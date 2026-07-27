@@ -1,5 +1,5 @@
-{"commits":["0b49a3b77778e30c3fd03e9f7be9d280b802a3fc"],"user_facing":true,"description":"Fix watch: resolve short SHAs to full 40-char (`gh run list --commit` requires it)","type":"fix"}
-{"commits":["79d89dd2279e1ae384f532c786a326615f3e46a5"],"user_facing":true,"description":"Pre-release hook runs Python checks before npm (faster failure)","type":"feature"}
-{"commits":["ae8bc039ba9ac619cb33249339fa34f306389822"],"user_facing":true,"description":"Go CI template uses `go-version-file: go.mod` instead of hardcoded versions; adds `-race` flag","type":"feature"}
-{"commits":["32faf741e7e459f8ac56c149b6c1a3e8eb5e67fb"],"user_facing":true,"description":"Node.js 24 in all CI/publish templates (dropped Node 18 EOL)","type":"feature"}
-{"commits":["71e06e60c3b6f648d60e2ee820d824c750a55ed5","6abf10dd090edfa55d1d614d78ddc14039cbfcd9","24a9b8963884ef705a93605108bc636446754c0a"],"user_facing":false}
+{"format_version":1,"commits":["0b49a3b77778e30c3fd03e9f7be9d280b802a3fc"],"user_facing":true,"description":"Fix watch: resolve short SHAs to full 40-char (`gh run list --commit` requires it)","type":"fix"}
+{"format_version":1,"commits":["79d89dd2279e1ae384f532c786a326615f3e46a5"],"user_facing":true,"description":"Pre-release hook runs Python checks before npm (faster failure)","type":"feature"}
+{"format_version":1,"commits":["ae8bc039ba9ac619cb33249339fa34f306389822"],"user_facing":true,"description":"Go CI template uses `go-version-file: go.mod` instead of hardcoded versions; adds `-race` flag","type":"feature"}
+{"format_version":1,"commits":["32faf741e7e459f8ac56c149b6c1a3e8eb5e67fb"],"user_facing":true,"description":"Node.js 24 in all CI/publish templates (dropped Node 18 EOL)","type":"feature"}
+{"format_version":1,"commits":["71e06e60c3b6f648d60e2ee820d824c750a55ed5","6abf10dd090edfa55d1d614d78ddc14039cbfcd9","24a9b8963884ef705a93605108bc636446754c0a"],"user_facing":false}

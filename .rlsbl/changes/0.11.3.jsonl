@@ -1,3 +1,3 @@
-{"commits":["5383915ac80d1f626cd8211a87f04ecd70ad078f","8f1bb3f3877154e23d06be50e0af0546ad133bb5"],"user_facing":true,"description":"**`--include`/`--exclude` release flags.** Control which targets run during release. Replaces `--skip-docs`.","type":"feature"}
-{"commits":["af41c0564bec8050b5de7ced2b5a65534507cdf9"],"user_facing":true,"description":"**`release_targets` config.** Declare baseline targets in `.rlsbl/config.json` to avoid auto-detect surprises.","type":"feature"}
-{"commits":["07ccadf0d71aca93f6ea8d20812772ef9ea42156","ccb89e9450656e67a68ad31f94f996a9990068a2"],"user_facing":false}
+{"format_version":1,"commits":["5383915ac80d1f626cd8211a87f04ecd70ad078f","8f1bb3f3877154e23d06be50e0af0546ad133bb5"],"user_facing":true,"description":"**`--include`/`--exclude` release flags.** Control which targets run during release. Replaces `--skip-docs`.","type":"feature"}
+{"format_version":1,"commits":["af41c0564bec8050b5de7ced2b5a65534507cdf9"],"user_facing":true,"description":"**`release_targets` config.** Declare baseline targets in `.rlsbl/config.json` to avoid auto-detect surprises.","type":"feature"}
+{"format_version":1,"commits":["07ccadf0d71aca93f6ea8d20812772ef9ea42156","ccb89e9450656e67a68ad31f94f996a9990068a2"],"user_facing":false}

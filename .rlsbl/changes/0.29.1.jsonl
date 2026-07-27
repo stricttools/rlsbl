@@ -1,3 +1,3 @@
-{"commits":["4d28cdfb03556268beb1c8a9d099f2ab1869020c"],"user_facing":true,"description":"**Fix.** Release no longer aborts when the `.validated` changelog cache is updated during validation.","type":"fix"}
-{"commits":["35ad95eb5fb94e1eeaf6a53a87f17c2ba6326cfe","9993f1f592f5180f5b56524e974f585f2216337b","6ebeb312c03be3642e150316c85c90c6005ef958"],"user_facing":false}
-{"commits":["48bc529053a6d8e8595e41b94c0889ed181bc5af"],"user_facing":false}
+{"format_version":1,"commits":["4d28cdfb03556268beb1c8a9d099f2ab1869020c"],"user_facing":true,"description":"**Fix.** Release no longer aborts when the `.validated` changelog cache is updated during validation.","type":"fix"}
+{"format_version":1,"commits":["35ad95eb5fb94e1eeaf6a53a87f17c2ba6326cfe","9993f1f592f5180f5b56524e974f585f2216337b","6ebeb312c03be3642e150316c85c90c6005ef958"],"user_facing":false}
+{"format_version":1,"commits":["48bc529053a6d8e8595e41b94c0889ed181bc5af"],"user_facing":false}

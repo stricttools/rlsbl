@@ -1,6 +1,6 @@
-{"commits":["72a1bfadeb741cde2ae047b1e8273803735b5772"],"user_facing":true,"description":"Go adapter uses VERSION file as version source (not git tags)","type":"feature"}
-{"commits":["b60e634630a5a43b2710943dd30e921a814e5970","0551fd769d155cca97a70bd52f73b90136ccf662"],"user_facing":true,"description":"First release bootstraps from VERSION without bumping","type":"feature"}
-{"commits":["fc30ee43f5c2619fa511b6b324a8b54e495d8f22"],"user_facing":true,"description":"Pre-release.sh template auto-detects Go/npm/Python and runs appropriate checks","type":"feature"}
-{"commits":["86f720ff738e99a963935370012a3b5a4894b81e"],"user_facing":true,"description":"Pre-push hook template supports Go VERSION file","type":"feature"}
-{"commits":["4ae7632dc889215c2ccb584ad2b560fd3bd69013"],"user_facing":true,"description":"GoReleaser NEXT_STEPS clarified (CI handles it, no local install needed)","type":"feature"}
-{"commits":["567cb7ba4a114be300410837b71547520ed78185","e491c73708dee999d67e16afc53bdf75906aa4c0","bd889371756c0cd91b8483d23177854efb117e67","94ac9a92d40e03119b3edd52bd0ab4d5c4780c47","423542c42a46f9a11a27b3cef1d3246126fa56e2"],"user_facing":false}
+{"format_version":1,"commits":["72a1bfadeb741cde2ae047b1e8273803735b5772"],"user_facing":true,"description":"Go adapter uses VERSION file as version source (not git tags)","type":"feature"}
+{"format_version":1,"commits":["b60e634630a5a43b2710943dd30e921a814e5970","0551fd769d155cca97a70bd52f73b90136ccf662"],"user_facing":true,"description":"First release bootstraps from VERSION without bumping","type":"feature"}
+{"format_version":1,"commits":["fc30ee43f5c2619fa511b6b324a8b54e495d8f22"],"user_facing":true,"description":"Pre-release.sh template auto-detects Go/npm/Python and runs appropriate checks","type":"feature"}
+{"format_version":1,"commits":["86f720ff738e99a963935370012a3b5a4894b81e"],"user_facing":true,"description":"Pre-push hook template supports Go VERSION file","type":"feature"}
+{"format_version":1,"commits":["4ae7632dc889215c2ccb584ad2b560fd3bd69013"],"user_facing":true,"description":"GoReleaser NEXT_STEPS clarified (CI handles it, no local install needed)","type":"feature"}
+{"format_version":1,"commits":["567cb7ba4a114be300410837b71547520ed78185","e491c73708dee999d67e16afc53bdf75906aa4c0","bd889371756c0cd91b8483d23177854efb117e67","94ac9a92d40e03119b3edd52bd0ab4d5c4780c47","423542c42a46f9a11a27b3cef1d3246126fa56e2"],"user_facing":false}

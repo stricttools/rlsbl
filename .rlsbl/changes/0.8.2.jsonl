@@ -1,6 +1,6 @@
-{"commits":["e95f7e47ca2a0ab3f1f2e569f88a8aea89ceed0b"],"user_facing":true,"description":"Handle KeyboardInterrupt in watch command (clean exit, no stack trace)","type":"feature"}
-{"commits":["02a78d9ff02a19dca7dec3f08125a500e48bb8ed"],"user_facing":true,"description":"Escape AppleScript strings in watch notifications (prevents injection via git tags)","type":"feature"}
-{"commits":["5aa831541e46454ca3f72a42e7a37c624ab6d21f"],"user_facing":true,"description":"Clear error when `--registry` is missing a value","type":"feature"}
-{"commits":["333109f06e9fe5977e3e58e6619a74785f040739"],"user_facing":true,"description":"Resolve project config path at call time (not module import time)","type":"feature"}
-{"commits":["077124d4b1f7005541bcb82d45c34375bac8f727"],"user_facing":true,"description":"Add `--width`, `--height`, `--font-size`, `--duration` flags to record-gif","type":"feature"}
-{"commits":["7515099c12f44c94b94e855f6b29bcced6481b83","66b950b29257d5ec002d380c71430cfe28fe3fa6","ca09bb9dc28a5843f8bfd4fafdc6f9b07bd9fe8f","b7abd897625418dd5afbef1f16dfe6cdd6ca4394","611ed569fbd256ba1a6db9606eb637ab72d026fb"],"user_facing":false}
+{"format_version":1,"commits":["e95f7e47ca2a0ab3f1f2e569f88a8aea89ceed0b"],"user_facing":true,"description":"Handle KeyboardInterrupt in watch command (clean exit, no stack trace)","type":"feature"}
+{"format_version":1,"commits":["02a78d9ff02a19dca7dec3f08125a500e48bb8ed"],"user_facing":true,"description":"Escape AppleScript strings in watch notifications (prevents injection via git tags)","type":"feature"}
+{"format_version":1,"commits":["5aa831541e46454ca3f72a42e7a37c624ab6d21f"],"user_facing":true,"description":"Clear error when `--registry` is missing a value","type":"feature"}
+{"format_version":1,"commits":["333109f06e9fe5977e3e58e6619a74785f040739"],"user_facing":true,"description":"Resolve project config path at call time (not module import time)","type":"feature"}
+{"format_version":1,"commits":["077124d4b1f7005541bcb82d45c34375bac8f727"],"user_facing":true,"description":"Add `--width`, `--height`, `--font-size`, `--duration` flags to record-gif","type":"feature"}
+{"format_version":1,"commits":["7515099c12f44c94b94e855f6b29bcced6481b83","66b950b29257d5ec002d380c71430cfe28fe3fa6","ca09bb9dc28a5843f8bfd4fafdc6f9b07bd9fe8f","b7abd897625418dd5afbef1f16dfe6cdd6ca4394","611ed569fbd256ba1a6db9606eb637ab72d026fb"],"user_facing":false}

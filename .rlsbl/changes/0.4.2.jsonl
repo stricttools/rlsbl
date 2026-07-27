@@ -1,4 +1,4 @@
-{"commits":["e0c92a7751e71657343458d32c96311bf90a5204","84577a5066ef059393ae9b6ee589e0b952bc6a7e"],"user_facing":true,"description":"Configurable push timeout via `RLSBL_PUSH_TIMEOUT` env var (default 120s), fixing timeouts on repos with slow pre-push hooks","type":"feature"}
-{"commits":["dbfceffa1d976a11c04a25047fa122770c4a1d8d"],"user_facing":true,"description":"Fix own pre-push hook missing VERSION file detection for Go projects","type":"fix"}
-{"commits":["ae2b0bdcfca7c2bf812cfc530b6841d18bf5b7fa"],"user_facing":true,"description":"Print a note when `RLSBL_PUSH_TIMEOUT` overrides the default","type":"feature"}
-{"commits":["83af7ae086c70ae4141aac513e3726031666361d","4a62a7f40571b49c904f00cd4f22742ddc926202","694746d5dc18988f94e10bf63e4f61aeab700e79"],"user_facing":false}
+{"format_version":1,"commits":["e0c92a7751e71657343458d32c96311bf90a5204","84577a5066ef059393ae9b6ee589e0b952bc6a7e"],"user_facing":true,"description":"Configurable push timeout via `RLSBL_PUSH_TIMEOUT` env var (default 120s), fixing timeouts on repos with slow pre-push hooks","type":"feature"}
+{"format_version":1,"commits":["dbfceffa1d976a11c04a25047fa122770c4a1d8d"],"user_facing":true,"description":"Fix own pre-push hook missing VERSION file detection for Go projects","type":"fix"}
+{"format_version":1,"commits":["ae2b0bdcfca7c2bf812cfc530b6841d18bf5b7fa"],"user_facing":true,"description":"Print a note when `RLSBL_PUSH_TIMEOUT` overrides the default","type":"feature"}
+{"format_version":1,"commits":["83af7ae086c70ae4141aac513e3726031666361d","4a62a7f40571b49c904f00cd4f22742ddc926202","694746d5dc18988f94e10bf63e4f61aeab700e79"],"user_facing":false}

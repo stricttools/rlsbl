@@ -1,8 +1,8 @@
-{"commits":["46f0f4b"],"user_facing":true,"description":"**`rlsbl yank` command.** Deprecate or delete past releases. Soft yank (`rlsbl yank v1.2.3`) marks the GitHub Release as a pre-release with a deprecation notice. Hard yank (`rlsbl yank v1.2.3 --hard`) deletes the GitHub Release and its git tag entirely.","type":"feature"}
-{"commits":["9a112c6"],"user_facing":true,"description":"**PyPI release bumps `__version__`.** Python source files containing `__version__` are now updated alongside `pyproject.toml` during release, keeping runtime version introspection in sync.","type":"feature"}
-{"commits":["f6603d0"],"user_facing":true,"description":"**Strict type validation for JSONL entries.** Changelog entries with `user_facing: true` now require `type` to be one of `feature`, `fix`, or `breaking`. Unrecognized types are rejected during validation and `changelog add`.","type":"feature"}
-{"commits":["8c55c99"],"user_facing":true,"description":"**Fix: scaffold stays in sub-project directory.** In monorepos, `rlsbl scaffold` no longer walks up to the repo root when project files already exist in the current directory. Previously this caused scaffold to operate on the wrong project.","type":"fix"}
-{"commits":["574c737","a8c9d61","c082c85"],"user_facing":false}
-{"commits":["9dda99e","2d2d538"],"user_facing":false}
-{"commits":["62f1f88","5f98233","baad933"],"user_facing":false}
-{"commits":["adf4d36"],"user_facing":false}
+{"format_version":1,"commits":["46f0f4b"],"user_facing":true,"description":"**`rlsbl yank` command.** Deprecate or delete past releases. Soft yank (`rlsbl yank v1.2.3`) marks the GitHub Release as a pre-release with a deprecation notice. Hard yank (`rlsbl yank v1.2.3 --hard`) deletes the GitHub Release and its git tag entirely.","type":"feature"}
+{"format_version":1,"commits":["9a112c6"],"user_facing":true,"description":"**PyPI release bumps `__version__`.** Python source files containing `__version__` are now updated alongside `pyproject.toml` during release, keeping runtime version introspection in sync.","type":"feature"}
+{"format_version":1,"commits":["f6603d0"],"user_facing":true,"description":"**Strict type validation for JSONL entries.** Changelog entries with `user_facing: true` now require `type` to be one of `feature`, `fix`, or `breaking`. Unrecognized types are rejected during validation and `changelog add`.","type":"feature"}
+{"format_version":1,"commits":["8c55c99"],"user_facing":true,"description":"**Fix: scaffold stays in sub-project directory.** In monorepos, `rlsbl scaffold` no longer walks up to the repo root when project files already exist in the current directory. Previously this caused scaffold to operate on the wrong project.","type":"fix"}
+{"format_version":1,"commits":["574c737","a8c9d61","c082c85"],"user_facing":false}
+{"format_version":1,"commits":["9dda99e","2d2d538"],"user_facing":false}
+{"format_version":1,"commits":["62f1f88","5f98233","baad933"],"user_facing":false}
+{"format_version":1,"commits":["adf4d36"],"user_facing":false}
