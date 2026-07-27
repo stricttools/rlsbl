@@ -264,12 +264,18 @@ def list_versioned_files(changes_dir: str) -> list[tuple[str, str]]:
     return [(ver, path) for _, ver, path in results]
 
 
-def read_unreleased(changes_dir: str) -> list[ChangelogEntry]:
-    """Read unreleased.jsonl and return entries. Empty list if file missing."""
+def read_unreleased(
+    changes_dir: str, *, enforce_format_version: bool = False
+) -> list[ChangelogEntry]:
+    """Read unreleased.jsonl and return entries. Empty list if file missing.
+
+    ``enforce_format_version`` is threaded to :func:`parse_jsonl`: when True, a
+    line lacking ``format_version`` is a hard error.
+    """
     path = os.path.join(changes_dir, "unreleased.jsonl")
     if not os.path.isfile(path):
         return []
-    return parse_jsonl(path)
+    return parse_jsonl(path, enforce_format_version=enforce_format_version)
 
 
 def append_entry(changes_dir: str, entry: ChangelogEntry) -> None:
@@ -591,6 +597,37 @@ def load_filter_repo_commit_map(path: str) -> "tuple[dict[str, str], list[str]]"
 # ---------------------------------------------------------------------------
 
 _VALID_COVERAGE_UNITS = ("commit", "changeset-file")
+
+# Config key that flips a repo from legacy (mixed-format tolerant) to enforced
+# (every changelog line must carry format_version). There is NO enforced default
+# value: absence is legacy AND is itself reported by a warn-level check, so the
+# transition is visible, never silent. A repo sets this to true after running
+# scripts/stamp_changelog_format_version.py over its changes dir(s).
+CHANGELOG_FORMAT_VERSION_ENFORCED_KEY = "changelog_format_version_enforced"
+
+
+def read_changelog_format_version_enforced(config: dict) -> "tuple[bool, bool]":
+    """Read the ``changelog_format_version_enforced`` flag from a config dict.
+
+    Returns ``(enforced, key_present)``:
+
+    - key ABSENT -> ``(False, False)``: legacy mode. There is no enforced
+      default; the absence is surfaced by the ``changelog-format-version`` warn
+      check ("enforcement not yet enabled").
+    - key present and boolean -> ``(value, True)``.
+
+    A present-but-non-boolean value is a hard error (:class:`ConfigError`) --
+    invalid config is never silently coerced.
+    """
+    if CHANGELOG_FORMAT_VERSION_ENFORCED_KEY not in config:
+        return (False, False)
+    value = config[CHANGELOG_FORMAT_VERSION_ENFORCED_KEY]
+    if not isinstance(value, bool):
+        raise ConfigError(
+            f"{CHANGELOG_FORMAT_VERSION_ENFORCED_KEY} in .rlsbl/config.json must "
+            f"be a boolean, got {value!r} (type {type(value).__name__})."
+        )
+    return (value, True)
 
 
 def read_coverage_unit(config: dict) -> str:

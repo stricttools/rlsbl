@@ -7,12 +7,91 @@ changelog-user-facing, changelog-batch-commits, changelog-batch-entries.
 
 import os
 
-from ..changelog.files import read_coverage_unit
+from ..changelog.files import (
+    read_changelog_format_version_enforced,
+    read_coverage_unit,
+)
 from ._common import _resolve_version_and_tag, _get_all_changelog_contexts
+
+
+def _changes_dirs_for_ctx(ctx):
+    """Return the changes-dir(s) whose *.jsonl files this ctx owns.
+
+    Derived from the same context resolution the other changelog checks use, so
+    the format_version gate covers exactly the files that are validated. Returns
+    an empty list when there is no changes dir.
+    """
+    return [changes_dir for changes_dir, _tag, _proj, _entries in _get_all_changelog_contexts(ctx)]
 
 
 def register_changelog_checks(app):
     """Register changelog-tag checks on *app*."""
+
+    @app.warn_check("changelog-format-version")
+    def check_changelog_format_version(ctx, reporter):
+        """Nudge repos that have not yet enabled the format_version gate.
+
+        The transition from legacy (mixed-format-tolerant) reading to enforced
+        reading is opt-in per repo via ``changelog_format_version_enforced`` in
+        .rlsbl/config.json. Absence is legacy mode -- accepted, but surfaced here
+        as visible pressure (never a silent default). The actual gate is enforced
+        by the ``changelog-format-version-gate`` error check once enabled.
+        """
+        _enforced, present = read_changelog_format_version_enforced(ctx.config)
+        if present:
+            return reporter.passed("format_version enforcement decision recorded")
+        msg = (
+            "changelog format_version enforcement not yet enabled. Run "
+            "scripts/stamp_changelog_format_version.py over the changes dir, "
+            'then set "changelog_format_version_enforced": true in '
+            ".rlsbl/config.json."
+        )
+        reporter.warn(msg)
+        return reporter.found(msg)
+
+    @app.error_check("changelog-format-version-gate")
+    def check_changelog_format_version_gate(ctx, reporter):
+        """When enforcement is on, every changelog line must carry format_version.
+
+        Scans unreleased.jsonl and every finalized x.y.z.jsonl in the changes
+        dir(s), routing each line through the strictspec per-line gate. A line
+        lacking (or carrying an unsupported) ``format_version`` is a hard error
+        directing the operator to the one-time stamping script. Skipped entirely
+        when enforcement is off (absent or ``false``) -- legacy mode tolerates
+        unstamped lines.
+        """
+        import os
+
+        from ..changelog.files import list_versioned_files
+        from ..changelog.schema import parse_jsonl
+        from ..errors import ChangelogError
+
+        enforced, _present = read_changelog_format_version_enforced(ctx.config)
+        if not enforced:
+            return reporter.skipped("format_version enforcement disabled")
+
+        dirs = _changes_dirs_for_ctx(ctx)
+        if not dirs:
+            return reporter.skipped("no .rlsbl/changes/ directory")
+
+        details = []
+        for changes_dir in dirs:
+            files = []
+            unreleased = os.path.join(changes_dir, "unreleased.jsonl")
+            if os.path.isfile(unreleased):
+                files.append(unreleased)
+            files.extend(path for _v, path in list_versioned_files(changes_dir))
+            for filepath in files:
+                try:
+                    parse_jsonl(filepath, enforce_format_version=True)
+                except ChangelogError as exc:
+                    details.append(f"{filepath}: {exc}")
+
+        if not details:
+            return reporter.passed("all changelog lines carry format_version")
+        for detail in details:
+            reporter.error(detail)
+        return reporter.found(f"{len(details)} changelog file(s) failed the format_version gate")
 
     @app.error_check("changelog-entry")
     def check_changelog_entry(ctx, reporter):

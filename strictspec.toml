@@ -27,3 +27,19 @@ path = ".strictspec/adjudication.schema.toml"
   lang    = "python"
   output  = "rlsbl/strictspec_gen/adjudication_validator.py"
   package = "rlsbl.strictspec_gen"
+
+[[schemas]]
+path = ".strictspec/changelog-entry-commit-mode.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "python"
+  output  = "rlsbl/strictspec_gen/changelog_entry_commit_validator.py"
+  package = "rlsbl.strictspec_gen"
+
+[[schemas]]
+path = ".strictspec/changelog-entry-changeset-file-mode.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "python"
+  output  = "rlsbl/strictspec_gen/changelog_entry_changeset_file_validator.py"
+  package = "rlsbl.strictspec_gen"

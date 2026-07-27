@@ -188,6 +188,25 @@ pure = false
 needs_network = false
 depends_on = []
 
+# A pure nudge (not in preflight-changelog): the absent-key warning is visible
+# pressure under `rlsbl check`, never a release blocker. The actual enforcement
+# is the error-severity changelog-format-version-gate, which IS in preflight.
+[checks.changelog-format-version]
+tags = ["changelog"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-format-version-gate]
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 # ---------------------------------------------------------------------------
 # Workspace checks (from doctor.py ad-hoc + monorepo lint)
 # ---------------------------------------------------------------------------
