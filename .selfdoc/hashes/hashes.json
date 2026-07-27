@@ -120,8 +120,8 @@
     "schema_hash": "f8bf9ba425f6c5fc5c87e49de0e6aec4cf84b3d3e31382d3c3c1fce78c511e57"
   },
   "en/configuration.md": {
-    "content": "bf950d8f60b28016eeb41366e820f139b58906d4b0c4f3758000c6ab725ecac0",
-    "description": "2ea096312c2a92d240fe0c16162f135cbd466c7ab18ea3686d58df6fef6d1fc5",
+    "content": "f57f3250c30b9f08d5387b8ef6d3601e508b6b30b02a5391fa960840fb69289f",
+    "description": "98d381a414c9c8f0504465c99da66aa04e3957a764959a68c181a4eb8dd70e47",
     "source_docstring": "2f48ecdf7f2d481b41a9ab57a44f19e50288df0eadfd022d57a26bef4c4915d3"
   },
   "en/dep-validation.md": {
@@ -257,6 +257,11 @@
     "content": "b2f78b429c9b19ab4a1a632fb12ec9966fc39ae840f5771cd1d69ad214d53728",
     "description": "55b67909591b9ad61346d8f4901713fd56239f14c7a1d09a8e0f8d03ba0bed96",
     "source_docstring": "f83bfb04eb42a782ee9fcc7c50c066f59b39fc7e24e888512630f00fd6fac725"
+  },
+  "en/rlsbl-checks-strictspec_gate.md": {
+    "content": "dd9ec3cafeed8bc2af2643a959e29121b69de90296d1b28d4b53c6bb1da97cca",
+    "description": "53a37d0bcd92dbb4678aa4ab39c2aa9b4d07fd9bd44858e8a3721f2b40997e54",
+    "seed_hash": "53a37d0bcd92dbb4678aa4ab39c2aa9b4d07fd9bd44858e8a3721f2b40997e54"
   },
   "en/rlsbl-checks-workspace.md": {
     "content": "efc2427d93b54ad89e5e727a15ac054037d28fc65f09ed3238b9c107eed39dcd",
@@ -787,6 +792,26 @@
     "content": "39d8ebe2d0b0933e996b06dfaf8a36a47f2ecc9fcd85cf3e8d2dbba735d9e5ea",
     "description": "88a63e5447b718acc27b9f03247bc3ca398e81e8335c4c7d1048793ab1af0217",
     "source_docstring": "a206d7777f34dda698d3adf37e59bf0a107ed9bd8f014d14431c61651c5d5e16"
+  },
+  "en/rlsbl-strictspec_gate.md": {
+    "content": "f2ded113e882c07b9575bcb4161ff5583572f203bd6f66760c08cd1f2a6c9f2c",
+    "description": "9c497f6a9abb4bfe44f4adde36a85e2698e8cedb8acc92e5fe93a57de32ff12a",
+    "seed_hash": "9c497f6a9abb4bfe44f4adde36a85e2698e8cedb8acc92e5fe93a57de32ff12a"
+  },
+  "en/rlsbl-strictspec_gen-adjudication_validator.md": {
+    "content": "835c81eb9394c2ae790137354a12f5596a1c062386963bc762ce91be941d5a58",
+    "description": "df1bfb7b8535d01690952ecec8da7b37ea9f6138553ff52f57f4fb6716dc25b3",
+    "seed_hash": "df1bfb7b8535d01690952ecec8da7b37ea9f6138553ff52f57f4fb6716dc25b3"
+  },
+  "en/rlsbl-strictspec_gen-config_validator.md": {
+    "content": "0f109a8d8131750db7f1956944af7de316a0b621f7a587b8c823d1665c17ee7d",
+    "description": "b3acf2c2d9699a70cffb4d738fad9920a887f62ad9c3995674f8fb63d2594a81",
+    "seed_hash": "b3acf2c2d9699a70cffb4d738fad9920a887f62ad9c3995674f8fb63d2594a81"
+  },
+  "en/rlsbl-strictspec_gen-release_file_validator.md": {
+    "content": "9538184553cc04e0dd6101aa1dc8e0bddde8aba32967745ba9948e97c5492c75",
+    "description": "686ce84def86e6e2c6c90321c43a7d0a830063414b1df3a08014ac42284330f7",
+    "seed_hash": "686ce84def86e6e2c6c90321c43a7d0a830063414b1df3a08014ac42284330f7"
   },
   "en/rlsbl-tag_glob.md": {
     "content": "8972b90adb08eeb7f33baccb12870213c7734c43f8611ba6dbb0fb1af28c6903",
