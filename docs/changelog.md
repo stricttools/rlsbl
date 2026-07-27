@@ -34,21 +34,52 @@ This system provides:
 
 ## Entry schema
 
-Each line in a JSONL file is a self-contained JSON object with 2-4 fields depending on whether the change is user-facing. User-facing entries require a description and type for generated output; non-user-facing entries need only commit hashes and the boolean flag:
+Each line in a JSONL file is a self-contained JSON object. Every line rlsbl writes carries a leading `format_version` (the per-line gate) plus 2-4 content fields depending on whether the change is user-facing. User-facing entries require a description and type for generated output; non-user-facing entries need only commit hashes and the boolean flag:
 
 ```jsonl
-{"commits":["a1b2c3d"],"user_facing":true,"description":"**New feature.** What it does for users.","type":"feature"}
-{"commits":["e4f5g6h","i7j8k9l"],"user_facing":false}
+{"format_version":1,"commits":["a1b2c3d"],"user_facing":true,"description":"**New feature.** What it does for users.","type":"feature"}
+{"format_version":1,"commits":["e4f5g6h","i7j8k9l"],"user_facing":false}
 ```
 
 | Field | Required | Type | Description |
 | --- | --- | --- | --- |
+| `format_version` | Always | integer | Per-line format gate (currently `1`). Validated by strictspec; stamped automatically on write. |
 | `commits` | Always | array of strings | Commit hashes (any prefix length — resolved to full SHA at validation) |
 | `user_facing` | Always | boolean | Whether this change affects users |
 | `description` | If user_facing | string | One-line description, supports markdown (bold, backticks) |
 | `type` | If user_facing | string | One of: `feature`, `fix`, `breaking` |
 
-Non-user-facing entries need only `commits` and `user_facing: false`. They exist solely for commit coverage and are excluded from generated output.
+Non-user-facing entries need only `format_version`, `commits`, and `user_facing: false`. They exist solely for commit coverage and are excluded from generated output.
+
+## The format_version gate
+
+The document shape of one JSONL line — the per-line `format_version` gate plus the field/enum/conditional-required shape — is validated by the **strictspec-generated validators** (`rlsbl/strictspec_gen/changelog_entry_commit_validator.py` and `changelog_entry_changeset_file_validator.py`, one per `coverage_unit` mode). strictspec is the single document authority for shape; rlsbl keeps only what strictspec cannot see native (hash resolution, tag ranges, coverage vs git, batch limits, cross-file rules).
+
+Reading is **explicit two-mode**, never a silent fallback:
+
+- A line **carrying** `format_version` is validated via strictspec. A missing gate is fine only in legacy mode; a *wrong* or unsupported `format_version` is always a hard error.
+- A line **lacking** `format_version` is a **legacy** line. It is accepted only when the reader is in legacy mode. The mode is chosen explicitly per repo by the `changelog_format_version_enforced` config key.
+
+### Transition (`changelog_format_version_enforced`)
+
+Historical finalized `x.y.z.jsonl` files and in-flight `unreleased.jsonl` lines predate the gate and carry no `format_version`. The rollout is one repo at a time:
+
+| `changelog_format_version_enforced` | Reading | Checks |
+| --- | --- | --- |
+| key absent | legacy (unstamped lines tolerated) | `changelog-format-version` **warns**: "enforcement not yet enabled" |
+| `true` | enforced (every line must carry `format_version`) | `changelog-format-version-gate` **errors** on any unstamped/wrong-version line |
+| `false` | legacy (explicit opt-out) | no warning; gate check skipped |
+
+There is **no enforced default**: absence is legacy *and* is surfaced as visible pressure by the warn check — never silent. To enable enforcement for a repo:
+
+```bash
+# 1. Stamp every existing JSONL line (one-time bootstrap).
+scripts/stamp_changelog_format_version.py .rlsbl/changes
+# 2. Flip the key.
+#    "changelog_format_version_enforced": true   in .rlsbl/config.json
+```
+
+The stamper is **stamp-only**: it inserts `"format_version":1` after the opening `{` of each line and preserves every other byte, so CHANGELOG.md regeneration is byte-identical before and after (generation ignores `format_version`). It unlocks read-only (444) finalized files, rewrites them, and re-locks them, and it **refuses** any file that already has a stamped line (running twice is an error, never a silent re-stamp). Pass `--dry-run` to preview. This is a breaking change for a repo only in the sense that, once the key is `true`, an unstamped line hard-fails the gate — the remediation is always "run the stamping script".
 
 ### Multiplicity rules
 
@@ -85,7 +116,7 @@ The command:
 
 ## Validation
 
-`rlsbl check --tag changelog` runs 10 checks covering hash resolution, commit coverage, schema conformance, and batch size limits. All 10 must pass before a release proceeds. Failed checks produce specific error messages identifying the exact entry or commit that caused the failure:
+`rlsbl check --tag changelog` runs 12 checks covering hash resolution, commit coverage, schema conformance, batch size limits, and the per-line `format_version` gate. All error-severity checks must pass before a release proceeds. Failed checks produce specific error messages identifying the exact entry or commit that caused the failure:
 
 | # | Check | What it verifies |
 | --- | --- | --- |
@@ -99,6 +130,8 @@ The command:
 | 8 | Batch size (entries) | No single commit may appear in more entries than `max_entries_per_commit` (default 5) |
 | 9 | Version consistency | Project version matches across all target files |
 | 10 | Changelog entry | CHANGELOG.md contains an entry for the current version |
+| 11 | format_version (warn) | `changelog-format-version`: warns while `changelog_format_version_enforced` is absent (enforcement not yet enabled) |
+| 12 | format_version gate | `changelog-format-version-gate`: once enforcement is on, every JSONL line must carry a valid `format_version` |
 
 Batch limits are configurable in `.rlsbl/config.json` under the `batch_limits` key:
 

@@ -197,7 +197,8 @@ class TestSerializeEntry:
         line = serialize_entry(entry)
         assert "\n" not in line
         data = json.loads(line)
-        assert data == {"commits": ["abc"], "user_facing": False}
+        # Every serialized line carries the per-line format_version gate.
+        assert data == {"format_version": 1, "commits": ["abc"], "user_facing": False}
 
     def test_full(self):
         entry = ChangelogEntry(
@@ -209,6 +210,7 @@ class TestSerializeEntry:
         line = serialize_entry(entry)
         data = json.loads(line)
         assert data == {
+            "format_version": 1,
             "commits": ["abc", "def"],
             "user_facing": True,
             "description": "Fixed it",
