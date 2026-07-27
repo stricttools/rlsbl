@@ -63,6 +63,7 @@ class TestLauncherConfigValidation:
             "artifact": "launcher",
             "wraps": "go",
             "binary_source": "github-release",
+            "download": "postinstall",
         }
         npm_entry.update(overrides)
         return {
@@ -156,6 +157,7 @@ class TestLauncherConfigValidation:
                     "artifact": "launcher",
                     "wraps": "go",
                     "binary_source": "github-release",
+                    "download": "first-run",
                 },
             },
         }
@@ -186,6 +188,7 @@ class TestLauncherTemplateMappings:
                 "artifact": "launcher",
                 "wraps": "go",
                 "binary_source": "github-release",
+                "download": "postinstall",
             },
         )
         pipeline.target = "npm"
@@ -207,6 +210,7 @@ class TestLauncherTemplateMappings:
                 "artifact": "launcher",
                 "wraps": "go",
                 "binary_source": "github-release",
+                "download": "first-run",
             },
         )
         pipeline.target = "pypi"
@@ -357,6 +361,7 @@ class TestLauncherNeedsChain:
                 "wraps": "go",
                 "binary_source": "github-release",
                 "provenance": True,
+                "download": "postinstall",
             },
         )
         npm.target = "npm"
@@ -427,6 +432,7 @@ class TestResolvePublishTemplateLauncher:
                 "artifact": "launcher",
                 "wraps": "go",
                 "binary_source": "github-release",
+                "download": "postinstall",
             },
         )
         pipeline.target = "npm"
@@ -445,6 +451,7 @@ class TestResolvePublishTemplateLauncher:
                 "artifact": "launcher",
                 "wraps": "go",
                 "binary_source": "github-release",
+                "download": "first-run",
             },
         )
         pipeline.target = "pypi"

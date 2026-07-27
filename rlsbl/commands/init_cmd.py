@@ -1990,15 +1990,24 @@ def _ensure_launcher_manifest(pipeline, subdir, shim_vars, *, dry_run=False):
         sys.exit(1)
 
     if pipeline.pipeline_type == "npm":
+        download = pipeline.config.get("download")
         return _fill_npm_launcher_manifest(
-            manifest_path, shim_vars, dry_run=dry_run
+            manifest_path, shim_vars, download, dry_run=dry_run
         )
     return _fill_pypi_launcher_manifest(
         manifest_path, shim_vars, dry_run=dry_run
     )
 
 
-def _fill_npm_launcher_manifest(manifest_path, shim_vars, *, dry_run=False):
+def _fill_npm_launcher_manifest(manifest_path, shim_vars, download, *, dry_run=False):
+    """Fill the npm launcher manifest for the given download mode.
+
+    Both modes map the command to ``bin/launcher.cjs``. Only the
+    ``postinstall`` mode adds a ``scripts.postinstall`` entry and ships the
+    ``scripts``/``vendor`` directories. ``first-run`` performs zero network
+    I/O at install time, so it emits NO postinstall script and ships only
+    ``bin`` (the binary is cached outside the package on first invocation).
+    """
     with open(manifest_path, "r", encoding="utf-8") as f:
         pkg = json.load(f)
 
@@ -2007,16 +2016,21 @@ def _fill_npm_launcher_manifest(manifest_path, shim_vars, *, dry_run=False):
     if "bin" not in pkg:
         pkg["bin"] = {binary_name: "bin/launcher.cjs"}
         changed = True
-    scripts = pkg.get("scripts")
-    if not isinstance(scripts, dict):
-        scripts = {}
-        pkg["scripts"] = scripts
-    if "postinstall" not in scripts:
-        scripts["postinstall"] = "node scripts/postinstall.cjs"
-        changed = True
-    if "files" not in pkg:
-        pkg["files"] = ["bin", "scripts", "vendor"]
-        changed = True
+    if download == "postinstall":
+        scripts = pkg.get("scripts")
+        if not isinstance(scripts, dict):
+            scripts = {}
+            pkg["scripts"] = scripts
+        if "postinstall" not in scripts:
+            scripts["postinstall"] = "node scripts/postinstall.cjs"
+            changed = True
+        if "files" not in pkg:
+            pkg["files"] = ["bin", "scripts", "vendor"]
+            changed = True
+    else:
+        if "files" not in pkg:
+            pkg["files"] = ["bin"]
+            changed = True
 
     if changed and not dry_run:
         with open(manifest_path, "w", encoding="utf-8") as f:

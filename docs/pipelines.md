@@ -312,9 +312,10 @@ The `artifact: "launcher"` pipeline kind produces a wrapper package that downloa
   "pipelines": {
     "go":   {"type": "go",   "local": false, "target": "go",   "artifact": "binary"},
     "npm":  {"type": "npm",  "local": false, "target": "npm",  "artifact": "launcher",
-             "wraps": "go", "binary_source": "github-release", "provenance": true},
+             "wraps": "go", "binary_source": "github-release", "download": "postinstall",
+             "provenance": true},
     "pypi": {"type": "pypi", "local": false, "target": "pypi", "artifact": "launcher",
-             "wraps": "go", "binary_source": "github-release"}
+             "wraps": "go", "binary_source": "github-release", "download": "first-run"}
   }
 }
 ```
@@ -326,13 +327,18 @@ The `artifact: "launcher"` pipeline kind produces a wrapper package that downloa
 | `artifact` | `"launcher"` | Selects the launcher publish template instead of the standard publish template |
 | `wraps` | string | Name of the pipeline that produces the binary. Must reference a pipeline with `artifact: "binary"`. |
 | `binary_source` | `"github-release"` | Where the launcher downloads binaries from. Only `"github-release"` is supported. |
+| `download` | `"first-run"` \| `"postinstall"` | **When** the binary is fetched. `"postinstall"` (npm only) downloads it at `npm install` time; `"first-run"` downloads it lazily on the first CLI invocation (zero network I/O at install). No default. |
 
-All three keys are mandatory when `artifact` is `"launcher"`. Missing or invalid values are hard errors at config validation and scaffold time.
+All four keys are mandatory when `artifact` is `"launcher"`. Missing or invalid values are hard errors at config validation and scaffold time. `download: "postinstall"` is an npm-only mechanism -- a non-npm launcher (e.g. PyPI, which has no install-time hook) with `download: "postinstall"` is a hard error and must use `"first-run"`.
 
-### Per-ecosystem binary_source semantics
+### `download` mode semantics
 
-- **npm (`github-release`):** The wrapper package ships a `postinstall` script (`scripts/postinstall.cjs`) that runs at `npm install` time. It maps `process.platform`/`process.arch` to goreleaser's OS/arch naming, downloads the matching release asset **and** the release's `checksums.txt`, SHA-256-verifies the asset against the matching `checksums.txt` line **before** installing it into the package's `vendor/` directory, and hard-fails on a checksum mismatch or a 404. A `bin/launcher.cjs` stub then execs the vendored binary, passing argv through. Node stdlib only -- zero runtime dependencies.
-- **PyPI (`github-release`):** pip has no `postinstall` hook, so the wrapper ships a console-script launcher module that downloads the binary on first invocation to a platform-specific cache directory (`~/.cache/<tool>/` on Linux, `~/Library/Caches/<tool>/` on macOS, `%LOCALAPPDATA%\<tool>\` on Windows), SHA-256-verifies it against the release's `checksums.txt`, then `os.exec`s it -- passing argv through. Subsequent invocations reuse the cached binary. Python stdlib only -- zero runtime dependencies.
+The `download` key selects **when** the wrapped binary is fetched. It is a deployment-shape decision with no default -- the operator must commit to it.
+
+- **`postinstall` (npm only):** The wrapper ships a `postinstall` script (`scripts/postinstall.cjs`) that runs at `npm install` time. It maps `process.platform`/`process.arch` to goreleaser's OS/arch naming, downloads the matching release asset **and** the release's `checksums.txt`, SHA-256-verifies the asset against the matching `checksums.txt` line **before** installing it into the package's `vendor/` directory, and hard-fails on a checksum mismatch or a 404. A `bin/launcher.cjs` stub then execs the vendored binary, passing argv through. Node stdlib only -- zero runtime dependencies.
+- **`first-run` (npm and PyPI):** `npm install` performs **zero network I/O** -- no `postinstall` script is emitted. The wrapper ships a single self-contained `bin/launcher.cjs` (npm) or console-script module (PyPI) that, on the **first CLI invocation**, resolves the exact package version, downloads the matching release asset **and** `checksums.txt`, SHA-256-verifies before caching, extracts the binary to a platform-specific cache directory (`~/.cache/<tool>/` on Linux, `~/Library/Caches/<tool>/` on macOS, `%LOCALAPPDATA%\<tool>\` on Windows), then execs it -- passing argv through. Subsequent invocations exec the cached binary directly (no network). This is the required mode for consumers whose package must not touch the network at install time (e.g. library-only installs). Stdlib only -- zero runtime dependencies.
+
+PyPI has no `postinstall` hook, so PyPI launchers always use `first-run`.
 
 Embedded platform wheels (building the binary into the wheel for each platform) are a different distribution model -- that is the per-platform binary-wrapper family, not the launcher. Launchers are download-at-install/run shims.
 
@@ -342,10 +348,11 @@ Scaffold never invents or writes the package name field in the launcher target's
 
 Around that pre-existing manifest, scaffold generates the shim code and fills **only the missing non-name fields, exactly once** -- never touching the name or any value the user already set, so a second scaffold is a byte-level no-op:
 
-- **npm:** `bin` (maps the command name to `bin/launcher.cjs`), `scripts.postinstall` (`node scripts/postinstall.cjs`), and `files` (so the shims ship in the tarball).
+- **npm (`download: "postinstall"`):** `bin` (maps the command name to `bin/launcher.cjs`), `scripts.postinstall` (`node scripts/postinstall.cjs`), and `files` (`["bin", "scripts", "vendor"]`, so the shims ship in the tarball).
+- **npm (`download: "first-run"`):** `bin` and `files` (`["bin"]`) only. **No** `scripts.postinstall` -- installing the package performs zero network I/O.
 - **PyPI:** the `[project.scripts]` console-script entry (mapping the command name to the launcher module's `main`).
 
-The `wrapper-producer` check additionally hard-errors if one of these required fields is later deleted from the manifest, naming the field -- a deletion would silently break the published wrapper.
+The `wrapper-producer` check additionally hard-errors if one of these required fields is later deleted from the manifest, naming the field -- a deletion would silently break the published wrapper. The required-field set is `download`-mode-aware: in `first-run` mode `scripts.postinstall` is not required (and not expected), only `bin` and `files`.
 
 ### Hard constraint: goreleaser default asset naming
 

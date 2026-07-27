@@ -28,14 +28,29 @@ class NpmPipeline(TokenPipeline):
             subdir = self._linked_target_subdir(ctx)
             def _anchor(rel):
                 return rel if subdir == "." else f"{subdir}/{rel}"
-            return [
+            mappings = [
                 {"template": "publish-launcher.yml.tpl",
                  "target": ".github/workflows/publish.yml"},
-                {"template": "shim-postinstall.cjs.tpl",
-                 "target": _anchor("scripts/postinstall.cjs")},
-                {"template": "shim-bin.cjs.tpl",
-                 "target": _anchor("bin/launcher.cjs")},
             ]
+            # The download mode selects which shim set is emitted. first-run
+            # ships a single self-contained bin stub that downloads +
+            # verifies + caches + execs on first invocation (no postinstall,
+            # so install does zero network I/O). postinstall ships the
+            # download-at-install script plus a thin exec stub.
+            download = self.config.get("download")
+            if download == "first-run":
+                mappings.append(
+                    {"template": "shim-firstrun.cjs.tpl",
+                     "target": _anchor("bin/launcher.cjs")}
+                )
+            else:
+                mappings.extend([
+                    {"template": "shim-postinstall.cjs.tpl",
+                     "target": _anchor("scripts/postinstall.cjs")},
+                    {"template": "shim-bin.cjs.tpl",
+                     "target": _anchor("bin/launcher.cjs")},
+                ])
+            return mappings
         # Detect package manager to select the right publish template
         pm = self._detect_package_manager(ctx)
         if pm == "pnpm":

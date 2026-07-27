@@ -23,7 +23,7 @@ from rlsbl.commands.init_cmd import run_cmd_multi
 from rlsbl.context import ProjectContext
 
 
-def _write_fixture(root: Path):
+def _write_fixture(root: Path, download="postinstall"):
     (root / "go.mod").write_text("module github.com/acme/mytool\n\ngo 1.23\n")
     (root / "main.go").write_text(
         "package main\n\nfunc main() {}\n"
@@ -47,7 +47,8 @@ def _write_fixture(root: Path):
                    "artifact": "binary"},
             "npm": {"type": "npm", "local": False, "target": "npm",
                     "artifact": "launcher", "wraps": "go",
-                    "binary_source": "github-release", "provenance": True},
+                    "binary_source": "github-release", "provenance": True,
+                    "download": download},
         },
     }
     (rlsbl_dir / "config.json").write_text(json.dumps(config, indent=2) + "\n")
@@ -106,4 +107,47 @@ class TestLauncherEndToEnd:
         assert (root / "package.json").read_bytes() == before
         # Shims still present after the orphan sweep.
         assert postinstall.exists()
+        assert binstub.exists()
+
+    def test_scaffold_produces_first_run_launcher(self, mock_git_repo):
+        root = mock_git_repo
+        _write_fixture(root, download="first-run")
+
+        _scaffold(root)
+
+        # 1. First-run bin stub present; NO postinstall script emitted.
+        binstub = root / "bin" / "launcher.cjs"
+        postinstall = root / "scripts" / "postinstall.cjs"
+        assert binstub.exists(), "first-run bin stub missing"
+        assert not postinstall.exists(), (
+            "first-run mode must not emit a postinstall script"
+        )
+
+        stub_text = binstub.read_text()
+        # Producer info baked in + checksum verification + cache dir + exec.
+        assert "acme/mytool" in stub_text
+        assert "checksums.txt" in stub_text
+        assert "verifyChecksum" in stub_text
+        assert "XDG_CACHE_HOME" in stub_text
+        assert "spawnSync" in stub_text
+        assert "{{" not in stub_text
+
+        # 2. Manifest filled: bin present, NO postinstall script (zero
+        # network I/O at install time -- the mode's contract).
+        pkg = json.loads((root / "package.json").read_text())
+        assert pkg["name"] == "mytool"
+        assert pkg["bin"] == {"mytool": "bin/launcher.cjs"}
+        assert "postinstall" not in pkg.get("scripts", {})
+        assert pkg["files"] == ["bin"]
+
+        # 3. Bin stub recorded in managed-files.json.
+        managed = json.loads((root / ".rlsbl" / "managed-files.json").read_text())
+        tracked = managed.get("files", managed)
+        assert "bin/launcher.cjs" in tracked
+        assert "scripts/postinstall.cjs" not in tracked
+
+        # 4. Second scaffold: manifest is a byte-level no-op.
+        before = (root / "package.json").read_bytes()
+        _scaffold(root)
+        assert (root / "package.json").read_bytes() == before
         assert binstub.exists()

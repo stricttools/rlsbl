@@ -29,10 +29,13 @@ def _launcher_manifest_missing_fields(root, subdir, launcher_entry):
     """Return the shim-critical manifest fields missing from a launcher target.
 
     Only reports when the manifest exists (an absent manifest is a separate
-    scaffold-time hard error). For npm: ``bin``, ``scripts.postinstall``,
-    ``files``. For pypi: ``project.scripts``.
+    scaffold-time hard error). For npm postinstall mode: ``bin``,
+    ``scripts.postinstall``, ``files``. For npm first-run mode: ``bin``,
+    ``files`` (no postinstall -- install does zero network I/O). For pypi:
+    ``project.scripts``.
     """
     ptype = launcher_entry.get("type")
+    download = launcher_entry.get("download")
     base = root if subdir == "." else os.path.join(root, subdir)
     missing = []
     if ptype == "npm":
@@ -46,9 +49,10 @@ def _launcher_manifest_missing_fields(root, subdir, launcher_entry):
             return []
         if "bin" not in pkg:
             missing.append("bin")
-        scripts = pkg.get("scripts")
-        if not isinstance(scripts, dict) or "postinstall" not in scripts:
-            missing.append("scripts.postinstall")
+        if download == "postinstall":
+            scripts = pkg.get("scripts")
+            if not isinstance(scripts, dict) or "postinstall" not in scripts:
+                missing.append("scripts.postinstall")
         if "files" not in pkg:
             missing.append("files")
     elif ptype == "pypi":

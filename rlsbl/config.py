@@ -450,6 +450,38 @@ def validate_pipelines_config(config, project_root="."):
                     f"pipeline '{name}'.binary_source must be "
                     f'"github-release", got {entry["binary_source"]!r}.'
                 )
+            # The download mode selects HOW the wrapped binary is fetched.
+            # There is no default (no-implicit-defaults doctrine): the value
+            # decides whether the install performs network I/O (postinstall)
+            # or defers it to the first CLI invocation (first-run), which is
+            # a deployment-shape decision the operator must commit to.
+            if "download" not in entry:
+                raise ConfigError(
+                    f"pipeline '{name}' has artifact=\"launcher\" but is "
+                    "missing required key 'download'. Set it to \"first-run\" "
+                    "(the wrapper performs ZERO network I/O at install time "
+                    "and lazily downloads the checksum-verified binary on the "
+                    "first CLI invocation, caching it) or \"postinstall\" "
+                    "(npm only: the wrapper downloads the binary at "
+                    "'npm install' time via a postinstall script). There is "
+                    "no default."
+                )
+            if entry["download"] not in ("first-run", "postinstall"):
+                raise ConfigError(
+                    f"pipeline '{name}'.download must be \"first-run\" or "
+                    f'"postinstall", got {entry["download"]!r}.'
+                )
+            # postinstall is an npm-only mechanism: pip has no postinstall
+            # hook, so a pypi launcher can only use first-run. Reject the
+            # nonsensical combination up front rather than scaffolding a
+            # wrapper that can never download its binary.
+            if entry["download"] == "postinstall" and ptype != "npm":
+                raise ConfigError(
+                    f"pipeline '{name}' (type {ptype}) has "
+                    'download="postinstall", but postinstall is an npm-only '
+                    "mechanism. Non-npm launchers have no install-time hook "
+                    'and must use download="first-run".'
+                )
             # Validate wraps references a real pipeline with artifact=binary
             wraps_ref = entry["wraps"]
             if wraps_ref not in pipelines:

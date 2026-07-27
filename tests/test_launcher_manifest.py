@@ -26,7 +26,8 @@ def _npm_pipeline():
     p = NpmPipeline(
         name="npm", pipeline_type="npm", local=False,
         config={"type": "npm", "local": False, "artifact": "launcher",
-                "wraps": "go", "binary_source": "github-release", "target": "npm"},
+                "wraps": "go", "binary_source": "github-release", "target": "npm",
+                "download": "postinstall"},
     )
     p.target = "npm"
     return p
@@ -76,7 +77,7 @@ class TestNpmFill:
     def test_fills_missing_fields_preserves_name(self, tmp_path):
         manifest = tmp_path / "package.json"
         manifest.write_text('{"name": "mycli", "version": "1.0.0"}\n')
-        dist = _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS)
+        dist = _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS, "postinstall")
         assert dist == "mycli"
         pkg = json.loads(manifest.read_text())
         assert pkg["name"] == "mycli"  # never touched
@@ -87,9 +88,9 @@ class TestNpmFill:
     def test_second_call_byte_noop(self, tmp_path):
         manifest = tmp_path / "package.json"
         manifest.write_text('{"name": "mycli", "version": "1.0.0"}\n')
-        _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS)
+        _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS, "postinstall")
         first = manifest.read_bytes()
-        _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS)
+        _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS, "postinstall")
         assert manifest.read_bytes() == first
 
     def test_existing_fields_preserved(self, tmp_path):
@@ -100,7 +101,7 @@ class TestNpmFill:
             '"scripts": {"postinstall": "echo hi", "test": "x"}, '
             '"files": ["lib"]}\n'
         )
-        _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS)
+        _fill_npm_launcher_manifest(str(manifest), _SHIM_VARS, "postinstall")
         pkg = json.loads(manifest.read_text())
         assert pkg["bin"] == {"custom": "bin/custom.js"}  # untouched
         assert pkg["scripts"]["postinstall"] == "echo hi"  # untouched
@@ -186,7 +187,8 @@ def _ctx(tmp_path):
             "go": {"type": "go", "local": False, "target": "go", "artifact": "binary"},
             "npm": {"type": "npm", "local": False, "target": "npm",
                     "artifact": "launcher", "wraps": "go",
-                    "binary_source": "github-release", "provenance": True},
+                    "binary_source": "github-release", "provenance": True,
+                    "download": "postinstall"},
         },
     }
     return ProjectContext(project_root=tmp_path, workspace_root=None, config=config)
