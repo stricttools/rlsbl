@@ -30,7 +30,7 @@
     "exclude": [
       "rlsbl.changelog",
       "rlsbl.commands.monorepo",
-      "rlsbl.strictspec_gen"
+      "rlsbl.strictspec_gen*"
     ]
   },
   "root_files": [
