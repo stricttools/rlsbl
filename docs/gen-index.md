@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "Auto-generated API reference index for the rlsbl package — browse every public module, including the batch-plan sidecar, tag-glob resolver, and CI-router helpers, with docstrings and source locations."
+description: "Auto-generated API reference index for the rlsbl package — browse every public module, including the batch-plan sidecar, tag-glob resolver, CI-router helpers, and the strictspec certificate deploy gate, with docstrings and source locations."
 generated: true
 nav_group: "API Reference"
 nav_order: 0
