@@ -41,6 +41,8 @@ EXPECTED_CHECKS = [
     "changelog-user-facing",
     "changelog-batch-commits",
     "changelog-batch-entries",
+    "changelog-format-version",
+    "changelog-format-version-gate",
     # Workspace checks
     "workspace-ci-router",
     "workspace-ci-synced",

@@ -123,6 +123,15 @@ def _native_message(diag, entry: ChangelogEntry, coverage_unit: str) -> str:
         if field_name == "commits":
             return "commits must be empty in changeset-file mode"
         return f"unknown key: {field_name}"
+    if code in ("STRICTSPEC_TYPE_NOT_ARRAY", "STRICTSPEC_TYPE_NOT_STRING"):
+        # A wrong-typed `packages` value (not a list, or a list with a non-string
+        # item) keeps rlsbl's historical wording. The path is `$.packages` for
+        # the container and `$.packages[N]` for an item; both extract "packages".
+        m = _RE_PATH_FIELD.search(diag.path)
+        field_name = m.group(1) if m else "?"
+        if field_name == "packages":
+            return "packages must be a list of strings"
+        return diag.message
     return diag.message
 
 
