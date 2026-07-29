@@ -81,8 +81,7 @@
   "en/cli-push.md": {
     "content": "3ecf5e132d1d0f8f43241a00b46cf670567b01e6956b3d49fbb27e212b2adb28",
     "description": "23ab0bec3ce7d197112684fe9f8283146fdefb68fb94f695741fb5b2ab58f9e5",
-    "schema_hash": "f57a17675842b898aaca38156bf048703a155ad565c934cc6a2cd6780cf428cf",
-    "seed_hash": "ab8a748c97030c99c2c5f307df84cd5331018465efa104e5dfca62ccca484ba6"
+    "schema_hash": "f57a17675842b898aaca38156bf048703a155ad565c934cc6a2cd6780cf428cf"
   },
   "en/cli-record-gif.md": {
     "content": "77edfe0b67b4acf98376ebb5d593bce0975978d40e477ed13f4dab3ba59d66bb",
@@ -275,8 +274,8 @@
   },
   "en/rlsbl-ci_router.md": {
     "content": "e02bcde1535a8b3196cdc1dc88d97a7c652dd0bf30b6a2e5981c8a94b4ab5663",
-    "description": "ec8f8084d485d05fb2b97a248b7e06863ec783735a2dcfc49809f3ca48534d8a",
-    "seed_hash": "ec8f8084d485d05fb2b97a248b7e06863ec783735a2dcfc49809f3ca48534d8a",
+    "description": "4d9ad9381c5f499cc4a5293f61270ab23b95c1be17eaec4027f6c9f47282879e",
+    "seed_hash": "4d9ad9381c5f499cc4a5293f61270ab23b95c1be17eaec4027f6c9f47282879e",
     "source_docstring": "64030303ba1e4c18b86e7371fc5cab7a1874e6a251db8158b535f27e109137de"
   },
   "en/rlsbl-ci_yaml.md": {
