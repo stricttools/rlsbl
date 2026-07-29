@@ -110,6 +110,7 @@ class NpmRegexLinter:
     parser_type = "regex"
 
     def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+        """Run forbidden-import and stdout checks on JS/TS files via regex."""
         results = []
 
         # Entry point check

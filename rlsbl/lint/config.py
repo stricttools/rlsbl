@@ -29,6 +29,8 @@ _DEFAULT_FORBIDDEN = {
 
 @dataclass
 class LanguageLintConfig:
+    """Per-language lint settings loaded from .rlsbl/lint/<language>.toml."""
+
     forbidden_imports: list[str] = field(default_factory=list)
     allowed_imports: list[str] = field(default_factory=list)
     stdout_enabled: bool = True

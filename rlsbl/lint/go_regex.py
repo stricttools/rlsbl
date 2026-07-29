@@ -118,6 +118,7 @@ class GoRegexLinter:
     parser_type = "regex"
 
     def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+        """Run forbidden-import, stdout, and entry-point checks on Go files via regex."""
         results = []
 
         for filepath in walk_source_files(project_path, (".go",), config.exclude_patterns):

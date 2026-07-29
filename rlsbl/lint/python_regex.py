@@ -128,6 +128,7 @@ class PythonRegexLinter:
     parser_type = "regex"
 
     def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+        """Run forbidden-import and stdout checks on Python files via regex."""
         results = []
 
         # Entry point check

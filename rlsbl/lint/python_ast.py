@@ -13,6 +13,8 @@ from .utils import walk_source_files
 
 @dataclasses.dataclass(frozen=True)
 class ImportRecord:
+    """Immutable record of a single Python import with location and context metadata."""
+
     top_level: str
     full_path: str
     filepath: str
@@ -24,6 +26,7 @@ PY_LANG = Language(tree_sitter_python.language())
 
 
 def _make_parser():
+    """Create a tree-sitter parser configured for Python."""
     parser = Parser(PY_LANG)
     return parser
 
@@ -436,6 +439,7 @@ class PythonAstLinter:
     parser_type = "ast"
 
     def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+        """Run forbidden-import, stdout, and unreachable-code checks on Python files."""
         results = []
 
         # Entry point check

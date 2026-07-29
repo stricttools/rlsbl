@@ -8,14 +8,20 @@ from .result import LintResult
 
 @runtime_checkable
 class LanguageLinter(Protocol):
+    """Interface for per-language linters that check library boundary violations."""
+
     language: str  # "python", "go", "npm"
     parser_type: str  # "ast" or "regex"
 
-    def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]: ...
+    def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+        """Run all lint checks on the project and return violations."""
+        ...
 
 
 @runtime_checkable
 class ImportScanner(Protocol):
+    """Interface for AST-based import scanners that extract all imports from a project."""
+
     def scan_imports(self, project_path: str) -> set[tuple[str, str, int, bool]]:
         """Collect all imports from source files in a project.
 

@@ -212,6 +212,7 @@ class NpmAstLinter:
     parser_type = "ast"
 
     def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+        """Run forbidden-import and stdout checks on JS/TS files."""
         results = []
 
         # Entry point check

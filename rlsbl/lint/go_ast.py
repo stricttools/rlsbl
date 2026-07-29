@@ -11,6 +11,7 @@ GO_LANG = Language(tree_sitter_go.language())
 
 
 def _make_parser():
+    """Create a tree-sitter parser configured for Go."""
     parser = Parser(GO_LANG)
     return parser
 
@@ -214,6 +215,7 @@ class GoAstLinter:
     parser_type = "ast"
 
     def lint(self, project_path: str, config: LanguageLintConfig) -> list[LintResult]:
+        """Run forbidden-import, stdout, and entry-point checks on Go files."""
         results = []
 
         parser = _make_parser()

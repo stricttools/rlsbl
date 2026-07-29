@@ -26,6 +26,7 @@ class MavenLinter:
         *,
         check_timeout: int = 120,
     ) -> list[LintResult]:
+        """Run the detected lint command (detekt, checkstyle, or gradlew check)."""
         from ..targets.maven import MavenTarget
 
         cmd = MavenTarget.detect_lint_command(project_path)
