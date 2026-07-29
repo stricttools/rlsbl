@@ -1,5 +1,5 @@
 ---
-description: "Pipeline architecture: types, auth patterns, custom assets, capability gating, the Go artifact key, and checksum-verified launcher shims for npm/PyPI."
+description: "Pipeline architecture: 10 built-in types with per-type reference, 3 auth patterns, custom assets, capability gating, the Go artifact key, launcher shims with checksum-verified download modes for npm/PyPI, and migration from the old publish key."
 ---
 
 # Pipelines

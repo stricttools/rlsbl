@@ -1,4 +1,4 @@
-"""JSONL changelog entry schema providing the dataclass definition, JSON parsing, serialization, field validation, and type coercion.
+"""JSONL changelog entry schema with dataclass definition, JSON parsing, serialization, field validation, type coercion, and entry ID generation.
 
 The strictspec-generated validators
 (``rlsbl/strictspec_gen/changelog_entry_commit_validator.py`` and
