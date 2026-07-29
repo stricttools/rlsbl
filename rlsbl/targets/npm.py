@@ -22,6 +22,7 @@ class NpmTarget(BaseTarget):
         return "npm"
 
     def detect(self, dir_path):
+        """Return True if dir_path contains a package.json."""
         return os.path.exists(os.path.join(dir_path, "package.json"))
 
     def read_name(self, dir_path, ctx):
@@ -165,12 +166,15 @@ class NpmTarget(BaseTarget):
         return [self.version_file()]
 
     def version_file(self, dir_path=None):
+        """Return the version file name for npm projects."""
         return "package.json"
 
     def tag_format(self, version):
+        """Return the git tag string for an npm release version."""
         return f"v{version}"
 
     def template_dir(self):
+        """Return the path to the npm-specific template directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "npm"
         )
@@ -223,6 +227,7 @@ class NpmTarget(BaseTarget):
         return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):
+        """Return CI and npmignore template mappings, selecting the CI template by package manager."""
         pm = self._detect_package_manager(".")
         if pm == "pnpm":
             ci_template = "ci-pnpm.yml.tpl"
@@ -236,12 +241,15 @@ class NpmTarget(BaseTarget):
         ]
 
     def check_project_exists(self, dir_path):
+        """Return True if package.json exists in dir_path."""
         return os.path.exists(os.path.join(dir_path, "package.json"))
 
     def get_project_init_hint(self):
+        """Return a hint for initializing an npm project."""
         return 'Run "npm init" first'
 
     def dev_install_command(self, project_dir):
+        """Return install specs for npm link (global) and npm install (local)."""
         return {
             "global": {
                 "tool": "npm",

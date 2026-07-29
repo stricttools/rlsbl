@@ -60,6 +60,7 @@ class GoTarget(BaseTarget):
         return "go"
 
     def detect(self, dir_path):
+        """Return True if dir_path contains a go.mod file."""
         return os.path.exists(os.path.join(dir_path, "go.mod"))
 
     def read_name(self, dir_path, ctx):
@@ -177,9 +178,11 @@ class GoTarget(BaseTarget):
         return [self.version_file()]
 
     def version_file(self, dir_path=None):
+        """Return the version file name for Go projects."""
         return VERSION_FILE
 
     def tag_format(self, version):
+        """Return the git tag string for a Go release version."""
         return f"v{version}"
 
     def companion_tags(self, name, version, path=None):
@@ -198,18 +201,21 @@ class GoTarget(BaseTarget):
         return []
 
     def monorepo_tag_format(self, name, version, path=None):
+        """Return a Go module proxy compatible tag using the package path prefix."""
         if path is not None:
             sep = "" if path.endswith("/") else "/"
             return f"{path}{sep}v{version}"
         return super().monorepo_tag_format(name, version, path)
 
     def monorepo_tag_glob(self, name, path=None):
+        """Return a glob pattern matching Go module proxy tags for a monorepo package."""
         if path is not None:
             sep = "" if path.endswith("/") else "/"
             return f"{path}{sep}v*"
         return super().monorepo_tag_glob(name, path)
 
     def template_dir(self):
+        """Return the path to the Go-specific template directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "go"
         )
@@ -339,6 +345,7 @@ class GoTarget(BaseTarget):
         return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):
+        """Return Go template mappings including VERSION, CI, goreleaser, and version.go."""
         project_root = str(ctx.project_root)
         mappings = [
             {"template": "VERSION.tpl", "target": "VERSION"},
@@ -372,6 +379,7 @@ class GoTarget(BaseTarget):
         return mappings
 
     def shared_template_mappings(self, ctx):
+        """Return shared mappings plus npm/crates wrapper mappings if enabled."""
         mappings = super().shared_template_mappings(ctx)
         project_root = str(ctx.project_root)
         if not os.path.exists(os.path.join(project_root, "go.mod")):
@@ -386,12 +394,15 @@ class GoTarget(BaseTarget):
         return mappings
 
     def check_project_exists(self, dir_path):
+        """Return True if go.mod exists in dir_path."""
         return os.path.exists(os.path.join(dir_path, "go.mod"))
 
     def get_project_init_hint(self):
+        """Return a hint for initializing a Go module."""
         return 'Run "go mod init <module-path>" first'
 
     def dev_install_command(self, project_dir):
+        """Return install specs for go install using declared install_paths."""
         from ..config import read_project_config
         from ..go_introspect import (
             GoIntrospectError,

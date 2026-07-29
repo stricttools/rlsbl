@@ -104,6 +104,7 @@ class PypiTarget(BaseTarget):
         return "pypi"
 
     def detect(self, dir_path):
+        """Return True if dir_path contains a pyproject.toml with a [project] table."""
         if not os.path.exists(os.path.join(dir_path, "pyproject.toml")):
             return False
         # A virtual uv workspace root (pyproject with [tool.uv.workspace] but
@@ -326,12 +327,15 @@ class PypiTarget(BaseTarget):
         return None
 
     def version_file(self, dir_path=None):
+        """Return the version file name for PyPI projects."""
         return "pyproject.toml"
 
     def tag_format(self, version):
+        """Return the git tag string for a PyPI release version."""
         return f"v{version}"
 
     def template_dir(self):
+        """Return the path to the PyPI-specific template directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "pypi"
         )
@@ -399,6 +403,7 @@ class PypiTarget(BaseTarget):
         return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):
+        """Return the PyPI-specific CI workflow template mapping."""
         return [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
         ]
@@ -477,12 +482,15 @@ class PypiTarget(BaseTarget):
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def check_project_exists(self, dir_path):
+        """Return True if pyproject.toml exists in dir_path."""
         return os.path.exists(os.path.join(dir_path, "pyproject.toml"))
 
     def get_project_init_hint(self):
+        """Return a hint for initializing a Python project."""
         return 'Run "uv init" first'
 
     def dev_install_command(self, project_dir):
+        """Return install specs for editable Python installs via uv."""
         return {
             "global": {
                 "tool": "uv",

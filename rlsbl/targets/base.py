@@ -47,39 +47,50 @@ class BaseTarget:
         return "base"
 
     def version_file(self, dir_path=None):
+        """Return the relative path of the file that holds the project version."""
         return None
 
     def tag_format(self, version):
+        """Return the git tag string for a standalone release version."""
         return f"v{version}"
 
     def monorepo_tag_format(self, name, version, path=None):
+        """Return the git tag string for a monorepo package release."""
         return f"{name}@v{version}"
 
     def monorepo_tag_glob(self, name, path=None):
+        """Return a glob pattern matching all version tags for a monorepo package."""
         return f"{name}@v*"
 
     def template_dir(self):
+        """Return the path to this target's ecosystem-specific template directory."""
         return None
 
     def shared_template_dir(self):
+        """Return the path to the shared template directory common to all targets."""
         templates = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "shared"
         )
         return templates
 
     def read_name(self, dir_path, ctx):
+        """Read the project name from the target's manifest file."""
         return None
 
     def read_metadata(self, dir_path):
+        """Read project metadata (license, description) from the manifest file."""
         return {}
 
     def template_vars(self, dir_path, ctx):
+        """Return template variables extracted from the project for scaffold rendering."""
         return TemplateVars(self.name, {})
 
     def template_mappings(self, ctx):
+        """Return the list of target-specific template-to-file mappings for scaffolding."""
         return []
 
     def shared_template_mappings(self, ctx):
+        """Return template-to-file mappings shared across all targets."""
         mappings = [
             {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
             {"template": "gitignore.tpl", "target": ".gitignore"},
@@ -127,9 +138,11 @@ class BaseTarget:
         return names
 
     def check_project_exists(self, dir_path):
+        """Return True if the project's manifest file exists in dir_path."""
         return self.detect(dir_path)
 
     def get_project_init_hint(self):
+        """Return a user-facing hint for initializing a project of this target type."""
         return ""
 
     def write_version(self, dir_path, version, ctx):
@@ -172,6 +185,7 @@ class BaseTarget:
         return self.BUILD_TIMEOUT_DEFAULT
 
     def build(self, dir_path, version, *, config=None):
+        """Build distributable artifacts for this target. No-op by default."""
         pass
 
     def companion_tags(self, name, version, path=None):
