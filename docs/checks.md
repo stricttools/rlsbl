@@ -185,3 +185,77 @@ Checks are declared in `rlsbl/data/checks.toml` with metadata that controls exec
 | `depends_on` | array of strings | Other checks that must pass first (skipped if dependency fails) |
 
 Checks are implemented via the `@app.check()` decorator in the `rlsbl/checks/` package (one module per tag, e.g. `project.py`, `release.py`, `workspace.py`), which registers the function with strictcli's check system. The decorator name must match the key in `checks.toml`.
+
+## Examples
+
+### Running all checks before a release
+
+```bash
+rlsbl check --all
+#   lock .......................... pass
+#   version-consistency ........... pass
+#   config-schema ................. pass
+#   license-file .................. pass
+#   scaffold-conflicts ............ pass
+#   cross-repo-path-sources ....... pass
+#   changelog-hashes .............. pass
+#   changelog-range ............... pass
+#   changelog-coverage ............ FAIL
+#     Uncovered commits:
+#       a1b2c3d  Add retry logic
+#       e4f5g6h  Fix timeout bug
+#   changelog-schema .............. pass
+#   changelog-user-facing ......... warn  No user-facing entries
+#   local-tag .................... warn  No tag for v0.5.3
+#   test-suite ................... pass
+#
+#   12 passed, 1 failed, 2 warnings
+```
+
+### Investigating a specific check failure
+
+```bash
+# Run just the failing check to see detailed output
+rlsbl check --name changelog-coverage
+#   changelog-coverage ............ FAIL
+#     Uncovered commits:
+#       a1b2c3d  Add retry logic
+#       e4f5g6h  Fix timeout bug
+#     Fix: run `rlsbl changelog add --commits <hash> ...` for each
+
+# Fix it
+rlsbl changelog add --commits a1b2c3d --description "Add retry logic to HTTP client" --type feature
+rlsbl changelog add --commits e4f5g6h --description "Fix timeout crash on slow connections" --type fix
+
+# Verify the fix
+rlsbl check --name changelog-coverage
+#   changelog-coverage ............ pass
+```
+
+### Checking workspace integrity in a monorepo
+
+```bash
+rlsbl check --tag workspace
+#   workspace-ci-router ........... pass
+#   workspace-ci-synced ........... pass
+#   workspace-targets ............. pass
+#   workspace-unregistered ........ FAIL
+#     packages/new-lib/ has pyproject.toml but is not in workspace.toml
+#   workspace-stale-entries ....... pass
+#   dev-only-boundary ............. pass
+#   dead-workspace-packages ....... warn  library 'old-utils' not imported by any workspace package
+#
+#   Fix: run `rlsbl monorepo add --path packages/new-lib --target pypi`
+```
+
+### Pre-push check output
+
+```bash
+# Triggered automatically by git push, or run manually:
+rlsbl check --tag prepush
+#   prepush-changelog-coverage .... pass
+#   prepush-gitignore-guard ....... pass
+#   prepush-manual-warning ........ skip  (not a release branch push)
+#   test-suite .................... pass
+#   scaffold-conflicts ............ pass
+```

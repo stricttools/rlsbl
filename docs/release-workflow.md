@@ -268,6 +268,87 @@ Direct scrubs are blocked: in rlsbl-managed repositories, safegit refuses destru
 
 Requires safegit 0.22.0+ (for `--remap-shas-in`, the persisted rewrite journal, and the cleanup_ok/pre_rewrite_remotes JSON fields).
 
+## Examples
+
+### Full release from start to finish
+
+A typical release session after implementing a new feature and fixing a bug:
+
+```bash
+# 1. Check project state
+rlsbl status
+#   Package: mylib
+#   Version: 0.5.2 (pyproject.toml)
+#   Branch:  main
+#   Last tag: v0.5.2
+#   JSONL:   3/3 commits covered
+#   ! 3 commits ahead of v0.5.2
+
+# 2. Add changelog entries for each commit (if not already done)
+rlsbl changelog add --commits a1b2c3d --description "Add retry logic to HTTP client" --type feature
+rlsbl changelog add --commits e4f5g6h --description "Fix timeout crash on slow connections" --type fix
+rlsbl changelog add --commits i7j8k9l --no-user-facing
+
+# 3. Verify changelog coverage
+rlsbl check --tag changelog
+#   changelog-hashes .............. pass
+#   changelog-range ............... pass
+#   changelog-coverage ............ pass
+#   changelog-schema .............. pass
+#   changelog-user-facing ......... pass
+
+# 4. Scaffold the release file
+rlsbl release init
+#   Created .rlsbl/releases/unreleased.toml
+
+# 5. Edit the release file: set bump type and description
+#    bump = "minor"
+#    description = "Add retry logic and fix timeout handling"
+
+# 6. Run the release
+rlsbl release run --no-allow-dirty --watch --yes
+#   Reading .rlsbl/releases/unreleased.toml ...
+#   Bump: minor (0.5.2 -> 0.6.0)
+#   Validating JSONL changelog ... OK
+#   Generating CHANGELOG.md ... OK
+#   Running tests ... OK
+#   Writing version 0.6.0 to pyproject.toml ... OK
+#   Committing v0.6.0 ... OK
+#   Pushing ... OK
+#   Finalizing JSONL ... OK
+#   Creating GitHub Release v0.6.0 ... OK
+#   Watching CI ...
+```
+
+### Dry run preview
+
+Preview what a release would do without making changes:
+
+```bash
+rlsbl release run --no-allow-dirty --no-watch --yes --dry-run
+#   [DRY RUN] Bump: patch (0.6.0 -> 0.6.1)
+#   [DRY RUN] Would write version 0.6.1 to pyproject.toml
+#   [DRY RUN] Would commit, tag v0.6.1, and push
+#   [DRY RUN] Would create GitHub Release v0.6.1
+```
+
+### Recovering from a failed release
+
+If CI fails after pushing:
+
+```bash
+# Undo the release (deletes GitHub Release, tag, reverts commit)
+rlsbl release undo
+
+# Fix the issue, commit the fix, add changelog entry
+rlsbl changelog add --commits f1x2d3e --description "Fix flaky test" --type fix
+
+# Re-run the release
+rlsbl release init
+# Edit unreleased.toml, then:
+rlsbl release run --no-allow-dirty --watch --yes
+```
+
 ## Source reference
 
 The release workflow is implemented in the `rlsbl.commands.release` module, which orchestrates the full release pipeline (see the step table above) from validation through GitHub Release creation and the post-release phase. This module coordinates version bumping, JSONL finalization, git operations, and hook execution.

@@ -166,3 +166,66 @@ rlsbl check --name scaffold-conflicts
 ```
 
 `scaffold-unreplaced-vars` runs under `rlsbl check --tag quality`. `scaffold-conflicts` runs under the `project`, `prepush`, and `release` tags, and also runs as a pre-mutation guard at the start of `rlsbl release run`.
+
+## Examples
+
+### First-time scaffold for a Python project
+
+```bash
+cd ~/Projects/mylib
+
+# Scaffold CI, hooks, and changelog infrastructure
+rlsbl scaffold
+#   Created .rlsbl/config.json
+#   Created .rlsbl/changes/unreleased.jsonl
+#   Created .rlsbl/hooks/pre-checks.sh
+#   Created .rlsbl/hooks/pre-release.sh
+#   Created .rlsbl/hooks/post-release.sh
+#   Created .github/workflows/ci.yml
+#   Created .github/workflows/publish.yml
+#   Created .git/hooks/pre-push
+#   Updated .gitignore
+#   Created CHANGELOG.md
+
+# Verify detected targets
+rlsbl targets
+#   Target   Detected   Version file
+#   pypi     yes        pyproject.toml
+```
+
+### Re-running scaffold after upgrading rlsbl
+
+```bash
+# Template changed, your edits preserved via three-way merge
+rlsbl scaffold
+#   Merged .github/workflows/ci.yml (template updated, your edits preserved)
+#   Merged .github/workflows/publish.yml (template updated, your edits preserved)
+#   Skipped .rlsbl/hooks/pre-checks.sh (user-owned)
+#   Skipped .rlsbl/changes/unreleased.jsonl (user-owned)
+```
+
+### Resolving merge conflicts after scaffold
+
+If scaffold produces conflicts:
+
+```bash
+rlsbl scaffold
+#   CONFLICT in .github/workflows/ci.yml -- resolve manually
+
+# Check for conflict markers
+rlsbl check --name scaffold-conflicts
+#   scaffold-conflicts ............ FAIL
+#     .github/workflows/ci.yml: unresolved conflict markers
+
+# Edit the file to resolve conflicts, then commit
+```
+
+### Resetting scaffold-managed files to template defaults
+
+```bash
+# Overwrite all scaffold-managed files (user-owned files are safe)
+rlsbl scaffold --force
+#   Wrote .github/workflows/ci.yml (forced)
+#   Wrote .github/workflows/publish.yml (forced)
+#   Skipped .rlsbl/hooks/pre-checks.sh (user-owned, never overwritten)
+```

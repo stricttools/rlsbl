@@ -361,6 +361,109 @@ If the boundary check fails, either:
 1. Remove the `dev_node` flag from the dependency (it is not actually a dev-only project)
 2. Move the runtime dependency to a dev dependency in the consumer's manifest
 
+## Examples
+
+### Setting up a monorepo from scratch
+
+```bash
+cd ~/Projects/my-monorepo
+git init
+
+# Initialize the workspace
+rlsbl monorepo init
+#   Created .rlsbl-monorepo/workspace.toml
+
+# Add a Python library
+mkdir -p packages/core
+# ... create packages/core/pyproject.toml ...
+rlsbl monorepo add --name core --path packages/core --target pypi --library
+
+# Add an npm CLI that depends on the library
+mkdir -p packages/cli
+# ... create packages/cli/package.json ...
+rlsbl monorepo add --name cli --path packages/cli --target npm --depends-on core
+
+# Add a test suite (dev node -- no changelog, no releases)
+mkdir -p packages/tests
+rlsbl monorepo add --name tests --path packages/tests --dev-node
+
+# Scaffold CI for each project
+cd packages/core && rlsbl scaffold && cd ../..
+cd packages/cli && rlsbl scaffold && cd ../..
+
+# Sync all CI workflows to the repo root
+rlsbl monorepo sync
+#   Synced packages/core CI -> .github/workflows/ci-router.yml
+#   Synced packages/cli CI -> .github/workflows/ci-router.yml
+```
+
+### Releasing multiple packages
+
+```bash
+# Check workspace status
+rlsbl monorepo status
+#   core   0.1.0  2 commits ahead of core@v0.1.0
+#   cli    0.2.0  3 commits ahead of cli@v0.2.0
+#   tests  (dev node -- not releasable)
+
+# Scaffold the release file
+rlsbl monorepo release init
+#   Created .rlsbl-monorepo/releases/unreleased.toml
+
+# Edit the release file:
+#   [packages.core]
+#   bump = "minor"
+#   description = "Add async support to core API"
+#
+#   [packages.cli]
+#   bump = "patch"
+#   description = "Update CLI to use new async core API"
+
+# Release in dependency order (core first, then cli)
+rlsbl monorepo release run --no-allow-dirty --watch --yes
+#   Release order: core, cli
+#   Releasing core 0.1.0 -> 0.2.0 ...
+#     Validating ... OK
+#     Tests ... OK
+#     Committing core@v0.2.0 ... OK
+#   Releasing cli 0.2.0 -> 0.2.1 ...
+#     Validating ... OK
+#     Tests ... OK
+#     Committing cli@v0.2.1 ... OK
+#   Watching CI ...
+```
+
+### Analyzing the impact of a change
+
+```bash
+# What breaks if we change the core library?
+rlsbl monorepo impact core
+#   Input packages:     core
+#   Direct dependents:  cli
+#   Test scope:         core, cli
+#   Release candidates: core, cli
+
+# What changed since the last release?
+rlsbl monorepo impact --since core@v0.1.0
+#   Changed packages:   core
+#   Direct dependents:  cli
+#   Test scope:         core, cli
+```
+
+### Viewing the dependency graph
+
+```bash
+# Text tree format
+rlsbl monorepo graph --format text
+#   core
+#     <- cli
+#   tests (dev node)
+
+# DOT format for visualization
+rlsbl monorepo graph --format dot --output workspace.dot
+dot -Tpng workspace.dot -o workspace.png
+```
+
 ## Workspace module
 
 The workspace module handles discovery, loading, saving, and resolution of monorepo workspaces. It walks the directory tree upward to locate the nearest `workspace.toml`, parses the TOML structure into validated `WorkspaceProject` entries, and writes changes back atomically using tomlkit to preserve formatting and comments.

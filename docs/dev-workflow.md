@@ -149,3 +149,90 @@ In monorepos, the pre-push hook runs from the repo root. The `test-suite` check 
 ### Deprecated command
 
 The old `rlsbl pre-push-check` command is deprecated. Update your hooks to the current version by running `rlsbl scaffold`, which installs the V5 hook template that calls `rlsbl check --tag prepush` instead.
+
+## Examples
+
+### Setting up local development for a Python project
+
+```bash
+cd ~/Projects/mylib
+
+# Install the project locally for development (editable install)
+rlsbl dev install
+#   Installing mylib via: uv tool install -e .
+#   Installed mylib 0.5.2
+
+# Verify it works
+mylib --version
+#   0.5.2
+```
+
+### Developing against a local sibling checkout
+
+When making coordinated changes to a library and its consumer:
+
+```bash
+cd ~/Projects/myapp
+
+# 1. Set UV_NO_SYNC=1 in your shell profile (one-time setup)
+echo 'export UV_NO_SYNC=1' >> ~/.bashrc
+source ~/.bashrc
+
+# 2. Create the overlay file
+cat > dev-sources.toml.local-only << 'EOF'
+[[overlay]]
+package = "strictcli"
+path = "../strictcli/python"
+EOF
+
+# 3. Run dev sync to overlay the local checkout
+rlsbl dev sync
+#   uv sync --inexact --no-install-package strictcli ... OK
+#   uv pip install -e ../strictcli/python ... OK
+#   Overlaid: strictcli 0.8.0 from ../strictcli/python
+
+# Now edits to ../strictcli/python are immediately visible in myapp's environment
+```
+
+### Checking overlay status
+
+```bash
+rlsbl dev status
+#   strictcli  0.8.0  ../strictcli/python  editable (intact)
+```
+
+### Installing all projects in a monorepo
+
+```bash
+cd ~/Projects/my-monorepo
+
+# Install all workspace projects
+rlsbl dev install --all
+#   Installing mylib via: uv tool install -e packages/mylib
+#   Installing cli via: npm link (packages/cli)
+#   Skipping tests (dev_node)
+
+# Or install specific projects
+rlsbl dev install --include mylib,cli
+
+# Uninstall when done
+rlsbl dev install --uninstall --all
+```
+
+### Watching CI after a push
+
+```bash
+# Watch CI for the latest commit
+rlsbl watch
+#   Discovering runs for abc1234 ...
+#   Watching: CI (abc1234) ... running
+#   CI (abc1234) ... passed
+
+# Watch CI for a specific commit
+rlsbl watch e4f5g6h
+#   Discovering runs for e4f5g6h ...
+#   Watching: CI (e4f5g6h) ... running
+#   CI (e4f5g6h) ... failed
+#   Auto-retrying CI ...
+#   Watching: CI (e4f5g6h) [retry] ... passed
+```
