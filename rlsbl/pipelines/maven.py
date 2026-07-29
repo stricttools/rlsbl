@@ -22,16 +22,19 @@ class MavenPipeline(BasePipeline):
     """
 
     def template_dir(self) -> str | None:
+        """Return the Maven CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "maven"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return the Maven/Gradle publish workflow mapping."""
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish via ``gradlew publish`` or ``mvn deploy``, auto-detecting the build tool."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -67,6 +70,7 @@ class MavenPipeline(BasePipeline):
             )
 
     def required_env_vars(self) -> list[str]:
+        """Return the token var (default GITHUB_TOKEN) when local publish is enabled."""
         if self.local:
             return [self.config.get("token_var", "GITHUB_TOKEN")]
         return []
@@ -101,16 +105,19 @@ class MavenCentralPipeline(BasePipeline):
     """
 
     def template_dir(self) -> str | None:
+        """Return the Maven CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "maven"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return the Maven Central publish workflow mapping."""
         return [
             {"template": "publish-central.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish to Maven Central via Gradle plugin or ``mvn deploy``."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -153,6 +160,7 @@ class MavenCentralPipeline(BasePipeline):
             )
 
     def required_env_vars(self) -> list[str]:
+        """Return Central Portal credential and GPG signing vars when local."""
         if self.local:
             return list(_MAVEN_CENTRAL_REQUIRED_VARS)
         return []

@@ -15,6 +15,7 @@ class CloudflarePagesPipeline(BasePipeline):
     """
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Deploy to Cloudflare Pages via ``selfdoc deploy``."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -38,6 +39,7 @@ class CloudflarePagesPipeline(BasePipeline):
             raise RuntimeError(f"selfdoc deploy failed: {exc}") from exc
 
     def required_env_vars(self) -> list[str]:
+        """Return Cloudflare account and API token vars when local."""
         if self.local:
             return ["CF_ACCOUNT_ID", "CF_PAGES_API_TOKEN"]
         return []

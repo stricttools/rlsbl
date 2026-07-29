@@ -18,16 +18,19 @@ class DockerPipeline(CredentialPipeline):
     _default_password_var = "DOCKER_PASSWORD"
 
     def template_dir(self) -> str | None:
+        """Return the Docker CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "docker"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return the Docker publish workflow mapping."""
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/docker-publish.yml"},
         ]
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Build and push Docker image, skipping :latest for pre-release versions."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -52,6 +55,7 @@ class DockerPipeline(CredentialPipeline):
         self._publish_command(dir_path, version, username, password)
 
     def _publish_command(self, dir_path: str, version: str, username: str, password: str) -> None:
+        """Build, tag, and push the Docker image to the configured registry."""
         image = self.config.get("image")
         registry = self.config.get("registry")
 

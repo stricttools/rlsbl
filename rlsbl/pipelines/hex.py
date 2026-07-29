@@ -14,16 +14,19 @@ class HexPipeline(TokenPipeline):
     _default_token_var = "HEX_API_KEY"
 
     def template_dir(self) -> str | None:
+        """Return the Hex CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "hex"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return the hex.pm publish workflow mapping."""
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish to hex.pm, probing first to skip duplicates."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -41,6 +44,7 @@ class HexPipeline(TokenPipeline):
         self._publish_command(dir_path, version, token)
 
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
+        """Run ``mix hex.publish --yes`` with the HEX_API_KEY."""
         try:
             run("mix", ["hex.publish", "--yes"], env={
                 **os.environ,

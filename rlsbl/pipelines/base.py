@@ -24,6 +24,7 @@ class BasePipeline:
     """
 
     def __init__(self, name: str, pipeline_type: str, local: bool, config: dict):
+        """Initialize with pipeline identity, local-publish flag, and config dict."""
         self.name = name
         self.pipeline_type = pipeline_type
         self.local = local
@@ -78,15 +79,19 @@ class BasePipeline:
         return any(sig in combined for sig in _ALREADY_EXISTS_SIGNATURES)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish the package. No-op by default; subclasses override."""
         pass
 
     def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
+        """Build release assets into *dist_dir*. Returns paths; empty by default."""
         return []
 
     def template_dir(self) -> str | None:
+        """Return the directory containing CI templates, or None if none."""
         return None
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return template-to-target mappings for CI scaffold. Empty by default."""
         return []
 
     def _linked_target_subdir(self, ctx) -> str:
@@ -183,6 +188,7 @@ class BasePipeline:
         return output_paths
 
     def required_env_vars(self) -> list[str]:
+        """Return env var names required for local publish. Empty by default."""
         return []
 
 
@@ -195,10 +201,12 @@ class TokenPipeline(BasePipeline):
     _default_token_var: str = ""
 
     def __init__(self, name: str, pipeline_type: str, local: bool, config: dict):
+        """Initialize and resolve the token env var from config or class default."""
         super().__init__(name, pipeline_type, local, config)
         self.token_var = config.get("token_var", self._default_token_var)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Resolve the token and delegate to ``_publish_command``."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -217,6 +225,7 @@ class TokenPipeline(BasePipeline):
         )
 
     def required_env_vars(self) -> list[str]:
+        """Return the token var when local publish is enabled."""
         if self.local:
             return [self.token_var]
         return []
@@ -233,11 +242,13 @@ class CredentialPipeline(BasePipeline):
     _default_password_var: str = ""
 
     def __init__(self, name: str, pipeline_type: str, local: bool, config: dict):
+        """Initialize and resolve username/password env vars from config or defaults."""
         super().__init__(name, pipeline_type, local, config)
         self.username_var = config.get("username_var", self._default_username_var)
         self.password_var = config.get("password_var", self._default_password_var)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Resolve credentials and delegate to ``_publish_command``."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -263,6 +274,7 @@ class CredentialPipeline(BasePipeline):
         )
 
     def required_env_vars(self) -> list[str]:
+        """Return username and password vars when local publish is enabled."""
         if self.local:
             return [self.username_var, self.password_var]
         return []

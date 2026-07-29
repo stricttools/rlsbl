@@ -19,16 +19,19 @@ class DenoPipeline(TokenPipeline):
     _default_token_var = "DENO_TOKEN"
 
     def template_dir(self) -> str | None:
+        """Return the Deno CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "deno"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return the JSR publish workflow mapping."""
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish to JSR with dual-token resolution (DENO_TOKEN or JSR_TOKEN)."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -61,6 +64,7 @@ class DenoPipeline(TokenPipeline):
         self._publish_command(dir_path, version, token)
 
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
+        """Run ``deno publish`` with the resolved token."""
         try:
             run("deno", ["publish"], env={
                 **os.environ,
@@ -71,6 +75,7 @@ class DenoPipeline(TokenPipeline):
             raise RuntimeError(f"deno publish failed: {exc}") from exc
 
     def required_env_vars(self) -> list[str]:
+        """Return the primary token var (DENO_TOKEN) or explicit config override."""
         if not self.local:
             return []
         config_token_var = self.config.get("token_var")

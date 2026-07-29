@@ -14,20 +14,24 @@ class CargoPipeline(TokenPipeline):
     _default_token_var = "CARGO_REGISTRY_TOKEN"
 
     def template_dir(self) -> str | None:
+        """Return the Cargo CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "cargo"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return the crates.io publish workflow mapping."""
         return [
             {"template": "publish.yml.tpl", "target": ".github/workflows/publish.yml"},
         ]
 
     def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
+        """Build Rust release binary into *dist_dir*."""
         from .build import build_cargo_assets
         return build_cargo_assets(dir_path, version, dist_dir)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish to crates.io, probing first to skip duplicates."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -45,6 +49,7 @@ class CargoPipeline(TokenPipeline):
         self._publish_command(dir_path, version, token)
 
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
+        """Run ``cargo publish`` with duplicate-version detection."""
         try:
             run("cargo", ["publish"], env={
                 **os.environ,

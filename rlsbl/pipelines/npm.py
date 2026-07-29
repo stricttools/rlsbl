@@ -14,11 +14,13 @@ class NpmPipeline(TokenPipeline):
     _default_token_var = "NPM_TOKEN"
 
     def template_dir(self) -> str | None:
+        """Return the npm CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "npm"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return publish workflow mappings, selecting template by artifact type and package manager."""
         # Launcher artifact: wrapper-package that downloads a binary
         # from a GitHub Release at npm install time (postinstall script).
         # In addition to the publish workflow, emit the shim source files
@@ -84,10 +86,12 @@ class NpmPipeline(TokenPipeline):
         return "npm"
 
     def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
+        """Pack an npm tarball into *dist_dir*."""
         from .build import build_npm_assets
         return build_npm_assets(dir_path, version, dist_dir)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish to npm with ``--access public``, probing first to skip duplicates."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -105,6 +109,7 @@ class NpmPipeline(TokenPipeline):
         self._publish_command(dir_path, version, token)
 
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
+        """Run ``npm publish``; tags pre-release versions with their preid."""
         try:
             # No --provenance: npm OIDC build-provenance attestation requires
             # a GitHub Actions runner and is impossible for a local publish.

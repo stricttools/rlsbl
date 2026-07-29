@@ -30,11 +30,13 @@ class GoPipeline(BasePipeline):
     """
 
     def template_dir(self) -> str | None:
+        """Return the Go CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "go"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return publish workflow mappings, selecting library or binary template."""
         # Library projects use a lightweight module-availability verification
         # publish template instead of goreleaser. The artifact kind is
         # mandatory -- there is no default. validate_pipelines_config
@@ -57,10 +59,12 @@ class GoPipeline(BasePipeline):
         ]
 
     def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
+        """Build Go binaries into *dist_dir* via goreleaser or ``go build``."""
         from .build import build_go_assets
         return build_go_assets(dir_path, version, dist_dir)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Notify the Go module proxy and ``go install`` declared binaries."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -115,5 +119,6 @@ class GoPipeline(BasePipeline):
             print(f"Installed: go install {path}")
 
     def required_env_vars(self) -> list[str]:
+        """Return empty list; Go uses GITHUB_TOKEN which is always available in CI."""
         # Go uses GITHUB_TOKEN which is always available in CI
         return []

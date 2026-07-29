@@ -51,11 +51,13 @@ class PypiPipeline(TokenPipeline):
     _default_token_var = "PYPI_TOKEN"
 
     def template_dir(self) -> str | None:
+        """Return the PyPI CI templates directory."""
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "pypi"
         )
 
     def template_mappings(self, ctx) -> list[dict[str, str]]:
+        """Return publish workflow mappings, emitting launcher shims when configured."""
         # Launcher artifact: wrapper-package that downloads a binary
         # from a GitHub Release on first run (no pip postinstall hook).
         # In addition to the publish workflow, emit the first-run launcher
@@ -78,10 +80,12 @@ class PypiPipeline(TokenPipeline):
         ]
 
     def build_assets(self, dir_path: str, version: str, dist_dir: str, ctx) -> list[str]:
+        """Build sdist and wheel into *dist_dir*."""
         from .build import build_pypi_assets
         return build_pypi_assets(dir_path, version, dist_dir)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
+        """Publish to PyPI with dual-token resolution (PYPI_TOKEN or TWINE_PASSWORD)."""
         if not self.local:
             print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
             return
@@ -114,6 +118,7 @@ class PypiPipeline(TokenPipeline):
         self._publish_command(dir_path, version, token)
 
     def _publish_command(self, dir_path: str, version: str, token: str) -> None:
+        """Run ``uv build`` then ``uv publish`` with duplicate-version detection."""
         try:
             run("uv", ["build"], env=os.environ, cwd=dir_path)
             run("uv", ["publish", "--check-url", "https://pypi.org/simple/"], env={
@@ -128,6 +133,7 @@ class PypiPipeline(TokenPipeline):
             raise RuntimeError(f"PyPI publish failed: {exc}") from exc
 
     def required_env_vars(self) -> list[str]:
+        """Return the primary token var (PYPI_TOKEN) or explicit config override."""
         if not self.local:
             return []
         config_token_var = self.config.get("token_var")
