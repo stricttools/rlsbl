@@ -1,4 +1,4 @@
-"""Batch release command for monorepo workspaces.
+"""Batch release command for monorepo workspaces that validates listed items, determines topological order, and releases each sequentially.
 
 Reads .rlsbl-monorepo/releases/unreleased.toml, validates all listed items,
 determines topological release order, and releases each sequentially

@@ -1,4 +1,4 @@
-"""Yank command that performs registry-level removal of a published version.
+"""Yank command for registry-level removal of a published version, probing each configured target and executing registry-specific yank actions.
 
 For each configured target, probes the registry to determine publication
 status, then executes the registry-specific yank action:

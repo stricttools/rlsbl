@@ -61,7 +61,7 @@ Modify an existing changelog entry in unreleased or released JSONL files. Finds 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--commits` |  | str |  |  | Comma-separated commit hashes identifying the target entry |
-| `--id` |  | str |  |  | Entry ID (ULID) identifying the target entry |
+| `--id` |  | str |  |  | Entry ID (ULID) identifying the target entry to edit in the JSONL file |
 | `--type` |  | str |  |  | New type value (feature, fix, breaking); also disambiguates multi-entry commits |
 | `--description` |  | str |  |  | Replacement description text for the matched changelog entry |
 | `--user-facing` |  | bool |  |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |

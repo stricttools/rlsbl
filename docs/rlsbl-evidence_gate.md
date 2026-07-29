@@ -1,6 +1,6 @@
 ---
 title: rlsbl.evidence_gate
-description: "Layered evidence gate for determining whether a release was published."
+description: "Layered evidence gate that checks multiple sources to determine whether a release was published, producing CLEARED or BLOCKED verdicts."
 generated: true
 nav_group: "API Reference"
 nav_order: 75

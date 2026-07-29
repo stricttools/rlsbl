@@ -1,4 +1,4 @@
-"""rlsbl push: tool-mediated push for non-release (dev) branches.
+"""Tool-mediated push for non-release dev branches with branch guard, preflight changelog coverage, behind-remote refusal, and wrapped git push.
 
 Provides branch guard (refuses release branches), preflight changelog
 coverage with actionable remediation hints, behind-remote refusal, and

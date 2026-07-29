@@ -1,4 +1,4 @@
-"""Resolved-plan sidecar for monorepo batch releases.
+"""Resolved-plan sidecar for monorepo batch releases that persists pre-batch base versions for idempotent, resumable release flows.
 
 A batch release file (``.rlsbl-monorepo/releases/unreleased.toml``) records
 only *bump intents* -- it does not persist the pre-batch base version of each

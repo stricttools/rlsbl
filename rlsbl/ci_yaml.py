@@ -1,4 +1,4 @@
-"""Shared CI workflow YAML helpers: parsing, serialization, and content injection.
+"""Shared CI workflow YAML helpers for GitHub Actions: parsing, serialization, and content injection used by standalone scaffold and monorepo sync.
 
 These functions are used by both standalone scaffold (init_cmd) and monorepo
 sync to manipulate GitHub Actions workflow YAML documents.

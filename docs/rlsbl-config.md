@@ -1,6 +1,6 @@
 ---
 title: rlsbl.config
-description: "Project configuration loading with layered precedence."
+description: "Project configuration loading with layered precedence from per-package, releasable, workspace, and project-level config.json files."
 generated: true
 nav_group: "API Reference"
 nav_order: 67

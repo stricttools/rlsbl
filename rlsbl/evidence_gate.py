@@ -1,4 +1,4 @@
-"""Layered evidence gate for determining whether a release was published.
+"""Layered evidence gate that checks multiple sources to determine whether a release was published, producing CLEARED or BLOCKED verdicts.
 
 The gate checks multiple evidence sources in order and produces a verdict:
 CLEARED (safe to undo) or BLOCKED (may have been published).

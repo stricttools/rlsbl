@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.batch_release
-description: "Batch release command for monorepo workspaces."
+description: "Batch release command for monorepo workspaces that validates listed items, determines topological order, and releases each sequentially."
 generated: true
 nav_group: "API Reference"
 nav_order: 37

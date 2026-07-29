@@ -1,4 +1,4 @@
-"""Shared CI-router job-key helpers.
+"""Shared CI-router job-key helpers for monorepo workflows, providing the single source of truth for project-prefixed job keys in ci-router.yml.
 
 The monorepo CI router (``ci-router.yml``) inlines every project's CI jobs,
 keyed ``<prefix>-<job>`` where the prefix is the CI file name minus ``.yml``.

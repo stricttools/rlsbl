@@ -1,4 +1,4 @@
-"""Pre-publish secret scan gate using gitleaks.
+"""Pre-publish secret scan gate using gitleaks that scans built artifacts for leaked secrets before any push or publish step in the release flow.
 
 Scans built artifacts (wheels, tarballs, archives) for leaked secrets
 before any push or publish step. This is a hard, non-bypassable gate

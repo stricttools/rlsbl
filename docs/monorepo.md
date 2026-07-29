@@ -1,5 +1,5 @@
 ---
-description: "Guide to rlsbl monorepo workspaces — workspace.toml format, dependency graphs, batch releases, impact analysis, snapshots, mirrors, two-level lint config, and checks."
+description: "Guide to rlsbl monorepo workspaces: workspace.toml format, dependency graphs, batch releases, impact analysis, snapshots, mirrors, and lint config."
 ---
 
 # Monorepo guide
@@ -133,6 +133,8 @@ Dependencies have a `scope` attribute with 4 possible values: `runtime`, `dev`, 
 
 ### Viewing the graph
 
+The graph can be exported in 3 formats: JSON for programmatic consumption, DOT for rendering with Graphviz, and indented text tree for quick terminal inspection. Each format supports the same filtering options, including scoping to a single root package and its transitive dependencies, reverse dependency queries showing what depends on a given package, and depth limiting to control how many levels of the graph are traversed:
+
 ```bash
 # JSON format (default)
 rlsbl monorepo graph
@@ -181,7 +183,7 @@ rlsbl monorepo impact --since v0.5.0
 
 ### Output (impact)
 
-The command reports a structured breakdown of the blast radius, organized by dependency distance from the changed package. Each section helps answer a different question about what to test, review, and release:
+The command reports a structured breakdown of the blast radius across 5 output sections, organized by dependency distance from the changed package. Each section helps answer a different question about what to test, review, and release:
 
 | Section | Meaning |
 | ------- | ------- |
@@ -278,7 +280,7 @@ Treat mirror repositories as read-only downstreams. To change a project, change 
 
 ### Plan and apply
 
-The command is an observe-then-converge reconciler:
+The mirror command follows an observe-then-converge reconciliation pattern. In dry-run mode it inspects the current state of the remote mirror and the local monorepo, produces a human-readable plan describing what would change, and exits without writing anything. In apply mode it executes the convergence steps, force-pushing with lease to update the mirror to match the current subtree state:
 
 - `rlsbl monorepo mirror <project> --dry-run` — observe and print a plan; makes **zero writes** (beyond the loose objects a branchless subtree split leaves in the monorepo's own object store).
 - `rlsbl monorepo mirror <project>` — observe, then converge (apply).

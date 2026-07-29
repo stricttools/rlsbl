@@ -1,4 +1,4 @@
-"""Helpers for crates.io binary wrapper packages (shims for Go tools).
+"""Helpers for crates.io binary wrapper packages that generate cargo-binstall shim crates wrapping prebuilt Go binaries from GitHub Releases.
 
 Parallel to npm_wrapper.py: provides template mappings and publish job
 generation for cargo-binstall + build.rs shim crates that wrap prebuilt

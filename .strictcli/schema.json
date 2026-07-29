@@ -742,7 +742,7 @@
             {
               "name": "id",
               "type": "str",
-              "help": "Entry ID (ULID) identifying the target entry",
+              "help": "Entry ID (ULID) identifying the target entry to edit in the JSONL file",
               "default": ""
             },
             {
@@ -1121,7 +1121,7 @@
             },
             {
               "name": "new_name",
-              "help": "New name for the releasable group"
+              "help": "New name for the releasable group in workspace.toml and state directories"
             }
           ]
         }
@@ -1485,6 +1485,27 @@
       "severity": "error",
       "fast": true,
       "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-format-version": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-format-version-gate": {
+      "tags": [
+        "changelog",
+        "preflight-changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
       "needs_network": false,
       "depends_on": []
     },
@@ -1940,6 +1961,19 @@
       "scope": "workspace"
     },
     "wrapper-producer": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
+    },
+    "strictspec-certificate-gate": {
       "tags": [
         "project",
         "preflight"

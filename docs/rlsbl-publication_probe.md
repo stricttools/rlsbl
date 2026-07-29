@@ -1,6 +1,6 @@
 ---
 title: rlsbl.publication_probe
-description: "Publication probe protocol for registry-aware version checking."
+description: "Publication probe protocol for registry-aware version checking, used by yank and undo commands to detect whether a version is published."
 generated: true
 nav_group: "API Reference"
 nav_order: 114

@@ -1,4 +1,4 @@
-"""Project configuration loading with layered precedence.
+"""Project configuration loading with layered precedence from per-package, releasable, workspace, and project-level config.json files.
 
 Layers (highest to lowest priority):
 1. Per-package config.json

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.ci_yaml
-description: "Shared CI workflow YAML helpers: parsing, serialization, and content injection."
+description: "Shared CI workflow YAML helpers for GitHub Actions: parsing, serialization, and content injection used by standalone scaffold and monorepo sync."
 generated: true
 nav_group: "API Reference"
 nav_order: 23

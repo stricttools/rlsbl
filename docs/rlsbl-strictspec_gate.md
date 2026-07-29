@@ -1,6 +1,6 @@
 ---
 title: rlsbl.strictspec_gate
-description: "Opt-in strictspec diff-certificate deploy gate: blocks a release when a certificate reports a violated or unsupported-and-unadjudicated format_version claim."
+description: "Strictspec diff-certificate deploy gate that blocks a release when a certificate reports a violated or unadjudicated format_version claim."
 generated: true
 nav_group: "API Reference"
 nav_order: 124

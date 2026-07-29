@@ -1,5 +1,5 @@
 ---
-description: "Pipeline architecture: 10 built-in types with per-type reference, 3 auth patterns, custom assets, capability gating, the Go artifact key, launcher shims with checksum-verified download modes for npm/PyPI, and migration from the old publish key."
+description: "Pipeline architecture: 10 built-in types, 3 auth patterns, custom assets, capability gating, launcher shims with download modes, and migration guide."
 ---
 
 # Pipelines
@@ -333,7 +333,7 @@ All four keys are mandatory when `artifact` is `"launcher"`. Missing or invalid 
 
 ### `download` mode semantics
 
-The `download` key selects **when** the wrapped binary is fetched. It is a deployment-shape decision with no default -- the operator must commit to it.
+The `download` key selects **when** the wrapped binary is fetched from GitHub Releases. This is a deployment-shape decision with no default -- the operator must explicitly choose between fetching at install time or lazily on first invocation. Each mode has different trade-offs for network behavior, install speed, and offline usability that affect how end users experience the tool:
 
 - **`postinstall` (npm only):** The wrapper ships a `postinstall` script (`scripts/postinstall.cjs`) that runs at `npm install` time. It maps `process.platform`/`process.arch` to goreleaser's OS/arch naming, downloads the matching release asset **and** the release's `checksums.txt`, SHA-256-verifies the asset against the matching `checksums.txt` line **before** installing it into the package's `vendor/` directory, and hard-fails on a checksum mismatch or a 404. A `bin/launcher.cjs` stub then execs the vendored binary, passing argv through. Node stdlib only -- zero runtime dependencies.
 - **`first-run` (npm and PyPI):** `npm install` performs **zero network I/O** -- no `postinstall` script is emitted. The wrapper ships a single self-contained `bin/launcher.cjs` (npm) or console-script module (PyPI) that, on the **first CLI invocation**, resolves the exact package version, downloads the matching release asset **and** `checksums.txt`, SHA-256-verifies before caching, extracts the binary to a platform-specific cache directory (`~/.cache/<tool>/` on Linux, `~/Library/Caches/<tool>/` on macOS, `%LOCALAPPDATA%\<tool>\` on Windows), then execs it -- passing argv through. Subsequent invocations exec the cached binary directly (no network). This is the required mode for consumers whose package must not touch the network at install time (e.g. library-only installs). Stdlib only -- zero runtime dependencies.
@@ -362,7 +362,7 @@ Both the CI verify step (which probes a representative asset URL and the `checks
 
 ### Verification closures
 
-Two structural closures prevent broken wrapper packages from reaching registries:
+Two structural closures work together to prevent broken wrapper packages from reaching registries. The first closure enforces ordering so the binary exists before the wrapper publishes, and the second closure verifies that the expected download URLs actually resolve. Both are enforced automatically in the generated CI workflows and cannot be bypassed:
 
 1. **`needs` dependency chain.** Every launcher publish job emits `needs: [gate, <producer-job-key>]` in the generated CI workflow. This ensures the binary producer's publish job (e.g., goreleaser) has finished and uploaded its assets before the launcher attempts to publish. The merged publish generator and the monorepo router both preserve this dependency. Without this, a shim could publish before its binary exists -- a permanently broken package on a registry that cannot un-publish.
 

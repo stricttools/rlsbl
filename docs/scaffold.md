@@ -206,7 +206,7 @@ rlsbl scaffold
 
 ### Resolving merge conflicts after scaffold
 
-If scaffold produces conflicts:
+When both the template and your customizations have changed the same lines since the last scaffold run, the three-way merge produces conflict markers in the output file. These are standard git-style conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) that must be resolved manually before the next release, because `rlsbl check --name scaffold-conflicts` detects unresolved markers and blocks the release preflight. To resolve:
 
 ```bash
 rlsbl scaffold

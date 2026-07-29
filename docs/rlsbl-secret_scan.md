@@ -1,6 +1,6 @@
 ---
 title: rlsbl.secret_scan
-description: "Pre-publish secret scan gate using gitleaks."
+description: "Pre-publish secret scan gate using gitleaks that scans built artifacts for leaked secrets before any push or publish step in the release flow."
 generated: true
 nav_group: "API Reference"
 nav_order: 121

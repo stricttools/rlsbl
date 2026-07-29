@@ -1151,7 +1151,7 @@ def cmd_chlog_amend(ctx, version, commits, id, description, type, user_facing, v
 
 @chlog.command(name="edit", help="Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash or entry ID, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.")
 @strictcli.flag(name="commits", type=str, help="Comma-separated commit hashes identifying the target entry", default="")
-@strictcli.flag(name="id", type=str, help="Entry ID (ULID) identifying the target entry", default="")
+@strictcli.flag(name="id", type=str, help="Entry ID (ULID) identifying the target entry to edit in the JSONL file", default="")
 @strictcli.flag(name="type", type=str, help="New type value (feature, fix, breaking); also disambiguates multi-entry commits", default="")
 @strictcli.flag(name="description", type=str, help="Replacement description text for the matched changelog entry", default="")
 @strictcli.flag(name="user-facing", type=bool, default=None, help="Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)")
@@ -1591,7 +1591,7 @@ def cmd_mono_migrate_releasable(ctx, dry_run, yes, quiet, releasable_name):
 
 
 @mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.")
-@strictcli.arg(name="new_name", help="New name for the releasable group")
+@strictcli.arg(name="new_name", help="New name for the releasable group in workspace.toml and state directories")
 @strictcli.arg(name="old_name", help="Current name of the releasable group in workspace.toml")
 def cmd_mono_rename_releasable(ctx, dry_run, yes, quiet, old_name, new_name):
     """Rename a releasable group, updating workspace.toml and state directories."""

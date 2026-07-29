@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.push_cmd
-description: "rlsbl push: tool-mediated push for non-release (dev) branches."
+description: "Tool-mediated push for non-release dev branches with branch guard, preflight changelog coverage, behind-remote refusal, and wrapped git push."
 generated: true
 nav_group: "API Reference"
 nav_order: 49

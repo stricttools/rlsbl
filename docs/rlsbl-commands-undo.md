@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.undo
-description: "Undo command that reverts a release by deleting the GitHub Release, removing the git tag, and reverting the version bump commit. Supports non-latest releases via --version."
+description: "Undo command that reverts a release by deleting the GitHub Release, removing the git tag, and reverting the version bump commit. Supports older versions."
 generated: true
 nav_group: "API Reference"
 nav_order: 63

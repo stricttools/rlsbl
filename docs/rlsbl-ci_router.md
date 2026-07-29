@@ -1,6 +1,6 @@
 ---
 title: rlsbl.ci_router
-description: "Shared CI-router job-key helpers."
+description: "Shared CI-router job-key helpers for monorepo workflows, providing the single source of truth for project-prefixed job keys in ci-router.yml."
 generated: true
 seeded: true
 nav_group: "API Reference"

@@ -1,4 +1,4 @@
-"""Publication probe protocol for registry-aware version checking.
+"""Publication probe protocol for registry-aware version checking, used by yank and undo commands to detect whether a version is published.
 
 Targets that support publication probing can determine whether a specific
 version of a package has been published to a registry. This is used by

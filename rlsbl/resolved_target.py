@@ -1,4 +1,4 @@
-"""Resolution of a member's release surface into ``ResolvedTarget`` records.
+"""Resolution of a member's release surface into ResolvedTarget records, linking separately-configured targets and pipelines for the release flow.
 
 Targets and pipelines are configured separately-but-linked (Phase 6.1): each
 pipeline entry declares an explicit ``target`` link (a target name, or ``null``

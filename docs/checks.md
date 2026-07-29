@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for rlsbl's checks across 6 primary tags, covering check metadata, severity levels, target applicability, and the workspace CI-router sync verification."
+description: "Reference for rlsbl checks across 6 tags, covering check metadata, severity levels, target applicability, and workspace CI-router sync verification."
 ---
 
 # Check system

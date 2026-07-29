@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release.execute
-description: "Release execution: version bump, commit, tag, push, GitHub Release creation, JSONL changelog finalization, rollback guard, post-release hooks, and dev-branch workflow."
+description: "Release execution: version bump, commit, tag, push, GitHub Release creation, JSONL changelog finalization, rollback guard, and post-release hooks."
 generated: true
 nav_group: "API Reference"
 nav_order: 51

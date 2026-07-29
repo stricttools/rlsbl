@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.batch_plan
-description: "Resolved-plan sidecar for monorepo batch releases."
+description: "Resolved-plan sidecar for monorepo batch releases that persists pre-batch base versions for idempotent, resumable release flows."
 generated: true
 nav_group: "API Reference"
 nav_order: 36

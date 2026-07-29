@@ -1,6 +1,6 @@
 ---
 title: rlsbl.crates_wrapper
-description: "Helpers for crates.io binary wrapper packages (shims for Go tools)."
+description: "Helpers for crates.io binary wrapper packages that generate cargo-binstall shim crates wrapping prebuilt Go binaries from GitHub Releases."
 generated: true
 nav_group: "API Reference"
 nav_order: 70

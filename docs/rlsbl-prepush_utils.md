@@ -1,6 +1,6 @@
 ---
 title: rlsbl.prepush_utils
-description: "Pre-push check utilities shared across checks/prepush.py and checks/workspace.py, providing commit enumeration, JSONL coverage verification, and changeset-file coverage mode."
+description: "Pre-push check utilities for commit enumeration, JSONL coverage verification, and changeset-file coverage mode shared across prepush and workspace checks."
 generated: true
 nav_group: "API Reference"
 nav_order: 113

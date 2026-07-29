@@ -272,7 +272,7 @@ Requires safegit 0.22.0+ (for `--remap-shas-in`, the persisted rewrite journal, 
 
 ### Full release from start to finish
 
-A typical release session after implementing a new feature and fixing a bug:
+This example walks through a complete release session after implementing a new feature and fixing a bug. It covers checking project state, adding changelog entries for uncovered commits, initializing the release file with the desired bump type, and executing the release with CI monitoring. Each step shows the actual commands and their expected output so you can follow along in your own project:
 
 ```bash
 # 1. Check project state
@@ -322,7 +322,7 @@ rlsbl release run --no-allow-dirty --watch --yes
 
 ### Dry run preview
 
-Preview what a release would do without making changes:
+Preview what a release would do without making any changes to the repository, registry, or GitHub. The dry-run flag runs the full validation pipeline (JSONL checks, version consistency, test suite) but stops before writing version files, committing, tagging, pushing, or creating GitHub Releases. Use this to verify that all checks pass and the bump type produces the expected version before executing a real release:
 
 ```bash
 rlsbl release run --no-allow-dirty --no-watch --yes --dry-run
@@ -334,7 +334,7 @@ rlsbl release run --no-allow-dirty --no-watch --yes --dry-run
 
 ### Recovering from a failed release
 
-If CI fails after pushing:
+When CI fails after the release has been pushed, use `rlsbl release undo` to cleanly revert all release artifacts: it deletes the GitHub Release, removes the git tag from both local and remote, and reverts the version bump commit. After undoing, fix the underlying issue, add a changelog entry for the fix, and re-run the release. The full recovery sequence looks like this:
 
 ```bash
 # Undo the release (deletes GitHub Release, tag, reverts commit)

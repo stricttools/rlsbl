@@ -1,4 +1,4 @@
-"""Release file reader and validator for file-based releases.
+"""Release file reader and validator for file-based releases, parsing .rlsbl/releases/unreleased.toml for bump type and release metadata.
 
 Instead of passing bump type on the CLI, the user creates
 .rlsbl/releases/unreleased.toml describing the release.

@@ -169,7 +169,7 @@ mylib --version
 
 ### Developing against a local sibling checkout
 
-When making coordinated changes to a library and its consumer:
+When making coordinated changes to a library and its consumer simultaneously, use `rlsbl dev sync` to overlay a local editable checkout of the library onto the consumer's locked virtual environment. This avoids publishing intermediate versions and lets you test changes across project boundaries immediately. The overlay mechanism uses `uv pip install -e` under the hood and requires `UV_NO_SYNC=1` in your environment to prevent bare `uv run` from reverting the overlay back to a registry wheel:
 
 ```bash
 cd ~/Projects/myapp

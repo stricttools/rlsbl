@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.mirror_cmd
-description: "Monorepo mirror reconciler that converges a project's subtree mirror to a tool-owned derived state, with a plan-only dry-run and a contract tripwire that hard-errors on hand-authored commits."
+description: "Monorepo mirror reconciler that converges a projects subtree mirror to a tool-owned derived state with dry-run planning and a foreign-commit tripwire."
 generated: true
 nav_group: "API Reference"
 nav_order: 43

@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.go
-description: "Go release target using a VERSION file as the source of truth, with GoReleaser integration for binaries, module proxy notification for libs, and retract support."
+description: "Go release target using a VERSION file as source of truth with GoReleaser integration for binaries, module proxy notification, and retract support."
 generated: true
 nav_group: "API Reference"
 nav_order: 134
