@@ -2297,7 +2297,7 @@ def _run_release_mutating(state: ReleaseState):
 
     # Run post-release hook if present (non-fatal: release is already complete)
     _use_releasable_hooks = releasable_name and monorepo_root and member_package_paths
-    hook_timeout = get_hook_timeout(ctx.config)
+    hook_timeout = get_hook_timeout(ctx.config, override=flags.get("hook-timeout"))
     _post_hook_error = None
 
     if "POST_HOOKS_RUN" in _completed:

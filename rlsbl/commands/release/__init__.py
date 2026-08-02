@@ -214,6 +214,10 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
 
     project_dir = str(project_root)
 
+    # Per-invocation timeout overrides, same as the fresh-release path.
+    from .shared import apply_timeout_overrides
+    apply_timeout_overrides(ctx.config, flags)
+
     # Extract saved state fields
     new_version = saved_state["new_version"]
     tag = saved_state["tag"]
@@ -294,6 +298,36 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
             pass
     if changes_dir is None and changes_dir_exists(project_dir):
         changes_dir = get_changes_dir(project_dir)
+
+    # Fix-forward support. A resume after a red CI gate re-enters with new
+    # commits on the release branch (the fix) and, normally, a new changelog
+    # entry covering them. CHANGELOG.md was rendered during the ORIGINAL run,
+    # so it must be regenerated while the release is still pre-finalization --
+    # otherwise the fix's entry would be sealed into <version>.jsonl by
+    # finalize_version but never appear in the changelog anyone reads.
+    _resume_completed = set(saved_state.get("completed_steps", []))
+    if (changes_dir
+            and "CHANGELOG_FINALIZED" not in _resume_completed
+            and not flags.get("dry-run", False)):
+        from ...changelog.home import generate_workspace_changelog
+        _regen_kwargs = {}
+        if releasable_name and _rel_cfg_dir:
+            from ...release_file import get_releases_dir as _get_releases_dir_resume
+            _regen_kwargs["changes_dir_override"] = changes_dir
+            _regen_kwargs["changelog_output_path"] = changelog_path
+            _regen_kwargs["releases_dir_override"] = _get_releases_dir_resume(
+                project_dir, releasable_dir=_rel_cfg_dir,
+            )
+        generate_changelog(
+            project_dir, version_override=new_version,
+            description=description, context=context, bump_type=bump_type,
+            **_regen_kwargs,
+        )
+        if releasable_name and monorepo_root:
+            generate_workspace_changelog(str(monorepo_root))
+        if os.path.exists(changelog_path):
+            changelog_entry = extract_changelog_entry(changelog_path, new_version)
+        log("Regenerated CHANGELOG.md from the current unreleased entries")
 
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     lock_root = monorepo_root if monorepo_name else project_root
@@ -429,6 +463,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 "`rlsbl release undo` to roll back."
             )
             raise ReleaseValidationError("".join(_parts))
+
+    # Per-invocation timeout overrides (--push/--ci/--check/--hook-timeout)
+    # land on the config before anything reads it, so the check framework and
+    # hook runner -- which only ever see a ProjectContext -- honour them too.
+    from .shared import apply_timeout_overrides
+    apply_timeout_overrides(config, flags)
 
     # --- Validate inputs and environment ---
     # Consolidated config schema validation (banned keys, structural invariants).
@@ -737,7 +777,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         prev_version=current_version or "",
         description=release_config.description if release_config else "",
     )
-    hook_timeout = get_hook_timeout(config)
+    hook_timeout = get_hook_timeout(config, override=flags.get("hook-timeout"))
 
     # In explicit releasable mode with members, use the multi-level hook system:
     #   1. Releasable pre-checks
