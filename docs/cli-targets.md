@@ -9,4 +9,4 @@ nav_order: 15
 
 # rlsbl targets
 
-List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.
+List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found.

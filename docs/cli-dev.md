@@ -13,7 +13,7 @@ Developer utilities for locally working with rlsbl projects, including editable 
 
 ## dev install
 
-Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 8 supported targets (pypi, npm, go, cargo, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.
+Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 7 supported targets (pypi, npm, go, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.
 
 ### Flags
 

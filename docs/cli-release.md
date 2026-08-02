@@ -91,7 +91,7 @@ Mark a past release as deprecated. Sets the GitHub Release pre-release flag and 
 
 ## release yank
 
-Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, cargo yank, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.
+Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.
 
 ### Flags
 

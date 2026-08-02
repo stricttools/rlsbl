@@ -508,11 +508,6 @@
       "type": "doc"
     },
     {
-      "path": "rlsbl-crates_wrapper.md",
-      "title": "rlsbl.crates_wrapper",
-      "type": "doc"
-    },
-    {
       "path": "rlsbl-dep_rewrite.md",
       "title": "rlsbl.dep_rewrite",
       "type": "doc"
@@ -663,11 +658,6 @@
       "type": "doc"
     },
     {
-      "path": "rlsbl-pipelines-cargo.md",
-      "title": "rlsbl.pipelines.cargo",
-      "type": "doc"
-    },
-    {
       "path": "rlsbl-pipelines-cloudflare_pages.md",
       "title": "rlsbl.pipelines.cloudflare_pages",
       "type": "doc"
@@ -795,11 +785,6 @@
     {
       "path": "rlsbl-targets-base.md",
       "title": "rlsbl.targets.base",
-      "type": "doc"
-    },
-    {
-      "path": "rlsbl-targets-cargo.md",
-      "title": "rlsbl.targets.cargo",
       "type": "doc"
     },
     {
@@ -975,5 +960,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-02T15:01:51.611362+00:00"
+  "last_gen": "2026-08-02T15:31:53.882704+00:00"
 }

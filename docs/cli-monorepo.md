@@ -30,7 +30,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--name` |  | str |  |  | Display name for the project in workspace.toml (defaults to directory name) |
-| `--target` |  | str |  |  | Registry this project publishes to (e.g. npm, pypi, go, cargo) |
+| `--target` |  | str |  |  | Registry this project publishes to (e.g. npm, pypi, go) |
 | `--watch` |  | str |  |  | Comma-separated glob patterns for change detection in CI workflows |
 | `--subtree-remote` |  | str |  |  | Git remote URL for split-publishing this project as a standalone repo |
 | `--depends-on` |  | str |  |  | Comma-separated names of workspace projects this project depends on |

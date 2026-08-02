@@ -15,4 +15,4 @@ Claim a name on a package registry by publishing a minimal placeholder package. 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Target package registry to publish the placeholder to (npm, pypi, or crates) |
+| `--target` |  | str |  |  | Target package registry to publish the placeholder to (npm or pypi) |
