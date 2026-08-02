@@ -206,6 +206,7 @@ class TestInternalPushesUseNoVerify:
         "commands/release/execute.py",
         "commands/undo.py",
         "commands/release_scrub.py",
+        "commands/monorepo/releasable_rename.py",
     ])
     def test_every_push_invocation_is_no_verify(self, relpath):
         text = (PKG_ROOT / relpath).read_text()

@@ -447,3 +447,58 @@ class TestNameValidator:
         for name in ("A", "1abc", "-abc", "a_b", "a.b", "", "a b"):
             with pytest.raises(Exception):
                 rr.validate_releasable_name(name)
+
+
+class TestAliasTagPushHygiene:
+    """The single sanctioned remote write obeys the standard push contract."""
+
+    def _capture_push(self, root, monkeypatch):
+        """Run a rename with ``run`` wrapped so the tag push is recorded."""
+        calls = []
+        real_run = rr.run
+
+        def spy(cmd, args, **kwargs):
+            if cmd == "git" and args and args[0] == "push":
+                calls.append((args, kwargs))
+            return real_run(cmd, args, **kwargs)
+
+        monkeypatch.setattr(rr, "run", spy)
+        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        assert calls, "no git push was issued"
+        return calls[-1]
+
+    def test_push_is_no_verify(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        args, _kwargs = self._capture_push(root, monkeypatch)
+        assert "--no-verify" in args
+
+    def test_push_uses_configured_timeout(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        rel_config = (root / ".rlsbl-monorepo" / "releasables" / "beta"
+                      / "config.json")
+        rel_config.write_text(json.dumps({"push_timeout": 321}) + "\n")
+        _git(root, "add", str(rel_config.relative_to(root)))
+        _git(root, "commit", "-q", "-m", "set push timeout")
+
+        _args, kwargs = self._capture_push(root, monkeypatch)
+        assert kwargs.get("timeout") == 321
+
+    def test_push_defaults_to_the_standard_timeout(self, tmp_path, monkeypatch,
+                                                   _gh_ok):
+        from rlsbl.utils import DEFAULT_PUSH_TIMEOUT
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        _args, kwargs = self._capture_push(root, monkeypatch)
+        assert kwargs.get("timeout") == DEFAULT_PUSH_TIMEOUT

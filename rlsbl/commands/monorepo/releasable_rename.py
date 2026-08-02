@@ -33,10 +33,12 @@ from tomlkit.items import AoT
 
 from ...errors import WorkspaceError
 from ...release_file import get_batch_release_file_path
+from ...config import read_project_config
 from ...utils import (
     check_gh_auth,
     check_gh_installed,
     commit_files_if_changed,
+    get_push_timeout,
     run,
 )
 from ...workspace import (
@@ -221,7 +223,17 @@ def _apply_local_rename(root, old, new):
     )
 
 
-def _finish_alias_tag(root, old_tag, new_tag, remote):
+def _push_timeout_for(root, name):
+    """Resolve the push timeout from the renamed releasable's config.
+
+    The workspace root has no per-package ``.rlsbl/config.json`` in a monorepo,
+    so this reads the releasable-level config and lets the standard
+    ``push_timeout`` key (or its default) apply.
+    """
+    return get_push_timeout(read_project_config(root, get_releasable_dir(root, name)))
+
+
+def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout):
     """Create the boundary alias tag and push it, idempotently.
 
     Returns a status dict describing what was (or would have been) done.
@@ -241,7 +253,10 @@ def _finish_alias_tag(root, old_tag, new_tag, remote):
         run("git", ["tag", new_tag, commit], cwd=root)
 
     # Push ONLY the alias tag -- the single sanctioned remote action.
-    run("git", ["push", remote, new_tag], cwd=root, timeout=120)
+    # --no-verify: the pre-push hook is a changelog-coverage guard for branch
+    # pushes; a tool-driven tag push must not be gated by it.
+    run("git", ["push", "--no-verify", remote, new_tag], cwd=root,
+        timeout=push_timeout)
     return {"status": "created", "tag": new_tag}
 
 
@@ -387,7 +402,10 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
 
         _apply_local_rename(root, old_name, new_name)
         if name_in_format:
-            result["tag"] = _finish_alias_tag(root, old_tag, new_tag, remote)
+            result["tag"] = _finish_alias_tag(
+                root, old_tag, new_tag, remote,
+                push_timeout=_push_timeout_for(root, new_name),
+            )
         else:
             result["name_only"] = True
         return result
@@ -493,7 +511,10 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
 
     # ---- alias tag + push (last) ----
     if name_in_format:
-        tag_result = _finish_alias_tag(root, old_tag, new_tag, remote)
+        tag_result = _finish_alias_tag(
+            root, old_tag, new_tag, remote,
+            push_timeout=_push_timeout_for(root, new_name),
+        )
         result["tag"] = tag_result
         result["note"] = _unmanaged_history_note(
             tag_format.format(name=old_name, version=""),
