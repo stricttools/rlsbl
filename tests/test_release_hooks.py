@@ -389,24 +389,21 @@ class TestWatchSHABeforePostHook:
 
 
 class TestHookTimeout:
-    """Tests for RLSBL_HOOK_TIMEOUT integration with hooks."""
+    """Tests for the hook_timeout config key's integration with hooks."""
 
-    def test_get_hook_timeout_no_env(self, monkeypatch):
-        monkeypatch.delenv("RLSBL_HOOK_TIMEOUT", raising=False)
-        assert get_hook_timeout() is None
+    def test_get_hook_timeout_unset(self):
+        assert get_hook_timeout({}) is None
 
-    def test_get_hook_timeout_valid(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "60")
-        assert get_hook_timeout() == 60
+    def test_get_hook_timeout_valid(self):
+        assert get_hook_timeout({"hook_timeout": 60}) == 60
 
-    def test_get_hook_timeout_invalid_raises(self, monkeypatch):
+    def test_get_hook_timeout_invalid_raises(self):
         from rlsbl.errors import ConfigError
 
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "abc")
         with pytest.raises(ConfigError) as exc_info:
-            get_hook_timeout()
+            get_hook_timeout({"hook_timeout": "abc"})
         msg = str(exc_info.value)
-        assert "RLSBL_HOOK_TIMEOUT" in msg
+        assert "hook_timeout" in msg
         assert "abc" in msg
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
@@ -444,7 +441,6 @@ class TestHookTimeout:
         capsys,
     ):
         """When a pre-release hook times out, the error message includes the configured seconds."""
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "45")
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nsleep 999\n")
         mock_run.side_effect = ["", "0", "", "", ""]
 
@@ -456,7 +452,7 @@ class TestHookTimeout:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+                run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "hook_timeout": 45}))
 
             assert exc_info.value.code == 1
             captured = capsys.readouterr()

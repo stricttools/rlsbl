@@ -383,8 +383,8 @@ def _make_external_check_fn(command, cwd, name, timeout=None):
 
     The returned function has the ``(ctx, reporter)`` signature expected by
     strictcli's check system.  The timeout is routed through the configured
-    check budget (``timeout=None`` resolves ``get_check_timeout(None)``,
-    honoring ``RLSBL_CHECK_TIMEOUT``).
+    check budget (``timeout=None`` resolves ``get_check_timeout(None)``, i.e.
+    the ``check_timeout`` config key or the shipped default).
     """
     def _run_external_check(ctx, reporter):
         check_cwd = _resolve_cwd(ctx, cwd)

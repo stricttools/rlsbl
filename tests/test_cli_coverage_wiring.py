@@ -233,6 +233,7 @@ class TestReleaseFlagSurface:
             "quiet": False,
             "allow-dirty": False,
             "watch": True,
+            "push-timeout": None,
         }
 
     def test_monorepo_release_run_no_watch(self):

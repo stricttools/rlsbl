@@ -405,8 +405,8 @@ class TestPostTaggedPushResumable:
 
         captured = capsys.readouterr()
         assert "rlsbl release resume" in captured.err
-        assert "RLSBL_PUSH_TIMEOUT" in captured.err, \
-            "a timeout failure must suggest raising RLSBL_PUSH_TIMEOUT"
+        assert "--push-timeout" in captured.err, \
+            "a timeout failure must suggest raising --push-timeout"
 
     def test_tag_push_raw_timeout_after_tag_is_resumable(self, tmp_project, capsys):
         """Form 2: tag push raises raw subprocess.TimeoutExpired (branch OK)."""
@@ -466,4 +466,4 @@ class TestPostTaggedPushResumable:
 
         captured = capsys.readouterr()
         assert "rlsbl release resume" in captured.err
-        assert "RLSBL_PUSH_TIMEOUT" in captured.err
+        assert "--push-timeout" in captured.err

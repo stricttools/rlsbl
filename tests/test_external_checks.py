@@ -508,8 +508,30 @@ class TestMakeExternalCheckFn:
 
 
 class TestTimeoutRouting:
-    def test_freeform_honors_env_timeout(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("RLSBL_CHECK_TIMEOUT", "77")
+    def test_freeform_honors_declared_timeout(self, tmp_path, monkeypatch):
+        captured = {}
+
+        def fake_run(*args, **kwargs):
+            captured["timeout"] = kwargs.get("timeout")
+
+            class R:
+                returncode = 0
+                stdout = "ok"
+                stderr = ""
+            return R()
+
+        monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
+        fn = _make_external_check_fn("echo hi", None, "c", timeout=77)
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        fn(FakeCtx(), ErrorReporter())
+        assert captured["timeout"] == 77
+
+    def test_freeform_falls_back_to_shipped_default(self, tmp_path, monkeypatch):
+        from rlsbl.utils import DEFAULT_CHECK_TIMEOUT
+
         captured = {}
 
         def fake_run(*args, **kwargs):
@@ -528,7 +550,7 @@ class TestTimeoutRouting:
             project_root = tmp_path
 
         fn(FakeCtx(), ErrorReporter())
-        assert captured["timeout"] == 77
+        assert captured["timeout"] == DEFAULT_CHECK_TIMEOUT
 
     def test_structured_honors_explicit_timeout(self, tmp_path, monkeypatch):
         captured = {}

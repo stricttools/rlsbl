@@ -204,92 +204,81 @@ def get_current_branch(*, cwd):
     return result
 
 
-def get_push_timeout(config=None):
+# Shipped timeout defaults. Deliberately generous: they are a backstop against
+# a genuinely hung subprocess, not a performance budget, and every observed real
+# cost (slow pushes over saturated links, full test suites with a cold uv cache)
+# must fit comfortably underneath. Override per project with the matching
+# config key in .rlsbl/config.json, or per invocation with the CLI flag.
+DEFAULT_PUSH_TIMEOUT = 300
+DEFAULT_CHECK_TIMEOUT = 900
+
+
+def _resolve_timeout(config, key, default, *, override=None):
+    """Resolve a timeout: explicit override > config key > shipped default.
+
+    There is deliberately NO environment-variable layer. A timeout is either
+    declared in the project's config or passed explicitly on the command line;
+    an ambient env var configuring release behavior is exactly the kind of
+    invisible state this tool refuses to have.
+
+    A present-but-invalid value (config or override) is a hard error naming the
+    key and the value -- never silently ignored, never silently defaulted.
+    """
+    if override is not None:
+        if not isinstance(override, int) or isinstance(override, bool) or override <= 0:
+            raise ConfigError(
+                f"Invalid --{key.replace('_', '-')} value: {override!r}. "
+                f"Must be a positive integer."
+            )
+        return override
+
+    if config is not None:
+        value = config.get(key)
+        if value is not None:
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                raise ConfigError(
+                    f"Invalid {key} in .rlsbl/config.json: {value!r}. "
+                    f"Must be a positive integer."
+                )
+            return value
+
+    return default
+
+
+def get_push_timeout(config=None, *, override=None):
     """Return the push timeout in seconds.
 
-    Precedence: RLSBL_PUSH_TIMEOUT env var > config dict push_timeout
-    > default 120 (the documented contract).
+    Precedence: ``override`` (the ``--push-timeout`` CLI flag) > config dict
+    ``push_timeout`` > :data:`DEFAULT_PUSH_TIMEOUT`.
 
-    ``config`` may be None (env > default only).
+    ``config`` may be None (override > default only).
     """
-    raw = os.environ.get("RLSBL_PUSH_TIMEOUT")
-    if raw is not None:
-        try:
-            val = int(raw)
-            if val <= 0:
-                raise ValueError
-            return val
-        except ValueError:
-            raise ConfigError(
-                f'Invalid RLSBL_PUSH_TIMEOUT="{raw}". Must be a positive integer.'
-            )
-
-    if config is not None:
-        config_val = config.get("push_timeout")
-        if config_val is not None:
-            if not isinstance(config_val, int) or config_val <= 0:
-                raise ConfigError(
-                    f'Invalid push_timeout in .rlsbl/config.json: {config_val!r}. '
-                    f'Must be a positive integer.'
-                )
-            return config_val
-
-    return 120
+    return _resolve_timeout(config, "push_timeout", DEFAULT_PUSH_TIMEOUT,
+                            override=override)
 
 
-def get_check_timeout(config=None):
+def get_check_timeout(config=None, *, override=None):
     """Return the check timeout in seconds.
 
-    Precedence: RLSBL_CHECK_TIMEOUT env var > config dict check_timeout
-    > default 120.
+    Precedence: ``override`` > config dict ``check_timeout`` >
+    :data:`DEFAULT_CHECK_TIMEOUT`.
 
-    ``config`` may be None (env > default only).
+    ``config`` may be None (override > default only).
     """
-    raw = os.environ.get("RLSBL_CHECK_TIMEOUT")
-    if raw is not None:
-        try:
-            val = int(raw)
-            if val <= 0:
-                raise ValueError
-            return val
-        except ValueError:
-            raise ConfigError(
-                f'Invalid RLSBL_CHECK_TIMEOUT="{raw}". Must be a positive integer.'
-            )
-
-    if config is not None:
-        config_val = config.get("check_timeout")
-        if config_val is not None:
-            if not isinstance(config_val, int) or config_val <= 0:
-                raise ConfigError(
-                    f'Invalid check_timeout in .rlsbl/config.json: {config_val!r}. '
-                    f'Must be a positive integer.'
-                )
-            return config_val
-
-    return 120
+    return _resolve_timeout(config, "check_timeout", DEFAULT_CHECK_TIMEOUT,
+                            override=override)
 
 
-def get_hook_timeout():
-    """Return the hook timeout in seconds, from RLSBL_HOOK_TIMEOUT or default None.
+def get_hook_timeout(config=None, *, override=None):
+    """Return the release-hook timeout in seconds, or None for no timeout.
 
-    If not set, returns None (no timeout — hooks run to completion).
-    If set, parses as a positive integer. A present-but-invalid value is
-    a hard error (:class:`ConfigError`) naming the variable and the value
-    -- never silently ignored.
+    Precedence: ``override`` > config dict ``hook_timeout`` > None. The default
+    is deliberately "no timeout": release hooks legitimately run whole test
+    suites and deploys, and killing one mid-flight is worse than waiting.
+
+    A present-but-invalid value is a hard error (:class:`ConfigError`).
     """
-    raw = os.environ.get("RLSBL_HOOK_TIMEOUT")
-    if raw is None:
-        return None
-    try:
-        val = int(raw)
-        if val <= 0:
-            raise ValueError
-        return val
-    except ValueError:
-        raise ConfigError(
-            f'Invalid RLSBL_HOOK_TIMEOUT="{raw}". Must be a positive integer.'
-        )
+    return _resolve_timeout(config, "hook_timeout", None, override=override)
 
 
 def remote_branch_exists(branch, cwd=None):

@@ -402,6 +402,7 @@ class TestCmdReleaseMissingFile:
                 watch=False,
                 bump="",
                 description="",
+                push_timeout=0,
                 preid="",
             )
 
@@ -434,6 +435,7 @@ class TestCmdReleaseInvalidFile:
                 watch=False,
                 bump="",
                 description="",
+                push_timeout=0,
                 preid="",
             )
 

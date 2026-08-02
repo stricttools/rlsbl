@@ -101,63 +101,52 @@ class TestExtractChangelogEntry:
 
 
 class TestGetHookTimeout:
-    """Tests for get_hook_timeout()."""
+    """Tests for get_hook_timeout() -- override > config key > None."""
 
-    def test_no_env_var_returns_none(self, monkeypatch):
-        monkeypatch.delenv("RLSBL_HOOK_TIMEOUT", raising=False)
+    def test_no_config_returns_none(self):
         assert get_hook_timeout() is None
+        assert get_hook_timeout({}) is None
 
-    def test_valid_value_returns_int(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", "30")
-        assert get_hook_timeout() == 30
+    def test_valid_value_returns_int(self):
+        assert get_hook_timeout({"hook_timeout": 30}) == 30
 
-    @pytest.mark.parametrize("value", ["not-a-number", "0", "-5"])
-    def test_invalid_value_raises(self, monkeypatch, value):
+    @pytest.mark.parametrize("value", ["not-a-number", 0, -5])
+    def test_invalid_value_raises(self, value):
         from rlsbl.errors import ConfigError
 
-        monkeypatch.setenv("RLSBL_HOOK_TIMEOUT", value)
         with pytest.raises(ConfigError) as exc_info:
-            get_hook_timeout()
+            get_hook_timeout({"hook_timeout": value})
         msg = str(exc_info.value)
-        assert "RLSBL_HOOK_TIMEOUT" in msg
-        assert value in msg
+        assert "hook_timeout" in msg
+        assert str(value) in msg
 
 
 class TestGetPushTimeout:
-    """Tests for get_push_timeout() -- env var > config dict > default 120."""
+    """Tests for get_push_timeout() -- override > config dict > default."""
 
-    @pytest.fixture(autouse=True)
-    def _setup(self, tmp_path, monkeypatch):
-        # Clear env var
-        monkeypatch.delenv("RLSBL_PUSH_TIMEOUT", raising=False)
-
-    def test_env_var_returns_value(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "60")
-        assert get_push_timeout({}) == 60
+    def test_override_returns_value(self):
+        assert get_push_timeout({}, override=60) == 60
 
     def test_config_returns_value(self):
         assert get_push_timeout({"push_timeout": 90}) == 90
 
-    def test_neither_returns_default_120(self):
-        # Documented contract: when neither the env var nor the config
-        # field is set, the push timeout defaults to 120 seconds.
-        assert get_push_timeout({}) == 120
+    def test_neither_returns_shipped_default(self):
+        from rlsbl.utils import DEFAULT_PUSH_TIMEOUT
 
-    def test_env_var_takes_precedence_over_config(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "45")
-        assert get_push_timeout({"push_timeout": 200}) == 45
+        assert get_push_timeout({}) == DEFAULT_PUSH_TIMEOUT
 
-    def test_invalid_env_var_raises_error(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "not-a-number")
+    def test_override_takes_precedence_over_config(self):
+        assert get_push_timeout({"push_timeout": 200}, override=45) == 45
+
+    def test_invalid_override_raises_error(self):
         with pytest.raises(ConfigError) as exc_info:
-            get_push_timeout({})
-        assert "Invalid RLSBL_PUSH_TIMEOUT" in str(exc_info.value)
+            get_push_timeout({}, override="not-a-number")
+        assert "push-timeout" in str(exc_info.value)
 
-    def test_zero_env_var_raises_error(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "0")
+    def test_zero_override_raises_error(self):
         with pytest.raises(ConfigError) as exc_info:
-            get_push_timeout({})
-        assert "Invalid RLSBL_PUSH_TIMEOUT" in str(exc_info.value)
+            get_push_timeout({}, override=0)
+        assert "push-timeout" in str(exc_info.value)
 
     def test_invalid_config_value_raises_error(self):
         with pytest.raises(ConfigError) as exc_info:

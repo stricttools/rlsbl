@@ -785,7 +785,7 @@ class TestTimeoutHint:
     """Timeout-failure messages name the configurable budget knob.
 
     Every ``command timed out`` message must append CHECK_TIMEOUT_HINT so an
-    agent hitting a timeout learns which knob (check_timeout / RLSBL_CHECK_TIMEOUT)
+    agent hitting a timeout learns which knob (the ``check_timeout`` config key)
     controls the budget -- while making clear the check still hard-fails on hangs.
     """
 
@@ -793,9 +793,9 @@ class TestTimeoutHint:
         raise subprocess.TimeoutExpired(cmd=kwargs.get("args", ["cmd"]), timeout=1)
 
     def test_hint_is_grounded(self):
-        """The hint names the config key, the env var, and the hard-fail caveat."""
-        assert "check_timeout in .rlsbl/config.json" in CHECK_TIMEOUT_HINT
-        assert "RLSBL_CHECK_TIMEOUT" in CHECK_TIMEOUT_HINT
+        """The hint names the config key and the hard-fail caveat -- no env var."""
+        assert "check_timeout key in .rlsbl/config.json" in CHECK_TIMEOUT_HINT
+        assert "RLSBL_" not in CHECK_TIMEOUT_HINT
         assert "hard-fail" in CHECK_TIMEOUT_HINT
 
     def test_pypi_uv_timeout_prints_hint(self, tmp_project, capsys):

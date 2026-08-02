@@ -434,10 +434,15 @@ class TestTargetRegistryIntegration:
 
 
 class TestBuildTimeoutResolution:
-    """Tests for BaseTarget._resolve_build_timeout 4-level precedence."""
+    """Tests for BaseTarget._resolve_build_timeout: config key > class default.
+
+    There is no environment-variable layer -- see
+    tests/test_timeout_config_surface.py, which pins that RLSBL_BUILD_TIMEOUT
+    and RLSBL_BUILD_TIMEOUT_<TARGET> are inert.
+    """
 
     def test_level4_class_default(self):
-        """With no config or env, falls back to BUILD_TIMEOUT_DEFAULT."""
+        """With no config, falls back to BUILD_TIMEOUT_DEFAULT."""
         from rlsbl.targets.base import BaseTarget
         t = BaseTarget()
         assert t._resolve_build_timeout(None) == 120
@@ -472,33 +477,20 @@ class TestBuildTimeoutResolution:
         config = {"build_timeout": {"pypi": 45}}
         assert t._resolve_build_timeout(config) == t.BUILD_TIMEOUT_DEFAULT
 
-    def test_level2_generic_env(self, monkeypatch):
-        """RLSBL_BUILD_TIMEOUT env var overrides config."""
-        t = TARGETS["npm"]
-        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT", "200")
-        assert t._resolve_build_timeout({"build_timeout": 60}) == 200
-
-    def test_level1_target_specific_env(self, monkeypatch):
-        """RLSBL_BUILD_TIMEOUT_NPM env var overrides generic env."""
+    def test_env_vars_are_inert(self, monkeypatch):
+        """The deleted env layer must stay deleted: config still wins."""
         t = TARGETS["npm"]
         monkeypatch.setenv("RLSBL_BUILD_TIMEOUT", "200")
         monkeypatch.setenv("RLSBL_BUILD_TIMEOUT_NPM", "30")
-        assert t._resolve_build_timeout({"build_timeout": 60}) == 30
+        assert t._resolve_build_timeout({"build_timeout": 60}) == 60
+        assert t._resolve_build_timeout(None) == t.BUILD_TIMEOUT_DEFAULT
 
-    def test_precedence_order(self, monkeypatch):
-        """Full 4-level precedence: specific env > generic env > config > class default."""
+    def test_precedence_order(self):
+        """Config key overrides the class default; nothing else participates."""
         from rlsbl.targets.maven import MavenTarget
         t = MavenTarget()
-        # Level 4 alone
         assert t._resolve_build_timeout(None) == 300
-        # Level 3 overrides 4
         assert t._resolve_build_timeout({"build_timeout": 150}) == 150
-        # Level 2 overrides 3
-        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT", "200")
-        assert t._resolve_build_timeout({"build_timeout": 150}) == 200
-        # Level 1 overrides 2
-        monkeypatch.setenv("RLSBL_BUILD_TIMEOUT_MAVEN", "50")
-        assert t._resolve_build_timeout({"build_timeout": 150}) == 50
 
     def test_pgdesign_default(self):
         """PgdesignTarget has BUILD_TIMEOUT_DEFAULT = 60."""

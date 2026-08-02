@@ -500,7 +500,7 @@ class TestCliReadsReleasableReleaseFile:
         with patch("rlsbl.commands.release.run_cmd") as mock_run:
             rlsbl_mod.cmd_release_run(None, 
                 dry_run=False, yes=True, quiet=True,
-                allow_dirty=False, watch=False,
+                allow_dirty=False, watch=False, push_timeout=0,
                 bump="", description="", preid="",
             )
         mock_run.assert_called_once()

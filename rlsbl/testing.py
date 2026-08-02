@@ -16,8 +16,8 @@ from .utils import detect_uv_workspace_root, get_check_timeout, require_tool
 # Shared remediation hint appended to every "command timed out" failure message
 # so agents know which knob controls the budget. Kept identical across all sites.
 CHECK_TIMEOUT_HINT = (
-    "(budget configurable: check_timeout in .rlsbl/config.json or "
-    "RLSBL_CHECK_TIMEOUT — the check still hard-fails on real hangs)"
+    "(budget configurable: the check_timeout key in .rlsbl/config.json "
+    "— the check still hard-fails on real hangs)"
 )
 
 

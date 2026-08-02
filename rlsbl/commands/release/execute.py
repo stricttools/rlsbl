@@ -689,6 +689,7 @@ def _run_release_mutating(state: ReleaseState):
         commit_files,
         commit_files_if_changed,
         has_staged_or_modified,
+        DEFAULT_PUSH_TIMEOUT,
         get_push_timeout,
         get_hook_timeout,
         get_current_branch,
@@ -895,7 +896,7 @@ def _run_release_mutating(state: ReleaseState):
         with resume guidance.
         """
         _timed_out = _is_push_timeout(_exc)
-        _retry_timeout = get_push_timeout(ctx.config)
+        _retry_timeout = get_push_timeout(ctx.config, override=flags.get("push-timeout"))
         _recovered = False
         if branch_pushed:
             # Branch commits are already on the remote; only the tag push
@@ -945,7 +946,8 @@ def _run_release_mutating(state: ReleaseState):
             print(
                 f"The push timed out (limit: {_retry_timeout}s). Raise the "
                 f"timeout and resume:\n"
-                f"  RLSBL_PUSH_TIMEOUT=300 rlsbl release resume",
+                f"  rlsbl release resume --push-timeout 900\n"
+                f"(or set push_timeout in .rlsbl/config.json)",
                 file=sys.stderr,
             )
         else:
@@ -1561,9 +1563,10 @@ def _run_release_mutating(state: ReleaseState):
 
         # PUSHED guard: skip branch push if remote matches local HEAD,
         # skip tag push if remote tag already exists.
-        push_timeout = get_push_timeout(ctx.config)
-        if push_timeout != 120:
-            log(f"Push timeout: {push_timeout}s (from RLSBL_PUSH_TIMEOUT)")
+        push_timeout = get_push_timeout(ctx.config, override=flags.get("push-timeout"))
+        if push_timeout != DEFAULT_PUSH_TIMEOUT:
+            log(f"Push timeout: {push_timeout}s (from --push-timeout or the "
+                f"push_timeout config key)")
         _push_already_done = False
         if "PUSHED" in _completed:
             _push_already_done = True
@@ -2001,7 +2004,7 @@ def _run_release_mutating(state: ReleaseState):
 
     # Run post-release hook if present (non-fatal: release is already complete)
     _use_releasable_hooks = releasable_name and monorepo_root and member_package_paths
-    hook_timeout = get_hook_timeout()
+    hook_timeout = get_hook_timeout(ctx.config)
     _post_hook_error = None
 
     if "POST_HOOKS_RUN" in _completed:

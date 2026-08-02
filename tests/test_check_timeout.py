@@ -1,66 +1,90 @@
-"""Tests for get_check_timeout() and get_push_timeout() -- env var > config dict > default 120."""
+"""Tests for get_check_timeout() / get_push_timeout() / get_hook_timeout().
+
+Precedence is: explicit override (the CLI flag) > config dict key > shipped
+default. There is deliberately no environment-variable layer -- see
+tests/test_timeout_config_surface.py, which pins that env vars are inert.
+"""
 
 import pytest
 
 from rlsbl.errors import ConfigError
-from rlsbl.utils import get_check_timeout, get_push_timeout
+from rlsbl.utils import (
+    DEFAULT_CHECK_TIMEOUT,
+    DEFAULT_PUSH_TIMEOUT,
+    get_check_timeout,
+    get_hook_timeout,
+    get_push_timeout,
+)
 
 
 class TestGetCheckTimeout:
-    """Tests for get_check_timeout() -- env var > config dict > default 120."""
+    """get_check_timeout() -- override > config dict > DEFAULT_CHECK_TIMEOUT."""
 
-    @pytest.fixture(autouse=True)
-    def _setup(self, monkeypatch):
-        monkeypatch.delenv("RLSBL_CHECK_TIMEOUT", raising=False)
-
-    def test_default_returns_120(self):
-        assert get_check_timeout({}) == 120
-
-    def test_env_var_returns_value(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_CHECK_TIMEOUT", "60")
-        assert get_check_timeout({}) == 60
+    def test_empty_config_returns_default(self):
+        assert get_check_timeout({}) == DEFAULT_CHECK_TIMEOUT
 
     def test_config_returns_value(self):
         assert get_check_timeout({"check_timeout": 90}) == 90
 
-    def test_env_overrides_config(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_CHECK_TIMEOUT", "45")
-        assert get_check_timeout({"check_timeout": 200}) == 45
-
-    def test_invalid_env_var_raises_config_error(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_CHECK_TIMEOUT", "not-a-number")
-        with pytest.raises(ConfigError) as exc_info:
-            get_check_timeout({})
-        assert "Invalid RLSBL_CHECK_TIMEOUT" in str(exc_info.value)
-
-    def test_negative_env_var_raises_config_error(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_CHECK_TIMEOUT", "-5")
-        with pytest.raises(ConfigError) as exc_info:
-            get_check_timeout({})
-        assert "Invalid RLSBL_CHECK_TIMEOUT" in str(exc_info.value)
+    def test_override_beats_config(self):
+        assert get_check_timeout({"check_timeout": 200}, override=45) == 45
 
     def test_invalid_config_value_raises_config_error(self):
         with pytest.raises(ConfigError) as exc_info:
             get_check_timeout({"check_timeout": "slow"})
         assert "Invalid check_timeout" in str(exc_info.value)
 
-    def test_config_none_no_env_returns_120(self):
-        assert get_check_timeout(None) == 120
+    def test_zero_config_value_raises_config_error(self):
+        with pytest.raises(ConfigError):
+            get_check_timeout({"check_timeout": 0})
 
-    def test_config_none_with_env_returns_env(self, monkeypatch):
-        monkeypatch.setenv("RLSBL_CHECK_TIMEOUT", "30")
-        assert get_check_timeout(None) == 30
+    def test_invalid_override_raises_config_error(self):
+        with pytest.raises(ConfigError):
+            get_check_timeout({}, override="slow")
+
+    def test_config_none_returns_default(self):
+        assert get_check_timeout(None) == DEFAULT_CHECK_TIMEOUT
+
+    def test_no_args_returns_default(self):
+        assert get_check_timeout() == DEFAULT_CHECK_TIMEOUT
 
 
 class TestGetPushTimeout:
-    """Tests for get_push_timeout() -- env var > config dict > default 120."""
+    """get_push_timeout() -- override > config dict > DEFAULT_PUSH_TIMEOUT."""
 
-    @pytest.fixture(autouse=True)
-    def _setup(self, monkeypatch):
-        monkeypatch.delenv("RLSBL_PUSH_TIMEOUT", raising=False)
+    def test_config_none_returns_default(self):
+        assert get_push_timeout(None) == DEFAULT_PUSH_TIMEOUT
 
-    def test_config_none_returns_120(self):
-        assert get_push_timeout(None) == 120
+    def test_no_args_returns_default(self):
+        assert get_push_timeout() == DEFAULT_PUSH_TIMEOUT
 
-    def test_default_no_args_returns_120(self):
-        assert get_push_timeout() == 120
+    def test_config_returns_value(self):
+        assert get_push_timeout({"push_timeout": 60}) == 60
+
+    def test_override_beats_config(self):
+        assert get_push_timeout({"push_timeout": 60}, override=900) == 900
+
+    def test_invalid_config_value_raises_config_error(self):
+        with pytest.raises(ConfigError) as exc_info:
+            get_push_timeout({"push_timeout": -1})
+        assert "Invalid push_timeout" in str(exc_info.value)
+
+
+class TestGetHookTimeout:
+    """get_hook_timeout() -- override > config dict > None (no timeout)."""
+
+    def test_default_is_no_timeout(self):
+        assert get_hook_timeout() is None
+        assert get_hook_timeout(None) is None
+        assert get_hook_timeout({}) is None
+
+    def test_config_returns_value(self):
+        assert get_hook_timeout({"hook_timeout": 1800}) == 1800
+
+    def test_override_beats_config(self):
+        assert get_hook_timeout({"hook_timeout": 1800}, override=60) == 60
+
+    def test_invalid_config_value_raises_config_error(self):
+        with pytest.raises(ConfigError) as exc_info:
+            get_hook_timeout({"hook_timeout": "forever"})
+        assert "Invalid hook_timeout" in str(exc_info.value)

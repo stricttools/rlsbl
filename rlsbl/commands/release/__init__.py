@@ -38,6 +38,7 @@ from ...utils import (
     extract_changelog_entry_from_text,
     extract_github_repo_from_remote,
     get_current_branch,
+    DEFAULT_PUSH_TIMEOUT,
     get_hook_timeout,
     get_push_timeout,
     has_staged_or_modified,
@@ -729,7 +730,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         prev_version=current_version or "",
         description=release_config.description if release_config else "",
     )
-    hook_timeout = get_hook_timeout()
+    hook_timeout = get_hook_timeout(config)
 
     # In explicit releasable mode with members, use the multi-level hook system:
     #   1. Releasable pre-checks

@@ -155,33 +155,24 @@ class BaseTarget:
         return []
 
     def _resolve_build_timeout(self, config):
-        """Resolve build timeout through 4-level precedence.
+        """Resolve the build timeout from config, then the shipped default.
 
-        1. ``RLSBL_BUILD_TIMEOUT_{TARGET_NAME}`` env var
-        2. ``RLSBL_BUILD_TIMEOUT`` env var
-        3. ``config["build_timeout"]`` (int or dict with target-name / "default" keys)
-        4. ``self.BUILD_TIMEOUT_DEFAULT`` class variable
+        1. ``config["build_timeout"]`` -- an int, or a dict keyed by target
+           name with an optional ``"default"`` entry
+        2. ``self.BUILD_TIMEOUT_DEFAULT`` class variable
+
+        There is deliberately no environment-variable layer: build budgets are
+        declared in ``.rlsbl/config.json``, never picked up from the ambient
+        environment.
         """
-        # Level 1: target-specific env var
-        env_specific = os.environ.get(f"RLSBL_BUILD_TIMEOUT_{self.name.upper()}")
-        if env_specific is not None:
-            return int(env_specific)
-
-        # Level 2: generic env var
-        env_generic = os.environ.get("RLSBL_BUILD_TIMEOUT")
-        if env_generic is not None:
-            return int(env_generic)
-
-        # Level 3: config file
         if config is not None:
             bt = config.get("build_timeout")
             if bt is not None:
-                if isinstance(bt, int):
+                if isinstance(bt, int) and not isinstance(bt, bool):
                     return bt
                 if isinstance(bt, dict):
                     return bt.get(self.name, bt.get("default", self.BUILD_TIMEOUT_DEFAULT))
 
-        # Level 4: class default
         return self.BUILD_TIMEOUT_DEFAULT
 
     def build(self, dir_path, version, *, config=None):

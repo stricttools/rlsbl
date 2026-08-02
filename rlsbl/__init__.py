@@ -244,12 +244,13 @@ release_group = app.group("release", help="Release orchestration commands. Provi
     name="run",
     help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
 )
+@strictcli.flag(name="push-timeout", type=int, default=0, help="Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.")
 @strictcli.flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)")
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
 @strictcli.flag(name="bump", type=str, help="Bump type: patch, minor, major, infra, prerelease. Skips the release file.", default="")
 @strictcli.flag(name="description", type=str, help="Short release description summarizing the changes (required with --bump)", default="")
 @strictcli.flag(name="preid", type=str, help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.", default="")
-def cmd_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, bump, description, preid):
+def cmd_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, bump, description, preid, push_timeout):
     """Execute the release flow: validate, bump, test, commit, tag, push, and create GitHub Release."""
     root = _require_sub_project_root(
         workspace_root_guidance=(
@@ -346,7 +347,8 @@ def cmd_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, bump, descript
             preid=preid,
         )
         from .commands.release.shared import build_release_flags
-        flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
+        flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch,
+                                    push_timeout=push_timeout or None)
         from .commands.release import run_cmd
         run_cmd(release_config, flags, ctx=ctx)
         return
@@ -367,7 +369,8 @@ def cmd_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, bump, descript
         sys.exit(1)
 
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch,
+                                push_timeout=push_timeout or None)
     from .commands.release import run_cmd
     run_cmd(release_config, flags, ctx=ctx)
 
@@ -376,8 +379,9 @@ def cmd_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, bump, descript
     name="resume",
     help="Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
 )
+@strictcli.flag(name="push-timeout", type=int, default=0, help="Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.")
 @strictcli.flag(name="watch", type=bool, help="After release, automatically watch CI runs to completion (--no-watch to skip)")
-def cmd_release_resume(ctx, dry_run, yes, quiet, watch):
+def cmd_release_resume(ctx, dry_run, yes, quiet, watch, push_timeout):
     """Resume a previously failed release from its last completed step."""
     from .commands.release.release_state import (
         StateResolutionError,
@@ -462,7 +466,8 @@ def cmd_release_resume(ctx, dry_run, yes, quiet, watch):
         )
 
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, yes, quiet, allow_dirty=False, watch=watch)
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty=False, watch=watch,
+                                push_timeout=push_timeout or None)
     from .commands.release import resume_cmd
     resume_cmd(saved, flags, ctx=ctx)
 
@@ -1348,12 +1353,14 @@ mono_release = mono.group("release", help="Release commands for monorepo workspa
     name="run",
     help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
 )
+@strictcli.flag(name="push-timeout", type=int, default=0, help="Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.")
 @strictcli.flag(name="watch", type=bool, help="After batch release, automatically watch CI runs to completion (--no-watch to skip)")
 @strictcli.flag(name="allow-dirty", type=bool, help="Skip the clean working tree check and allow releasing with uncommitted changes")
-def cmd_mono_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch):
+def cmd_mono_release_run(ctx, dry_run, yes, quiet, allow_dirty, watch, push_timeout):
     """Execute a batch release of multiple monorepo packages in topological order."""
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch)
+    flags = build_release_flags(dry_run, yes, quiet, allow_dirty, watch=watch,
+                                push_timeout=push_timeout or None)
     root = _require_project_root()
     from .commands.monorepo import _cmd_batch_release
     _cmd_batch_release(flags, project_root=root)

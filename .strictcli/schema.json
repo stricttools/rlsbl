@@ -339,6 +339,12 @@
           "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
           "flags": [
             {
+              "name": "push-timeout",
+              "type": "int",
+              "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.",
+              "default": 0
+            },
+            {
               "name": "watch",
               "type": "bool",
               "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
@@ -374,6 +380,12 @@
           "name": "resume",
           "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
           "flags": [
+            {
+              "name": "push-timeout",
+              "type": "int",
+              "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.",
+              "default": 0
+            },
             {
               "name": "watch",
               "type": "bool",
@@ -1072,6 +1084,12 @@
               "name": "run",
               "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
               "flags": [
+                {
+                  "name": "push-timeout",
+                  "type": "int",
+                  "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.",
+                  "default": 0
+                },
                 {
                   "name": "watch",
                   "type": "bool",

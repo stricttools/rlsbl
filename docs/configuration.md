@@ -21,7 +21,10 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | release_branches | array | Branch names that trigger the manual-release-push warning. Default: `["main", "master"]` when absent. An empty list is a hard error -- either omit the key entirely or list at least one branch. |
 | changelog_format | string | Controls the format of generated CHANGELOG.md. Default: `"grouped"`. Currently the only supported value, which produces version sections with `### Breaking`, `### Features`, `### Fixes` sub-headers. |
 | batch_limits | object | Limits and exclusions for changelog batch-size validation checks. See [batch_limits](#batch_limits) below. |
-| check_timeout | int | Timeout in seconds for check subprocesses (built-in tests, etc.). Default: 120. Overridable per-invocation via the `RLSBL_CHECK_TIMEOUT` env var (precedence: env > config > default). A declared budget, not a bypass — the check still hard-fails on a real hang. |
+| check_timeout | int | Timeout in seconds for check subprocesses (built-in tests, etc.). Default: 900. A declared budget, not a bypass — the check still hard-fails on a real hang. |
+| push_timeout | int | Timeout in seconds for each `git push` during a release. Default: 300. Overridable per-invocation with `--push-timeout`. |
+| hook_timeout | int | Timeout in seconds for release hooks. Default: absent, meaning no timeout — hooks run to completion. |
+| build_timeout | int or object | Timeout in seconds for target build steps. An int applies to every target; an object is keyed by target name with an optional `default` entry. Falls back to each target's shipped default (120s for most, 300s for maven, 60s for pgdesign). |
 | test | object | Per-target test-selection filters. See [test](#test) below. |
 | external_checks | array | Config-declared subprocess checks that run during `rlsbl check` and the release preflight. Each entry declares a `kind` (`structured` or `freeform`). See [external_checks](#external_checks) below. |
 | strictspec_gate | object | Opt-in [strictspec certificate deploy gate](#strictspec_gate). Consumes a `strictspec diff` certificate as a `format_version` gate. See below. |
@@ -195,7 +198,7 @@ For every structured entry, rlsbl emits an additional pure, fast check named `<n
 
 #### Timeout
 
-Both kinds route their subprocess timeout through the configured check budget — `check_timeout` in `.rlsbl/config.json` or the `RLSBL_CHECK_TIMEOUT` env var (precedence: env > config > default 120s). The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
+Both kinds route their subprocess timeout through the configured check budget — the `check_timeout` key in `.rlsbl/config.json`, else the shipped default (900s). The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
 
 ### Pipeline config
 
@@ -319,10 +322,11 @@ Some CLI flags override config.json keys for a single invocation, providing temp
 | `--no-tag` | `tag` | project + user | Disables ecosystem tagging for this invocation |
 | `--allow-dirty` | (none) | release only | Skips clean working tree check |
 | `--watch`/`--no-watch` | (none) | release only | Controls CI monitoring after push |
-| `RLSBL_PUSH_TIMEOUT` env | `push_timeout` | project | Push timeout in seconds (default 120) |
-| `RLSBL_CHECK_TIMEOUT` env | `check_timeout` | project | Check subprocess timeout in seconds (default 120). Precedence: env > config > default. A declared budget, not a bypass — the check still hard-fails on a real hang. |
+| `--push-timeout` | `push_timeout` | release only | Push timeout in seconds for this invocation (0, the default, means use the config key, else the shipped 300s) |
 
 Global flags `--dry-run`, `--yes`, and `--quiet` are runtime-only and have no `config.json` equivalent. They affect the current invocation but are never persisted to configuration.
+
+Timeouts are never read from the environment. `RLSBL_PUSH_TIMEOUT`, `RLSBL_CHECK_TIMEOUT`, `RLSBL_HOOK_TIMEOUT`, `RLSBL_BUILD_TIMEOUT`, and `RLSBL_BUILD_TIMEOUT_<TARGET>` were removed: a timeout is declared in `.rlsbl/config.json` or passed explicitly on the command line, never picked up from ambient environment state.
 
 ## .rlsbl-monorepo/workspace.toml
 

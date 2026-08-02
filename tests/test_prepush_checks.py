@@ -12,6 +12,7 @@ from unittest.mock import patch
 import pytest
 from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
 from rlsbl import app
+from rlsbl.utils import DEFAULT_CHECK_TIMEOUT
 from rlsbl.check_context import WorkspaceCheckContext
 
 
@@ -527,7 +528,7 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
 
         assert result.status == "pass"
         # Upfront uv sync runs at workspace root
-        mock_sync.assert_called_once_with(str(repo), check_timeout=120)
+        mock_sync.assert_called_once_with(str(repo), check_timeout=DEFAULT_CHECK_TIMEOUT)
         # Per-project test runs with skip_sync=True
         mock_tests.assert_called_once_with(
             "pypi", project_dir=str(pkg), workspace_root=str(repo), skip_sync=True,
