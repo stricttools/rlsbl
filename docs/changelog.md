@@ -1,5 +1,5 @@
 ---
-description: "JSONL changelog reference: entry schema, format_version gate, adding entries, validation checks, caching, markdown generation, and pre-push enforcement."
+description: "JSONL changelog reference: entry schema, the format_version gate, adding entries, validation checks, caching, generation, and pre-push enforcement."
 ---
 
 # JSONL changelog

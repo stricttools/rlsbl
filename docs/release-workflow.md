@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for the rlsbl release flow — prerequisites, pipeline order, hooks, flags, dev node behavior, and related commands."
+description: "Reference for the rlsbl release flow: bump types, the alpha/beta/rc/stable pre-release channel, pipeline order, hooks, flags, and related commands."
 ---
 
 # Release workflow
@@ -46,8 +46,12 @@ targets = ["pypi", "npm"]
 | `patch` | Bug fixes, small improvements, no API changes | 0.5.2 -> 0.5.3 |
 | `minor` | New features, backward-compatible additions | 0.5.2 -> 0.6.0 |
 | `major` | Breaking changes, API removals, incompatible changes | 0.5.2 -> 1.0.0 |
+| `infra` | Infrastructure-only releases with zero user-facing entries | 0.5.2 -> 0.5.3 |
+| `prerelease` | Advance an existing pre-release: next counter, or promote to the next channel | 0.6.0-alpha.0 -> 0.6.0-alpha.1 |
 
 For pre-stable projects (0.x.x), breaking changes are a minor bump. Never bump to 1.0.0 without explicit authorization.
+
+`infra` exempts the release from the at-least-one-user-facing-entry gate and **forbids** user-facing entries. It is not a hotfix mechanism — a user-facing hotfix is a `patch`.
 
 ### Description and context
 
@@ -83,6 +87,77 @@ mode = "build"
 `rlsbl release init` auto-generates the `[targets.flutter]` section with `mode = "build"` as the default when a Flutter target is detected. Change the mode before running `rlsbl release run` if an OTA release is intended.
 
 Target config sections for targets not listed in `include` are rejected as validation errors. Only fields documented for a target type are allowed — unknown fields cause a hard error.
+
+## The pre-release channel
+
+Pre-releases are a first-class release channel, not a workaround: a version can ship to real consumers as `0.6.0-alpha.0` and be promoted through `beta` and `rc` to the stable `0.6.0` without the version number ever burning or the release flow changing shape. Every release step — validation, changelog finalization, tagging, the GitHub Release, publishing — runs exactly as it does for a stable release.
+
+### The identifiers
+
+`preid` selects the channel: `alpha`, `beta`, `rc`, or `stable`. They are **ordered** — `alpha < beta < rc < stable` — and the ordering is enforced:
+
+| Situation | Result |
+| --- | --- |
+| Advance within a channel | `0.6.0-beta.1` -> `0.6.0-beta.2` |
+| Promote to a later channel | `0.6.0-alpha.3` -> `0.6.0-beta.0` (counter restarts at 0) |
+| Promote to `stable` | `0.6.0-rc.2` -> `0.6.0` (suffix stripped) |
+| Demote to an earlier channel | Hard error — `Cannot demote pre-release from "beta" to "alpha"` |
+| Any preid with `bump = "infra"` | Hard error — infra releases cannot be pre-releases |
+| `preid = "stable"` with a bump other than `prerelease` | Hard error — stabilizing is an operation on an existing pre-release |
+
+An unknown identifier is a hard error listing the valid four. `preid = ""` (and whitespace) means *unset*, not "some default channel" — there is no implicit pre-release.
+
+### Entering, advancing, and leaving the channel
+
+**Enter** with a normal bump plus a `preid`. The base version bumps as usual and gains a `-<preid>.0` suffix:
+
+```toml
+# .rlsbl/releases/unreleased.toml -- 0.5.2 becomes 0.6.0-alpha.0
+bump = "minor"
+preid = "alpha"
+description = "First alpha of the new resolver"
+```
+
+**Advance** with `bump = "prerelease"`. Omitting `preid` (or repeating the current one) increments the counter; naming a later identifier promotes and restarts the counter at 0:
+
+```toml
+# 0.6.0-alpha.0 -> 0.6.0-alpha.1
+bump = "prerelease"
+description = "Second alpha: resolver fixes"
+```
+
+```toml
+# 0.6.0-alpha.1 -> 0.6.0-beta.0
+bump = "prerelease"
+preid = "beta"
+description = "Beta: resolver API frozen"
+```
+
+**Leave** the channel with `preid = "stable"`, which strips the suffix and ships the base version that was reserved all along:
+
+```toml
+# 0.6.0-rc.2 -> 0.6.0
+bump = "prerelease"
+preid = "stable"
+description = "0.6.0 stable"
+```
+
+`bump = "prerelease"` on a version with no pre-release suffix is a hard error — there is nothing to advance. Enter the channel with a normal bump first.
+
+### What a pre-release does differently downstream
+
+Only the distribution side changes, and it changes automatically from the version string:
+
+| Surface | Pre-release behavior |
+| --- | --- |
+| GitHub Release | Marked as a **pre-release** (any version containing `-`). |
+| npm / pnpm / yarn publish | Published under the `--tag <preid>` dist-tag, so `npm install <pkg>` still resolves the latest stable. |
+| Changelog | Finalized to `x.y.z-preid.N.jsonl` and sorted before the matching stable version. |
+| Tags | Same scheme as stable (`v0.6.0-alpha.0`, or `<name>@v0.6.0-alpha.0` in a monorepo). |
+
+### Declaring it
+
+The release file's `preid` key is the normal path, and `rlsbl release init` scaffolds it as a commented line. The `--preid` flag on `rlsbl release run` is valid **only** alongside `--bump` (the flag pair that bypasses the release file entirely). In a monorepo, each `[releasables.<name>]` / `[packages.<name>]` section carries its own `preid`, so one workspace release can ship some packages stable and others as alphas.
 
 ## Release pipeline order
 

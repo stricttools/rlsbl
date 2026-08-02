@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference: config.json settings including pipelines, batch limits, check_timeout, test block, external_checks, and workspace.toml format."
+description: "Configuration reference: config.json pipelines, batch limits, timeouts, test block, external_checks and their release-context env, and workspace.toml."
 ---
 
 # Configuration reference
