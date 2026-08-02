@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import run_git, make_commit, make_workspace
+from conftest import git_head, run_git, make_commit, make_workspace
 from rlsbl.commands.changelog_cmd import cmd_add
 from rlsbl.workspace import WORKSPACE_DIR
 
@@ -167,3 +167,143 @@ class TestChangelogAddSkipsValidationStandalone:
         from rlsbl.changelog.files import get_changes_dir, read_unreleased
         entries = read_unreleased(get_changes_dir(str(repo)))
         assert len(entries) == 1
+
+
+# ---------------------------------------------------------------------------
+# The repo's FIRST commit is in scope like any other
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fresh_releasable_monorepo(tmp_path, monkeypatch):
+    """A monorepo whose INITIAL commit already contains a releasable's files.
+
+    This is the state every new repo is in when it runs its very first
+    ``rlsbl changelog add``: there is exactly one commit, it has no parent,
+    and it created the whole project.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    run_git(tmp_path, "init", "-q", "-b", "main")
+    run_git(tmp_path, "config", "user.email", "test@test.local")
+    run_git(tmp_path, "config", "user.name", "Test")
+
+    ws_dir = tmp_path / WORKSPACE_DIR
+    ws_dir.mkdir()
+    (ws_dir / "workspace.toml").write_text(
+        '[[projects]]\n'
+        'path = "python"\n'
+        'name = "pylib"\n'
+        'releasable = "core"\n'
+        '\n'
+        '[[releasables]]\n'
+        'name = "core"\n'
+        'tag_format = "{name}@v{version}"\n'
+    )
+    rel_changes = ws_dir / "releasables" / "core" / "changes"
+    rel_changes.mkdir(parents=True)
+    (rel_changes / "unreleased.jsonl").write_text("")
+    (ws_dir / "releasables" / "core" / "version").write_text("0.1.0\n")
+    (ws_dir / "releasables" / "core" / "config.json").write_text(
+        json.dumps({"publish_mode": "ci"}) + "\n"
+    )
+
+    pkg = tmp_path / "python"
+    (pkg / "src").mkdir(parents=True)
+    (pkg / "pyproject.toml").write_text(
+        '[project]\nname = "pylib"\nversion = "0.1.0"\n'
+    )
+    (pkg / "src" / "mod.py").write_text("VALUE = 1\n")
+
+    run_git(tmp_path, "add", "-A")
+    run_git(tmp_path, "commit", "-q", "-m", "initial")
+    return tmp_path
+
+
+class TestRootCommitIsInScope:
+    """A parentless commit that created the project must not be "out of scope"."""
+
+    def _root_sha(self, root):
+        from githarness import git as _git
+        return _git(root, "rev-list", "--max-parents=0", "HEAD").splitlines()[0]
+
+    def test_git_util_sees_the_root_commit_files(self, fresh_releasable_monorepo,
+                                                 monkeypatch):
+        from rlsbl.git_util import (
+            filter_commits_for_project,
+            filter_commits_for_releasable,
+            get_commit_files,
+        )
+
+        root = fresh_releasable_monorepo
+        monkeypatch.chdir(root)
+        sha = self._root_sha(root)
+
+        files = get_commit_files(sha)
+        assert "python/pyproject.toml" in files
+        assert "python/src/mod.py" in files
+
+        proj = {"path": "python", "name": "pylib"}
+        assert filter_commits_for_project({sha}, proj) == {sha}
+        assert filter_commits_for_releasable({sha}, [proj]) == {sha}
+
+    def test_changelog_add_accepts_the_root_commit(self, fresh_releasable_monorepo,
+                                                   monkeypatch):
+        root = fresh_releasable_monorepo
+        pkg = root / "python"
+        monkeypatch.chdir(pkg)
+        sha = self._root_sha(root)
+
+        flags = {
+            "commits": sha[:12],
+            "description": "First release of the library",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        cmd_add(flags, project_root=pkg)
+
+        from rlsbl.changelog.files import read_unreleased
+        from rlsbl.workspace import get_releasable_changes_dir
+
+        entries = read_unreleased(get_releasable_changes_dir(str(root), "core"))
+        assert len(entries) == 1
+        assert entries[0].description == "First release of the library"
+
+    def test_out_of_scope_root_commit_is_still_rejected(self, tmp_path,
+                                                        monkeypatch):
+        """The fix must not turn scope validation into a rubber stamp."""
+        monkeypatch.chdir(tmp_path)
+
+        run_git(tmp_path, "init", "-q", "-b", "main")
+        run_git(tmp_path, "config", "user.email", "test@test.local")
+        run_git(tmp_path, "config", "user.name", "Test")
+
+        projects = [{"path": "alpha", "name": "alpha"},
+                    {"path": "beta", "name": "beta"}]
+        make_workspace(tmp_path, projects)
+        for proj in ("alpha", "beta"):
+            d = tmp_path / proj
+            (d / ".rlsbl" / "changes").mkdir(parents=True)
+            (d / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+            (d / ".rlsbl" / "config.json").write_text(
+                json.dumps({"publish_mode": "ci"}) + "\n"
+            )
+        # The root commit creates ONLY beta.
+        (tmp_path / "beta" / "src.py").write_text("x = 1\n")
+        run_git(tmp_path, "add", WORKSPACE_DIR, "beta")
+        run_git(tmp_path, "commit", "-q", "-m", "initial")
+        sha = git_head(tmp_path)
+
+        alpha_dir = tmp_path / "alpha"
+        monkeypatch.chdir(alpha_dir)
+        flags = {
+            "commits": sha[:12],
+            "description": "Should fail",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_add(flags, project_root=alpha_dir)
+        assert exc_info.value.code == 1

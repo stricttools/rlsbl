@@ -17,11 +17,16 @@ def get_commit_files(sha):
     """Get the list of files changed by a single commit.
 
     Returns a list of file paths relative to the repo root, or None on error.
+
+    ``--root`` is required: a parentless commit (a repo's first commit) has
+    nothing to diff against, and without it ``git diff-tree`` prints nothing
+    at all -- making the commit that created the entire project look like it
+    touched no files, so every project-scope match against it failed.
     """
     try:
         result = subprocess.run(
             ["git", "diff-tree", "--no-commit-id", "--name-only", "-r",
-             "-m", "--first-parent", sha],
+             "-m", "--first-parent", "--root", sha],
             capture_output=True,
             text=True,
             timeout=10,

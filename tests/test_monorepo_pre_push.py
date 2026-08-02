@@ -149,6 +149,29 @@ class TestGetCommitFiles:
         files = get_commit_files(sha)
         assert sorted(files) == ["go/main.go", "python/lib.py"]
 
+    def test_returns_files_for_the_root_commit(self, tmp_path):
+        """A repo's FIRST commit has no parent -- it still changed files.
+
+        ``git diff-tree`` emits nothing for a parentless commit unless
+        ``--root`` is passed, which made every root commit look like it
+        touched no project at all.
+        """
+        repo = tmp_path / "fresh"
+        repo.mkdir()
+        run_git(repo, "init", "-q", "-b", "main")
+        run_git(repo, "config", "user.email", "test@test.local")
+        run_git(repo, "config", "user.name", "Test")
+        (repo / "python").mkdir()
+        (repo / "python" / "pyproject.toml").write_text(
+            '[project]\nname = "pylib"\nversion = "0.1.0"\n'
+        )
+        run_git(repo, "add", "python/pyproject.toml")
+        run_git(repo, "commit", "-q", "-m", "initial")
+
+        os.chdir(repo)
+        files = get_commit_files(git_head(repo))
+        assert files == ["python/pyproject.toml"]
+
     def test_returns_files_for_merge_commit(self, monorepo_fixture):
         """Returns files introduced by a merge commit (first-parent diff)."""
         root = monorepo_fixture.root
