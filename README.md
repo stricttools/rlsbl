@@ -244,7 +244,6 @@ Supports architectural layer rules via `[layers]` in `workspace.toml` for enforc
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RLSBL_PUSH_TIMEOUT` | `120` | Timeout in seconds for `git push` operations |
 | `RLSBL_VERSION` | -- | Set when running pre-release and post-release hooks; contains the version being released |
 | `RLSBL_DIST_DIR` | -- | Set when running `custom_assets` build commands; points to the distribution directory for output files |
 | `GITHUB_TOKEN` | -- | Used by `gh` CLI for GitHub API calls; `discover` works unauthenticated for public repos |

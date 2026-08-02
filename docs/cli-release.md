@@ -19,6 +19,7 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
+| `--push-timeout` |  | int |  |  | Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default. |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 | `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
 | `--bump` |  | str |  |  | Bump type: patch, minor, major, infra, prerelease. Skips the release file. |
@@ -33,6 +34,7 @@ Resume a previously failed release from where it left off. Reads the in-progress
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
+| `--push-timeout` |  | int |  |  | Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default. |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 
 ## release init
