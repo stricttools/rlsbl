@@ -50,16 +50,25 @@ STATE_FILENAME = "in-progress.json"
 SCRUB_RESULT_FILENAME = "scrub-result.json"
 
 # Ordered steps of the mutating phase (rolled back or resumed on failure).
-# SNAPSHOT_REGENERATED lands BEFORE TAGGED: the monorepo snapshot commit
-# must be created before the tag so the tag points at the branch tip that
-# is pushed (the commit CI runs on). It was previously a post-release step
-# emitted after the push; moving it pre-tag makes the tag the push tip.
+#
+# Main-as-candidate ordering: the release publishes the version-bump commit to
+# the release branch UNTAGGED (BRANCH_PUSHED), waits for the repository's own
+# CI to go green on exactly that commit (CI_VERIFIED), and only then finalizes
+# the changelog / release file, tags the verified commit, pushes the tag, and
+# creates the GitHub Release. Nothing irreversible or publicly visible as a
+# release exists while CI is red, so a red candidate is fixed forward on the
+# same version instead of burning it.
+#
+# SNAPSHOT_REGENERATED lands BEFORE BRANCH_PUSHED: the monorepo snapshot commit
+# must be part of the candidate CI verifies (and therefore of the tagged tree).
 MUTATING_STEPS = (
     "VERSION_BUMPED",
     "COMMITTED",
+    "SNAPSHOT_REGENERATED",
+    "BRANCH_PUSHED",
+    "CI_VERIFIED",
     "CHANGELOG_FINALIZED",
     "RELEASE_FILE_FINALIZED",
-    "SNAPSHOT_REGENERATED",
     "TAGGED",
     "PUSHED",
     "GITHUB_RELEASE",
@@ -78,19 +87,18 @@ RELEASE_STEPS = MUTATING_STEPS + POST_RELEASE_STEPS
 
 # Steps whose failure aborts the release (state preserved, resumable). "Fatal"
 # means the release stops; it does NOT mean the same recovery for every step.
-# Fatal steps split into two tiers around the tag:
+# Fatal steps split into two tiers around the CANDIDATE PUSH:
 #
-#   - Pre-tag fatal steps (VERSION_BUMPED .. TAGGED, incl. the pre-tag
-#     SNAPSHOT_REGENERATED): a failure ROLLS BACK -- `git reset --hard` to the
-#     pre-release HEAD plus orphan-artifact cleanup -- leaving the tree as if
-#     the release never started. Snapshot regeneration was moved pre-tag (the
-#     tag must be the push tip), so it rolls back like its mutating neighbors
-#     rather than completing with a recorded failure marker.
-#   - Post-tag fatal steps (PUSHED, GITHUB_RELEASE, ASSETS_UPLOADED,
-#     PIPELINES_PUBLISHED): NO rollback. The tag and finalized changelog /
-#     release-file artifacts are preserved on disk; the failure is recorded and
+#   - Pre-push fatal steps (VERSION_BUMPED, COMMITTED, SNAPSHOT_REGENERATED):
+#     a failure ROLLS BACK -- `git reset --hard` to the pre-release HEAD plus
+#     orphan-artifact cleanup -- leaving the tree as if the release never
+#     started. Nothing left the machine.
+#   - Post-push fatal steps (BRANCH_PUSHED onward, plus ASSETS_UPLOADED and
+#     PIPELINES_PUBLISHED): NO rollback. The candidate commit is on the remote,
+#     so a local reset would diverge from it. The failure is recorded and
 #     `rlsbl release resume` re-attempts from the failed step via idempotent
-#     guards.
+#     guards. A red CI_VERIFIED is the canonical case: fix forward on the
+#     release branch and resume at the SAME version.
 #
 # Deploy and post-release hooks remain non-fatal: their failures are recorded
 # and loudly reported, but the release completes and the state file is cleared.

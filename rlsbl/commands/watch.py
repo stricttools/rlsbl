@@ -247,7 +247,8 @@ def _retry_workflow(workflow_name, repo_slug, label, failed_run_id):
         return {"name": workflow_name, "passed": False, "run_id": retry_id}
 
 
-def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workflows=None):
+def _watch_single_run(ci_run, label, repo_slug, retried_lock=None,
+                      retried_workflows=None, timeout=3600):
     """Watch a single CI run. Returns a dict with name, passed, and run_id.
 
     When retried_lock and retried_workflows are provided, deduplicates retries
@@ -265,7 +266,7 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
         # gh run watch blocks until the run completes;
         # --exit-status makes it exit 1 on failure; check=True raises
         # CalledProcessError so we can distinguish pass from fail
-        run_gh(["run", "watch", run_id, "--exit-status"], timeout=3600)
+        run_gh(["run", "watch", run_id, "--exit-status"], timeout=timeout)
         msg = f"rlsbl: {label}: [{workflow_name}] passed"
         print(msg, file=sys.stderr)
         return {"name": workflow_name, "passed": True, "run_id": run_id}
@@ -320,7 +321,7 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
                 return retry_result
         return {"name": workflow_name, "passed": False, "run_id": run_id}
     except subprocess.TimeoutExpired:
-        msg = f"rlsbl: {label}: [{workflow_name}] timed out after 1h"
+        msg = f"rlsbl: {label}: [{workflow_name}] timed out after {timeout}s"
         print(msg, file=sys.stderr)
         return {"name": workflow_name, "passed": False, "run_id": run_id}
     except Exception as exc:
@@ -329,7 +330,8 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None, retried_workf
         return {"name": workflow_name, "passed": False, "run_id": run_id}
 
 
-def _watch_runs(runs, label, repo_slug, retried_lock=None, retried_workflows=None):
+def _watch_runs(runs, label, repo_slug, retried_lock=None, retried_workflows=None,
+                timeout=3600):
     """Watch all runs in parallel. Returns list of result dicts.
 
     retried_lock and retried_workflows may be passed in so that retry
@@ -348,7 +350,7 @@ def _watch_runs(runs, label, repo_slug, retried_lock=None, retried_workflows=Non
     with ThreadPoolExecutor(max_workers=len(runs)) as executor:
         futures = {
             executor.submit(_watch_single_run, ci_run, label, repo_slug, retried_lock,
-                            retried_workflows): ci_run
+                            retried_workflows, timeout): ci_run
             for ci_run in runs
         }
         for future in as_completed(futures):
@@ -456,6 +458,165 @@ def poll_runs(commit_sha, max_attempts=30, interval=4):
             pass
         time.sleep(interval)
     return []
+
+
+# ---------------------------------------------------------------------------
+# In-process CI wait (main-as-candidate release ordering)
+# ---------------------------------------------------------------------------
+
+# How long to wait for CI runs to APPEAR for a freshly pushed candidate before
+# concluding that the push produced none. Distinct from the CI-completion
+# budget (see get_ci_timeout): a queued-but-not-yet-created run is normal for
+# a minute or two, a run that never appears at all is a hard error.
+CI_DISCOVERY_GRACE_SECONDS = 300
+CI_DISCOVERY_INTERVAL = 5
+
+# Verdicts returned by wait_for_ci_green.
+CI_GREEN = "green"
+CI_RED = "red"
+CI_NOT_CONFIGURED = "no-ci"
+
+
+class CIWaitError(Exception):
+    """Raised when the CI wait cannot reach a verdict at all.
+
+    Distinct from a red verdict: this means the repository declares
+    push-triggered CI but the pushed candidate produced no runs, so there is
+    nothing to gate on and proceeding would publish an unverified commit.
+    """
+
+
+def _workflow_triggers_on_push(path):
+    """Return True if a workflow file declares a ``push`` trigger.
+
+    Parsed rather than grepped so a ``push`` mentioned in a job step or a
+    comment is not mistaken for a trigger. Unparseable files are treated as
+    NOT push-triggered -- an unreadable workflow cannot be evidence that CI
+    is expected.
+    """
+    from ruamel.yaml import YAML
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = YAML(typ="safe").load(f)
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    # YAML 1.1 loaders turn the bare key ``on`` into the boolean True; YAML 1.2
+    # keeps it a string. Accept both spellings.
+    triggers = data.get("on", data.get(True))
+    if isinstance(triggers, str):
+        return triggers == "push"
+    if isinstance(triggers, (list, tuple)):
+        return "push" in triggers
+    if isinstance(triggers, dict):
+        return "push" in triggers
+    return False
+
+
+def push_triggered_workflows(repo_root=None):
+    """Return the names of ``.github/workflows`` files that trigger on push.
+
+    An empty result means the repository has no push-triggered CI: the release
+    flow then proceeds without a CI gate instead of blocking forever on runs
+    that can never appear. The distinction is an observable fact about the
+    repository, not a fallback.
+    """
+    root = repo_root or _repo_root()
+    workflow_dir = os.path.join(str(root), ".github", "workflows")
+    if not os.path.isdir(workflow_dir):
+        return []
+    found = []
+    for filename in sorted(os.listdir(workflow_dir)):
+        if not filename.endswith((".yml", ".yaml")):
+            continue
+        if _workflow_triggers_on_push(os.path.join(workflow_dir, filename)):
+            found.append(filename)
+    return found
+
+
+def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
+                      repo_root=None, label=None,
+                      discovery_grace=CI_DISCOVERY_GRACE_SECONDS):
+    """Block until every CI run for *commit_sha* concludes.
+
+    Returns ``(verdict, results)`` where verdict is one of :data:`CI_GREEN`,
+    :data:`CI_RED`, or :data:`CI_NOT_CONFIGURED`.
+
+    Three explicit outcomes, no silent waits:
+
+    - The repository declares no push-triggered workflow -> :data:`CI_NOT_CONFIGURED`
+      immediately (nothing can ever run; blocking would hang the release).
+    - Push-triggered workflows exist but no run appears for the commit within
+      *discovery_grace* seconds -> :class:`CIWaitError` (hard error).
+    - Runs appear -> they are watched to completion (transient failures retried
+      once, deterministic ones not) and the aggregate verdict is returned.
+    """
+    def _log(msg):
+        if log is not None:
+            log(msg)
+        else:
+            print(msg, file=sys.stderr)
+
+    expected = push_triggered_workflows(repo_root)
+    if not expected:
+        return CI_NOT_CONFIGURED, []
+
+    label = label or f"candidate {commit_sha[:12]}"
+
+    try:
+        repo_slug = json.loads(
+            run_gh(["repo", "view", "--json", "nameWithOwner"], config=config)
+        ).get("nameWithOwner", "")
+    except Exception:
+        repo_slug = ""
+
+    attempts = max(1, int(discovery_grace // max(1, CI_DISCOVERY_INTERVAL)))
+    _log(
+        f"Waiting for CI on the release candidate {commit_sha[:12]} "
+        f"({len(expected)} push-triggered workflow file(s): {', '.join(expected)})..."
+    )
+    started = time.time()
+    runs = poll_runs(commit_sha, max_attempts=attempts, interval=CI_DISCOVERY_INTERVAL)
+    if not runs:
+        raise CIWaitError(
+            f"no CI runs appeared for the release candidate {commit_sha} within "
+            f"{discovery_grace}s, but this repository declares push-triggered "
+            f"workflow(s): {', '.join(expected)}.\n"
+            f"The candidate is on the remote and nothing was tagged or "
+            f"published. Investigate why the push produced no runs (branch or "
+            f"paths filters, disabled workflows, Actions quota), then re-run "
+            f"`rlsbl release resume`."
+        )
+
+    _log(f"Found {len(runs)} CI run(s) for {commit_sha[:12]}; waiting for completion...")
+
+    retried_lock = threading.Lock()
+    retried_workflows = set()
+    known_ids = {str(r["databaseId"]) for r in runs}
+
+    remaining = max(1, int(timeout - (time.time() - started)))
+    results = _watch_runs(runs, label, repo_slug, retried_lock, retried_workflows,
+                          timeout=remaining)
+
+    # Late-starting runs (a matrix leg or a second workflow created after the
+    # first poll) must not escape the gate.
+    time.sleep(5)
+    late_runs = [
+        r for r in poll_runs(commit_sha, max_attempts=1, interval=0)
+        if str(r["databaseId"]) not in known_ids
+    ]
+    if late_runs:
+        _log(f"Found {len(late_runs)} late-starting CI run(s); waiting...")
+        remaining = max(1, int(timeout - (time.time() - started)))
+        results.extend(
+            _watch_runs(late_runs, label, repo_slug, retried_lock,
+                        retried_workflows, timeout=remaining)
+        )
+
+    verdict = CI_GREEN if all(r["passed"] for r in results) else CI_RED
+    return verdict, results
 
 
 def run_cmd(registry, args, flags):

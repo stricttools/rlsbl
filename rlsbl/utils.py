@@ -218,6 +218,10 @@ def get_current_branch(*, cwd):
 # config key in .rlsbl/config.json, or per invocation with the CLI flag.
 DEFAULT_PUSH_TIMEOUT = 300
 DEFAULT_CHECK_TIMEOUT = 900
+# Budget for the release's in-process CI wait (main-as-candidate ordering): the
+# release pushes the candidate untagged and blocks here until CI concludes.
+# Real CI matrices routinely run 20-40 minutes; one hour is the backstop.
+DEFAULT_CI_TIMEOUT = 3600
 
 
 def _resolve_timeout(config, key, default, *, override=None):
@@ -273,6 +277,18 @@ def get_check_timeout(config=None, *, override=None):
     ``config`` may be None (override > default only).
     """
     return _resolve_timeout(config, "check_timeout", DEFAULT_CHECK_TIMEOUT,
+                            override=override)
+
+
+def get_ci_timeout(config=None, *, override=None):
+    """Return the release CI-wait timeout in seconds.
+
+    Precedence: ``override`` (the ``--ci-timeout`` CLI flag) > config dict
+    ``ci_timeout`` > :data:`DEFAULT_CI_TIMEOUT`.
+
+    ``config`` may be None (override > default only).
+    """
+    return _resolve_timeout(config, "ci_timeout", DEFAULT_CI_TIMEOUT,
                             override=override)
 
 
@@ -439,7 +455,7 @@ def resolve_tag_push_plan(tags, cwd=None, remote="origin"):
     return needs_push
 
 
-def push_if_needed(branch, *, config, cwd):
+def push_if_needed(branch, *, config, cwd, sha=None):
     """Push the branch to origin if local is ahead of remote.
 
     The push runs with ``--no-verify``: this is a release-internal push, and
@@ -454,19 +470,25 @@ def push_if_needed(branch, *, config, cwd):
             There is deliberately no process-cwd default: an unanchored push
             once executed a real ``git push`` from the test-runner's own repo.
             Callers must pass the project root explicitly.
+        sha: optional explicit commit to publish as ``<sha>:refs/heads/<branch>``
+            instead of pushing the branch ref by name. The release flow always
+            passes it: the commit that CI verified is the commit that is
+            published, and a ride-in that landed on the local branch after the
+            candidate was pinned can never be swept along by the push.
     """
     timeout = get_push_timeout(config)
-    local = run("git", ["rev-parse", branch], cwd=cwd)
+    refspec = f"{sha}:refs/heads/{branch}" if sha else branch
+    local = run("git", ["rev-parse", sha or branch], cwd=cwd)
     if not remote_branch_exists(branch, cwd=cwd):
         try:
-            run("git", ["push", "--no-verify", "-u", "origin", branch], timeout=timeout, cwd=cwd)
+            run("git", ["push", "--no-verify", "-u", "origin", refspec], timeout=timeout, cwd=cwd)
         except subprocess.TimeoutExpired as e:
             raise GitError(f"Push timed out after {timeout}s — remote state may be inconsistent. Check with: git push --dry-run") from e
         return
     remote = run("git", ["rev-parse", f"origin/{branch}"], cwd=cwd)
     if local != remote:
         try:
-            run("git", ["push", "--no-verify", "origin", branch], timeout=timeout, cwd=cwd)
+            run("git", ["push", "--no-verify", "origin", refspec], timeout=timeout, cwd=cwd)
         except subprocess.TimeoutExpired as e:
             raise GitError(f"Push timed out after {timeout}s — remote state may be inconsistent. Check with: git push --dry-run") from e
 

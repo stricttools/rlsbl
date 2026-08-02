@@ -11,6 +11,8 @@ import pytest
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 
+from githarness import fake_run_dispatch
+
 
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
@@ -140,25 +142,7 @@ class TestMultiTargetRelease:
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        mock_run.side_effect = [
-            "",               # fetch
-            "0",              # rev-list
-            "",               # pre-hook snapshot
-            "",               # pre-selfdoc snapshot
-            "",               # post-selfdoc snapshot
-            "",               # post-hook snapshot
-            "",               # baseline snapshot
-            "/tmp/fake-repo", # show-toplevel
-            "pre123",         # rev-parse HEAD (pre_release_sha)
-            "",               # re-check dirty
-            "",               # git log -1 (COMMITTED guard)
-            "",               # status --porcelain (backfilled .md)
-            "",               # git tag
-            "pre123",         # rev-parse HEAD (PUSHED guard)
-            "pre123",         # rev-parse origin/main (PUSHED guard)
-            "",               # git push tag
-            "pre123",         # rev-parse HEAD (pushed sha)
-        ]
+        mock_run.side_effect = fake_run_dispatch(head_sha="pre123")
 
         # Mock the spec target's build to track calls
         from rlsbl.targets import TARGETS

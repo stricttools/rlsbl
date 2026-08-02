@@ -73,13 +73,22 @@ class TestSnapshotBeforeTag:
         tag_sha = _rev(tmp_project, "alpha@v1.0.1")
         head_sha = git(tmp_project, "rev-parse", "HEAD")
 
-        # The tag points at the branch tip that gets pushed.
-        assert tag_sha == head_sha, "the tag must be the pushed branch tip"
+        # Main-as-candidate ordering: the tag points at the CI-verified
+        # candidate, and the changelog / release-file finalization commits land
+        # on top of it, so HEAD is strictly ahead of the tag.
+        assert tag_sha != head_sha, (
+            "finalization happens after the CI gate, so HEAD must be ahead of the tag"
+        )
+        assert subprocess.run(
+            ["git", "merge-base", "--is-ancestor", tag_sha, head_sha],
+            cwd=str(tmp_project),
+        ).returncode == 0, "the tag must be an ancestor of HEAD"
 
-        # The tag commit IS the snapshot commit (snapshot lands last, pre-tag).
+        # The tag commit IS the snapshot commit: the snapshot is regenerated
+        # last before the candidate push, so it is the candidate's tip.
         tag_subject = git(tmp_project, "log", "-1", "--format=%s", tag_sha)
         assert tag_subject == "snapshot", (
-            "the snapshot commit must be the tag tip (regenerated pre-tag)"
+            "the snapshot commit must be the candidate tip (regenerated pre-push)"
         )
 
         # Explicitly: the snapshot commit is an ancestor-or-equal of the tag.
@@ -107,7 +116,7 @@ class TestBatchModeSnapshotPreTag:
     def test_batch_mode_member_snapshot_is_pre_tag(self, tmp_project):
         """The batch orchestrator releases each member via run_cmd with
         batch-mode set. Batch-mode only governs the final watch step; the
-        per-member snapshot must still land pre-tag (tag == snapshot tip)."""
+        per-member snapshot must still land pre-push (tag == snapshot tip)."""
         core = _setup_releasable_workspace(tmp_project)
         _run_release_flags(
             core, tmp_project,
@@ -115,8 +124,6 @@ class TestBatchModeSnapshotPreTag:
         )
 
         tag_sha = _rev(tmp_project, "alpha@v1.0.1")
-        head_sha = git(tmp_project, "rev-parse", "HEAD")
-        assert tag_sha == head_sha
         assert git(tmp_project, "log", "-1", "--format=%s", tag_sha) == "snapshot", (
             "batch-mode must not push the snapshot past the tag"
         )

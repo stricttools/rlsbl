@@ -1454,27 +1454,26 @@ class TestReleaseRollbackOnPushFailure:
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.app.run_checks", return_value=([], [], 0))
-    def test_push_failure_after_tag_is_resumable_not_rolled_back(
+    def test_rejected_candidate_push_rolls_back_cleanly(
         self, _run_checks, _gh_inst, _gh_auth, _validate,
         _gen_cl, _extract, _tag, _deploy, _push,
     ):
-        """A push failure AFTER tagging must be classified RESUMABLE.
+        """A REJECTED candidate push (not a timeout) rolls back completely.
 
-        The release is already TAGGED with finalized changelog files on disk,
-        so a failed branch push must NOT trigger a destructive rollback
-        (which would destroy exactly the state `release resume` needs).
-        Instead the tag and commits are preserved and a failed PUSHED marker
-        is recorded. (Previously this rolled back -- the bug this fixes.)
+        Under main-as-candidate ordering the branch push is the first thing
+        that leaves the machine, and it happens before any tag exists. A
+        rejected push proves nothing landed on the remote, so the release must
+        reset to the pre-release commit: no tag, no finalized changelog, no
+        in-progress state -- the same version can simply be re-run.
+
+        (A push that TIMED OUT is the opposite case -- it may have landed --
+        and is covered in test_partial_push_rollback.)
         """
         from rlsbl.commands.release import run_cmd
         from rlsbl.commands.release.release_state import (
             get_state_path, load_release_state,
         )
 
-        # Run release -- push_if_needed raises CalledProcessError post-TAGGED.
-        # run_cmd now catches expected push failures (raw CalledProcessError
-        # included) and exits cleanly via SystemExit(1) instead of letting the
-        # subprocess error propagate, so the batch loop can catch it uniformly.
         with pytest.raises(SystemExit) as _exc:
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(_rc(), {
@@ -1485,24 +1484,19 @@ class TestReleaseRollbackOnPushFailure:
 )
         assert _exc.value.code == 1
 
-        # HEAD must NOT be rolled back -- the release commits are preserved.
         post_sha = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        assert post_sha != self.pre_release_sha, \
-            "HEAD must NOT be rolled back after a post-TAGGED push failure"
+        assert post_sha == self.pre_release_sha, \
+            "a rejected candidate push must roll back to the pre-release commit"
 
-        # The tag must be preserved for resume.
         tag_check = subprocess.run(
             ["git", "tag", "-l", "v1.0.1"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        assert tag_check == "v1.0.1", \
-            "Tag v1.0.1 must be preserved after a post-TAGGED push failure"
+        assert tag_check == "", \
+            "no tag may exist when the candidate push was rejected"
 
-        # State preserved with a failed PUSHED marker.
-        state = load_release_state(get_state_path("."))
-        assert state is not None, "in-progress.json must be preserved"
-        assert "TAGGED" in state["completed_steps"]
-        assert "PUSHED" in state.get("failed_steps", {})
+        assert load_release_state(get_state_path(".")) is None, \
+            "a clean rollback must clear the in-progress state"

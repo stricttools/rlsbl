@@ -37,6 +37,7 @@ from ...utils import (
     extract_github_repo_from_remote,
     get_current_branch,
     DEFAULT_PUSH_TIMEOUT,
+    get_ci_timeout,
     get_hook_timeout,
     get_push_timeout,
     has_staged_or_modified,
@@ -51,6 +52,13 @@ from ...utils import (
     run_gh,
     tag_exists_locally,
     tag_exists_on_remote,
+)
+from ..watch import (  # noqa: F401  (re-exported for execute.py's late-bound imports)
+    CI_GREEN,
+    CI_NOT_CONFIGURED,
+    CI_RED,
+    CIWaitError,
+    wait_for_ci_green,
 )
 from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfblog_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config
@@ -82,6 +90,7 @@ from .execute import (
     _bump_selfdoc_version,
     _rel_to_git_root,
     ReleaseAbortError,
+    ReleaseCIError,
     RollbackClobberError,
     ReleaseState,
     resolve_target_paths,

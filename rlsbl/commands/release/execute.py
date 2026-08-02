@@ -31,6 +31,51 @@ class RollbackClobberError(Exception):
     """
 
 
+class ReleaseCIError(ReleaseAbortError):
+    """Raised when CI does not go green on the pushed release candidate.
+
+    Under main-as-candidate ordering this is a *normal* terminal state, not a
+    corrupted one: the candidate commit is on the release branch, but no tag,
+    no GitHub Release and no finalized changelog exist. The version is not
+    burnt -- the fix lands forward on the same version and the release
+    resumes.
+    """
+
+
+def _ci_red_message(*, version, tag, branch, candidate_sha, detail):
+    """Remediation text for a red (or unreachable) CI verdict on the candidate.
+
+    This replaces the pre-C4 guidance ("re-run CI to green on this exact
+    commit"), which was unfollowable whenever the failure was in the code at
+    the tagged commit -- the common case. Under main-as-candidate ordering the
+    correct remedy is always the same and always available: fix forward on the
+    release branch, same version, then resume.
+    """
+    return (
+        f"CI did not pass on the release candidate for {version}.\n"
+        f"  {detail}\n"
+        f"  Candidate commit: {candidate_sha} (on origin/{branch})\n"
+        f"\n"
+        f"Nothing was tagged, released or finalized:\n"
+        f"  - no {tag} tag exists (local or remote)\n"
+        f"  - no GitHub Release exists\n"
+        f"  - the changelog is still unreleased.jsonl -- {version} was not\n"
+        f"    finalized, so there is no orphan version file to clean up\n"
+        f"  - nothing reached any registry\n"
+        f"\n"
+        f"The version number is NOT burnt. Fix forward on {branch}:\n"
+        f"  1. Fix the failure and commit on {branch}\n"
+        f"     (record it with `rlsbl changelog add` as usual)\n"
+        f"  2. rlsbl release resume\n"
+        f"     -- re-pushes the new tip as the candidate, re-runs the CI gate,\n"
+        f"        and completes the SAME version ({version}) when it is green.\n"
+        f"\n"
+        f"Do not start a new release at a higher version to escape a red CI, and\n"
+        f"do not re-run CI on the same commit expecting a different answer: a\n"
+        f"failure baked into the code fails identically every time."
+    )
+
+
 # The publish gate's only precise statement of which commit CI must be green
 # on. Matched on its own line so a reconcile replaces rather than duplicates.
 _CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
@@ -194,6 +239,42 @@ def _guard_rollback(pre_release_sha, state_path, cwd=None):
         f"\n  3. Otherwise, cherry-pick or stash foreign work first"
     )
     raise RollbackClobberError("\n".join(parts))
+
+
+def _is_push_timeout_exc(exc):
+    """True when a push failure was a timeout.
+
+    Both the candidate/branch push (via ``push_if_needed``) and the tag push
+    surface timeouts as :class:`GitError` whose message contains "timed out"; a
+    raw :class:`subprocess.TimeoutExpired` counts too (belt-and-braces in case
+    conversion is bypassed).
+    """
+    import subprocess as _sp
+
+    from ...errors import GitError
+
+    if isinstance(exc, _sp.TimeoutExpired):
+        return True
+    return isinstance(exc, GitError) and "timed out" in str(exc).lower()
+
+
+def _is_resumable_failure(exc, branch_pushed, candidate_push_attempted, completed):
+    """Decide whether a mutating-phase failure must SKIP rollback.
+
+    Rollback (``git reset --hard`` to the pre-release commit) is only safe
+    while nothing has reached the remote. Three states forbid it:
+
+    - the candidate push succeeded (``branch_pushed``),
+    - a prior run already recorded ``BRANCH_PUSHED``,
+    - the candidate push was attempted and TIMED OUT -- a timed-out push may
+      still have landed, so resetting would diverge from published history.
+
+    A non-timeout candidate-push failure (rejected ref, auth error) proves
+    nothing landed, and still rolls back.
+    """
+    if branch_pushed or "BRANCH_PUSHED" in completed:
+        return True
+    return candidate_push_attempted and _is_push_timeout_exc(exc)
 
 
 def _bump_selfdoc_version(project_dir, new_version):
@@ -755,6 +836,11 @@ def _run_release_mutating(state: ReleaseState):
         DEFAULT_PUSH_TIMEOUT,
         get_push_timeout,
         get_hook_timeout,
+        get_ci_timeout,
+        wait_for_ci_green,
+        CIWaitError,
+        CI_GREEN,
+        CI_NOT_CONFIGURED,
         get_current_branch,
         should_tag,
         tag_exists_locally,
@@ -916,39 +1002,35 @@ def _run_release_mutating(state: ReleaseState):
     # fresh start; populated when resuming from a prior failed attempt).
     _completed = set(_state_dict.get("completed_steps", []))
 
-    # Track whether the branch push succeeded. Once commits are on the
+    # Track whether the candidate push succeeded. Once commits are on the
     # remote, a local `git reset --hard` would create divergent state.
     # Set to True after push_if_needed() returns successfully.
     branch_pushed = False
-
-    def _is_push_timeout(_exc):
-        """True when a push failure was a timeout.
-
-        Both the branch push (via ``push_if_needed``) and the tag push
-        surface timeouts as :class:`GitError` whose message contains
-        "timed out"; a raw :class:`subprocess.TimeoutExpired` counts too
-        (belt-and-braces in case conversion is bypassed).
-        """
-        import subprocess as _sp
-        from ...errors import GitError
-        if isinstance(_exc, _sp.TimeoutExpired):
-            return True
-        return isinstance(_exc, GitError) and "timed out" in str(_exc).lower()
+    # True once the candidate push has been ATTEMPTED. A push that timed out
+    # may still have landed on the remote, so a timeout at this point must not
+    # trigger `git reset --hard` (that is exactly how divergent local/remote
+    # state was created before). A non-timeout push failure proves nothing
+    # landed and still rolls back.
+    candidate_push_attempted = False
+    # The commit CI verified: the tag target, the CI-SHA release-notes marker,
+    # and the post-release watch all address it explicitly. Assigned inside the
+    # mutating try block once the candidate is pushed.
+    verified_sha = None
 
     def _handle_resumable_push_failure(_exc) -> bool:
-        """Classify a post-TAGGED push failure as RESUMABLE (no rollback).
+        """Classify a post-candidate-push failure as RESUMABLE (no rollback).
 
-        Once the release is TAGGED and its changelog / release-file
-        artifacts are finalized on disk, a push failure is the canonical
-        resumable state: the tag exists, the finalized files are committed,
-        and ``rlsbl release resume`` re-attempts the push with idempotent
-        guards. We therefore skip the entire rollback family — no clobber
-        guard, no ``git reset --hard``, no tag deletion, no artifact
-        cleanup, no state clearing — record a failed PUSHED marker, and
-        print the resume command. When the branch is already on the remote,
-        a best-effort tag-push retry is attempted first (transient stalls
-        often clear on retry); a recovered tag push marks PUSHED complete so
-        resume picks up at GITHUB_RELEASE.
+        Once the release candidate is on the remote, a local rollback would
+        diverge from published history, so the entire rollback family is
+        skipped — no clobber guard, no ``git reset --hard``, no tag deletion,
+        no artifact cleanup, no state clearing. The failure is recorded and
+        ``rlsbl release resume`` re-attempts from the failed step via
+        idempotent guards.
+
+        When the release is already TAGGED, the outstanding work is the tag
+        push: a best-effort retry is attempted first (transient stalls often
+        clear on retry); a recovered tag push marks PUSHED complete so resume
+        picks up at GITHUB_RELEASE.
 
         Returns True when the outstanding tag push recovered on retry (PUSHED
         marked complete): the caller then falls through into the remaining
@@ -956,10 +1038,11 @@ def _run_release_mutating(state: ReleaseState):
         False when the push is still outstanding and the release must stop
         with resume guidance.
         """
-        _timed_out = _is_push_timeout(_exc)
+        _timed_out = _is_push_timeout_exc(_exc)
         _retry_timeout = get_push_timeout(ctx.config, override=flags.get("push-timeout"))
         _recovered = False
-        if branch_pushed:
+        _tagged = "TAGGED" in _completed
+        if branch_pushed and _tagged:
             # Branch commits are already on the remote; only the tag push
             # is outstanding. Retry it a couple of times before giving up.
             # Use the same commit-aware plan as the main PUSHED path: if a
@@ -988,21 +1071,45 @@ def _run_release_mutating(state: ReleaseState):
             # pushed. Signal the caller to continue with the post-push steps
             # rather than aborting with resume guidance.
             return True
-        if "PUSHED" not in _completed:
-            # Record the failed PUSHED step (fatal + resumable). This does
-            # NOT gate resume-skip; resume re-attempts PUSHED via its own
-            # idempotent branch/tag guards.
-            save_step_failure(
-                _state_path, "PUSHED", str(_exc) or _exc.__class__.__name__,
-            )
+        # The failing step is the first canonical mutating step that has not
+        # completed. Derived rather than hardcoded so every failure point
+        # between the candidate push and the GitHub Release records itself.
+        from .release_state import MUTATING_STEPS as _MUTATING_STEPS
+        _failed_step = next(
+            (s for s in _MUTATING_STEPS if s not in _completed), "PUSHED",
+        )
+        # Record the failed step (fatal + resumable). This does NOT gate
+        # resume-skip; resume re-attempts the step via its own idempotent
+        # guards.
+        save_step_failure(
+            _state_path, _failed_step, str(_exc) or _exc.__class__.__name__,
+        )
         if hasattr(_exc, "stderr") and _exc.stderr:
             print(f"Command error: {_exc.stderr.strip()}", file=sys.stderr)
-        print(
-            f"Error: push failed after the release was tagged ({tag}). "
-            f"Local state is intact and fully resumable — nothing was rolled "
-            f"back; the tag and finalized changelog files are preserved.",
-            file=sys.stderr,
-        )
+        if _tagged:
+            print(
+                f"Error: push failed after the release was tagged ({tag}). "
+                f"Local state is intact and fully resumable — nothing was rolled "
+                f"back; the tag and finalized changelog files are preserved.",
+                file=sys.stderr,
+            )
+        elif _failed_step == "BRANCH_PUSHED":
+            print(
+                f"Error: the candidate push to origin/{branch} timed out, so "
+                f"whether it landed is unknown. Nothing was rolled back (a "
+                f"reset could diverge from a push that did land) and nothing "
+                f"was tagged, released or finalized — {new_version} is not "
+                f"burnt.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"Error: the release failed after the candidate was pushed to "
+                f"origin/{branch}. Nothing was rolled back (the candidate is "
+                f"published) and nothing was tagged, released or finalized — "
+                f"{new_version} is not burnt.",
+                file=sys.stderr,
+            )
         if _timed_out:
             print(
                 f"The push timed out (limit: {_retry_timeout}s). Raise the "
@@ -1369,6 +1476,151 @@ def _run_release_mutating(state: ReleaseState):
             save_step(_state_path, "COMMITTED")
             _completed.add("COMMITTED")
 
+        # SNAPSHOT_REGENERATED: regenerate the monorepo snapshot BEFORE the
+        # candidate push so the snapshot commit is part of the commit CI
+        # verifies -- and therefore of the tree the tag points at. This is a
+        # fatal pre-push mutating step: a failure rolls back like its
+        # neighbours rather than completing with a recorded failure marker.
+        if "SNAPSHOT_REGENERATED" in _completed:
+            log("Skipping snapshot regeneration (already done)")
+        elif "BRANCH_PUSHED" in _completed or "TAGGED" in _completed:
+            # Resume of a release whose candidate is already published (or an
+            # old-ordering state file whose tag was already pushed). The
+            # pre-push slot is forfeit -- a commit cannot be inserted before a
+            # commit that is already on the remote. The post-hoc fallback
+            # (after the release completes) regenerates the snapshot instead.
+            log("Snapshot pre-push slot forfeit (candidate already pushed); "
+                "will regenerate post-hoc")
+        elif monorepo_name:
+            from ...snapshot import generate_snapshot, write_snapshot
+            from ...workspace_graph import WorkspaceGraph
+
+            projects = load_workspace(monorepo_root)
+            graph = WorkspaceGraph(monorepo_root, projects)
+            snapshot = generate_snapshot(monorepo_root, projects, graph)
+            rel_path = write_snapshot(monorepo_root, snapshot)
+            did_commit = commit_files_if_changed(
+                "snapshot", [rel_path], skip_message="Snapshot unchanged.",
+                autogenerated=True, cwd=monorepo_root,
+            )
+            if did_commit:
+                _track_release_commit(_state_path)
+            log(f"Regenerated monorepo snapshot: {rel_path}")
+            save_step(_state_path, "SNAPSHOT_REGENERATED")
+            _completed.add("SNAPSHOT_REGENERATED")
+        else:
+            # Not a monorepo: nothing to regenerate; the step is trivially done.
+            save_step(_state_path, "SNAPSHOT_REGENERATED")
+            _completed.add("SNAPSHOT_REGENERATED")
+
+        # ---- Candidate push + CI gate (main-as-candidate ordering) ----
+        #
+        # The version-bump commit is published to the release branch UNTAGGED
+        # and the repository's own CI judges it. Only a green verdict unlocks
+        # the irreversible half of the release (changelog finalization, tag,
+        # GitHub Release, registry publish). A red verdict leaves NO tag, NO
+        # GitHub Release and NO finalized changelog behind, so the version is
+        # not burnt and the fix lands forward at the same version.
+        push_timeout = get_push_timeout(ctx.config, override=flags.get("push-timeout"))
+        if push_timeout != DEFAULT_PUSH_TIMEOUT:
+            log(f"Push timeout: {push_timeout}s (from --push-timeout or the "
+                f"push_timeout config key)")
+
+        if "CI_VERIFIED" in _completed:
+            candidate_sha = (
+                (load_release_state(_state_path) or {}).get("candidate_sha")
+                or run("git", ["rev-parse", "HEAD"]).strip()
+            )
+            branch_pushed = True
+            log("Skipping candidate push and CI gate (already verified)")
+        else:
+            # A resume after a red CI re-pins the candidate on the CURRENT tip
+            # (the fix commit), so BRANCH_PUSHED is deliberately re-evaluated
+            # whenever CI_VERIFIED is missing.
+            candidate_sha = run("git", ["rev-parse", "HEAD"]).strip()
+            _cand_state = load_release_state(_state_path) or {}
+            _cand_state["candidate_sha"] = candidate_sha
+            save_release_state(_state_path, _cand_state)
+
+            _cand_needs_push = True
+            try:
+                _ls_out = run(
+                    "git", ["ls-remote", "origin", f"refs/heads/{branch}"]
+                ).strip()
+                _remote_head = _ls_out.split()[0] if _ls_out else None
+                if _remote_head and candidate_sha == _remote_head:
+                    _cand_needs_push = False
+                    log("Skipping candidate push (remote already at the candidate)")
+            except Exception:
+                pass  # Remote branch might not exist yet
+
+            if _cand_needs_push:
+                candidate_push_attempted = True
+                push_if_needed(
+                    branch, config=ctx.config, cwd=project_dir, sha=candidate_sha,
+                )
+            branch_pushed = True
+            log(
+                f"Pushed release candidate {candidate_sha[:12]} to "
+                f"origin/{branch} (untagged)"
+            )
+            save_step(_state_path, "BRANCH_PUSHED")
+            _completed.add("BRANCH_PUSHED")
+
+            if flags.get("ci-defer"):
+                # Batch mode, pass 1: every item's candidate is pushed first
+                # and ONE CI wait covers the whole batch. The orchestrator
+                # resumes each item with ci-verified-sha once that wait is
+                # green. State is preserved on disk for the resume.
+                log("Deferring the CI gate to the batch orchestrator")
+                return
+
+            if flags.get("ci-verified-sha"):
+                log(
+                    "CI gate satisfied by the batch orchestrator "
+                    f"({str(flags['ci-verified-sha'])[:12]})"
+                )
+            else:
+                _ci_timeout = get_ci_timeout(
+                    ctx.config, override=flags.get("ci-timeout"),
+                )
+                try:
+                    _verdict, _ci_results = wait_for_ci_green(
+                        candidate_sha, timeout=_ci_timeout, log=log,
+                        config=ctx.config, repo_root=_git_root,
+                    )
+                except CIWaitError as _cw:
+                    save_step_failure(_state_path, "CI_VERIFIED", str(_cw))
+                    raise ReleaseCIError(_ci_red_message(
+                        version=new_version, tag=tag, branch=branch,
+                        candidate_sha=candidate_sha, detail=str(_cw),
+                    ))
+                if _verdict == CI_NOT_CONFIGURED:
+                    log(
+                        "No push-triggered CI workflow is configured in "
+                        ".github/workflows; proceeding without a CI gate."
+                    )
+                elif _verdict != CI_GREEN:
+                    _red = ", ".join(
+                        r["name"] for r in _ci_results if not r["passed"]
+                    ) or "unknown workflow"
+                    _detail = f"Failing workflow(s): {_red}"
+                    save_step_failure(_state_path, "CI_VERIFIED", _detail)
+                    raise ReleaseCIError(_ci_red_message(
+                        version=new_version, tag=tag, branch=branch,
+                        candidate_sha=candidate_sha, detail=_detail,
+                    ))
+                else:
+                    log(f"CI is green on {candidate_sha[:12]}")
+
+            save_step(_state_path, "CI_VERIFIED")
+            _completed.add("CI_VERIFIED")
+
+        # The commit the tag, the CI-SHA marker and the publish gate all
+        # address. In batch mode the orchestrator verifies the batch tip and
+        # passes it here, so every member tag points at a CI-green commit.
+        verified_sha = flags.get("ci-verified-sha") or candidate_sha
+
         # Finalize JSONL changelog: rename unreleased.jsonl to x.y.z.jsonl.
         # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
         # earlier generate_changelog() call (above acquire_lock) was passed
@@ -1541,45 +1793,8 @@ def _run_release_mutating(state: ReleaseState):
             save_step(_state_path, "RELEASE_FILE_FINALIZED")
             _completed.add("RELEASE_FILE_FINALIZED")
 
-        # SNAPSHOT_REGENERATED: regenerate the monorepo snapshot BEFORE the
-        # tag so the snapshot commit lands between the finalize commits and
-        # the tag -- the tag then points at the branch tip that gets pushed
-        # (the commit CI runs on). This is a fatal pre-tag mutating step: a
-        # failure propagates to the pre-TAGGED rollback path like its
-        # neighbors, rather than the old post-push non-fatal behavior.
-        if "SNAPSHOT_REGENERATED" in _completed:
-            log("Skipping snapshot regeneration (already done)")
-        elif "TAGGED" in _completed:
-            # Old-ordering resume: the tag was already created/pushed under
-            # the previous step order (snapshot came post-push). The pre-tag
-            # slot is forfeit -- a commit cannot be inserted before an
-            # existing pushed tag. The post-tag fallback (after PUSHED)
-            # regenerates the snapshot post-hoc instead.
-            log("Snapshot pre-tag slot forfeit (tag already present); "
-                "will regenerate post-hoc")
-        elif monorepo_name:
-            from ...snapshot import generate_snapshot, write_snapshot
-            from ...workspace_graph import WorkspaceGraph
-
-            projects = load_workspace(monorepo_root)
-            graph = WorkspaceGraph(monorepo_root, projects)
-            snapshot = generate_snapshot(monorepo_root, projects, graph)
-            rel_path = write_snapshot(monorepo_root, snapshot)
-            did_commit = commit_files_if_changed(
-                "snapshot", [rel_path], skip_message="Snapshot unchanged.",
-                autogenerated=True, cwd=monorepo_root,
-            )
-            if did_commit:
-                _track_release_commit(_state_path)
-            log(f"Regenerated monorepo snapshot: {rel_path}")
-            save_step(_state_path, "SNAPSHOT_REGENERATED")
-            _completed.add("SNAPSHOT_REGENERATED")
-        else:
-            # Not a monorepo: nothing to regenerate; the step is trivially done.
-            save_step(_state_path, "SNAPSHOT_REGENERATED")
-            _completed.add("SNAPSHOT_REGENERATED")
-
-        # TAGGED guard: skip if the tag already exists and points to HEAD
+        # TAGGED guard: the tag is created on the CI-VERIFIED commit, which is
+        # an ancestor of HEAD (the finalization commits land on top of it).
         _tag_already_exists = False
         if "TAGGED" in _completed:
             _tag_already_exists = True
@@ -1587,19 +1802,18 @@ def _run_release_mutating(state: ReleaseState):
         else:
             _existing_tag = tag_exists_locally(tag)
             if _existing_tag:
-                # Tag exists -- verify it points to HEAD
+                # Tag exists -- verify it points at the verified commit
                 _tag_sha = run("git", ["rev-parse", f"refs/tags/{tag}^{{}}"]).strip()
-                _head_sha = run("git", ["rev-parse", "HEAD"]).strip()
-                if _tag_sha == _head_sha:
+                if _tag_sha == verified_sha:
                     _tag_already_exists = True
                     save_step(_state_path, "TAGGED")
                     _completed.add("TAGGED")
-                    log("Skipping tag creation (tag already exists at HEAD)")
+                    log("Skipping tag creation (tag already at the verified commit)")
 
         if not _tag_already_exists:
-            # Create local git tag
-            run("git", ["tag", tag])
-            log(f"Tagged: {tag}")
+            # Create local git tag on the commit CI verified
+            run("git", ["tag", tag, verified_sha])
+            log(f"Tagged: {tag} -> {verified_sha[:12]} (CI-verified)")
 
             # Create companion tags (e.g. Go module proxy tags in releasable mode)
             if member_package_paths is not None:
@@ -1608,19 +1822,16 @@ def _run_release_mutating(state: ReleaseState):
                     releasable_config_dir=_releasable_cfg_dir,
                 )
                 for ctag in _companion_list:
-                    run("git", ["tag", ctag])
+                    run("git", ["tag", ctag, verified_sha])
                     state.companion_tags.append(ctag)
                     log(f"Created Go companion tag: {ctag}")
 
             save_step(_state_path, "TAGGED")
             _completed.add("TAGGED")
 
-        # PUSHED guard: skip branch push if remote matches local HEAD,
-        # skip tag push if remote tag already exists.
-        push_timeout = get_push_timeout(ctx.config, override=flags.get("push-timeout"))
-        if push_timeout != DEFAULT_PUSH_TIMEOUT:
-            log(f"Push timeout: {push_timeout}s (from --push-timeout or the "
-                f"push_timeout config key)")
+        # PUSHED guard: publish the finalization commits (SHA-addressed, so a
+        # ride-in that landed on the local branch is never swept along) and the
+        # tags. The candidate itself is already on the remote.
         _push_already_done = False
         if "PUSHED" in _completed:
             _push_already_done = True
@@ -1648,7 +1859,9 @@ def _run_release_mutating(state: ReleaseState):
                 pass  # Remote branch might not exist yet
 
             if _branch_needs_push:
-                push_if_needed(branch, config=ctx.config, cwd=project_dir)
+                push_if_needed(
+                    branch, config=ctx.config, cwd=project_dir, sha=_local_head,
+                )
                 branch_pushed = True
 
             # Check if tag push is needed. Commit-aware: verify EVERY release
@@ -1681,11 +1894,19 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Pushed to origin/{branch}")
             save_step(_state_path, "PUSHED")
             _completed.add("PUSHED")
+    except ReleaseCIError as e:
+        # CI did not pass on the pushed candidate. The candidate commit is on
+        # the remote, so there is nothing to roll back; and no tag, GitHub
+        # Release or finalized changelog was created, so there is nothing to
+        # clean up. State is preserved for `rlsbl release resume`.
+        print(f"Error: {e}", file=sys.stderr)
+        raise
     except ReleaseAbortError as e:
-        if "TAGGED" in _completed:
-            # Post-TAGGED failure: canonical resumable state. Preserve
-            # everything and record a failed PUSHED marker instead of
-            # rolling back (which would destroy exactly what resume needs).
+        if _is_resumable_failure(e, branch_pushed, candidate_push_attempted,
+                                 _completed):
+            # Post-candidate-push failure: canonical resumable state. Preserve
+            # everything and record a failed marker instead of rolling back
+            # (which would diverge from the already-published candidate).
             # A recovered tag-push retry falls through into the post-push
             # steps below; otherwise re-raise to abort with resume guidance.
             if not _handle_resumable_push_failure(e):
@@ -1693,7 +1914,7 @@ def _run_release_mutating(state: ReleaseState):
             # Recovered: the retry cleared the outstanding push. Fall through
             # (no rollback) so the post-push steps below the try/except run.
         else:
-            # Pre-TAGGED failure -- safe to roll back locally,
+            # Pre-push failure -- safe to roll back locally,
             # but only if no foreign commits or dirty files would be destroyed.
             _guard_rollback(pre_release_sha, _state_path)
             run("git", ["reset", "--hard", pre_release_sha])
@@ -1712,10 +1933,11 @@ def _run_release_mutating(state: ReleaseState):
             _warn_rollback_residuals()
             raise
     except Exception as e:
-        if "TAGGED" in _completed:
-            # Post-TAGGED failure (push failed / timed out): canonical
+        if _is_resumable_failure(e, branch_pushed, candidate_push_attempted,
+                                 _completed):
+            # Post-candidate-push failure (push failed / timed out): canonical
             # resumable state. Preserve everything and record a failed
-            # PUSHED marker instead of rolling back. A recovered tag-push
+            # marker instead of rolling back. A recovered tag-push
             # retry falls through into the post-push steps below; otherwise
             # re-raise to abort with resume guidance.
             if not _handle_resumable_push_failure(e):
@@ -1723,7 +1945,7 @@ def _run_release_mutating(state: ReleaseState):
             # Recovered: the retry cleared the outstanding push. Fall through
             # (no rollback) so the post-push steps below the try/except run.
         else:
-            # Pre-TAGGED failure -- safe to roll back locally,
+            # Pre-push failure -- safe to roll back locally,
             # but only if no foreign commits or dirty files would be destroyed.
             _guard_rollback(pre_release_sha, _state_path)
             # Delete tag (may not exist yet) and reset commits so the working
@@ -1753,17 +1975,25 @@ def _run_release_mutating(state: ReleaseState):
                 file=sys.stderr,
             )
             print(
-                "No push happened (the failure occurred before tagging), so nothing "
-                "on the remote needs fixing. Address the error above and re-run:\n"
+                "No push happened (the failure occurred before the release "
+                "candidate was pushed), so nothing on the remote needs fixing. "
+                "Address the error above and re-run:\n"
                 "  rlsbl release run",
                 file=sys.stderr,
             )
             _warn_rollback_residuals()
             raise
 
-    # Capture the pushed commit SHA now, before any post-release hooks that
-    # might create new commits and move HEAD past the release commit.
-    pushed_sha = run("git", ["rev-parse", "HEAD"])
+    # The CI-verified commit: the tag target, the publish gate's subject, and
+    # the SHA the post-release watch follows. It is stable across post-release
+    # hooks that create further commits. On a resume that skipped straight past
+    # the CI gate the state file carries it; fall back to the tag's own commit.
+    if verified_sha is None:
+        verified_sha = (
+            (load_release_state(_state_path) or {}).get("candidate_sha")
+            or run("git", ["rev-parse", f"refs/tags/{tag}^{{}}"]).strip()
+        )
+    pushed_sha = verified_sha
 
     # GITHUB_RELEASE guard: skip if the release already exists
     # Create GitHub Release using a temp notes file
@@ -1786,10 +2016,11 @@ def _run_release_mutating(state: ReleaseState):
             pass  # Release doesn't exist yet -- proceed with creation
 
     # The machine-parseable CI-SHA marker tells the publish gate exactly which
-    # commit CI runs on. pushed_sha is HEAD after the (post-reorg) tag/push,
-    # i.e. the pushed branch tip = tag tip. The notes file is written
-    # UNCONDITIONALLY -- the subtree mirror release reuses it, and a
-    # pre-existing Release gets the marker reconciled in below.
+    # commit CI ran on: the CI-verified candidate, which is also the tag's
+    # commit. Under main-as-candidate ordering CI has ALREADY concluded green
+    # on it before this Release exists, so the gate confirms rather than waits.
+    # The notes file is written UNCONDITIONALLY -- the subtree mirror release
+    # reuses it, and a pre-existing Release gets the marker reconciled in below.
     _ci_sha = pushed_sha.strip()
     _ci_marker = f"<!-- rlsbl-ci-sha: {_ci_sha} -->"
     notes_body = (changelog_entry or "").rstrip("\n")

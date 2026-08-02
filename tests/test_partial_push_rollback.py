@@ -234,19 +234,20 @@ def _setup_rerelease_with_committed_finalize(repo):
     _git(repo, "commit", "-q", "-m", "chore: leftover finalize files from earlier attempt")
 
 
-class TestPreTaggedReReleaseRollback:
-    """Pre-TAGGED rollback must not destroy tracked finalize files, must not
-    emit the (wrong, unreachable) force-push hint, and must point the user at
-    fix-and-retry via `rlsbl release run`."""
+class TestFinalizeFailureAfterCandidatePush:
+    """A finalization failure lands AFTER the candidate push under
+    main-as-candidate ordering, so it is resumable rather than rolled back.
+    It must preserve the tracked finalize files, leave no tag or GitHub
+    Release behind, emit no (wrong, unreachable) force-push hint, and point
+    the operator at `rlsbl release resume`."""
 
-    def test_rollback_preserves_tracked_finalize_and_no_forcepush_hint(
+    def test_finalize_failure_is_resumable_and_preserves_tracked_files(
         self, tmp_project, capsys
     ):
-        """A pre-TAGGED failure (finalize_version refuses to clobber the
-        tracked 1.0.1.jsonl) rolls back. Cleanup must preserve the tracked
-        finalize files, the tree must be byte-identical clean, no
-        `--force-with-lease` hint may appear, and the fix-and-retry pointer
-        must be present.
+        """finalize_version refuses to clobber the tracked 1.0.1.jsonl. The
+        candidate is already pushed, so nothing is reset: the tracked finalize
+        files survive untouched, no tag exists, no `--force-with-lease` hint
+        appears, and the resume pointer is present.
         """
         _setup_rerelease_with_committed_finalize(tmp_project)
 
@@ -277,30 +278,28 @@ class TestPreTaggedReReleaseRollback:
                     ),
                 )
 
-        # Rollback landed us back at the pre-release HEAD.
-        assert _git_head(tmp_project) == pre_sha, \
-            "pre-TAGGED failure must reset to the pre-release commit"
+        # The candidate is on the remote: no reset may happen.
+        assert _git_head(tmp_project) != pre_sha, \
+            "a post-candidate-push failure must NOT reset published commits"
+
+        # No tag and no finalized release artifact: the version is not burnt.
+        assert not _tag_exists(tmp_project, "v1.0.1"), \
+            "no tag may be created when finalization fails"
 
         # Tracked finalize files survive and stay tracked.
         jsonl = tmp_project / ".rlsbl" / "changes" / "1.0.1.jsonl"
         md = tmp_project / ".rlsbl" / "changes" / "1.0.1.md"
         assert jsonl.exists() and md.exists(), \
-            "tracked finalize files must not be deleted by cleanup"
+            "tracked finalize files must not be deleted"
         assert _is_tracked(tmp_project, ".rlsbl/changes/1.0.1.jsonl")
         assert _is_tracked(tmp_project, ".rlsbl/changes/1.0.1.md")
-
-        # Byte-identical clean working tree (no ` D` entries, no orphans).
-        assert _porcelain(tmp_project) == "", \
-            "rollback must leave a byte-identical clean working tree"
 
         err = capsys.readouterr().err
         assert "force-with-lease" not in err, \
             "the unreachable force-push hint must be gone"
         assert "push --force" not in err
-        assert "rlsbl release run" in err, \
-            "rollback must point the user at fix-and-retry via rlsbl release run"
-        assert "residual" not in err.lower(), \
-            "a clean rollback must not emit the residual-leftover warning"
+        assert "rlsbl release resume" in err, \
+            "the operator must be pointed at resume, not at a fresh release"
 
 
 def _tag_exists(repo, tag):
@@ -354,8 +353,37 @@ class TestPostTaggedPushResumable:
         assert (repo / ".rlsbl" / "changes" / "1.0.1.jsonl").exists(), \
             "finalized changelog file must remain on disk"
 
-    def test_branch_push_timeout_after_tag_is_resumable(self, tmp_project, capsys):
-        """Form 1: branch push times out (GitError) after the tag is created."""
+    def _assert_candidate_push_resumable_state(self, repo, pre_sha):
+        """Post-conditions for a candidate-push timeout: commits and state
+        preserved, but NO tag and NO finalized changelog exist yet (the CI
+        gate never opened), so the version can be released unchanged."""
+        from rlsbl.commands.release.release_state import (
+            get_state_path, load_release_state,
+        )
+
+        assert not _tag_exists(repo, "v1.0.1"), \
+            "no tag may exist before the CI gate opens"
+        assert _git_head(repo) != pre_sha, \
+            "release commits must NOT be rolled back after a push timeout"
+
+        state = load_release_state(get_state_path(str(repo)))
+        assert state is not None, "in-progress.json must be preserved"
+        assert "COMMITTED" in state["completed_steps"]
+        assert "BRANCH_PUSHED" not in state["completed_steps"]
+        assert "BRANCH_PUSHED" in state.get("failed_steps", {}), \
+            "a failed BRANCH_PUSHED marker must be recorded"
+
+        assert not (repo / ".rlsbl" / "changes" / "1.0.1.jsonl").exists(), \
+            "the changelog must not be finalized before CI is green"
+
+    def test_candidate_push_timeout_is_resumable(self, tmp_project, capsys):
+        """Form 1: the CANDIDATE push times out (GitError) before tagging.
+
+        Under main-as-candidate ordering the branch push happens first, so a
+        push timeout is now a pre-tag event. It must still skip rollback: a
+        timed-out push may have landed, and `git reset --hard` would then
+        diverge from published history. Nothing was tagged, released or
+        finalized, so the version is not burnt."""
         _setup_releasable_npm_project(tmp_project)
 
         from rlsbl.commands.release import run_cmd
@@ -400,13 +428,15 @@ class TestPostTaggedPushResumable:
         assert _exc.value.code == 1
 
         assert not reset_hard_called, \
-            "git reset --hard must NOT run for a post-TAGGED branch-push timeout"
-        self._assert_resumable_state(tmp_project, pre_sha)
+            "git reset --hard must NOT run for a candidate-push timeout"
+        self._assert_candidate_push_resumable_state(tmp_project, pre_sha)
 
         captured = capsys.readouterr()
         assert "rlsbl release resume" in captured.err
         assert "--push-timeout" in captured.err, \
             "a timeout failure must suggest raising --push-timeout"
+        assert "not burnt" in captured.err, \
+            "the operator must be told the version survives the failure"
 
     def test_tag_push_raw_timeout_after_tag_is_resumable(self, tmp_project, capsys):
         """Form 2: tag push raises raw subprocess.TimeoutExpired (branch OK)."""

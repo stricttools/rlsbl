@@ -101,3 +101,48 @@ def snapshot_remote_refs(repo, *, remote="origin"):
         if len(parts) == 2:
             refs[parts[1]] = parts[0]
     return refs
+
+
+def fake_run_dispatch(*, head_sha="abc123def456", toplevel="/tmp/fake-repo",
+                      porcelain="", porcelain_after_bump=None,
+                      remote_head=None, log_subject="", behind_count="0",
+                      branch="main"):
+    """Command-dispatching stand-in for ``rlsbl.commands.release.run``.
+
+    Release-flow unit tests used to feed ``mock_run.side_effect`` a positional
+    list of canned outputs, one per expected ``run()`` call. Any change to the
+    order or number of git calls inside the release flow silently exhausted the
+    list and produced a ``StopIteration`` unrelated to the behaviour under
+    test. This helper answers by COMMAND instead, so a test asserts what it
+    means to assert.
+
+    ``porcelain`` is returned by ``git status`` until the release captures its
+    pre-release HEAD (``git rev-parse HEAD``); after that point
+    ``porcelain_after_bump`` (defaulting to ``porcelain``) is returned, which is
+    what the unexpected-modified-files re-check guard observes.
+    """
+    seen_head = {"v": False}
+    after = porcelain if porcelain_after_bump is None else porcelain_after_bump
+
+    def fake(cmd, args=None, timeout=None, env=None, cwd=None, **kwargs):
+        a = list(args or [])
+        if cmd != "git" or not a:
+            return ""
+        if a[0] == "status":
+            return after if seen_head["v"] else porcelain
+        if a[0] == "rev-parse":
+            if "--show-toplevel" in a:
+                return toplevel
+            if a[1:2] == ["HEAD"]:
+                seen_head["v"] = True
+            return head_sha
+        if a[0] == "ls-remote":
+            head = head_sha if remote_head is None else remote_head
+            return f"{head}\trefs/heads/{branch}" if head else ""
+        if a[:2] == ["rev-list", "--count"]:
+            return behind_count
+        if a[0] == "log":
+            return log_subject
+        return ""
+
+    return fake

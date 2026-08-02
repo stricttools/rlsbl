@@ -168,6 +168,32 @@ class TestWatchInvokesWatchCmd:
         assert "Dry run" in captured.out
 
 
+def _fake_run_dispatch(head_sha, toplevel="/tmp/fake-repo"):
+    """Command-dispatching stand-in for ``run``.
+
+    Positional side_effect lists are brittle: any change to the release step
+    order (e.g. the main-as-candidate reorder) silently exhausts them. This
+    answers by command instead, so the test asserts the behaviour under test
+    rather than an exact call sequence.
+    """
+
+    def fake(cmd, args=None, timeout=None, env=None, cwd=None, **kwargs):
+        a = list(args or [])
+        if cmd != "git" or not a:
+            return ""
+        if a[0] == "rev-parse":
+            if "--show-toplevel" in a:
+                return toplevel
+            return head_sha
+        if a[0] == "ls-remote":
+            return f"{head_sha}\trefs/heads/main"
+        if a[:2] == ["rev-list", "--count"]:
+            return "0"
+        return ""
+
+    return fake
+
+
 class TestWatchInvokedAfterRelease:
     """When --watch is set and release completes, watch.run_cmd is called."""
 
@@ -175,7 +201,7 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True)
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
+    @patch("rlsbl.commands.release.tag_exists_locally", return_value=False)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.commit_files_if_changed")
@@ -234,25 +260,7 @@ class TestWatchInvokedAfterRelease:
         )
 
         fake_sha = "abc123def456"
-        mock_run.side_effect = [
-            "",       # fetch
-            "0",      # rev-list (not behind)
-            "",       # pre-hook dirty snapshot
-            "",       # pre-selfdoc dirty snapshot
-            "",       # post-selfdoc dirty snapshot
-            "",       # post-hook dirty snapshot
-            "",       # baseline dirty snapshot
-            "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
-            "",       # re-check dirty snapshot
-            "pre123", # rev-parse HEAD (pre-release)
-            "",       # git log -1 (COMMITTED guard)
-            "",       # status --porcelain (backfilled .md detection)
-            "",       # git tag (create tag)
-            "pre123", # rev-parse HEAD (PUSHED guard _local_head)
-            "pre123", # rev-parse origin/main (PUSHED guard _remote_head)
-            "",       # git push origin tag
-            fake_sha, # rev-parse HEAD (pushed sha)
-        ]
+        mock_run.side_effect = _fake_run_dispatch(fake_sha)
 
         with patch("rlsbl.commands.release.acquire_lock"), \
              patch("rlsbl.commands.release.release_lock"), \
@@ -271,7 +279,7 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True)
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
+    @patch("rlsbl.commands.release.tag_exists_locally", return_value=False)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.commit_files_if_changed")
@@ -329,25 +337,7 @@ class TestWatchInvokedAfterRelease:
         )
 
         fake_sha = "abc123def456"
-        mock_run.side_effect = [
-            "",       # fetch
-            "0",      # rev-list
-            "",       # pre-hook status
-            "",       # pre-selfdoc status
-            "",       # post-selfdoc status
-            "",       # post-hook status
-            "",       # baseline status
-            "/tmp/fake-repo",  # git rev-parse --show-toplevel (for vpath)
-            "",       # re-check dirty status
-            "pre123", # rev-parse HEAD (pre-release)
-            "",       # git log -1 (COMMITTED guard)
-            "",       # status --porcelain (backfilled .md detection)
-            "",       # git tag (create tag)
-            "pre123", # rev-parse HEAD (PUSHED guard _local_head)
-            "pre123", # rev-parse origin/main (PUSHED guard _remote_head)
-            "",       # git push origin tag
-            fake_sha, # rev-parse HEAD (pushed sha)
-        ]
+        mock_run.side_effect = _fake_run_dispatch(fake_sha)
 
         with patch("rlsbl.commands.release.acquire_lock"), \
              patch("rlsbl.commands.release.release_lock"), \

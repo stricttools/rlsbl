@@ -20,6 +20,8 @@ import rlsbl.lock
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 
+from githarness import fake_run_dispatch
+
 
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
@@ -198,27 +200,7 @@ class TestPrivatePublishGuardrail:
 
         from rlsbl.commands.release import run_cmd
 
-        mock_run.side_effect = [
-            # run_cmd phase:
-            "",                 # git fetch origin --quiet
-            "0",                # git rev-list --count HEAD..origin/main
-            "",                 # git status --porcelain (pre-hook snapshot)
-            "",                 # git status --porcelain (pre-selfdoc snapshot)
-            "",                 # git status --porcelain (post-selfdoc snapshot)
-            "",                 # git status --porcelain (post-hook snapshot)
-            # _run_release_mutating phase:
-            "",                 # git status --porcelain (baseline snapshot)
-            "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
-            "abc123",           # git rev-parse HEAD (pre_release_sha)
-            "",                 # git status --porcelain (re-check guard)
-            "",                 # git log -1 --format=%s (COMMITTED guard)
-            "",                 # git status --porcelain (backfilled .md detection)
-            "",                 # git tag v1.0.1
-            "abc123",           # rev-parse HEAD (PUSHED guard _local_head)
-            "abc123",           # rev-parse origin/main (PUSHED guard _remote_head)
-            "",                 # git push origin v1.0.1
-            "def456",           # git rev-parse HEAD (pushed_sha)
-        ]
+        mock_run.side_effect = fake_run_dispatch(head_sha="abc123")
 
         with patch("rlsbl.pipelines.npm.NpmPipeline.publish") as mock_publish:
             run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False}}}))
@@ -267,27 +249,7 @@ class TestPrivatePublishGuardrail:
         from rlsbl.commands.release import run_cmd
 
         mock_tag_local.side_effect = [True, False, False]
-        mock_run.side_effect = [
-            # run_cmd phase:
-            "",                 # git fetch origin --quiet
-            "0",                # git rev-list --count HEAD..origin/main
-            "",                 # git status --porcelain (pre-hook snapshot)
-            "",                 # git status --porcelain (pre-selfdoc snapshot)
-            "",                 # git status --porcelain (post-selfdoc snapshot)
-            "",                 # git status --porcelain (post-hook snapshot)
-            # _run_release_mutating phase:
-            "",                 # git status --porcelain (baseline snapshot)
-            "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
-            "abc123",           # git rev-parse HEAD (pre_release_sha)
-            "",                 # git status --porcelain (re-check guard)
-            "",                 # git log -1 --format=%s (COMMITTED guard)
-            "",                 # git status --porcelain (backfilled .md detection)
-            "",                 # git tag v1.0.1
-            "abc123",           # rev-parse HEAD (PUSHED guard _local_head)
-            "abc123",           # rev-parse origin/main (PUSHED guard _remote_head)
-            "",                 # git push origin v1.0.1
-            "def456",           # git rev-parse HEAD (pushed_sha)
-        ]
+        mock_run.side_effect = fake_run_dispatch(head_sha="abc123")
 
         run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
 

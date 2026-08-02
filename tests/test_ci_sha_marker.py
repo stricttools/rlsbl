@@ -1,9 +1,9 @@
 """Test for the CI-SHA release-notes marker (1.3).
 
 At GitHub Release creation, rlsbl appends a machine-parseable marker line to
-the release notes: `<!-- rlsbl-ci-sha: <sha> -->`, where <sha> is the pushed
-branch tip (the commit CI runs on). The publish gate reads this marker to
-learn exactly which commit to gate on.
+the release notes: `<!-- rlsbl-ci-sha: <sha> -->`, where <sha> is the CI-verified
+release candidate (the commit the tag points at). The publish gate reads this
+marker to learn exactly which commit to gate on.
 """
 
 import subprocess
@@ -48,7 +48,7 @@ class TestCiShaMarker:
         assert "notes" in captured, "gh release create must have been invoked"
         tag_sha = git(tmp_project, "rev-list", "-n", "1", "alpha@v1.0.1")
         assert f"<!-- rlsbl-ci-sha: {tag_sha} -->" in captured["notes"], (
-            "release notes must carry the CI-SHA marker for the pushed tip"
+            "release notes must carry the CI-SHA marker for the verified candidate"
         )
 
 
@@ -114,7 +114,10 @@ class TestCiShaMarkerWhenReleaseAlreadyExists:
         def capturing_gh(args, **kwargs):
             if args[:2] == ["release", "view"]:
                 if "--json" in args:
-                    sha = git(tmp_project, "rev-parse", "HEAD")
+                    # The marker names the CI-VERIFIED commit, which is the
+                    # tag's commit -- an ancestor of HEAD once the finalization
+                    # commits land on top of it.
+                    sha = git(tmp_project, "rev-list", "-n", "1", "alpha@v1.0.1")
                     return f"Release notes\n\n<!-- rlsbl-ci-sha: {sha} -->\n"
                 return "existing release"
             if args[:2] == ["release", "edit"]:

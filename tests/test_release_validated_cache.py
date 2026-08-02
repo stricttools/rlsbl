@@ -18,6 +18,8 @@ from rlsbl.context import ProjectContext
 
 from rlsbl.release_file import ReleaseConfig
 
+from githarness import fake_run_dispatch
+
 
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
@@ -90,29 +92,9 @@ class TestReleaseValidatedCache:
         # along with the expected package.json (from version bump)
         porcelain_recheck = " M .rlsbl/changes/.validated\n M package.json"
 
-        mock_run.side_effect = [
-            # run_cmd phase:
-            "",               # git fetch origin --quiet
-            "0",              # git rev-list --count HEAD..origin/main
-            "",               # git status --porcelain (pre-hook snapshot)
-            "",               # git status --porcelain (pre-selfdoc snapshot)
-            "",               # git status --porcelain (post-selfdoc snapshot)
-            "",               # git status --porcelain (post-hook snapshot)
-            # _run_release_mutating phase:
-            "",                 # git status --porcelain (baseline snapshot)
-            "/tmp/fake-repo",   # git rev-parse --show-toplevel (for vpath)
-            "abc123def456",     # git rev-parse HEAD (pre_release_sha -- before version bump)
-            porcelain_recheck,  # git status --porcelain (re-check guard)
-            # new_version != current_version, so has_staged_or_modified is short-circuited
-            # commit_files is mocked separately
-            "",                 # git log -1 --format=%s (COMMITTED guard)
-            "M package.json",   # status --porcelain (backfilled .md detection)
-            "",                 # git tag v1.0.1
-            "abc123def456",     # rev-parse HEAD (PUSHED guard _local_head)
-            "abc123def456",     # rev-parse origin/main (PUSHED guard _remote_head)
-            "",                 # git push origin v1.0.1
-            "",                 # git rev-parse HEAD (pushed_sha)
-        ]
+        mock_run.side_effect = fake_run_dispatch(
+            head_sha="abc123def456", porcelain_after_bump=porcelain_recheck,
+        )
 
         with patch("sys.stdout", new_callable=StringIO):
             # Should NOT raise SystemExit -- .validated is expected

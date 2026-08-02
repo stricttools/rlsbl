@@ -169,17 +169,41 @@ class TestCanonicalStepList:
     """The ordered canonical step list is the single source of truth."""
 
     def test_mutating_steps_order(self):
-        # SNAPSHOT_REGENERATED lands before TAGGED so the monorepo snapshot
-        # commit is the pushed branch tip (the commit CI runs on).
+        # Main-as-candidate ordering: the candidate is pushed untagged
+        # (BRANCH_PUSHED) and CI judges it (CI_VERIFIED) BEFORE anything
+        # irreversible happens. SNAPSHOT_REGENERATED lands before the push so
+        # the snapshot commit is part of the commit CI verifies.
         assert MUTATING_STEPS == (
             "VERSION_BUMPED",
             "COMMITTED",
+            "SNAPSHOT_REGENERATED",
+            "BRANCH_PUSHED",
+            "CI_VERIFIED",
             "CHANGELOG_FINALIZED",
             "RELEASE_FILE_FINALIZED",
-            "SNAPSHOT_REGENERATED",
             "TAGGED",
             "PUSHED",
             "GITHUB_RELEASE",
+        )
+
+    def test_finalization_and_tag_come_after_the_ci_gate(self):
+        """The irreversible half of the release must never precede CI.
+
+        Regression for failure modes 1/2/10: a tag, a GitHub Release or a
+        finalized changelog created before CI reported left orphan artifacts
+        and burnt the version number on every red run.
+        """
+        order = {s: i for i, s in enumerate(MUTATING_STEPS)}
+        for step in ("CHANGELOG_FINALIZED", "RELEASE_FILE_FINALIZED",
+                     "TAGGED", "PUSHED", "GITHUB_RELEASE"):
+            assert order[step] > order["CI_VERIFIED"], (
+                f"{step} must happen only after the CI gate is green"
+            )
+        assert order["BRANCH_PUSHED"] < order["CI_VERIFIED"], (
+            "the candidate must be pushed before CI can judge it"
+        )
+        assert order["SNAPSHOT_REGENERATED"] < order["BRANCH_PUSHED"], (
+            "the snapshot commit must be part of the verified candidate"
         )
 
     def test_post_release_steps_order(self):
@@ -192,7 +216,7 @@ class TestCanonicalStepList:
 
     def test_release_steps_is_concatenation(self):
         assert RELEASE_STEPS == MUTATING_STEPS + POST_RELEASE_STEPS
-        assert len(RELEASE_STEPS) == 12
+        assert len(RELEASE_STEPS) == 14
         # No duplicates
         assert len(set(RELEASE_STEPS)) == len(RELEASE_STEPS)
 

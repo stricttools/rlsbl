@@ -1672,8 +1672,8 @@ class TestWatchRunsSingleRun:
         assert len(results) == 1
         # Even a single run goes through the pool path with the shared
         # retry-dedup state (ci_run, label, repo_slug, retried_lock,
-        # retried_workflows)
-        assert len(mock_single.call_args[0]) == 5
+        # retried_workflows, timeout)
+        assert len(mock_single.call_args[0]) == 6
 
 
 class TestWatchRunCmdRunIdRepoError:
