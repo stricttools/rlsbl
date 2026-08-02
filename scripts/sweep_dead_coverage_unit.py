@@ -114,6 +114,46 @@ def dirty_paths(repo):
     return paths
 
 
+def summarize(swept, skipped_dirty, failed, *, dry_run):
+    """Return the summary lines for a sweep run.
+
+    The headline count alone is misleading: a run that sweeps nothing because
+    every candidate repo was dirty is NOT the same as a run that found nothing
+    to sweep. The summary therefore always states, separately and explicitly,
+    how many repos still carry the key after this run.
+    """
+    label = "would sweep" if dry_run else "swept"
+    lines = [f"{label}: {len(swept)} repo(s)"]
+    for repo, rel in swept:
+        lines.append(f"  {repo}: {', '.join(rel)}")
+
+    if skipped_dirty:
+        verb = "still carry" if dry_run else "still carries"
+        lines.append(
+            f"NOT SWEPT -- {len(skipped_dirty)} repo(s) skipped (dirty tree) "
+            f"and {verb} {KEY}:"
+        )
+        for repo, rel, foreign in skipped_dirty:
+            lines.append(
+                f"  {repo}: {', '.join(rel)} "
+                f"-- foreign changes: {', '.join(foreign[:5])}"
+            )
+        lines.append(
+            f"re-run after those trees are clean; {KEY} is not gone yet."
+        )
+    elif not swept:
+        lines.append(f"nothing sweepable: no live config carries {KEY}.")
+    else:
+        lines.append(f"no repo left carrying {KEY}.")
+
+    if failed:
+        lines.append(f"FAILED: {len(failed)} repo(s)")
+        for repo, rel, why in failed:
+            lines.append(f"  {repo}: {', '.join(rel)} -- {why}")
+
+    return lines
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
@@ -165,19 +205,9 @@ def main():
             continue
         swept.append((repo, rel))
 
-    label = "would sweep" if args.dry_run else "swept"
-    print(f"{label}: {len(swept)} repo(s)")
-    for repo, rel in swept:
-        print(f"  {repo}: {', '.join(rel)}")
-    print(f"skipped (dirty tree): {len(skipped_dirty)} repo(s)")
-    for repo, rel, foreign in skipped_dirty:
-        print(f"  {repo}: {', '.join(rel)} -- foreign changes: {', '.join(foreign[:5])}")
-    if failed:
-        print(f"FAILED: {len(failed)} repo(s)")
-        for repo, rel, why in failed:
-            print(f"  {repo}: {', '.join(rel)} -- {why}")
-        return 1
-    return 0
+    for line in summarize(swept, skipped_dirty, failed, dry_run=args.dry_run):
+        print(line)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
