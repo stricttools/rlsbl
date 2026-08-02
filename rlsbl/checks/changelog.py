@@ -54,7 +54,8 @@ def register_changelog_checks(app):
         Scans unreleased.jsonl and every finalized x.y.z.jsonl in the changes
         dir(s), routing each line through the strictspec per-line gate. A line
         lacking (or carrying an unsupported) ``format_version`` is a hard error
-        directing the operator to the one-time stamping script. Skipped entirely
+        naming the file and the fix (stamp the line, re-add the entry, or record
+        a deliberate legacy-mode decision). Skipped entirely
         when enforcement is off (absent or ``false``) -- legacy mode tolerates
         unstamped lines.
         """

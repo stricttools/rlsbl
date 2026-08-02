@@ -1,12 +1,12 @@
 ---
-description: "Pipeline architecture: 10 built-in types, 3 auth patterns, custom assets, capability gating, launcher shims with download modes, and migration guide."
+description: "Pipeline architecture: 9 built-in types, 3 auth patterns, custom assets, capability gating, launcher shims with download modes, and migration guide."
 ---
 
 # Pipelines
 
 ## Overview
 
-Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports 10 built-in pipeline types across 3 authentication patterns (token, credential, and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
+Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports 9 built-in pipeline types across 3 authentication patterns (token, credential, and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
 
 Pipelines are distinct from targets: targets determine which files get version-bumped (auto-detected from manifests), while pipelines determine where the release artifact is published (explicitly configured). A project can have an npm target for versioning but a cloudflare-pages pipeline for publishing, or multiple pipelines publishing to different registries.
 
@@ -24,14 +24,15 @@ A project with no pipelines configured simply does not publish anywhere — vers
 
 ## Configuration
 
-Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each entry is keyed by a user-chosen name (any valid JSON string) and requires at minimum a `type` field (one of 10 built-in types) and a `local` boolean field indicating whether publishing happens on the developer machine or in CI:
+Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each entry is keyed by a user-chosen name (any valid JSON string) and requires a `type` field (one of 9 built-in types), a `local` boolean field indicating whether publishing happens on the developer machine or in CI, and a `target` link naming the release target it publishes for (or `null` for a targetless publisher):
 
 ```json
 {
   "pipelines": {
     "my-pipeline-name": {
       "type": "npm",
-      "local": false
+      "local": false,
+      "target": "npm"
     }
   }
 }
@@ -43,6 +44,7 @@ Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each
 | --- | --- | --- | --- |
 | `type` | string | Yes | One of the 9 built-in pipeline types (see table below) |
 | `local` | bool | Yes | Whether to publish from the developer machine. `false` means CI handles it. |
+| `target` | string or null | Yes | The release target this pipeline publishes for. Must name an entry in the config's `targets` list, or be `null` for a targetless publisher (e.g. a docs deploy). There is no name-based inference. |
 | `artifact` | string | Yes (type `go`) | `binary` or `library`. Selects the go publish workflow. No default. See [go](#go). |
 | `token_var` | string | No | Env var name for the publish token. Each type has a default. |
 | `username_var` | string | No | Env var for username auth (docker only). |
@@ -53,7 +55,7 @@ Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each
 
 ## Pipeline types
 
-There are 10 built-in pipeline types covering all major package registries and deployment platforms. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
+There are 9 built-in pipeline types covering all major package registries and deployment platforms. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
 
 :-: table-pipelines
 

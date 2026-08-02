@@ -159,7 +159,7 @@ The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl check
 
 The hook is namespace-aware: it enforces on `refs/heads/*` and exits 0 for `refs/tags/*` (release tags, pushed by rlsbl itself) and `refs/backups/*` (tool-owned backup slots). Release-internal pushes run `git push --no-verify` and never invoke the hook, so there is no environment-variable bypass to leak.
 
-Old hooks that call `rlsbl pre-push-check` still work but show a deprecation warning. Run `rlsbl scaffold` to update to the current hook format.
+Old hooks that call `rlsbl pre-push-check` no longer work: the command was removed and now exits non-zero with an error, which blocks the push. Run `rlsbl scaffold` to install the current hook.
 
 To reinstall, run `rlsbl scaffold` -- it writes the current hook (and upgrades any previously shipped version in place).
 

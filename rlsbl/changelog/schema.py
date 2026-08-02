@@ -167,8 +167,9 @@ def parse_entry(line: str, *, enforce_format_version: bool = False) -> Changelog
       unsupported version is a hard error);
     - a line lacking ``format_version`` is LEGACY. It is accepted only when
       ``enforce_format_version`` is False (the transition default). With
-      ``enforce_format_version=True`` a missing gate is a hard error directing
-      the operator to run the one-time stamping script.
+      ``enforce_format_version=True`` a missing gate is a hard error telling the
+      operator to stamp the line, re-add the entry, or record a deliberate
+      legacy-mode decision in ``.rlsbl/config.json``.
 
     Raises ChangelogError on malformed JSON or missing required fields.
     Historical entries without ``id`` load fine (``id`` is optional on read).
