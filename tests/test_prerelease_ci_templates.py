@@ -51,7 +51,8 @@ class TestNpmPublishDistTag:
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish.yml.tpl")
         dist_tag_pos = content.index("Determine dist-tag")
-        publish_pos = content.index("npm publish")
+        # Match the STEP, not a prose mention in a comment.
+        publish_pos = content.index("- run: npm publish")
         assert dist_tag_pos < publish_pos
 
 
@@ -82,7 +83,8 @@ class TestPnpmPublishDistTag:
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-pnpm.yml.tpl")
         dist_tag_pos = content.index("Determine dist-tag")
-        publish_pos = content.index("pnpm publish")
+        # Match the STEP, not a prose mention in a comment.
+        publish_pos = content.index("- run: pnpm publish")
         assert dist_tag_pos < publish_pos
 
 
@@ -113,7 +115,8 @@ class TestYarnPublishDistTag:
     def test_dist_tag_step_before_publish(self):
         content = _read_template(NPM_TEMPLATE_DIR, "publish-yarn.yml.tpl")
         dist_tag_pos = content.index("Determine dist-tag")
-        publish_pos = content.index("yarn npm publish")
+        # Match the STEP, not a prose mention in a comment.
+        publish_pos = content.index("- run: yarn npm publish")
         assert dist_tag_pos < publish_pos
 
 

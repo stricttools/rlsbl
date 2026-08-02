@@ -65,6 +65,11 @@ jobs:
           echo "Checksums file verified (HTTP ${SUM_CODE})"
         env:
           RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      - name: Install dependencies
+        # Full install (devDependencies included): `npm publish` runs the
+        # package's prepack script, which for a TypeScript package compiles
+        # with the dev toolchain. A bare checkout has none of it.
+        run: npm ci
       - name: Check if already published
         id: check-npm
         run: |
