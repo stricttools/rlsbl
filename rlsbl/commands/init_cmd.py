@@ -381,6 +381,36 @@ NEXT_STEPS = {
     ],
 }
 
+# A Go library's publish workflow does not run goreleaser at all -- it verifies
+# module availability on the proxy. Telling its author about goreleaser is
+# simply false.
+GO_LIBRARY_FIRST_STEP = (
+    "Go library: no binaries are built -- publishing verifies the module is "
+    "available on the Go module proxy"
+)
+
+
+def _go_artifact_kind(config):
+    """Return the artifact kind of the config's go pipeline, or None."""
+    for entry in ((config or {}).get("pipelines") or {}).values():
+        if isinstance(entry, dict) and entry.get("type") == "go":
+            return entry.get("artifact")
+    return None
+
+
+def _next_steps_for(registry, config):
+    """Return the next-steps lines for *registry*, or None.
+
+    Specialized by pipeline config where the generic text would be wrong.
+    """
+    steps = NEXT_STEPS.get(registry)
+    if steps is None:
+        return None
+    steps = list(steps)
+    if registry == "go" and _go_artifact_kind(config) == "library":
+        steps[0] = GO_LIBRARY_FIRST_STEP
+    return steps
+
 
 _ESCAPE_SENTINEL = "__RLSBL_ESCAPE_OPEN__"
 
@@ -1349,9 +1379,8 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
 
     # Next steps
     if registry:
-        steps = NEXT_STEPS.get(registry)
+        steps = _next_steps_for(registry, config)
         if steps:
-            steps = list(steps)
             if npm_lockfile_missing:
                 steps.insert(0, 'Run "npm install" and commit package-lock.json before pushing')
             print("\nNext steps:")
@@ -1514,10 +1543,14 @@ def _print_private_summary():
 def _ensure_pipeline_config(registries, ctx):
     """Generate default pipeline config for detected targets if not already present.
 
-    For each detected target whose name matches a PIPELINE_TYPES key,
-    creates a pipeline entry with name=target_name, type=target_name, local=false.
+    For each detected target whose name matches a PIPELINE_TYPES key, creates a
+    pipeline entry with name=target_name, type=target_name, local=false, and
+    the mandatory ``target`` link pointing at the same-named target.
     If multiple targets share the same pipeline type, errors with a message
     telling the user to name pipelines manually.
+
+    Callers must register the targets in config (``_ensure_target_in_config``)
+    BEFORE calling this, so the generated ``target`` link always resolves.
 
     Go pipelines additionally set ``artifact`` to ``"library"`` or
     ``"binary"`` (auto-detected from the project's package layout). No
@@ -1544,6 +1577,14 @@ def _ensure_pipeline_config(registries, ctx):
             entry = {
                 "type": target_name,
                 "local": False,
+                # The target link is mandatory (validate_pipeline_target_links)
+                # and is what publish-template resolution matches on -- a
+                # generated entry without it fails rlsbl's own config-schema
+                # check AND silently falls back to the target-name default
+                # template, ignoring pipeline config such as Go's `artifact`.
+                # The caller registers the targets before calling this, so the
+                # reference always resolves.
+                "target": target_name,
             }
             if target_name == "go":
                 entry["artifact"] = _detect_go_artifact_kind(ctx.project_root)
