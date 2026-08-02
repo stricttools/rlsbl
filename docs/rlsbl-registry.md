@@ -1,6 +1,6 @@
 ---
 title: rlsbl.registry
-description: "Registry version query functions for npm, PyPI, Go proxy, and crates.io, returning the latest published version for name availability and dependency che..."
+description: "Registry version query functions for npm, PyPI, and the Go proxy, returning the latest published version for name availability and dependency checks."
 generated: true
 nav_group: "API Reference"
 nav_order: 113

@@ -1,6 +1,6 @@
 ---
 title: rlsbl claim-name
-description: "Claim a name on a package registry (npm, PyPI, or crates.io) by publishing a minimal placeholder. Runs check-name first, then publishes if available."
+description: "Claim a name on npm or PyPI by publishing a minimal placeholder package. Runs check-name first and publishes only if the name is available."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 4

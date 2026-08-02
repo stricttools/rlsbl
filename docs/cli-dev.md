@@ -1,6 +1,6 @@
 ---
 title: rlsbl dev
-description: "Developer utilities for locally working with rlsbl projects: editable installs across 8 release targets with global, venv, and uninstall modes."
+description: "Developer utilities for local work on rlsbl projects: editable installs across 7 release targets, sibling checkout overlays via dev sync, and overlay drift reporting."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 7

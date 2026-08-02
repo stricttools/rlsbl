@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.targets_cmd
-description: "Targets command that lists all available release targets (npm, PyPI, Go, Cargo, etc.) and shows their auto-detection status."
+description: "Targets command that lists all available release targets (npm, PyPI, Go, and the rest) and shows their auto-detection status."
 generated: true
 nav_group: "API Reference"
 nav_order: 61
