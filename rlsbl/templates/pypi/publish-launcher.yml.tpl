@@ -39,7 +39,16 @@ jobs:
           # packages reach the registry.
           OWNER_REPO="${GITHUB_REPOSITORY}"
           TAG="${RELEASE_TAG}"
-          ASSET_URL="https://github.com/${OWNER_REPO}/releases/download/${TAG}/${OWNER_REPO##*/}_${TAG#v}_linux_amd64.tar.gz"
+          # Baked in at scaffold time from the WRAPPED PRODUCER pipeline --
+          # the same two values the launcher shim downloads with, so the probe
+          # can never check a different URL than users fetch. The repo
+          # basename is not the asset project name (goreleaser names assets
+          # after the producer), and a bare "v" strip leaves a prefixed
+          # monorepo tag ("<name>@v1.2.3") completely intact.
+          ASSET_PROJECT="{{assetProject}}"
+          TAG_PREFIX="{{tagPrefix}}"
+          VERSION="${TAG#"${TAG_PREFIX}"}"
+          ASSET_URL="https://github.com/${OWNER_REPO}/releases/download/${TAG}/${ASSET_PROJECT}_${VERSION}_linux_amd64.tar.gz"
           echo "Checking binary asset: ${ASSET_URL}"
           HTTP_CODE=$(curl -sSL -o /dev/null -w '%{http_code}' "${ASSET_URL}")
           if [ "${HTTP_CODE}" = "404" ]; then

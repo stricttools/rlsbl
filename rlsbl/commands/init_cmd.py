@@ -1703,7 +1703,7 @@ def run_cmd(registry, args, flags, ctx):
             publish_target = os.path.join(".github", "workflows", "publish.yml")
             merged_content = _generate_merged_publish(
                 [registry], vars_dict, {registry: target_path},
-                pipelines=_loaded_pipelines,
+                pipelines=_loaded_pipelines, ctx=ctx,
             )
             pipeline_plans = [_plan_merged_publish(
                 publish_target, merged_content,
@@ -2193,8 +2193,18 @@ def _resolve_publish_template(target_name, pipelines, templates_root):
     return None
 
 
+def _launcher_pipeline_for_target(target_name, pipelines):
+    """Return the launcher pipeline linked to *target_name*, or None."""
+    for pipeline in (pipelines or {}).values():
+        if getattr(pipeline, "target", None) != target_name:
+            continue
+        if pipeline.config.get("artifact") == "launcher":
+            return pipeline
+    return None
+
+
 def _generate_merged_publish(targets, template_vars, target_paths=None,
-                             pipelines=None):
+                             pipelines=None, ctx=None):
     """Generate a merged publish.yml from individual target publish templates.
 
     Reads each target's publish template (resolved via pipeline
@@ -2254,6 +2264,16 @@ def _generate_merged_publish(targets, template_vars, target_paths=None,
         # even when this target is not the primary.
         per_target_vars = dict(template_vars)
         _overlay_target_vars(per_target_vars, target_name)
+
+        # A launcher target's publish job verifies the release asset the shim
+        # will download. Resolve assetProject/tagPrefix from the SAME resolver
+        # the shim render path uses, so the probe and the download can never
+        # disagree. A resolution failure is a hard error there and here.
+        launcher = _launcher_pipeline_for_target(target_name, pipelines)
+        if launcher is not None:
+            per_target_vars.update(
+                _resolve_launcher_shim_vars(launcher, pipelines, ctx)
+            )
 
         # Process template variables, then parse as structured YAML.
         # Unresolved {{var}} placeholders are not valid YAML (parsed as flow
@@ -2825,7 +2845,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             publish_target = os.path.join(".github", "workflows", "publish.yml")
             merged_content = _generate_merged_publish(
                 registries_list, vars_dict, target_paths,
-                pipelines=_loaded_pipelines,
+                pipelines=_loaded_pipelines, ctx=ctx,
             )
             merged_plans = [_plan_merged_publish(
                 publish_target, merged_content,

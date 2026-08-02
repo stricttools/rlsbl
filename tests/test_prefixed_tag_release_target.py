@@ -181,3 +181,159 @@ class TestResolveTagPrefix:
         pkg = mock_git_repo / "core"
         pkg.mkdir(exist_ok=True)
         assert resolve_tag_prefix(str(pkg)) == "alpha@v"
+
+
+# ---------------------------------------------------------------------------
+# Launcher PUBLISH templates: the asset-verification probe is prefix-aware
+# ---------------------------------------------------------------------------
+
+
+LAUNCHER_PUBLISH = [
+    ("npm", "publish-launcher.yml.tpl"),
+    ("pypi", "publish-launcher.yml.tpl"),
+]
+
+_PUBLISH_RENDER_VARS = {
+    "githubRepo": "smm-h/mono",
+    "assetProject": "alpha",
+    "binaryName": "alpha",
+    "tagPrefix": "alpha@v",
+    "distName": "alpha",
+    "registryUrl": "https://registry.npmjs.org",
+    "publishGate": "",
+    "npm.provenance": "",
+}
+
+
+class TestLauncherPublishProbeIsPrefixAware:
+    """The publish-time 404 probe must build the SAME URL the shim downloads.
+
+    It used to build ``${OWNER_REPO##*/}_${TAG#v}_...``: the repo basename
+    (not the producer's asset project name) and a bare-``v`` strip that leaves
+    a prefixed tag like ``alpha@v1.2.3`` completely intact.
+    """
+
+    @pytest.mark.parametrize("target,name", LAUNCHER_PUBLISH)
+    def test_no_bare_v_strip(self, target, name):
+        assert "${TAG#v}" not in _read(target, name)
+
+    @pytest.mark.parametrize("target,name", LAUNCHER_PUBLISH)
+    def test_no_repo_basename_as_asset_project(self, target, name):
+        assert "${OWNER_REPO##*/}" not in _read(target, name)
+
+    @pytest.mark.parametrize("target,name", LAUNCHER_PUBLISH)
+    def test_declares_the_shim_vars(self, target, name):
+        content = _read(target, name)
+        assert "{{assetProject}}" in content
+        assert "{{tagPrefix}}" in content
+
+    @pytest.mark.parametrize("target,name", LAUNCHER_PUBLISH)
+    def test_renders_the_asset_project_and_prefix(self, target, name):
+        rendered, _unreplaced = process_template(
+            _read(target, name), dict(_PUBLISH_RENDER_VARS),
+        )
+        assert 'ASSET_PROJECT="alpha"' in rendered
+        assert 'TAG_PREFIX="alpha@v"' in rendered
+        assert "${ASSET_PROJECT}_${VERSION}_linux_amd64.tar.gz" in rendered
+        # GitHub's own ${{ }} expressions survive; rlsbl's do not.
+        assert "{{assetProject}}" not in rendered
+        assert "{{tagPrefix}}" not in rendered
+
+
+class TestLauncherPublishVersionDerivation:
+    """The version-stripping expression, exercised as real shell."""
+
+    EXPR = 'TAG="%s"; TAG_PREFIX="%s"; printf "%%s" "${TAG#"${TAG_PREFIX}"}"'
+
+    @pytest.mark.parametrize("tag,prefix,expected", [
+        ("alpha@v1.2.3", "alpha@v", "1.2.3"),
+        ("v1.2.3", "v", "1.2.3"),
+        ("cmd/tool/v0.4.0", "cmd/tool/v", "0.4.0"),
+        ("alpha@v1.0.0-rc.1", "alpha@v", "1.0.0-rc.1"),
+    ])
+    def test_strips_exactly_the_prefix(self, tag, prefix, expected):
+        out = subprocess.run(
+            ["bash", "-c", self.EXPR % (tag, prefix)],
+            capture_output=True, text=True, check=True,
+        )
+        assert out.stdout == expected
+
+    @pytest.mark.parametrize("target,name", LAUNCHER_PUBLISH)
+    def test_the_template_uses_this_exact_expression(self, target, name):
+        assert '${TAG#"${TAG_PREFIX}"}' in _read(target, name)
+
+
+class TestMergedPublishFeedsTheLauncherVars:
+    """The scaffold's publish render path resolves the same vars the shims get.
+
+    The bug was a plumbing gap, not a template typo: the shim render path
+    resolved ``assetProject``/``tagPrefix`` from the wrapped producer, the
+    publish render path did not, so the probe fell back to guesswork.
+    """
+
+    def _fixture(self, root):
+        import json
+
+        (root / "go.mod").write_text("module github.com/acme/alpha\n\ngo 1.23\n")
+        (root / "main.go").write_text("package main\n\nfunc main() {}\n")
+        (root / "VERSION").write_text("0.1.0\n")
+        (root / "package.json").write_text(
+            json.dumps({"name": "alpha", "version": "0.1.0"}, indent=2) + "\n"
+        )
+        (root / ".rlsbl-monorepo").mkdir(exist_ok=True)
+        (root / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            '[[projects]]\n'
+            'name = "alpha"\n'
+            'path = "."\n'
+            'releasable = "alpha"\n'
+            '\n'
+            '[[releasables]]\n'
+            'name = "alpha"\n'
+            'tag_format = "{name}@v{version}"\n'
+        )
+        rlsbl_dir = root / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps({
+            "publish_mode": "ci",
+            "targets": [{"name": "go", "path": "."},
+                        {"name": "npm", "path": "."}],
+            "pipelines": {
+                "go": {"type": "go", "local": False, "target": "go",
+                       "artifact": "binary"},
+                "npm": {"type": "npm", "local": False, "target": "npm",
+                        "artifact": "launcher", "wraps": "go",
+                        "binary_source": "github-release", "provenance": True,
+                        "download": "first-run"},
+            },
+        }, indent=2) + "\n")
+
+    def test_prefixed_releasable_probe_uses_the_real_asset_url(
+            self, mock_git_repo, monkeypatch):
+        from pathlib import Path
+
+        from rlsbl.commands.init_cmd import _generate_merged_publish
+        from rlsbl.config import read_project_config
+        from rlsbl.context import ProjectContext
+        from rlsbl.pipelines import load_pipelines
+
+        root = mock_git_repo
+        self._fixture(root)
+        monkeypatch.chdir(root)
+
+        ctx = ProjectContext(project_root=Path("."), workspace_root=None,
+                             config=read_project_config("."))
+        pipelines = load_pipelines(ctx.config)
+        content = _generate_merged_publish(
+            ["go", "npm"],
+            {"name": "alpha", "registryUrl": "https://registry.npmjs.org",
+             "publishGate": "", "npm.provenance": "",
+             "modulePath": "github.com/acme/alpha"},
+            {"go": ".", "npm": "."},
+            pipelines=pipelines,
+            ctx=ctx,
+        )
+        assert 'ASSET_PROJECT="alpha"' in content
+        assert 'TAG_PREFIX="alpha@v"' in content
+        # No placeholder survived into the generated workflow.
+        assert "__UNRESOLVED__assetProject__" not in content
+        assert "__UNRESOLVED__tagPrefix__" not in content

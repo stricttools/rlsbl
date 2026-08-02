@@ -367,9 +367,17 @@ class TestLauncherNeedsChain:
         npm.target = "npm"
         return {"go": go, "npm": npm}
 
-    def test_merged_publish_npm_depends_on_go(self):
+    def test_merged_publish_npm_depends_on_go(self, tmp_path, monkeypatch):
         """In the merged publish, the npm launcher job depends on the go job."""
         from rlsbl.commands.init_cmd import _generate_merged_publish
+
+        # A launcher target's publish job bakes in the producer's asset
+        # project + tag prefix, so the producer must be resolvable on disk.
+        (tmp_path / "go.mod").write_text(
+            "module github.com/test/test-pkg\n\ngo 1.23\n"
+        )
+        (tmp_path / "main.go").write_text("package main\n\nfunc main() {}\n")
+        monkeypatch.chdir(tmp_path)
 
         pipelines = self._make_pipelines()
         targets = ["go", "npm"]
