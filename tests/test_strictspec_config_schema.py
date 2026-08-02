@@ -38,7 +38,6 @@ class TestValidConfigs:
                 "docs": {"type": "cloudflare-pages", "local": True,
                          "target": None},
             },
-            "coverage_unit": "commit",
         }
         assert _v(doc) == []
 

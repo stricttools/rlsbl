@@ -212,7 +212,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -264,7 +264,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -315,7 +315,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -364,7 +364,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
                 _rc(), {"dry-run": True, "quiet": True, "yes": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"},
+                    config={"publish_mode": "ci", "pipelines": {}},
                 ),
             )
 
@@ -518,7 +518,6 @@ class TestExternalChecksVsHookCustomization:
         config = self._setup_with_external_check(
             tmp_project, hook_body="#!/bin/bash\necho custom tests\n"
         )
-        config["coverage_unit"] = "commit"
 
         started = [p.start() for p in _FULL_FLOW_PATCHES]
         try:

@@ -3384,24 +3384,6 @@ class TestReclassifiedLabels:
         result = app._check_defs["changelog-entry"].impl(ctx)
         assert result.status == "warn"
 
-    # -- changelog-user-facing: changeset-file mode no-pending -> skip -----
-
-    def test_changelog_user_facing_no_pending_files_is_skip(self, tmp_path, monkeypatch):
-        """changelog-user-facing: changeset-file mode with no pending files -> skip."""
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _init_repo(repo)
-        changes_dir = repo / ".rlsbl" / "changes"
-        changes_dir.mkdir(parents=True)
-        pending_dir = changes_dir / "pending"
-        pending_dir.mkdir()
-        # Empty pending dir
-
-        ctx = make_ctx(repo, config={"coverage_unit": "changeset-file"})
-        result = app._check_defs["changelog-user-facing"].impl(ctx)
-        assert result.status == "skip"
-
     # -- library-lint: dual-gating errors vs warnings ----------------------
 
     def test_library_lint_errors_only_is_fail(self, tmp_path, monkeypatch):

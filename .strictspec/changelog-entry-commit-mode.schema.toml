@@ -1,12 +1,6 @@
-# strictspec schema for one rlsbl JSONL changelog line -- COMMIT coverage mode.
-# Source of truth: rlsbl/changelog/schema.py (ChangelogEntry, validate_schema
-# with coverage_unit="commit"). One document = one JSONL line.
-#
-# MODE SPLIT: coverage_unit is a PROJECT-CONFIG value (.rlsbl/config.json), NOT a
-# field on the entry line. There is therefore no in-document discriminator, so
-# the two modes are TWO SEPARATE SCHEMAS the consumer selects from config --
-# explicit mode selection, not silent runtime degradation. This is the
-# commit-mode schema; the changeset-file-mode schema is its sibling.
+# strictspec schema for one rlsbl JSONL changelog line.
+# Source of truth: rlsbl/changelog/schema.py (ChangelogEntry, validate_schema).
+# One document = one JSONL line.
 #
 # SCOPE: strictspec owns the raw DOCUMENT SHAPE (the per-line format_version
 # gate, field types, the type/release_type enums, required fields, unknown-key
@@ -23,7 +17,7 @@ document_syntax = "jsonl"
 role = "schema"
 root = "ChangelogEntry"
 targets = ["python"]
-description = "One JSONL changelog line in commit-coverage mode: commits required, id optional."
+description = "One JSONL changelog line: commits required, id optional."
 
 [types.ChangelogEntry]
 type = "record"
@@ -37,7 +31,7 @@ description = "Per-line format_version (JSONL per-line gate). Stamped into pre-v
 type = "array"
 required = true
 min_len = 1
-description = "Commit hashes. REQUIRED and non-empty in commit mode (validate_schema: \"commits is empty\")."
+description = "Commit hashes. REQUIRED and non-empty (validate_schema: \"commits is empty\")."
 [types.ChangelogEntry.fields.commits.item]
 type = "string"
 
@@ -67,7 +61,7 @@ description = "Flutter target release channel. Optional, unconstrained by user_f
 [types.ChangelogEntry.fields.id]
 type = "string"
 required = false
-description = "Stable ULID-style identifier. OPTIONAL in commit mode (present on newer entries, absent on historical ones)."
+description = "Stable ULID-style identifier. OPTIONAL (present on newer entries, absent on historical ones)."
 
 [types.ChangelogEntry.fields.packages]
 type = "array"

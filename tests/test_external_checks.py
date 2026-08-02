@@ -647,7 +647,6 @@ class TestExternalCheckIntegration:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
-            "coverage_unit": "commit",
             "external_checks": [_freeform(
                 name="ext-test-pass", command="echo 'all good'",
             )],
@@ -679,7 +678,6 @@ class TestExternalCheckIntegration:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
-            "coverage_unit": "commit",
             "external_checks": [_freeform(name="ext-test-fail", command="false")],
         }
         (rlsbl_dir / "config.json").write_text(json.dumps(config))
@@ -710,7 +708,6 @@ class TestExternalCheckIntegration:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
-            "coverage_unit": "commit",
             "external_checks": [
                 _freeform(name="ext-dep-target", command="echo target"),
                 _freeform(
@@ -759,7 +756,6 @@ class TestRunExternalPreflightChecks:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
-            "coverage_unit": "commit",
             "external_checks": [_freeform(
                 name="ext-marker-check", command=f"touch {ext_marker}",
             )],
@@ -812,7 +808,6 @@ class TestRunExternalPreflightChecks:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
-            "coverage_unit": "commit",
             "external_checks": [_structured(name="mypy-strict", paths=["src"])],
         }
         (rlsbl_dir / "config.json").write_text(json.dumps(config))
@@ -841,7 +836,6 @@ class TestRunExternalPreflightChecks:
         monkeypatch.chdir(mock_git_repo)
         config = {
             "publish_mode": "ci",
-            "coverage_unit": "commit",
             "external_checks": [_freeform(name="ext-fail-check", command="false")],
         }
         rlsbl_dir = mock_git_repo / ".rlsbl"
@@ -896,7 +890,6 @@ class TestPartitionWiring:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
-            "coverage_unit": "commit",
             "external_checks": [_freeform(
                 name="ext-pure-test", command=f"touch {ext_marker}",
             )],
@@ -935,7 +928,6 @@ class TestPartitionWiring:
         config = {
             "publish_mode": "ci",
             "targets": ["plain"],
-            "coverage_unit": "commit",
             "external_checks": [_structured(name="mypy-strict", paths=["src"])],
         }
         (rlsbl_dir / "config.json").write_text(json.dumps(config))

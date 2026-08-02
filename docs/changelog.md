@@ -53,7 +53,7 @@ Non-user-facing entries need only `format_version`, `commits`, and `user_facing:
 
 ## The format_version gate
 
-The document shape of one JSONL line — the per-line `format_version` gate plus the field/enum/conditional-required shape — is validated by the **strictspec-generated validators** (`rlsbl/strictspec_gen/changelog_entry_commit_validator.py` and `changelog_entry_changeset_file_validator.py`, one per `coverage_unit` mode). strictspec is the single document authority for shape; rlsbl keeps only what strictspec cannot see native (hash resolution, tag ranges, coverage vs git, batch limits, cross-file rules).
+The document shape of one JSONL line — the per-line `format_version` gate plus the field/enum/conditional-required shape — is validated by the **strictspec-generated validator** (`rlsbl/strictspec_gen/changelog_entry_commit_validator.py`). strictspec is the single document authority for shape; rlsbl keeps only what strictspec cannot see native (hash resolution, tag ranges, coverage vs git, batch limits, cross-file rules).
 
 Reading is **explicit two-mode**, never a silent fallback:
 

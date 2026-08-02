@@ -47,7 +47,7 @@ _ISOLATED_ROOT = {"path": None}
 @pytest.fixture(autouse=True)
 def _isolate_ctx_default(tmp_path):
     # Seed the isolated root with a minimal valid rlsbl project so member-context
-    # config reads (publish_mode, coverage_unit) resolve here instead of falling
+    # config reads (publish_mode) resolve here instead of falling
     # back to the real repo. Undo coverage tests reach the evidence gate; without
     # an explicit mock they were making live npm/PyPI probes (fixture version
     # 1.0.0 not published -> CLEARED). Default the gate to CLEARED so they are
@@ -56,7 +56,7 @@ def _isolate_ctx_default(tmp_path):
     rlsbl_dir.mkdir(exist_ok=True)
     (rlsbl_dir / "config.json").write_text(
         json.dumps({
-            "publish_mode": "ci", "coverage_unit": "commit", "targets": ["npm"],
+            "publish_mode": "ci", "targets": ["npm"],
         }) + "\n"
     )
     _ISOLATED_ROOT["path"] = tmp_path

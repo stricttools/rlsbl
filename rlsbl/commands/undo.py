@@ -17,9 +17,8 @@ import sys
 import traceback
 from types import SimpleNamespace
 
-from ..changelog.files import get_changes_dir, read_coverage_unit, unfinalize_changeset_version, unfinalize_version
+from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
-from ..config import read_project_config
 from ..evidence_gate import EvidenceKind, Verdict, run_evidence_gate, write_undo_audit
 from ..member_context import resolve_member_context
 from ..release_file import unfinalize_release_file
@@ -564,11 +563,7 @@ def _restore_changelog(plan, uc, results):
         changes_dir, regenerate_changelog, add_paths = _resolve_undo_changelog_paths(
             plan.project_path, uc.ws_root, plan.releasable_name,
         )
-        _cfg = read_project_config(plan.project_path)
-        if read_coverage_unit(_cfg) == "changeset-file":
-            unfinalize_changeset_version(changes_dir, plan.version)
-        else:
-            unfinalize_version(changes_dir, plan.version)
+        unfinalize_version(changes_dir, plan.version)
         regenerate_changelog()
         status = run("git", ["status", "--porcelain", "--", *add_paths]).strip()
         if status:

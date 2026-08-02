@@ -705,11 +705,9 @@ def _run_release_mutating(state: ReleaseState):
         ensure_npm_keyword,
         ensure_pypi_keyword,
         changes_dir_exists,
-        finalize_changeset_version,
         finalize_version,
         generate_version_file,
         get_changes_dir,
-        read_coverage_unit,
         validate_subtree_remote_ssh_host,
         _cleanup_release_artifacts,
         upload_release_assets,
@@ -1349,12 +1347,7 @@ def _run_release_mutating(state: ReleaseState):
             else:
                 tag_glob = None
 
-            # Determine coverage mode for finalization
-            _coverage_unit = read_coverage_unit(ctx.config)
-            if _coverage_unit == "changeset-file":
-                finalize_changeset_version(changes_dir, new_version)
-            else:
-                finalize_version(changes_dir, new_version, tag_glob=tag_glob)
+            finalize_version(changes_dir, new_version, tag_glob=tag_glob)
             # Pass release metadata so the new version's .md matches what a
             # future backfill from the archived v{version}.toml would produce
             # (the archived toml is stripped on read, so strip here too).
@@ -1367,10 +1360,8 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Finalized JSONL changelog for {new_version}")
             # Commit the finalized JSONL file and the new empty unreleased.jsonl
             jsonl_finalized = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.jsonl"), _git_root)
-            finalize_files = [jsonl_finalized, *_changelog_commit_files]
-            if _coverage_unit != "changeset-file":
-                jsonl_unreleased = _rel_to_git_root(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
-                finalize_files.append(jsonl_unreleased)
+            jsonl_unreleased = _rel_to_git_root(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
+            finalize_files = [jsonl_finalized, jsonl_unreleased, *_changelog_commit_files]
             # Also commit the generated per-version .md file if it exists
             jsonl_md = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.md"), _git_root)
             if os.path.exists(jsonl_md):

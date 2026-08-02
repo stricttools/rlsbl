@@ -1,13 +1,12 @@
 """JSONL changelog entry schema with dataclass definition, JSON parsing, serialization, field validation, type coercion, and entry ID generation.
 
-The strictspec-generated validators
-(``rlsbl/strictspec_gen/changelog_entry_commit_validator.py`` and
-``changelog_entry_changeset_file_validator.py``) are the DOCUMENT authority for
-one JSONL line: the per-line ``format_version`` gate and the field/enum/
-conditional-required shape. This module routes shape validation through them and
-keeps only what strictspec cannot see (hash resolution, tag ranges, coverage vs
-git, batch limits, cross-file rules) native -- those live in ``validate.py`` and
-``files.py``.
+The strictspec-generated validator
+(``rlsbl/strictspec_gen/changelog_entry_commit_validator.py``) is the DOCUMENT
+authority for one JSONL line: the per-line ``format_version`` gate and the
+field/enum/conditional-required shape. This module routes shape validation
+through it and keeps only what strictspec cannot see (hash resolution, tag
+ranges, coverage vs git, batch limits, cross-file rules) native -- those live in
+``validate.py`` and ``files.py``.
 
 Transition contract (see docs/changelog.md): every line rlsbl WRITES carries
 ``format_version = 1``. Reading is EXPLICIT two-mode -- a line carrying
@@ -65,15 +64,6 @@ class ChangelogEntry:
     packages: list[str] | None = None  # optional: affected member packages in a releasable
 
 
-def _mode_validator(coverage_unit: str):
-    """Return the strictspec-generated validator module for a coverage mode."""
-    if coverage_unit == "commit":
-        from ..strictspec_gen import changelog_entry_commit_validator as _v
-        return _v
-    from ..strictspec_gen import changelog_entry_changeset_file_validator as _v
-    return _v
-
-
 # Diagnostic-message field extractors. strictspec message text is pinned
 # (spec/appendix-surface-syntax.md), so these patterns are stable.
 _RE_MISSING = re.compile(r"Missing required field (\w+) ")
@@ -82,7 +72,7 @@ _RE_UNKNOWN = re.compile(r"Unknown key (\w+) ")
 _RE_PATH_FIELD = re.compile(r"\$\.(\w+)")
 
 
-def _native_message(diag, entry: ChangelogEntry, coverage_unit: str) -> str:
+def _native_message(diag, entry: ChangelogEntry) -> str:
     """Render one strictspec diagnostic as an rlsbl-native schema error string.
 
     strictspec is the shape engine; this is a thin presentation adapter that
@@ -95,8 +85,6 @@ def _native_message(diag, entry: ChangelogEntry, coverage_unit: str) -> str:
         field_name = m.group(1) if m else "?"
         if field_name == "commits":
             return "commits is empty"
-        if field_name == "id":
-            return "id is required in changeset-file mode"
         return f"missing required field: {field_name}"
     if code == "STRICTSPEC_INTRA_CONDITIONAL_REQUIRED":
         m = _RE_CONDITIONAL.search(diag.message)
@@ -120,8 +108,6 @@ def _native_message(diag, entry: ChangelogEntry, coverage_unit: str) -> str:
     if code == "STRICTSPEC_KEY_UNKNOWN":
         m = _RE_UNKNOWN.search(diag.message)
         field_name = m.group(1) if m else "?"
-        if field_name == "commits":
-            return "commits must be empty in changeset-file mode"
         return f"unknown key: {field_name}"
     if code in ("STRICTSPEC_TYPE_NOT_ARRAY", "STRICTSPEC_TYPE_NOT_STRING"):
         # A wrong-typed `packages` value (not a list, or a list with a non-string
@@ -135,33 +121,26 @@ def _native_message(diag, entry: ChangelogEntry, coverage_unit: str) -> str:
     return diag.message
 
 
-def validate_schema(entry: ChangelogEntry, *, coverage_unit: str = "commit") -> list[str]:
+def validate_schema(entry: ChangelogEntry) -> list[str]:
     """Return a list of schema errors for the entry. Empty list means valid.
 
-    ``coverage_unit`` selects which strictspec schema is the authority:
-
-    - ``"commit"`` (default): ``commits`` is required, ``id`` is optional.
-    - ``"changeset-file"``: ``commits`` is forbidden, ``id`` is required.
-
-    The entry is serialized (stamping ``format_version = CURRENT_FORMAT_VERSION``)
-    and validated through the mode-appropriate strictspec-generated validator --
-    the single shape engine. Diagnostics are rendered back into rlsbl's native
-    wording by :func:`_native_message`.
+    ``commits`` is required and ``id`` is optional. The entry is serialized
+    (stamping ``format_version = CURRENT_FORMAT_VERSION``) and validated through
+    the strictspec-generated validator -- the single shape engine. Diagnostics
+    are rendered back into rlsbl's native wording by :func:`_native_message`.
     """
-    if coverage_unit not in ("commit", "changeset-file"):
-        return [f"unknown coverage_unit: {coverage_unit!r}"]
-    validator = _mode_validator(coverage_unit)
+    from ..strictspec_gen import changelog_entry_commit_validator as validator
+
     line = serialize_entry(entry).encode("utf-8")
     _root, diags = validator.validate_bytes(line, "jsonl")
-    return [_native_message(d, entry, coverage_unit) for d in diags]
+    return [_native_message(d, entry) for d in diags]
 
 
 def _gate_line(line: str) -> None:
     """Run the strictspec per-line ``format_version`` gate on a raw JSONL line.
 
-    Uses the commit-mode validator's compiled program, but the gate is
-    mode-neutral (both schemas declare the identical ``format_version`` gate),
-    so this checks only the gate, never entry shape. Raises ChangelogError when
+    Uses the validator's compiled program, but checks only the gate, never entry
+    shape. Raises ChangelogError when
     ``format_version`` is present but not accepted (e.g. a future/wrong value).
     A line with NO ``format_version`` passes here silently -- the legacy/enforced
     decision is the caller's (see :func:`parse_entry`).
@@ -194,8 +173,8 @@ def parse_entry(line: str, *, enforce_format_version: bool = False) -> Changelog
 
     Raises ChangelogError on malformed JSON or missing required fields.
     Historical entries without ``id`` load fine (``id`` is optional on read).
-    Entries without ``commits`` are allowed (changeset-file mode entries
-    stored in finalized JSONL may have an empty commits list).
+    Entries without ``commits`` load with an empty commits list; the
+    ``changelog-schema`` check is what rejects them.
     """
     try:
         data = json.loads(line)
@@ -219,8 +198,8 @@ def parse_entry(line: str, *, enforce_format_version: bool = False) -> Changelog
     if "user_facing" not in data:
         raise ChangelogError("missing required field: user_facing")
 
-    # commits defaults to empty list when absent (changeset-file mode entries
-    # stored in finalized JSONL have no commits field).
+    # commits defaults to empty list when absent; validate_schema is the
+    # authority that rejects an entry with no commits.
     commits = data.get("commits", [])
     if not isinstance(commits, list):
         raise ChangelogError("commits must be a list")
@@ -241,8 +220,7 @@ def serialize_entry(entry: ChangelogEntry) -> str:
 
     Every line is stamped with ``format_version = CURRENT_FORMAT_VERSION`` as the
     leading key (the per-line gate). Only includes non-None optional fields to
-    keep lines compact. Omits ``commits`` when the list is empty (changeset-file
-    mode).
+    keep lines compact. Omits ``commits`` when the list is empty.
     """
     data: dict = {"format_version": CURRENT_FORMAT_VERSION}
     if entry.id is not None:

@@ -172,7 +172,7 @@ def _make_released_repo(repo, *, n_commits=5, with_remote=True):
 def _ctx(repo):
     return ProjectContext(
         project_root=Path(str(repo)), workspace_root=None,
-        config={"coverage_unit": "commit", "publish_mode": "ci"},
+        config={"publish_mode": "ci"},
     )
 
 

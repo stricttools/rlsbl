@@ -342,7 +342,7 @@ class TestTwoHookModel:
 
         from rlsbl.commands.release import run_cmd
 
-        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"}))
+        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # The hook should have actually run and created the marker
         assert marker.exists(), "pre-checks.sh should have created the marker file"
@@ -393,7 +393,7 @@ class TestTwoHookModel:
 
         from rlsbl.commands.release import run_cmd
 
-        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "coverage_unit": "commit"}))
+        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # pre-release hook still executes in dry-run mode
         assert pre_release_marker.exists(), (

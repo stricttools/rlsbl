@@ -4,7 +4,7 @@
 # rlsbl/external_checks.py (validate_external_checks).
 #
 # SCOPE (honest subset): this schema models the CORE, well-understood document
-# shape -- publish_mode, targets, pipelines, external_checks, coverage_unit.
+# shape -- publish_mode, targets, pipelines, external_checks.
 # It is NOT wired into config reading yet: (1) the fleet's config.json files do
 # not carry the mandatory strictspec format_version gate, and (2) the full
 # config surface has additional sections (services, test_env, batch_limits,
@@ -51,12 +51,6 @@ required = false
 description = "Config-declared subprocess checks (a discriminated union per entry)."
 [types.Config.fields.external_checks.item]
 type = "ExternalCheck"
-
-[types.Config.fields.coverage_unit]
-type = "enum"
-required = false
-values = ["commit", "changeset-file"]
-description = "Changelog coverage mode."
 
 # external_check names unique across the list.
 [[types.Config.constraints]]

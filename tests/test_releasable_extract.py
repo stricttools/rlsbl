@@ -757,7 +757,7 @@ def _setup_released_source_repo(tmp_path):
 
     os.makedirs(str(repo / ".rlsbl"), exist_ok=True)
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"publish_mode": "ci", "coverage_unit": "commit", "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )
     # v0.1.0 feature commit
     c1 = _make_multi_commit(
@@ -765,7 +765,7 @@ def _setup_released_source_repo(tmp_path):
         {
             "package.json": json.dumps({"name": "widget", "version": "0.1.0"}) + "\n",
             "src/index.js": "export const v = 1;\n",
-            ".rlsbl/config.json": json.dumps({"publish_mode": "ci", "coverage_unit": "commit", "targets": ["npm"]}) + "\n",
+            ".rlsbl/config.json": json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n",
         },
         "feat: initial widget",
     )

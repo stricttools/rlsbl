@@ -234,53 +234,6 @@ def _read_stdin_lines():
     return lines if lines else None
 
 
-def check_changeset_file_coverage(
-    changed_files: list[str],
-    *,
-    changes_dir: str,
-) -> str | None:
-    """Check changeset-file coverage for a push.
-
-    In changeset-file mode, a push that touches non-exempt paths must also
-    include at least one ``pending/*.json`` file.  Exempt paths are:
-
-    - ``.rlsbl/changes/`` (and subdirectories)
-    - ``CHANGELOG.md``
-
-    Returns ``None`` on success, or an error message string on failure.
-    """
-    if not changed_files:
-        return None
-
-    has_pending = False
-    has_non_exempt = False
-
-    for f in changed_files:
-        # Normalize path separators
-        normalized = f.replace(os.sep, "/")
-
-        # Check if this is a pending file
-        if "/pending/" in normalized and normalized.endswith(".json"):
-            has_pending = True
-            continue
-
-        # Check exempt paths
-        if normalized == "CHANGELOG.md" or normalized.endswith("/CHANGELOG.md"):
-            continue
-        if ".rlsbl/changes/" in normalized or ".rlsbl-monorepo/" in normalized:
-            continue
-
-        has_non_exempt = True
-
-    if has_non_exempt and not has_pending:
-        return (
-            "changeset-file mode: source files changed but no pending "
-            "changelog file included. Run `rlsbl changelog add` to "
-            "create a pending file."
-        )
-    return None
-
-
 def _parse_stdin_refs(stdin_lines=None):
     """Parse pre-push hook stdin to extract (local_sha, remote_sha) pairs.
 

@@ -176,7 +176,7 @@ class TestParseEntry:
             parse_entry("[1, 2, 3]")
 
     def test_missing_commits_defaults_to_empty(self):
-        """Entries without commits are valid (changeset-file mode)."""
+        """Entries without commits parse with an empty commits list."""
         entry = parse_entry('{"user_facing": false}')
         assert entry.commits == []
 

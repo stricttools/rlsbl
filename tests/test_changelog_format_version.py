@@ -131,21 +131,6 @@ class TestValidateSchemaStillNative:
         )
         assert any("invalid type" in e and "performance" in e for e in errs)
 
-    def test_changeset_needs_id(self):
-        errs = validate_schema(ChangelogEntry(user_facing=False), coverage_unit="changeset-file")
-        assert any("id is required" in e for e in errs)
-
-    def test_changeset_forbids_commits(self):
-        errs = validate_schema(
-            ChangelogEntry(commits=["a"], id="x", user_facing=False),
-            coverage_unit="changeset-file",
-        )
-        assert any("commits must be empty" in e for e in errs)
-
-    def test_unknown_coverage_unit(self):
-        errs = validate_schema(ChangelogEntry(commits=["a"], user_facing=False), coverage_unit="bogus")
-        assert any("unknown coverage_unit" in e for e in errs)
-
 
 class TestEnforcementConfigReader:
     def test_absent_is_legacy_and_reports_absent(self):
