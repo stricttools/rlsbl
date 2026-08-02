@@ -3,6 +3,7 @@
 import json
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
@@ -952,3 +953,178 @@ class TestPartitionWiring:
             assert guard_results[0].status == "pass"
         finally:
             rlsbl.app.reset_check_provider_cache()
+
+
+# ---------------------------------------------------------------------------
+# Release-context env injection (RLSBL_PROJECT_ROOT / LAST_TAG / RANGE)
+# ---------------------------------------------------------------------------
+
+
+def _env_probe_command():
+    """A freeform command that prints the injected release-context vars."""
+    return (
+        'printf "root=%s tag=[%s] range=%s" '
+        '"$RLSBL_PROJECT_ROOT" "$RLSBL_LAST_TAG" "$RLSBL_UNRELEASED_RANGE"'
+    )
+
+
+class TestReleaseContextEnv:
+    """Both check kinds run with the release context in their environment."""
+
+    def _tag(self, repo, tag):
+        subprocess.run(["git", "tag", tag], cwd=str(repo), check=True)
+
+    def test_untagged_repo_exports_empty_last_tag(self, mock_git_repo):
+        """No tag yet -> LAST_TAG is the empty string, RANGE is HEAD."""
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
+        )
+        fn = _make_external_check_fn(_env_probe_command(), None, "env-probe")
+        reporter = ErrorReporter()
+        result = fn(ctx, reporter)
+
+        assert result.status == "pass"
+        assert f"root={mock_git_repo}" in result.message
+        assert "tag=[]" in result.message
+        assert "range=HEAD" in result.message
+
+    def test_tagged_repo_exports_tag_and_range(self, mock_git_repo):
+        """A tagged standalone repo gets <tag> and <tag>..HEAD."""
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        self._tag(mock_git_repo, "v1.2.3")
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
+        )
+        fn = _make_external_check_fn(_env_probe_command(), None, "env-probe")
+        result = fn(ctx, ErrorReporter())
+
+        assert result.status == "pass"
+        assert "tag=[v1.2.3]" in result.message
+        assert "range=v1.2.3..HEAD" in result.message
+
+    def test_structured_check_gets_the_same_env(self, mock_git_repo, monkeypatch):
+        """The structured (shell-free) path injects the identical env."""
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        self._tag(mock_git_repo, "v0.9.0")
+        captured = {}
+
+        def fake_run(argv, **kwargs):
+            captured["env"] = kwargs.get("env")
+            return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
+
+        # Rebind the NAME in external_checks only -- patching the shared
+        # subprocess module would also swallow the git calls the env resolver
+        # itself makes.
+        monkeypatch.setattr(
+            external_checks, "subprocess",
+            SimpleNamespace(run=fake_run, TimeoutExpired=subprocess.TimeoutExpired),
+        )
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
+        )
+        fn = _make_structured_check_fn("mypy", ["src"], None, "mypy-strict")
+        fn(ctx, ErrorReporter())
+
+        env = captured["env"]
+        assert env["RLSBL_PROJECT_ROOT"] == str(mock_git_repo)
+        assert env["RLSBL_LAST_TAG"] == "v0.9.0"
+        assert env["RLSBL_UNRELEASED_RANGE"] == "v0.9.0..HEAD"
+
+    def test_cwd_override_still_learns_the_project_root(self, mock_git_repo):
+        """An entry with a cwd override has no other way to find the root."""
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        sub = mock_git_repo / "sub"
+        sub.mkdir()
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
+        )
+        fn = _make_external_check_fn(_env_probe_command(), "sub", "env-probe")
+        result = fn(ctx, ErrorReporter())
+
+        assert result.status == "pass"
+        assert f"root={mock_git_repo}" in result.message
+
+    def test_resolved_once_per_run_not_once_per_check(self, mock_git_repo, monkeypatch):
+        """N external checks must not mean N `git describe` calls."""
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        self._tag(mock_git_repo, "v2.0.0")
+        calls = []
+        real = external_checks.get_last_version_tag
+
+        def counting(tag_glob="v*", **kwargs):
+            calls.append(tag_glob)
+            return real(tag_glob, **kwargs)
+
+        monkeypatch.setattr(external_checks, "get_last_version_tag", counting)
+        ctx = ProjectContext(
+            project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
+        )
+        for name in ("a", "b", "c"):
+            fn = _make_external_check_fn("true", None, name)
+            fn(ctx, ErrorReporter())
+
+        assert len(calls) == 1, calls
+
+
+class TestReleaseContextEnvWorkspace:
+    """In a monorepo the tag glob is the project's own, not the bare `v*`."""
+
+    def _workspace(self, repo):
+        """An explicit-mode workspace with one releasable named `alpha`."""
+        (repo / ".rlsbl-monorepo").mkdir(exist_ok=True)
+        (repo / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            '[[projects]]\n'
+            'name = "alpha"\n'
+            'path = "alpha"\n'
+            'releasable = "alpha"\n'
+            '\n'
+            '[[releasables]]\n'
+            'name = "alpha"\n'
+            'tag_format = "{name}@v{version}"\n'
+        )
+        changes = repo / ".rlsbl-monorepo" / "releasables" / "alpha" / "changes"
+        changes.mkdir(parents=True, exist_ok=True)
+        (changes / "unreleased.jsonl").write_text("")
+        pkg = repo / "alpha"
+        pkg.mkdir(exist_ok=True)
+        (pkg / "package.json").write_text('{"name":"alpha","version":"1.0.0"}')
+        return pkg
+
+    def test_uses_the_releasable_tag_glob(self, mock_git_repo):
+        """`alpha@v*` resolves alpha's own tag, ignoring an unrelated `v*`."""
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace import load_releasables, load_workspace
+        from pathlib import Path
+
+        pkg = self._workspace(mock_git_repo)
+        subprocess.run(["git", "tag", "v9.9.9"], cwd=str(mock_git_repo), check=True)
+        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
+
+        projects = load_workspace(str(mock_git_repo))
+        releasables = load_releasables(str(mock_git_repo), projects)
+        ctx = WorkspaceCheckContext(
+            project_root=Path(str(pkg)),
+            workspace_root=Path(str(mock_git_repo)),
+            config={},
+            projects=projects,
+            graph=None,
+            releasables=releasables,
+        )
+        fn = _make_external_check_fn(_env_probe_command(), None, "env-probe")
+        result = fn(ctx, ErrorReporter())
+
+        assert result.status == "pass"
+        assert "tag=[alpha@v1.0.0]" in result.message
+        assert "range=alpha@v1.0.0..HEAD" in result.message
+        assert f"root={pkg}" in result.message

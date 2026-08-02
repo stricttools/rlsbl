@@ -30,7 +30,7 @@ import tomllib
 
 from strictcli import error_check_spec
 
-from .utils import detect_uv_workspace_root, get_check_timeout
+from .utils import detect_uv_workspace_root, get_check_timeout, get_last_version_tag
 
 
 # Leading environment-assignment pattern (``VAR=value``).  Shell-legal as a
@@ -345,6 +345,57 @@ def _compose_structured_argv(tool, paths, project_dir):
 # ---------------------------------------------------------------------------
 
 
+#: Attribute the resolved release-context env is memoized on, so N external
+#: checks in one run mean ONE `git describe`, not N.
+_ENV_CACHE_ATTR = "_rlsbl_external_check_env"
+
+
+def _release_context_env(ctx):
+    """Return the subprocess env for an external check: os.environ + RLSBL_*.
+
+    Injected (see docs/configuration.md for the availability matrix):
+
+    - ``RLSBL_PROJECT_ROOT`` -- the resolved project root. An entry with a
+      ``cwd`` override otherwise has no way to find it.
+    - ``RLSBL_LAST_TAG`` -- the project's last release tag, resolved through
+      the same per-project tag glob the changelog layer uses (so it is
+      monorepo-correct). The EMPTY STRING when no tag exists, so a check can
+      tell "no baseline yet" from "not injected".
+    - ``RLSBL_UNRELEASED_RANGE`` -- ``<last_tag>..HEAD``, or ``HEAD`` on a
+      first release.
+
+    Computed once per check run and memoized on the context object.
+    """
+    cached = getattr(ctx, _ENV_CACHE_ATTR, None)
+    if cached is not None:
+        return cached
+
+    from .changelog.resolve import _unreleased_range
+    from .checks._common import _resolve_tag_glob
+
+    project_root = str(ctx.project_root)
+    tag_glob = _resolve_tag_glob(ctx)
+    try:
+        last_tag = get_last_version_tag(tag_glob, cwd=project_root)
+    except Exception:
+        # A repo we cannot interrogate (shallow clone, not a git repo) still
+        # gets the project root; the tag pair is simply absent-as-empty.
+        last_tag = None
+        unreleased_range = "HEAD"
+    else:
+        unreleased_range = _unreleased_range(tag_glob, cwd=project_root)
+
+    env = dict(os.environ)
+    env["RLSBL_PROJECT_ROOT"] = project_root
+    env["RLSBL_LAST_TAG"] = last_tag or ""
+    env["RLSBL_UNRELEASED_RANGE"] = unreleased_range
+    try:
+        setattr(ctx, _ENV_CACHE_ATTR, env)
+    except AttributeError:
+        pass  # a slotted/frozen context simply recomputes
+    return env
+
+
 def _resolve_cwd(ctx, cwd):
     """Resolve an entry's cwd against the project root."""
     if cwd is None:
@@ -384,7 +435,8 @@ def _make_external_check_fn(command, cwd, name, timeout=None):
     The returned function has the ``(ctx, reporter)`` signature expected by
     strictcli's check system.  The timeout is routed through the configured
     check budget (``timeout=None`` resolves ``get_check_timeout(None)``, i.e.
-    the ``check_timeout`` config key or the shipped default).
+    the ``check_timeout`` config key or the shipped default).  The subprocess
+    env carries the release context (see :func:`_release_context_env`).
     """
     def _run_external_check(ctx, reporter):
         check_cwd = _resolve_cwd(ctx, cwd)
@@ -397,6 +449,7 @@ def _make_external_check_fn(command, cwd, name, timeout=None):
                 capture_output=True,
                 text=True,
                 timeout=budget,
+                env=_release_context_env(ctx),
             )
         except subprocess.TimeoutExpired:
             msg = f"external check '{name}' timed out after {budget}s"
@@ -416,7 +469,8 @@ def _make_structured_check_fn(tool, paths, cwd, name, timeout=None):
 
     No shell: the argv is a list, composed as ``uv run [group flags] <binary>
     <subcommand...> <paths...>``.  The timeout is routed through the configured
-    check budget.
+    check budget, and the subprocess env carries the release context (see
+    :func:`_release_context_env`).
     """
     def _run_structured_check(ctx, reporter):
         check_cwd = _resolve_cwd(ctx, cwd)
@@ -429,6 +483,7 @@ def _make_structured_check_fn(tool, paths, cwd, name, timeout=None):
                 capture_output=True,
                 text=True,
                 timeout=budget,
+                env=_release_context_env(ctx),
             )
         except subprocess.TimeoutExpired:
             msg = f"external check '{name}' timed out after {budget}s"

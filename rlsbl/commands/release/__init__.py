@@ -847,7 +847,13 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     config=ctx.config,
                     projects=[member_proj],
                     graph=None,
-                    releasables=[],
+                    # The releasable MUST be carried: checks that resolve a
+                    # releasable (changelog context, tag glob, the external-
+                    # check release-context env) fall back to per-project
+                    # resolution when this is empty, so a member of an
+                    # explicit-mode releasable would see the wrong (or no)
+                    # changes dir and the wrong tag glob during preflight.
+                    releasables=[releasable_obj] if releasable_obj else [],
                 )
                 if hook_is_customized:
                     if _pf_dry:

@@ -150,6 +150,23 @@ def _get_changelog_context(ctx):
     return changes_dir, tag_glob, proj, entries
 
 
+def _resolve_tag_glob(ctx):
+    """Return the git tag glob that scopes *ctx*'s project to its own releases.
+
+    The single derivation used by the changelog checks
+    (:func:`_get_changelog_context`): the releasable's ``tag_format`` in
+    explicit monorepo mode, the target's ``monorepo_tag_glob`` in implicit
+    mode, and the plain ``v*`` for a standalone repo. Reused by the
+    external-check release-context env so a consumer check resolves the same
+    last tag rlsbl itself would.
+    """
+    resolved = _get_changelog_context(ctx)
+    if resolved is None:
+        return "v*"
+    _changes_dir, tag_glob, _project, _entries = resolved
+    return tag_glob or "v*"
+
+
 def _get_all_changelog_contexts(ctx):
     """Return changelog contexts for ALL releasables when CWD is the workspace root.
 

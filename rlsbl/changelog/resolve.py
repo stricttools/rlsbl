@@ -68,23 +68,23 @@ def _git_log_hashes(range_spec: str) -> list[str]:
         return []
 
 
-def _get_last_version_tag(tag_glob: str | None = None) -> str | None:
-    """Backward-compatible wrapper around get_last_version_tag from utils.
+def _get_last_version_tag(tag_glob: str | None = None, *, cwd=None) -> str | None:
+    """Resolve the last version tag, accepting None for tag_glob.
 
-    Accepts None for tag_glob (defaulting to "v*") to preserve the old call
-    signature used by _unreleased_range and external callers like status.py.
+    None means the plain ``v*`` glob (standalone repos); monorepo callers pass
+    their project's glob. ``cwd`` selects the repository.
     """
-    return get_last_version_tag(tag_glob if tag_glob else "v*")
+    return get_last_version_tag(tag_glob if tag_glob else "v*", cwd=cwd)
 
 
-def _unreleased_range(tag_glob: str | None = None) -> str:
+def _unreleased_range(tag_glob: str | None = None, *, cwd=None) -> str:
     """Return the git log range spec for unreleased commits.
 
     Uses <last_tag>..HEAD if a version tag exists, otherwise HEAD
-    (all commits, for first release). Passes tag_glob through to
+    (all commits, for first release). Passes tag_glob and cwd through to
     _get_last_version_tag for monorepo-aware tag discovery.
     """
-    tag = _get_last_version_tag(tag_glob)
+    tag = _get_last_version_tag(tag_glob, cwd=cwd)
     if tag:
         return f"{tag}..HEAD"
     return "HEAD"

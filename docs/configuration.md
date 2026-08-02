@@ -196,6 +196,33 @@ For every structured entry, rlsbl emits an additional pure, fast check named `<n
 - **mypy guard.** mypy's `files` / `packages` / `modules` config keys are silently **overridden** by CLI paths — a scope declared there is dead but misleading. The guard reads `pyproject.toml` `[tool.mypy]`, `mypy.ini`, `.mypy.ini`, and `setup.cfg` `[mypy]`; any of those keys present is an error. Scope must live only in the structured entry's `paths`.
 - **ruff guard** (both `ruff-check` and `ruff-format`)**.** ruff's `include` / `extend-include` config keys silently **narrow** the directories passed explicitly on the CLI (confirmed on ruff 0.15.20). The guard reads `pyproject.toml` `[tool.ruff]`, `ruff.toml`, and `.ruff.toml`; `include` or `extend-include` present is an error. `exclude` / `extend-exclude` / `force-exclude` are **exempt** — those are bypassed by explicit paths (loud over-inclusion, not silent under-scoping).
 
+#### Release-context environment
+
+Both kinds run with rlsbl's release context merged into their environment on top of the ambient one. rlsbl already knows the answers — a check must never re-derive them with its own `git describe`, which gets monorepo tag prefixes wrong.
+
+| Variable | Value | Availability |
+| --- | --- | --- |
+| `RLSBL_PROJECT_ROOT` | The resolved project root (absolute). The one way an entry with a `cwd` override can find it. | Always |
+| `RLSBL_LAST_TAG` | The project's last release tag, resolved through the same per-project tag glob the changelog layer uses (`v*` standalone, `<name>@v*` or the releasable's `tag_format` in a monorepo). **The empty string when no tag exists**, so "no baseline yet" is distinguishable from "not injected". | Always |
+| `RLSBL_UNRELEASED_RANGE` | `<last_tag>..HEAD`, or `HEAD` on a first release. | Always |
+
+The three are resolved **once per check run** and shared by every external check in it, so N checks never mean N `git describe` calls.
+
+Availability matrix — plain `rlsbl check` vs the release preflight:
+
+| Context | The three vars above | `RLSBL_VERSION` / `RLSBL_PREV_VERSION` / `RLSBL_BUMP_TYPE` / `RLSBL_DESCRIPTION` / `RLSBL_PACKAGE` |
+| --- | --- | --- |
+| `rlsbl check` / `rlsbl check --tag <t>` | Present. `RLSBL_LAST_TAG` is the current last tag. | **Absent** — these are hook-only vars. |
+| Release preflight (inside `rlsbl release run`) | Present, and computed **before** the version bump and tag: `RLSBL_LAST_TAG` is still the *previous* release, and `RLSBL_UNRELEASED_RANGE` covers exactly the commits being released. | **Absent** — hooks (`.rlsbl/hooks/*.sh`) get them; checks do not. Write a release-diff check against `RLSBL_LAST_TAG` instead of the version pair. |
+
+A release-diff gate is then a one-liner:
+
+```bash
+git show "$RLSBL_LAST_TAG:schema/contract.json" > /tmp/baseline.json
+```
+
+with the first-release case handled by testing `[ -z "$RLSBL_LAST_TAG" ]`.
+
 #### Timeout
 
 Both kinds route their subprocess timeout through the configured check budget — the `check_timeout` key in `.rlsbl/config.json`, else the shipped default (900s). The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
