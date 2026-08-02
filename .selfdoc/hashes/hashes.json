@@ -45,7 +45,7 @@
   },
   "en/cli-dev.md": {
     "content": "f2d7af56bba21a9ca156b8c3026bc83b136b0f334663ddf8e34c53e5512cb79a",
-    "description": "e4da2f64c863dfd068978fa6aa1796777cdae8956ba134cac1ad816744297c76",
+    "description": "7e5d7e70dc1156c6bc7ae83faaa6c61f13976b929da84fd09d8bba9c2427f873",
     "schema_hash": "dd4b6b589ccf248ae1d313c11474e1fa1127d0268cfb1e33d5dd2c53fdb14160"
   },
   "en/cli-discover.md": {
@@ -974,7 +974,7 @@
   },
   "en/rlsbl.md": {
     "content": "9a4bf9dac5ebff2213b85e0b39ac43567da92f718bcdcaf398f09576a47b145e",
-    "description": "4557b01a406a84aba4665496d0c7641231ec86d0d14c1798d6a20c3faeb4e5b1",
+    "description": "cab9800949ea6956f1a5fb73066d18d791450ac65252bf82bd4edf7ee46643ac",
     "source_docstring": "c32891a50c37cfb4160b4bc357f00125669b3c2b7099cf49aff79f1b0693e0c9"
   },
   "en/scaffold.md": {
