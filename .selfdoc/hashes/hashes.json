@@ -1,8 +1,8 @@
 {
   "_hash_version": 3,
   "en/changelog.md": {
-    "content": "65fefdd955dffae770f748e3ada8c347f655a8138adb0d974bcefbe08cbb8b48",
-    "description": "a108627297f0093eb37ffbbdaef8db19b53970a1187ea3c7368c26c1617b461f",
+    "content": "375ae7f2a5e5318ca81c60785f236e097cc8170191bda3dd097d88368b7aa480",
+    "description": "3812705303f15d762780ea37bdc83ddf880f3cc548c9cb5c003b5382c1209cd0",
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
@@ -119,8 +119,8 @@
     "schema_hash": "f8bf9ba425f6c5fc5c87e49de0e6aec4cf84b3d3e31382d3c3c1fce78c511e57"
   },
   "en/configuration.md": {
-    "content": "f57f3250c30b9f08d5387b8ef6d3601e508b6b30b02a5391fa960840fb69289f",
-    "description": "52e497765bb12fb19611ac26695fb303c02f1178e84a509316ce71195477cd45",
+    "content": "15fca5e7eac436bb922856740fb806b280621ae78bd29e034fdaec45434765ac",
+    "description": "89f2ba736ad276bf2aa6eb6a6e696b124c89434718a7cc74d245a9edde36ac22",
     "source_docstring": "f63ecdc06d0960176c03f8e153c8f9ac925ae3dc16a8edba4ae41c09c5c57e8c"
   },
   "en/dep-validation.md": {
@@ -168,8 +168,8 @@
     "description": "bd3a4444c61bbee18af14e4b42c03a39b3d70542e6ea6e220a116f8f15ae1e9f"
   },
   "en/release-workflow.md": {
-    "content": "647cfa90f69c46ff983e5cb4a6974490211f5ec6d17c845caa6f8fdf283d41ce",
-    "description": "3cf2e2019db7ea6e42a449401b41677c8398866bfd4663f6199b0310aacd5311",
+    "content": "bdb11277817234f6dac3ec9e369436d87146e756996e224a21f76cf718ec7586",
+    "description": "c7f2249f7a17941d9e55811cdd8ed30afd3dd116fad54def526951987ae06598",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
   "en/rlsbl-__main__.md": {
