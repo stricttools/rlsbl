@@ -97,7 +97,38 @@ def _strip_expression_wrapper(expr):
     return expr
 
 
-def _generate_router(projects):
+def _releasable_finalize_artifact(project, releasables):
+    """Repo-relative path of the releasable artifact a release commit writes.
+
+    In explicit releasable mode a release finalizes the releasable's
+    ``CHANGELOG.md`` under ``.rlsbl-monorepo/releasables/<name>/``. That file
+    is part of the project's own change surface: a release commit IS a change
+    to the released project, so it must satisfy the router's paths filter.
+
+    Without it, a release push that touches nothing under the project's path
+    (inevitable on a FIRST release, where the version write is a no-op) skips
+    the project's CI job, and the publish gate -- which refuses to treat a
+    skipped check as passing -- deadlocks with no re-runnable recovery.
+
+    Deliberately the finalize artifact only, NOT the whole releasable
+    directory: ``rlsbl changelog add`` writes the JSONL between releases and
+    must not spend CI minutes on every entry.
+
+    Returns None outside explicit releasable mode or for a non-releasable
+    project.
+    """
+    if not releasables:
+        return None
+    from ...workspace import resolve_releasable_for_project
+    from ...workspace_types import RELEASABLES_DIR, WORKSPACE_DIR
+
+    rel = resolve_releasable_for_project(project, releasables)
+    if rel is None:
+        return None
+    return f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{rel.name}/CHANGELOG.md"
+
+
+def _generate_router(projects, releasables=None):
     """Generate ci-router.yml content with every project's CI jobs inlined.
 
     Each project dict must carry ``_ci_docs``: a list of ``(job_prefix, doc)``
@@ -120,14 +151,16 @@ def _generate_router(projects):
     filter_lines = []
     for p in projects:
         clean_path = p['path'].rstrip('/')
-        watch = p.get("watch", [])
-        if watch:
-            filter_lines.append(f"{p['name']}:")
-            filter_lines.append(f"  - '{clean_path}/**'")
-            for w in watch:
-                filter_lines.append(f"  - '{w}'")
+        patterns = [f"{clean_path}/**"]
+        patterns.extend(p.get("watch", []))
+        finalize_artifact = _releasable_finalize_artifact(p, releasables)
+        if finalize_artifact:
+            patterns.append(finalize_artifact)
+        if len(patterns) == 1:
+            filter_lines.append(f"{p['name']}: '{patterns[0]}'")
         else:
-            filter_lines.append(f"{p['name']}: '{clean_path}/**'")
+            filter_lines.append(f"{p['name']}:")
+            filter_lines.extend(f"  - '{pattern}'" for pattern in patterns)
     filters_str = LiteralScalarString("\n".join(filter_lines) + "\n")
 
     # detect job
@@ -638,12 +671,19 @@ def _cmd_sync(flags, project_root):
             else:
                 projects_with_publish.append(proj)
 
+    # Releasables drive BOTH routers: the CI router's paths filters (each
+    # project's releasable finalize artifact) and the publish router's tag
+    # prefixes. Loaded once, before either is generated.
+    from ...workspace import is_explicit_mode, load_releasables
+
+    releasables = load_releasables(root, projects) if is_explicit_mode(root) else None
+
     # Generate CI router (only for projects that have CI workflows)
     router_path = os.path.join(workflows_dir, "ci-router.yml")
     if os.path.isfile(router_path):
         os.chmod(router_path, 0o644)
     with open(router_path, "w", encoding="utf-8") as f:
-        f.write(_generate_router(projects_with_ci))
+        f.write(_generate_router(projects_with_ci, releasables=releasables))
     os.chmod(router_path, 0o444)
     written_files.append(router_path)
 
@@ -657,12 +697,6 @@ def _cmd_sync(flags, project_root):
             save_publish_cache,
             should_regenerate_router,
         )
-        from ...workspace import is_explicit_mode, load_releasables
-
-        # Load releasables so publish conditions use releasable tag prefixes
-        releasables = None
-        if is_explicit_mode(root):
-            releasables = load_releasables(root, projects)
 
         monorepo_dir = os.path.join(root, ".rlsbl-monorepo")
         current_hashes = compute_publish_hashes(projects, root)
