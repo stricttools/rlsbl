@@ -985,13 +985,13 @@ class TestPushMechanics:
         branch_args, branch_kw = push_calls[0]
         assert f"--force-with-lease=refs/heads/main:{self.OLD_HEAD}" in branch_args
         assert "refs/heads/main:refs/heads/main" in branch_args
-        assert branch_kw.get("env", {}).get("RLSBL_RELEASE_PUSH") == "1"
+        assert "--no-verify" in branch_args
 
         # Tag push: explicit lease too (plain --force is gone)
         tag_args, tag_kw = push_calls[1]
         assert f"--force-with-lease=refs/tags/v1.0.0:{self.OLD_TAG}" in tag_args
         assert "refs/tags/v1.0.0:refs/tags/v1.0.0" in tag_args
-        assert tag_kw.get("env", {}).get("RLSBL_RELEASE_PUSH") == "1"
+        assert "--no-verify" in tag_args
         for args, _ in push_calls:
             assert "--force" not in args, "plain --force must never be used"
 

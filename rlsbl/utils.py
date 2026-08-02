@@ -443,14 +443,16 @@ def resolve_tag_push_plan(tags, cwd=None, remote="origin"):
     return needs_push
 
 
-def push_if_needed(branch, env=None, *, config, cwd):
+def push_if_needed(branch, *, config, cwd):
     """Push the branch to origin if local is ahead of remote.
+
+    The push runs with ``--no-verify``: this is a release-internal push, and
+    the pre-push hook exists to catch MANUAL pushes to release branches. There
+    is no environment-variable handshake -- bypassing the hook is expressed by
+    not running it.
 
     Args:
         branch: branch name to push.
-        env: optional environment dict passed to the push subprocess (e.g. to
-            set ``RLSBL_RELEASE_PUSH=1`` so the pre-push hook recognises the
-            push as release-authorized). Defaults to None (inherit current env).
         config: project config dict forwarded to get_push_timeout.
         cwd: REQUIRED (keyword-only) repo directory the git commands run from.
             There is deliberately no process-cwd default: an unanchored push
@@ -461,14 +463,14 @@ def push_if_needed(branch, env=None, *, config, cwd):
     local = run("git", ["rev-parse", branch], cwd=cwd)
     if not remote_branch_exists(branch, cwd=cwd):
         try:
-            run("git", ["push", "-u", "origin", branch], timeout=timeout, env=env, cwd=cwd)
+            run("git", ["push", "--no-verify", "-u", "origin", branch], timeout=timeout, cwd=cwd)
         except subprocess.TimeoutExpired as e:
             raise GitError(f"Push timed out after {timeout}s — remote state may be inconsistent. Check with: git push --dry-run") from e
         return
     remote = run("git", ["rev-parse", f"origin/{branch}"], cwd=cwd)
     if local != remote:
         try:
-            run("git", ["push", "origin", branch], timeout=timeout, env=env, cwd=cwd)
+            run("git", ["push", "--no-verify", "origin", branch], timeout=timeout, cwd=cwd)
         except subprocess.TimeoutExpired as e:
             raise GitError(f"Push timed out after {timeout}s — remote state may be inconsistent. Check with: git push --dry-run") from e
 

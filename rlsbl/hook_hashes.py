@@ -14,7 +14,30 @@ and show the user a diff so they can decide what to do.
 import hashlib
 
 
-CURRENT_PRE_PUSH_HOOK = '#!/usr/bin/env bash\nexport RLSBL_PUSH_STDIN="$(cat)"\nexec rlsbl check --tag prepush\n'
+# The current pre-push hook is namespace-aware. git feeds the hook one line per
+# ref being pushed: "<local_ref> <local_sha> <remote_ref> <remote_sha>". Only
+# branch pushes (refs/heads/*) are subject to rlsbl's prepush checks:
+#   refs/tags/*    -- release tags, pushed by rlsbl's own release flow
+#   refs/backups/* -- safegit's backup slots
+# Both are tool-owned namespaces; enforcing on them would block the tools that
+# own them. Anything else (a push with no branch refs at all) exits 0 too.
+CURRENT_PRE_PUSH_HOOK = """\
+#!/usr/bin/env bash
+# rlsbl pre-push hook. Enforces on refs/heads/* only; refs/tags/* and
+# refs/backups/* are tool-owned namespaces and exit 0.
+stdin_data="$(cat)"
+enforce=0
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/*) enforce=1 ;;
+  esac
+done <<< "$stdin_data"
+if [ "$enforce" -eq 0 ]; then
+  exit 0
+fi
+export RLSBL_PUSH_STDIN="$stdin_data"
+exec rlsbl check --tag prepush
+"""
 
 
 # Historical pre-push hook contents. These are the literal bytes rlsbl
@@ -126,8 +149,13 @@ _PRE_PUSH_HOOK_V3 = '#!/usr/bin/env bash\nexec rlsbl pre-push-check "$@"\n'
 # Version 4: two-line dispatcher without "$@".
 _PRE_PUSH_HOOK_V4 = '#!/usr/bin/env bash\nexec rlsbl pre-push-check\n'
 
-# Version 5 (current): captures git's push stdin and delegates to the check system.
-_PRE_PUSH_HOOK_V5 = CURRENT_PRE_PUSH_HOOK
+# Version 5: captures git's push stdin and delegates to the check system,
+# unconditionally (no ref-namespace filtering).
+_PRE_PUSH_HOOK_V5 = '#!/usr/bin/env bash\nexport RLSBL_PUSH_STDIN="$(cat)"\nexec rlsbl check --tag prepush\n'
+
+# Version 6 (current): namespace-aware -- enforces on refs/heads/*, exits 0 for
+# refs/tags/* and refs/backups/*.
+_PRE_PUSH_HOOK_V6 = CURRENT_PRE_PUSH_HOOK
 
 
 def compute_hook_hash(content):
@@ -151,6 +179,7 @@ PRE_PUSH_HOOK_HASHES = frozenset({
     compute_hook_hash(_PRE_PUSH_HOOK_V3),
     compute_hook_hash(_PRE_PUSH_HOOK_V4),
     compute_hook_hash(_PRE_PUSH_HOOK_V5),
+    compute_hook_hash(_PRE_PUSH_HOOK_V6),
 })
 
 

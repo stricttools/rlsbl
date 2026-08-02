@@ -51,43 +51,6 @@ def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = Non
     return os.path.join(project_dir, ".rlsbl", "releases")
 
 
-# Kept in sync with rlsbl.commands.release.release_state.STATE_FILENAME. Defined
-# here (a leaf module) so checks/ can query in-progress state without importing
-# from commands/ (which would recreate the checks<->commands import cycle).
-IN_PROGRESS_STATE_FILENAME = "in-progress.json"
-
-
-def repo_has_in_progress_release(project_root: str, workspace_root: str | None = None) -> bool:
-    """Return True if any in-progress release state file exists for this repo.
-
-    Ties the ``RLSBL_RELEASE_PUSH`` pre-push bypass to reality: the bypass is
-    honored only during an actual release (which writes ``in-progress.json`` at
-    the start of its mutating phase), never on the bare presence of the env var.
-
-    Checks the standalone/implicit-package location for ``project_root`` and, in
-    a workspace, every explicit-mode releasable's
-    ``.rlsbl-monorepo/releasables/*/releases/in-progress.json``. Lives in this
-    leaf module (not release_state, under commands/) so ``checks/prepush.py`` can
-    call it without importing from ``commands/``.
-    """
-    import glob
-
-    if os.path.isfile(
-        os.path.join(get_releases_dir(project_root), IN_PROGRESS_STATE_FILENAME)
-    ):
-        return True
-    if workspace_root is not None:
-        from .workspace import RELEASABLES_DIR, WORKSPACE_DIR
-
-        pattern = os.path.join(
-            str(workspace_root), WORKSPACE_DIR, RELEASABLES_DIR, "*",
-            "releases", IN_PROGRESS_STATE_FILENAME,
-        )
-        if glob.glob(pattern):
-            return True
-    return False
-
-
 def get_release_file_path(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
     """Return the path to the release file (unreleased.toml).
 

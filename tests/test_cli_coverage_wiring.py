@@ -290,13 +290,6 @@ class TestStandaloneWiring:
         assert m.call_args[0][1] == []
         assert m.call_args[0][2] == {}
 
-    def test_push(self):
-        result, m = _dispatch(["push"], "rlsbl.commands.push_cmd.run_push")
-        assert result.exit_code == 0, result.stderr
-        # run_push(ctx, yes=..., quiet=...)
-        assert m.call_args.kwargs["yes"] is False
-        assert m.call_args.kwargs["quiet"] is False
-
     def test_targets(self):
         result, m = _dispatch(["targets"], "rlsbl.commands.targets_cmd.run_cmd")
         assert result.exit_code == 0, result.stderr

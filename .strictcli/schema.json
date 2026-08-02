@@ -49,7 +49,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.110.2",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 14 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 51 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
       "name": "dry-run",
@@ -279,10 +279,6 @@
     "prs": {
       "name": "prs",
       "help": "List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work."
-    },
-    "push": {
-      "name": "push",
-      "help": "Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation hints, and behind-remote detection. Use `rlsbl release run` for release branches."
     },
     "unreleased": {
       "name": "unreleased",
@@ -1774,7 +1770,7 @@
       "tags": [
         "prepush"
       ],
-      "severity": "warn",
+      "severity": "error",
       "fast": true,
       "pure": true,
       "needs_network": false,

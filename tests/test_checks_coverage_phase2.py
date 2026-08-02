@@ -420,7 +420,7 @@ class TestPrepushGitignoreGuardExplicitMode:
 class TestPrepushManualWarning:
     """Lines 161-173: prepush-manual-warning with pushed release branches."""
 
-    def test_manual_push_to_release_branch_warns(self, tmp_path, monkeypatch):
+    def test_manual_push_to_release_branch_errors(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -432,7 +432,7 @@ class TestPrepushManualWarning:
         ctx.push_stdin = f"refs/heads/main {head} refs/heads/main {zero}"
 
         result = app._check_defs["prepush-manual-warning"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "fail"
         assert "main" in result.message
 
     def test_manual_push_not_release_branch_passes(self, tmp_path, monkeypatch):

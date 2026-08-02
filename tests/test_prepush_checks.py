@@ -178,64 +178,55 @@ class TestGitignoreGuardPassesNormally:
 
 
 class TestManualWarningOnReleaseBranch:
-    """prepush-manual-warning returns warn on manual push to release branch."""
+    """prepush-manual-warning hard-errors on a manual push to a release branch."""
 
-    def test_manual_push_to_main_warns(self, prepush_repo, monkeypatch):
+    def test_manual_push_to_main_errors(self, prepush_repo):
         head_sha = git_head(prepush_repo)
         zero_sha = "0" * 40
-
-        # Ensure RLSBL_RELEASE_PUSH is NOT set
-        monkeypatch.delenv("RLSBL_RELEASE_PUSH", raising=False)
 
         ctx = make_ctx(prepush_repo)
         ctx.push_stdin = _make_push_stdin(prepush_repo, head_sha, zero_sha)
 
         result = app._check_defs["prepush-manual-warning"].impl(ctx)
-        assert result.status == "warn"
+        assert result.status == "fail"
         assert "main" in result.message
 
 
 # ------------------------------------------------------------------
-# Test 7: manual warning suppressed during release
+# Test 7: no environment bypass exists
 # ------------------------------------------------------------------
 
 
-class TestManualWarningSuppressedDuringRelease:
-    """prepush-manual-warning: bypass requires RLSBL_RELEASE_PUSH=1 AND an
-    in-progress release state file. The env var alone no longer suppresses."""
+class TestNoEnvironmentBypass:
+    """There is no env-var bypass: release-internal pushes use --no-verify,
+    so every push that reaches the hook is by construction manual."""
 
-    def test_release_push_with_state_suppresses_warning(self, prepush_repo, monkeypatch):
+    def test_stray_release_push_env_does_not_suppress(self, prepush_repo, monkeypatch):
+        head_sha = git_head(prepush_repo)
+        zero_sha = "0" * 40
+
+        monkeypatch.setenv("RLSBL_RELEASE_PUSH", "1")
+
+        ctx = make_ctx(prepush_repo)
+        ctx.push_stdin = _make_push_stdin(prepush_repo, head_sha, zero_sha)
+
+        result = app._check_defs["prepush-manual-warning"].impl(ctx)
+        assert result.status == "fail"
+        assert "main" in result.message
+
+    def test_in_progress_release_state_does_not_suppress(self, prepush_repo):
         from rlsbl.commands.release.release_state import get_state_path, save_release_state
 
         head_sha = git_head(prepush_repo)
         zero_sha = "0" * 40
 
-        monkeypatch.setenv("RLSBL_RELEASE_PUSH", "1")
-        # A real release writes in-progress.json at the start of its mutating
-        # phase; the bypass is honored only when that file exists.
         save_release_state(get_state_path(str(prepush_repo)), {"completed_steps": []})
 
         ctx = make_ctx(prepush_repo)
         ctx.push_stdin = _make_push_stdin(prepush_repo, head_sha, zero_sha)
 
         result = app._check_defs["prepush-manual-warning"].impl(ctx)
-        assert result.status == "pass"
-
-    def test_release_push_env_without_state_still_warns(self, prepush_repo, monkeypatch):
-        """Regression: a stray env var without an in-progress release must not
-        suppress the manual-push warning."""
-        head_sha = git_head(prepush_repo)
-        zero_sha = "0" * 40
-
-        monkeypatch.setenv("RLSBL_RELEASE_PUSH", "1")
-        # No in-progress.json written -> bypass must NOT be honored.
-
-        ctx = make_ctx(prepush_repo)
-        ctx.push_stdin = _make_push_stdin(prepush_repo, head_sha, zero_sha)
-
-        result = app._check_defs["prepush-manual-warning"].impl(ctx)
-        assert result.status == "warn"
-        assert "main" in result.message
+        assert result.status == "fail"
 
 
 # ------------------------------------------------------------------

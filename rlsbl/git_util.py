@@ -8,7 +8,6 @@ and detect manual pushes to release branches.
 """
 
 import fnmatch
-import os
 import re
 import subprocess
 import sys
@@ -240,25 +239,19 @@ def affected_projects(changed_files, projects):
     return result
 
 
-def detect_manual_push_branches(stdin_lines, release_branches, *, release_in_progress=False):
+def detect_manual_push_branches(stdin_lines, release_branches):
     """Return list of release branch names being pushed to manually.
 
     Parses pre-push hook stdin lines for ``refs/heads/<branch>`` patterns
     and returns branch names that match *release_branches*.
 
-    Returns an empty list if no release branches are being pushed to, if
-    *stdin_lines* is empty/None, or if the push is a legitimate release push.
+    Returns an empty list if no release branches are being pushed to or if
+    *stdin_lines* is empty/None.
 
-    A release push is recognized ONLY when BOTH conditions hold:
-    ``RLSBL_RELEASE_PUSH=1`` is set AND *release_in_progress* is True (an
-    in-progress release state file exists for this repo). The env var alone is
-    no longer sufficient: a stray ``RLSBL_RELEASE_PUSH`` leaked into the
-    environment (e.g. a test process) must not silently disable the guard.
-    Callers determine *release_in_progress* via
-    :func:`rlsbl.commands.release.release_state.repo_has_in_progress_release`.
+    There is deliberately NO environment-variable bypass. Release-internal
+    pushes run ``git push --no-verify``, so they never invoke the hook at all;
+    every push that reaches this function is a hook-running push, i.e. manual.
     """
-    if os.environ.get("RLSBL_RELEASE_PUSH") == "1" and release_in_progress:
-        return []
     if not stdin_lines:
         return []
 

@@ -164,33 +164,33 @@ def register_prepush_checks(app):
             return reporter.found(error)
         return reporter.passed("no rlsbl-managed files are gitignored")
 
-    @app.warn_check("prepush-manual-warning")
+    @app.error_check("prepush-manual-warning")
     def check_prepush_manual_warning(ctx, reporter):
-        """Warn when pushing to a release branch outside rlsbl release."""
+        """Hard-error when pushing to a release branch outside rlsbl release.
+
+        Release-internal pushes never reach this check: they run
+        ``git push --no-verify`` and skip the hook entirely. So any push to a
+        release branch that DOES run the hook is by construction a manual one.
+        """
         from ..prepush_utils import _get_release_branches
         from ..git_util import detect_manual_push_branches
 
         if ctx.push_stdin is None:
             return reporter.skipped("not in push context")
 
-        from ..release_file import repo_has_in_progress_release
-
         stdin_lines = ctx.push_stdin.strip().splitlines()
         release_branches = _get_release_branches(ctx)
-        in_progress = repo_has_in_progress_release(
-            str(ctx.project_root),
-            str(ctx.workspace_root) if ctx.workspace_root is not None else None,
-        )
         pushed_release_branches = detect_manual_push_branches(
-            stdin_lines, release_branches, release_in_progress=in_progress,
+            stdin_lines, release_branches,
         )
 
         if pushed_release_branches:
             branches_str = ", ".join(sorted(set(pushed_release_branches)))
-            reporter.warn(
-                f"manual push to release branch ({branches_str}) -- not via 'rlsbl release'"
+            msg = (
+                f"manual push to release branch ({branches_str}) -- "
+                f"not via 'rlsbl release'. Use `rlsbl release run` to publish; "
+                f"never push a release branch by hand."
             )
-            return reporter.found(
-                f"manual push to release branch ({branches_str}) -- not via 'rlsbl release'"
-            )
+            reporter.error(msg)
+            return reporter.found(msg)
         return reporter.passed("not pushing to a release branch")

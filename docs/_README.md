@@ -154,19 +154,14 @@ The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl check
 
 1. **Changelog coverage** -- every pushed commit must have a JSONL entry
 2. **Gitignore guard** -- rlsbl-managed files must not be gitignored
-3. **Manual push warning** -- warns when pushing to a release branch outside `rlsbl release`
+3. **Manual push guard** -- hard error when pushing to a release branch outside `rlsbl release`
 4. **Test suite** -- runs project tests (single-project) or affected project tests (monorepo)
+
+The hook is namespace-aware: it enforces on `refs/heads/*` and exits 0 for `refs/tags/*` (release tags, pushed by rlsbl itself) and `refs/backups/*` (tool-owned backup slots). Release-internal pushes run `git push --no-verify` and never invoke the hook, so there is no environment-variable bypass to leak.
 
 Old hooks that call `rlsbl pre-push-check` still work but show a deprecation warning. Run `rlsbl scaffold` to update to the current hook format.
 
-To reinstall manually:
-
-```
-echo '#!/usr/bin/env bash' > .git/hooks/pre-push
-echo 'export RLSBL_PUSH_STDIN="$(cat)"' >> .git/hooks/pre-push
-echo 'exec rlsbl check --tag prepush' >> .git/hooks/pre-push
-chmod +x .git/hooks/pre-push
-```
+To reinstall, run `rlsbl scaffold` -- it writes the current hook (and upgrades any previously shipped version in place).
 
 ## Ecosystem tagging
 

@@ -125,13 +125,16 @@ class TestTransientTagPushRetrySuccess:
         tag_push_attempts = []
 
         def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            if cmd == "git" and args and args[0] == "push" and len(args) > 2 \
-                    and args[2].startswith("v"):
+            # Release-internal pushes carry --no-verify; strip it so the tag
+            # name lands at a stable index.
+            _a = [a for a in (args or []) if a != "--no-verify"]
+            if cmd == "git" and _a and _a[0] == "push" and len(_a) > 2 \
+                    and _a[2].startswith("v"):
                 tag_push_attempts.append(list(args))
                 # Fail the first attempt only; the in-handler retry succeeds.
                 if len(tag_push_attempts) == 1:
                     raise subprocess.CalledProcessError(
-                        1, ["git", "push", "origin", args[2]],
+                        1, ["git", "push", "origin", _a[2]],
                         stderr="fatal: transient network blip",
                     )
                 return ""
@@ -245,10 +248,11 @@ class TestPermanentPushFailureCleanExit:
             # Permanent tag-push failure (branch push goes through real
             # push_if_needed, which is NOT patched, so the branch reaches the
             # bare remote -- but the tag never does).
-            if cmd == "git" and args and args[0] == "push" and len(args) > 2 \
-                    and args[2].startswith("v"):
+            _a = [a for a in (args or []) if a != "--no-verify"]
+            if cmd == "git" and _a and _a[0] == "push" and len(_a) > 2 \
+                    and _a[2].startswith("v"):
                 raise subprocess.CalledProcessError(
-                    1, ["git", "push", "origin", args[2]],
+                    1, ["git", "push", "origin", _a[2]],
                     stderr="fatal: remote rejected tag",
                 )
             return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)

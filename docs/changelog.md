@@ -251,16 +251,24 @@ Never fabricate a user-facing entry to bypass the user-facing requirement. If a 
 
 ## Pre-push enforcement
 
-The `.git/hooks/pre-push` hook runs `rlsbl pre-push-check` on every push to verify changelog completeness before commits reach the remote. This is a hard enforcement point that blocks pushes with uncovered commits, preventing incomplete changelogs from reaching the main branch:
+The `.git/hooks/pre-push` hook captures git's push refs and runs `rlsbl check --tag prepush` on every branch push, to verify changelog completeness before commits reach the remote. This is a hard enforcement point that blocks pushes with uncovered commits, preventing incomplete changelogs from reaching the main branch:
 
 1. Checks that every pushed commit has a JSONL entry (hard error — blocks the push)
-2. Warns when a push targets a release branch but did not originate from `rlsbl release run`
+2. Hard-errors when a push targets a release branch but did not originate from `rlsbl release run`
+
+The hook is namespace-aware. It reads git's stdin (one line per pushed ref) and only enforces on `refs/heads/*`:
+
+| Ref namespace | Behavior |
+| --- | --- |
+| `refs/heads/*` | Enforce all prepush checks |
+| `refs/tags/*` | Exit 0 — release tags are pushed by rlsbl's own release flow |
+| `refs/backups/*` | Exit 0 — tool-owned backup slots |
 
 Release pushes are auto-detected and exempted: when a version bump commit (message matching `^v\d+\.\d+\.\d+$`) is present in the pushed commits, the JSONL check is skipped entirely. This is safe because validation already ran during `rlsbl release run`.
 
 The hook does not pass `$@` to rlsbl (git provides remote name and URL as args, which strictcli would reject as unknown arguments).
 
-The release commands (`rlsbl release run`, `rlsbl release undo`) set `RLSBL_RELEASE_PUSH=1` in the push environment so the hook recognizes legitimate release pushes and suppresses the branch warning.
+There is no environment-variable bypass. Release-internal pushes run `git push --no-verify`, so they never invoke the hook at all — which means any push that DOES reach the manual-push check is by construction a hand-made one, and is rejected.
 
 ## Examples
 

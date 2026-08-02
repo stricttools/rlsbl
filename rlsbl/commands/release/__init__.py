@@ -65,7 +65,7 @@ from .validate import (
     validate_release_targets, validate_ota_mode, validate_config_integrity,
     validate_pipeline_config, validate_gh_cli, validate_gh_push_access,
     validate_clean_tree,
-    validate_branch_and_remote, BranchValidation, resolve_monorepo_context,
+    validate_branch_and_remote, resolve_monorepo_context,
     compute_release_version, validate_changelog_state,
     print_dry_run_summary,
     _format_releasable_tag, _releasable_tag_glob,
@@ -458,25 +458,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if flags.get("batch-mode", False):
         pre_existing_dirty = set()
         branch = get_current_branch(cwd=str(project_root))
-        dev_branch = None
-        needs_ff_merge = False
     else:
         validate_gh_cli()
         validate_gh_push_access(config)
         pre_existing_dirty = validate_clean_tree(flags)
-        branch_info = validate_branch_and_remote(flags, config=config, cwd=str(project_root))
-        # Extract branch-role information for the release-from-dev flow.
-        # BranchValidation.branch is the release branch (e.g. "main");
-        # dev_branch is the branch we started from (e.g. "dev"), or None.
-        # Handle both BranchValidation and plain string (from test mocks).
-        if isinstance(branch_info, BranchValidation):
-            branch = branch_info.branch
-            dev_branch = branch_info.dev_branch
-            needs_ff_merge = branch_info.needs_ff_merge
-        else:
-            branch = str(branch_info)
-            dev_branch = None
-            needs_ff_merge = False
+        branch = str(validate_branch_and_remote(flags, config=config, cwd=str(project_root)))
 
     # --- Resolve context ---
     monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name = resolve_monorepo_context(
@@ -1040,39 +1026,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if not skip_lock:
         acquire_lock(lock_dir=lock_dir, project_root=lock_root)
 
-    # --- Release-from-dev: fast-forward merge ---
-    # When releasing from a dev branch, checkout the release branch and
-    # fast-forward merge it to the dev branch HEAD. This must happen
-    # AFTER all validation and hooks pass (so a failed hook doesn't leave
-    # us on the wrong branch) but BEFORE any mutating writes (version
-    # bump, changelog materialization).
-    #
-    # Re-verify ff-ability at merge time: another session may have pushed
-    # to the release branch between our initial fetch and now.
-    if needs_ff_merge:
-        from ...utils import run as _run_util
-        log(f'Fast-forward merging "{branch}" to {dev_branch} HEAD...')
-        try:
-            _run_util("git", ["checkout", branch])
-        except Exception as e:
-            raise ReleaseValidationError(
-                f'failed to checkout release branch "{branch}": {e}'
-            )
-        try:
-            _run_util("git", ["merge", "--ff-only", dev_branch])
-        except Exception as e:
-            # ff-merge failed -- switch back to dev before raising
-            try:
-                _run_util("git", ["checkout", dev_branch])
-            except Exception:
-                pass
-            raise ReleaseValidationError(
-                f'fast-forward merge of "{dev_branch}" into "{branch}" '
-                f'failed: {e}. This usually means "{branch}" has diverged '
-                f'since validation. Rebase or merge and try again.'
-            )
-        log(f'Fast-forward merge complete: {branch} is now at {dev_branch} HEAD')
-
     # Materialize CHANGELOG.md on disk now that all pre-release checks passed
     if changes_dir is not None:
         generate_changelog(
@@ -1117,62 +1070,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             ctx=ctx,
         ))
     except ReleaseAbortError:
-        # On failure, switch back to dev branch if we came from one
-        if dev_branch:
-            try:
-                from ...utils import run as _run_util
-                _run_util("git", ["checkout", dev_branch])
-            except Exception:
-                print(
-                    f'Warning: could not switch back to dev branch "{dev_branch}". '
-                    f'You are on "{branch}".',
-                    file=sys.stderr,
-                )
         sys.exit(1)
-    except (KeyboardInterrupt, SystemExit):
-        # On interrupt, switch back to dev branch
-        if dev_branch:
-            try:
-                from ...utils import run as _run_util
-                _run_util("git", ["checkout", dev_branch])
-            except Exception:
-                pass
-        raise
-    except Exception:
-        # On any other failure, switch back to dev branch
-        if dev_branch:
-            try:
-                from ...utils import run as _run_util
-                _run_util("git", ["checkout", dev_branch])
-            except Exception:
-                print(
-                    f'Warning: could not switch back to dev branch "{dev_branch}". '
-                    f'You are on "{branch}".',
-                    file=sys.stderr,
-                )
-        raise
     finally:
         if not skip_lock:
             release_lock()
-
-    # --- Release-from-dev: return to dev branch ---
-    # After a successful release, switch back to the dev branch and
-    # merge the release branch (which now has the version bump commit)
-    # back to dev so dev stays up to date.
-    if dev_branch:
-        from ...utils import run as _run_util
-        try:
-            _run_util("git", ["checkout", dev_branch])
-            # Merge release branch to dev -- should be ff-only since
-            # the release added commits on top of the ff-merged HEAD.
-            _run_util("git", ["merge", "--ff-only", branch])
-            log(f'Switched back to "{dev_branch}" (merged release commits from "{branch}")')
-        except Exception as e:
-            print(
-                f'Warning: could not merge "{branch}" back to "{dev_branch}": {e}. '
-                f'You may need to manually merge or rebase.',
-                file=sys.stderr,
-            )
 
     # Track build releases for Flutter OTA validation
     flutter_targets = [t for t in release_config.include if t.startswith("flutter-")]

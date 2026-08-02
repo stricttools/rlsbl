@@ -127,11 +127,13 @@ class TestPartialPushRollback:
                     reset_hard_called = True
                     # Still run it so the test doesn't break on subsequent operations
                     return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
-                # Tag push should fail
-                if args[0] == "push" and len(args) >= 3 and args[1] == "origin":
+                # Tag push should fail. Release-internal pushes carry
+                # --no-verify; strip it so indices stay stable.
+                _a = [a for a in args if a != "--no-verify"]
+                if _a[0] == "push" and len(_a) >= 3 and _a[1] == "origin":
                     # Check if this is a tag push (not branch push)
-                    # Tag pushes have a tag name like "v1.0.1" as args[2]
-                    if args[2].startswith("v"):
+                    # Tag pushes have a tag name like "v1.0.1" as _a[2]
+                    if _a[2].startswith("v"):
                         raise tag_push_error
             return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
@@ -425,10 +427,11 @@ class TestPostTaggedPushResumable:
                 if (len(args) >= 2 and args[0] == "reset" and args[1] == "--hard"):
                     reset_hard_called = True
                 # Raw tag push times out (tag refs start with "v").
-                if (args[0] == "push" and len(args) >= 3
-                        and args[1] == "origin" and args[2].startswith("v")):
+                _a = [a for a in args if a != "--no-verify"]
+                if (_a[0] == "push" and len(_a) >= 3
+                        and _a[1] == "origin" and _a[2].startswith("v")):
                     raise subprocess.TimeoutExpired(
-                        cmd=["git", "push", "origin", args[2]], timeout=timeout,
+                        cmd=["git", "push", "origin", _a[2]], timeout=timeout,
                     )
             return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 

@@ -386,64 +386,30 @@ class TestUndoVersionRegex:
 
 
 class TestPrePushPrerelease:
-    """Pre-push hook correctly handles pre-release version pushes.
+    """Pre-push detection is version-agnostic: pre-release pushes to a release
+    branch are flagged exactly like any other manual push, and there is no
+    environment-variable bypass (release-internal pushes use --no-verify)."""
 
-    The pre-push check uses RLSBL_RELEASE_PUSH env var, not commit
-    message matching, so pre-release versions work without changes.
-    """
-
-    def test_release_push_env_with_state_skips_check(self):
-        """Env var AND an in-progress release -> bypass honored."""
+    def test_manual_push_to_release_branch_is_detected(self):
         from rlsbl.git_util import detect_manual_push_branches
 
-        stdin_lines = [
-            "refs/heads/main abc123 refs/heads/main def456"
-        ]
-        with patch.dict(os.environ, {"RLSBL_RELEASE_PUSH": "1"}):
-            result = detect_manual_push_branches(
-                stdin_lines, ["main"], release_in_progress=True,
-            )
-        assert result == []
+        stdin_lines = ["refs/heads/main abc123 refs/heads/main def456"]
+        assert detect_manual_push_branches(stdin_lines, ["main"]) == ["main"]
 
-    def test_release_push_env_without_state_runs_check(self):
-        """Env var but NO in-progress release -> bypass NOT honored.
-
-        Regression: a stray ``RLSBL_RELEASE_PUSH`` in the environment (e.g. a
-        leaked test env var) must not silently disable the manual-push guard.
-        """
+    def test_stray_release_push_env_does_not_suppress(self):
+        """Regression: the deleted RLSBL_RELEASE_PUSH bypass must stay deleted."""
         from rlsbl.git_util import detect_manual_push_branches
 
-        stdin_lines = [
-            "refs/heads/main abc123 refs/heads/main def456"
-        ]
+        stdin_lines = ["refs/heads/main abc123 refs/heads/main def456"]
         with patch.dict(os.environ, {"RLSBL_RELEASE_PUSH": "1"}):
-            result = detect_manual_push_branches(
-                stdin_lines, ["main"], release_in_progress=False,
-            )
+            result = detect_manual_push_branches(stdin_lines, ["main"])
         assert result == ["main"]
 
-    def test_no_release_push_env_detects_manual(self):
+    def test_non_release_branch_is_not_flagged(self):
         from rlsbl.git_util import detect_manual_push_branches
 
-        stdin_lines = [
-            "refs/heads/main abc123 refs/heads/main def456"
-        ]
-        with patch.dict(os.environ, {}, clear=True):
-            # Remove RLSBL_RELEASE_PUSH if present
-            os.environ.pop("RLSBL_RELEASE_PUSH", None)
-            result = detect_manual_push_branches(
-                stdin_lines, ["main"], release_in_progress=True,
-            )
-        assert result == ["main"]
-
-    def test_repo_has_in_progress_release_detects_state_file(self, tmp_path):
-        """repo_has_in_progress_release reflects the actual state file."""
-        from rlsbl.release_file import repo_has_in_progress_release
-        from rlsbl.commands.release.release_state import get_state_path, save_release_state
-
-        assert repo_has_in_progress_release(str(tmp_path)) is False
-        save_release_state(get_state_path(str(tmp_path)), {"completed_steps": []})
-        assert repo_has_in_progress_release(str(tmp_path)) is True
+        stdin_lines = ["refs/heads/dev abc123 refs/heads/dev def456"]
+        assert detect_manual_push_branches(stdin_lines, ["main"]) == []
 
 
 class TestQuickBumpPreid:

@@ -534,8 +534,7 @@ def _print_plan(plan):
 
 def _delete_tag(tag, ctx, results):
     try:
-        undo_push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-        run("git", ["push", "origin", f":{tag}"], timeout=get_push_timeout(ctx.config), env=undo_push_env)
+        run("git", ["push", "--no-verify", "origin", f":{tag}"], timeout=get_push_timeout(ctx.config))
         results.append(("Delete remote tag", OK, "-"))
     except Exception:
         traceback.print_exc()
@@ -646,8 +645,7 @@ def _execute_plan(plan, uc, flags, ctx):
     if plan.companion_tags:
         for ct in plan.companion_tags:
             try:
-                undo_push_env_ct = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-                run("git", ["push", "origin", f":{ct}"], timeout=get_push_timeout(ctx.config), env=undo_push_env_ct)
+                run("git", ["push", "--no-verify", "origin", f":{ct}"], timeout=get_push_timeout(ctx.config))
             except Exception:
                 pass  # remote tag may not exist
             try:
@@ -692,8 +690,7 @@ def _execute_plan(plan, uc, flags, ctx):
     if should_push:
         try:
             branch = get_current_branch(cwd=plan.project_path)
-            push_env = {**os.environ, "RLSBL_RELEASE_PUSH": "1"}
-            push_if_needed(branch, env=push_env, config=ctx.config, cwd=plan.project_path)
+            push_if_needed(branch, config=ctx.config, cwd=plan.project_path)
             results.append(("Push", OK, "-"))
         except Exception:
             traceback.print_exc()
