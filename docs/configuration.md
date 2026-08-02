@@ -220,10 +220,10 @@ Each entry in `pipelines` is keyed by a user-chosen name and must have:
 | `max_asset_size_mb` | int | When `assets` or `custom_assets` is set | Maximum artifact size in MB. Releases fail if exceeded. |
 | `custom_assets` | array | No | List of custom build artifacts (see below). |
 
-**Built-in pipeline types:** `npm`, `pypi`, `go`, `cargo`, `deno`, `hex`, `maven`, `docker`, `cloudflare-pages`
+**Built-in pipeline types:** `npm`, `pypi`, `go`, `deno`, `hex`, `maven`, `docker`, `cloudflare-pages`
 
 Pipeline types use different auth patterns:
-- **Token-based** (npm, pypi, go, cargo, deno, hex, maven): authenticate via a single env var specified by `token_var`
+- **Token-based** (npm, pypi, go, deno, hex, maven): authenticate via a single env var specified by `token_var`
 - **Credential-based** (docker): authenticate via `username_var` and `password_var`
 - **Other** (cloudflare-pages): type-specific auth configured per pipeline
 
@@ -234,7 +234,6 @@ Pipeline types use different auth patterns:
 | `npm` | `NPM_TOKEN` | Token | Runs `npm publish` (or pnpm/yarn equivalent based on lockfile detection) |
 | `pypi` | `PYPI_TOKEN` (or `TWINE_PASSWORD`) | Token / OIDC | OIDC Trusted Publishing preferred; falls back to token-based upload via twine |
 | `go` | None | None | Notifies Go module proxy (`GOPROXY=proxy.golang.org`); no authentication required |
-| `cargo` | `CARGO_REGISTRY_TOKEN` | Token | Runs `cargo publish` to crates.io |
 | `deno` | `DENO_TOKEN` (or `JSR_TOKEN`) | Token | Runs `deno publish` to JSR |
 | `hex` | `HEX_API_KEY` | Token | Runs `mix hex.publish` to hex.pm |
 | `maven` | `MAVEN_TOKEN` (or `GITHUB_TOKEN`) | Token | Runs gradle or maven publish task to configured repository |

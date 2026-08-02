@@ -1,4 +1,4 @@
-"""Tests for concrete pipeline type implementations (npm, pypi, go, cargo, deno, hex, maven, docker, cloudflare-pages)."""
+"""Tests for concrete pipeline type implementations (npm, pypi, go, deno, hex, maven, docker, cloudflare-pages)."""
 
 import os
 import subprocess
@@ -9,7 +9,6 @@ from rlsbl.pipelines import PIPELINE_TYPES, Pipeline
 from rlsbl.pipelines.npm import NpmPipeline
 from rlsbl.pipelines.pypi import PypiPipeline
 from rlsbl.pipelines.go import GoPipeline
-from rlsbl.pipelines.cargo import CargoPipeline
 from rlsbl.pipelines.deno import DenoPipeline
 from rlsbl.pipelines.hex import HexPipeline
 from rlsbl.pipelines.maven import MavenPipeline, MavenCentralPipeline
@@ -23,15 +22,14 @@ from rlsbl.pipelines.cloudflare_pages import CloudflarePagesPipeline
 
 
 class TestPipelineRegistry:
-    def test_all_10_types_registered(self):
-        expected = {"npm", "pypi", "go", "cargo", "deno", "hex", "maven", "maven-central", "docker", "cloudflare-pages"}
+    def test_all_9_types_registered(self):
+        expected = {"npm", "pypi", "go", "deno", "hex", "maven", "maven-central", "docker", "cloudflare-pages"}
         assert set(PIPELINE_TYPES.keys()) == expected
 
     def test_registry_maps_to_classes(self):
         assert PIPELINE_TYPES["npm"] is NpmPipeline
         assert PIPELINE_TYPES["pypi"] is PypiPipeline
         assert PIPELINE_TYPES["go"] is GoPipeline
-        assert PIPELINE_TYPES["cargo"] is CargoPipeline
         assert PIPELINE_TYPES["deno"] is DenoPipeline
         assert PIPELINE_TYPES["hex"] is HexPipeline
         assert PIPELINE_TYPES["maven"] is MavenPipeline
@@ -47,7 +45,7 @@ class TestPipelineRegistry:
 
 class TestProtocolConformance:
     @pytest.mark.parametrize("cls", [
-        NpmPipeline, PypiPipeline, GoPipeline, CargoPipeline,
+        NpmPipeline, PypiPipeline, GoPipeline,
         DenoPipeline, HexPipeline, MavenPipeline, MavenCentralPipeline,
         DockerPipeline, CloudflarePagesPipeline,
     ])
@@ -66,7 +64,6 @@ _ALL_PIPELINES = [
     ("npm", "npm", NpmPipeline),
     ("pypi", "pypi", PypiPipeline),
     ("go", "go", GoPipeline),
-    ("cargo", "cargo", CargoPipeline),
     ("deno", "deno", DenoPipeline),
     ("hex", "hex", HexPipeline),
     ("maven", "maven", MavenPipeline),
@@ -100,7 +97,6 @@ class TestPublishLocalFalseSkips:
 # Pipelines with a single token_var attribute and matching required_env_vars
 _TOKEN_PIPELINES = [
     ("npm", "npm", NpmPipeline, "NPM_TOKEN"),
-    ("cargo", "cargo", CargoPipeline, "CARGO_REGISTRY_TOKEN"),
     ("hex", "hex", HexPipeline, "HEX_API_KEY"),
     ("pypi", "pypi", PypiPipeline, "PYPI_TOKEN"),
     ("deno", "deno", DenoPipeline, "DENO_TOKEN"),
@@ -128,7 +124,7 @@ class TestRequiredEnvVarsLocalTrue:
 
 
 # ---------------------------------------------------------------------------
-# Token-based pipelines: npm, cargo, hex
+# Token-based pipelines: npm, hex
 # ---------------------------------------------------------------------------
 
 
@@ -163,20 +159,6 @@ class TestNpmPipeline:
                         config={"token_var": "MY_NPM_TOKEN"})
         assert p.token_var == "MY_NPM_TOKEN"
         assert p.required_env_vars() == ["MY_NPM_TOKEN"]
-
-
-class TestCargoPipeline:
-    def test_publish_with_token_calls_command(self, monkeypatch):
-        calls = []
-        monkeypatch.setenv("CARGO_REGISTRY_TOKEN", "tok456")
-        monkeypatch.setattr(
-            "rlsbl.pipelines.cargo.run",
-            lambda cmd, args, **kw: calls.append((cmd, args)),
-        )
-        p = CargoPipeline(name="cargo", pipeline_type="cargo", local=True, config={})
-        p.publish(".", "1.0.0", None)
-        assert len(calls) == 1
-        assert calls[0] == ("cargo", ["publish"])
 
 
 class TestHexPipeline:

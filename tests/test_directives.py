@@ -89,7 +89,7 @@ def _pipeline_table_resolve(attrs, config, body):
 # ---------------------------------------------------------------------------
 
 ALL_TARGETS = sorted([
-    "cargo", "dart", "deno", "docker", "flutter",
+    "dart", "deno", "docker", "flutter",
     "go", "hex", "maven", "npm", "pgdesign", "plain",
     "pypi", "spec", "swift", "swift-apple", "zig",
 ])
@@ -148,7 +148,7 @@ class TestTargetTableResolve:
 # ---------------------------------------------------------------------------
 
 EXPECTED_PIPELINE_TYPES = sorted([
-    "cargo", "cloudflare-pages", "deno", "docker", "go",
+    "cloudflare-pages", "deno", "docker", "go",
     "hex", "maven", "maven-central", "npm", "pypi",
 ])
 

@@ -18,10 +18,6 @@ from ..npm_wrapper import (
     npm_wrapper_enabled,
     npm_wrapper_template_mappings,
 )
-from ..crates_wrapper import (
-    build_crates_publish_jobs,
-    crates_wrapper_template_mappings,
-)
 from ..utils import read_go_module_path
 
 VERSION_FILE = "VERSION"
@@ -304,19 +300,6 @@ class GoTarget(BaseTarget):
                 " (<bin>-<platform>) before first publish"
             )
 
-        # crates.io wrapper publish job
-        crates_publish_jobs = ""
-        crates_wrapper_config = config.get("crates_wrapper", {}) if config else {}
-        crates_wrapper_enabled = crates_wrapper_config.get("enabled", False)
-        if crates_wrapper_enabled and not is_library and repo_name:
-            crates_publish_jobs = build_crates_publish_jobs(
-                short_name, repo_name,
-            )
-            publish_setup += (
-                "\n- Configure Trusted Publishing on crates.io for the wrapper crate"
-                "\n  (crates.io > Manage > Settings > Trusted Publishing > Add GitHub repo)"
-            )
-
         result = {
             "name": short_name,
             "modulePath": name,
@@ -330,7 +313,6 @@ class GoTarget(BaseTarget):
             "brewsSection": brews_section,
             "homebrewEnv": homebrew_env,
             "npmPublishJobs": npm_publish_jobs,
-            "cratesPublishJobs": crates_publish_jobs,
         }
 
         # Extract minimum required Go version from go.mod
@@ -379,7 +361,7 @@ class GoTarget(BaseTarget):
         return mappings
 
     def shared_template_mappings(self, ctx):
-        """Return shared mappings plus npm/crates wrapper mappings if enabled."""
+        """Return shared mappings plus npm wrapper mappings if enabled."""
         mappings = super().shared_template_mappings(ctx)
         project_root = str(ctx.project_root)
         if not os.path.exists(os.path.join(project_root, "go.mod")):
@@ -388,9 +370,6 @@ class GoTarget(BaseTarget):
             config = ctx.config if ctx else {}
             if npm_wrapper_enabled(config):
                 mappings.extend(npm_wrapper_template_mappings())
-            crates_wrapper_config = config.get("crates_wrapper", {})
-            if crates_wrapper_config.get("enabled"):
-                mappings.extend(crates_wrapper_template_mappings())
         return mappings
 
     def check_project_exists(self, dir_path):

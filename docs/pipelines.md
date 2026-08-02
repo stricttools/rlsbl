@@ -64,7 +64,7 @@ All 10 pipeline implementations inherit from `BasePipeline`, which provides no-o
 | Class | Auth pattern | Pipelines |
 | --- | --- | --- |
 | `BasePipeline` | None (direct subclass) | go (proxy notification), maven (flexible auth), maven-central (Central Portal credentials), cloudflare-pages (selfdoc CLI) |
-| `TokenPipeline(BasePipeline)` | Single env var token | npm, pypi, cargo, deno, hex |
+| `TokenPipeline(BasePipeline)` | Single env var token | npm, pypi, deno, hex |
 | `CredentialPipeline(BasePipeline)` | Username + password env vars | docker |
 
 `TokenPipeline` validates that the token env var is set before attempting publish and passes it to the ecosystem-specific publish command. `CredentialPipeline` validates both username and password env vars.
@@ -237,15 +237,6 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Library tag handling:** The library publish workflow bakes the module path from `go.mod` at scaffold time (correct even for monorepo subdirectory modules, whose proxy-visible tags are the companion subdir tag `<subdir>/vX.Y.Z`) and derives the version from the release tag, handling plain (`v1.2.3`), releasable (`<name>@v1.2.3`), and subdir (`<subdir>/v1.2.3`) tag formats.
 - **Private modules:** A private Go module cannot be verified against the public proxy (`proxy.golang.org` refuses to serve private modules). Private Go libraries must set `publish_mode` `"none"` in `.rlsbl/config.json`, which suppresses the publish job entirely — no publish workflow is scaffolded.
 - **Quirks:** Pipelines with `local: true` **must** declare `install_paths` (a list of main-package dirs relative to the project root, e.g. `["./cmd/mytool"]`). Missing or invalid declarations are hard errors; each declared path is validated against `go list` (it must be a `package main` dir). There is no auto-detection fallback — detection only validates declarations.
-
-### cargo
-
-- **Class:** `TokenPipeline`
-- **Default token env var:** `CARGO_REGISTRY_TOKEN`
-- **Auth pattern:** Single token. The token is passed to `cargo publish` via the `--token` flag or the `CARGO_REGISTRY_TOKEN` env var.
-- **Publish command:** `cargo publish`
-- **CI template:** Standard publish step with the token from GitHub secrets.
-- **Quirks:** Standard single-token pattern with no special fallback logic.
 
 ### deno
 

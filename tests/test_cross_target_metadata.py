@@ -150,16 +150,6 @@ class TestMinVersionExtraction:
         vars_ = TARGETS["go"].template_vars(str(tmp_path), make_ctx(tmp_path))
         assert vars_["minRequiredGo"] == "1.21"
 
-    def test_cargo_min_rust(self, tmp_path):
-        (tmp_path / "Cargo.toml").write_text(
-            '[package]\nname = "test"\nversion = "1.0.0"\n'
-            'rust-version = "1.70"\nedition = "2021"\n'
-        )
-        vars_ = TARGETS["cargo"].template_vars(str(tmp_path), make_ctx(tmp_path))
-        assert vars_["minRequiredRust"] == "1.70"
-        assert vars_["edition"] == "2021"
-
-
 # ---------------------------------------------------------------------------
 # Test class 4: read_name and read_metadata
 # ---------------------------------------------------------------------------

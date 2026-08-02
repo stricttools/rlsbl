@@ -12,13 +12,10 @@ from rlsbl.pipelines.build import (
     build_npm_assets,
     build_pypi_assets,
     build_go_assets,
-    build_cargo_assets,
-    _read_cargo_name,
 )
 from rlsbl.pipelines.npm import NpmPipeline
 from rlsbl.pipelines.pypi import PypiPipeline
 from rlsbl.pipelines.go import GoPipeline
-from rlsbl.pipelines.cargo import CargoPipeline
 
 
 # ---------------------------------------------------------------------------
@@ -52,21 +49,6 @@ def _make_go_project(tmp_path):
     proj.mkdir()
     (proj / "go.mod").write_text("module example.com/myapp\n\ngo 1.21\n")
     (proj / "main.go").write_text("package main\n\nfunc main() {}\n")
-    return proj
-
-
-def _make_cargo_project(tmp_path):
-    proj = tmp_path / "cargoproject"
-    proj.mkdir()
-    (proj / "Cargo.toml").write_text(textwrap.dedent("""\
-        [package]
-        name = "mycrate"
-        version = "1.0.0"
-        edition = "2021"
-    """))
-    src = proj / "src"
-    src.mkdir()
-    (src / "main.rs").write_text('fn main() { println!("hello"); }\n')
     return proj
 
 
@@ -267,63 +249,6 @@ class TestBuildGoAssets:
 
 
 # ---------------------------------------------------------------------------
-# build_cargo_assets
-# ---------------------------------------------------------------------------
-
-
-class TestBuildCargoAssets:
-    def test_calls_cargo_build_release(self, tmp_path, monkeypatch):
-        proj = _make_cargo_project(tmp_path)
-        dist = str(tmp_path / "dist")
-        calls = []
-
-        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            calls.append((cmd, args, cwd))
-            release_dir = os.path.join(str(proj), "target", "release")
-            os.makedirs(release_dir, exist_ok=True)
-            open(os.path.join(release_dir, "mycrate"), "w").close()
-            return ""
-
-        monkeypatch.setattr("rlsbl.pipelines.build.run", fake_run)
-
-        result = build_cargo_assets(str(proj), "1.0.0", dist)
-
-        assert len(calls) == 1
-        cmd, args, cwd = calls[0]
-        assert cmd == "cargo"
-        assert args == ["build", "--release"]
-        assert cwd == str(proj)
-        assert len(result) == 1
-        assert os.path.basename(result[0]) == "mycrate"
-
-    def test_creates_dist_dir(self, tmp_path, monkeypatch):
-        proj = _make_cargo_project(tmp_path)
-        dist = str(tmp_path / "nonexistent" / "dist")
-
-        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            return ""
-
-        monkeypatch.setattr("rlsbl.pipelines.build.run", fake_run)
-        build_cargo_assets(str(proj), "1.0.0", dist)
-        assert os.path.isdir(dist)
-
-    def test_no_binary_returns_empty(self, tmp_path, monkeypatch):
-        proj = _make_cargo_project(tmp_path)
-        dist = str(tmp_path / "dist")
-
-        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            return ""
-
-        monkeypatch.setattr("rlsbl.pipelines.build.run", fake_run)
-        result = build_cargo_assets(str(proj), "1.0.0", dist)
-        assert result == []
-
-    def test_read_cargo_name(self, tmp_path):
-        proj = _make_cargo_project(tmp_path)
-        assert _read_cargo_name(str(proj)) == "mycrate"
-
-
-# ---------------------------------------------------------------------------
 # Pipeline type delegation
 # ---------------------------------------------------------------------------
 
@@ -378,19 +303,3 @@ class TestPipelineBuildDelegation:
         result = pipeline.build_assets(str(proj), "1.0.0", dist, ctx=None)
         assert len(result) == 1
 
-    def test_cargo_pipeline_delegates(self, tmp_path, monkeypatch):
-        proj = _make_cargo_project(tmp_path)
-        dist = str(tmp_path / "dist")
-
-        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            release_dir = os.path.join(str(proj), "target", "release")
-            os.makedirs(release_dir, exist_ok=True)
-            open(os.path.join(release_dir, "mycrate"), "w").close()
-            return ""
-
-        monkeypatch.setattr("rlsbl.pipelines.build.run", fake_run)
-
-        pipeline = CargoPipeline(name="cargo", pipeline_type="cargo", local=True, config={})
-        result = pipeline.build_assets(str(proj), "1.0.0", dist, ctx=None)
-        assert len(result) == 1
-        assert os.path.basename(result[0]) == "mycrate"

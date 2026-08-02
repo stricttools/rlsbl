@@ -237,22 +237,6 @@ class TestClaimNameDryRun:
         out = capsys.readouterr().out
         assert "would publish" in out.lower()
 
-    @patch("builtins.input", return_value="n")
-    @patch("rlsbl.commands.claim_name._read_cargo_token", return_value="crates-tok")
-    @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
-    @patch("rlsbl.commands.claim_name.subprocess.run")
-    @patch("rlsbl.commands.check._check_single_name")
-    def test_crates_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_token, mock_input, capsys):
-        mock_check.return_value = {"name": "my-crate", "registry": "crates", "status": "available", "variants": None, "reason": None}
-        run_cmd("crates", ["my-crate"], {"yes": False, "dry-run": True})
-        mock_run.assert_not_called()
-        mock_mkdtemp.assert_not_called()
-        # Dry run must not fire even the crates permanence prompt.
-        mock_input.assert_not_called()
-        out = capsys.readouterr().out
-        assert "would publish" in out.lower()
-
-
 class TestClaimNameConfirmation:
     """An available name with neither --yes nor --dry-run must prompt before
     publishing; declining aborts before any publish, accepting proceeds."""

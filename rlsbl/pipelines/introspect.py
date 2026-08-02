@@ -10,7 +10,6 @@ _ECOSYSTEMS: dict[str, str] = {
     "npm": "npm registry",
     "pypi": "Python Package Index",
     "go": "Go module proxy",
-    "cargo": "crates.io",
     "deno": "JSR (Deno)",
     "hex": "hex.pm (Elixir)",
     "maven": "Maven Central / Gradle",

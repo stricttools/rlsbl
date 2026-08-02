@@ -186,43 +186,6 @@ class TestPublicationProbeOnTargets:
         result = t.publication_probe("/fake", "1.0.0")
         assert result.status == PublicationStatus.UNPROBEABLE
 
-    @patch("rlsbl.targets.cargo.CargoTarget.read_name", return_value="my-crate")
-    def test_cargo_published(self, _):
-        from rlsbl.targets.cargo import CargoTarget
-
-        t = CargoTarget()
-        mock_resp = MagicMock()
-        mock_resp.read.return_value = b'{"version": {"num": "1.0.0"}}'
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = lambda s, *a: None
-
-        with patch("rlsbl.commands.check._request_with_backoff", return_value=mock_resp):
-            result = t.publication_probe("/fake", "1.0.0")
-        assert result.status == PublicationStatus.PUBLISHED
-
-    @patch("rlsbl.targets.cargo.CargoTarget.read_name", return_value="my-crate")
-    def test_cargo_unpublished(self, _):
-        from rlsbl.targets.cargo import CargoTarget
-        import urllib.error
-
-        t = CargoTarget()
-        with patch(
-            "rlsbl.commands.check._request_with_backoff",
-            side_effect=urllib.error.HTTPError(
-                url="", code=404, msg="", hdrs=None, fp=None
-            ),
-        ):
-            result = t.publication_probe("/fake", "1.0.0")
-        assert result.status == PublicationStatus.UNPUBLISHED
-
-    @patch("rlsbl.targets.cargo.CargoTarget.read_name", return_value=None)
-    def test_cargo_no_name_returns_unprobeable(self, _):
-        from rlsbl.targets.cargo import CargoTarget
-        t = CargoTarget()
-        result = t.publication_probe("/fake", "1.0.0")
-        assert result.status == PublicationStatus.UNPROBEABLE
-
-
 class TestCapabilityConsistency:
     """Verify that targets declaring publication_probe capability have a working probe."""
 

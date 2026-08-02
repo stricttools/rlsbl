@@ -51,7 +51,7 @@ def npm_wrapper_enabled(config: dict | None) -> bool:
     """Return whether the npm binary-wrapper family is enabled for this config.
 
     Activation is an explicit boolean gate: ``{"npm_wrapper": {"enabled":
-    true}}``. This mirrors the ``crates_wrapper.enabled`` gate.
+    true}}``.
 
     Hard-errors (``NpmWrapperConfigError``) if the config carries the removed
     ``scope``/``npm_scope`` key, which used to activate scoped npm names
@@ -158,7 +158,7 @@ def build_npm_publish_jobs(
     ``provenance`` threads ``--provenance`` into ``npm publish`` commands
     and adds ``id-token: write`` permission to the job (required for npm
     OIDC build-provenance attestation on GitHub Actions). Mirrors the
-    ``id-token: write`` pattern already used by crates_wrapper.py.
+    ``id-token: write`` pattern.
     """
     provenance_flag = " --provenance" if provenance else ""
 
@@ -211,7 +211,7 @@ def build_npm_publish_jobs(
     setup_node_action = format_action("actions/setup-node")
 
     # When provenance is enabled, the job needs id-token: write for the
-    # OIDC attestation flow (same pattern as crates_wrapper.py).
+    # OIDC attestation flow.
     if provenance:
         permissions_block = """\
     permissions:

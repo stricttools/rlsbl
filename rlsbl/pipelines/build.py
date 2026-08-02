@@ -69,26 +69,3 @@ def _build_go_with_goreleaser(dir_path: str, dist_dir: str) -> list[str]:
                 shutil.copy2(fentry.path, dest)
                 artifacts.append(dest)
     return sorted(artifacts)
-
-
-def _read_cargo_name(dir_path: str) -> str:
-    """Read the package name from Cargo.toml."""
-    cargo_path = os.path.join(dir_path, "Cargo.toml")
-    with open(cargo_path, "r", encoding="utf-8") as f:
-        doc = tomlkit.parse(f.read())
-    pkg = doc.get("package", {})
-    name = pkg.get("name")
-    return str(name) if name is not None else ""
-
-
-def build_cargo_assets(dir_path: str, version: str, dist_dir: str) -> list[str]:
-    """Build Rust binary in release mode and copy to *dist_dir*."""
-    os.makedirs(dist_dir, exist_ok=True)
-    run("cargo", ["build", "--release"], cwd=dir_path)
-
-    name = _read_cargo_name(dir_path)
-    target_release = os.path.join(dir_path, "target", "release", name)
-    if os.path.isfile(target_release):
-        shutil.copy2(target_release, dist_dir)
-
-    return sorted(glob.glob(os.path.join(dist_dir, "*")))

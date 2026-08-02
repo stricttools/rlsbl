@@ -1,6 +1,6 @@
 """Targeted coverage tests for rlsbl/__init__.py CLI entry points and
 low-coverage modules: watch.py, yank.py, targets/protocol.py, and
-pipeline modules (go, hex, npm, deno, cargo, docker, maven).
+pipeline modules (go, hex, npm, deno, docker, maven).
 
 Strategy: mock the underlying implementation functions and verify that
 each command handler properly parses flags and delegates.
@@ -2023,36 +2023,6 @@ class TestDenoPipeline:
         from rlsbl.pipelines.deno import DenoPipeline
         p = DenoPipeline("deno", "deno", True, {})
         assert p.required_env_vars() == ["DENO_TOKEN"]
-
-
-class TestCargoPipeline:
-    """Cover CargoPipeline uncovered lines."""
-
-    def test_template_dir(self):
-        from rlsbl.pipelines.cargo import CargoPipeline
-        p = CargoPipeline("cargo", "cargo", True, {})
-        assert "cargo" in p.template_dir()
-
-    def test_template_mappings(self):
-        from rlsbl.pipelines.cargo import CargoPipeline
-        p = CargoPipeline("cargo", "cargo", True, {})
-        assert len(p.template_mappings(None)) == 1
-
-    def test_publish_success(self, monkeypatch, capsys):
-        from rlsbl.pipelines.cargo import CargoPipeline
-        monkeypatch.setenv("CARGO_REGISTRY_TOKEN", "fake")
-        p = CargoPipeline("cargo", "cargo", True, {})
-        with patch("rlsbl.pipelines.cargo.run"):
-            p.publish(".", "1.0.0", None)
-        assert "Published to crates.io" in capsys.readouterr().out
-
-    def test_publish_failure(self, monkeypatch):
-        from rlsbl.pipelines.cargo import CargoPipeline
-        monkeypatch.setenv("CARGO_REGISTRY_TOKEN", "fake")
-        p = CargoPipeline("cargo", "cargo", True, {})
-        with patch("rlsbl.pipelines.cargo.run", side_effect=subprocess.CalledProcessError(1, "cargo")):
-            with pytest.raises(RuntimeError, match="cargo publish failed"):
-                p.publish(".", "1.0.0", None)
 
 
 class TestDockerPipeline:

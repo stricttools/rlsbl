@@ -1,4 +1,4 @@
-"""Release target discovery and registry that maps ecosystem identifiers (npm, pypi, go, cargo, deno, zig, swift, hex, docker, maven, plain) to their corresponding target classes for version bumps and scaffolding."""
+"""Release target discovery and registry that maps ecosystem identifiers (npm, pypi, go, deno, zig, swift, hex, docker, maven, plain) to their corresponding target classes for version bumps and scaffolding."""
 
 import os
 import sys
@@ -12,7 +12,6 @@ from .swift_apple import SwiftAppleTarget
 from .spec import SpecTarget
 from .hex import HexTarget
 from .deno import DenoTarget
-from .cargo import CargoTarget
 from .dart import DartTarget
 from .docker import DockerTarget
 from .flutter import FlutterTarget
@@ -43,7 +42,6 @@ TARGETS = {
     "spec": SpecTarget(),
     "hex": HexTarget(),
     "deno": DenoTarget(),
-    "cargo": CargoTarget(),
     "dart": DartTarget(),
     "docker": DockerTarget(),
     "flutter": FlutterTarget(),

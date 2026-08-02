@@ -201,7 +201,7 @@ class BaseTarget:
         """Format a semver version for this target's ecosystem.
 
         The default implementation returns the version unchanged (identity).
-        This is correct for npm, Go, Cargo, Deno, plain, and most targets
+        This is correct for npm, Go, Deno, plain, and most targets
         where semver is used directly.
 
         Targets with different version conventions (e.g. PyPI's PEP 440)
@@ -218,7 +218,7 @@ class BaseTarget:
             UNPROBEABLE: this target cannot probe (no API, no name, etc.).
 
         The default implementation returns UNPROBEABLE. Targets with registry
-        APIs (npm, pypi, go, cargo) override this to query the registry.
+        APIs (npm, pypi, go) override this to query the registry.
         """
         from ..publication_probe import PublicationProbeResult, PublicationStatus
         return PublicationProbeResult(

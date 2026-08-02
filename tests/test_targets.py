@@ -16,7 +16,6 @@ from rlsbl.targets.swift_apple import SwiftAppleTarget
 from rlsbl.targets.spec import SpecTarget
 from rlsbl.targets.hex import HexTarget
 from rlsbl.targets.deno import DenoTarget
-from rlsbl.targets.cargo import CargoTarget
 from rlsbl.targets import TARGETS, detect_targets
 
 
@@ -741,67 +740,6 @@ class TestDenoTarget:
         assert DenoTarget().version_file(str(tmp_path)) == "deno.json"
 
 
-class TestCargoTarget:
-    def test_protocol_conformance(self):
-        assert isinstance(CargoTarget(), ReleaseTarget)
-
-    def test_detection_with_package(self, tmp_path):
-        target = CargoTarget()
-        # No Cargo.toml -> not detected
-        assert not target.detect(str(tmp_path))
-        # With [package] -> detected
-        (tmp_path / "Cargo.toml").write_text('[package]\nname = "myapp"\nversion = "1.0.0"\n')
-        assert target.detect(str(tmp_path))
-
-    def test_detection_workspace_only(self, tmp_path):
-        # Workspace root without [package] -> NOT detected
-        (tmp_path / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/*"]\n')
-        assert not CargoTarget().detect(str(tmp_path))
-
-    def test_version_read_write(self, tmp_path):
-        target = CargoTarget()
-        content = '[package]\nname = "myapp"\nversion = "1.2.3"\nedition = "2021"\n'
-        (tmp_path / "Cargo.toml").write_text(content)
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        import tomlkit
-        doc = tomlkit.parse((tmp_path / "Cargo.toml").read_text())
-        assert doc["package"]["version"] == "2.0.0"
-
-    def test_version_preserves_comments(self, tmp_path):
-        content = '# My crate\n[package]\nname = "myapp"\nversion = "1.0.0"  # current\nedition = "2021"\n'
-        (tmp_path / "Cargo.toml").write_text(content)
-        CargoTarget().write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        result = (tmp_path / "Cargo.toml").read_text()
-        assert "# My crate" in result
-        assert "# current" in result or "2.0.0" in result
-
-    def test_tag_format(self):
-        assert CargoTarget().tag_format("1.2.3") == "v1.2.3"
-
-    def test_is_library_with_lib_section(self, tmp_path):
-        target = CargoTarget()
-        content = '[package]\nname = "mylib"\nversion = "1.0.0"\n\n[lib]\n'
-        (tmp_path / "Cargo.toml").write_text(content)
-        assert target._is_library(str(tmp_path))
-
-    def test_is_library_no_main_rs(self, tmp_path):
-        target = CargoTarget()
-        content = '[package]\nname = "mylib"\nversion = "1.0.0"\n'
-        (tmp_path / "Cargo.toml").write_text(content)
-        os.makedirs(tmp_path / "src")
-        (tmp_path / "src" / "lib.rs").write_text("pub fn hello() {}")
-        assert target._is_library(str(tmp_path))
-
-    def test_is_not_library_with_main_rs(self, tmp_path):
-        target = CargoTarget()
-        content = '[package]\nname = "myapp"\nversion = "1.0.0"\n'
-        (tmp_path / "Cargo.toml").write_text(content)
-        os.makedirs(tmp_path / "src")
-        (tmp_path / "src" / "main.rs").write_text("fn main() {}")
-        assert not target._is_library(str(tmp_path))
-
-
 class TestDockerTarget:
     def test_protocol_conformance(self):
         from rlsbl.targets.docker import DockerTarget
@@ -1085,7 +1023,6 @@ class TestDetectTargetsAutoDetection:
         ("pypi", "pyproject.toml", '[project]\nname = "test"\nversion = "0.1.0"'),
         ("go", "go.mod", "module example.com/test\n\ngo 1.21"),
         ("swift", "Package.swift", "// swift-tools-version:5.9"),
-        ("cargo", "Cargo.toml", '[package]\nname = "test"\nversion = "0.1.0"'),
         ("deno", "deno.json", '{"name": "test", "version": "0.1.0"}'),
         ("docker", "Dockerfile", "FROM alpine"),
         ("hex", "mix.exs", "defmodule Test.MixProject do"),
@@ -1206,13 +1143,6 @@ class TestWriteVersionReturnPaths:
         target = GoTarget()
         result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
         assert result == ["VERSION"]
-
-    def test_cargo_returns_cargo_toml(self, tmp_path):
-        """CargoTarget.write_version returns ['Cargo.toml']."""
-        target = CargoTarget()
-        (tmp_path / "Cargo.toml").write_text('[package]\nname = "test"\nversion = "1.0.0"\n')
-        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert result == ["Cargo.toml"]
 
     def test_deno_returns_deno_json(self, tmp_path):
         """DenoTarget.write_version returns ['deno.json']."""

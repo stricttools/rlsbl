@@ -8,7 +8,7 @@ the EvidenceSource protocol and registering them in the sources list.
 
 Current sources:
 - RegistryProbeSource: uses publication_probe() from target implementations
-  (npm, pypi, go, cargo)
+  (npm, pypi, go)
 
 Future sources (not yet implemented):
 - CIPublishRunSource: checks GitHub Actions workflow conclusions

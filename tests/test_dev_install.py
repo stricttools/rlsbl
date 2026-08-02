@@ -49,13 +49,6 @@ def _make_go(dir_path):
         )
 
 
-def _make_cargo(dir_path, name="mycrate"):
-    """Create a minimal Cargo.toml so the cargo target is detected."""
-    os.makedirs(dir_path, exist_ok=True)
-    with open(os.path.join(dir_path, "Cargo.toml"), "w", encoding="utf-8") as f:
-        f.write(f'[package]\nname = "{name}"\nversion = "0.1.0"\nedition = "2021"\n')
-
-
 def _make_hex(dir_path, app="myapp"):
     """Create a minimal mix.exs so the hex target is detected."""
     os.makedirs(dir_path, exist_ok=True)
@@ -517,26 +510,6 @@ def test_go_venv_skipped_with_clear_message(
     captured = capsys.readouterr()
     assert "Skipping go" in captured.out
     assert "--venv not supported" in captured.out
-
-
-def test_cargo_venv_skipped_with_clear_message(
-    tmp_project, fake_run, all_tools_present, capsys
-):
-    _make_cargo(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
-    assert rc == 0
-    assert fake_run.calls == []
-    captured = capsys.readouterr()
-    assert "Skipping cargo" in captured.out
-    assert "--venv not supported" in captured.out
-
-
-def test_cargo_global_runs_cargo_install(tmp_project, fake_run, all_tools_present):
-    _make_cargo(str(tmp_project))
-    rc = run_install({}, project_root=".")
-    assert rc == 0
-    assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["cargo", "install", "--path", "."]
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""Registry version query functions for npm, PyPI, Go proxy, and crates.io, returning the latest published version for name availability and dependency checks."""
+"""Registry version query functions for npm, PyPI, and the Go proxy, returning the latest published version for name availability and dependency checks."""
 
 import json
 import urllib.error
@@ -83,37 +83,10 @@ def query_go_version(module_path):
         return {"status": "error", "message": str(e) or "Network error"}
 
 
-def query_crates_version(name):
-    """Query crates.io for the latest version of a crate.
-
-    Returns {"status": "found", "version": "X.Y.Z"} on success,
-    {"status": "not_found"} if the crate does not exist,
-    or {"status": "error", "message": "..."} on failure.
-    """
-    url = f"https://crates.io/api/v1/crates/{name}"
-    headers = {"User-Agent": "rlsbl-cli"}
-    try:
-        with _request_with_backoff(url, headers=headers) as resp:
-            data = json.loads(resp.read())
-        version = data.get("crate", {}).get("max_version")
-        if version is None:
-            return {"status": "error", "message": "No crate.max_version in response"}
-        return {"status": "found", "version": version}
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return {"status": "not_found"}
-        return {"status": "error", "message": f"HTTP {e.code}"}
-    except json.JSONDecodeError as e:
-        return {"status": "error", "message": f"Invalid JSON: {e}"}
-    except Exception as e:
-        return {"status": "error", "message": str(e) or "Network error"}
-
-
 _REGISTRY_DISPATCH = {
     "npm": query_npm_version,
     "pypi": query_pypi_version,
     "go": query_go_version,
-    "cargo": query_crates_version,
 }
 
 
@@ -121,7 +94,7 @@ def query_registry_version(name, registry):
     """Query a registry for the latest version of a package.
 
     Dispatches to the appropriate registry-specific function based on
-    the registry parameter ("npm", "pypi", "go", or "cargo").
+    the registry parameter ("npm", "pypi", or "go").
 
     Returns {"status": "found", "version": "X.Y.Z"} on success,
     {"status": "not_found"} if the package does not exist,

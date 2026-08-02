@@ -15,7 +15,6 @@ description: "Local development workflow: editable installs across 8 targets, lo
 | pypi | `uv tool install -e .` | `uv sync` |
 | npm | `npm link` | `npm install` |
 | go | `go install <install_paths>` (declared on the go pipeline in `.rlsbl/config.json`) | (not supported) |
-| cargo | `cargo install --path .` | (not supported) |
 | deno | `deno install` | (not supported) |
 | zig | (not yet supported) | (not yet supported) |
 | swift | `swift build` | (not supported) |
@@ -39,7 +38,6 @@ When neither `--global` nor `--venv` is passed, `--global` is the default. The t
 | pypi | `uv tool uninstall {name}` | Resolves package name from `pyproject.toml` |
 | npm | `npm unlink` | Removes the global symlink |
 | go | (skipped) | No clean uninstall mechanism; prints a message |
-| cargo | (skipped) | No clean uninstall mechanism; prints a message |
 
 ### Monorepo mode
 

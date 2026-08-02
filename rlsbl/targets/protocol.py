@@ -128,7 +128,7 @@ class ReleaseTarget(Protocol):
                 are fetched into the project's own environment without exposing
                 a global CLI (e.g. `uv sync`, `npm install`). None for targets
                 that have no separate local-environment concept (e.g. Go,
-                Cargo, Zig, Swift).
+                Zig, Swift).
 
         Each spec dict has the shape:
             {

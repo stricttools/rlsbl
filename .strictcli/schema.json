@@ -49,7 +49,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.110.2",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 51 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 51 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
   "global_flags": [
     {
       "name": "dry-run",
@@ -195,12 +195,12 @@
     },
     "check-name": {
       "name": "check-name",
-      "help": "Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
+      "help": "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
       "flags": [
         {
           "name": "target",
           "type": "str",
-          "help": "Registry to query for name availability (npm, pypi, crates, go, or github); repeatable",
+          "help": "Registry to query for name availability (npm, pypi, go, or github); repeatable",
           "default": [],
           "repeatable": true,
           "unique": true
@@ -227,7 +227,7 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Target package registry to publish the placeholder to (npm, pypi, or crates)",
+          "help": "Target package registry to publish the placeholder to (npm or pypi)",
           "default": ""
         }
       ]
@@ -295,7 +295,7 @@
     },
     "targets": {
       "name": "targets",
-      "help": "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found."
+      "help": "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found."
     },
     "deploy": {
       "name": "deploy",
@@ -465,7 +465,7 @@
         },
         "yank": {
           "name": "yank",
-          "help": "Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, cargo yank, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.",
+          "help": "Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.",
           "flags": [
             {
               "name": "reason",
@@ -779,7 +779,7 @@
             {
               "name": "target",
               "type": "str",
-              "help": "Registry this project publishes to (e.g. npm, pypi, go, cargo)",
+              "help": "Registry this project publishes to (e.g. npm, pypi, go)",
               "default": ""
             },
             {
@@ -1130,7 +1130,7 @@
       "commands": {
         "install": {
           "name": "install",
-          "help": "Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 8 supported targets (pypi, npm, go, cargo, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.",
+          "help": "Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 7 supported targets (pypi, npm, go, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.",
           "flags": [
             {
               "name": "all",

@@ -107,10 +107,6 @@ class TestIsAlreadyPublishedError(unittest.TestCase):
         exc = RuntimeError("File already exists: pkg-1.0.0.tar.gz")
         self.assertTrue(BasePipeline.is_already_published_error(exc))
 
-    def test_crates_already_uploaded(self):
-        exc = RuntimeError("crate version 1.0.0 already uploaded")
-        self.assertTrue(BasePipeline.is_already_published_error(exc))
-
     def test_unrelated_error(self):
         exc = RuntimeError("network timeout")
         self.assertFalse(BasePipeline.is_already_published_error(exc))
@@ -142,20 +138,6 @@ class TestPipelineProbeIntegration(unittest.TestCase):
 
         pl = NpmPipeline("npm", "npm", local=True, config={})
         pl.target = "npm"
-
-        with patch.object(pl, "probe_before_publish", return_value=False) as mock_probe:
-            pl.publish("/dir", "1.0.0", ctx=None)
-
-        mock_probe.assert_called_once_with("/dir", "1.0.0", None)
-        mock_run.assert_not_called()
-
-    @patch("rlsbl.pipelines.cargo.run")
-    def test_cargo_publish_calls_probe(self, mock_run):
-        """CargoPipeline.publish() calls probe_before_publish."""
-        from rlsbl.pipelines.cargo import CargoPipeline
-
-        pl = CargoPipeline("cargo", "cargo", local=True, config={})
-        pl.target = "cargo"
 
         with patch.object(pl, "probe_before_publish", return_value=False) as mock_probe:
             pl.publish("/dir", "1.0.0", ctx=None)
@@ -274,11 +256,6 @@ class TestCITemplateProbes(unittest.TestCase):
     def test_pypi_publish_has_skip_existing(self):
         content = self._read_template("pypi", "publish.yml.tpl")
         self.assertIn("skip-existing: true", content)
-
-    def test_cargo_publish_has_probe(self):
-        content = self._read_template("cargo", "publish.yml.tpl")
-        self.assertIn("Check if already published", content)
-        self.assertIn("check-cargo", content)
 
     def test_hex_publish_has_probe(self):
         content = self._read_template("hex", "publish.yml.tpl")
@@ -434,7 +411,7 @@ class TestRecoveryDispatch(unittest.TestCase):
     """Tests for Phase 7.5: recovery dispatch with tag input."""
 
     def test_all_publish_templates_have_tag_input(self):
-        """All 13 publish templates have workflow_dispatch.inputs.tag."""
+        """All publish templates have workflow_dispatch.inputs.tag."""
         import os, glob
 
         tpl_dir = os.path.join(
@@ -442,7 +419,7 @@ class TestRecoveryDispatch(unittest.TestCase):
             "rlsbl", "templates",
         )
         templates = sorted(glob.glob(os.path.join(tpl_dir, "*/publish*.yml.tpl")))
-        self.assertEqual(len(templates), 15)
+        self.assertEqual(len(templates), 14)
 
         for tpl_path in templates:
             with open(tpl_path) as f:

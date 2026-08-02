@@ -8,12 +8,10 @@ import sys
 # npm: E403 "You cannot publish over the previously published versions"
 #      or EPUBLISHCONFLICT
 # PyPI: 400 "File already exists"
-# crates.io: "already uploaded"
 _ALREADY_EXISTS_SIGNATURES = (
     "previously published version",
     "EPUBLISHCONFLICT",
     "File already exists",
-    "already uploaded",
 )
 
 

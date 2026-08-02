@@ -4,7 +4,6 @@ from .protocol import Pipeline
 from .npm import NpmPipeline
 from .pypi import PypiPipeline
 from .go import GoPipeline
-from .cargo import CargoPipeline
 from .deno import DenoPipeline
 from .hex import HexPipeline
 from .maven import MavenPipeline, MavenCentralPipeline
@@ -15,7 +14,6 @@ PIPELINE_TYPES: dict[str, type] = {
     "npm": NpmPipeline,
     "pypi": PypiPipeline,
     "go": GoPipeline,
-    "cargo": CargoPipeline,
     "deno": DenoPipeline,
     "hex": HexPipeline,
     "maven": MavenPipeline,

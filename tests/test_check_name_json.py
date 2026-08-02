@@ -18,7 +18,6 @@ import pytest
 
 import rlsbl
 from rlsbl.commands.check import (
-    _RULE_TOKEN_CRATES_SEPARATOR,
     _RULE_TOKEN_NPM_MONIKER,
     _RULE_TOKEN_PYPI_SEPARATOR,
     _RULE_TOKEN_PYPI_ULTRANORM,
@@ -89,7 +88,6 @@ class TestResultToJson:
         _RULE_TOKEN_NPM_MONIKER,
         _RULE_TOKEN_PYPI_SEPARATOR,
         _RULE_TOKEN_PYPI_ULTRANORM,
-        _RULE_TOKEN_CRATES_SEPARATOR,
         _RULE_TOKEN_STDLIB,
     ])
     def test_each_token_surfaces_sentence(self, token):

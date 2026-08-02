@@ -3,7 +3,6 @@
 For each configured target, probes the registry to determine publication
 status, then executes the registry-specific yank action:
 - npm: ``npm deprecate``
-- cargo: ``cargo yank``
 - Go: retract directive + tag deletion
 - PyPI: human-in-the-loop checklist (no yank API)
 
@@ -190,8 +189,6 @@ def _yank_target(target, project_dir, version, tag, reason, dry_run):
     name = target.name
     if name == "npm":
         _yank_npm(target, project_dir, version, reason, dry_run)
-    elif name == "cargo":
-        _yank_cargo(target, project_dir, version, dry_run)
     elif name == "go":
         _yank_go(target, project_dir, version, tag, dry_run)
     elif name == "pypi":
@@ -228,34 +225,6 @@ def _yank_npm(target, project_dir, version, reason, dry_run):
         print(f"  npm: deprecation failed: {e.stderr.strip()}", file=sys.stderr)
     except FileNotFoundError:
         print("  npm: npm CLI not found", file=sys.stderr)
-
-
-def _yank_cargo(target, project_dir, version, dry_run):
-    """Yank a version on crates.io."""
-    crate_name = target.read_name(project_dir, None)
-    if not crate_name:
-        print("  cargo: cannot determine crate name, skipping", file=sys.stderr)
-        return
-
-    if dry_run:
-        print(f"  cargo: would run: cargo yank --version {version} {crate_name}")
-        return
-
-    import subprocess
-    try:
-        subprocess.run(
-            ["cargo", "yank", "--version", version, crate_name],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=project_dir,
-        )
-        print(f"  cargo: yanked {crate_name}@{version}")
-    except subprocess.CalledProcessError as e:
-        print(f"  cargo: yank failed: {e.stderr.strip()}", file=sys.stderr)
-    except FileNotFoundError:
-        print("  cargo: cargo CLI not found", file=sys.stderr)
 
 
 def _yank_go(target, project_dir, version, tag, dry_run):

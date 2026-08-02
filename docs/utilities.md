@@ -102,7 +102,7 @@ Each commit in the unreleased range is listed with full details for preparing a 
 
 ## `rlsbl targets`
 
-List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found. This helps verify that rlsbl will detect the correct targets before scaffolding CI or initializing a release.
+List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found. This helps verify that rlsbl will detect the correct targets before scaffolding CI or initializing a release.
 
 ### Usage
 
@@ -116,7 +116,7 @@ A table with 3 columns showing the detection status of all 18 supported release 
 
 | Column | Description |
 | --- | --- |
-| Target | Registry name (npm, pypi, go, cargo, deno, zig, swift, hex, etc.) |
+| Target | Registry name (npm, pypi, go, deno, zig, swift, hex, etc.) |
 | Detected | Whether the target's manifest file was found in the project |
 | Version file | The file where the target stores its version |
 

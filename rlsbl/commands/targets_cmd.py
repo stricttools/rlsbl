@@ -1,4 +1,4 @@
-"""Targets command that lists all available release targets (npm, PyPI, Go, Cargo, etc.) and shows their auto-detection status."""
+"""Targets command that lists all available release targets (npm, PyPI, Go, etc.) and shows their auto-detection status."""
 
 from ..targets import TARGETS, detect_targets
 

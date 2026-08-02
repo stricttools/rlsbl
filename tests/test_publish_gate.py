@@ -74,7 +74,6 @@ RENDER_VARS = {
     "zig.minRequiredZig": "0.13.0",
     # Block-insertion vars: empty so the base template stands alone.
     "npmPublishJobs": "",
-    "cratesPublishJobs": "",
     "homebrewEnv": "",
 }
 
@@ -103,7 +102,6 @@ class TestPublishTemplatesEnumerated:
             for p in _publish_templates()
         }
         expected = {
-            "cargo/publish.yml.tpl",
             "deno/publish.yml.tpl",
             "docker/publish.yml.tpl",
             "go/publish.yml.tpl",

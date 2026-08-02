@@ -58,7 +58,6 @@ class TestTemplatesHaveConcurrency:
             for p in _ci_templates()
         }
         expected = {
-            "cargo/ci.yml.tpl",
             "deno/ci.yml.tpl",
             "docker/ci.yml.tpl",
             "go/ci.yml.tpl",

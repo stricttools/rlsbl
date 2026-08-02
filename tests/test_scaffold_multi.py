@@ -258,21 +258,20 @@ class TestMergedPublishCombinations:
 
     TEMPLATE_VARS = {"repoName": "user/repo", "name": "test", "version": "1.0.0"}
 
-    def test_npm_cargo_merged(self):
-        """Merged publish contains both an npm job and a cargo job."""
-        result = _generate_merged_publish(["npm", "cargo"], self.TEMPLATE_VARS)
+    def test_npm_deno_merged(self):
+        """Merged publish contains both an npm job and a deno job."""
+        result = _generate_merged_publish(["npm", "deno"], self.TEMPLATE_VARS)
 
         # Both jobs present as top-level job keys under jobs:
         assert "\n  npm:" in result
-        assert "\n  cargo:" in result
+        assert "\n  deno:" in result
 
         # npm-specific content
         assert "npm publish" in result
         assert "NPM_TOKEN" in result
 
-        # cargo-specific content
-        assert "cargo publish" in result
-        assert "CARGO_REGISTRY_TOKEN" in result
+        # deno-specific content
+        assert "deno publish" in result
 
     def test_pypi_deno_merged(self):
         """Merged publish contains both a pypi job and a deno job."""
@@ -296,7 +295,6 @@ class TestMergedPublishCombinations:
 
         # No other registry jobs
         assert "\n  pypi:" not in result
-        assert "\n  cargo:" not in result
         assert "\n  go:" not in result
         assert "\n  deno:" not in result
 
@@ -406,7 +404,7 @@ class TestMergedPublishCombinations:
 
     def test_on_block_preserves_release_trigger(self):
         """Merged on: block preserves release trigger with sub-keys."""
-        result = _generate_merged_publish(["cargo", "deno"], self.TEMPLATE_VARS)
+        result = _generate_merged_publish(["pypi", "deno"], self.TEMPLATE_VARS)
         assert "release:" in result
         assert "types: [published]" in result
         assert "workflow_dispatch:" in result

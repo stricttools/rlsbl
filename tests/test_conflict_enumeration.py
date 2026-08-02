@@ -2,7 +2,7 @@
 
 Verifies that _check_single_name stores the FULL conflict list plus
 the matched normalization rule on the result dict for all registries
-(npm, pypi, crates), and that both check-name and claim-name render
+(npm, pypi), and that both check-name and claim-name render
 every conflicting package and the rule in their text output.
 """
 
@@ -12,7 +12,6 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from rlsbl.commands.check import (
-    _RULE_TOKEN_CRATES_SEPARATOR,
     _RULE_TOKEN_NPM_MONIKER,
     _RULE_TOKEN_PYPI_SEPARATOR,
     _RULE_TOKEN_PYPI_ULTRANORM,
@@ -73,28 +72,6 @@ class TestCheckSingleNameConflictStorage:
             assert pkg in result["note"], f"'{pkg}' missing from note: {result['note']}"
         assert result["conflict_rule"] in result["note"]
 
-    @patch("rlsbl.commands.check._check_variants")
-    @patch("rlsbl.commands.check.check_crates_availability")
-    def test_crates_multi_conflict_stored(self, mock_avail, mock_variants):
-        """crates: multiple hard collisions stored in conflicts + conflict_rule."""
-        mock_avail.return_value = {"status": "available"}
-        mock_variants.return_value = ["foo-bar", "foo_bar"]
-
-        with patch("rlsbl.commands.check._classify_variant_collisions",
-                    return_value=(["foo-bar", "foo_bar"], [])):
-            result = _check_single_name("foobar", "crates")
-
-        assert result["status"] == "taken"
-        assert result["reason"] == "normalized"
-        assert "conflicts" in result, "crates result missing 'conflicts' key"
-        assert set(result["conflicts"]) == {"foo-bar", "foo_bar"}
-        assert "conflict_rule" in result, "crates result missing 'conflict_rule' key"
-        assert result["conflict_rule"]  # non-empty
-        for pkg in ("foo-bar", "foo_bar"):
-            assert pkg in result["note"], f"'{pkg}' missing from note: {result['note']}"
-        assert result["conflict_rule"] in result["note"]
-
-
 # ---------------------------------------------------------------------------
 # Unified structured_conflicts field: {name, rule} objects per mechanism
 # ---------------------------------------------------------------------------
@@ -144,20 +121,6 @@ class TestStructuredConflictsPerMechanism:
             {"name": "foo_bar", "rule": _RULE_TOKEN_PYPI_SEPARATOR},
         ]
 
-    @patch("rlsbl.commands.check._check_variants")
-    @patch("rlsbl.commands.check.check_crates_availability")
-    def test_crates_separator_token(self, mock_avail, mock_variants):
-        mock_avail.return_value = {"status": "available"}
-        mock_variants.return_value = ["foo-bar", "foo_bar"]
-        with patch("rlsbl.commands.check._classify_variant_collisions",
-                    return_value=(["foo-bar", "foo_bar"], [])):
-            result = _check_single_name("foobar", "crates")
-
-        assert result["structured_conflicts"] == [
-            {"name": "foo-bar", "rule": _RULE_TOKEN_CRATES_SEPARATOR},
-            {"name": "foo_bar", "rule": _RULE_TOKEN_CRATES_SEPARATOR},
-        ]
-
     @patch("rlsbl.commands.check.check_pypi_availability")
     def test_stdlib_token(self, mock_avail):
         # 'queue' collides with the stdlib module 'queue' before any network call.
@@ -201,12 +164,12 @@ class TestStructuredConflictsPerMechanism:
         """Regardless of insertion order, the list sorts by (name, rule)."""
         result = {"name": "x", "registry": "npm", "status": "taken"}
         _add_structured_conflicts(result, ["zeta", "alpha"], _RULE_TOKEN_NPM_MONIKER)
-        _add_structured_conflicts(result, ["alpha"], _RULE_TOKEN_CRATES_SEPARATOR)
+        _add_structured_conflicts(result, ["alpha"], _RULE_TOKEN_PYPI_SEPARATOR)
         names_rules = [(c["name"], c["rule"]) for c in result["structured_conflicts"]]
         assert names_rules == sorted(names_rules)
         # 'alpha' appears twice with different rules, ordered by rule.
-        assert names_rules[0] == ("alpha", _RULE_TOKEN_CRATES_SEPARATOR)
-        assert names_rules[1] == ("alpha", _RULE_TOKEN_NPM_MONIKER)
+        assert names_rules[0] == ("alpha", _RULE_TOKEN_NPM_MONIKER)
+        assert names_rules[1] == ("alpha", _RULE_TOKEN_PYPI_SEPARATOR)
 
 
 # ---------------------------------------------------------------------------
@@ -249,23 +212,6 @@ class TestFormatSingleResultConflictEnumeration:
             assert pkg in out, f"'{pkg}' missing from check-name output"
         assert rule in out
 
-    def test_crates_multi_conflict_rendered(self, capsys):
-        rule = "crates.io treats hyphens and underscores as equivalent"
-        result = {
-            "name": "foobar", "registry": "crates", "status": "taken",
-            "variants": [], "reason": "normalized",
-            "conflicts": ["foo-bar", "foo_bar"],
-            "conflict_rule": rule,
-            "note": f"normalization collision with {_enumerate_conflicts(['foo-bar', 'foo_bar'])} — {rule}",
-        }
-        exit_code = _format_single_result(result)
-        assert exit_code == 1
-        out = capsys.readouterr().out
-        for pkg in ("foo-bar", "foo_bar"):
-            assert pkg in out, f"'{pkg}' missing from check-name output"
-        assert rule in out
-
-
 # ---------------------------------------------------------------------------
 # claim-name: text output enumerates every conflict + rule
 # ---------------------------------------------------------------------------
@@ -287,27 +233,6 @@ class TestClaimNameConflictEnumeration:
 
         with pytest.raises(SystemExit) as exc_info:
             claim_run_cmd("pypi", ["foobar"], {"yes": False})
-        assert exc_info.value.code == 1
-
-        err = capsys.readouterr().err
-        for pkg in ("foo-bar", "foo_bar"):
-            assert pkg in err, f"'{pkg}' missing from claim-name stderr"
-        assert rule in err
-
-    @patch("rlsbl.commands.check._check_single_name")
-    def test_claim_crates_multi_conflict_rendered(self, mock_check, capsys):
-        rule = "crates.io treats hyphens and underscores as equivalent"
-        mock_check.return_value = {
-            "name": "foobar", "registry": "crates", "status": "taken",
-            "variants": None, "reason": "normalized",
-            "conflicts": ["foo-bar", "foo_bar"],
-            "conflict_rule": rule,
-            "note": f"normalization collision with {_enumerate_conflicts(['foo-bar', 'foo_bar'])} — {rule}",
-        }
-        from rlsbl.commands.claim_name import run_cmd as claim_run_cmd
-
-        with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("crates", ["foobar"], {"yes": False})
         assert exc_info.value.code == 1
 
         err = capsys.readouterr().err

@@ -1,4 +1,4 @@
-"""rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps, changelogs, tags, GitHub Releases, and CI/CD."""
+"""rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps, changelogs, tags, GitHub Releases, and CI/CD."""
 
 import os
 import subprocess
@@ -59,7 +59,7 @@ def detect_registries():
 
     Returns a list of name strings, e.g. ["npm"], ["pypi"], or ["npm", "pypi"].
     Delegates to detect_targets() so all registered targets (including docker,
-    cargo, deno, hex, maven, etc.) are auto-detected when no config exists.
+    deno, hex, maven, etc.) are auto-detected when no config exists.
     """
     from .targets import detect_targets
     return [entry.name for entry in detect_targets(".")]
@@ -154,7 +154,7 @@ app = strictcli.App(
     # The command-count sentence is appended after all registrations (see
     # "Derived help counts" near the bottom of this module) so it is computed
     # from the live registry instead of hand-maintained literals that drift.
-    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more).",
+    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more).",
     flags=[
         strictcli.Flag(name="dry-run", type=bool, default=False, help="Preview changes without applying them"),
         strictcli.Flag(name="yes", type=bool, short="y", default=False, help="Skip confirmation prompts"),
@@ -656,8 +656,8 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag, 
 # check
 # ---------------------------------------------------------------------------
 
-@app.command(name="check-name", help="Query npm, PyPI, crates.io, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
-@strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, crates, go, or github); repeatable", repeatable=True, unique=True)
+@app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.")
+@strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, go, or github); repeatable", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
 @strictcli.flag(name="json", type=bool, default=False, help="Output results as machine-readable JSON: one object for a single name+target, a JSON array for multiple names and/or targets")
 def cmd_check_name(ctx, target, delay, json, dry_run, yes, quiet):
@@ -667,17 +667,17 @@ def cmd_check_name(ctx, target, delay, json, dry_run, yes, quiet):
     if not targets:
         print(
             "Error: --target is required. "
-            "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|crates|go|github>",
+            "Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go|github>",
             file=sys.stderr,
         )
         sys.exit(1)
     # Validate ALL targets upfront before any network calls
-    valid_targets = {"npm", "pypi", "crates", "go", "github"}
+    valid_targets = {"npm", "pypi", "go", "github"}
     invalid = [t for t in targets if t not in valid_targets]
     if invalid:
         print(
             f"Error: unknown target(s): {', '.join(repr(t) for t in invalid)}. "
-            f"Valid: npm, pypi, crates, go, github",
+            f"Valid: npm, pypi, go, github",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -706,20 +706,20 @@ def cmd_check_name(ctx, target, delay, json, dry_run, yes, quiet):
 # ---------------------------------------------------------------------------
 
 @app.command(name="claim-name", help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.")
-@strictcli.flag(name="target", type=str, help="Target package registry to publish the placeholder to (npm, pypi, or crates)", default="")
+@strictcli.flag(name="target", type=str, help="Target package registry to publish the placeholder to (npm or pypi)", default="")
 def cmd_claim_name(ctx, target, yes, dry_run, quiet):
     """Claim a package name on a registry by publishing a minimal placeholder."""
     if not target:
         print(
             "Error: --target is required. "
-            "Usage: rlsbl claim-name <name> --target <npm|pypi|crates>",
+            "Usage: rlsbl claim-name <name> --target <npm|pypi>",
             file=sys.stderr,
         )
         sys.exit(1)
-    valid_targets = {"npm", "pypi", "crates"}
+    valid_targets = {"npm", "pypi"}
     if target not in valid_targets:
         print(
-            f"Error: unknown target: {target!r}. Valid: npm, pypi, crates",
+            f"Error: unknown target: {target!r}. Valid: npm, pypi",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -727,7 +727,7 @@ def cmd_claim_name(ctx, target, yes, dry_run, quiet):
     if len(names) != 1:
         print(
             "Error: expected exactly one package name. "
-            "Usage: rlsbl claim-name <name> --target <npm|pypi|crates>",
+            "Usage: rlsbl claim-name <name> --target <npm|pypi>",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -807,7 +807,7 @@ def cmd_release_deprecate(ctx, reason, use, dry_run, yes, quiet, version):
 # release yank (registry-aware removal)
 # ---------------------------------------------------------------------------
 
-@release_group.command(name="yank", help="Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, cargo yank, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.")
+@release_group.command(name="yank", help="Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.")
 @strictcli.flag(name="reason", type=str, help="Human-readable explanation of why this version is being yanked", default="")
 @strictcli.flag(name="use", type=str, help="Suggest this version as a replacement in the yank notice", default="")
 @strictcli.arg(name="version", help="Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)")
@@ -970,7 +970,7 @@ def cmd_unreleased(ctx, json, dry_run, yes, quiet):
 # targets
 # ---------------------------------------------------------------------------
 
-@app.command(name="targets", help="List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.")
+@app.command(name="targets", help="List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found.")
 def cmd_targets(ctx, dry_run, yes, quiet):
     """List all release targets detected in the current project."""
     root = _require_sub_project_root(
@@ -1196,7 +1196,7 @@ def cmd_mono_init(ctx, auto_commit, dry_run, yes, quiet):
 
 @mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.")
 @strictcli.flag(name="name", type=str, help="Display name for the project in workspace.toml (defaults to directory name)", default="")
-@strictcli.flag(name="target", type=str, help="Registry this project publishes to (e.g. npm, pypi, go, cargo)", default="")
+@strictcli.flag(name="target", type=str, help="Registry this project publishes to (e.g. npm, pypi, go)", default="")
 @strictcli.flag(name="watch", type=str, help="Comma-separated glob patterns for change detection in CI workflows", default="")
 @strictcli.flag(name="subtree-remote", type=str, help="Git remote URL for split-publishing this project as a standalone repo", default="")
 @strictcli.flag(name="depends-on", type=str, help="Comma-separated names of workspace projects this project depends on", default="")
@@ -1601,7 +1601,7 @@ def cmd_mono_rename_releasable(ctx, dry_run, yes, quiet, old_name, new_name):
 dev = app.group("dev", help="Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).")
 
 
-@dev.command(name="install", help="Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 8 supported targets (pypi, npm, go, cargo, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.")
+@dev.command(name="install", help="Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 7 supported targets (pypi, npm, go, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.")
 @strictcli.flag(name="all", type=bool, default=False, help="In monorepo mode, install every project in the workspace")
 @strictcli.flag(name="include", type=str, help="In monorepo mode, comma-separated project names to include", default="")
 @strictcli.flag(name="exclude", type=str, help="In monorepo mode, comma-separated project names to exclude", default="")

@@ -9,7 +9,6 @@ from rlsbl.registry import (
     query_npm_version,
     query_pypi_version,
     query_go_version,
-    query_crates_version,
     query_registry_version,
 )
 
@@ -62,19 +61,6 @@ class TestQueryGoVersion:
         assert result == {"status": "found", "version": "1.21.0"}
 
 
-class TestQueryCratesVersion:
-    @patch("urllib.request.urlopen")
-    def test_found_with_user_agent(self, mock_urlopen):
-        mock_urlopen.return_value = FakeResponse(
-            {"crate": {"max_version": "0.8.4"}}
-        )
-        result = query_crates_version("serde")
-        assert result == {"status": "found", "version": "0.8.4"}
-        # Verify the request was made with User-Agent header
-        called_req = mock_urlopen.call_args[0][0]
-        assert called_req.get_header("User-agent") == "rlsbl-cli"
-
-
 class TestQueryRegistryVersion:
     @patch("urllib.request.urlopen")
     def test_dispatches_npm(self, mock_urlopen):
@@ -99,14 +85,6 @@ class TestQueryRegistryVersion:
         )
         result = query_registry_version("example.com/mod", "go")
         assert result == {"status": "found", "version": "1.0.0"}
-
-    @patch("urllib.request.urlopen")
-    def test_dispatches_cargo(self, mock_urlopen):
-        mock_urlopen.return_value = FakeResponse(
-            {"crate": {"max_version": "4.0.0"}}
-        )
-        result = query_registry_version("mycrate", "cargo")
-        assert result == {"status": "found", "version": "4.0.0"}
 
     def test_unknown_registry(self):
         result = query_registry_version("pkg", "unknown")
@@ -141,6 +119,6 @@ class TestNetworkErrors:
     @patch("urllib.request.urlopen")
     def test_invalid_json_returns_error_status(self, mock_urlopen):
         mock_urlopen.return_value = FakeResponse(b"not valid json")
-        result = query_crates_version("mycrate")
+        result = query_npm_version("mypkg")
         assert result["status"] == "error"
         assert "Invalid JSON" in result["message"]

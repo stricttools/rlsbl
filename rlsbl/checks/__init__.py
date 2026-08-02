@@ -141,10 +141,10 @@ CHECK_EXCLUDED_TARGETS: dict[str, dict[str, str]] = {
 
 # Canonical column order for the feature matrix.  The order is the
 # original display order the feature matrix has always used.  The
-# assertion guarantees completeness: if a 19th target is added but not
+# assertion guarantees completeness: if a new target is added but not
 # listed here, startup fails loudly.
 MATRIX_COLUMNS: tuple[str, ...] = (
-    "pypi", "go", "npm", "dart", "cargo", "deno", "hex", "zig",
+    "pypi", "go", "npm", "dart", "deno", "hex", "zig",
     "swift", "swift-apple", "maven", "native-android", "native-ios", "docker", "flutter",
     "pgdesign", "plain", "spec",
 )
