@@ -38,10 +38,11 @@ def register_changelog_checks(app):
         if present:
             return reporter.passed("format_version enforcement decision recorded")
         msg = (
-            "changelog format_version enforcement not yet enabled. Run "
-            "scripts/stamp_changelog_format_version.py over the changes dir, "
-            'then set "changelog_format_version_enforced": true in '
-            ".rlsbl/config.json."
+            "changelog format_version enforcement decision not recorded. Set "
+            '"changelog_format_version_enforced" to true in .rlsbl/config.json '
+            "once every changelog line carries format_version (every line "
+            "`rlsbl changelog add` writes does), or to false to stay in legacy "
+            "mode deliberately."
         )
         reporter.warn(msg)
         return reporter.found(msg)

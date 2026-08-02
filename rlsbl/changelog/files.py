@@ -593,8 +593,8 @@ def load_filter_repo_commit_map(path: str) -> "tuple[dict[str, str], list[str]]"
 # Config key that flips a repo from legacy (mixed-format tolerant) to enforced
 # (every changelog line must carry format_version). There is NO enforced default
 # value: absence is legacy AND is itself reported by a warn-level check, so the
-# transition is visible, never silent. A repo sets this to true after running
-# scripts/stamp_changelog_format_version.py over its changes dir(s).
+# transition is visible, never silent. A repo sets this to true once every line
+# in its changes dir(s) carries format_version.
 CHANGELOG_FORMAT_VERSION_ENFORCED_KEY = "changelog_format_version_enforced"
 
 

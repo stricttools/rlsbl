@@ -15,8 +15,7 @@ accepted ONLY when the caller opts into legacy mode
 (``enforce_format_version=False``, the transition default). With
 ``enforce_format_version=True`` a missing gate is a hard error. The absence is
 never silent: a warn-level check surfaces "enforcement not yet enabled" until a
-repo runs the one-time stamping script and sets
-``changelog_format_version_enforced`` in its config.
+repo records its ``changelog_format_version_enforced`` decision in its config.
 """
 
 from __future__ import annotations
@@ -190,9 +189,10 @@ def parse_entry(line: str, *, enforce_format_version: bool = False) -> Changelog
     if "format_version" not in data and enforce_format_version:
         raise ChangelogError(
             "missing format_version: this changelog line predates the "
-            "format_version gate. Run scripts/stamp_changelog_format_version.py "
-            "to stamp the changes dir, then set "
-            '"changelog_format_version_enforced": true in .rlsbl/config.json.'
+            'format_version gate. Add \'"format_version":1\' to the line (or '
+            "re-add the entry with `rlsbl changelog add`, which always stamps "
+            "it), or set \"changelog_format_version_enforced\": false in "
+            ".rlsbl/config.json to read this repo in legacy mode."
         )
 
     if "user_facing" not in data:

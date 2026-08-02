@@ -70,16 +70,14 @@ Historical finalized `x.y.z.jsonl` files and in-flight `unreleased.jsonl` lines 
 | `true` | enforced (every line must carry `format_version`) | `changelog-format-version-gate` **errors** on any unstamped/wrong-version line |
 | `false` | legacy (explicit opt-out) | no warning; gate check skipped |
 
-There is **no enforced default**: absence is legacy *and* is surfaced as visible pressure by the warn check — never silent. To enable enforcement for a repo:
+There is **no enforced default**: absence is legacy *and* is surfaced as visible pressure by the warn check — never silent. Every line `rlsbl changelog add` writes carries `format_version`, so a repo that has been on the current tooling for a full release cycle is already fully stamped. To enable enforcement, confirm every line in the changes dir carries the field and set:
 
-```bash
-# 1. Stamp every existing JSONL line (one-time bootstrap).
-scripts/stamp_changelog_format_version.py .rlsbl/changes
-# 2. Flip the key.
-#    "changelog_format_version_enforced": true   in .rlsbl/config.json
+```jsonc
+// .rlsbl/config.json
+"changelog_format_version_enforced": true
 ```
 
-The stamper is **stamp-only**: it inserts `"format_version":1` after the opening `{` of each line and preserves every other byte, so CHANGELOG.md regeneration is byte-identical before and after (generation ignores `format_version`). It unlocks read-only (444) finalized files, rewrites them, and re-locks them, and it **refuses** any file that already has a stamped line (running twice is an error, never a silent re-stamp). Pass `--dry-run` to preview. This is a breaking change for a repo only in the sense that, once the key is `true`, an unstamped line hard-fails the gate — the remediation is always "run the stamping script".
+The one-time bootstrap stamper that seeded historical lines has been retired — the fleet is stamped and new lines stamp themselves. Once the key is `true`, any line still lacking `format_version` hard-fails the `changelog-format-version-gate` check; the remediation is to add `"format_version":1` to that line (finalized `x.y.z.jsonl` files are read-only 444, so unlock, edit, and re-lock), or to record `false` and stay in legacy mode deliberately.
 
 ### Multiplicity rules
 
