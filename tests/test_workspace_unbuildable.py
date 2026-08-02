@@ -1,4 +1,18 @@
-"""Tests for the workspace-unbuildable check."""
+"""Tests for the workspace-unbuildable check.
+
+Two layouts, two strategies (chosen explicitly from the repo layout, never
+silently): a root uv workspace gets one root-level ``uv sync --all-packages``;
+a polyglot monorepo with no root uv workspace gets a per-pypi-project
+``uv sync`` in each project's own directory.
+"""
+
+
+def _make_root_uv_workspace(root, members):
+    """Declare the repo root as a uv workspace root over *members*."""
+    member_list = ", ".join(f'"{m}"' for m in members)
+    (root / "pyproject.toml").write_text(
+        f"[tool.uv.workspace]\nmembers = [{member_list}]\n"
+    )
 
 import subprocess
 from pathlib import Path
@@ -48,6 +62,7 @@ class TestWorkspaceUnbuildableSkips:
         (proj_dir / "pyproject.toml").write_text(
             '[project]\nname = "mylib"\nversion = "0.1.0"\n'
         )
+        _make_root_uv_workspace(mock_git_repo, ["mylib"])
 
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
@@ -72,6 +87,7 @@ class TestWorkspaceUnbuildablePass:
         (proj_dir / "pyproject.toml").write_text(
             '[project]\nname = "mylib"\nversion = "0.1.0"\n'
         )
+        _make_root_uv_workspace(mock_git_repo, ["mylib"])
 
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
@@ -103,6 +119,7 @@ class TestWorkspaceUnbuildableFail:
         (proj_dir / "pyproject.toml").write_text(
             '[project]\nname = "mylib"\nversion = "0.1.0"\n'
         )
+        _make_root_uv_workspace(mock_git_repo, ["mylib"])
 
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
@@ -131,6 +148,7 @@ class TestWorkspaceUnbuildableFail:
         (proj_dir / "pyproject.toml").write_text(
             '[project]\nname = "mylib"\nversion = "0.1.0"\n'
         )
+        _make_root_uv_workspace(mock_git_repo, ["mylib"])
 
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
@@ -144,3 +162,91 @@ class TestWorkspaceUnbuildableFail:
             result = app._check_defs["workspace-unbuildable"].impl(ctx)
         assert result.status == "fail"
         assert "timed out" in result.message
+
+
+class TestPolyglotNoRootUvWorkspace:
+    """A polyglot monorepo with no root pyproject.toml is a real layout.
+
+    Regression for the false positive where the root-level
+    ``uv sync --all-packages`` died with "No pyproject.toml found" even though
+    every project built fine in its own directory.
+    """
+
+    def _ctx(self, root):
+        return WorkspaceCheckContext(
+            project_root=root,
+            workspace_root=root,
+            config={},
+            projects=[
+                {"path": "gotool", "name": "gotool"},
+                {"path": "pylib", "name": "pylib"},
+            ],
+            graph=None,
+        )
+
+    def _polyglot(self, root):
+        """go project + independent python project, NO root pyproject.toml."""
+        go_dir = root / "gotool"
+        go_dir.mkdir()
+        (go_dir / "go.mod").write_text("module example.com/gotool\n\ngo 1.25\n")
+        py_dir = root / "pylib"
+        py_dir.mkdir()
+        (py_dir / "pyproject.toml").write_text(
+            '[project]\nname = "pylib"\nversion = "0.1.0"\n'
+        )
+        assert not (root / "pyproject.toml").exists()
+        return py_dir
+
+    def test_syncs_each_pypi_project_in_its_own_dir(self, mock_git_repo):
+        """No root uv workspace -> per-project `uv sync`, and it passes."""
+        py_dir = self._polyglot(mock_git_repo)
+
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append((list(argv), kwargs.get("cwd")))
+            return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            result = app._check_defs["workspace-unbuildable"].impl(self._ctx(mock_git_repo))
+
+        assert result.status == "pass"
+        assert calls == [(["uv", "sync", "--dry-run"], str(py_dir))], calls
+        assert "--all-packages" not in " ".join(calls[0][0])
+
+    def test_reports_the_failing_project_by_name(self, mock_git_repo):
+        """A genuinely unbuildable python project still fails, named."""
+        self._polyglot(mock_git_repo)
+
+        fake_result = subprocess.CompletedProcess(
+            args=["uv", "sync", "--dry-run"],
+            returncode=1,
+            stdout="",
+            stderr="error: Failed to build `pylib`\nCaused by: missing build-system",
+        )
+        with patch("subprocess.run", return_value=fake_result):
+            result = app._check_defs["workspace-unbuildable"].impl(self._ctx(mock_git_repo))
+
+        assert result.status == "fail"
+        assert result.message.startswith("pylib: ")
+        assert "Failed to build `pylib`" in result.message
+        assert len(result.problems) == 2
+
+    def test_root_uv_workspace_still_syncs_at_the_root(self, mock_git_repo):
+        """The marker present -> unchanged root-level `uv sync --all-packages`."""
+        self._polyglot(mock_git_repo)
+        _make_root_uv_workspace(mock_git_repo, ["pylib"])
+
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append((list(argv), kwargs.get("cwd")))
+            return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            result = app._check_defs["workspace-unbuildable"].impl(self._ctx(mock_git_repo))
+
+        assert result.status == "pass"
+        assert calls == [
+            (["uv", "sync", "--all-packages", "--dry-run"], str(mock_git_repo))
+        ], calls

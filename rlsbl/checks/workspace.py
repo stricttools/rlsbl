@@ -405,50 +405,91 @@ def register_workspace_checks(app):
 
     @app.error_check("workspace-unbuildable")
     def check_workspace_unbuildable(ctx, reporter):
-        """Detect workspace members that fail ``uv sync --all-packages``."""
+        """Detect workspace members that fail to sync with uv.
+
+        The repo layout selects the strategy explicitly:
+
+        - The repo root IS a uv workspace root -- it declares
+          ``[tool.uv.workspace]`` itself, or a pypi member resolves up to it --
+          so one ``uv sync --all-packages --dry-run`` at the root covers every
+          member.
+        - The root is NOT a uv workspace (a polyglot monorepo whose python
+          packages are independent, with no root ``pyproject.toml``): run
+          ``uv sync --dry-run`` in each pypi project's own directory instead.
+          Every pypi package is still verified, and "there is no root uv
+          workspace" stops being reported as an unbuildable workspace.
+        """
         from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..utils import detect_uv_workspace_root, is_virtual_uv_root
 
         root = str(ctx.workspace_root)
-        has_pypi = False
+        pypi_projects = []
         for proj in ctx.projects:
             proj_dir = os.path.join(root, proj["path"])
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
             target_entries = detect_targets(proj_dir, releasable_config_dir=rel_dir)
             if any(e.name == "pypi" for e in target_entries):
-                has_pypi = True
-                break
+                pypi_projects.append((proj["name"], proj_dir))
 
-        if not has_pypi:
+        if not pypi_projects:
             return reporter.skipped("no pypi-target projects in workspace")
 
+        root_abs = os.path.abspath(root)
+        root_is_uv_workspace = is_virtual_uv_root(root) or any(
+            detect_uv_workspace_root(d) == root_abs for _name, d in pypi_projects
+        )
+
+        if root_is_uv_workspace:
+            runs = [(None, root, ["uv", "sync", "--all-packages", "--dry-run"])]
+        else:
+            runs = [
+                (name, proj_dir, ["uv", "sync", "--dry-run"])
+                for name, proj_dir in pypi_projects
+            ]
+
         timeout = get_check_timeout(ctx.config)
-        try:
-            result = subprocess.run(
-                ["uv", "sync", "--all-packages", "--dry-run"],
-                cwd=root,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-        except FileNotFoundError:
-            reporter.error(
-                "uv is not installed -- install uv "
-                "(https://docs.astral.sh/uv/) to verify workspace members build"
-            )
-            return reporter.found("uv is not installed")
-        except subprocess.TimeoutExpired:
-            reporter.error(f"uv sync --all-packages --dry-run timed out after {timeout}s")
-            return reporter.found(f"uv sync --all-packages --dry-run timed out after {timeout}s")
+        details = []
+        for name, cwd, argv in runs:
+            prefix = f"{name}: " if name else ""
+            try:
+                result = subprocess.run(
+                    argv,
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+            except FileNotFoundError:
+                reporter.error(
+                    "uv is not installed -- install uv "
+                    "(https://docs.astral.sh/uv/) to verify workspace members build"
+                )
+                return reporter.found("uv is not installed")
+            except subprocess.TimeoutExpired:
+                msg = f"{prefix}{' '.join(argv)} timed out after {timeout}s"
+                reporter.error(msg)
+                return reporter.found(msg)
 
-        if result.returncode == 0:
-            return reporter.passed("all workspace members buildable")
+            if result.returncode == 0:
+                continue
 
-        stderr = result.stderr.strip()
-        details = [line for line in stderr.splitlines() if line.strip()]
-        summary = details[0] if details else "uv sync --all-packages --dry-run failed"
+            stderr = result.stderr.strip()
+            lines = [line for line in stderr.splitlines() if line.strip()]
+            if not lines:
+                lines = [f"{' '.join(argv)} failed"]
+            details.extend(f"{prefix}{line}" for line in lines)
+
+        if not details:
+            if root_is_uv_workspace:
+                return reporter.passed("all workspace members buildable")
+            return reporter.passed(
+                f"all {len(pypi_projects)} pypi project(s) buildable "
+                "(no root uv workspace)"
+            )
+
         for detail in details:
             reporter.error(detail)
-        return reporter.found(summary)
+        return reporter.found(details[0])
 
     @app.error_check("deps-unused")
     def check_deps_unused(ctx, reporter):
