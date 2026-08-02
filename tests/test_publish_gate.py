@@ -72,6 +72,10 @@ RENDER_VARS = {
     "modulePath": "github.com/owner/repo",
     "zig.projectName": "myproj",
     "zig.minRequiredZig": "0.13.0",
+    # Launcher publish templates bake in the wrapped producer's asset naming
+    # so their 404 probe checks the exact URL the shim downloads.
+    "assetProject": "mytool",
+    "tagPrefix": "v",
     # Block-insertion vars: empty so the base template stands alone.
     "npmPublishJobs": "",
     "homebrewEnv": "",
