@@ -20,6 +20,9 @@ const { execFileSync } = require("child_process");
 const GITHUB_REPO = "{{githubRepo}}";
 const ASSET_PROJECT = "{{assetProject}}";
 const BINARY_NAME = "{{binaryName}}";
+// Release tags are prefixed in a monorepo ("<name>@v1.2.3"); a bare "v"
+// would reconstruct a URL for a tag that does not exist.
+const TAG_PREFIX = "{{tagPrefix}}";
 
 // process.platform/arch -> goreleaser (Os, Arch) naming.
 const OS_MAP = { linux: "linux", darwin: "darwin", win32: "windows" };
@@ -44,7 +47,7 @@ function assetName(version) {
 }
 
 function releaseBaseUrl(version) {
-  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}`;
+  return `https://github.com/${GITHUB_REPO}/releases/download/${TAG_PREFIX}${version}`;
 }
 
 // Download a URL to a Buffer, following GitHub's redirect to the CDN.

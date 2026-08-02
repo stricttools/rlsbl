@@ -206,6 +206,7 @@ class TestFirstRunTemplateContent:
             "githubRepo": "acme/mytool",
             "assetProject": "mytool",
             "binaryName": "mycli",
+            "tagPrefix": "v",
         })
         assert "{{" not in content
         assert "acme/mytool" in content

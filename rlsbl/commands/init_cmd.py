@@ -113,6 +113,46 @@ def _is_releasable_member_project(project_root):
     return isinstance(project.releasable, str)
 
 
+def resolve_tag_prefix(project_root):
+    """Return the git tag prefix release tags of *project_root* carry.
+
+    ``"v"`` for a standalone repo (``v1.2.3``); ``"<name>@v"`` or ``"<path>/v"``
+    in a monorepo, derived from the SAME resolution the tag globs use
+    (:func:`rlsbl.tag_glob.resolve_monorepo_tag_glob`, minus the trailing
+    ``*``).
+
+    Launcher shims reconstruct GitHub release-asset URLs from the version, so
+    a shim that hardcodes ``v`` downloads from a tag that does not exist in any
+    prefixed-tag repo.
+    """
+    if project_root is None:
+        return "v"
+    from ..tag_glob import resolve_monorepo_tag_glob
+    from ..workspace import (
+        find_workspace_root,
+        is_explicit_mode,
+        load_releasables,
+        load_workspace,
+        resolve_project,
+        resolve_releasable_for_project,
+    )
+
+    ws_root = find_workspace_root(str(project_root))
+    if ws_root is None:
+        return "v"
+    project = resolve_project(ws_root, str(project_root))
+    if project is None:
+        return "v"
+    releasable = None
+    if is_explicit_mode(ws_root):
+        projects = load_workspace(ws_root)
+        releasable = resolve_releasable_for_project(
+            project, load_releasables(ws_root, projects=projects),
+        )
+    glob = resolve_monorepo_tag_glob(project, ws_root, releasable=releasable)
+    return glob[:-1] if glob.endswith("*") else glob
+
+
 def _get_releasable_config_dir(project_root):
     """Return the releasable config directory for a releasable member project.
 
@@ -1951,6 +1991,12 @@ def _resolve_launcher_shim_vars(pipeline, pipelines, ctx):
         "githubRepo": repo_name,
         "assetProject": asset_project,
         "binaryName": bin_command,
+        # The tag prefix release assets actually live under. "v" standalone,
+        # "<name>@v" (or "<path>/v") in a monorepo -- a shim that assumes "v"
+        # builds a 404 URL in every prefixed-tag repo.
+        "tagPrefix": resolve_tag_prefix(
+            getattr(ctx, "project_root", None) if ctx is not None else None
+        ),
     }
     missing = [k for k, v in resolved.items() if not v]
     if missing:
@@ -2110,7 +2156,7 @@ def _plan_launcher_shims(pipelines, ctx, *, dry_run=False):
         render_vars["distName"] = dist_name or ""
         plans.extend(plan_mappings(
             pipeline.template_dir(), shim_mappings, render_vars,
-            required_vars={"binaryName", "githubRepo", "assetProject"},
+            required_vars={"binaryName", "githubRepo", "assetProject", "tagPrefix"},
         ))
     return plans
 

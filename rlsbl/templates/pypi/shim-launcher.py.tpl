@@ -25,6 +25,9 @@ from pathlib import Path
 GITHUB_REPO = "{{githubRepo}}"
 ASSET_PROJECT = "{{assetProject}}"
 BINARY_NAME = "{{binaryName}}"
+# Release tags are prefixed in a monorepo ("<name>@v1.2.3"); a bare "v"
+# would reconstruct a URL for a tag that does not exist.
+TAG_PREFIX = "{{tagPrefix}}"
 DIST_NAME = "{{distName}}"
 
 
@@ -71,7 +74,7 @@ def asset_name(version):
 
 
 def release_base_url(version):
-    return f"https://github.com/{GITHUB_REPO}/releases/download/v{version}"
+    return f"https://github.com/{GITHUB_REPO}/releases/download/{TAG_PREFIX}{version}"
 
 
 def cache_dir():
