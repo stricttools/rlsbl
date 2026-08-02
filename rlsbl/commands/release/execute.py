@@ -3,6 +3,7 @@
 import dataclasses
 import json
 import os
+import re
 import sys
 import time
 
@@ -28,6 +29,68 @@ class RollbackClobberError(Exception):
     This prevents ``git reset --hard`` from silently discarding work
     created by concurrent sessions sharing the same worktree.
     """
+
+
+# The publish gate's only precise statement of which commit CI must be green
+# on. Matched on its own line so a reconcile replaces rather than duplicates.
+_CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
+
+
+def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
+    """Ensure an ALREADY-EXISTING GitHub Release carries the CI-SHA marker.
+
+    The marker used to be written only on the creation path, so a Release that
+    pre-existed the notes write -- a resumed release, or one created out of
+    band -- shipped without it and the publish gate fell back to
+    ``$GITHUB_SHA``, gating on whatever commit the workflow happened to see.
+    The marker is now written unconditionally: created with the Release, or
+    edited into the existing body here.
+
+    Idempotent: a body already carrying this exact marker is left untouched; a
+    body carrying a DIFFERENT marker has it replaced, never duplicated.
+    """
+    # Late-bound through the package namespace, like the rest of this module,
+    # so mock.patch("rlsbl.commands.release.run_gh") is honored at call time.
+    from . import run_gh
+
+    try:
+        body = run_gh(
+            ["release", "view", tag, "--json", "body", "-q", ".body"],
+            config=config,
+        )
+    except Exception as exc:
+        print(
+            f"Warning: could not read the '{tag}' release body to reconcile the "
+            f"CI-SHA marker ({exc}). The publish gate will fall back to "
+            f"$GITHUB_SHA.",
+            file=sys.stderr,
+        )
+        return False
+
+    if marker in body:
+        log(f"CI-SHA marker already present on {tag}")
+        return True
+
+    stripped = _CI_SHA_MARKER_RE.sub("", body).rstrip("\n")
+    new_body = f"{stripped}\n\n{marker}\n"
+    tmp = notes_file + ".reconcile"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(new_body)
+        run_gh(["release", "edit", tag, "--notes-file", tmp], config=config)
+    except Exception as exc:
+        print(
+            f"Warning: could not write the CI-SHA marker onto the existing "
+            f"'{tag}' release ({exc}). The publish gate will fall back to "
+            f"$GITHUB_SHA.",
+            file=sys.stderr,
+        )
+        return False
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    log(f"Reconciled CI-SHA marker onto existing release {tag}")
+    return True
 
 
 def _track_release_commit(state_path, sha=None, cwd=None):
@@ -1722,17 +1785,25 @@ def _run_release_mutating(state: ReleaseState):
         except Exception:
             pass  # Release doesn't exist yet -- proceed with creation
 
+    # The machine-parseable CI-SHA marker tells the publish gate exactly which
+    # commit CI runs on. pushed_sha is HEAD after the (post-reorg) tag/push,
+    # i.e. the pushed branch tip = tag tip. The notes file is written
+    # UNCONDITIONALLY -- the subtree mirror release reuses it, and a
+    # pre-existing Release gets the marker reconciled in below.
+    _ci_sha = pushed_sha.strip()
+    _ci_marker = f"<!-- rlsbl-ci-sha: {_ci_sha} -->"
+    notes_body = (changelog_entry or "").rstrip("\n")
+    notes_body = f"{notes_body}\n\n{_ci_marker}\n"
+    with open(writing_file, "w", encoding="utf-8") as f:
+        f.write(notes_body)
+    os.rename(writing_file, notes_file)
+
     try:
-        if not _gh_release_already_exists:
-            # Append a machine-parseable CI-SHA marker so the publish gate can
-            # read exactly which commit CI runs on. pushed_sha is HEAD after
-            # the (post-reorg) tag/push, i.e. the pushed branch tip = tag tip.
-            _ci_sha = pushed_sha.strip()
-            notes_body = (changelog_entry or "").rstrip("\n")
-            notes_body = f"{notes_body}\n\n<!-- rlsbl-ci-sha: {_ci_sha} -->\n"
-            with open(writing_file, "w", encoding="utf-8") as f:
-                f.write(notes_body)
-            os.rename(writing_file, notes_file)
+        if _gh_release_already_exists:
+            _reconcile_ci_sha_marker(
+                tag, _ci_marker, notes_file, config=ctx.config, log=log,
+            )
+        else:
             # Retry gh release create with race-condition detection.
             # GitHub API can return an error even when the release was actually created,
             # so after each failure we check whether the release exists before retrying.
