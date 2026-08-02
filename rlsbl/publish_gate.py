@@ -32,6 +32,15 @@ Conclusion semantics (explicit, no silent waits):
   never treats it as passing and never waits forever for it.
 - No matching check runs after a grace window -> hard error; a scaffolded
   repository always has CI, so the release commit must produce check runs.
+
+Under rlsbl's main-as-candidate release ordering this gate is a CONFIRMATION,
+not a wait: ``rlsbl release run`` already waited for CI to conclude green on
+the candidate commit before tagging it and creating the Release, so the checks
+polled here are normally already complete. A red conclusion therefore means
+the world changed after the release (CI re-run and regressed, a required check
+added later) or the tag was created outside rlsbl -- which is why the
+remediation is "cut a new release and deprecate this one", never "retry the
+publish".
 """
 
 from __future__ import annotations
@@ -191,7 +200,8 @@ while :; do
   if [ "$total" -eq 0 ]; then
     if [ "$(now)" -ge "$grace_deadline" ]; then
       echo "::error::Publish gate: no CI check runs matching $CI_CHECK_REGEX appeared on $sha within $GATE_GRACE_MINUTES minutes."
-      echo "A scaffolded repository always has a CI workflow, so the release commit must produce CI check runs."
+      echo "A scaffolded repository always has a CI workflow, and rlsbl verifies CI on this exact commit BEFORE tagging it, so check runs must exist here."
+      echo "Their absence means the check runs were deleted, the commit resolution is wrong, or this tag was created outside rlsbl."
       echo "If CI jobs were renamed, update CI_CHECK_REGEX in this workflow's gate job to match the new names."
       exit 1
     fi
@@ -219,13 +229,18 @@ while :; do
     while IFS= read -r conclusion; do
       case "$conclusion" in
         failure|timed_out)
-          echo "CI concluded '$conclusion' on the release commit. Fix the failure, re-run the CI workflow to green on this exact commit (gh run rerun <run-id>), then re-dispatch this publish workflow at the tag ref: gh workflow run <publish workflow> --ref $GITHUB_REF_NAME"
+          echo "CI concluded '$conclusion' on the release commit."
+          echo "rlsbl tags and releases a commit only AFTER its CI has gone green, so reaching this branch means one of: CI was re-run on an already-released commit and regressed, a required check was added after the release, or this tag/Release was created outside rlsbl."
+          echo "Do NOT re-dispatch this publish workflow expecting a different answer -- a failure baked into the code at this commit fails identically every time, and there is no way to make this tag green."
+          echo "Remedy: fix forward on the release branch and cut a NEW release with 'rlsbl release run' (its own CI gate must go green before it is tagged), then mark this one with 'rlsbl release deprecate <version>'."
           ;;
         cancelled)
-          echo "A CI check run was CANCELLED. A cancelled run proves nothing about the commit, so the gate treats it as a hard failure instead of waiting for a conclusion that will never come. Re-run the cancelled CI workflow (gh run rerun <run-id>), then re-dispatch this publish workflow at the tag ref."
+          echo "A CI check run was CANCELLED. A cancelled run proves nothing about the commit, so the gate treats it as a hard failure instead of waiting for a conclusion that will never come."
+          echo "Remedy: re-run the cancelled CI workflow on this exact commit (gh run rerun <run-id>). If it concludes success, re-dispatch this publish workflow at the tag ref: gh workflow run <publish workflow> --ref $GITHUB_REF_NAME"
           ;;
         skipped)
-          echo "A CI check run matching the filter was SKIPPED. The gate cannot treat a skipped check as passing: this project's own CI must actually run on the release commit. Check paths filters and job conditions, re-run CI on this commit, then re-dispatch this publish workflow at the tag ref."
+          echo "A CI check run matching the filter was SKIPPED. The gate cannot treat a skipped check as passing: this project must actually run its own CI on the release commit."
+          echo "Remedy: check paths filters and job conditions so CI runs for this project, re-run CI on this commit, then re-dispatch this publish workflow at the tag ref."
           ;;
         *)
           echo "CI check concluded '$conclusion' (not success). The gate only proceeds when every matching check concluded success."
