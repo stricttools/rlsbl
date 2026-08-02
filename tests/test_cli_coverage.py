@@ -146,7 +146,7 @@ class TestCmdReleaseRun:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_run(None, 
                 dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, watch_async=False,
+                allow_dirty=False, watch=False,
                 bump="", description="", preid="",
             )
         assert exc.value.code == 1
@@ -160,7 +160,7 @@ class TestCmdReleaseRun:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_run(None, 
                 dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, watch_async=False,
+                allow_dirty=False, watch=False,
                 bump="", description="", preid="",
             )
         assert exc.value.code == 1
@@ -175,7 +175,7 @@ class TestCmdReleaseRun:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_run(None, 
                 dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, watch_async=False,
+                allow_dirty=False, watch=False,
                 bump="", description="", preid="",
             )
         assert exc.value.code == 1
@@ -191,7 +191,7 @@ class TestCmdReleaseRun:
         mock_read.return_value = MagicMock()
         rlsbl.cmd_release_run(None, 
             dry_run=True, yes=True, quiet=False,
-            allow_dirty=True, watch=True, watch_async=False,
+            allow_dirty=True, watch=True,
             bump="", description="", preid="",
         )
         mock_run.assert_called_once()
@@ -232,7 +232,7 @@ class TestCmdReleaseRetry:
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_release_retry(None, 
                 dry_run=False, yes=True, quiet=False,
-                watch=False, watch_async=False,
+                watch=False,
             )
         assert exc.value.code == 1
 
@@ -243,7 +243,7 @@ class TestCmdReleaseRetry:
     def test_passes_none_config_when_no_file(self, mock_run, *_):
         rlsbl.cmd_release_retry(None, 
             dry_run=True, yes=False, quiet=False,
-            watch=True, watch_async=False,
+            watch=True,
         )
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] is None
@@ -551,20 +551,18 @@ class TestCmdDiscover:
 class TestCmdWatch:
     def test_sha_and_run_id_mutual_exclusion(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=["123"], as_daemon_child=False,
-                            stop=False, sha="abc")
+            rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=["123"], sha="abc")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.watch.run_cmd")
     def test_sha_only(self, mock_run):
-        rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="npm", run_id=[], as_daemon_child=False,
-                        stop=False, sha="abc123")
+        rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="npm", run_id=[], sha="abc123")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == ["abc123"]
 
     @patch("rlsbl.commands.watch.run_cmd")
     def test_no_args_uses_head(self, mock_run):
-        rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=[], as_daemon_child=False, stop=False)
+        rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=[])
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == []
 
@@ -862,7 +860,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_delegates(self, mock_release, _):
-        rlsbl.cmd_mono_release_run(None, dry_run=True, yes=True, quiet=False, allow_dirty=True, watch=False, watch_async=False)
+        rlsbl.cmd_mono_release_run(None, dry_run=True, yes=True, quiet=False, allow_dirty=True, watch=False)
         mock_release.assert_called_once()
         flags = mock_release.call_args[0][0]
         assert flags["allow-dirty"] is True
@@ -870,7 +868,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_watch_flag_passed(self, mock_release, _):
-        rlsbl.cmd_mono_release_run(None, dry_run=False, yes=True, quiet=False, allow_dirty=False, watch=True, watch_async=False)
+        rlsbl.cmd_mono_release_run(None, dry_run=False, yes=True, quiet=False, allow_dirty=False, watch=True)
         flags = mock_release.call_args[0][0]
         assert flags["watch"] is True
 

@@ -219,20 +219,6 @@ class TestReleaseFlagSurface:
         flags = m.call_args[0][1]
         assert flags["allow-dirty"] is False
         assert flags["watch"] is True
-        assert flags["watch-async"] is False
-
-    def test_release_run_watch_async_flag_surface(self, tmp_path, monkeypatch):
-        self._clean_project(tmp_path, monkeypatch)
-        with patch("rlsbl.commands.release.run_cmd") as m, \
-             patch("rlsbl.targets.detect_targets", return_value=[self._Target("pypi")]):
-            result = app.test(
-                ["release", "run", "--bump", "minor", "--description", "d",
-                 "--no-allow-dirty", "--watch-async"]
-            )
-        assert result.exit_code == 0, result.stderr
-        flags = m.call_args[0][1]
-        assert flags["watch"] is False
-        assert flags["watch-async"] is True
 
     def test_monorepo_release_run_flag_surface(self):
         result, m = _dispatch(
@@ -247,19 +233,17 @@ class TestReleaseFlagSurface:
             "quiet": False,
             "allow-dirty": False,
             "watch": True,
-            "watch-async": False,
         }
 
-    def test_monorepo_release_run_watch_async(self):
+    def test_monorepo_release_run_no_watch(self):
         result, m = _dispatch(
-            ["monorepo", "release", "run", "--allow-dirty", "--watch-async"],
+            ["monorepo", "release", "run", "--allow-dirty", "--no-watch"],
             "rlsbl.commands.monorepo._cmd_batch_release",
         )
         assert result.exit_code == 0, result.stderr
         flags = _flags(m)
         assert flags["allow-dirty"] is True
         assert flags["watch"] is False
-        assert flags["watch-async"] is True
 
 
 # ---------------------------------------------------------------------------

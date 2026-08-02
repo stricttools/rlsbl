@@ -31,7 +31,6 @@ class TestBuildReleaseFlags:
             "quiet": False,
             "allow-dirty": False,
             "watch": False,
-            "watch-async": False,
         }
 
     def test_with_watch_true(self):

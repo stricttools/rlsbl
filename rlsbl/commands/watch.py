@@ -1,11 +1,8 @@
 """Watch command that polls GitHub Actions CI workflow runs for a given commit SHA and reports pass, fail, or in-progress status."""
 
-import atexit
-import glob
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import threading
@@ -13,11 +10,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..utils import require_tool, run, run_gh
-
-# Set to True when running as the detached watcher child (--as-daemon-child):
-# desktop notifications become fire-and-forget (no action button, no blocking
-# wait for a click -- there is no interactive user attached to the process).
-_fire_and_forget_notify = False
 
 
 def _open_url(url):
@@ -57,17 +49,12 @@ def _notify(title, body, url=None):
             )
         elif require_tool("notify-send", fatal=False):
             cmd = ["notify-send", "-u", "normal"]
-            if url and not _fire_and_forget_notify:
+            if url:
                 cmd += ["--action", "open=Open"]
             cmd += [title, body]
-            if _fire_and_forget_notify:
-                # Detached mode: no action button, no blocking wait for a
-                # click -- just send and move on.
-                subprocess.run(cmd, timeout=10, capture_output=True, text=True)
-            else:
-                result = subprocess.run(cmd, timeout=120, capture_output=True, text=True)
-                if url and result.stdout.strip() == "open":
-                    _open_url(url)
+            result = subprocess.run(cmd, timeout=120, capture_output=True, text=True)
+            if url and result.stdout.strip() == "open":
+                _open_url(url)
     except Exception:
         pass
 
@@ -471,275 +458,6 @@ def poll_runs(commit_sha, max_attempts=30, interval=4):
     return []
 
 
-# ---------------------------------------------------------------------------
-# Detached watcher (--watch-async)
-# ---------------------------------------------------------------------------
-
-
-def _watch_state_dir():
-    """Directory holding detached-watcher pidfiles and logs.
-
-    Resolved from the git repo root so every invocation in the repo (package
-    dirs, workspace root) agrees on one location: the repo's .rlsbl/ if it
-    exists, else .rlsbl-monorepo/, else a freshly created .rlsbl/. Files in
-    it use the .local-only suffix, which is gitignored fleet-wide.
-    """
-    base = _repo_root()
-    for name in (".rlsbl", ".rlsbl-monorepo"):
-        candidate = os.path.join(base, name)
-        if os.path.isdir(candidate):
-            return candidate
-    fallback = os.path.join(base, ".rlsbl")
-    os.makedirs(fallback, exist_ok=True)
-    return fallback
-
-
-def _pidfile_path(commit_sha):
-    return os.path.join(_watch_state_dir(), f"watch-{commit_sha[:12]}.pid.local-only")
-
-
-def _logfile_path(commit_sha):
-    return os.path.join(_watch_state_dir(), f"watch-{commit_sha[:12]}.log.local-only")
-
-
-def _pid_alive(pid):
-    """Return True if a process with this PID exists."""
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except Exception:
-        return False
-
-
-def _pgid_alive(pgid):
-    """Return True if a process group with this ID still has members."""
-    try:
-        os.killpg(pgid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except Exception:
-        return False
-
-
-def _read_pidfile(path):
-    """Read a PID from a pidfile. Returns None on any error."""
-    try:
-        with open(path) as f:
-            return int(f.read().strip())
-    except Exception:
-        return None
-
-
-def _cleanup_own_pidfiles():
-    """Remove pidfiles that record this process's PID.
-
-    Registered via atexit in daemon-child mode so a watcher that exits
-    normally leaves no stale pidfile behind. Pidfiles belonging to other
-    watchers are never touched. Crash leftovers (kill -9) are cleaned
-    lazily by spawn_detached_watcher and `rlsbl watch --stop`.
-    """
-    own_pid = os.getpid()
-    try:
-        pattern = os.path.join(_watch_state_dir(), "watch-*.pid.local-only")
-        for path in glob.glob(pattern):
-            if _read_pidfile(path) == own_pid:
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
-    except Exception:
-        pass
-
-
-def spawn_detached_watcher(commit_sha, run_ids=None):
-    """Spawn `rlsbl watch` as a detached background process and return.
-
-    The child runs in its own session (survives the parent exiting), with
-    stdout/stderr appended to a per-SHA log file and notifications in
-    fire-and-forget mode. The spawner writes the pidfile from the child's
-    PID; the child removes it on normal exit (see _cleanup_own_pidfiles).
-
-    When run_ids is given, the child watches those workflow run IDs instead
-    of searching by SHA (the pidfile/log are still keyed by the commit SHA).
-
-    Refuses to spawn while a live watcher for the same SHA exists, but the
-    conflict is non-fatal: a loud warning is printed and a conflict result
-    is returned. The callers are release success epilogues that run AFTER
-    release state cleanup, so exiting non-zero here would misreport an
-    otherwise-successful release. A stale pidfile from a dead process is
-    cleaned up and spawning proceeds.
-
-    Returns a dict with conflict (bool), pid, pidfile, and logfile; on
-    conflict, pid is the already-running watcher's PID.
-    """
-    try:
-        full_sha = run("git", ["rev-parse", commit_sha])
-    except Exception:
-        full_sha = commit_sha
-    sha12 = full_sha[:12]
-
-    pidfile = _pidfile_path(full_sha)
-    existing_pid = _read_pidfile(pidfile)
-    if existing_pid is not None:
-        if _pid_alive(existing_pid):
-            logfile = _logfile_path(full_sha)
-            print(
-                f"rlsbl: WARNING: a detached watcher for {sha12} is already "
-                f"running (pid {existing_pid}) -- not spawning another.",
-                file=sys.stderr,
-            )
-            print(f"rlsbl:   log:  {logfile}", file=sys.stderr)
-            print(f"rlsbl:   stop: rlsbl watch --stop {sha12}", file=sys.stderr)
-            return {"conflict": True, "pid": existing_pid,
-                    "pidfile": pidfile, "logfile": logfile}
-        print(
-            f"rlsbl: removing stale pidfile for {sha12} "
-            f"(pid {existing_pid} is not running)",
-            file=sys.stderr,
-        )
-        try:
-            os.remove(pidfile)
-        except OSError:
-            pass
-
-    # sys.executable -m rlsbl guarantees the child uses the same interpreter
-    # and environment as the spawner (the rlsbl console script may not be on
-    # PATH in every invocation context).
-    cmd = [sys.executable, "-m", "rlsbl", "watch"]
-    if run_ids:
-        for rid in run_ids:
-            cmd += ["--run-id", str(rid)]
-    else:
-        cmd.append(full_sha)
-    cmd.append("--as-daemon-child")
-
-    logfile = _logfile_path(full_sha)
-    with open(logfile, "ab") as log_f:
-        proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.DEVNULL,
-            stdout=log_f,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-            cwd=os.getcwd(),
-        )
-
-    with open(pidfile, "w") as f:
-        f.write(f"{proc.pid}\n")
-
-    print(f"rlsbl: detached watcher started for {sha12} (pid {proc.pid})")
-    print(f"rlsbl:   log:  {logfile}")
-    print(f"rlsbl:   stop: rlsbl watch --stop {sha12}")
-    return {"conflict": False, "pid": proc.pid, "pidfile": pidfile,
-            "logfile": logfile}
-
-
-def _sha12_from_pidfile(path):
-    """Extract the 12-char SHA prefix from a watch-<sha12>.pid.local-only name."""
-    name = os.path.basename(path)
-    return name[len("watch-"):-len(".pid.local-only")]
-
-
-def _stop_one(pidfile, sha12):
-    """Stop the watcher recorded in pidfile: SIGTERM, wait up to 5s, SIGKILL.
-
-    The watcher was spawned with start_new_session, so it leads its own
-    process group (pgid == pid). Signals go to the whole group so in-flight
-    children (e.g. a blocking `gh run watch`) die with the watcher instead
-    of surviving and polling GitHub for up to an hour.
-
-    A dead PID (stale pidfile) is reported and cleaned. The pidfile is
-    always removed (SIGTERM'd children never reach their atexit cleanup).
-    """
-    pid = _read_pidfile(pidfile)
-    # pid <= 1 guards a corrupt pidfile: signaling group 0 would hit our
-    # own process group, group 1 init's. Treat it as stale.
-    if pid is None or pid <= 1 or not _pid_alive(pid):
-        try:
-            os.remove(pidfile)
-        except OSError:
-            pass
-        print(f"rlsbl: watcher for {sha12} was not running (stale pidfile removed)")
-        return
-
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        if not _pgid_alive(pid):
-            break
-        time.sleep(0.1)
-    if _pgid_alive(pid):
-        try:
-            os.killpg(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        print(f"rlsbl: watcher for {sha12} (pid {pid}) did not exit on SIGTERM; killed")
-    else:
-        print(f"rlsbl: stopped watcher for {sha12} (pid {pid})")
-    try:
-        os.remove(pidfile)
-    except OSError:
-        pass
-
-
-def stop_watcher(sha_arg):
-    """Stop a detached watcher. Always exits the process.
-
-    With sha_arg: stops the watcher for that commit (error if none exists).
-    Without: stale pidfiles are cleaned first; then stops the single live
-    watcher, or errors listing the candidates when several are live.
-    """
-    if sha_arg:
-        try:
-            full_sha = run("git", ["rev-parse", sha_arg])
-        except Exception:
-            full_sha = sha_arg
-        sha12 = full_sha[:12]
-        pidfile = _pidfile_path(full_sha)
-        if not os.path.exists(pidfile):
-            print(f"Error: no detached watcher found for {sha12}.", file=sys.stderr)
-            sys.exit(1)
-        _stop_one(pidfile, sha12)
-        sys.exit(0)
-
-    live = []
-    pattern = os.path.join(_watch_state_dir(), "watch-*.pid.local-only")
-    for path in sorted(glob.glob(pattern)):
-        sha12 = _sha12_from_pidfile(path)
-        pid = _read_pidfile(path)
-        if pid is None or not _pid_alive(pid):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
-            print(f"rlsbl: removed stale pidfile for {sha12}", file=sys.stderr)
-            continue
-        live.append((path, sha12, pid))
-
-    if not live:
-        print("Error: no live detached watchers found.", file=sys.stderr)
-        sys.exit(1)
-    if len(live) > 1:
-        print("Error: multiple live detached watchers; specify the SHA:", file=sys.stderr)
-        for _path, sha12, pid in live:
-            print(f"  rlsbl watch --stop {sha12}    (pid {pid})", file=sys.stderr)
-        sys.exit(1)
-
-    path, sha12, _pid = live[0]
-    _stop_one(path, sha12)
-    sys.exit(0)
-
-
 def run_cmd(registry, args, flags):
     """Watch all CI runs for a commit until they complete.
 
@@ -747,18 +465,6 @@ def run_cmd(registry, args, flags):
            rlsbl watch --run-id <id> [--run-id <id2>]
     Defaults to HEAD if no commit SHA is provided.
     """
-    if flags.get("stop"):
-        # Stop mode needs no gh/repo resolution; handle it first.
-        stop_watcher(args[0] if args else None)
-
-    if flags.get("as-daemon-child"):
-        # Running as the detached watcher child: notifications must not
-        # block waiting for a click, and the pidfile written by the spawner
-        # is removed when this process exits (sys.exit triggers atexit).
-        global _fire_and_forget_notify
-        _fire_and_forget_notify = True
-        atexit.register(_cleanup_own_pidfiles)
-
     run_ids = flags.get("run-id", [])
     if run_ids:
         try:

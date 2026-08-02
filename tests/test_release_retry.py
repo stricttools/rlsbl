@@ -1141,7 +1141,6 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
                             yes=True,
                             quiet=True,
                             watch=False,
-                            watch_async=False,
                         )
 
             self.assertEqual(ctx.exception.code, 1)
