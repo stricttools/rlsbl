@@ -19,7 +19,6 @@ Built in Python 3.11+ with ruamel-yaml, tomlkit, strictcli, and tree-sitter. Als
 | `watch` | Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline. |
 | `pre-push-check` | Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes. |
 | `prs` | List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work. |
-| `push` | Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation hints, and behind-remote detection. Use `rlsbl release run` for release branches. |
 | `unreleased` | List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release. |
 | `targets` | List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found. |
 | `deploy` | Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced. |

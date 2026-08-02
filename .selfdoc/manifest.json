@@ -83,11 +83,6 @@
       "type": "doc"
     },
     {
-      "path": "cli-push.md",
-      "title": "rlsbl push",
-      "type": "doc"
-    },
-    {
       "path": "cli-release.md",
       "title": "rlsbl release",
       "type": "doc"
@@ -405,11 +400,6 @@
     {
       "path": "rlsbl-commands-prs.md",
       "title": "rlsbl.commands.prs",
-      "type": "doc"
-    },
-    {
-      "path": "rlsbl-commands-push_cmd.md",
-      "title": "rlsbl.commands.push_cmd",
       "type": "doc"
     },
     {
@@ -985,5 +975,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-27T20:49:51.077815+00:00"
+  "last_gen": "2026-08-02T15:01:51.611362+00:00"
 }

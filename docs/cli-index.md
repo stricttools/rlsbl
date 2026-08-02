@@ -11,7 +11,7 @@ order: 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 14 top-level commands and 4 command groups (release, changelog, monorepo, dev).
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 18 release targets (npm, PyPI, Go, Cargo, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 51 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).
 
 Version: :-: var key="project.version"
 
@@ -26,7 +26,6 @@ Version: :-: var key="project.version"
 - [watch](cli-watch.html) -- Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.
 - [pre-push-check](cli-pre-push-check.html) -- Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.
 - [prs](cli-prs.html) -- List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work.
-- [push](cli-push.html) -- Push the current branch to origin with preflight checks: branch guard (refuses release branches), changelog coverage validation with actionable remediation hints, and behind-remote detection. Use `rlsbl release run` for release branches.
 - [unreleased](cli-unreleased.html) -- List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
 - [targets](cli-targets.html) -- List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, Cargo, etc.) are active based on manifest files found.
 - [deploy](cli-deploy.html) -- Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced.
