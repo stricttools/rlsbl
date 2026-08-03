@@ -28,6 +28,7 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | test | object | Per-target test-selection filters. See [test](#test) below. |
 | external_checks | array | Config-declared subprocess checks that run during `rlsbl check` and the release preflight. Each entry declares a `kind` (`structured` or `freeform`). See [external_checks](#external_checks) below. |
 | strictspec_gate | object | Opt-in [strictspec certificate deploy gate](#strictspec_gate). Consumes a `strictspec diff` certificate as a `format_version` gate. See below. |
+| test_sandbox | object | Opt-in [sandboxed test runner](#test_sandbox). Declaring it makes `rlsbl scaffold` emit an executable bubblewrap runner script and turns on the `stricttest-floor` check. See below. |
 
 Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > user config (`~/.rlsbl/config.json`) > default (true).
 
@@ -56,6 +57,37 @@ The certificate itself is un-gated by design (it carries `certificate_format_ver
   }
 }
 ```
+
+### test_sandbox
+
+The `test_sandbox` object opts a project into the **sandboxed test runner** rlsbl distributes: the outer layer of the [stricttest](https://github.com/smm-h/stricttest) test-isolation floor. Declaring the section makes `rlsbl scaffold` render the shared runner template to `runner_path` (executable), and turns on the `stricttest-floor` check. Projects without the section are untouched — the check skips.
+
+Inside the sandbox the real repo is bound read-only, the suite runs in a writable throwaway copy of the tree on a private tmpfs, `HOME` is throwaway, and there is no network at all — a stray push, an unanchored commit into the dev repo, or a live API call is physically impossible rather than merely discouraged. The runner exports `STRICTTEST_SANDBOX=1`, the variable the stricttest plugin reads to lift its bare-run refusal.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `runner_path` | string | Yes | Where the runner is emitted, relative to the project root (e.g. `scripts/test.sh`). |
+| `command` | string | Yes | The command run inside the sandbox. Extra CLI arguments are appended to it. Must not contain a single quote (it is embedded in a single-quoted shell literal). |
+| `default_args` | string | No | Arguments used when the runner is invoked with none (e.g. `-q -n auto`). |
+| `caches` | array | No | Toolchain caches to make available, from the closed set `uv`, `go`, `python_user_base`. An unlisted ecosystem costs nothing and requires none of its tools to be installed. Unknown names are a hard error, never a silently-ignored bind. |
+| `prewarm` | array | No | Shell commands run OUTSIDE the sandbox (network allowed) from the project root, before the sandbox is entered — for warming a cache the offline in-sandbox build then hits. A non-zero exit aborts the run. |
+| `extra_env` | array | No | Additional `NAME: value` pairs exported inside the sandbox. `STRICTTEST_SANDBOX` is always exported and cannot be redeclared here. |
+| `ci_workflows` | array | No | Workflow files that must invoke the runner. The `stricttest-floor` check hard-fails when a listed workflow does not — a repo that claims CI runs the suite sandboxed, but does not, is broken. |
+
+```json
+{
+  "test_sandbox": {
+    "runner_path": "scripts/test.sh",
+    "command": "uv sync --offline && uv run --offline pytest",
+    "default_args": "-q -n auto",
+    "caches": ["uv", "go", "python_user_base"],
+    "prewarm": ["scripts/test-prewarm.sh"],
+    "ci_workflows": [".github/workflows/ci-pypi.yml"]
+  }
+}
+```
+
+Run `<runner_path> --selftest` to prove the invariants (the real repo is read-only, the network is dead) without running the suite.
 
 ### batch_limits
 

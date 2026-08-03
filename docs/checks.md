@@ -38,7 +38,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 
 | Tag | Purpose | Check count |
 | --- | --- | --- |
-| `project` | Project-level metadata, config schema, version consistency | 15 |
+| `project` | Project-level metadata, config schema, version consistency | 20 |
 | `release` | Git tag and GitHub Release validation | 5 |
 | `changelog` | JSONL changelog validation and structure | 9 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 15 |
@@ -66,6 +66,11 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | `selfdoc-version-drift` | error | selfdoc-generated version references match the actual project version |
 | `scaffold-conflicts` | error | Unresolved git merge conflict markers in scaffold files (managed-files registry, `.github/workflows/`, all of `.rlsbl/`); also tagged `prepush` and `release` |
 | `cross-repo-path-sources` | error | `[tool.uv.sources]` path entries in the committed `pyproject.toml` must resolve inside the repository (in-repo paths and `workspace = true` are legal; local overrides belong in `dev-sources.toml.local-only`). Also enforced unconditionally by `rlsbl release run` |
+| `dev-overlay-drift` | error | Packages recorded in the `rlsbl dev sync` sentinel are still editable installs of their declared checkouts (a bare `uv sync` silently replaces an overlay with the released wheel) |
+| `requires-services` | error | CI service containers declared under `services`/`test_env` are actually provisioned in the rendered CI workflow |
+| `wrapper-producer` | error | Every launcher pipeline's `wraps` reference names a real binary-artifact pipeline, and the wrapped target's manifest still carries the shim-critical fields |
+| `strictspec-certificate-gate` | error | A configured strictspec diff certificate reports no violated (or unsupported-and-unadjudicated) claim. Skips when the project has no `strictspec_gate` section |
+| `stricttest-floor` | error | An adopted sandboxed test runner works: the `test_sandbox` runner script exists and is executable, the config family is complete, and every CI workflow the family names actually invokes the runner. Skips when the project has adopted neither the `test_sandbox` family nor the stricttest plugin |
 
 ## Release checks
 
