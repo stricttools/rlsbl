@@ -6,9 +6,11 @@ description: "Reference for the rlsbl release flow: bump types, the alpha/beta/r
 
 ## Overview
 
-`rlsbl release run` orchestrates the full release lifecycle: validates the project state, bumps the version, runs quality checks, commits, tags, pushes, creates a GitHub Release, finalizes the changelog, and optionally watches CI. The entire flow is driven by a release file (`.rlsbl/releases/unreleased.toml`) that declares the bump type, description, and optional context.
+`rlsbl release run` orchestrates the full release lifecycle: validates the project state, bumps the version, runs quality checks, commits, **pushes the version-bump commit to the release branch untagged and waits for the repository's own CI to conclude on it**, and only then finalizes the changelog, tags that CI-verified commit, pushes, creates a GitHub Release, and publishes. The entire flow is driven by a release file (`.rlsbl/releases/unreleased.toml`) that declares the bump type, description, and optional context.
 
-Validation failures abort with no partial state left behind. Once the mutating phase starts, every step records a success or failure marker in an in-progress state file: a fatal failure preserves the state so `rlsbl release resume` can continue from where the release stopped, and non-fatal failures are recorded and loudly named in the completion summary while the release completes (see "Resumable release state" below). Use `rlsbl release undo` to revert a release that succeeded locally but failed in CI.
+This is **main-as-candidate ordering**, and it is the load-bearing property of the whole flow: the tag, the GitHub Release, the finalized changelog and every registry push happen strictly *after* a green CI verdict on the exact commit being released. A red (or unresolved) verdict leaves nothing behind but the candidate commit on the branch — no tag, no GitHub Release, no finalized changelog, nothing on any registry. The version number is therefore never burnt by a failure: the fix lands forward on the release branch at the *same* version and `rlsbl release resume` completes it.
+
+Validation failures abort with no partial state left behind. Once the mutating phase starts, every step records a success or failure marker in an in-progress state file: a fatal failure preserves the state so `rlsbl release resume` can continue from where the release stopped, and non-fatal failures are recorded and loudly named in the completion summary while the release completes (see "Release state and resume" below). `rlsbl release undo` exists for a release that *completed* and turned out to be bad — not for a CI failure, which under this ordering never produces anything to undo.
 
 ## Prerequisites
 
@@ -161,7 +163,9 @@ The release file's `preid` key is the normal path, and `rlsbl release init` scaf
 
 ## Release pipeline order
 
-The release pipeline executes its steps in a fixed order, from initial validation through post-release hooks. Validation steps abort with no partial state left behind; once the mutating phase starts, progress is tracked in an in-progress state file so a failed release can be resumed with `rlsbl release resume`. Steps 9 and 10 are conditionally skipped when the pre-release hook is customized:
+The release pipeline executes its steps in a fixed order, from initial validation through post-release hooks. Validation steps abort with no partial state left behind; once the mutating phase starts, progress is tracked in an in-progress state file so a failed release can be resumed with `rlsbl release resume`. Steps 9 and 10 are conditionally skipped when the pre-release hook is customized.
+
+Steps 15 and 16 are the **candidate push and the CI gate**: everything above them is reversible, everything below them is not. The gate is the dividing line of the whole flow.
 
 | Step | Action | Abort on failure |
 | --- | --- | --- |
@@ -177,18 +181,40 @@ The release pipeline executes its steps in a fixed order, from initial validatio
 | 10 | Run built-in lint (library projects only) | Yes |
 | 11 | Run `pre-release.sh` hook | Yes |
 | 12 | Write new version to all detected target files + `.rlsbl/version` | Yes |
-| 13 | Commit (message = tag string, e.g. `v1.2.3`), tag, push | Yes |
-| 14 | Finalize JSONL: rename `unreleased.jsonl` to `x.y.z.jsonl` (chmod 444), create fresh `unreleased.jsonl`, regenerate CHANGELOG.md, generate `x.y.z.md`, commit | Yes |
-| 15 | Create GitHub Release with the version's changelog section as notes | Yes |
-| 16 | Upload assets if pipeline has `assets` or `custom_assets` configured | Yes (state preserved, resumable) |
-| 17 | Run pipeline `publish` for each configured pipeline (skipped for `private: true`) | Yes (state preserved, resumable) |
-| 18 | Deploy configured targets | No (failure recorded and named in the completion summary) |
-| 19 | Run `post-release.sh` hook | No (failure recorded and named in the completion summary) |
-| 20 | Regenerate monorepo snapshot | No (failure recorded and named in the completion summary) |
-| 21 | Print `Watch CI: rlsbl watch <sha>` | -- |
+| 13 | Commit (message = tag string, e.g. `v1.2.3`) — **not** tagged | Yes |
+| 14 | Regenerate the monorepo snapshot, so the snapshot commit is part of what CI verifies | Yes |
+| 15 | **Push the version-bump commit to the release branch UNTAGGED** — this is the release candidate | Yes |
+| 16 | **CI gate**: wait in-process for the repository's own push-triggered CI to conclude on that exact commit | Yes (nothing is tagged, finalized or published while it is not green) |
+| 17 | Finalize JSONL: rename `unreleased.jsonl` to `x.y.z.jsonl` (chmod 444), create fresh `unreleased.jsonl`, regenerate CHANGELOG.md, generate `x.y.z.md`, commit | Yes (state preserved, resumable) |
+| 18 | Archive the release file to `v{version}.toml` and regenerate `x.y.z.md` from the archived metadata | Yes (state preserved, resumable) |
+| 19 | Tag the **CI-verified commit** (plus Go companion tags in releasable mode) | Yes (state preserved, resumable) |
+| 20 | Push the finalization commits and the tags | Yes (state preserved, resumable) |
+| 21 | Create GitHub Release with the version's changelog section as notes | Yes (state preserved, resumable) |
+| 22 | Upload assets if pipeline has `assets` or `custom_assets` configured | Yes (state preserved, resumable) |
+| 23 | Run pipeline `publish` for each configured pipeline (skipped for `publish_mode: "none"`) | Yes (state preserved, resumable) |
+| 24 | Deploy configured targets | No (failure recorded and named in the completion summary) |
+| 25 | Run `post-release.sh` hook | No (failure recorded and named in the completion summary) |
+| 26 | Regenerate the monorepo snapshot post-hoc, if the pre-push slot at step 14 was forfeit | No (failure recorded and named in the completion summary) |
+| 27 | Print `Watch CI: rlsbl watch <sha>` | -- |
 
-Between steps 2 and 3, three pre-mutation guards run unconditionally -- they are direct validation calls, not preflight-tag checks, so a customized pre-release hook never skips them:
+The tag at step 19 is placed on the commit CI verified at step 16, **not** on HEAD: the finalization commits from steps 17-18 land on top of it and are pushed alongside it at step 20. This is what makes "the tag points at a CI-green tree" true rather than approximately true.
 
+### The CI gate
+
+The gate has four possible verdicts, and each is reported distinctly:
+
+| Verdict | What it means | What the release does |
+| --- | --- | --- |
+| Green | Every push-triggered run for the candidate concluded successfully | Proceeds to finalization |
+| Red | At least one run definitively failed | Hard error with fix-forward guidance; nothing tagged, finalized or published |
+| Timeout | The wait ran out with runs still unresolved | Hard error saying so honestly — the runs may still be in flight, so the remedy is to check them (`rlsbl watch <sha>`) and resume, not to go fix code that may be fine |
+| Not configured | The repository declares no push-triggered workflow at all | Proceeds **without** a gate, and says so loudly on stderr (the notice is unconditional — `--quiet` cannot suppress it) |
+
+Push-triggered CI that produces no runs at all within the discovery grace is a hard error, never a silent proceed. The whole wait is bounded by `--ci-timeout` (config key `ci_timeout`, default 3600s); run discovery is spent *inside* that budget and is capped at half of it, so a short budget always leaves the runs a real window to complete in.
+
+Between steps 2 and 3, four pre-mutation guards run unconditionally -- they are direct validation calls, not preflight-tag checks, so a customized pre-release hook never skips them:
+
+- **Range pin** -- HEAD is pinned before *any* mutation (including the pre-mutating selfdoc auto-commit), and every commit the release itself creates is recorded in a trail on the state file. The pin range is re-checked at four checkpoints: the mutating entry, the candidate push, immediately after the CI gate, and the final push. A commit in the range that the release did not create -- a concurrent session sharing the worktree, an editor auto-commit, a hook -- is a hard error naming every foreign SHA with its subject. Nothing is rolled back: the guard refuses to *ship* foreign work, never to destroy it. The batch orchestrator takes the same pin at the workspace level and checks it at the batch CI gate.
 - **Scaffold conflict guard** -- unresolved merge conflict markers in scaffold-managed files abort the release.
 - **Cross-repo path source guard** -- a committed `pyproject.toml` (including releasable member packages) declaring a `[tool.uv.sources]` path entry that resolves outside the repository aborts the release. See the `cross-repo-path-sources` check in [checks](checks.md).
 - **Version-skew guard** -- if `dev-sources.toml.local-only` declares local checkout overlays (see [dev workflow](dev-workflow.md)), each overlaid package's local version is compared against its latest PyPI release. Local ahead of the registry aborts with "release the dependency first: `<pkg>` local X > registry Y" -- the release was developed against unreleased dependency code. An unpublished overlay package or a registry/network failure is also a hard error, never a silent skip. No overlays file means nothing to check.
@@ -222,7 +248,10 @@ Timeout, grace window, and poll interval are job env values (`GATE_TIMEOUT_MINUT
 
 ### Retry contract
 
-To retry a publish after fixing CI, first re-run the CI workflow to green **on the same release commit** using `gh run rerun <run-id>` so that the checks API shows a passing run for that SHA. Then dispatch the publish workflow **at the tag ref** rather than a branch ref, so the gate and all version reads resolve to the tagged release commit:
+Under main-as-candidate ordering a tag only ever exists on a commit whose CI already went green, so the gate is a safety net rather than a routine obstacle. When it does block a dispatch, the remedy depends on *why*:
+
+- **CI is red on the tagged commit.** Do not re-run CI on that commit expecting a different answer — a failure baked into the code fails identically every time. Fix forward on the release branch and cut the next release; if the tagged version is already public and broken, `rlsbl release deprecate` or `rlsbl release yank` it.
+- **The publish run itself failed** (a registry hiccup, an expired token) while CI on the tagged commit is green. Dispatch the publish workflow **at the tag ref** rather than a branch ref, so the gate and all version reads resolve to the tagged release commit:
 
 ```bash
 gh workflow run publish.yml --ref <tag>
@@ -248,7 +277,7 @@ Three shell scripts in `.rlsbl/hooks/` provide extension points at different sta
 | --- | --- | --- | --- | --- |
 | `pre-checks.sh` | 5 | User-owned | No (created once, never touched again) | Non-zero aborts release |
 | `pre-release.sh` | 11 | Scaffold-managed | Yes | Non-zero aborts release |
-| `post-release.sh` | 19 | Scaffold-managed | Yes | Non-fatal (release continues) |
+| `post-release.sh` | 25 | Scaffold-managed | Yes | Non-fatal (release continues) |
 
 ### Hooks override
 
@@ -281,15 +310,19 @@ Watching is always in-process: there is no detached background watcher. To watch
 
 ## Related commands
 
-The `release` command group provides 6 subcommands covering the full release lifecycle — from scaffolding the release file through post-release corrections and rollbacks. Each subcommand is designed for a specific phase: `init` prepares, `run` executes, `retry` recovers from CI failures, `edit` corrects release notes, `undo` reverts a bad release, and `yank` deprecates old versions.
+The `release` command group covers the full release lifecycle — from scaffolding the release file through post-release corrections and rollbacks. Each subcommand is designed for a specific phase: `init` prepares, `run` executes, `resume` continues a release that stopped (most often at a red CI gate), `retry` re-dispatches publish workflows, `edit` corrects release notes, `undo` reverts a completed release, and `deprecate` / `yank` retire published ones.
 
 | Command | Purpose |
 | --- | --- |
 | `rlsbl release init` | Scaffold `.rlsbl/releases/unreleased.toml` with auto-detected targets |
-| `rlsbl release retry` | Re-dispatch CI workflows for a completed release (reads from `retry.toml`) |
+| `rlsbl release resume` | Continue a release that stopped, skipping completed steps. Re-pins at the current tip, so a fix-forward commit is adopted and the same version completes. |
+| `rlsbl release retry` | Re-dispatch publish workflows for a completed release (reads from `retry.toml`) |
 | `rlsbl release edit [version]` | Sync GitHub Release notes from CHANGELOG.md (defaults to current version) |
-| `rlsbl release undo` | Revert last release: delete GitHub Release, delete tag, revert commit. Requires manual `git push` after. |
-| `rlsbl release yank <version>` | Mark a past release as deprecated (`--hard` deletes entirely). Refuses to yank the latest release. |
+| `rlsbl release undo` | Revert a completed release: delete GitHub Release, delete tag, revert commit. Requires manual `git push` after. |
+| `rlsbl release deprecate <version>` | Flag a published release as deprecated on GitHub, with an optional reason and replacement |
+| `rlsbl release yank <version>` | Registry-aware removal of a published version (npm deprecate, cargo yank, Go retract, PyPI checklist) |
+| `rlsbl release scrub` | Scrub sensitive content from history and re-align tags, changelog hashes and GitHub Releases |
+| `rlsbl release reconcile` | Re-push tags a history rewrite moved and recreate their GitHub Releases, driven by safegit's rewrite journal |
 
 ## Dev node projects
 
@@ -378,8 +411,12 @@ rlsbl release run --no-allow-dirty --watch --yes
 #   Running tests ... OK
 #   Writing version 0.6.0 to pyproject.toml ... OK
 #   Committing v0.6.0 ... OK
-#   Pushing ... OK
+#   Pushed release candidate 9f2a1c4b8e07 to origin/main (untagged)
+#   Waiting for CI on the release candidate 9f2a1c4b8e07 ...
+#   CI is green on 9f2a1c4b8e07
 #   Finalizing JSONL ... OK
+#   Tagged: v0.6.0 -> 9f2a1c4b8e07 (CI-verified)
+#   Pushing ... OK
 #   Creating GitHub Release v0.6.0 ... OK
 #   Watching CI ...
 ```
@@ -392,26 +429,33 @@ Preview what a release would do without making any changes to the repository, re
 rlsbl release run --no-allow-dirty --no-watch --yes --dry-run
 #   [DRY RUN] Bump: patch (0.6.0 -> 0.6.1)
 #   [DRY RUN] Would write version 0.6.1 to pyproject.toml
-#   [DRY RUN] Would commit, tag v0.6.1, and push
+#   [DRY RUN] Would commit, push the candidate, gate on CI, tag v0.6.1, and push
 #   [DRY RUN] Would create GitHub Release v0.6.1
 ```
 
-### Recovering from a failed release
+### Recovering from a red CI gate
 
-When CI fails after the release has been pushed, use `rlsbl release undo` to cleanly revert all release artifacts: it deletes the GitHub Release, removes the git tag from both local and remote, and reverts the version bump commit. After undoing, fix the underlying issue, add a changelog entry for the fix, and re-run the release. The full recovery sequence looks like this:
+When CI goes red on the release candidate, there is nothing to undo. The candidate commit is on the release branch, but no tag exists (local or remote), no GitHub Release exists, the changelog is still `unreleased.jsonl`, and nothing reached any registry. The version number is not burnt — fix forward on the release branch and resume the *same* version:
 
 ```bash
-# Undo the release (deletes GitHub Release, tag, reverts commit)
-rlsbl release undo
+# 1. Fix the failure and commit it on the release branch
+git commit -m "Fix the flaky test"
 
-# Fix the issue, commit the fix, add changelog entry
+# 2. Record it, exactly as you would any other commit
 rlsbl changelog add --commits f1x2d3e --description "Fix flaky test" --type fix
 
-# Re-run the release
-rlsbl release init
-# Edit unreleased.toml, then:
-rlsbl release run --no-allow-dirty --watch --yes
+# 3. Resume: re-pushes the new tip as the candidate, re-runs the CI gate,
+#    and completes the SAME version once it is green.
+rlsbl release resume
 ```
+
+Do **not** start a new release at a higher version to escape a red CI, and do not re-run CI on the same commit expecting a different answer: a failure baked into the code fails identically every time. The same recipe applies to a batch (`rlsbl monorepo release run` — each member resumes at its own unchanged version) and to a timeout verdict, except that a timeout means the runs may still be in flight, so check them (`rlsbl watch <sha>`) before deciding there is anything to fix.
+
+> **Check `git log` before resuming.** `rlsbl release resume` deliberately re-pins at the *current* branch tip, because the whole point is to adopt the fix commit you just made. That means it adopts **every** commit landed since the failure, including another session's work sharing the worktree. Those commits ship under this version's changelog. Review the range before resuming, and move anything that does not belong onto a branch of its own.
+
+### Recovering from a release that completed and was wrong
+
+`rlsbl release undo` is for a release that ran to completion and then turned out to be bad — not for a CI failure. It deletes the GitHub Release, removes the git tag from both local and remote, and reverts the version bump commit; push manually afterwards. For a version that already reached a public registry, prefer `rlsbl release deprecate` (a soft flag on the GitHub Release) or `rlsbl release yank` (registry-aware removal) — an undo cannot unpublish what a registry has already served.
 
 ## Source reference
 
