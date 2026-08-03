@@ -214,6 +214,11 @@ class TestGateJob:
         assert job["permissions"] == {"checks": "read", "contents": "read"}
         assert job["env"]["CI_CHECK_REGEX"] == "^(test)$"
         assert job["env"]["GH_TOKEN"] == "${{ secrets.GITHUB_TOKEN }}"
+        # The gate has no checkout, so `gh release view` (which reads the
+        # rlsbl-ci-sha marker) needs repo context via GH_REPO -- otherwise
+        # the marker read silently fails and the gate falls back to the tag
+        # commit, whose path-filtered CI is skipped in a monorepo.
+        assert job["env"]["GH_REPO"] == "${{ github.repository }}"
         assert job["env"]["GATE_TIMEOUT_MINUTES"] == "20"
 
     def test_ci_check_regex_single_target(self):

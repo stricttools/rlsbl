@@ -268,6 +268,13 @@ def build_gate_job(check_regex: str | None = None, resolver_script: str | None =
     """
     env = {
         "GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}",
+        # The gate job has no checkout, so `gh release view` (which reads the
+        # rlsbl-ci-sha marker from the Release body) has no repo context and
+        # its read silently fails (2>/dev/null), forcing a fallback to
+        # $GITHUB_SHA -- the tag commit, whose path-filtered CI is skipped in a
+        # monorepo, so every batch publish is blocked. GH_REPO supplies the
+        # repo so the marker read resolves the true release commit.
+        "GH_REPO": "${{ github.repository }}",
         "GATE_TIMEOUT_MINUTES": GATE_TIMEOUT_MINUTES,
         "GATE_GRACE_MINUTES": GATE_GRACE_MINUTES,
         "GATE_POLL_SECONDS": GATE_POLL_SECONDS,
