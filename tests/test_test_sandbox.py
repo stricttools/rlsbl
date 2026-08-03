@@ -6,7 +6,10 @@ runner script -- and enforces that an adopted repo actually has a working one.
 """
 
 import json
+import os
 import stat
+import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -297,6 +300,105 @@ def test_rlsbl_own_runner_is_a_template_instance():
     )
     assert unreplaced == []
     assert (REPO_ROOT / "scripts" / "test.sh").read_text() == rendered
+
+
+# ---------------------------------------------------------------------------
+# Orphaned scratch sweep
+# ---------------------------------------------------------------------------
+
+
+RUNNER = REPO_ROOT / "scripts" / "test.sh"
+
+# Comfortably past the runner's 5-minute grace window.
+_AGED_SECONDS = 3600
+
+
+def _age(path):
+    """Backdate a path past the sweep's grace window."""
+    stale = time.time() - _AGED_SECONDS
+    os.utime(path, (stale, stale))
+
+
+def _scratch(parent, name, *, pid=None, aged=True):
+    """Create a scratch dir with an optional owner-PID sidecar."""
+    directory = parent / name
+    directory.mkdir(parents=True)
+    (directory / "payload.txt").write_text("throwaway\n")
+    if pid is not None:
+        (parent / f"{name}.pid").write_text(f"{pid}\n")
+    if aged:
+        _age(directory)
+    return directory
+
+
+def _reaped_pid():
+    """A PID that is guaranteed to have exited and been reaped."""
+    proc = subprocess.Popen(["true"])
+    proc.wait()
+    return proc.pid
+
+
+def _sweep(tmp_path):
+    """Run the real runner's ``--sweep-only`` mode over a private TMPDIR."""
+    tmpdir = tmp_path / "tmpdir"
+    tmpdir.mkdir(exist_ok=True)
+    uv_cache = tmp_path / "uvcache"
+    env = {
+        **os.environ,
+        "TMPDIR": str(tmpdir),
+        "UV_CACHE_DIR": str(uv_cache),
+    }
+    result = subprocess.run(
+        ["bash", str(RUNNER), "--sweep-only"],
+        env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, result.stderr
+    return result
+
+
+class TestOrphanedScratchSweep:
+    """A killed run never fires the EXIT trap, so it leaks a full copy of the
+    repo under TMPDIR. The next run sweeps its own leftovers -- and only those
+    whose owner process is provably gone."""
+
+    def test_sweeps_dead_and_unowned_leaves_live_alone(self, tmp_path):
+        tmpdir = tmp_path / "tmpdir"
+        tmpdir.mkdir()
+
+        live = _scratch(tmpdir, "test-sandbox-work.LIVEAA", pid=os.getpid())
+        dead = _scratch(tmpdir, "test-sandbox-work.DEADAA", pid=_reaped_pid())
+        nopid = _scratch(tmpdir, "test-sandbox-work.NOPIDA")
+        # A concurrent run that has just mktemp'd but not yet written its
+        # sidecar: no PID file, but inside the grace window.
+        fresh = _scratch(tmpdir, "test-sandbox-work.FRESHA", aged=False)
+        unrelated = tmpdir / "flutter_tools.KEEPME"
+        unrelated.mkdir()
+        _age(unrelated)
+
+        result = _sweep(tmp_path)
+
+        assert live.exists(), "a live owner's scratch must never be swept"
+        assert fresh.exists(), "a dir inside the grace window must survive"
+        assert unrelated.exists(), "only the runner's own prefixes are swept"
+        assert not dead.exists(), "a dead owner's scratch must be reclaimed"
+        assert not nopid.exists(), "an unowned stale scratch must be reclaimed"
+        assert not (tmpdir / "test-sandbox-work.DEADAA.pid").exists()
+        assert "swept 2 orphaned scratch dir(s)" in result.stderr
+
+    def test_sweeps_orphaned_uv_cache_clones(self, tmp_path):
+        """The uv cache clone leaks the same way, next to the real cache."""
+        uv_cache = tmp_path / "uvcache"
+        uv_cache.mkdir()
+        clone = _scratch(tmp_path, "uvcache.sandbox.DEADAA", pid=_reaped_pid())
+
+        _sweep(tmp_path)
+
+        assert not clone.exists()
+        assert uv_cache.exists(), "the real cache must never be swept"
+
+    def test_empty_tmpdir_is_a_no_op(self, tmp_path):
+        result = _sweep(tmp_path)
+        assert "orphaned scratch" not in result.stderr
 
 
 # ---------------------------------------------------------------------------
