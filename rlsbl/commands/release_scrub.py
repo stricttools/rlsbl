@@ -34,7 +34,6 @@ from .release_reconcile import (
     push_rewritten_tags,
     recreate_github_releases,
     snapshot_remote_refs as _snapshot_remote_refs_impl,
-    tag_name_from_refname as _tag_name_from_refname,
 )
 
 # Minimum safegit release the scrub flow is built against: the flow depends on

@@ -498,7 +498,6 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
     )
 
     dry_run = flags.get("dry-run", False)
-    yes = flags.get("yes", False)
     quiet = flags.get("quiet", False)
 
     def log(msg):
@@ -706,7 +705,6 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
     release_order = [name for name in full_order if name in batch_names]
 
     dry_run = flags.get("dry-run", False)
-    yes = flags.get("yes", False)
     quiet = flags.get("quiet", False)
 
     def log(msg):
