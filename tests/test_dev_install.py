@@ -692,3 +692,67 @@ def test_cli_workspace_root_gives_cd_guidance(tmp_path, monkeypatch):
     assert result.exit_code == 1
     assert "sub-project" in result.stderr
     assert "monorepo add" not in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Help accuracy
+# ---------------------------------------------------------------------------
+
+
+def _install_modes():
+    """Return (global, venv, uninstall) target-name sets from the live registry."""
+    from rlsbl.targets import TARGETS
+
+    supports_global, supports_venv, supports_uninstall = set(), set(), set()
+    for name, target_cls in TARGETS.items():
+        # A directory that exists but holds no manifest: every target returns
+        # the generic shape of its command rather than introspecting a project.
+        modes = target_cls.dev_install_command(os.path.dirname(__file__))
+        if modes.get("global"):
+            supports_global.add(name)
+            if modes["global"].get("uninstall_args_template"):
+                supports_uninstall.add(name)
+        if modes.get("venv"):
+            supports_venv.add(name)
+    return supports_global, supports_venv, supports_uninstall
+
+
+def test_dev_install_help_matches_the_real_supported_sets():
+    """`dev install`'s help must name exactly the targets that support each mode.
+
+    The help used to claim a flat "installs system-wide across N supported
+    targets" list, which was wrong twice over: three of those targets have no
+    system-wide install at all, and the --venv/--uninstall sets are smaller
+    still. Derive the sets from the target registry so the text cannot drift.
+    """
+    from rlsbl import app
+
+    help_text = app._groups["dev"].commands["install"].help
+    supports_global, supports_venv, supports_uninstall = _install_modes()
+
+    assert f"{len(supports_global)} targets" in help_text
+    global_part, venv_part = help_text.split("--venv installs", 1)
+    for name in supports_global:
+        assert name in global_part, f"{name} supports --global but is unlisted"
+
+    venv_sentence = venv_part.split("--uninstall", 1)[0]
+    for name in supports_venv:
+        assert name in venv_sentence, f"{name} supports --venv but is unlisted"
+    for name in supports_global - supports_venv:
+        assert name not in venv_sentence, f"{name} does not support --venv"
+
+    uninstall_sentence = venv_part.split("--uninstall", 1)[1]
+    for name in supports_uninstall:
+        assert name in uninstall_sentence
+    for name in supports_global - supports_uninstall:
+        assert name not in uninstall_sentence
+
+
+def test_pre_push_check_help_says_it_is_removed():
+    """The stub's help must not describe a check it no longer performs."""
+    from rlsbl import app
+
+    help_text = app._commands["pre-push-check"].help
+    assert help_text.startswith("Removed.")
+    assert "CHANGELOG.md" not in help_text
+    assert "check --tag prepush" in help_text

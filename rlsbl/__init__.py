@@ -965,7 +965,7 @@ def cmd_watch(ctx, target, run_id, dry_run, yes, quiet, sha=None):
 # pre-push-check
 # ---------------------------------------------------------------------------
 
-@app.command(name="pre-push-check", help="Verify that CHANGELOG.md contains an entry matching the current project version. Designed to run as a git pre-push hook to prevent pushing releases without documented changes.")
+@app.command(name="pre-push-check", help="Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.")
 def cmd_pre_push_check(ctx, dry_run, yes, quiet):
     """Removed command stub that directs users to re-scaffold."""
     print(
@@ -1647,7 +1647,7 @@ def cmd_mono_rename_releasable(ctx, dry_run, yes, quiet, old_name, new_name):
 dev = app.group("dev", help="Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).")
 
 
-@dev.command(name="install", help="Install the project locally for development using the detected target's editable install command. --global (default) installs system-wide across 7 supported targets (pypi, npm, go, zig, swift, deno, hex), while --venv installs into the project's local environment instead. In monorepo mode, pair with --all, --include, or --exclude. Use --uninstall to reverse a previous install.")
+@dev.command(name="install", help="Install the project locally for development by running each detected target's own install command. --global (default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go (go install), deno (deno install), and -- since they have no system-wide install concept -- zig (zig build install), swift (swift build), and hex (mix deps.get). --venv installs into the project's local environment instead and is supported by pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install where the target supports it (pypi, npm, deno). In monorepo mode, pair with --all, --include, or --exclude.")
 @strictcli.flag(name="all", type=bool, default=False, help="In monorepo mode, install every project in the workspace")
 @strictcli.flag(name="include", type=str, help="In monorepo mode, comma-separated project names to include", default="")
 @strictcli.flag(name="exclude", type=str, help="In monorepo mode, comma-separated project names to exclude", default="")
