@@ -237,7 +237,11 @@ register_checks(app)
 # release group
 # ---------------------------------------------------------------------------
 
-release_group = app.group("release", help="Release orchestration commands. Provides 9 subcommands covering the full release lifecycle: run, resume, init, retry, edit, undo, deprecate, yank, and scrub.")
+# The subcommand-count sentence is appended after all registrations (see
+# "Derived help counts" near the bottom of this module) so it is computed from
+# the live registry instead of a hand-maintained literal that drifts -- it said
+# "9 subcommands" and omitted `reconcile` long after reconcile shipped.
+release_group = app.group("release", help="Release orchestration commands covering the full release lifecycle.")
 
 
 @release_group.command(
@@ -1203,7 +1207,9 @@ def cmd_chlog_remap(ctx, map_file, from_journal, stdin, dry_run, yes, quiet):
 # monorepo group
 # ---------------------------------------------------------------------------
 
-mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 16 monorepo subcommands plus a release subgroup, and supports all 18 release targets in a single workspace.toml.")
+# Same derived-count treatment as the release group: the literal said "16
+# monorepo subcommands" while 18 were registered.
+mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml.")
 
 
 @mono.command(name="init", help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.")
@@ -1743,6 +1749,29 @@ app.help = (
     f"{len(app._commands)} top-level commands and {len(app._groups)} "
     f"command groups ({', '.join(app._groups)})."
 )
+
+
+def _append_subcommand_sentence(group, noun):
+    """Append a derived 'Provides N subcommands: ...' sentence to a group help.
+
+    Same rationale as the app-level sentence: the release group's literal said
+    "9 subcommands" and omitted `reconcile`, and the monorepo group's said 16
+    when 18 were registered. Both are now recounted from the live registry.
+    """
+    names = list(group.commands)
+    sentence = (
+        f" Provides {len(names)} {noun}: {', '.join(names)}."
+        if names else ""
+    )
+    subgroups = list(group._groups)
+    if subgroups:
+        label = "subgroup" if len(subgroups) == 1 else "subgroups"
+        sentence += f" Plus {len(subgroups)} {label}: {', '.join(subgroups)}."
+    group.help = f"{group.help}{sentence}"
+
+
+_append_subcommand_sentence(release_group, "subcommands")
+_append_subcommand_sentence(mono, "monorepo subcommands")
 
 
 # ---------------------------------------------------------------------------

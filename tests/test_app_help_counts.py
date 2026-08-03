@@ -29,3 +29,41 @@ def test_help_command_counts_match_registry():
     assert int(m.group(2)) == len(app._commands)
     assert int(m.group(3)) == len(app._groups)
     assert m.group(4) == ", ".join(app._groups)
+
+
+def _parse_subcommand_sentence(help_text):
+    m = re.search(r"Provides (\d+) [a-z ]*subcommands: ([^.]+)\.", help_text)
+    assert m, f"group help lacks the subcommand sentence: {help_text!r}"
+    return int(m.group(1)), [n.strip() for n in m.group(2).split(",")]
+
+
+def test_release_group_help_lists_every_subcommand():
+    """Regression: the literal said '9 subcommands' and omitted `reconcile`."""
+    group = app._groups["release"]
+    count, names = _parse_subcommand_sentence(group.help)
+    assert count == len(group.commands)
+    assert names == list(group.commands)
+    assert "reconcile" in names
+
+
+def test_monorepo_group_help_lists_every_subcommand_and_subgroup():
+    """Regression: the literal said '16 monorepo subcommands' with 18 live."""
+    group = app._groups["monorepo"]
+    count, names = _parse_subcommand_sentence(group.help)
+    assert count == len(group.commands)
+    assert names == list(group.commands)
+
+    subs = re.search(r"Plus (\d+) subgroups?: ([^.]+)\.", group.help)
+    assert subs, f"monorepo help lacks the subgroup sentence: {group.help!r}"
+    assert int(subs.group(1)) == len(group._groups)
+    assert [n.strip() for n in subs.group(2).split(",")] == list(group._groups)
+
+
+def test_no_group_help_carries_a_hand_written_subcommand_count():
+    """Any group help stating a count must state the derived one."""
+    for name, group in app._groups.items():
+        for m in re.finditer(r"(\d+) (?:[a-z]+ )?subcommands", group.help):
+            assert int(m.group(1)) == len(group.commands), (
+                f"{name} group help claims {m.group(1)} subcommands but "
+                f"{len(group.commands)} are registered"
+            )
