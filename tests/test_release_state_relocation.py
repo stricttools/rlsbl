@@ -434,7 +434,12 @@ class TestScrubStateRelocation:
         """Scrub reads scrub-result.json from the releasable releases dir
         for releasable member projects."""
         from rlsbl.commands.release.release_state import get_scrub_result_path
+        from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION
         from rlsbl.commands.release_scrub import run_cmd as scrub_run_cmd
+
+        # Pinned to the floor so a SAFEGIT_MIN_VERSION bump does not
+        # silently turn this into a version-rejection test.
+        safegit_ok = "safegit " + ".".join(str(p) for p in SAFEGIT_MIN_VERSION)
 
         core = _setup_releasable_workspace(tmp_project)
         rel_dir = get_releasable_dir(str(tmp_project), "alpha")
@@ -452,7 +457,7 @@ class TestScrubStateRelocation:
             with (
                 patch(f"{mod}.require_tool"),
                 patch(f"{mod}.run", MagicMock(
-                    side_effect=["safegit 0.22.0", "different_sha"],
+                    side_effect=[safegit_ok, "different_sha"],
                 )),
             ):
                 scrub_run_cmd(flags, ctx=_make_ctx(core, tmp_project))

@@ -491,14 +491,13 @@ class TestJournalRecoveryE2E:
         # Pre-scrub lease snapshot, exactly as run_cmd captures it.
         remote_refs = _snapshot_remote_refs(repo)
 
-        # Direct orchestrated scrub WITHOUT remap globs. The env var is
-        # required: the repo is rlsbl-managed, so safegit's guard is live.
-        env = {**os.environ, "RLSBL_SCRUB_ORCHESTRATED": "1"}
+        # Direct scrub WITHOUT remap globs. --yes is explicit: --json does
+        # not answer safegit's destructive confirmation.
         result = subprocess.run(
-            ["safegit", "scrub", "match", "--json",
+            ["safegit", "scrub", "match", "--json", "--yes",
              "--pattern", SECRET, "--replace", REPLACEMENT,
              "--entire-history", "--reason", "direct scrub"],
-            cwd=str(repo), env=env,
+            cwd=str(repo),
             capture_output=True, text=True, check=True,
         )
         data = json.loads(result.stdout)
@@ -571,14 +570,13 @@ class TestNoMatchJournalRepairE2E:
         _add_remote(repo, e2e_env / "remote")
         old_remote_head = _remote_ref(repo, "refs/heads/main")
 
-        # Direct orchestrated scrub WITHOUT remap globs: prunes c1, leaves
-        # the worktree JSONL dangling, persists the rewrite journal.
-        env = {**os.environ, "RLSBL_SCRUB_ORCHESTRATED": "1"}
+        # Direct scrub WITHOUT remap globs: prunes c1, leaves the worktree
+        # JSONL dangling, persists the rewrite journal.
         subprocess.run(
-            ["safegit", "scrub", "match", "--json",
+            ["safegit", "scrub", "match", "--json", "--yes",
              "--pattern", SECRET, "--replace", REPLACEMENT,
              "--entire-history", "--reason", "direct scrub"],
-            cwd=str(repo), env=env,
+            cwd=str(repo),
             capture_output=True, text=True, check=True,
         )
         assert _git(
@@ -615,41 +613,6 @@ class TestNoMatchJournalRepairE2E:
         assert _remote_ref(repo, "refs/heads/main") == old_remote_head
         # No leftover resume state either.
         assert not (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()
-
-
-# ===========================================================================
-# Unorchestrated-scrub guard: the handshake is real end-to-end
-# ===========================================================================
-
-
-class TestOrchestrationGuardE2E:
-    def test_direct_destructive_scrub_blocked_without_env(self, e2e_env):
-        """In an rlsbl-managed repo, a destructive safegit scrub WITHOUT
-        RLSBL_SCRUB_ORCHESTRATED=1 must die pointing at 'rlsbl release
-        scrub', proving the orchestration handshake is enforced for real
-        (the other e2e tests prove the env rlsbl sets satisfies it)."""
-        repo = e2e_env / "repo"
-        _init_repo(repo)
-        _commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
-        _commit_file(repo, ".rlsbl/config.json", "{}\n", "rlsbl config")
-        head = _git(repo, "rev-parse", "HEAD")
-
-        env = {
-            k: v for k, v in os.environ.items()
-            if k != "RLSBL_SCRUB_ORCHESTRATED"
-        }
-        result = subprocess.run(
-            ["safegit", "scrub", "match",
-             "--pattern", SECRET, "--replace", REPLACEMENT,
-             "--entire-history", "--reason", "unorchestrated"],
-            cwd=str(repo), env=env, capture_output=True, text=True,
-        )
-        assert result.returncode != 0
-        assert "rlsbl release scrub" in (result.stderr + result.stdout)
-
-        # Nothing was rewritten
-        assert _git(repo, "rev-parse", "HEAD") == head
-        assert SECRET in (repo / "config.env").read_text()
 
 
 # ===========================================================================

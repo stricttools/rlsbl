@@ -11,7 +11,7 @@ import pytest
 
 from rlsbl.changelog.files import RemapResult
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
-from rlsbl.commands.release_scrub import run_cmd
+from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION, run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.workspace import WorkspaceProject
 
@@ -19,6 +19,12 @@ from rlsbl.workspace import WorkspaceProject
 # Module path prefix for patching
 # ---------------------------------------------------------------------------
 MOD = "rlsbl.commands.release_scrub"
+
+# Mocked `safegit --version` output pinned to the floor the scrub flow requires.
+# Derived rather than hardcoded: a SAFEGIT_MIN_VERSION bump used to invalidate
+# ~50 string literals across the suite.
+SAFEGIT_FLOOR = ".".join(str(p) for p in SAFEGIT_MIN_VERSION)
+SAFEGIT_OK = f"safegit {SAFEGIT_FLOOR}"
 
 
 def _ctx(project_root, config=None, workspace_root=None):
@@ -109,7 +115,7 @@ class TestFileModeRealSafegitContract:
             "old_head": "def456",
         })
         mock_run.side_effect = [
-            "safegit 0.22.0",  # safegit --version
+            SAFEGIT_OK,  # safegit --version
             file_dry_run,      # safegit scrub file --json --dry-run ...
         ]
 
@@ -180,7 +186,7 @@ class TestRecipeMode:
             "binary_skipped": 0,
         })
         mock_run.side_effect = [
-            "safegit 0.22.0",  # safegit --version
+            SAFEGIT_OK,  # safegit --version
             dry_json,          # safegit scrub run --json --dry-run ...
         ]
 
@@ -248,12 +254,15 @@ class TestRecipeMode:
 
 
 class TestSafegitMinVersion:
-    """The scrub flow depends on safegit >= 0.22.0 (--remap-shas-in, the
+    """The scrub flow depends on safegit >= SAFEGIT_MIN_VERSION (--remap-shas-in, the
     persisted rewrite journal, cleanup_ok/pre_rewrite_remotes JSON)."""
 
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
     def test_rejects_old_safegit(self, mock_run, _req_tool, tmp_path, capsys):
+        # Deliberately a real, historical safegit version below every plausible
+        # floor -- this is the case that proves the floor rejects, so it stays
+        # hardcoded rather than derived from SAFEGIT_MIN_VERSION.
         mock_run.side_effect = ["safegit 0.21.1"]
         flags = {
             "pattern": "x", "replace": "y", "reason": "r",
@@ -262,7 +271,7 @@ class TestSafegitMinVersion:
         with pytest.raises(SystemExit) as exc_info:
             run_cmd(flags, ctx=_ctx(str(tmp_path)))
         assert exc_info.value.code == 1
-        assert "0.22.0" in capsys.readouterr().err
+        assert SAFEGIT_FLOOR in capsys.readouterr().err
 
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
@@ -272,35 +281,12 @@ class TestSafegitMinVersion:
             "version": 1, "dry_run": True, "pattern": "x",
             "total_matches": 0, "estimated_commits": 0,
         })
-        mock_run.side_effect = ["safegit 0.22.0+dirty", dry_json]
+        mock_run.side_effect = [SAFEGIT_OK + "+dirty", dry_json]
         flags = {
             "pattern": "x", "replace": "y", "reason": "r",
             "entire-history": True, "dry-run": True,
         }
         run_cmd(flags, ctx=_ctx(str(tmp_path)))  # must not raise
-
-
-class TestScrubOrchestrationHandshake:
-    """The safegit scrub subprocess must receive RLSBL_SCRUB_ORCHESTRATED=1."""
-
-    @patch(f"{MOD}.require_tool")
-    @patch(f"{MOD}.run")
-    def test_env_var_set_on_scrub_invocation(self, mock_run, _req_tool, tmp_path):
-        dry_json = json.dumps({
-            "version": 1, "dry_run": True, "pattern": "x",
-            "total_matches": 0, "estimated_commits": 0,
-        })
-        mock_run.side_effect = ["safegit 0.22.0", dry_json]
-        flags = {
-            "pattern": "x", "replace": "y", "reason": "r",
-            "entire-history": True, "dry-run": True,
-        }
-        run_cmd(flags, ctx=_ctx(str(tmp_path)))
-
-        scrub_call = mock_run.call_args_list[1]
-        env = scrub_call[1].get("env")
-        assert env is not None, "scrub invocation must pass an env"
-        assert env.get("RLSBL_SCRUB_ORCHESTRATED") == "1"
 
 
 class TestRemapGlobsPassedToSafegit:
@@ -322,7 +308,7 @@ class TestRemapGlobsPassedToSafegit:
             "version": 1, "dry_run": True, "pattern": "x",
             "total_matches": 0, "estimated_commits": 0,
         })
-        mock_run.side_effect = ["safegit 0.22.0", dry_json]
+        mock_run.side_effect = [SAFEGIT_OK, dry_json]
         flags = {
             "pattern": "x", "replace": "y", "reason": "r",
             "entire-history": True, "dry-run": True,
@@ -338,7 +324,7 @@ class TestRemapGlobsPassedToSafegit:
             "version": 1, "dry_run": True, "file": "secrets.env",
             "mode": "remove", "from": "abc", "commit_count": 1,
         })
-        mock_run.side_effect = ["safegit 0.22.0", dry_json]
+        mock_run.side_effect = [SAFEGIT_OK, dry_json]
         flags = {
             "file": "secrets.env", "from-commit": "abc",
             "reason": "r", "dry-run": True,
@@ -358,7 +344,7 @@ class TestRemapGlobsPassedToSafegit:
             "version": 1, "dry_run": True, "operation_count": 1,
             "estimated_commits": 0,
         })
-        mock_run.side_effect = ["safegit 0.22.0", dry_json]
+        mock_run.side_effect = [SAFEGIT_OK, dry_json]
         flags = {
             "recipe": str(recipe), "reason": "r",
             "entire-history": True, "dry-run": True,
@@ -375,7 +361,7 @@ class TestEmptyOutputMeansNoMatches:
     @patch(f"{MOD}.run")
     def test_empty_execute_output(self, mock_run, _req_tool, tmp_path, capsys):
         mock_run.side_effect = [
-            "safegit 0.22.0",  # safegit --version
+            SAFEGIT_OK,  # safegit --version
             "",                # git ls-remote origin (pre-scrub snapshot)
             "",                # safegit scrub match: no matches -> empty stdout
         ]
@@ -426,7 +412,7 @@ class TestDryRunShowsPreviewNoMutations:
             "estimated_commits": 2,
         })
         mock_run.side_effect = [
-            "safegit 0.22.0",  # safegit --version
+            SAFEGIT_OK,  # safegit --version
             safegit_result,    # safegit scrub match --json --dry-run ...
         ]
 
@@ -474,7 +460,7 @@ class TestDryRunShowsPreviewNoMutations:
             "old_head": "def456",
         })
         mock_run.side_effect = [
-            "safegit 0.22.0",
+            SAFEGIT_OK,
             safegit_result,
         ]
         flags = {
@@ -550,7 +536,7 @@ class TestFullScrubFlow:
         # Function-style side effect: robust to extra bookkeeping calls
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             return ""
@@ -719,7 +705,7 @@ class TestResumeFromScrubResult:
         # run() calls: git/safegit only (gh calls go through run_gh)
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "git" and args and args[:2] == ["rev-parse", "HEAD"]:
                 return saved_head
             return ""
@@ -854,7 +840,7 @@ class TestReleasableDirsRemapped:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 scrub_args.extend(args)
                 return safegit_result
@@ -927,7 +913,7 @@ class TestPushMechanics:
         def run_effect(cmd, args=None, **kw):
             calls.append((cmd, list(args or []), kw))
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
             if cmd == "safegit" and args and args[0] == "scrub":
@@ -1040,7 +1026,7 @@ class TestPushMechanics:
         def run_effect(cmd, args=None, **kw):
             calls.append((cmd, list(args or []), kw))
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
             if cmd == "safegit" and args and args[0] == "scrub":
@@ -1165,7 +1151,7 @@ class TestScrubArchiveCommitted:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             return ""
@@ -1240,7 +1226,7 @@ class TestPostRemapValidationGate:
             "new_head": "new_hash_1",
         })
         mock_run.side_effect = [
-            "safegit 0.22.0",  # safegit --version
+            SAFEGIT_OK,  # safegit --version
             "",                # git ls-remote origin (pre-scrub snapshot)
             safegit_result,    # safegit scrub
             # git rev-parse --git-dir (journal lookup; no journal there)
@@ -1294,7 +1280,7 @@ class TestPostRemapValidationGate:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             return ""
@@ -1367,7 +1353,7 @@ class TestJournalRecovery:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             if cmd == "git" and args == ["rev-parse", "--git-dir"]:
@@ -1591,7 +1577,7 @@ class TestJournalRecovery:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             if cmd == "git" and args == ["rev-parse", "--git-dir"]:
@@ -1711,7 +1697,7 @@ class TestCorruptJournalLine:
 
 
 class TestPreRewriteRemotesCrossCheck:
-    """safegit 0.22.0 reports pre_rewrite_remotes -- the LOCAL
+    """safegit reports pre_rewrite_remotes -- the LOCAL
     remote-tracking snapshot taken before updateRefs. It may be stale (no
     fetch since the last push), so rlsbl's ls-remote snapshot of the ACTUAL
     remote stays the --force-with-lease authority. When the two disagree,
@@ -1742,7 +1728,7 @@ class TestPreRewriteRemotesCrossCheck:
         def run_effect(cmd, args=None, **kw):
             calls.append((cmd, list(args or []), kw))
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
             if cmd == "safegit" and args and args[0] == "scrub":
@@ -1817,7 +1803,7 @@ class TestPreRewriteRemotesCrossCheck:
 
 
 class TestCleanupOkGate:
-    """safegit 0.22.0 reports cleanup_ok/cleanup_errors. rlsbl's hash
+    """safegit reports cleanup_ok/cleanup_errors. rlsbl's hash
     validation gate silently DEPENDS on old objects being pruned (dangling
     old hashes are only detectable because the objects are gone), so
     cleanup_ok=false is a hard error BEFORE the commit step -- with the
@@ -1859,7 +1845,7 @@ class TestCleanupOkGate:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             # git cat-file -e <old-sha> succeeds: the object still exists,
@@ -1913,7 +1899,7 @@ class TestCleanupOkGate:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             if cmd == "git" and args and args[:2] == ["cat-file", "-e"]:
@@ -1944,7 +1930,7 @@ class TestCleanupOkGate:
         _gh_installed, _gh_auth, _acquire_lock, _release_lock,
         tmp_path, capsys,
     ):
-        """Tag-annotation-only rewrite: safegit 0.22.0 emits an ALL-IDENTITY
+        """Tag-annotation-only rewrite: safegit emits an ALL-IDENTITY
         commit map (every commit maps to itself) and old_head == new_head.
         The head object legitimately exists forever, so with
         cleanup_ok=false the gate must not demand a prune of old_head that
@@ -1969,7 +1955,7 @@ class TestCleanupOkGate:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             # git cat-file -e succeeds for EVERY sha: head and the identity
@@ -2012,7 +1998,7 @@ class TestChangelogRegenerateUnchanged:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return safegit_result
             return ""
@@ -2124,7 +2110,7 @@ class TestNoMatchesExitsCleanly:
         })
 
         mock_run.side_effect = [
-            "safegit 0.22.0",  # safegit --version
+            SAFEGIT_OK,  # safegit --version
             "",                # git ls-remote origin (pre-scrub snapshot)
             safegit_result,    # safegit scrub match --json ...
         ]
@@ -2193,7 +2179,7 @@ class TestNoMatchValidatesHashes:
 
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
-                return "safegit 0.22.0"
+                return SAFEGIT_OK
             if cmd == "safegit" and args and args[0] == "scrub":
                 return no_match_result
             if cmd == "git" and args == ["rev-parse", "--git-dir"]:
@@ -2410,7 +2396,7 @@ class TestMonorepoTagCorrectProject:
         })
 
         mock_run.side_effect = [
-            "safegit 0.22.0",       # safegit --version
+            SAFEGIT_OK,       # safegit --version
             "",                      # git ls-remote origin (snapshot)
             safegit_result,          # safegit scrub
             "",                      # safegit commit (archive)
@@ -2521,7 +2507,7 @@ class TestStandaloneTagNoPrefix:
         })
 
         mock_run.side_effect = [
-            "safegit 0.22.0",       # safegit --version
+            SAFEGIT_OK,       # safegit --version
             "",                      # git ls-remote origin (snapshot)
             safegit_result,          # safegit scrub
             "",                      # safegit commit (archive)
