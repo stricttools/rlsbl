@@ -21,8 +21,8 @@ def _get_github_token():
     if token:
         return token
     try:
-        result = effects.run(
-            ["gh", "auth", "token"],
+        result = effects.gh(
+            ["auth", "token"],
             capture_output=True, text=True, check=True, timeout=10,
         )
         return result.stdout.strip() or None

@@ -79,60 +79,79 @@ class TestGetGithubRepo:
             assert get_github_repo(None) is None
 
 
+def _completed(stdout="ok\n"):
+    """A stand-in for the CompletedProcess effects.run returns."""
+    proc = MagicMock()
+    proc.stdout = stdout
+    return proc
+
+
 class TestRunGh:
+    """run_gh reaches the outside world only through effects.gh -> effects.run.
+
+    These patch ``rlsbl.effects.run`` -- the chokepoint's process primitive --
+    rather than any intermediate helper, so the real ``run_gh`` and the real
+    ``effects.gh`` env-injection both execute under test.
+    """
+
     def test_sets_gh_repo_when_resolvable(self):
-        """run_gh sets GH_REPO in subprocess env when repo is resolved."""
+        """run_gh sets GH_REPO in the child env when the repo is resolved."""
         with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
-             patch("rlsbl.utils.run") as mock_run:
-            mock_run.return_value = "ok"
+             patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
             result = run_gh(["release", "list"], config={"github_repo": "smm-h/rlsbl"})
             assert result == "ok"
             mock_run.assert_called_once()
-            call_args = mock_run.call_args
-            assert call_args[0] == ("gh", ["release", "list"])
-            env = call_args[1]["env"]
-            assert env["GH_REPO"] == "smm-h/rlsbl"
+            assert mock_run.call_args[0] == (["gh", "release", "list"],)
+            assert mock_run.call_args[1]["env"]["GH_REPO"] == "smm-h/rlsbl"
 
     def test_no_gh_repo_when_unresolvable(self):
-        """run_gh does not set GH_REPO when repo cannot be resolved."""
+        """run_gh does not set GH_REPO when the repo cannot be resolved."""
         with patch("rlsbl.utils.get_github_repo", return_value=None), \
-             patch("rlsbl.utils.run") as mock_run:
-            mock_run.return_value = "ok"
+             patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
             result = run_gh(["auth", "status"], config=None)
             assert result == "ok"
             mock_run.assert_called_once()
-            call_args = mock_run.call_args
-            assert call_args[0] == ("gh", ["auth", "status"])
-            # env should not be in kwargs (or at least GH_REPO not set)
-            env = call_args[1].get("env")
+            assert mock_run.call_args[0] == (["gh", "auth", "status"],)
+            env = mock_run.call_args[1].get("env")
             assert env is None or "GH_REPO" not in env
 
     def test_does_not_mutate_os_environ(self):
         """run_gh must not modify os.environ (thread-safety)."""
         original_environ = os.environ.copy()
         with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
-             patch("rlsbl.utils.run") as mock_run:
-            mock_run.return_value = "ok"
+             patch("rlsbl.effects.run", return_value=_completed()):
             run_gh(["release", "list"])
             assert "GH_REPO" not in os.environ
             assert os.environ == original_environ
 
-    def test_forwards_extra_kwargs(self):
-        """run_gh forwards timeout, cwd, and other kwargs to run."""
+    def test_forwards_timeout_and_cwd(self):
+        """run_gh forwards timeout and cwd through to the process primitive."""
         with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
-             patch("rlsbl.utils.run") as mock_run:
-            mock_run.return_value = "ok"
+             patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
             run_gh(["release", "list"], config=None, timeout=30, cwd="/tmp")
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["timeout"] == 30
             assert call_kwargs["cwd"] == "/tmp"
 
+    def test_default_timeout_matches_the_shared_run_helper(self):
+        """Absent an explicit timeout, run_gh keeps utils.run's 120s default."""
+        with patch("rlsbl.utils.get_github_repo", return_value=None), \
+             patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
+            run_gh(["auth", "status"])
+            assert mock_run.call_args[1]["timeout"] == 120
+
+    def test_rejects_unknown_keywords(self):
+        """The seam is closed: an unsupported keyword is a hard error."""
+        with patch("rlsbl.utils.get_github_repo", return_value=None), \
+             patch("rlsbl.effects.run", return_value=_completed()):
+            with pytest.raises(TypeError, match="check"):
+                run_gh(["auth", "status"], check=False)
+
     def test_caller_env_merged_with_gh_repo(self):
         """When caller passes env=, GH_REPO is added to that env, not os.environ."""
         caller_env = {"PATH": "/usr/bin", "CUSTOM": "value"}
         with patch("rlsbl.utils.get_github_repo", return_value="acme/proj"), \
-             patch("rlsbl.utils.run") as mock_run:
-            mock_run.return_value = "ok"
+             patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
             run_gh(["release", "list"], env=caller_env)
             call_env = mock_run.call_args[1]["env"]
             assert call_env["GH_REPO"] == "acme/proj"

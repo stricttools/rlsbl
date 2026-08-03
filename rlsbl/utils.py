@@ -958,13 +958,24 @@ def run_gh(args: list, config: dict | None = None, **kwargs) -> str:
     repository.  Does NOT mutate os.environ (critical for thread-safety
     in watch.py's ThreadPoolExecutor).
 
-    All extra kwargs are forwarded to run().
+    All extra kwargs are forwarded to run().  The call itself goes through
+    ``effects.gh``, the chokepoint's named entry point for the gh CLI, so every
+    GitHub-mutating verb in the codebase passes one identifiable seam.
     """
     repo = get_github_repo(config)
-    if repo is not None:
-        base = kwargs.pop("env", None) or os.environ
-        kwargs["env"] = {**base, "GH_REPO": repo}
-    return run("gh", args, **kwargs)
+    result = effects.gh(
+        args,
+        repo=repo,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=kwargs.pop("timeout", 120),
+        env=kwargs.pop("env", None),
+        cwd=kwargs.pop("cwd", None),
+    )
+    if kwargs:
+        raise TypeError(f"run_gh got unexpected keyword arguments: {sorted(kwargs)}")
+    return result.stdout.strip()
 
 
 def read_go_module_path(project_dir: str) -> str | None:

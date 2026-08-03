@@ -1,6 +1,5 @@
 """PRs command that lists open GitHub pull requests for the current repository to provide awareness of in-flight changes before releasing."""
 
-import os
 import sys
 
 from ..utils import check_gh_auth, check_gh_installed, get_github_repo, run_gh
@@ -28,11 +27,9 @@ def run_cmd(registry, args, flags):
         if count > 0:
             print(f"Open PRs: {count}")
             # Display the PR list directly to terminal (stdout not captured).
-            # Cannot use run_gh here because run() hardcodes capture_output=True
+            # Cannot use run_gh here because it hardcodes capture_output=True
             # and we need interactive terminal output.
-            repo = get_github_repo()
-            env = {**os.environ, "GH_REPO": repo} if repo else None
-            effects.run(["gh", "pr", "list", "--state", "open"], env=env)
+            effects.gh(["pr", "list", "--state", "open"], repo=get_github_repo())
 
     except Exception as e:
         print(f"Warning: could not list PRs: {e}", file=sys.stderr)
