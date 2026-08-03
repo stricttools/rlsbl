@@ -101,6 +101,8 @@ def gh(
     (critical for thread-safety in watch.py's ThreadPoolExecutor).
     """
     if repo is not None:
+        # ``is not None``, not truthiness: an explicitly empty *env* means an
+        # empty child environment and must not silently widen to os.environ.
         base = env if env is not None else os.environ
         env = {**base, "GH_REPO": repo}
     return run(
@@ -166,7 +168,9 @@ def write_bytes(path, data):
         f.write(data)
 
 
-def atomic_write_text(path, content, *, encoding="utf-8", preserve_mode=False):
+def atomic_write_text(
+    path, content, *, encoding="utf-8", preserve_mode=False, file_mode=None
+):
     """Write *content* to *path* atomically (temp file + :func:`os.replace`).
 
     A crash mid-write can never leave a truncated file: the content lands in a
@@ -175,16 +179,24 @@ def atomic_write_text(path, content, *, encoding="utf-8", preserve_mode=False):
     when *path* itself is read-only (0o444 changelog files), with no unlock
     step.
 
-    When *preserve_mode* is true and *path* already exists, the replacement
-    carries the target's ORIGINAL mode -- a deliberately locked file (a 0o444
-    released changelog, say) must not silently become writable.  Otherwise the
-    new file gets the umask-derived default, matching plain ``open(path, "w")``
-    exactly: ``tempfile.mkstemp`` creates 0o600 files, so the mode is always
-    set explicitly rather than inherited from the temp file.
+    Permission bits of the result, in precedence order:
+
+    * *file_mode*, when given, is applied verbatim.
+    * *preserve_mode* keeps an existing target's ORIGINAL bits -- a
+      deliberately locked file (a 0o444 released changelog, say) must not
+      silently become writable.
+    * otherwise the umask-derived default, matching plain ``open(path, "w")``.
+
+    The mode is always set explicitly because ``tempfile.mkstemp`` creates
+    0o600 files; inheriting that would silently narrow every rewritten file.
     """
+    if file_mode is not None and preserve_mode:
+        raise ValueError("pass either file_mode or preserve_mode, not both")
+
     directory = os.path.dirname(path) or "."
-    target_mode = None
-    if preserve_mode and os.path.exists(path):
+    if file_mode is not None:
+        target_mode = file_mode
+    elif preserve_mode and os.path.exists(path):
         target_mode = stat.S_IMODE(os.stat(path).st_mode)
     else:
         # Mirror open(path, "w") for a new file: 0o666 masked by the umask.
