@@ -112,6 +112,31 @@ The command:
 4. Appends to `unreleased.jsonl`
 5. Auto-commits the file (message: `changelog: <description>`) unless `--no-commit` is passed
 
+### The auto-commit moves HEAD
+
+Step 5 creates a commit, so `HEAD` after `changelog add` is the changelog
+commit, not the code commit you were working on. That composes badly with
+multi-step sessions where a code commit is still being shaped:
+
+```bash
+git commit -m "fix the parser"
+rlsbl changelog add --commits HEAD --description "..." --type fix
+git commit --amend                 # amends the CHANGELOG commit, not the fix
+```
+
+The amend lands on the wrong commit and has to be unwound by hand. Two ways to
+avoid it, both explicit:
+
+- **Finish the code commit first.** Treat `changelog add` as the last step for
+  a change, after any amends or rebases. This is the normal flow, and it is
+  also why entries reference hashes: once recorded, the commit should not move.
+- **Defer the commit** with `rlsbl changelog add --no-commit`, keep working,
+  and commit `unreleased.jsonl` yourself when the code commit is settled.
+
+If a code commit does move after its entry was recorded, the hash-resolution
+and orphan-detection checks catch the stale hash loudly (see Validation below);
+`rlsbl changelog edit` repoints the entry at the new hash.
+
 ## Validation
 
 `rlsbl check --tag changelog` runs 12 checks covering hash resolution, commit coverage, schema conformance, batch size limits, and the per-line `format_version` gate. All error-severity checks must pass before a release proceeds. Failed checks produce specific error messages identifying the exact entry or commit that caused the failure:
