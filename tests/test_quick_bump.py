@@ -28,6 +28,9 @@ _BASE_KWARGS = dict(
     allow_dirty=False,
     watch=False,
     push_timeout=0,
+    ci_timeout=0,
+    check_timeout=0,
+    hook_timeout=0,
     preid="",
 )
 

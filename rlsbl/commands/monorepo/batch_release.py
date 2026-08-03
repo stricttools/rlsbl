@@ -27,6 +27,7 @@ from ...lock import rlsbl_lock
 from ...utils import commit_files, run
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
 from ...workspace_graph import CycleError, WorkspaceGraph
+from ..watch import wait_for_ci_green
 from .batch_plan import (
     PLAN_FILENAME,
     BatchPlanError,
@@ -95,6 +96,102 @@ def _run_root_selfdoc(flags, workspace_root, log):
             expected_root=workspace_root,
         )
         log("Committed root-level selfdoc-generated files")
+
+
+def _batch_release_flags(flags, **extra):
+    """Per-item release flags for the batch loop."""
+    release_flags = {
+        "dry-run": flags.get("dry-run", False),
+        "yes": flags.get("yes", False),
+        "quiet": flags.get("quiet", False),
+        "allow-dirty": flags.get("allow-dirty", False),
+        "skip-lock": True,
+        "batch-mode": True,
+    }
+    for key in ("push-timeout", "ci-timeout", "check-timeout", "hook-timeout"):
+        if flags.get(key) is not None:
+            release_flags[key] = flags[key]
+    release_flags.update(extra)
+    return release_flags
+
+
+def _batch_ci_gate(workspace_root, flags, log):
+    """Run ONE CI gate for the whole batch and return the verified SHA.
+
+    Every member's candidate has been pushed by this point (the first pass runs
+    with ``ci-defer``), so the branch tip contains all of them and a single CI
+    verdict covers the batch. Each member is then tagged on exactly this
+    commit, so every tag in the batch points at a CI-verified tree.
+
+    Returns the verified SHA. Raises :class:`ReleaseValidationError` when CI is
+    red or unreachable -- the candidates stay on the branch untagged, nothing
+    is finalized, and no version number is burnt.
+    """
+    from ...utils import get_ci_timeout
+    from ..watch import CI_GREEN, CI_NOT_CONFIGURED, CIWaitError
+
+    sha = run("git", ["rev-parse", "HEAD"], cwd=workspace_root).strip()
+    # Config is per-project in a workspace; the batch gate is a workspace-level
+    # wait, so only the CLI override applies here (no single config owns it).
+    timeout = get_ci_timeout(None, override=flags.get("ci-timeout"))
+    try:
+        verdict, results = wait_for_ci_green(
+            sha, timeout=timeout, log=log, repo_root=workspace_root,
+            label=f"batch candidate {sha[:12]}",
+        )
+    except CIWaitError as exc:
+        raise ReleaseValidationError(str(exc)) from exc
+
+    if verdict == CI_NOT_CONFIGURED:
+        log(
+            "No push-triggered CI workflow is configured in .github/workflows; "
+            "proceeding without a CI gate."
+        )
+        return sha
+    if verdict != CI_GREEN:
+        red = ", ".join(r["name"] for r in results if not r["passed"]) or "unknown"
+        raise ReleaseValidationError(
+            f"CI did not pass on the batch release candidate {sha}.\n"
+            f"  Failing workflow(s): {red}\n"
+            f"\n"
+            f"Nothing in this batch was tagged, released or finalized -- no "
+            f"version number was burnt. Every member's version-bump commit is "
+            f"on the release branch, which is the design: the branch carries "
+            f"the candidate until CI proves it green.\n"
+            f"Fix forward on the release branch, then re-run "
+            f"`rlsbl monorepo release run`: each member resumes at its own "
+            f"unchanged version."
+        )
+    log(f"CI is green on the batch candidate {sha[:12]}")
+    return sha
+
+
+def _resume_batch_item(name, project_dir, workspace_root, state_path, flags,
+                       verified_sha, log):
+    """Second batch pass: finish one member on the verified candidate."""
+    from pathlib import Path
+
+    from ...context import create_context
+    from ..release import resume_cmd
+
+    saved = read_state_for_resume(state_path)
+    if saved is None:
+        raise ReleaseValidationError(
+            f"release state for {name!r} vanished between the candidate push "
+            f"and the CI gate ({state_path}). Investigate before retrying."
+        )
+    pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
+    resume_cmd(
+        saved,
+        _batch_release_flags(flags, **{"ci-verified-sha": verified_sha}),
+        ctx=pkg_ctx,
+    )
+
+
+def read_state_for_resume(state_path):
+    from ..release.release_state import load_release_state
+
+    return load_release_state(state_path)
 
 
 def _releasable_release_order(batch_names, releasables, projects, graph):
@@ -350,6 +447,9 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
     released = []
     last_sha = None
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
+        # Pass 1: push every member's candidate untagged (the CI gate is
+        # deferred so ONE wait covers the whole batch).
+        pending = []
         for rel_name in release_order:
             release_config = batch_config.packages[rel_name]
             member_projs = members_of(rel_name, projects)
@@ -381,19 +481,30 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                 from ...context import create_context
                 from ..release import run_cmd
 
-                release_flags = {
-                    "dry-run": dry_run,
-                    "yes": yes,
-                    "quiet": quiet,
-                    "allow-dirty": flags.get("allow-dirty", False),
-                    "skip-lock": True,
-                    "batch-mode": True,
-                }
+                release_flags = _batch_release_flags(
+                    flags, **({} if dry_run else {"ci-defer": True}),
+                )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
-                released.append(rel_name)
-                if not dry_run:
-                    last_sha = run("git", ["rev-parse", "HEAD"])
+                if dry_run:
+                    released.append(rel_name)
+                else:
+                    from ...workspace_types import get_releasable_dir as _grd
+                    from ..release.release_state import get_state_path as _gsp
+                    _sp = _gsp(
+                        workspace_root,
+                        releasable_dir=_grd(workspace_root, rel_name),
+                    )
+                    if os.path.exists(_sp):
+                        pending.append((rel_name, project_dir, _sp))
+                    else:
+                        # No in-progress state means nothing is in progress:
+                        # the member's release ran to completion inside its own
+                        # call (every step already satisfied), so there is
+                        # nothing for the batch gate to finish. The archive
+                        # gate below is the correctness backstop.
+                        released.append(rel_name)
+                        last_sha = run("git", ["rev-parse", "HEAD"])
             except SystemExit as e:
                 if e.code != 0:
                     print(
@@ -404,6 +515,36 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                     raise
 
             log("")
+
+        # One CI gate for the whole batch, then pass 2: finalize, tag and
+        # release each member on the verified candidate.
+        if pending:
+            try:
+                verified_sha = _batch_ci_gate(workspace_root, flags, log)
+            except ReleaseValidationError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+            for rel_name, project_dir, state_path in pending:
+                log(f"--- Completing releasable {rel_name} ---")
+                try:
+                    _resume_batch_item(
+                        rel_name, project_dir, workspace_root, state_path,
+                        flags, verified_sha, log,
+                    )
+                except ReleaseValidationError as e:
+                    print(f"Error: {e}", file=sys.stderr)
+                    sys.exit(1)
+                except SystemExit as e:
+                    if e.code != 0:
+                        print(
+                            f"\nError: release of releasable {rel_name} failed. "
+                            f"Successfully released: {', '.join(released) if released else '(none)'}",
+                            file=sys.stderr,
+                        )
+                        raise
+                released.append(rel_name)
+                log("")
+            last_sha = verified_sha
 
         # Archive is state-driven: only fires when every plan item is released.
         if not dry_run:
@@ -493,6 +634,9 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
     released = []
     last_sha = None
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
+        # Pass 1: push every package's candidate untagged (the CI gate is
+        # deferred so ONE wait covers the whole batch).
+        pending = []
         for pkg_name in release_order:
             release_config = batch_config.packages[pkg_name]
             project = project_by_name[pkg_name]
@@ -518,19 +662,24 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                 from ...context import create_context
                 from ..release import run_cmd
 
-                release_flags = {
-                    "dry-run": dry_run,
-                    "yes": yes,
-                    "quiet": quiet,
-                    "allow-dirty": flags.get("allow-dirty", False),
-                    "skip-lock": True,
-                    "batch-mode": True,
-                }
+                release_flags = _batch_release_flags(
+                    flags, **({} if dry_run else {"ci-defer": True}),
+                )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
-                released.append(pkg_name)
-                if not dry_run:
-                    last_sha = run("git", ["rev-parse", "HEAD"])
+                if dry_run:
+                    released.append(pkg_name)
+                else:
+                    from ..release.release_state import get_state_path as _gsp
+                    _sp = _gsp(project_dir)
+                    if os.path.exists(_sp):
+                        pending.append((pkg_name, project_dir, _sp))
+                    else:
+                        # No in-progress state means nothing is in progress:
+                        # the package's release ran to completion inside its
+                        # own call. The archive gate below is the backstop.
+                        released.append(pkg_name)
+                        last_sha = run("git", ["rev-parse", "HEAD"])
             except SystemExit as e:
                 if e.code != 0:
                     print(
@@ -541,6 +690,36 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                     raise
 
             log("")
+
+        # One CI gate for the whole batch, then pass 2: finalize, tag and
+        # release each package on the verified candidate.
+        if pending:
+            try:
+                verified_sha = _batch_ci_gate(workspace_root, flags, log)
+            except ReleaseValidationError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+            for pkg_name, project_dir, state_path in pending:
+                log(f"--- Completing {pkg_name} ---")
+                try:
+                    _resume_batch_item(
+                        pkg_name, project_dir, workspace_root, state_path,
+                        flags, verified_sha, log,
+                    )
+                except ReleaseValidationError as e:
+                    print(f"Error: {e}", file=sys.stderr)
+                    sys.exit(1)
+                except SystemExit as e:
+                    if e.code != 0:
+                        print(
+                            f"\nError: release of {pkg_name} failed. "
+                            f"Successfully released: {', '.join(released) if released else '(none)'}",
+                            file=sys.stderr,
+                        )
+                        raise
+                released.append(pkg_name)
+                log("")
+            last_sha = verified_sha
 
         # Archive is state-driven: only fires when every plan item is released.
         if not dry_run:

@@ -32,6 +32,9 @@ class TestBuildReleaseFlags:
             "allow-dirty": False,
             "watch": False,
             "push-timeout": None,
+            "ci-timeout": None,
+            "check-timeout": None,
+            "hook-timeout": None,
         }
 
     def test_with_watch_true(self):
@@ -105,45 +108,44 @@ class TestBatchModeSuppressesWatch:
 
 
 class TestPerPackageFlags:
-    """Verify that per-package release_flags in both batch functions
-    include batch-mode and exclude watch."""
+    """The per-item release flags both batch loops pass to the release flow.
 
-    def _extract_release_flags_from_source(self, func_name):
-        """Read the source of batch_release.py and verify the flags dict
-        inside the given function includes batch-mode and excludes watch."""
-        import ast
-        import inspect
-        from rlsbl.commands.monorepo import batch_release
+    Both loops build them through one helper, so this asserts the helper's
+    output directly instead of scraping the loops' source.
+    """
 
-        source = inspect.getsource(batch_release)
-        tree = ast.parse(source)
+    def _flags(self, **overrides):
+        from rlsbl.commands.monorepo.batch_release import _batch_release_flags
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == func_name:
-                # Find the release_flags dict assignment
-                for child in ast.walk(node):
-                    if isinstance(child, ast.Assign):
-                        for target in child.targets:
-                            if isinstance(target, ast.Name) and target.id == "release_flags":
-                                if isinstance(child.value, ast.Dict):
-                                    keys = []
-                                    for k in child.value.keys:
-                                        if isinstance(k, ast.Constant):
-                                            keys.append(k.value)
-                                    assert "batch-mode" in keys, (
-                                        f"{func_name}: release_flags missing 'batch-mode'"
-                                    )
-                                    assert "watch" not in keys, (
-                                        f"{func_name}: release_flags should not contain 'watch'"
-                                    )
-                                    return
-        raise AssertionError(f"Could not find release_flags dict in {func_name}")
+        base = {"dry-run": False, "yes": True, "quiet": False,
+                "allow-dirty": False, "watch": True}
+        base.update(overrides)
+        return _batch_release_flags(base)
 
-    def test_releasables_flags_have_batch_mode(self):
-        self._extract_release_flags_from_source("_batch_release_releasables")
+    def test_batch_mode_is_set(self):
+        assert self._flags()["batch-mode"] is True
 
-    def test_packages_flags_have_batch_mode(self):
-        self._extract_release_flags_from_source("_batch_release_packages")
+    def test_watch_is_never_forwarded(self):
+        """The orchestrator watches once, after the whole batch."""
+        assert "watch" not in self._flags()
+
+    def test_lock_is_held_by_the_orchestrator(self):
+        assert self._flags()["skip-lock"] is True
+
+    def test_timeout_overrides_are_forwarded(self):
+        flags = self._flags(**{"ci-timeout": 60, "check-timeout": 30})
+        assert flags["ci-timeout"] == 60
+        assert flags["check-timeout"] == 30
+
+    def test_unset_timeouts_are_not_forwarded(self):
+        flags = self._flags(**{"ci-timeout": None})
+        assert "ci-timeout" not in flags
+
+    def test_extra_keys_are_merged(self):
+        from rlsbl.commands.monorepo.batch_release import _batch_release_flags
+
+        flags = _batch_release_flags({"dry-run": False}, **{"ci-defer": True})
+        assert flags["ci-defer"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -154,28 +156,22 @@ class TestPerPackageFlags:
 class TestBatchSHACapture:
     """Verify that batch release captures SHA and calls watch after the loop."""
 
-    @patch("rlsbl.commands.monorepo.batch_release.run")
-    @patch("rlsbl.commands.monorepo.batch_release.commit_files")
-    def test_releasables_captures_sha(self, mock_commit, mock_run, tmp_path):
-        """_batch_release_releasables records last_sha from git rev-parse HEAD
-        after each successful release."""
+    @pytest.mark.parametrize("func_name", [
+        "_batch_release_releasables", "_batch_release_packages",
+    ])
+    def test_batch_watches_the_verified_candidate(self, func_name):
+        """Both loops watch a concrete SHA after the batch completes.
+
+        The SHA is now the batch's CI-verified candidate (the commit every
+        member tag points at) rather than whatever HEAD happened to be after
+        the last member.
+        """
         import inspect
         from rlsbl.commands.monorepo import batch_release
 
-        source = inspect.getsource(batch_release._batch_release_releasables)
-        # After run_cmd(), the code should call run("git", ["rev-parse", "HEAD"])
-        assert 'run("git", ["rev-parse", "HEAD"])' in source
-
-    @patch("rlsbl.commands.monorepo.batch_release.run")
-    @patch("rlsbl.commands.monorepo.batch_release.commit_files")
-    def test_packages_captures_sha(self, mock_commit, mock_run, tmp_path):
-        """_batch_release_packages records last_sha from git rev-parse HEAD
-        after each successful release."""
-        import inspect
-        from rlsbl.commands.monorepo import batch_release
-
-        source = inspect.getsource(batch_release._batch_release_packages)
-        assert 'run("git", ["rev-parse", "HEAD"])' in source
+        source = inspect.getsource(getattr(batch_release, func_name))
+        assert "last_sha = verified_sha" in source
+        assert "_batch_ci_gate(workspace_root, flags, log)" in source
 
     def test_releasables_watch_block_present(self):
         """_batch_release_releasables has a watch block after finalization."""
@@ -197,20 +193,18 @@ class TestBatchSHACapture:
         assert "watch_run_cmd" in source
         assert "Watch CI: rlsbl watch" in source
 
-    def test_sha_capture_only_when_not_dry_run(self):
-        """SHA capture is guarded by 'not dry_run'."""
+    @pytest.mark.parametrize("func_name", [
+        "_batch_release_releasables", "_batch_release_packages",
+    ])
+    def test_dry_run_never_reaches_the_ci_gate(self, func_name):
+        """A dry run pushes no candidate, so there is nothing to gate on.
+
+        Both loops only collect pending items when ``not dry_run``, and the
+        gate + watch only fire when something is pending.
+        """
         import inspect
         from rlsbl.commands.monorepo import batch_release
 
-        for func in [batch_release._batch_release_releasables, batch_release._batch_release_packages]:
-            source = inspect.getsource(func)
-            # Find the line with rev-parse HEAD
-            lines = source.split("\n")
-            for i, line in enumerate(lines):
-                if 'rev-parse' in line and 'HEAD' in line:
-                    # Check that a preceding line has "not dry_run" or "if not dry_run"
-                    context = "\n".join(lines[max(0, i - 3):i + 1])
-                    assert "not dry_run" in context, (
-                        f"SHA capture in {func.__name__} is not guarded by dry_run check"
-                    )
-                    break
+        source = inspect.getsource(getattr(batch_release, func_name))
+        assert "if pending:" in source
+        assert "if dry_run:" in source

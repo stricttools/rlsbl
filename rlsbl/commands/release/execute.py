@@ -1526,13 +1526,28 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Push timeout: {push_timeout}s (from --push-timeout or the "
                 f"push_timeout config key)")
 
-        if "CI_VERIFIED" in _completed:
+        # The batch orchestrator runs ONE CI gate for the whole batch: every
+        # member's candidate is pushed first (ci-defer), the batch tip is
+        # verified once, and each member is then resumed with that verified
+        # SHA. Such a resume must not re-push or re-gate its own candidate.
+        _batch_verified = flags.get("ci-verified-sha")
+        if "CI_VERIFIED" in _completed or (
+            _batch_verified and "BRANCH_PUSHED" in _completed
+        ):
             candidate_sha = (
                 (load_release_state(_state_path) or {}).get("candidate_sha")
                 or run("git", ["rev-parse", "HEAD"]).strip()
             )
             branch_pushed = True
-            log("Skipping candidate push and CI gate (already verified)")
+            if "CI_VERIFIED" in _completed:
+                log("Skipping candidate push and CI gate (already verified)")
+            else:
+                log(
+                    "CI gate satisfied by the batch orchestrator "
+                    f"({str(_batch_verified)[:12]})"
+                )
+                save_step(_state_path, "CI_VERIFIED")
+                _completed.add("CI_VERIFIED")
         else:
             # A resume after a red CI re-pins the candidate on the CURRENT tip
             # (the fix commit), so BRANCH_PUSHED is deliberately re-evaluated
