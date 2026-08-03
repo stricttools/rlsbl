@@ -1,5 +1,5 @@
 ---
-description: "Reference for the rlsbl release flow: bump types, the alpha/beta/rc/stable pre-release channel, pipeline order, hooks, flags, and related commands."
+description: "Reference for the rlsbl release flow: the untagged candidate and its CI gate, bump types, the pre-release channel, pipeline order, hooks, and recovery."
 ---
 
 # Release workflow
@@ -201,7 +201,7 @@ The tag at step 19 is placed on the commit CI verified at step 16, **not** on HE
 
 ### The CI gate
 
-The gate has four possible verdicts, and each is reported distinctly:
+The gate blocks the irreversible half of the release until the repository's own CI has spoken about the candidate commit, and it distinguishes four outcomes rather than collapsing them into pass/fail. The distinction matters because the right operator response differs sharply between a definite failure, an unfinished wait, and a repository that simply has no CI to wait for:
 
 | Verdict | What it means | What the release does |
 | --- | --- | --- |
@@ -455,7 +455,9 @@ Do **not** start a new release at a higher version to escape a red CI, and do no
 
 ### Recovering from a release that completed and was wrong
 
-`rlsbl release undo` is for a release that ran to completion and then turned out to be bad — not for a CI failure. It deletes the GitHub Release, removes the git tag from both local and remote, and reverts the version bump commit; push manually afterwards. For a version that already reached a public registry, prefer `rlsbl release deprecate` (a soft flag on the GitHub Release) or `rlsbl release yank` (registry-aware removal) — an undo cannot unpublish what a registry has already served.
+`rlsbl release undo` is for a release that ran to completion and then turned out to be bad — not for a CI failure, which under this ordering leaves nothing to undo. It deletes the GitHub Release, removes the git tag from both local and remote, and reverts the version bump commit; push manually afterwards.
+
+For a version that already reached a public registry, prefer `rlsbl release deprecate` (a soft flag on the GitHub Release) or `rlsbl release yank` (registry-aware removal). An undo cannot unpublish what a registry has already served.
 
 ## Source reference
 
