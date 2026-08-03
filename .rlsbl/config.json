@@ -27,5 +27,24 @@
       "target": null
     }
   },
-  "changelog_format_version_enforced": true
+  "changelog_format_version_enforced": true,
+  "test_sandbox": {
+    "runner_path": "scripts/test.sh",
+    "command": "uv sync --offline && uv run --offline pytest",
+    "default_args": "-q -n auto",
+    "caches": [
+      "uv",
+      "go",
+      "python_user_base"
+    ],
+    "prewarm": [
+      "scripts/test-prewarm.sh"
+    ],
+    "extra_env": {
+      "RLSBL_TEST_SANDBOX": "1"
+    },
+    "ci_workflows": [
+      ".github/workflows/ci-pypi.yml"
+    ]
+  }
 }
