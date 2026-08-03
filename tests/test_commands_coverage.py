@@ -1099,6 +1099,7 @@ class TestArchiveBlogBody:
 # ============================================================================
 
 MOD_SCRUB = "rlsbl.commands.release_scrub"
+MOD_RECONCILE = "rlsbl.commands.release_reconcile"
 
 
 class TestScrubSafegitVersionTooOld:

@@ -29,6 +29,13 @@ from ..utils import (
 )
 from ..workspace import load_workspace
 from ..tag_glob import TagMode, parse_version_tag
+from .release_reconcile import (
+    push_ref_with_lease as _push_ref_with_lease_impl,
+    push_rewritten_tags,
+    recreate_github_releases,
+    snapshot_remote_refs as _snapshot_remote_refs_impl,
+    tag_name_from_refname as _tag_name_from_refname,
+)
 
 # Minimum safegit release the scrub flow is built against: the flow depends
 # on >= 0.22.0 for --remap-shas-in (in-history changelog hash remapping), the
@@ -36,19 +43,6 @@ from ..tag_glob import TagMode, parse_version_tag
 # cleanup_ok/cleanup_errors/pre_rewrite_remotes JSON fields. The integration
 # test harness builds exactly this version.
 SAFEGIT_MIN_VERSION = (0, 22, 0)
-
-
-def _tag_name_from_refname(refname):
-    """Return the tag name for a ``refs/tags/...`` refname, else None.
-
-    safegit's tags[] list should only contain tag refs, but a stray
-    non-tag refname (e.g. ``refs/heads/x``) must never be treated as a
-    tag: ``removeprefix`` alone would leave it unchanged and the tag step
-    would force-push it.
-    """
-    if not refname.startswith("refs/tags/"):
-        return None
-    return refname[len("refs/tags/"):] or None
 
 
 def _save_step(path, data, step_name):
@@ -219,62 +213,6 @@ def _get_archive_path(scrub_result_path, new_head):
     return os.path.join(state_home, "scrubs", f"scrub-{new_head[:12]}.json")
 
 
-def _snapshot_remote_refs():
-    """Snapshot the remote's refs BEFORE the rewrite.
-
-    Returns {refname: sha}. These are the only trustworthy lease
-    expectations for the post-scrub force-pushes: after the rewrite, bare
-    --force-with-lease is useless because safegit rewrites the
-    remote-tracking refs, and tags carry no tracking information at all.
-    """
-    out = run("git", ["ls-remote", "origin"], timeout=120)
-    refs = {}
-    for line in out.splitlines():
-        parts = line.split(None, 1)
-        if len(parts) == 2:
-            sha, ref = parts
-            refs[ref.strip()] = sha.strip()
-    return refs
-
-
-def _push_ref_with_lease(refname, expected_sha, target_sha, *, timeout):
-    """Force-push one ref with an explicit lease expectation.
-
-    ``expected_sha`` is the remote value captured before the scrub (None
-    when the ref did not exist remotely). ``target_sha`` is the value the
-    remote should end up with; if the push is rejected but the remote
-    already equals ``target_sha`` (a resumed run), the push is treated as
-    done. Any other rejection is a hard error: the remote changed under us
-    and force-pushing would destroy someone's work.
-
-    The push runs with ``--no-verify``: scrub pushes are tool-internal and the
-    pre-push hook exists to catch MANUAL pushes to release branches.
-    """
-    lease = f"--force-with-lease={refname}:{expected_sha or ''}"
-    try:
-        run("git", ["push", "--no-verify", lease, "origin", f"{refname}:{refname}"],
-            timeout=timeout)
-        return
-    except Exception as push_exc:
-        # Idempotence: a previous (partially completed) run may have
-        # already pushed this ref.
-        try:
-            out = run("git", ["ls-remote", "origin", refname], timeout=120)
-            current = out.split()[0] if out.split() else ""
-        except Exception:
-            current = ""
-        if target_sha and current == target_sha:
-            print(f"{refname} already up to date on origin.")
-            return
-        print(
-            f"Error: failed to push {refname}: {push_exc}\n"
-            f"  expected remote value: {expected_sha or '<absent>'}\n"
-            f"  current remote value:  {current or '<unknown>'}\n"
-            f"The remote changed since the scrub started; refusing to "
-            f"force-push over it.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
 
 def _print_dry_run_summary(mode, data):
@@ -437,6 +375,16 @@ def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
         )
     scrub_data["remapped_files"] = sorted(
         set(scrub_data.get("remapped_files", [])) | {r.path for r in repaired}
+    )
+    print(
+        "  Changelog hashes are repaired, but a rewrite also invalidates "
+        "release metadata that lives outside the commit graph: the remote's "
+        "tags and the GitHub Releases attached to them.\n"
+        "  If this rewrite was not driven by `rlsbl release scrub`, reconcile "
+        "them too:\n"
+        "    rlsbl release reconcile --dry-run   # plan\n"
+        "    rlsbl release reconcile             # re-push moved tags, "
+        "recreate their Releases"
     )
     return True
 
@@ -762,7 +710,7 @@ def run_cmd(flags, *, ctx):
         remote_refs = None
         if not flags.get("dry-run"):
             try:
-                remote_refs = _snapshot_remote_refs()
+                remote_refs = _snapshot_remote_refs_impl(git=run)
             except Exception as e:
                 print(
                     f"Error: cannot read remote refs from origin: {e}\n"
@@ -1044,116 +992,32 @@ def run_cmd(flags, *, ctx):
                 branch_target = run("git", ["rev-parse", branch_ref])
             except Exception:
                 branch_target = ""
-            _push_ref_with_lease(
+            _push_ref_with_lease_impl(
                 branch_ref, remote_refs.get(branch_ref), branch_target,
-                timeout=push_timeout,
+                timeout=push_timeout, git=run,
             )
 
             _save_step(scrub_result_path, scrub_data, "BRANCH_PUSHED")
 
         # -- Force-push tags (explicit lease each; never plain --force) --
+        # Shared with `rlsbl release reconcile`, which performs exactly these
+        # two steps after an out-of-band rewrite.
         if "TAGS_PUSHED" not in completed:
-            for tag_info in tags:
-                refname = tag_info.get("refname", "")
-                if _tag_name_from_refname(refname) is None:
-                    print(
-                        f"Warning: skipping non-tag refname in scrub tag "
-                        f"list: {refname!r}",
-                        file=sys.stderr,
-                    )
-                    continue
-                _push_ref_with_lease(
-                    refname, remote_refs.get(refname), tag_info.get("new_sha", ""),
-                    timeout=push_timeout,
-                )
-
+            push_rewritten_tags(
+                tags, remote_refs, push_timeout=push_timeout, git=run,
+            )
             _save_step(scrub_result_path, scrub_data, "TAGS_PUSHED")
 
         # -- Recreate GitHub Releases --
         if "RELEASES_UPDATED" not in completed:
-            if check_gh_installed() and check_gh_auth():
-                for tag_info in tags:
-                    refname = tag_info.get("refname", "")
-                    tag_name = _tag_name_from_refname(refname)
-                    if tag_name is None:
-                        print(
-                            f"Warning: skipping non-tag refname in scrub "
-                            f"tag list: {refname!r}",
-                            file=sys.stderr,
-                        )
-                        continue
-
-                    # Check if a GitHub Release exists for this tag
-                    try:
-                        run_gh(["release", "view", tag_name, "--json", "body"], config=ctx.config)
-                    except Exception:
-                        # No release exists for this tag -- skip
-                        continue
-
-                    # Delete existing release
-                    try:
-                        run_gh(["release", "delete", tag_name, "--yes"], config=ctx.config)
-                    except Exception as e:
-                        print(f"Warning: failed to delete release {tag_name}: {e}", file=sys.stderr)
-                        continue
-
-                    # Extract version from tag name (final releases only -- a
-                    # prerelease suffix disqualifies the tag). Handles standalone
-                    # "v1.2.3", monorepo "project@v1.2.3", and path "project/v1.2.3".
-                    parsed_tag = parse_version_tag(tag_name, mode=TagMode.FINAL_ONLY)
-                    if not parsed_tag:
-                        print(f"Warning: cannot extract version from tag {tag_name}", file=sys.stderr)
-                        continue
-                    version = parsed_tag.version
-
-                    # Find the right project's CHANGELOG.md
-                    changelog_notes = None
-                    if ctx.workspace_root:
-                        # Use prefix index to match tag to project
-                        matched_proj = None
-                        if tag_prefix_index:
-                            for prefix, proj in tag_prefix_index.items():
-                                if tag_name.startswith(prefix):
-                                    matched_proj = proj
-                                    break
-                        if matched_proj is not None:
-                            # Matched a monorepo project by tag prefix
-                            proj_path = os.path.join(str(ctx.workspace_root), matched_proj.path)
-                            changelog_path = os.path.join(proj_path, "CHANGELOG.md")
-                            if os.path.exists(changelog_path):
-                                changelog_notes = extract_changelog_entry(changelog_path, version)
-                        elif parsed_tag.scheme == "standalone":
-                            # Standalone tag format (vX.Y.Z with no project prefix) -- use project root CHANGELOG
-                            changelog_path = os.path.join(str(ctx.workspace_root), "CHANGELOG.md")
-                            if os.path.exists(changelog_path):
-                                changelog_notes = extract_changelog_entry(changelog_path, version)
-                        else:
-                            # Fallback: iterate all projects with a warning
-                            print(f"Warning: no prefix match for tag {tag_name}, scanning all projects", file=sys.stderr)
-                            for proj in workspace_projects:
-                                proj_path = os.path.join(str(ctx.workspace_root), proj.path)
-                                changelog_path = os.path.join(proj_path, "CHANGELOG.md")
-                                if os.path.exists(changelog_path):
-                                    entry = extract_changelog_entry(changelog_path, version)
-                                    if entry:
-                                        changelog_notes = entry
-                                        break
-                    else:
-                        changelog_path = os.path.join(str(project_root), "CHANGELOG.md")
-                        if os.path.exists(changelog_path):
-                            changelog_notes = extract_changelog_entry(changelog_path, version)
-
-                    if not changelog_notes:
-                        changelog_notes = f"Release {version}"
-
-                    # Create new release
-                    try:
-                        run_gh(["release", "create", tag_name,
-                               "--title", tag_name,
-                               "--notes", changelog_notes], config=ctx.config)
-                    except Exception as e:
-                        print(f"Warning: failed to recreate release {tag_name}: {e}", file=sys.stderr)
-
+            recreate_github_releases(
+                tags, ctx=ctx, project_root=project_root,
+                workspace_projects=workspace_projects,
+                tag_prefix_index=tag_prefix_index,
+                gh=run_gh, gh_installed=check_gh_installed,
+                gh_auth=check_gh_auth,
+                extract_entry=extract_changelog_entry,
+            )
             _save_step(scrub_result_path, scrub_data, "RELEASES_UPDATED")
 
         # -- Cleanup and summary --

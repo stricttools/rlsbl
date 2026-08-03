@@ -904,6 +904,31 @@ def cmd_release_scrub(ctx, pattern, file, recipe, replace, mangle, from_commit, 
     run_cmd(flags, ctx=ctx)
 
 
+@release_group.command(
+    name="reconcile",
+    help="Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.",
+)
+@strictcli.flag(name="push-timeout", type=int, default=0, help="Timeout in seconds for each tag push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.")
+def cmd_release_reconcile(ctx, push_timeout, dry_run, yes, quiet):
+    """Re-push rewritten tags and recreate their GitHub Releases."""
+    root = _require_project_root()
+    from .workspace import find_workspace_root
+    monorepo_root = find_workspace_root(str(root))
+    ctx = create_context(
+        root, workspace_root=Path(monorepo_root) if monorepo_root else None,
+    )
+    from .commands.release_reconcile import run_cmd
+    run_cmd(
+        {
+            "dry-run": dry_run,
+            "yes": yes,
+            "quiet": quiet,
+            "push-timeout": push_timeout or None,
+        },
+        ctx=ctx,
+    )
+
+
 # ---------------------------------------------------------------------------
 # discover
 # ---------------------------------------------------------------------------
