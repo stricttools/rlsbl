@@ -70,6 +70,10 @@ BANNED_METHOD_NAMES = {
 
 WRITE_MODE_CHARS = ("w", "a", "x", "+")
 
+# The authorized spellings of a gh CLI invocation.  Everything else that puts
+# "gh" in argv position 0 is reaching GitHub outside the named network seam.
+GH_ENTRY_POINTS = {"gh", "gh_argv", "run_gh", "run_gh_unscoped"}
+
 
 def _production_files():
     """Yield every production Python file, honoring the exemption lists."""
@@ -170,6 +174,71 @@ def _violations(path):
                     found.append((node.lineno, f"open(..., {mode!r})"))
 
     return found
+
+
+def _gh_bypasses(path):
+    """Return (lineno, description) for gh invocations outside effects.gh.
+
+    ``effects.run(["gh", "release", "create", ...])`` passes the subprocess
+    chokepoint but escapes the NAMED network seam, so the mutating GitHub
+    verbs would stop being enumerable.  This catches "gh" in argv position 0
+    of any call that is not one of the authorized entry points.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        tree = ast.parse(f.read(), filename=path)
+    found = []
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        func = node.func
+        callee = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+        if callee in GH_ENTRY_POINTS:
+            continue
+
+        first = node.args[0]
+        # run("gh", [...]) -- the utils.run shape
+        if isinstance(first, ast.Constant) and first.value == "gh":
+            found.append((node.lineno, f"{callee}('gh', ...)"))
+            continue
+        # effects.run(["gh", ...]) -- the argv-list shape
+        if isinstance(first, (ast.List, ast.Tuple)) and first.elts:
+            head = first.elts[0]
+            if isinstance(head, ast.Constant) and head.value == "gh":
+                found.append((node.lineno, f"{callee}(['gh', ...])"))
+
+    return found
+
+
+def test_no_production_module_invokes_gh_outside_the_network_seam():
+    """Every gh call goes through effects.gh (directly or via run_gh*)."""
+    offenders = []
+    for path in sorted(_production_files()):
+        rel = os.path.relpath(path, PROJECT_ROOT)
+        for lineno, what in _gh_bypasses(path):
+            offenders.append(f"{rel}:{lineno}: {what}")
+
+    assert not offenders, (
+        f"{len(offenders)} gh invocation(s) outside the network seam -- call "
+        "effects.gh, utils.run_gh (repo-scoped) or utils.run_gh_unscoped:\n"
+        + "\n".join(offenders)
+    )
+
+
+def test_gh_scanner_detects_a_planted_bypass(tmp_path):
+    """The gh scanner is not vacuously green."""
+    planted = tmp_path / "planted_gh.py"
+    planted.write_text(
+        "from rlsbl import effects\n"
+        "def go():\n"
+        "    effects.run(['gh', 'release', 'create', 'v1'])\n"
+        "    run('gh', ['auth', 'status'])\n"
+        "    effects.gh(['release', 'list'])\n"
+        "    run_gh(['release', 'list'])\n",
+        encoding="utf-8",
+    )
+    descriptions = [what for _, what in _gh_bypasses(str(planted))]
+    assert descriptions == ["run(['gh', ...])", "run('gh', ...)"]
 
 
 def test_no_production_module_bypasses_the_effect_chokepoint():

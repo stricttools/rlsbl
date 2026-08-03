@@ -29,9 +29,10 @@ class TestIsPrivateRepo:
             "rlsbl.utils.run",
             lambda cmd, args, **kw: {
                 ("git", ("remote", "get-url", "origin")): "git@github.com:owner/repo.git",
-                ("gh", ("auth", "token")): "fake-token",
             }[(cmd, tuple(args))],
         )
+        # gh goes through the network seam, not the generic run helper.
+        monkeypatch.setattr("rlsbl.utils.run_gh_unscoped", lambda args, **kw: "fake-token")
 
         fake_resp = MagicMock()
         fake_resp.read.return_value = json.dumps({"private": True}).encode()
@@ -48,9 +49,10 @@ class TestIsPrivateRepo:
             "rlsbl.utils.run",
             lambda cmd, args, **kw: {
                 ("git", ("remote", "get-url", "origin")): "https://github.com/owner/repo",
-                ("gh", ("auth", "token")): "fake-token",
             }[(cmd, tuple(args))],
         )
+        # gh goes through the network seam, not the generic run helper.
+        monkeypatch.setattr("rlsbl.utils.run_gh_unscoped", lambda args, **kw: "fake-token")
 
         fake_resp = MagicMock()
         fake_resp.read.return_value = json.dumps({"private": False}).encode()

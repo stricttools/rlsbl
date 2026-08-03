@@ -542,7 +542,7 @@ def extract_changelog_entry(changelog_path, version):
 def check_gh_installed():
     """Check that the gh CLI is installed."""
     try:
-        run("gh", ["--version"])
+        run_gh_unscoped(["--version"])
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -551,7 +551,7 @@ def check_gh_installed():
 def check_gh_auth():
     """Check that the gh CLI is authenticated."""
     try:
-        run("gh", ["auth", "status"])
+        run_gh_unscoped(["auth", "status"])
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
@@ -869,7 +869,7 @@ def is_private_repo():
             return None
         owner, repo = repo_name.split("/", 1)
 
-        token = run("gh", ["auth", "token"])
+        token = run_gh_unscoped(["auth", "token"])
         req = urllib.request.Request(
             f"https://api.github.com/repos/{owner}/{repo}"
         )
@@ -958,23 +958,50 @@ def run_gh(args: list, config: dict | None = None, **kwargs) -> str:
     repository.  Does NOT mutate os.environ (critical for thread-safety
     in watch.py's ThreadPoolExecutor).
 
-    All extra kwargs are forwarded to run().  The call itself goes through
-    ``effects.gh``, the chokepoint's named entry point for the gh CLI, so every
-    GitHub-mutating verb in the codebase passes one identifiable seam.
+    Accepts ``timeout``, ``env`` and ``cwd``; anything else is a hard error.
+    The call goes through ``effects.gh``, the chokepoint's named entry point
+    for the gh CLI, so every GitHub verb in the codebase passes one
+    identifiable seam.
     """
-    repo = get_github_repo(config)
+    timeout = kwargs.pop("timeout", 120)
+    env = kwargs.pop("env", None)
+    cwd = kwargs.pop("cwd", None)
+    # Validated BEFORE the command runs: a rejected call must not have already
+    # created or deleted a Release on the way to raising.
+    if kwargs:
+        raise TypeError(f"run_gh got unexpected keyword arguments: {sorted(kwargs)}")
     result = effects.gh(
         args,
-        repo=repo,
+        repo=get_github_repo(config),
         capture_output=True,
         text=True,
         check=True,
-        timeout=kwargs.pop("timeout", 120),
-        env=kwargs.pop("env", None),
-        cwd=kwargs.pop("cwd", None),
+        timeout=timeout,
+        env=env,
+        cwd=cwd,
     )
-    if kwargs:
-        raise TypeError(f"run_gh got unexpected keyword arguments: {sorted(kwargs)}")
+    return result.stdout.strip()
+
+
+def run_gh_unscoped(args: list, *, timeout: int = 120, cwd: str | None = None) -> str:
+    """Invoke ``gh`` WITHOUT injecting GH_REPO; return trimmed stdout.
+
+    For the gh calls that must not be scoped to the current project: the
+    repo-independent ones (``--version``, ``auth status``, ``auth token``) and
+    the ones that name their own ``--repo`` explicitly.  They deliberately skip
+    :func:`run_gh`, but they still route through ``effects.gh``, so the gh
+    family remains one enumerable surface.
+
+    Contract matches :func:`run`: capture, text, ``check=True``, 120s default.
+    """
+    result = effects.gh(
+        args,
+        cwd=cwd,
+        timeout=timeout,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return result.stdout.strip()
 
 

@@ -9,7 +9,7 @@ import urllib.error
 
 import tomlkit
 
-from .utils import extract_github_repo_from_remote, run, run_gh
+from .utils import extract_github_repo_from_remote, run, run_gh, run_gh_unscoped
 from . import effects
 
 
@@ -78,7 +78,7 @@ def ensure_github_topic(quiet=False):
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         try:
-            token = run("gh", ["auth", "token"])
+            token = run_gh_unscoped(["auth", "token"])
         except (subprocess.CalledProcessError, FileNotFoundError):
             pass
 

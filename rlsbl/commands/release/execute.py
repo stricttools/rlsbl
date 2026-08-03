@@ -974,6 +974,7 @@ def _run_release_mutating(state: ReleaseState):
     from . import (
         run,
         run_gh,
+        run_gh_unscoped,
         push_if_needed,
         commit_files,
         commit_files_if_changed,
@@ -2336,8 +2337,12 @@ def _run_release_mutating(state: ReleaseState):
 
                 # Create GitHub Release on the mirror repo (non-fatal)
                 try:
-                    run("gh", ["release", "create", plain_tag, "--repo", subtree_remote,
-                         "--title", plain_tag, "--notes-file", notes_file])
+                    # Unscoped: --repo names the mirror explicitly, so this
+                    # must NOT inherit the current project's GH_REPO.
+                    run_gh_unscoped(["release", "create", plain_tag,
+                                     "--repo", subtree_remote,
+                                     "--title", plain_tag,
+                                     "--notes-file", notes_file])
                     log(f"Created mirror GitHub Release: {plain_tag} on {subtree_remote}")
                 except Exception as e:
                     print(f"Warning: mirror GitHub Release failed: {e}", file=sys.stderr)

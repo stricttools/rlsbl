@@ -50,6 +50,7 @@ from ...utils import (
     resolve_tag_push_plan,
     run,
     run_gh,
+    run_gh_unscoped,
     tag_exists_locally,
     tag_exists_on_remote,
 )

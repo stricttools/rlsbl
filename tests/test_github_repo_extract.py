@@ -6,7 +6,15 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from rlsbl.utils import extract_github_repo_from_remote, get_origin_repo, get_github_repo, run_gh
+from rlsbl.utils import (
+    check_gh_auth,
+    check_gh_installed,
+    extract_github_repo_from_remote,
+    get_origin_repo,
+    get_github_repo,
+    run_gh,
+    run_gh_unscoped,
+)
 
 
 class TestExtractGithubRepoFromRemote:
@@ -140,12 +148,53 @@ class TestRunGh:
             run_gh(["auth", "status"])
             assert mock_run.call_args[1]["timeout"] == 120
 
-    def test_rejects_unknown_keywords(self):
-        """The seam is closed: an unsupported keyword is a hard error."""
+    def test_rejects_unknown_keywords_before_running_anything(self):
+        """A rejected call must not have already created or deleted a Release."""
         with patch("rlsbl.utils.get_github_repo", return_value=None), \
-             patch("rlsbl.effects.run", return_value=_completed()):
+             patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
             with pytest.raises(TypeError, match="check"):
-                run_gh(["auth", "status"], check=False)
+                run_gh(["release", "delete", "v1"], check=False)
+            mock_run.assert_not_called()
+
+
+class TestRunGhUnscoped:
+    """The repo-independent gh calls stay on the seam without GH_REPO."""
+
+    def test_never_injects_gh_repo(self):
+        with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
+             patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
+            assert run_gh_unscoped(["auth", "token"]) == "ok"
+            assert mock_run.call_args[0] == (["gh", "auth", "token"],)
+            assert mock_run.call_args[1]["env"] is None
+
+    def test_matches_the_shared_run_helpers_contract(self):
+        with patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
+            run_gh_unscoped(["--version"])
+            kwargs = mock_run.call_args[1]
+            assert kwargs["capture_output"] is True
+            assert kwargs["text"] is True
+            assert kwargs["check"] is True
+            assert kwargs["timeout"] == 120
+
+    def test_forwards_timeout_and_cwd(self, tmp_path):
+        with patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
+            run_gh_unscoped(["auth", "status"], timeout=7, cwd=str(tmp_path))
+            kwargs = mock_run.call_args[1]
+            assert kwargs["timeout"] == 7
+            assert kwargs["cwd"] == str(tmp_path)
+
+    def test_check_gh_installed_reports_a_missing_binary(self):
+        with patch("rlsbl.effects.run", side_effect=FileNotFoundError):
+            assert check_gh_installed() is False
+
+    def test_check_gh_auth_reports_a_failed_status(self):
+        err = subprocess.CalledProcessError(1, ["gh", "auth", "status"])
+        with patch("rlsbl.effects.run", side_effect=err):
+            assert check_gh_auth() is False
+
+    def test_check_gh_auth_reports_success(self):
+        with patch("rlsbl.effects.run", return_value=_completed()):
+            assert check_gh_auth() is True
 
     def test_caller_env_merged_with_gh_repo(self):
         """When caller passes env=, GH_REPO is added to that env, not os.environ."""
