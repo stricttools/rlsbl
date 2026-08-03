@@ -1,6 +1,6 @@
 ---
 title: rlsbl.publish_gate
-description: "Publish CI gate job that resolves the release commit from the GitHub Release body and collapses retried check-runs to prevent stale failures from blocking."
+description: "Publish CI gate job that confirms, from the GitHub Release body, the CI verdict rlsbl obtained before tagging; collapses retried check-runs, fails forward."
 generated: true
 nav_group: "API Reference"
 nav_order: 113

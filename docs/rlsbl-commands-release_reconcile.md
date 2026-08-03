@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.release_reconcile
-description: "Reconcile release metadata with rewritten history: re-push moved tags and recreate their GitHub Releases from the safegit rewrite journal."
+description: "Repairs the release metadata a history rewrite leaves stale -- the remote's tags and their GitHub Releases -- from safegit's rewrite journal, fail-closed."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 58
 ---
