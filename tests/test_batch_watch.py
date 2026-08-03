@@ -8,6 +8,7 @@ Covers:
 """
 
 import io
+import re
 from unittest.mock import MagicMock, patch, call
 
 import pytest
@@ -171,7 +172,12 @@ class TestBatchSHACapture:
 
         source = inspect.getsource(getattr(batch_release, func_name))
         assert "last_sha = verified_sha" in source
-        assert "_batch_ci_gate(workspace_root, flags, log)" in source
+        # Matched on the call's identity, not its exact spelling: the gate also
+        # takes the batch's foreign-commit pin and trail as keyword arguments,
+        # so the call spans several lines.
+        assert re.search(
+            r"_batch_ci_gate\(\s*workspace_root,\s*flags,\s*log\b", source,
+        ), "the batch loop must run the shared CI gate"
 
     def test_releasables_watch_block_present(self):
         """_batch_release_releasables has a watch block after finalization."""

@@ -40,7 +40,7 @@ from .batch_plan import (
     validate_plan_against_config,
     write_batch_plan,
 )
-from ..release.execute import ForeignCommitError
+from ..release.execute import ForeignCommitError, head_sha
 from ..release.validate import (
     ReleaseValidationError,
     HookError,
@@ -116,14 +116,26 @@ def _batch_release_flags(flags, **extra):
     return release_flags
 
 
-def _head(workspace_root):
-    """HEAD of the workspace repo (used for the batch's own pin/trail)."""
-    return run("git", ["rev-parse", "HEAD"], cwd=workspace_root).strip()
-
-
 def _commits_between(start, end, workspace_root):
-    """The commits in ``start..end``, newest first."""
-    out = run("git", ["rev-list", f"{start}..{end}"], cwd=workspace_root)
+    """The commits in ``start..end``, newest first; empty when unresolvable.
+
+    Bookkeeping for the batch drift guard, so it goes through ``subprocess``
+    directly rather than the release flow's mock-patched ``run`` -- the same
+    rationale as :func:`~rlsbl.commands.release.execute.head_sha`. An
+    unresolvable range yields no trail entries, and an unresolvable pin
+    disables the guard outright, so neither can fabricate a foreign commit.
+    """
+    import subprocess
+
+    if not start or not end:
+        return []
+    try:
+        out = subprocess.run(
+            ["git", "rev-list", f"{start}..{end}"],
+            capture_output=True, text=True, check=True, cwd=workspace_root,
+        ).stdout
+    except Exception:
+        return []
     return [c.strip() for c in out.splitlines() if c.strip()]
 
 
@@ -169,7 +181,7 @@ def _batch_ci_gate(workspace_root, flags, log, *, pin_sha=None, trail=()):
         pin_sha, trail, cwd=workspace_root, phase="batch CI gate",
     )
 
-    sha = _head(workspace_root)
+    sha = run("git", ["rev-parse", "HEAD"], cwd=workspace_root).strip()
     # Config is per-project in a workspace; the batch gate is a workspace-level
     # wait, so only the CLI override applies here (no single config owns it).
     timeout = get_ci_timeout(None, override=flags.get("ci-timeout"))
@@ -515,7 +527,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
         # Workspace-level pin, taken before the first candidate is built. Every
         # commit that appears in pin..HEAD must be one a member's own release
         # call created; anything else is a ride-in and aborts the gate.
-        batch_pin = None if dry_run else _head(workspace_root)
+        batch_pin = None if dry_run else head_sha(cwd=workspace_root)
         inline_commits = []
         # Pass 1: push every member's candidate untagged (the CI gate is
         # deferred so ONE wait covers the whole batch).
@@ -555,7 +567,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                     flags, **({} if dry_run else {"ci-defer": True}),
                 )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
-                _before = None if dry_run else _head(workspace_root)
+                _before = None if dry_run else head_sha(cwd=workspace_root)
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
                 if dry_run:
                     released.append(rel_name)
@@ -724,7 +736,7 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
         # Workspace-level pin, taken before the first candidate is built. Every
         # commit that appears in pin..HEAD must be one a member's own release
         # call created; anything else is a ride-in and aborts the gate.
-        batch_pin = None if dry_run else _head(workspace_root)
+        batch_pin = None if dry_run else head_sha(cwd=workspace_root)
         inline_commits = []
         # Pass 1: push every package's candidate untagged (the CI gate is
         # deferred so ONE wait covers the whole batch).
@@ -758,7 +770,7 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                     flags, **({} if dry_run else {"ci-defer": True}),
                 )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
-                _before = None if dry_run else _head(workspace_root)
+                _before = None if dry_run else head_sha(cwd=workspace_root)
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
                 if dry_run:
                     released.append(pkg_name)
