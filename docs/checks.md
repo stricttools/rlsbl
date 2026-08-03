@@ -40,12 +40,12 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | --- | --- | --- |
 | `project` | Project-level metadata, config schema, version consistency | 20 |
 | `release` | Git tag and GitHub Release validation | 5 |
-| `changelog` | JSONL changelog validation and structure | 9 |
-| `workspace` | Monorepo workspace integrity and dependency rules | 15 |
-| `quality` | Code quality, dependency analysis, scaffold hygiene | 9 |
+| `changelog` | JSONL changelog validation and structure | 11 |
+| `workspace` | Monorepo workspace integrity and dependency rules | 17 |
+| `quality` | Code quality, dependency analysis, scaffold hygiene | 10 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
-Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (`library-lint`, `test-suite`) and `preflight-changelog` (the 8 structural changelog checks, i.e. all changelog checks except `changelog-entry`). The `maven` tag groups `maven-central-metadata`.
+Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (7 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
 
 ## Project checks
 
@@ -96,6 +96,8 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | `changelog-batch-commits` | error | No single entry references more commits than `max_commits_per_entry` (default 5) |
 | `changelog-batch-entries` | error | No single commit appears in more entries than `max_entries_per_commit` (default 5) |
 | `changelog-entry` | warn | `CHANGELOG.md` contains an entry for the current project version |
+| `changelog-format-version` | warn | The repo has recorded a `changelog_format_version_enforced` decision (enabling the gate below, or staying in legacy mode deliberately) |
+| `changelog-format-version-gate` | error | When enforcement is on, every line in `unreleased.jsonl` and every finalized `x.y.z.jsonl` carries a supported `format_version`. Skipped while enforcement is off |
 
 Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-hashes` (hash resolution must succeed first).
 
@@ -117,6 +119,8 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `root-rlsbl-conflict` | error | Root `.rlsbl/` does not coexist with `.rlsbl-monorepo/` |
 | `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version; a broken member config is a hard failure |
 | `releasable-residue` | error | Releasable member packages carry no per-package release state (`.rlsbl/changes/`, `.rlsbl/releases/`, `.rlsbl/version`, etc.); `hooks/` and root-path members are exempt |
+| `member-pytest-config` | error | When the workspace root has a `conftest.py`, every member with a `tests/` directory pins its own pytest rootdir, so a member run cannot escape into the root config |
+| `mixed-tag-schemes` | error | No member directory declares both Go's path-based `{path}/v*` tags and `{name}@v*` tags, which would make the publish-router prefix ordering-dependent |
 
 `test-suite-workspace` (see prepush checks) is also tagged `workspace`.
 
@@ -125,6 +129,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | Check | Severity | Description |
 | --- | --- | --- |
 | `dead-modules` | warn | Detects source modules with no inbound imports (unreachable code) |
+| `dead-modules-stale` | error | Every path declared in `dead-modules.toml` still exists, so an exclusion cannot silently outlive the file it excused |
 | `circular-deps` | warn | Detects circular import dependencies between modules |
 | `library-lint` | error | Runs lint rules for library projects (API surface, exports) |
 | `ruff-lint` | error | Project passes ruff lint checks (skipped when ruff is not installed) |
