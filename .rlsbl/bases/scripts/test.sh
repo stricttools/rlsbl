@@ -169,6 +169,20 @@ scratch_older_than() {
   [ -n "$(find "$1" -maxdepth 0 -mmin "+$2" 2>/dev/null)" ]
 }
 
+# Delete scratch paths, retrying once through a recursive chmod. Order matters
+# at this scale: a cloned uv cache is ~300k inodes, so a blanket `chmod -R`
+# before every removal doubles the syscalls for the common case where nothing
+# is write-protected. Only a genuinely locked tree (a test fixture's read-only
+# directories) needs the second pass.
+scratch_remove() {
+  local first="$1"
+  rm -rf "$@" 2>/dev/null || true
+  if [ -e "${first}" ]; then
+    chmod -R u+w "${first}" 2>/dev/null || true
+    rm -rf "$@"
+  fi
+}
+
 sweep_orphaned_scratch() {
   local dir pidfile owner swept=0
   for dir in "$@"; do
@@ -185,8 +199,7 @@ sweep_orphaned_scratch() {
     scratch_older_than "${dir}" "${SANDBOX_SCRATCH_GRACE_MIN}" || continue
     # The runner's own transient scratch, never user data: removed outright
     # rather than archived (these are gigabytes of throwaway tree copies).
-    chmod -R u+w "${dir}" 2>/dev/null || true
-    rm -rf "${dir}" "${pidfile}"
+    scratch_remove "${dir}" "${pidfile}"
     swept=$((swept + 1))
   done
   if [ "${swept}" -gt 0 ]; then
@@ -228,12 +241,10 @@ if has_cache uv; then
   echo $$ >"${UV_CACHE_COPY}.pid"
 fi
 cleanup() {
-  local paths=("${WORK}" "${WORK}.pid")
+  scratch_remove "${WORK}" "${WORK}.pid"
   if [ -n "${UV_CACHE_COPY}" ]; then
-    paths+=("${UV_CACHE_COPY}" "${UV_CACHE_COPY}.pid")
+    scratch_remove "${UV_CACHE_COPY}" "${UV_CACHE_COPY}.pid"
   fi
-  chmod -R u+w "${paths[@]}" 2>/dev/null || true
-  rm -rf "${paths[@]}"
 }
 trap cleanup EXIT
 if has_cache uv; then

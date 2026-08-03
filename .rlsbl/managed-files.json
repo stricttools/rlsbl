@@ -5,10 +5,10 @@
     ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3",
     ".github/workflows/publish.yml": "50d4c836f52a3c679891da5683f0dbeb49838e6ec92e0d12acdc36fdff3210eb",
     "CHANGELOG.md": "060bc0c38eef807e5564ea2d3ac6b23fea25bfbdbcd749d0ab1ed2659f72d9e5",
-    ".gitignore": "5a800d26a95bb32b05a7d91bdf85ab47fd3a885d5a43b0a472100f5aaab12924",
-    ".rlsbl/changes/unreleased.jsonl": "16e6888b33bb0745d51bff4416259f248bd981ce2901fa146fb2b3c0e785b298",
+    ".gitignore": "96e12ae8bb6c0c68089314402f1766d5be75622b75304eac351794e3b9887145",
+    ".rlsbl/changes/unreleased.jsonl": "0540c20f9dd6b8b31fd10e3efe159da3be2472f484392ca0b24205e8f42801f4",
     ".rlsbl/lint/python.toml": "9cfbcef2e010d5fad243437bf2fd8df54a1fae70ee0762f9d11da70fe207501c",
     ".rlsbl/lint/npm.toml": "baa36014e65923d8cc5c8b83c77fa651da79351627570476402da66840027645",
-    "scripts/test.sh": "8785e4517d4d5d0bafce570165ff643c4ecb7454b5d17dcc4c5185639cc75f6e"
+    "scripts/test.sh": "1b94c24ad112f29f8a6f1b0eef65595b2f023f943a479c396e2adcb926294235"
   }
 }
