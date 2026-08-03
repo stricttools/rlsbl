@@ -504,28 +504,39 @@ class TestMakeExternalCheckFn:
 
 
 # ---------------------------------------------------------------------------
-# Timeout routing (live-bug fix: hardcoded 300 -> configured budget)
+# Timeout routing
+#
+# The budget is resolved per RUN from the live check context's config, never
+# bound when the spec is built. The provider materializes specs from a fresh
+# on-disk config read, so a bound budget could never see --check-timeout.
 # ---------------------------------------------------------------------------
 
 
+def _capture_timeout(monkeypatch, captured):
+    """Patch subprocess.run in external_checks to record its timeout kwarg."""
+    def fake_run(*args, **kwargs):
+        captured["timeout"] = kwargs.get("timeout")
+        captured["argv"] = args[0] if args else None
+        captured["shell"] = kwargs.get("shell")
+
+        class R:
+            returncode = 0
+            stdout = "ok"
+            stderr = ""
+        return R()
+
+    monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
+
+
 class TestTimeoutRouting:
-    def test_freeform_honors_declared_timeout(self, tmp_path, monkeypatch):
+    def test_freeform_honors_the_config_key(self, tmp_path, monkeypatch):
         captured = {}
-
-        def fake_run(*args, **kwargs):
-            captured["timeout"] = kwargs.get("timeout")
-
-            class R:
-                returncode = 0
-                stdout = "ok"
-                stderr = ""
-            return R()
-
-        monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
-        fn = _make_external_check_fn("echo hi", None, "c", timeout=77)
+        _capture_timeout(monkeypatch, captured)
+        fn = _make_external_check_fn("echo hi", None, "c")
 
         class FakeCtx:
             project_root = tmp_path
+            config = {"check_timeout": 77}
 
         fn(FakeCtx(), ErrorReporter())
         assert captured["timeout"] == 77
@@ -534,49 +545,102 @@ class TestTimeoutRouting:
         from rlsbl.utils import DEFAULT_CHECK_TIMEOUT
 
         captured = {}
-
-        def fake_run(*args, **kwargs):
-            captured["timeout"] = kwargs.get("timeout")
-
-            class R:
-                returncode = 0
-                stdout = "ok"
-                stderr = ""
-            return R()
-
-        monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
+        _capture_timeout(monkeypatch, captured)
         fn = _make_external_check_fn("echo hi", None, "c")
 
         class FakeCtx:
             project_root = tmp_path
+            config = {}
 
         fn(FakeCtx(), ErrorReporter())
         assert captured["timeout"] == DEFAULT_CHECK_TIMEOUT
 
-    def test_structured_honors_explicit_timeout(self, tmp_path, monkeypatch):
+    def test_structured_honors_the_config_key(self, tmp_path, monkeypatch):
         captured = {}
-
-        def fake_run(*args, **kwargs):
-            captured["timeout"] = kwargs.get("timeout")
-            captured["argv"] = args[0]
-
-            class R:
-                returncode = 0
-                stdout = "ok"
-                stderr = ""
-            return R()
-
-        monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
+        _capture_timeout(monkeypatch, captured)
         _write_pyproject(tmp_path, "[dependency-groups]\ndev = [\"mypy>=2.3.0\"]\n")
-        fn = _make_structured_check_fn("mypy", ["src"], None, "c", 1800)
+        fn = _make_structured_check_fn("mypy", ["src"], None, "c")
 
         class FakeCtx:
             project_root = tmp_path
+            config = {"check_timeout": 1800}
 
         fn(FakeCtx(), ErrorReporter())
         assert captured["timeout"] == 1800
         assert captured["argv"] == ["uv", "run", "mypy", "src"]
         assert captured.get("shell") is None  # list argv, no shell
+
+
+class TestCheckTimeoutFlagReachesExternalChecks:
+    """``--check-timeout`` must govern config-declared external checks too.
+
+    Regression: the provider was registered with a FRESH on-disk config read
+    and bound each check's budget at materialization time, so the release's
+    in-memory config -- the only place ``apply_timeout_overrides`` writes the
+    flag -- was never consulted. An external check ran on the shipped default
+    no matter what ``--check-timeout`` said.
+    """
+
+    def _run_spec(self, name, specs, ctx):
+        """Invoke a provider-built spec the way strictcli does (impl takes ctx)."""
+        spec = next(s for s in specs if s.name == name)
+        return spec._impl(ctx)
+
+    def test_freeform_external_check_honors_the_flag(self, tmp_path, monkeypatch):
+        from rlsbl.commands.release.shared import (
+            apply_timeout_overrides,
+            build_release_flags,
+        )
+
+        captured = {}
+        _capture_timeout(monkeypatch, captured)
+
+        # What the provider sees on disk: no override, only the config key.
+        on_disk = {"external_checks": [_freeform(command="echo ok")]}
+        monkeypatch.setattr(shutil, "which", lambda b: "/usr/bin/echo")
+        specs = make_external_check_provider(lambda: dict(on_disk))()
+
+        # What the release holds in memory: the same config with --check-timeout
+        # applied, handed to the check as ctx.config.
+        live = dict(on_disk)
+        apply_timeout_overrides(
+            live,
+            build_release_flags(False, True, False, False, check_timeout=13),
+        )
+
+        class ReleaseCtx:
+            project_root = tmp_path
+            config = live
+
+        self._run_spec("my-check", specs, ReleaseCtx())
+        assert captured["timeout"] == 13
+
+    def test_structured_external_check_honors_the_flag(self, tmp_path, monkeypatch):
+        from rlsbl.commands.release.shared import (
+            apply_timeout_overrides,
+            build_release_flags,
+        )
+
+        captured = {}
+        _capture_timeout(monkeypatch, captured)
+        _write_pyproject(tmp_path, "[dependency-groups]\ndev = [\"mypy>=2.3.0\"]\n")
+
+        on_disk = {"external_checks": [_structured()]}
+        monkeypatch.setattr(shutil, "which", lambda b: f"/usr/bin/{b}")
+        specs = make_external_check_provider(lambda: dict(on_disk))()
+
+        live = dict(on_disk)
+        apply_timeout_overrides(
+            live,
+            build_release_flags(False, True, False, False, check_timeout=21),
+        )
+
+        class ReleaseCtx:
+            project_root = tmp_path
+            config = live
+
+        self._run_spec("mypy-strict", specs, ReleaseCtx())
+        assert captured["timeout"] == 21
 
 
 # ---------------------------------------------------------------------------

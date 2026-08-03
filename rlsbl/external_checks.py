@@ -429,18 +429,31 @@ def _report_subprocess_result(reporter, result, name):
     )
 
 
-def _make_external_check_fn(command, cwd, name, timeout=None):
+def _resolve_check_budget(ctx):
+    """Resolve the subprocess budget for an external check at RUN time.
+
+    Read from the live ``ctx.config`` rather than bound when the check spec is
+    built.  The provider materializes specs from a fresh on-disk config read,
+    so a budget bound there could never see ``--check-timeout`` (which
+    ``apply_timeout_overrides`` writes into the release's in-memory config).
+    Resolving here is also what every built-in check does
+    (``get_check_timeout(ctx.config)``), so one precedence chain -- flag >
+    ``check_timeout`` config key > shipped default -- governs all of them.
+    """
+    return get_check_timeout(getattr(ctx, "config", None))
+
+
+def _make_external_check_fn(command, cwd, name):
     """Build a check function that runs a freeform *command* through a shell.
 
     The returned function has the ``(ctx, reporter)`` signature expected by
-    strictcli's check system.  The timeout is routed through the configured
-    check budget (``timeout=None`` resolves ``get_check_timeout(None)``, i.e.
-    the ``check_timeout`` config key or the shipped default).  The subprocess
-    env carries the release context (see :func:`_release_context_env`).
+    strictcli's check system.  The timeout is resolved per run from the live
+    context (see :func:`_resolve_check_budget`).  The subprocess env carries
+    the release context (see :func:`_release_context_env`).
     """
     def _run_external_check(ctx, reporter):
         check_cwd = _resolve_cwd(ctx, cwd)
-        budget = timeout if timeout is not None else get_check_timeout(None)
+        budget = _resolve_check_budget(ctx)
         try:
             result = subprocess.run(
                 command,
@@ -464,17 +477,17 @@ def _make_external_check_fn(command, cwd, name, timeout=None):
     return _run_external_check
 
 
-def _make_structured_check_fn(tool, paths, cwd, name, timeout=None):
+def _make_structured_check_fn(tool, paths, cwd, name):
     """Build a check function that runs a structured tool via composed argv.
 
     No shell: the argv is a list, composed as ``uv run [group flags] <binary>
-    <subcommand...> <paths...>``.  The timeout is routed through the configured
-    check budget, and the subprocess env carries the release context (see
-    :func:`_release_context_env`).
+    <subcommand...> <paths...>``.  The timeout is resolved per run from the
+    live context (see :func:`_resolve_check_budget`), and the subprocess env
+    carries the release context (see :func:`_release_context_env`).
     """
     def _run_structured_check(ctx, reporter):
         check_cwd = _resolve_cwd(ctx, cwd)
-        budget = timeout if timeout is not None else get_check_timeout(None)
+        budget = _resolve_check_budget(ctx)
         argv = _compose_structured_argv(tool, paths, check_cwd)
         try:
             result = subprocess.run(
@@ -624,11 +637,14 @@ def _make_scope_guard_fn(tool, cwd, name):
 # ---------------------------------------------------------------------------
 
 
-def _entry_specs(entry, timeout):
+def _entry_specs(entry):
     """Build the check spec(s) for a single validated external-check entry.
 
     Freeform entries yield one impure subprocess check.  Structured entries
     yield the impure tool check plus a pure/fast competing-scope guard check.
+
+    No timeout is bound here: the subprocess budget is resolved per run from
+    the live check context (see :func:`_resolve_check_budget`).
     """
     name = entry["name"]
     tag = entry["tag"]
@@ -646,7 +662,7 @@ def _entry_specs(entry, timeout):
             pure=False,
             needs_network=False,
             depends_on=depends_on,
-            impl=_make_structured_check_fn(tool, paths, cwd, name, timeout),
+            impl=_make_structured_check_fn(tool, paths, cwd, name),
         ))
         # Competing-scope guard: pure + fast, no depends_on so it partitions
         # cleanly into the pure set even when the tool check depends on impure
@@ -669,7 +685,7 @@ def _entry_specs(entry, timeout):
             pure=False,
             needs_network=False,
             depends_on=depends_on,
-            impl=_make_external_check_fn(command, cwd, name, timeout),
+            impl=_make_external_check_fn(command, cwd, name),
         ))
 
     return specs
@@ -699,10 +715,9 @@ def make_external_check_provider(config_reader):
                 f"external checks config error: {exc}"
             ) from exc
 
-        timeout = get_check_timeout(config)
         specs = []
         for entry in ext_checks:
-            specs.extend(_entry_specs(entry, timeout))
+            specs.extend(_entry_specs(entry))
         return specs
 
     return _provider
