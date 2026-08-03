@@ -400,6 +400,16 @@ class TestOrphanedScratchSweep:
         result = _sweep(tmp_path)
         assert "orphaned scratch" not in result.stderr
 
+    def test_runner_does_not_exec_the_sandbox(self):
+        """``exec bwrap`` replaces the shell, so the EXIT trap that removes
+        the scratch dirs never runs -- which leaked a full repo copy on EVERY
+        run, successful ones included, not just killed ones. bwrap must be a
+        child whose status the runner forwards after cleaning up.
+        """
+        for text in (RUNNER.read_text(), TEMPLATE_PATH.read_text()):
+            assert "exec bwrap" not in text
+            assert "trap cleanup EXIT" in text
+
 
 # ---------------------------------------------------------------------------
 # The stricttest-floor check
