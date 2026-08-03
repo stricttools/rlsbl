@@ -87,7 +87,7 @@ The one-time bootstrap stamper that seeded historical lines has been retired —
 
 ## Adding entries
 
-Use `rlsbl changelog add` after each commit or group of related commits to append a structured entry to `unreleased.jsonl`. Each entry links one or more commit hashes to a description and type, and the command auto-commits the JSONL file unless `--no-commit` is passed:
+Use `rlsbl changelog add` after each commit or group of related commits to append a structured entry to `unreleased.jsonl`. Each entry links one or more commit hashes to a description and type, and the command auto-commits the JSONL file unless `--no-auto-commit` is passed:
 
 ```bash
 # User-facing entry
@@ -103,14 +103,14 @@ rlsbl changelog add --commits f9g8h7i --no-user-facing
 | `--description` | Required for user-facing entries. One-line description. |
 | `--type` | Required for user-facing entries. One of: `feature`, `fix`, `breaking`. |
 | `--no-user-facing` | Mark as non-user-facing (no description or type needed). |
-| `--no-commit` | Skip the auto-commit of `unreleased.jsonl`. |
+| `--no-auto-commit` | Skip the auto-commit of `unreleased.jsonl`. |
 
 The command:
 1. Resolves each hash via `git rev-parse` (errors on invalid hashes)
 2. In monorepo mode, validates that each commit touches files within the current sub-project's path/watch patterns
 3. Validates entry schema
 4. Appends to `unreleased.jsonl`
-5. Auto-commits the file (message: `changelog: <description>`) unless `--no-commit` is passed
+5. Auto-commits the file (message: `changelog: <description>`) unless `--no-auto-commit` is passed
 
 ### The auto-commit moves HEAD
 
@@ -130,7 +130,7 @@ avoid it, both explicit:
 - **Finish the code commit first.** Treat `changelog add` as the last step for
   a change, after any amends or rebases. This is the normal flow, and it is
   also why entries reference hashes: once recorded, the commit should not move.
-- **Defer the commit** with `rlsbl changelog add --no-commit`, keep working,
+- **Defer the commit** with `rlsbl changelog add --no-auto-commit`, keep working,
   and commit `unreleased.jsonl` yourself when the code commit is settled.
 
 If a code commit does move after its entry was recorded, the hash-resolution
