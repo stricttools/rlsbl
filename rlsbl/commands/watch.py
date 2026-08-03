@@ -321,9 +321,13 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None,
                 return retry_result
         return {"name": workflow_name, "passed": False, "run_id": run_id}
     except subprocess.TimeoutExpired:
+        # NOT a failure: the local wait ran out, the run itself may still be
+        # going. Marked so the caller can report "unresolved" instead of the
+        # deterministic-failure remedy (see CI_TIMEOUT in wait_for_ci_green).
         msg = f"rlsbl: {label}: [{workflow_name}] timed out after {timeout}s"
         print(msg, file=sys.stderr)
-        return {"name": workflow_name, "passed": False, "run_id": run_id}
+        return {"name": workflow_name, "passed": False, "timed_out": True,
+                "run_id": run_id}
     except Exception as exc:
         msg = f"rlsbl: {label}: [{workflow_name}] error: {exc}"
         print(msg, file=sys.stderr)
@@ -471,10 +475,53 @@ def poll_runs(commit_sha, max_attempts=30, interval=4):
 CI_DISCOVERY_GRACE_SECONDS = 300
 CI_DISCOVERY_INTERVAL = 5
 
+# Discovery is spent INSIDE the total CI budget, so it is capped at half of it:
+# whatever the operator declares with --ci-timeout / ci_timeout, at least half
+# of it is always left for the runs to actually complete. Without the cap a
+# short budget was swallowed whole by the 300s grace and the completion wait
+# collapsed to a 1-second sham that reported an immediate "timeout".
+CI_DISCOVERY_BUDGET_SHARE = 2
+
+# The shortest completion wait rlsbl will start. Below this the declared budget
+# is simply spent, and saying so is more honest than starting a wait that
+# cannot conclude.
+CI_MIN_COMPLETION_WINDOW = 30
+
 # Verdicts returned by wait_for_ci_green.
 CI_GREEN = "green"
 CI_RED = "red"
 CI_NOT_CONFIGURED = "no-ci"
+# The local wait ran out with runs still unresolved. NOT a red verdict: the
+# runs may still be in flight, so the remedy is to check their status and
+# resume, never the fix-forward-the-code remedy a real failure calls for.
+CI_TIMEOUT = "timeout"
+
+
+def _discovery_budget(timeout, discovery_grace):
+    """Clamp the discovery grace so it never eats the whole CI budget.
+
+    Returns ``(effective_grace, clamped)``. At least one poll interval is
+    always granted -- a budget too small to poll even once is the operator's
+    declaration, not a reason to skip discovery entirely.
+    """
+    cap = max(CI_DISCOVERY_INTERVAL, int(timeout) // CI_DISCOVERY_BUDGET_SHARE)
+    if discovery_grace <= cap:
+        return discovery_grace, False
+    return cap, True
+
+
+def _timeout_verdict(results):
+    """Aggregate per-run results into a verdict.
+
+    A genuine failure outranks a timeout: if any run definitively failed, the
+    answer is known (:data:`CI_RED`) and fix-forward is the right remedy, even
+    if a sibling run was still going when the budget ran out.
+    """
+    if all(r["passed"] for r in results):
+        return CI_GREEN
+    if any(not r["passed"] and not r.get("timed_out") for r in results):
+        return CI_RED
+    return CI_TIMEOUT
 
 
 class CIWaitError(Exception):
@@ -542,16 +589,23 @@ def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
     """Block until every CI run for *commit_sha* concludes.
 
     Returns ``(verdict, results)`` where verdict is one of :data:`CI_GREEN`,
-    :data:`CI_RED`, or :data:`CI_NOT_CONFIGURED`.
+    :data:`CI_RED`, :data:`CI_TIMEOUT`, or :data:`CI_NOT_CONFIGURED`.
 
-    Three explicit outcomes, no silent waits:
+    Four explicit outcomes, no silent waits:
 
     - The repository declares no push-triggered workflow -> :data:`CI_NOT_CONFIGURED`
       immediately (nothing can ever run; blocking would hang the release).
     - Push-triggered workflows exist but no run appears for the commit within
-      *discovery_grace* seconds -> :class:`CIWaitError` (hard error).
-    - Runs appear -> they are watched to completion (transient failures retried
-      once, deterministic ones not) and the aggregate verdict is returned.
+      the discovery grace -> :class:`CIWaitError` (hard error).
+    - Runs appear and conclude -> :data:`CI_GREEN` / :data:`CI_RED` (transient
+      failures retried once, deterministic ones not).
+    - Runs appear but *timeout* expires with some still unresolved ->
+      :data:`CI_TIMEOUT`. Distinct from red on purpose: nothing was proven
+      about those runs, so the remedy is to check their status, not to fix
+      code that may be perfectly fine.
+
+    *timeout* is the WHOLE budget: discovery is spent inside it and is capped
+    at half of it, so the completion wait always keeps at least half.
     """
     def _log(msg):
         if log is not None:
@@ -572,17 +626,25 @@ def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
     except Exception:
         repo_slug = ""
 
-    attempts = max(1, int(discovery_grace // max(1, CI_DISCOVERY_INTERVAL)))
+    effective_grace, clamped = _discovery_budget(timeout, discovery_grace)
+    attempts = max(1, int(effective_grace // max(1, CI_DISCOVERY_INTERVAL)))
     _log(
         f"Waiting for CI on the release candidate {commit_sha[:12]} "
         f"({len(expected)} push-triggered workflow file(s): {', '.join(expected)})..."
     )
+    if clamped:
+        _log(
+            f"Run-discovery grace clamped to {effective_grace}s (normally "
+            f"{discovery_grace}s): it is spent inside the {timeout}s CI budget, "
+            f"and at least half of that budget stays reserved for the runs to "
+            f"complete."
+        )
     started = time.time()
     runs = poll_runs(commit_sha, max_attempts=attempts, interval=CI_DISCOVERY_INTERVAL)
     if not runs:
         raise CIWaitError(
             f"no CI runs appeared for the release candidate {commit_sha} within "
-            f"{discovery_grace}s, but this repository declares push-triggered "
+            f"{effective_grace}s, but this repository declares push-triggered "
             f"workflow(s): {', '.join(expected)}.\n"
             f"The candidate is on the remote and nothing was tagged or "
             f"published. Investigate why the push produced no runs (branch or "
@@ -596,7 +658,23 @@ def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
     retried_workflows = set()
     known_ids = {str(r["databaseId"]) for r in runs}
 
-    remaining = max(1, int(timeout - (time.time() - started)))
+    def _remaining():
+        return int(timeout - (time.time() - started))
+
+    remaining = _remaining()
+    if remaining < CI_MIN_COMPLETION_WINDOW:
+        # Only reachable with a budget too small to hold a real wait; starting
+        # a sub-floor wait would report a "timeout" that measured nothing.
+        _log(
+            f"CI budget of {timeout}s is spent (only {remaining}s left, floor "
+            f"is {CI_MIN_COMPLETION_WINDOW}s); not starting a completion wait."
+        )
+        return CI_TIMEOUT, [
+            {"name": r.get("name", f"run {r['databaseId']}"), "passed": False,
+             "timed_out": True, "run_id": str(r["databaseId"])}
+            for r in runs
+        ]
+
     results = _watch_runs(runs, label, repo_slug, retried_lock, retried_workflows,
                           timeout=remaining)
 
@@ -608,15 +686,26 @@ def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
         if str(r["databaseId"]) not in known_ids
     ]
     if late_runs:
-        _log(f"Found {len(late_runs)} late-starting CI run(s); waiting...")
-        remaining = max(1, int(timeout - (time.time() - started)))
-        results.extend(
-            _watch_runs(late_runs, label, repo_slug, retried_lock,
-                        retried_workflows, timeout=remaining)
-        )
+        remaining = _remaining()
+        if remaining < CI_MIN_COMPLETION_WINDOW:
+            _log(
+                f"Found {len(late_runs)} late-starting CI run(s), but the "
+                f"{timeout}s CI budget is spent ({remaining}s left, floor is "
+                f"{CI_MIN_COMPLETION_WINDOW}s); they stay unresolved."
+            )
+            results.extend(
+                {"name": r.get("name", f"run {r['databaseId']}"), "passed": False,
+                 "timed_out": True, "run_id": str(r["databaseId"])}
+                for r in late_runs
+            )
+        else:
+            _log(f"Found {len(late_runs)} late-starting CI run(s); waiting...")
+            results.extend(
+                _watch_runs(late_runs, label, repo_slug, retried_lock,
+                            retried_workflows, timeout=remaining)
+            )
 
-    verdict = CI_GREEN if all(r["passed"] for r in results) else CI_RED
-    return verdict, results
+    return _timeout_verdict(results), results
 
 
 def run_cmd(registry, args, flags):

@@ -8,8 +8,18 @@ import threading
 import pytest
 from unittest.mock import patch, MagicMock, call
 
+import time
+
 from rlsbl.commands.watch import (
+    CI_DISCOVERY_GRACE_SECONDS,
+    CI_DISCOVERY_INTERVAL,
+    CI_GREEN,
+    CI_RED,
+    CI_TIMEOUT,
     _classify_failure,
+    _discovery_budget,
+    _timeout_verdict,
+    wait_for_ci_green,
     _fetch_failure_log,
     _has_publish_workflow_on_disk,
     _is_publish_workflow,
@@ -1283,6 +1293,142 @@ class TestRetryClassification:
         err = capsys.readouterr().err
         assert "failure log tail:" in err
         assert "goreleaser: error: invalid config" in err
+
+
+class TestCIWaitTimeoutVerdict:
+    """A CI-wait TIMEOUT is its own verdict, never a red one.
+
+    Regression: _watch_single_run returned a plain ``passed=False`` on a
+    TimeoutExpired, indistinguishable from a genuine failure, so an unresolved
+    run produced a red verdict and the deterministic-failure remedy.
+    """
+
+    @patch("rlsbl.commands.watch.run_gh",
+           side_effect=subprocess.TimeoutExpired("gh", 5))
+    def test_a_timed_out_run_is_marked_as_such(self, _mock_gh):
+        result = _watch_single_run(
+            {"databaseId": 7, "name": "CI"}, "label", "o/r", timeout=5,
+        )
+        assert result["passed"] is False
+        assert result["timed_out"] is True
+
+    @patch("rlsbl.commands.watch.run_gh",
+           side_effect=subprocess.CalledProcessError(1, "gh"))
+    def test_a_generic_error_is_not_marked_as_a_timeout(self, _mock_gh):
+        result = _watch_single_run(
+            {"databaseId": 7, "name": "CI"}, "label", "o/r", timeout=5,
+        )
+        assert result.get("timed_out") is not True
+
+    def test_verdict_aggregation(self):
+        green = {"name": "a", "passed": True}
+        red = {"name": "b", "passed": False}
+        stalled = {"name": "c", "passed": False, "timed_out": True}
+
+        assert _timeout_verdict([green, green]) == CI_GREEN
+        assert _timeout_verdict([green, red]) == CI_RED
+        assert _timeout_verdict([green, stalled]) == CI_TIMEOUT
+        # A definite failure outranks an unresolved sibling: the answer IS
+        # known, and fix-forward is the right remedy.
+        assert _timeout_verdict([red, stalled]) == CI_RED
+
+
+class TestCIDiscoveryBudget:
+    """Run discovery is spent INSIDE the total CI budget.
+
+    Regression: the 300s discovery grace was unbudgeted, so a short
+    --ci-timeout was swallowed whole and the completion wait collapsed to a
+    1-second window that could only ever report a timeout.
+    """
+
+    def test_a_generous_budget_is_untouched(self):
+        grace, clamped = _discovery_budget(3600, CI_DISCOVERY_GRACE_SECONDS)
+        assert grace == CI_DISCOVERY_GRACE_SECONDS
+        assert clamped is False
+
+    def test_a_short_budget_clamps_discovery_to_half(self):
+        grace, clamped = _discovery_budget(120, CI_DISCOVERY_GRACE_SECONDS)
+        assert grace == 60
+        assert clamped is True
+
+    def test_discovery_never_exceeds_half_the_budget(self):
+        for timeout in (30, 60, 120, 300, 600, 1200, 3600):
+            grace, _ = _discovery_budget(timeout, CI_DISCOVERY_GRACE_SECONDS)
+            assert grace <= max(CI_DISCOVERY_INTERVAL, timeout // 2), timeout
+
+    def test_one_poll_interval_is_always_granted(self):
+        grace, _ = _discovery_budget(1, CI_DISCOVERY_GRACE_SECONDS)
+        assert grace == CI_DISCOVERY_INTERVAL
+
+    def test_the_completion_wait_keeps_at_least_half_the_budget(self, tmp_path):
+        """The whole point: no 1-second completion windows."""
+        wf = tmp_path / ".github" / "workflows"
+        wf.mkdir(parents=True)
+        (wf / "ci.yml").write_text("name: ci\non: push\n")
+        seen = {}
+
+        def fake_poll(sha, max_attempts=30, interval=4):
+            # Discovery burns its whole clamped grace before finding a run.
+            time.sleep(0)
+            return [{"databaseId": 1, "name": "CI"}]
+
+        def fake_watch(runs, label, repo_slug, lock=None, retried=None,
+                       timeout=3600):
+            seen["timeout"] = timeout
+            return [{"name": "CI", "passed": True, "run_id": "1"}]
+
+        with (
+            patch("rlsbl.commands.watch.poll_runs", side_effect=fake_poll),
+            patch("rlsbl.commands.watch._watch_runs", side_effect=fake_watch),
+            patch("rlsbl.commands.watch.run_gh",
+                  return_value='{"nameWithOwner": "o/r"}'),
+            patch("rlsbl.commands.watch.time.sleep"),
+        ):
+            verdict, _results = wait_for_ci_green(
+                "0" * 40, timeout=120, repo_root=str(tmp_path),
+                log=lambda _m: None,
+            )
+
+        assert verdict == CI_GREEN
+        assert seen["timeout"] >= 60, (
+            "the completion wait must keep at least half the declared budget"
+        )
+
+    def test_an_exhausted_budget_reports_a_timeout_not_a_sham_wait(self, tmp_path):
+        wf = tmp_path / ".github" / "workflows"
+        wf.mkdir(parents=True)
+        (wf / "ci.yml").write_text("name: ci\non: push\n")
+        watched = []
+
+        def slow_poll(sha, max_attempts=30, interval=4):
+            # Simulate discovery consuming the entire budget.
+            start[0] -= 10_000
+            return [{"databaseId": 1, "name": "CI"}]
+
+        start = [0]
+        real_time = time.time
+
+        with (
+            patch("rlsbl.commands.watch.poll_runs", side_effect=slow_poll),
+            patch("rlsbl.commands.watch._watch_runs",
+                  side_effect=lambda *a, **k: watched.append(k) or []),
+            patch("rlsbl.commands.watch.run_gh",
+                  return_value='{"nameWithOwner": "o/r"}'),
+            patch("rlsbl.commands.watch.time.time",
+                  side_effect=lambda: real_time() - start[0]),
+            patch("rlsbl.commands.watch.time.sleep"),
+        ):
+            verdict, results = wait_for_ci_green(
+                "0" * 40, timeout=120, repo_root=str(tmp_path),
+                log=lambda _m: None,
+            )
+
+        assert verdict == CI_TIMEOUT
+        assert watched == [], (
+            "no completion wait may start below the floor -- it could only "
+            "report a timeout it never measured"
+        )
+        assert results and all(r["timed_out"] for r in results)
 
 
 if __name__ == "__main__":

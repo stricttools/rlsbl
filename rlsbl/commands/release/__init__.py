@@ -57,6 +57,7 @@ from ..watch import (  # noqa: F401  (re-exported for execute.py's late-bound im
     CI_GREEN,
     CI_NOT_CONFIGURED,
     CI_RED,
+    CI_TIMEOUT,
     CIWaitError,
     wait_for_ci_green,
 )

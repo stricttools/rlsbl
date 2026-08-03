@@ -78,6 +78,42 @@ def _ci_red_message(*, version, tag, branch, candidate_sha, detail):
     )
 
 
+def _ci_timeout_message(*, version, tag, branch, candidate_sha, detail):
+    """Remediation text for a CI wait that ran OUT OF TIME, not out of luck.
+
+    A timeout proves nothing about the candidate: the runs may still be in
+    flight. Reporting it as a red verdict would send the operator to fix code
+    that is very possibly fine, so it gets its own honest message.
+    """
+    return (
+        f"The CI wait for {version} ran out of time before every run "
+        f"concluded.\n"
+        f"  {detail}\n"
+        f"  Candidate commit: {candidate_sha} (on origin/{branch})\n"
+        f"\n"
+        f"This is NOT a CI failure: those runs may still be in progress. "
+        f"Nothing was\n"
+        f"proven about the candidate either way.\n"
+        f"\n"
+        f"Nothing was tagged, released or finalized:\n"
+        f"  - no {tag} tag exists (local or remote)\n"
+        f"  - no GitHub Release exists\n"
+        f"  - the changelog is still unreleased.jsonl -- {version} was not\n"
+        f"    finalized\n"
+        f"  - nothing reached any registry\n"
+        f"\n"
+        f"The version number is NOT burnt. What to do:\n"
+        f"  1. Check the runs: `rlsbl watch {candidate_sha[:12]}`\n"
+        f"  2. When they are green: `rlsbl release resume`\n"
+        f"     -- completes the SAME version ({version}).\n"
+        f"  3. If they went red, fix forward on {branch} and resume; if they are\n"
+        f"     merely slow, raise the budget with `--ci-timeout` or the\n"
+        f"     `ci_timeout` config key.\n"
+        f"\n"
+        f"Do not start a new release at a higher version to escape a slow CI."
+    )
+
+
 # The publish gate's only precise statement of which commit CI must be green
 # on. Matched on its own line so a reconcile replaces rather than duplicates.
 _CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
@@ -306,33 +342,34 @@ class ForeignCommitError(RlsblError):
     """
 
 
-def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
-    """Refuse to continue if commits in ``pin_sha..HEAD`` are not this
-    release's own.
+def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
+    """Refuse to continue if commits in ``pin_sha..HEAD`` are not in *trail*.
 
-    The release pins HEAD at the top of its entry and records every commit it
-    creates in the state file's ``release_commits`` trail. Anything in the pin
-    range that is not in the trail arrived from somewhere else -- a concurrent
-    session sharing the worktree, an editor's auto-commit, a hook. Releasing it
-    would ship unreviewed work under this version's changelog, and the range
-    is recomputed at run time, so a ride-in between two attempts used to join
-    the release silently.
+    A release pins HEAD when it starts and records every commit it creates in
+    a trail. Anything in the pin range that is not in the trail arrived from
+    somewhere else -- a concurrent session sharing the worktree, an editor's
+    auto-commit, a hook. Releasing it would ship unreviewed work under this
+    version's changelog, and the range is recomputed at run time, so a ride-in
+    between two attempts used to join the release silently.
 
     Fail-closed and by name: the error lists every foreign SHA with its
     subject, so the operator can decide whether to include the work (record it
-    in the changelog and re-run) or move it aside.
+    in the changelog and re-run) or move it aside. Nothing is rolled back.
 
     ``phase`` names the checkpoint in the error text (entry / candidate push /
-    final push). Uses ``subprocess`` directly, not the mock-patched ``run``, so
-    the guard is never starved of a mock side effect in tests.
+    CI gate / final push). Uses ``subprocess`` directly, not the mock-patched
+    ``run``, so the guard is never starved of a mock side effect in tests.
+
+    The batch orchestrator uses this directly with a workspace-level pin and
+    the union of its members' trails; :func:`_guard_foreign_commits` is the
+    single-release wrapper that reads the trail out of a state file.
     """
     import subprocess
 
     if not pin_sha:
         return
 
-    state = load_release_state(state_path)
-    trail = set((state or {}).get("release_commits", []))
+    trail = set(trail or ())
 
     try:
         result = subprocess.run(
@@ -377,6 +414,17 @@ def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
         "branch of their own) first",
     ])
     raise ForeignCommitError("\n".join(lines))
+
+
+def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
+    """Single-release wrapper: the trail comes from the state file."""
+    state = load_release_state(state_path)
+    guard_foreign_commits(
+        pin_sha,
+        (state or {}).get("release_commits", []),
+        cwd=cwd,
+        phase=phase,
+    )
 
 
 def _bump_selfdoc_version(project_dir, new_version):
@@ -950,6 +998,7 @@ def _run_release_mutating(state: ReleaseState):
         CIWaitError,
         CI_GREEN,
         CI_NOT_CONFIGURED,
+        CI_TIMEOUT,
         get_current_branch,
         should_tag,
         tag_exists_locally,
@@ -1742,13 +1791,31 @@ def _run_release_mutating(state: ReleaseState):
                         candidate_sha=candidate_sha, detail=str(_cw),
                     ))
                 if _verdict == CI_NOT_CONFIGURED:
-                    log(
-                        "No push-triggered CI workflow is configured in "
-                        ".github/workflows; proceeding without a CI gate."
+                    # Deliberately unconditional and on stderr: this notice is
+                    # the operator's only signal that the release shipped with
+                    # NO CI gate, and --quiet must not be able to swallow it.
+                    print(
+                        "rlsbl: no push-triggered CI workflow is configured in "
+                        ".github/workflows; proceeding without a CI gate.",
+                        file=sys.stderr,
                     )
+                elif _verdict == CI_TIMEOUT:
+                    _unresolved = ", ".join(
+                        r["name"] for r in _ci_results if r.get("timed_out")
+                    ) or "unknown workflow"
+                    _detail = (
+                        f"Unresolved workflow(s) after {_ci_timeout}s: "
+                        f"{_unresolved}"
+                    )
+                    save_step_failure(_state_path, "CI_VERIFIED", _detail)
+                    raise ReleaseCIError(_ci_timeout_message(
+                        version=new_version, tag=tag, branch=branch,
+                        candidate_sha=candidate_sha, detail=_detail,
+                    ))
                 elif _verdict != CI_GREEN:
                     _red = ", ".join(
-                        r["name"] for r in _ci_results if not r["passed"]
+                        r["name"] for r in _ci_results
+                        if not r["passed"] and not r.get("timed_out")
                     ) or "unknown workflow"
                     _detail = f"Failing workflow(s): {_red}"
                     save_step_failure(_state_path, "CI_VERIFIED", _detail)

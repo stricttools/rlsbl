@@ -375,3 +375,73 @@ class TestRedMessageContent:
             GATE_POLL_SCRIPT
         assert "rlsbl release deprecate" in GATE_POLL_SCRIPT
         assert "Do NOT re-dispatch this publish workflow" in GATE_POLL_SCRIPT
+
+
+# --------------------------------------------------------------------------- #
+# A CI TIMEOUT is not a red CI
+# --------------------------------------------------------------------------- #
+
+
+class TestCITimeoutIsNotRed:
+    """A wait that ran out of time proves nothing about the candidate.
+
+    Regression: _watch_single_run returned ``passed=False`` on a
+    TimeoutExpired, so an unresolved run was aggregated into a red verdict and
+    the operator was handed the deterministic-failure remedy ("a failure baked
+    into the code fails identically every time") for runs that were very
+    possibly still going.
+    """
+
+    def test_timeout_gets_its_own_honest_message(self, tmp_project, capsys):
+        core = _setup_releasable_workspace(tmp_project)
+
+        with pytest.raises(SystemExit) as exc:
+            _run(core, tmp_project, verdict="timeout")
+        assert exc.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "ran out of time" in err
+        assert "may still be in progress" in err
+        assert "NOT a CI failure" in err
+        assert "rlsbl watch" in err, "the operator must be told how to check"
+        assert "rlsbl release resume" in err
+        assert "fails identically every time" not in err, (
+            "the deterministic-failure remedy must not be given for a timeout"
+        )
+
+    def test_timeout_leaves_the_release_resumable_at_the_same_version(
+        self, tmp_project,
+    ):
+        core = _setup_releasable_workspace(tmp_project)
+        with pytest.raises(SystemExit):
+            _run(core, tmp_project, verdict="timeout")
+
+        assert TAG not in _tags(tmp_project)
+        state = load_release_state(_state_path(tmp_project))
+        assert state is not None and state["new_version"] == VERSION
+        assert "CI_VERIFIED" in state.get("failed_steps", {})
+        assert "Unresolved workflow(s)" in state["failed_steps"]["CI_VERIFIED"]
+
+    def test_timeout_message_content(self):
+        from rlsbl.commands.release.execute import _ci_timeout_message
+
+        msg = _ci_timeout_message(
+            version="1.2.3", tag="v1.2.3", branch="main",
+            candidate_sha="a" * 40,
+            detail="Unresolved workflow(s) after 60s: ci",
+        )
+        assert "NOT a CI failure" in msg
+        assert "not burnt" in msg.lower()
+        assert "--ci-timeout" in msg, "the budget knob must be named"
+        assert "fails identically every time" not in msg
+
+
+class TestNoCIGateNoticeSurvivesQuiet:
+    """The 'proceeding without a CI gate' notice is the only signal that a
+    release shipped ungated -- --quiet must not be able to swallow it."""
+
+    def test_notice_reaches_stderr_under_quiet(self, tmp_project, capsys):
+        core = _setup_releasable_workspace(tmp_project)
+        _run(core, tmp_project, verdict="no-ci")
+        err = capsys.readouterr().err
+        assert "without a CI gate" in err
