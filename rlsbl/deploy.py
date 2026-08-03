@@ -6,7 +6,6 @@ import socket
 import subprocess
 import sys
 import time
-import urllib.request
 
 from .errors import ConfigError
 from . import effects
@@ -213,7 +212,7 @@ def _check_health_http(config):
 
     while time.monotonic() < deadline:
         try:
-            resp = urllib.request.urlopen(url, timeout=5)
+            resp = effects.urlopen(url, timeout=5)
             if resp.status == 200:
                 return True, f"HTTP health check passed: {url}"
         except Exception as e:

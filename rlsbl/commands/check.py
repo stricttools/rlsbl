@@ -45,7 +45,7 @@ def _request_with_backoff(url, timeout=5, max_retries=3, headers=None):
     last_exc = None
     for attempt in range(max_retries):
         try:
-            return urllib.request.urlopen(req, timeout=timeout)
+            return effects.urlopen(req, timeout=timeout)
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 last_exc = e

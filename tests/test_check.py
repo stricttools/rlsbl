@@ -127,7 +127,7 @@ class TestCheckGo:
 class TestCheckGitHub:
     """Tests for check_github_availability."""
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_github_available_on_zero_count(self, mock_urlopen):
         """Zero total_count means the name is unique on GitHub."""
         mock_urlopen.return_value = FakeResponse({"total_count": 0, "items": []})
@@ -135,7 +135,7 @@ class TestCheckGitHub:
         assert result["status"] == "available"
         assert result["count"] == 0
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_github_exists_on_nonzero_count(self, mock_urlopen):
         """Non-zero total_count means repos with this name exist."""
         mock_urlopen.return_value = FakeResponse({"total_count": 5, "items": []})
@@ -145,7 +145,7 @@ class TestCheckGitHub:
         assert "note" in result
         assert "5" in result["note"]
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_github_error_on_exception(self, mock_urlopen):
         """A network error returns error status."""
         mock_urlopen.side_effect = URLError("Connection refused")
@@ -262,7 +262,7 @@ class TestCheckTargetRequired:
 class TestRequestWithBackoff:
     """Tests for the _request_with_backoff retry helper."""
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_successful_request_no_retry(self, mock_urlopen):
         """A successful request returns the response without retrying."""
         fake_resp = FakeResponse(b"OK")
@@ -272,7 +272,7 @@ class TestRequestWithBackoff:
         assert mock_urlopen.call_count == 1
 
     @patch("rlsbl.commands.check.time.sleep")
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_429_with_retry_after_header(self, mock_urlopen, mock_sleep):
         """HTTP 429 with Retry-After header sleeps that many seconds then succeeds."""
         headers_429 = MagicMock()
@@ -289,7 +289,7 @@ class TestRequestWithBackoff:
         mock_sleep.assert_called_once_with(3.0)
 
     @patch("rlsbl.commands.check.time.sleep")
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_429_without_retry_after_uses_exponential_backoff(self, mock_urlopen, mock_sleep):
         """HTTP 429 without Retry-After uses exponential backoff (2, 4, ...)."""
         headers_429 = MagicMock()
@@ -311,7 +311,7 @@ class TestRequestWithBackoff:
         assert mock_sleep.call_args_list[1][0][0] == 4
 
     @patch("rlsbl.commands.check.time.sleep")
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_max_retries_exhausted_raises(self, mock_urlopen, mock_sleep):
         """After exhausting max_retries on 429, raises the last HTTPError."""
         headers_429 = MagicMock()
@@ -329,7 +329,7 @@ class TestRequestWithBackoff:
         assert mock_sleep.call_count == 3
 
     @patch("rlsbl.commands.check.time.sleep")
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_non_429_http_error_not_retried(self, mock_urlopen, mock_sleep):
         """Non-429 HTTP errors are raised immediately without retrying."""
         error_500 = HTTPError(
@@ -581,7 +581,7 @@ class TestNpmMonikerNormalize:
 class TestSearchNpmSimilar:
     """Tests for _search_npm_similar."""
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_finds_moniker_conflict(self, mock_urlopen):
         """When API returns a package with matching moniker, it is reported."""
         mock_urlopen.return_value = FakeResponse({
@@ -593,21 +593,21 @@ class TestSearchNpmSimilar:
         result = _search_npm_similar("selfdoc")
         assert result == ["self-doc"]
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_no_similar_results(self, mock_urlopen):
         """When API returns no results, returns empty list."""
         mock_urlopen.return_value = FakeResponse({"objects": []})
         result = _search_npm_similar("selfdoc")
         assert result == []
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_network_error_raises(self, mock_urlopen):
         """Network errors propagate as exceptions (no silent degradation)."""
         mock_urlopen.side_effect = URLError("Connection refused")
         with pytest.raises(URLError):
             _search_npm_similar("selfdoc")
 
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_no_moniker_match(self, mock_urlopen):
         """When results exist but none have matching monikers, returns empty."""
         mock_urlopen.return_value = FakeResponse({
@@ -855,7 +855,7 @@ class TestRetryVisibility:
     """Tests for retry visibility: _request_with_backoff prints to stderr on 429."""
 
     @patch("rlsbl.commands.check.time.sleep")
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_429_with_retry_after_prints_to_stderr(self, mock_urlopen, mock_sleep):
         """HTTP 429 with Retry-After header prints rate-limit message to stderr."""
         headers_429 = MagicMock()
@@ -871,7 +871,7 @@ class TestRetryVisibility:
         assert "Rate limited, retrying in" in mock_stderr.getvalue()
 
     @patch("rlsbl.commands.check.time.sleep")
-    @patch("rlsbl.commands.check.urllib.request.urlopen")
+    @patch("rlsbl.effects.urlopen")
     def test_429_without_retry_after_prints_to_stderr(self, mock_urlopen, mock_sleep):
         """HTTP 429 without Retry-After header prints rate-limit message to stderr."""
         headers_429 = MagicMock()

@@ -875,7 +875,7 @@ def is_private_repo():
         )
         req.add_header("Authorization", f"Bearer {token.strip()}")
         req.add_header("User-Agent", "rlsbl-cli")
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with effects.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
             return data.get("private", False)
     except Exception:

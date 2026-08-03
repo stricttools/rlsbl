@@ -41,7 +41,7 @@ def _make_request(url, token):
     if token:
         req.add_header("Authorization", f"token {token}")
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with effects.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             headers = dict(resp.headers)
             return data, headers
@@ -60,7 +60,7 @@ def _make_request(url, token):
         retry_req.add_header("User-Agent", "rlsbl-cli")
         if token:
             retry_req.add_header("Authorization", f"token {token}")
-        with urllib.request.urlopen(retry_req, timeout=15) as resp:
+        with effects.urlopen(retry_req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             headers = dict(resp.headers)
             return data, headers
@@ -126,7 +126,7 @@ def _get_authenticated_user(token):
         req.add_header("Accept", "application/vnd.github+json")
         req.add_header("User-Agent", "rlsbl-cli")
         req.add_header("Authorization", f"token {token}")
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with effects.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             return data.get("login")
     except Exception:

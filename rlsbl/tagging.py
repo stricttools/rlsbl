@@ -10,6 +10,7 @@ import urllib.error
 import tomlkit
 
 from .utils import extract_github_repo_from_remote, run, run_gh
+from . import effects
 
 
 def ensure_npm_keyword(dir_path=".", quiet=False, *, project_root):
@@ -39,9 +40,9 @@ def ensure_npm_keyword(dir_path=".", quiet=False, *, project_root):
 
     # Atomic write: write to temp file, then rename
     tmp_path = pkg_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         f.write(output)
-    os.replace(tmp_path, pkg_path)
+    effects.replace(tmp_path, pkg_path)
 
     if not quiet:
         print('Tagged package.json with "rlsbl" keyword')
@@ -69,9 +70,9 @@ def ensure_pypi_keyword(dir_path=".", quiet=False, *, project_root):
         keywords.append("rlsbl")
 
     tmp_path = pyproject_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(doc))
-    os.replace(tmp_path, pyproject_path)
+    effects.replace(tmp_path, pyproject_path)
 
     if not quiet:
         print('Tagged pyproject.toml with "rlsbl" keyword')
@@ -124,7 +125,7 @@ def ensure_github_topic(quiet=False):
     # GET existing topics
     try:
         req = urllib.request.Request(api_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with effects.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
         if not quiet:
@@ -141,7 +142,7 @@ def ensure_github_topic(quiet=False):
     try:
         req = urllib.request.Request(api_url, data=payload, headers=headers, method="PUT")
         req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with effects.urlopen(req, timeout=15) as resp:
             resp.read()  # consume response
     except (urllib.error.URLError, OSError) as e:
         if not quiet:
