@@ -67,6 +67,7 @@ order: 90
 - [rlsbl.commands.release.shared](rlsbl-commands-release-shared.html)
 - [rlsbl.commands.release.validate](rlsbl-commands-release-validate.html)
 - [rlsbl.commands.release_init](rlsbl-commands-release_init.html)
+- [rlsbl.commands.release_reconcile](rlsbl-commands-release_reconcile.html)
 - [rlsbl.commands.release_retry](rlsbl-commands-release_retry.html)
 - [rlsbl.commands.release_scrub](rlsbl-commands-release_scrub.html)
 - [rlsbl.commands.status](rlsbl-commands-status.html)
