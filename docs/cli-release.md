@@ -20,6 +20,9 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--push-timeout` |  | int |  |  | Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default. |
+| `--ci-timeout` |  | int |  |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; 0 (the default) means use ci_timeout, else the shipped default. |
+| `--check-timeout` |  | int |  |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; 0 (the default) means use check_timeout, else the shipped default. |
+| `--hook-timeout` |  | int |  |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; 0 (the default) means use hook_timeout, else no timeout. |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 | `--allow-dirty` |  | bool |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
 | `--bump` |  | str |  |  | Bump type: patch, minor, major, infra, prerelease. Skips the release file. |
@@ -35,6 +38,9 @@ Resume a previously failed release from where it left off. Reads the in-progress
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--push-timeout` |  | int |  |  | Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default. |
+| `--ci-timeout` |  | int |  |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; 0 (the default) means use ci_timeout, else the shipped default. |
+| `--check-timeout` |  | int |  |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; 0 (the default) means use check_timeout, else the shipped default. |
+| `--hook-timeout` |  | int |  |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; 0 (the default) means use hook_timeout, else no timeout. |
 | `--watch` |  | bool |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 
 ## release init
@@ -122,3 +128,13 @@ Scrub sensitive content from git history and update release metadata to match th
 | `--recipe` |  | str |  |  | Recipe mode: path to a scrub recipe TOML file executed via safegit scrub run; per-operation pattern/replace/mangle live inside the recipe (mutually exclusive with --pattern and --file) |
 | `--from-commit` |  | str |  |  | SHA of the earliest commit to rewrite (all descendants are also rewritten) |
 | `--entire-history` |  | bool |  |  | Rewrite every commit in the repository from the initial commit onward (match and recipe modes only; file mode requires --from-commit) |
+
+## release reconcile
+
+Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--push-timeout` |  | int |  |  | Timeout in seconds for each tag push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default. |
