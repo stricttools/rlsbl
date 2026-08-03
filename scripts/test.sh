@@ -34,6 +34,7 @@
 #   scripts/test.sh                 # full suite, configured default args
 #   scripts/test.sh -k foo -x       # forward args to the test command
 #   scripts/test.sh --selftest      # prove the sandbox invariants
+#   scripts/test.sh --sweep-only    # reclaim scratch leaked by killed runs
 #
 set -euo pipefail
 
@@ -145,6 +146,68 @@ if has_cache python_user_base; then
   export USERBASE
 fi
 
+# --- orphaned scratch sweep --------------------------------------------------
+# The runner's scratch dirs (the writable tree copy under TMPDIR, and the uv
+# cache clone beside the real cache) are removed by the EXIT trap below. A run
+# that dies without running its trap -- SIGKILL, OOM, a closed terminal, a
+# cancelled CI job -- leaks a full copy of the repo, and enough of those fill a
+# tmpfs /tmp outright. So every run sweeps its OWN leftovers before allocating
+# new ones.
+#
+# Ownership is tracked with a sidecar `<scratch-dir>.pid` file -- a sidecar
+# rather than a file inside the dir, so the working copy of the repo and the
+# cloned uv cache stay byte-identical to their sources. A scratch dir is
+# orphaned when its owner process is gone (or was never recorded) AND it has not
+# been touched for the grace window; the grace window keeps the sweep off a
+# concurrent run that has mktemp'd its dir but not yet written the sidecar. A
+# dir whose owner PID is still alive is left alone until the hard-stale age,
+# past which the PID has certainly been recycled -- no sandbox run lasts a day.
+SANDBOX_SCRATCH_GRACE_MIN="${SANDBOX_SCRATCH_GRACE_MIN:-5}"
+SANDBOX_SCRATCH_HARD_STALE_MIN="${SANDBOX_SCRATCH_HARD_STALE_MIN:-1440}"
+
+scratch_older_than() {
+  [ -n "$(find "$1" -maxdepth 0 -mmin "+$2" 2>/dev/null)" ]
+}
+
+sweep_orphaned_scratch() {
+  local dir pidfile owner swept=0
+  for dir in "$@"; do
+    [ -d "${dir}" ] || continue
+    pidfile="${dir}.pid"
+    owner=""
+    if [ -f "${pidfile}" ]; then
+      owner="$(cat "${pidfile}" 2>/dev/null || true)"
+    fi
+    if [ -n "${owner}" ] && kill -0 "${owner}" 2>/dev/null \
+       && ! scratch_older_than "${dir}" "${SANDBOX_SCRATCH_HARD_STALE_MIN}"; then
+      continue
+    fi
+    scratch_older_than "${dir}" "${SANDBOX_SCRATCH_GRACE_MIN}" || continue
+    # The runner's own transient scratch, never user data: removed outright
+    # rather than archived (these are gigabytes of throwaway tree copies).
+    chmod -R u+w "${dir}" 2>/dev/null || true
+    rm -rf "${dir}" "${pidfile}"
+    swept=$((swept + 1))
+  done
+  if [ "${swept}" -gt 0 ]; then
+    echo "[sandbox] swept ${swept} orphaned scratch dir(s)" >&2
+  fi
+  return 0
+}
+
+SCRATCH_CANDIDATES=("${TMPDIR:-/tmp}"/test-sandbox-work.*)
+if has_cache uv; then
+  SCRATCH_CANDIDATES+=("${UV_CACHE}".sandbox.*)
+fi
+sweep_orphaned_scratch "${SCRATCH_CANDIDATES[@]}"
+
+# `--sweep-only` reclaims orphaned scratch and exits, without pre-warming or
+# entering the sandbox. It is how the suite exercises the sweep directly, and
+# how a human reclaims space after a run was killed.
+if [ "${1:-}" = "--sweep-only" ]; then
+  exit 0
+fi
+
 # --- pre-warm (OUTSIDE the sandbox, network allowed) -------------------------
 # Config-declared commands (test_sandbox.prewarm), run from the project root
 # before the sandbox is entered, so an offline in-sandbox build hits a warm
@@ -159,12 +222,18 @@ scripts/test-prewarm.sh
 # real git history). Excludes virtualenvs (absolute paths break on move) and
 # disposable caches. ---
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/test-sandbox-work.XXXXXX")"
+echo $$ >"${WORK}.pid"
 if has_cache uv; then
   UV_CACHE_COPY="$(mktemp -d "${UV_CACHE}.sandbox.XXXXXX")"
+  echo $$ >"${UV_CACHE_COPY}.pid"
 fi
 cleanup() {
-  chmod -R u+w "${WORK}" ${UV_CACHE_COPY:+"${UV_CACHE_COPY}"} 2>/dev/null || true
-  rm -rf "${WORK}" ${UV_CACHE_COPY:+"${UV_CACHE_COPY}"}
+  local paths=("${WORK}" "${WORK}.pid")
+  if [ -n "${UV_CACHE_COPY}" ]; then
+    paths+=("${UV_CACHE_COPY}" "${UV_CACHE_COPY}.pid")
+  fi
+  chmod -R u+w "${paths[@]}" 2>/dev/null || true
+  rm -rf "${paths[@]}"
 }
 trap cleanup EXIT
 if has_cache uv; then
