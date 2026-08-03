@@ -1,6 +1,6 @@
 ---
 title: rlsbl pre-push-check
-description: "Verify that every pushed commit has a JSONL changelog entry, run as a git pre-push hook to block pushes without documented coverage."
+description: "Retired stub: the pre-push hook now runs `rlsbl check --tag prepush`, so this command performs no check and only tells you to re-scaffold."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 10

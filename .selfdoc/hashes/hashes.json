@@ -44,8 +44,8 @@
     "schema_hash": "ef9e3815f96d65ef5605451a856f64ecb12db663391e865b69b339fa2998eb91"
   },
   "en/cli-dev.md": {
-    "content": "f2d7af56bba21a9ca156b8c3026bc83b136b0f334663ddf8e34c53e5512cb79a",
-    "description": "7e5d7e70dc1156c6bc7ae83faaa6c61f13976b929da84fd09d8bba9c2427f873",
+    "content": "e6246f653e5c82940fd12c2c014317ec8fa207d95e3f984aaf82ccec63fd1d9d",
+    "description": "ae1427eaebf51d6203160f6427aa3c8203ddd6ab8a4ea6a52868f110d5b6bb35",
     "schema_hash": "dd4b6b589ccf248ae1d313c11474e1fa1127d0268cfb1e33d5dd2c53fdb14160"
   },
   "en/cli-discover.md": {
@@ -69,8 +69,8 @@
     "schema_hash": "25188aba7292c4e98532ab9f7d350a0bc886b688f994ed3ffc9c7319f8d2e95c"
   },
   "en/cli-pre-push-check.md": {
-    "content": "8660161d226f3d579c70f2c99d5391bd177e57b1de28cc52c14f45668e1b94d5",
-    "description": "5cb7137f4eedb386cdc26b6bc45a1ac29270cf46bb560594fd4d4e828589307c",
+    "content": "1d37536f64a77ff5246986c4999217c1fb3f910ad9cb7a738a9b5b3a56c32e11",
+    "description": "deb4bcfb2b76bdd6c92e8412114675a821c881697c14ad139e9d7101a85d58c8",
     "schema_hash": "c9bdda7fdecdf4e3e8a67c9c95cecc299c643a26cf20e711f4a18f2ca2b9daba"
   },
   "en/cli-prs.md": {
@@ -89,8 +89,8 @@
     "schema_hash": "8ec11c80f2ba2db1ea6f1ccdb6d2f8aebce1c0386f499a42919083e4215beb23"
   },
   "en/cli-release.md": {
-    "content": "775c918bb1d76cd44800d90e616751f99e9a3ada17d27d4a5631386c63297214",
-    "description": "426161d0837c91b54d0b9fcc5d6e5baea2149f391a4cc8f18c8709333c62e0f9",
+    "content": "903322450a4323f3bfc9d04231ea1aee1cc75b6ca1b3221a85afaccd2cca95f2",
+    "description": "36f8fe259c65a9e7b5c2b0b74120bb30830446993a241416b5f2478277e4ad28",
     "schema_hash": "babd225223a5e2081e9daa72b36de0d219b0621b2908214cfbdd193ac74ef577"
   },
   "en/cli-scaffold.md": {
@@ -119,8 +119,8 @@
     "schema_hash": "2b4364201d7b5c2bceee2baca1f8bddf521302fcf5c4ca76be5e02502d786c41"
   },
   "en/configuration.md": {
-    "content": "15fca5e7eac436bb922856740fb806b280621ae78bd29e034fdaec45434765ac",
-    "description": "d542f6c05acb3edfb98b75979a91d4db8eca3c5f6176511cc42bf68ebf0648b9",
+    "content": "f77651c379053fdf28c206004fb982ab4350c45b75d9a089f99877fa8049e537",
+    "description": "0aa261cec0e694bb7eb362627b2458d7bfdb2168c0fca2f1e8b4af758204b39e",
     "source_docstring": "f63ecdc06d0960176c03f8e153c8f9ac925ae3dc16a8edba4ae41c09c5c57e8c"
   },
   "en/dep-validation.md": {
