@@ -1,6 +1,6 @@
 ---
 title: rlsbl dev
-description: "Developer utilities for rlsbl projects: per-target local installs (global for 7 targets, venv for 4), sibling checkout overlays via dev sync, and overlay drift reporting."
+description: "Developer utilities for rlsbl projects: per-target local installs, sibling checkout overlays via dev sync, and overlay drift reporting."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 7

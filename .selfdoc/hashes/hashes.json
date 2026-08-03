@@ -45,7 +45,7 @@
   },
   "en/cli-dev.md": {
     "content": "e6246f653e5c82940fd12c2c014317ec8fa207d95e3f984aaf82ccec63fd1d9d",
-    "description": "ae1427eaebf51d6203160f6427aa3c8203ddd6ab8a4ea6a52868f110d5b6bb35",
+    "description": "ec3ebf23770a8289a6d7a67a97322d65ae7a406c78f1a0ac36312dc5a0a36fc6",
     "schema_hash": "7fbb69fe88fb4b4c49349cc97fb9598233a82d9d8312d0b37bff978b83ba55b0"
   },
   "en/cli-discover.md": {
@@ -90,7 +90,7 @@
   },
   "en/cli-release.md": {
     "content": "903322450a4323f3bfc9d04231ea1aee1cc75b6ca1b3221a85afaccd2cca95f2",
-    "description": "36f8fe259c65a9e7b5c2b0b74120bb30830446993a241416b5f2478277e4ad28",
+    "description": "ef016a2e189c5995dced271d1714ab29e9f495b004bb5e54e5fefda8474c63ea",
     "schema_hash": "c539a93abafa38dc1a3ef7db4b138db2993d541729c52884aab72e3f1511038e"
   },
   "en/cli-scaffold.md": {
@@ -120,7 +120,7 @@
   },
   "en/configuration.md": {
     "content": "5d52a88793cf43ee575c9d1354efdca612a87e85f471ec69adf44d98487ac4fd",
-    "description": "0aa261cec0e694bb7eb362627b2458d7bfdb2168c0fca2f1e8b4af758204b39e",
+    "description": "bca0db1d4b6fc87a957a522195db56345021da976cbfe02f28e15ed87632e5d8",
     "source_docstring": "f63ecdc06d0960176c03f8e153c8f9ac925ae3dc16a8edba4ae41c09c5c57e8c"
   },
   "en/dep-validation.md": {
