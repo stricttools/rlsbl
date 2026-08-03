@@ -6,6 +6,7 @@ from ruamel.yaml import YAML
 
 from .base import BaseTarget
 from ..errors import VersionError
+from .. import effects
 
 
 class DartTarget(BaseTarget):
@@ -65,9 +66,9 @@ class DartTarget(BaseTarget):
         data["version"] = new_version
 
         tmp_path = pubspec + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             yaml.dump(data, f)
-        os.replace(tmp_path, pubspec)
+        effects.replace(tmp_path, pubspec)
         return [self.version_file()]
 
     def _compute_version_with_build_number(self, old_version, new_semver, dir_path, ctx):

@@ -345,9 +345,9 @@ class MavenTarget(BaseTarget):
 
         # Atomic write
         tmp_path = catalog_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             tomlkit.dump(doc, f)
-        os.replace(tmp_path, catalog_path)
+        effects.replace(tmp_path, catalog_path)
 
         return os.path.relpath(catalog_path, dir_path)
 
@@ -464,9 +464,9 @@ class MavenTarget(BaseTarget):
             with open(tmp_path, "r", encoding="utf-8") as f:
                 xml_content = f.read()
             if not xml_content.endswith("\n"):
-                with open(tmp_path, "a", encoding="utf-8") as f:
+                with effects.open_write(tmp_path, "a", encoding="utf-8") as f:
                     f.write("\n")
-            os.replace(tmp_path, filepath)
+            effects.replace(tmp_path, filepath)
             return [rel_path]
 
         else:
@@ -474,9 +474,9 @@ class MavenTarget(BaseTarget):
 
         # Atomic write for non-XML formats
         tmp_path = filepath + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             f.write(new_content)
-        os.replace(tmp_path, filepath)
+        effects.replace(tmp_path, filepath)
         return [rel_path]
 
     def version_file(self, dir_path=None):

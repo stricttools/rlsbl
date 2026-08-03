@@ -35,6 +35,7 @@ from .release_reconcile import (
     recreate_github_releases,
     snapshot_remote_refs as _snapshot_remote_refs_impl,
 )
+from .. import effects
 
 # Minimum safegit release the scrub flow is built against: the flow depends on
 # --remap-shas-in (in-history changelog hash remapping), the persisted rewrite
@@ -52,9 +53,9 @@ def _save_step(path, data, step_name):
     """Record a completed step in the scrub result file."""
     data["completed_steps"].append(step_name)
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
-    os.replace(tmp, path)
+    effects.replace(tmp, path)
 
 
 def _fail(msg):
@@ -518,9 +519,9 @@ def _require_cleanup_ok(scrub_data, scrub_result_path):
         )
         scrub_data["cleanup_ok"] = True
         tmp = scrub_result_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp, "w", encoding="utf-8") as f:
             json.dump(scrub_data, f, indent=2)
-        os.replace(tmp, scrub_result_path)
+        effects.replace(tmp, scrub_result_path)
         return
 
     still_present = []
@@ -539,9 +540,9 @@ def _require_cleanup_ok(scrub_data, scrub_result_path):
         )
         scrub_data["cleanup_ok"] = True
         tmp = scrub_result_path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp, "w", encoding="utf-8") as f:
             json.dump(scrub_data, f, indent=2)
-        os.replace(tmp, scrub_result_path)
+        effects.replace(tmp, scrub_result_path)
         return
 
     print(
@@ -617,9 +618,9 @@ def _regenerate_and_assert_unchanged(proj_path, scrub_result_path):
     for p, before, _after in diffs:
         if before is None:
             if os.path.exists(p):
-                os.unlink(p)
+                effects.remove(p)
         else:
-            with open(p, "wb") as f:
+            with effects.open_write(p, "wb") as f:
                 f.write(before)
 
     print(
@@ -787,11 +788,11 @@ def run_cmd(flags, *, ctx):
         # Save scrub-result.json for resume support
         scrub_data["completed_steps"] = []
         scrub_data["remote_refs"] = remote_refs or {}
-        os.makedirs(os.path.dirname(scrub_result_path), exist_ok=True)
+        effects.makedirs(os.path.dirname(scrub_result_path), exist_ok=True)
         tmp_path = scrub_result_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             json.dump(scrub_data, f, indent=2)
-        os.replace(tmp_path, scrub_result_path)
+        effects.replace(tmp_path, scrub_result_path)
 
     # -- Parse results --
     rewrites = scrub_data.get("rewrites", {})
@@ -802,7 +803,7 @@ def run_cmd(flags, *, ctx):
         print("No matches found, nothing to do.")
         # Clean up scrub-result.json if it exists
         if os.path.exists(scrub_result_path):
-            os.unlink(scrub_result_path)
+            effects.remove(scrub_result_path)
         # Same validation/repair as the empty-stdout no-match path above.
         _no_match_validate_and_repair(
             project_root, ctx.workspace_root, workspace_projects,
@@ -923,7 +924,7 @@ def run_cmd(flags, *, ctx):
                     run("git", ["ls-files", "--error-unmatch", validated])
                 except Exception:
                     tracked = False
-                os.unlink(validated)
+                effects.remove(validated)
                 if tracked:
                     deleted_validated.append(validated)
 
@@ -947,12 +948,12 @@ def run_cmd(flags, *, ctx):
             new_head = scrub_data.get("new_head", "")
             if new_head:
                 archive_path = _get_archive_path(scrub_result_path, new_head)
-                os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+                effects.makedirs(os.path.dirname(archive_path), exist_ok=True)
                 archive = _build_scrub_archive(scrub_data, mode, flags["reason"])
                 tmp_archive = archive_path + ".tmp"
-                with open(tmp_archive, "w", encoding="utf-8") as f:
+                with effects.open_write(tmp_archive, "w", encoding="utf-8") as f:
                     json.dump(archive, f, indent=2)
-                os.replace(tmp_archive, archive_path)
+                effects.replace(tmp_archive, archive_path)
                 modified_files.append(archive_path)
 
             # Only commit if there are modified files
@@ -1026,7 +1027,7 @@ def run_cmd(flags, *, ctx):
 
         # -- Cleanup and summary --
         if os.path.exists(scrub_result_path):
-            os.unlink(scrub_result_path)
+            effects.remove(scrub_result_path)
 
         releases_count = sum(
             1 for t in tags

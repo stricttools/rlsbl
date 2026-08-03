@@ -932,8 +932,8 @@ def _finalize_batch_file(batch_path, log):
     versioned_name = f"{versioned_stem}.toml"
     versioned_path = os.path.join(releases_dir, versioned_name)
 
-    os.rename(batch_path, versioned_path)
-    os.chmod(versioned_path, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # 444
+    effects.rename(batch_path, versioned_path)
+    effects.chmod(versioned_path, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # 444
 
     # Commit finalized files
     finalize_files = [

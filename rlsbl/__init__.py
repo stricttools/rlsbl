@@ -541,7 +541,7 @@ def cmd_release_retry(ctx, dry_run, yes, quiet, watch):
             # Clean up the invalid file so it doesn't block subsequent
             # `rlsbl release run` with a dirty working tree.
             if os.path.exists(retry_path):
-                os.remove(retry_path)
+                effects.remove(retry_path)
             print(
                 "Hint: `rlsbl release retry` is for dispatching CI after a "
                 "completed release. To re-run a failed release, use "

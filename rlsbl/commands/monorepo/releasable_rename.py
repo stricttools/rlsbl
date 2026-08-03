@@ -164,9 +164,9 @@ def _apply_workspace_rename(root, old, new):
 
     if changed:
         tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp, "w", encoding="utf-8") as f:
             f.write(tomlkit.dumps(doc))
-        os.replace(tmp, path)
+        effects.replace(tmp, path)
 
     return changed
 
@@ -190,7 +190,7 @@ def _apply_local_rename(root, old, new):
     old_dir = get_releasable_dir(root, old)
     new_dir = get_releasable_dir(root, new)
     if os.path.isdir(old_dir) and not os.path.isdir(new_dir):
-        os.rename(old_dir, new_dir)
+        effects.rename(old_dir, new_dir)
 
     # Step 3: drop the moved changes/.validated cache (stale after prefix change).
     validated = os.path.join(get_releasable_changes_dir(root, new), ".validated")

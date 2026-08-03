@@ -34,6 +34,7 @@ import sys
 from dataclasses import dataclass
 
 from ...utils import tag_exists_locally, tag_exists_on_remote
+from ... import effects
 
 
 PLAN_FILENAME = "unreleased.plan.json"
@@ -94,12 +95,12 @@ def write_batch_plan(path: str, plan: BatchPlan) -> None:
             for it in plan.items.values()
         ],
     }
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    effects.makedirs(os.path.dirname(path), exist_ok=True)
     tmp_path = path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, sort_keys=True)
         f.write("\n")
-    os.replace(tmp_path, path)
+    effects.replace(tmp_path, path)
 
 
 def read_batch_plan(path: str) -> BatchPlan:
@@ -347,6 +348,6 @@ def archive_plan_file(plan_path: str, versioned_stem: str) -> list[str]:
         return []
     releases_dir = os.path.dirname(plan_path)
     versioned_plan = os.path.join(releases_dir, f"{versioned_stem}.plan.json")
-    os.rename(plan_path, versioned_plan)
-    os.chmod(versioned_plan, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # 444
+    effects.rename(plan_path, versioned_plan)
+    effects.chmod(versioned_plan, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # 444
     return [os.path.normpath(versioned_plan), os.path.normpath(plan_path)]

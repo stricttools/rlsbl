@@ -2,7 +2,6 @@
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -108,7 +107,7 @@ def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
         ) from e
     finally:
         if tmp_changelog and os.path.exists(tmp_changelog.name):
-            os.unlink(tmp_changelog.name)
+            effects.remove(tmp_changelog.name)
 
     return True
 
@@ -170,7 +169,7 @@ def _prefix_artifact(artifact_path, member_name):
     basename = os.path.basename(artifact_path)
     prefixed = f"{member_name}--{basename}"
     new_path = os.path.join(dirname, prefixed)
-    os.rename(artifact_path, new_path)
+    effects.rename(artifact_path, new_path)
     return new_path
 
 
@@ -244,7 +243,7 @@ def _upload_assets_for_config(
                     file_name = os.path.basename(artifact_path)
                     actual_mb = file_size / (1024 * 1024)
                     if os.path.isdir(dist_dir):
-                        shutil.rmtree(dist_dir)
+                        effects.rmtree(dist_dir)
                     raise ReleaseValidationError(
                         f"artifact '{file_name}' is {actual_mb:.1f}MB, "
                         f"exceeds max_asset_size_mb ({max_size_mb}MB) for pipeline {label}."
@@ -257,7 +256,7 @@ def _upload_assets_for_config(
             print(f"Warning: asset upload failed for pipeline {label}: {e}", file=sys.stderr)
 
         if os.path.isdir(dist_dir):
-            shutil.rmtree(dist_dir)
+            effects.rmtree(dist_dir)
 
 
 def upload_release_assets(tag, new_version, log, flags, *, ctx):

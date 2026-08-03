@@ -7,6 +7,7 @@ import sys
 from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import WorkspaceGraph
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
+from ... import effects
 
 
 def _collect_graph_data(root, projects, graph):
@@ -214,7 +215,7 @@ def _cmd_graph(flags, project_root):
 
     output_file = flags.get("output") or None
     if output_file:
-        with open(output_file, "w", encoding="utf-8") as f:
+        with effects.open_write(output_file, "w", encoding="utf-8") as f:
             f.write(output)
             f.write("\n")
         print(f"Wrote graph to {output_file}")

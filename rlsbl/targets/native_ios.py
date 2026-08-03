@@ -7,6 +7,7 @@ import tempfile
 
 from .base import BaseTarget
 from ..errors import VersionError
+from .. import effects
 
 
 class NativeIosTarget(BaseTarget):
@@ -178,11 +179,11 @@ def _atomic_write(path, content):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
-        os.replace(tmp_path, path)
+        effects.replace(tmp_path, path)
     except BaseException:
         # Clean up temp file on failure
         try:
-            os.unlink(tmp_path)
+            effects.remove(tmp_path)
         except OSError:
             pass
         raise

@@ -326,8 +326,8 @@ def load_managed_files():
 
 def save_managed_files(files):
     """Write the managed-files registry to .rlsbl/managed-files.json."""
-    os.makedirs(os.path.dirname(MANAGED_FILES), exist_ok=True)
-    with open(MANAGED_FILES, "w") as f:
+    effects.makedirs(os.path.dirname(MANAGED_FILES), exist_ok=True)
+    with effects.open_write(MANAGED_FILES, "w") as f:
         json.dump({"version": 1, "files": files}, f, indent=2)
         f.write("\n")
 
@@ -533,8 +533,8 @@ def check_unreplaced_vars(source_path, unreplaced):
 def _save_base(target, content):
     """Save rendered template content as the merge base for future three-way merges."""
     base_path = os.path.join(BASES_DIR, target)
-    os.makedirs(os.path.dirname(base_path), exist_ok=True)
-    with open(base_path, "w", encoding="utf-8") as f:
+    effects.makedirs(os.path.dirname(base_path), exist_ok=True)
+    with effects.open_write(base_path, "w", encoding="utf-8") as f:
         f.write(content)
 
 
@@ -659,7 +659,7 @@ def _three_way_merge(ours_text, base_text, theirs_text):
         for tmp in (ours_tmp, base_tmp, theirs_tmp):
             if tmp is not None:
                 try:
-                    os.unlink(tmp.name)
+                    effects.remove(tmp.name)
                 except OSError:
                     pass
 
@@ -984,8 +984,8 @@ def apply_plans(plans):
         if action in ("write", "write_no_base"):
             target_dir = os.path.dirname(target)
             if target_dir and target_dir != ".":
-                os.makedirs(target_dir, exist_ok=True)
-            with open(target, "w", encoding="utf-8") as f:
+                effects.makedirs(target_dir, exist_ok=True)
+            with effects.open_write(target, "w", encoding="utf-8") as f:
                 f.write(plan["content"])
             if action == "write" and plan.get("base_content") is not None:
                 _save_base(target, plan["base_content"])
@@ -1004,7 +1004,7 @@ def apply_plans(plans):
     for plan in plans:
         target = plan.get("target")
         if plan.get("executable") and target and os.path.exists(target):
-            os.chmod(target, 0o755)
+            effects.chmod(target, 0o755)
 
     return created, skipped, warnings, new_hashes
 
@@ -1129,10 +1129,10 @@ def _install_or_update_hook(hook_name, current_content, current_hash, known_hash
     hook_target = os.path.join(hooks_dir, hook_name)
 
     if not os.path.exists(hook_target):
-        os.makedirs(hooks_dir, exist_ok=True)
-        with open(hook_target, "w", encoding="utf-8") as f:
+        effects.makedirs(hooks_dir, exist_ok=True)
+        with effects.open_write(hook_target, "w", encoding="utf-8") as f:
             f.write(current_content)
-        os.chmod(hook_target, 0o755)
+        effects.chmod(hook_target, 0o755)
         print(f"Installed {hook_name} hook (.git/hooks/{hook_name})")
         return
 
@@ -1144,9 +1144,9 @@ def _install_or_update_hook(hook_name, current_content, current_hash, known_hash
         return
 
     if installed_hash in known_hashes:
-        with open(hook_target, "w", encoding="utf-8") as f:
+        with effects.open_write(hook_target, "w", encoding="utf-8") as f:
             f.write(current_content)
-        os.chmod(hook_target, 0o755)
+        effects.chmod(hook_target, 0o755)
         print(f"Updated {hook_name} hook (was an older rlsbl version).")
         return
 
@@ -1227,7 +1227,7 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     if os.path.isdir(hooks_dir):
         for entry in os.listdir(hooks_dir):
             if entry.endswith(".sh"):
-                os.chmod(os.path.join(hooks_dir, entry), 0o755)
+                effects.chmod(os.path.join(hooks_dir, entry), 0o755)
 
     # Install or update the pre-push hook.
     #
@@ -1245,9 +1245,9 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     # Write scaffolding version marker so the pre-push hook can detect drift
     from rlsbl import __version__
     marker_dir = os.path.join(".", ".rlsbl")
-    os.makedirs(marker_dir, exist_ok=True)
+    effects.makedirs(marker_dir, exist_ok=True)
     marker_path = os.path.join(marker_dir, "version")
-    with open(marker_path, "w") as f:
+    with effects.open_write(marker_path, "w") as f:
         f.write(__version__ + "\n")
     print("Wrote scaffolding version marker (.rlsbl/version)")
 
@@ -1298,7 +1298,7 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                 )
                 # Prune empty parent directories up to BASES_DIR
                 try:
-                    os.removedirs(os.path.dirname(base_path))
+                    effects.removedirs(os.path.dirname(base_path))
                 except OSError:
                     pass
             created.append((orphan_path, "removed (orphan)"))
@@ -1337,7 +1337,7 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                         print(f"Removing orphaned scaffold merge base: {base_abs}")
                         # Prune empty parent directories up to BASES_DIR
                         try:
-                            os.removedirs(os.path.dirname(base_abs))
+                            effects.removedirs(os.path.dirname(base_abs))
                         except OSError:
                             pass
 
@@ -2140,7 +2140,7 @@ def _fill_npm_launcher_manifest(manifest_path, shim_vars, download, *, dry_run=F
             changed = True
 
     if changed and not dry_run:
-        with open(manifest_path, "w", encoding="utf-8") as f:
+        with effects.open_write(manifest_path, "w", encoding="utf-8") as f:
             json.dump(pkg, f, indent=2)
             f.write("\n")
     return pkg.get("name")
@@ -2172,7 +2172,7 @@ def _fill_pypi_launcher_manifest(manifest_path, shim_vars, *, dry_run=False):
             changed = True
 
     if changed and not dry_run:
-        with open(manifest_path, "w", encoding="utf-8") as f:
+        with effects.open_write(manifest_path, "w", encoding="utf-8") as f:
             f.write(tomlkit.dumps(doc))
     return dist_name
 

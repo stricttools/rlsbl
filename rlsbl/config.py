@@ -14,6 +14,7 @@ import sys
 import tempfile
 
 from .errors import ConfigError
+from . import effects
 
 
 def merge_config(base, overlay):
@@ -1045,10 +1046,10 @@ def clean_stale_exclusions(config_path):
     batch_limits["exclusions"] = cleaned
     # Atomic write: tmp file then replace
     tmp_path = config_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
         f.write("\n")
-    os.replace(tmp_path, config_path)
+    effects.replace(tmp_path, config_path)
     return removed
 
 
@@ -1063,10 +1064,10 @@ def update_last_build_release(project_dir, version):
         ) from e
     config["last_build_release"] = version
     tmp_path = config_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
         f.write("\n")
-    os.replace(tmp_path, config_path)
+    effects.replace(tmp_path, config_path)
 
 
 def write_project_config(key, value, project_root):
@@ -1076,7 +1077,7 @@ def write_project_config(key, value, project_root):
     """
     config_path = _project_config(project_root)
     parent = os.path.dirname(config_path)
-    os.makedirs(parent, exist_ok=True)
+    effects.makedirs(parent, exist_ok=True)
     existing = read_json_config(config_path)
     existing[key] = value
     # Atomic write: serialize into a temp file in the same dir, then replace.
@@ -1087,9 +1088,9 @@ def write_project_config(key, value, project_root):
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(existing, f, indent=2)
             f.write("\n")
-        os.replace(tmp_path, config_path)
+        effects.replace(tmp_path, config_path)
     except BaseException:
         if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+            effects.remove(tmp_path)
         raise
     return existing

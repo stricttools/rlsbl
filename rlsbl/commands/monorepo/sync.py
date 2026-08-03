@@ -409,21 +409,21 @@ def scaffold_releasable_dirs(workspace_root):
 
     for rel in releasables:
         rel_dir = get_releasable_dir(workspace_root, rel.name)
-        os.makedirs(rel_dir, exist_ok=True)
+        effects.makedirs(rel_dir, exist_ok=True)
 
         # Version file (user-owned: create if missing, never overwrite)
         version_path = get_releasable_version_path(workspace_root, rel.name)
         if not os.path.isfile(version_path):
-            with open(version_path, "w", encoding="utf-8") as f:
+            with effects.open_write(version_path, "w", encoding="utf-8") as f:
                 f.write("0.0.0\n")
             created_files.append(version_path)
 
         # Changes directory + unreleased.jsonl (user-owned)
         changes_dir = get_releasable_changes_dir(workspace_root, rel.name)
-        os.makedirs(changes_dir, exist_ok=True)
+        effects.makedirs(changes_dir, exist_ok=True)
         unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
         if not os.path.isfile(unreleased_path):
-            with open(unreleased_path, "w", encoding="utf-8") as f:
+            with effects.open_write(unreleased_path, "w", encoding="utf-8") as f:
                 pass  # empty file
             created_files.append(unreleased_path)
 
@@ -508,9 +508,9 @@ def _sync_import_names(root, projects):
 
     # Write back atomically
     tmp = ws_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(doc))
-    os.replace(tmp, ws_path)
+    effects.replace(tmp, ws_path)
 
     return ws_path
 
@@ -552,7 +552,7 @@ def _cmd_sync(flags, project_root):
         )
 
     workflows_dir = os.path.join(root, ".github", "workflows")
-    os.makedirs(workflows_dir, exist_ok=True)
+    effects.makedirs(workflows_dir, exist_ok=True)
 
     written_files = []
     current_project_names = set()
@@ -681,10 +681,10 @@ def _cmd_sync(flags, project_root):
     # Generate CI router (only for projects that have CI workflows)
     router_path = os.path.join(workflows_dir, "ci-router.yml")
     if os.path.isfile(router_path):
-        os.chmod(router_path, 0o644)
-    with open(router_path, "w", encoding="utf-8") as f:
+        effects.chmod(router_path, 0o644)
+    with effects.open_write(router_path, "w", encoding="utf-8") as f:
         f.write(_generate_router(projects_with_ci, releasables=releasables))
-    os.chmod(router_path, 0o444)
+    effects.chmod(router_path, 0o444)
     written_files.append(router_path)
 
     # Generate inline publish router (only if any project has publish.yml)
@@ -704,10 +704,10 @@ def _cmd_sync(flags, project_root):
 
         if should_regenerate_router(cached_hashes, current_hashes, publish_router_path):
             if os.path.isfile(publish_router_path):
-                os.chmod(publish_router_path, 0o644)
-            with open(publish_router_path, "w", encoding="utf-8") as f:
+                effects.chmod(publish_router_path, 0o644)
+            with effects.open_write(publish_router_path, "w", encoding="utf-8") as f:
                 f.write(generate_inline_publish_router(projects_with_publish, root, releasables=releasables))
-            os.chmod(publish_router_path, 0o444)
+            effects.chmod(publish_router_path, 0o444)
             written_files.append(publish_router_path)
 
             cache_path = save_publish_cache(monorepo_dir, current_hashes)
@@ -727,7 +727,7 @@ def _cmd_sync(flags, project_root):
 
         # All *-publish.yml files are stale (we no longer generate per-project wrappers)
         if filename.endswith("-publish.yml"):
-            os.chmod(filepath, 0o644)
+            effects.chmod(filepath, 0o644)
             _saferm_workflow(
                 filepath,
                 f"Removing stale per-project publish wrapper {filename} "
@@ -742,7 +742,7 @@ def _cmd_sync(flags, project_root):
         # {name}-ci-{target}.yml reusable workflows at the root; the router
         # now inlines all CI jobs, so no such copy is ever current.
         if "-ci" in filename and filename.endswith(".yml"):
-            os.chmod(filepath, 0o644)
+            effects.chmod(filepath, 0o644)
             _saferm_workflow(
                 filepath,
                 f"Removing stale per-project CI workflow copy {filename} "

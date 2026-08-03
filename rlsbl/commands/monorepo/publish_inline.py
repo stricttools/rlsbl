@@ -311,6 +311,7 @@ def transform_parsed_jobs(
 # CI-router job-key helpers live in the low-level rlsbl.ci_router module so the
 # check layer can share them without importing from the command layer.
 from ...ci_router import _router_ci_check_regex  # noqa: E402
+from ... import effects
 
 
 def _require_root_publish_gate_regex(project: dict, root: str) -> str:
@@ -586,7 +587,7 @@ def save_publish_cache(monorepo_dir: str, hashes: dict) -> str:
     Returns the absolute path to the written cache file.
     """
     cache_path = os.path.join(monorepo_dir, PUBLISH_CACHE_FILENAME)
-    with open(cache_path, "w") as f:
+    with effects.open_write(cache_path, "w") as f:
         json.dump(hashes, f, indent=2)
         f.write("\n")
     return cache_path

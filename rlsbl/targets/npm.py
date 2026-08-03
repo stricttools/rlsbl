@@ -6,6 +6,7 @@ import re
 
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
+from .. import effects
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
 
@@ -160,9 +161,9 @@ class NpmTarget(BaseTarget):
         output = json.dumps(pkg, indent=indent, ensure_ascii=False) + trailing_newline
         # Atomic write: write to temp file, then rename
         tmp_path = pkg_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             f.write(output)
-        os.replace(tmp_path, pkg_path)
+        effects.replace(tmp_path, pkg_path)
         return [self.version_file()]
 
     def version_file(self, dir_path=None):

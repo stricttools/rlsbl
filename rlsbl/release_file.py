@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import tomlkit
 
 from .errors import ReleaseFileError
+from . import effects
 
 
 VALID_BUMP_TYPES = ("patch", "minor", "major", "infra", "prerelease")
@@ -429,10 +430,10 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
                     file=sys.stderr,
                 )
                 return []
-        os.unlink(unreleased)
+        effects.remove(unreleased)
 
-    os.chmod(versioned, 0o644)
-    os.rename(versioned, unreleased)
+    effects.chmod(versioned, 0o644)
+    effects.rename(versioned, unreleased)
     changed = [unreleased, versioned]
 
     # Also reverse blog body file archival if present
@@ -445,8 +446,8 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
                 file=sys.stderr,
             )
         else:
-            os.chmod(versioned_md, 0o644)
-            os.rename(versioned_md, unreleased_md)
+            effects.chmod(versioned_md, 0o644)
+            effects.rename(versioned_md, unreleased_md)
             changed.extend([unreleased_md, versioned_md])
 
     return changed

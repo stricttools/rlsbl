@@ -27,6 +27,7 @@ from .workspace_types import (  # noqa: F401
     project_is_dev_only,
     project_is_releasable,
 )
+from . import effects
 
 
 # ---------------------------------------------------------------------------
@@ -76,17 +77,17 @@ def write_releasable_version(workspace_root, releasable_name, version):
     """
     path = get_releasable_version_path(workspace_root, releasable_name)
     target_dir = os.path.dirname(path)
-    os.makedirs(target_dir, exist_ok=True)
+    effects.makedirs(target_dir, exist_ok=True)
 
     fd, tmp_path = tempfile.mkstemp(dir=target_dir, prefix=".version.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(version + "\n")
-        os.replace(tmp_path, path)
+        effects.replace(tmp_path, path)
     except BaseException:
         # Clean up the temp file on any failure
         try:
-            os.unlink(tmp_path)
+            effects.remove(tmp_path)
         except OSError:
             pass
         raise
@@ -424,7 +425,7 @@ def save_workspace(root, projects, releasables=None):
     from tomlkit.items import AoT
 
     ws_dir = os.path.join(root, WORKSPACE_DIR)
-    os.makedirs(ws_dir, exist_ok=True)
+    effects.makedirs(ws_dir, exist_ok=True)
 
     target = os.path.join(ws_dir, WORKSPACE_FILE)
 
@@ -497,9 +498,9 @@ def save_workspace(root, projects, releasables=None):
             doc.add("projects", aot)
 
     tmp = target + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(doc))
-    os.replace(tmp, target)
+    effects.replace(tmp, target)
 
 
 def resolve_project(root, cwd="."):

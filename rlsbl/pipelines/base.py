@@ -132,7 +132,7 @@ class BasePipeline:
         max_size_mb = self.config.get("max_asset_size_mb")
         max_size_bytes = max_size_mb * 1024 * 1024
 
-        os.makedirs(dist_dir, exist_ok=True)
+        effects.makedirs(dist_dir, exist_ok=True)
         output_paths = []
 
         for entry in custom_assets:

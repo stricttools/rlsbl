@@ -5,6 +5,7 @@ import re
 
 from .base import BaseTarget
 from ..errors import VersionError
+from .. import effects
 
 
 class NativeAndroidTarget(BaseTarget):
@@ -85,9 +86,9 @@ class NativeAndroidTarget(BaseTarget):
 
         # Atomic write
         tmp_path = gradle_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             f.write(content)
-        os.replace(tmp_path, gradle_path)
+        effects.replace(tmp_path, gradle_path)
         return [rel_path]
 
     def version_file(self, dir_path=None):

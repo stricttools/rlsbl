@@ -3,6 +3,7 @@
 import os
 
 from ...utils import run
+from ... import effects
 
 
 def _is_tracked(project_dir: str, path: str) -> bool:
@@ -62,7 +63,7 @@ def _cleanup_release_artifacts(project_dir: str, version: str, *,
                 if _is_tracked(project_dir, path):
                     continue
                 # Released JSONL files are chmod 444; make writable before unlinking
-                os.chmod(path, 0o644)
-                os.unlink(path)
+                effects.chmod(path, 0o644)
+                effects.remove(path)
     except Exception:
         pass  # Best-effort: never mask the original error

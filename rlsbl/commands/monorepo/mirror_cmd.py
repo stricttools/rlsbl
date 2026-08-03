@@ -28,7 +28,6 @@ commit -- a contract violation -- and is a hard error that touches nothing.
 
 import json
 import os
-import shutil
 import sys
 import tempfile
 from dataclasses import dataclass, field
@@ -376,7 +375,7 @@ def observe(remote, root, project_path):
             foreign_commits=foreign,
         )
     finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
+        effects.rmtree(tmpdir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -475,8 +474,8 @@ def _run_scaffold(clone_dir, sub_config_path):
             config = json.load(f)
 
     clone_rlsbl_dir = os.path.join(clone_dir, ".rlsbl")
-    os.makedirs(clone_rlsbl_dir, exist_ok=True)
-    with open(os.path.join(clone_rlsbl_dir, "config.json"), "w", encoding="utf-8") as f:
+    effects.makedirs(clone_rlsbl_dir, exist_ok=True)
+    with effects.open_write(os.path.join(clone_rlsbl_dir, "config.json"), "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
         f.write("\n")
 
@@ -541,7 +540,7 @@ def _converge(plan, remote, root, project_path, sub_config_path):
             )
         print(f"Mirror converged: {remote}")
     finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
+        effects.rmtree(tmpdir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------

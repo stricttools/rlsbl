@@ -7,7 +7,6 @@ in the release flow.
 
 import glob
 import os
-import shutil
 import sys
 import tarfile
 import tempfile
@@ -134,7 +133,7 @@ def clean_stale_artifacts(project_dir, log=None, target_paths=None):
         for pattern in _ARTIFACT_PATTERNS:
             for path in glob.glob(os.path.join(dist_dir, pattern)):
                 try:
-                    os.remove(path)
+                    effects.remove(path)
                     removed.append(path)
                 except OSError:
                     pass  # Best-effort: a file we cannot remove is not fatal.
@@ -239,7 +238,7 @@ def scan_artifacts_for_secrets(project_dir, log=None, target_paths=None):
                         f"gitleaks failed on {artifact_name} with exit code {exit_code}"
                     )
         finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+            effects.rmtree(tmp_dir, ignore_errors=True)
 
     if all_findings:
         print(

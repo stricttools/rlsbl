@@ -5,6 +5,7 @@ import os
 import tomlkit
 
 from .base import BaseTarget, TemplateVars
+from .. import effects
 
 VERSION_FILE = "VERSION"
 
@@ -74,9 +75,9 @@ class PlainTarget(BaseTarget):
         """
         version_path = os.path.join(dir_path, VERSION_FILE)
         tmp_path = version_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             f.write(version + "\n")
-        os.replace(tmp_path, version_path)
+        effects.replace(tmp_path, version_path)
 
         modified = [self.version_file()]
 
@@ -89,9 +90,9 @@ class PlainTarget(BaseTarget):
             if project is not None and "version" in project:
                 doc["project"]["version"] = version
                 tmp_pyproject = pyproject_path + ".tmp"
-                with open(tmp_pyproject, "w", encoding="utf-8") as f:
+                with effects.open_write(tmp_pyproject, "w", encoding="utf-8") as f:
                     f.write(tomlkit.dumps(doc))
-                os.replace(tmp_pyproject, pyproject_path)
+                effects.replace(tmp_pyproject, pyproject_path)
                 modified.append("pyproject.toml")
 
         return modified

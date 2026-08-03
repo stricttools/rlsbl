@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+from .. import effects
 
 VERSION_FILE = "VERSION"
 ZON_FILE = "build.zig.zon"
@@ -53,9 +54,9 @@ def write_zig_version(dir_path, version):
     # Write VERSION atomically
     version_path = os.path.join(dir_path, VERSION_FILE)
     tmp_path = version_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         f.write(version + "\n")
-    os.replace(tmp_path, version_path)
+    effects.replace(tmp_path, version_path)
 
     modified = [VERSION_FILE]
 
@@ -78,9 +79,9 @@ def write_zig_version(dir_path, version):
         return modified
 
     zon_tmp = zon_path + ".tmp"
-    with open(zon_tmp, "w", encoding="utf-8") as f:
+    with effects.open_write(zon_tmp, "w", encoding="utf-8") as f:
         f.write(new_content)
-    os.replace(zon_tmp, zon_path)
+    effects.replace(zon_tmp, zon_path)
     modified.append(ZON_FILE)
 
     return modified

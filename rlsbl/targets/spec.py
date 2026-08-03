@@ -4,6 +4,7 @@ import json
 import os
 
 from .base import BaseTarget, TemplateVars
+from .. import effects
 
 
 class SpecTarget(BaseTarget):
@@ -72,10 +73,10 @@ class SpecTarget(BaseTarget):
             data = {}
         data["version"] = version
         tmp_path = path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
             f.write("\n")
-        os.replace(tmp_path, path)
+        effects.replace(tmp_path, path)
         return [os.path.relpath(path, dir_path)]
 
     def version_file(self, dir_path=None):

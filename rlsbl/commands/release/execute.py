@@ -159,7 +159,7 @@ def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
     new_body = f"{stripped}\n\n{marker}\n"
     tmp = notes_file + ".reconcile"
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp, "w", encoding="utf-8") as f:
             f.write(new_body)
         run_gh(["release", "edit", tag, "--notes-file", tmp], config=config)
     except Exception as exc:
@@ -172,7 +172,7 @@ def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
         return False
     finally:
         if os.path.exists(tmp):
-            os.unlink(tmp)
+            effects.remove(tmp)
     log(f"Reconciled CI-SHA marker onto existing release {tag}")
     return True
 
@@ -459,9 +459,9 @@ def _bump_selfdoc_version(project_dir, new_version):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(new_content)
-        os.replace(tmp_path, config_path)
+        effects.replace(tmp_path, config_path)
     except BaseException:
-        os.unlink(tmp_path)
+        effects.remove(tmp_path)
         raise
     return ["selfdoc.json"]
 
@@ -700,8 +700,8 @@ def archive_blog_body(releases_dir, version):
     blog_body_src = os.path.join(releases_dir, "unreleased.md")
     blog_body_dst = os.path.join(releases_dir, f"v{version}.md")
     if os.path.exists(blog_body_src):
-        os.rename(blog_body_src, blog_body_dst)
-        os.chmod(blog_body_dst, 0o444)
+        effects.rename(blog_body_src, blog_body_dst)
+        effects.chmod(blog_body_dst, 0o444)
         return blog_body_dst
     return None
 
@@ -1510,7 +1510,7 @@ def _run_release_mutating(state: ReleaseState):
         if _releasable_cfg_dir is None and _scaffold_meta_present:
             try:
                 from ... import __version__ as rlsbl_ver
-                with open(rlsbl_version_marker, "w") as f:
+                with effects.open_write(rlsbl_version_marker, "w") as f:
                     f.write(rlsbl_ver + "\n")
                 if rlsbl_version_marker not in files_to_commit:
                     files_to_commit.append(rlsbl_version_marker)
@@ -1972,8 +1972,8 @@ def _run_release_mutating(state: ReleaseState):
         if not _release_file_already_finalized and os.path.exists(release_file_path):
             releases_dir = os.path.dirname(release_file_path)
             versioned_release = os.path.join(releases_dir, f"v{new_version}.toml")
-            os.rename(release_file_path, versioned_release)
-            os.chmod(versioned_release, 0o444)
+            effects.rename(release_file_path, versioned_release)
+            effects.chmod(versioned_release, 0o444)
             # Archive blog body file if it exists (unreleased.md -> v{version}.md)
             blog_body_dst = archive_blog_body(releases_dir, new_version)
             release_finalize_files = [
@@ -2260,9 +2260,9 @@ def _run_release_mutating(state: ReleaseState):
     _ci_marker = f"<!-- rlsbl-ci-sha: {_ci_sha} -->"
     notes_body = (changelog_entry or "").rstrip("\n")
     notes_body = f"{notes_body}\n\n{_ci_marker}\n"
-    with open(writing_file, "w", encoding="utf-8") as f:
+    with effects.open_write(writing_file, "w", encoding="utf-8") as f:
         f.write(notes_body)
-    os.rename(writing_file, notes_file)
+    effects.rename(writing_file, notes_file)
 
     try:
         if _gh_release_already_exists:
@@ -2361,7 +2361,7 @@ def _run_release_mutating(state: ReleaseState):
         # Clean up temp files after both main and mirror releases
         for tmp in (notes_file, writing_file):
             if os.path.exists(tmp):
-                os.unlink(tmp)
+                effects.remove(tmp)
 
     # ---- Post-release phase ----
     # Every step below is tracked in the state file. Success markers gate

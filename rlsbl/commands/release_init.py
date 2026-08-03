@@ -4,6 +4,7 @@ import os
 import sys
 
 from ..utils import commit_scaffold_file
+from .. import effects
 
 
 def run_cmd(project_root):
@@ -121,7 +122,7 @@ def run_cmd(project_root):
         doc.add("targets", targets_table)
 
     releases_dir = os.path.dirname(release_path)
-    os.makedirs(releases_dir, exist_ok=True)
+    effects.makedirs(releases_dir, exist_ok=True)
 
     # Atomic exclusive-create closes the TOCTOU: the earlier exists() check and
     # this write are far apart (detect_targets/doc-build run in between), so a

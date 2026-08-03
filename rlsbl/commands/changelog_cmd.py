@@ -431,7 +431,7 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
             batch_limits = config_data.setdefault("batch_limits", {})
             exclusions = batch_limits.setdefault("exclusions", [])
             exclusions.append(exclusion)
-            with open(config_path, "w", encoding="utf-8") as f:
+            with effects.open_write(config_path, "w", encoding="utf-8") as f:
                 json.dump(config_data, f, indent=2)
                 f.write("\n")
             print(f"Auto-created batch exclusion for line {line_number} in .rlsbl/config.json")
@@ -859,10 +859,10 @@ def cmd_edit(flags, project_root):
         try:
             os.write(fd, content.encode("utf-8"))
             os.close(fd)
-            os.replace(tmp_path, target_path)
+            effects.replace(tmp_path, target_path)
         except BaseException:
             if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+                effects.remove(tmp_path)
             raise
 
     if is_released:

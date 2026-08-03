@@ -184,7 +184,7 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
             - ``consolidation_tag`` (str or None): tag created at HEAD, if any
     """
     dest_changes_dir = get_releasable_changes_dir(workspace_root, releasable_name)
-    os.makedirs(dest_changes_dir, exist_ok=True)
+    effects.makedirs(dest_changes_dir, exist_ok=True)
     dest_path = os.path.join(dest_changes_dir, "unreleased.jsonl")
 
     all_entries = []
@@ -217,7 +217,7 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
 
     # Write all merged entries to the releasable's unreleased.jsonl
     lines = [serialize_entry(e) + "\n" for e in all_entries]
-    with open(dest_path, "w", encoding="utf-8") as f:
+    with effects.open_write(dest_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
 
     # Merge versioned JSONL files from member projects into the releasable.
@@ -389,9 +389,9 @@ def _merge_versioned_files(workspace_root, releasable_name, member_projects,
 
         dest_path = os.path.join(dest_changes_dir, f"{version}.jsonl")
         lines = [serialize_entry(e) + "\n" for e in deduped]
-        with open(dest_path, "w", encoding="utf-8") as f:
+        with effects.open_write(dest_path, "w", encoding="utf-8") as f:
             f.writelines(lines)
-        os.chmod(dest_path, 0o444)
+        effects.chmod(dest_path, 0o444)
         files_written += 1
 
     return files_written
@@ -433,7 +433,7 @@ def _copy_release_metadata(workspace_root, member_projects, releasable_dir):
         return
 
     dest_releases_dir = os.path.join(releasable_dir, "releases")
-    os.makedirs(dest_releases_dir, exist_ok=True)
+    effects.makedirs(dest_releases_dir, exist_ok=True)
 
     for version, tomls in version_tomls.items():
         if len(tomls) == 1:
@@ -454,7 +454,7 @@ def _copy_release_metadata(workspace_root, member_projects, releasable_dir):
                 merged["context"] = "\n\n".join(contexts)
 
         dest_path = os.path.join(dest_releases_dir, f"v{version}.toml")
-        with open(dest_path, "w", encoding="utf-8") as f:
+        with effects.open_write(dest_path, "w", encoding="utf-8") as f:
             tomlkit.dump(merged, f)
 
 
@@ -503,7 +503,7 @@ def _migrate_batch_exclusions(workspace_root, releasable_name,
 
     # Write to the releasable's config.json
     rel_dir = get_releasable_dir(workspace_root, releasable_name)
-    os.makedirs(rel_dir, exist_ok=True)
+    effects.makedirs(rel_dir, exist_ok=True)
     config_path = os.path.join(rel_dir, "config.json")
     config = read_json_config(config_path)
     bl = config.setdefault("batch_limits", {})
@@ -511,10 +511,10 @@ def _migrate_batch_exclusions(workspace_root, releasable_name,
     existing.extend(new_exclusions)
 
     tmp_path = config_path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
         f.write("\n")
-    os.replace(tmp_path, config_path)
+    effects.replace(tmp_path, config_path)
 
     return len(new_exclusions)
 

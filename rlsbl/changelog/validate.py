@@ -166,7 +166,7 @@ def _write_cache(changes_dir: str) -> None:
     if head is None:
         return
     path = _cache_path(changes_dir)
-    with open(path, "w", encoding="utf-8") as f:
+    with effects.open_write(path, "w", encoding="utf-8") as f:
         f.write(head + "\n")
     commit_files_if_changed("update validation cache", [path], skip_message="Validation cache unchanged.")
 

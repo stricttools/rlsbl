@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from .targets import detect_targets, resolve_releasable_config_dir, TARGETS
 from .workspace import WORKSPACE_DIR, project_is_dev_only, project_is_releasable
+from . import effects
 
 
 SNAPSHOT_FILE = "snapshot.json"
@@ -113,14 +114,14 @@ def write_snapshot(root, snapshot):
     Returns the relative path to the written file.
     """
     ws_dir = os.path.join(root, WORKSPACE_DIR)
-    os.makedirs(ws_dir, exist_ok=True)
+    effects.makedirs(ws_dir, exist_ok=True)
     target = os.path.join(ws_dir, SNAPSHOT_FILE)
 
     content = json.dumps(snapshot, indent=2) + "\n"
     tmp = target + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp, "w", encoding="utf-8") as f:
         f.write(content)
-    os.replace(tmp, target)
+    effects.replace(tmp, target)
 
     return os.path.join(WORKSPACE_DIR, SNAPSHOT_FILE)
 

@@ -13,6 +13,7 @@ import tempfile
 
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
 from ..errors import ChangelogError, ConfigError
+from .. import effects
 
 _VERSION_RE = re.compile(
     r"^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?\.jsonl$"
@@ -282,7 +283,7 @@ def append_entry(changes_dir: str, entry: ChangelogEntry) -> None:
     Writes the serialized line to a temp file, then appends it to the target.
     Creates the changes directory and unreleased.jsonl if they don't exist.
     """
-    os.makedirs(changes_dir, exist_ok=True)
+    effects.makedirs(changes_dir, exist_ok=True)
     target = os.path.join(changes_dir, "unreleased.jsonl")
     _append_entry_to_file(target, entry)
 
@@ -303,7 +304,7 @@ def _append_entry_to_file(target: str, entry: ChangelogEntry) -> None:
     Creates parent directories if they don't exist.
     """
     parent = os.path.dirname(target)
-    os.makedirs(parent, exist_ok=True)
+    effects.makedirs(parent, exist_ok=True)
     line = serialize_entry(entry) + "\n"
 
     # Write to a temp file in the same directory (same filesystem for rename)
@@ -312,12 +313,12 @@ def _append_entry_to_file(target: str, entry: ChangelogEntry) -> None:
         os.write(fd, line.encode("utf-8"))
         os.close(fd)
         # Append the temp file content to the target
-        with open(target, "a", encoding="utf-8") as f:
+        with effects.open_write(target, "a", encoding="utf-8") as f:
             with open(tmp_path, "r", encoding="utf-8") as tmp_f:
                 f.write(tmp_f.read())
     finally:
         if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+            effects.remove(tmp_path)
 
 
 def _warn_stale_entries(src: str, tag_glob: str) -> None:
@@ -402,11 +403,11 @@ def finalize_version(
             f"by design; inspect the existing file and remove it manually "
             f"before re-releasing."
         )
-    os.rename(src, dst)
-    os.chmod(dst, 0o444)
+    effects.rename(src, dst)
+    effects.chmod(dst, 0o444)
 
     # Create a new empty unreleased.jsonl
-    open(src, "w", encoding="utf-8").close()
+    effects.open_write(src, "w", encoding="utf-8").close()
 
 
 def unfinalize_version(changes_dir: str, version: str) -> list[str]:
@@ -426,13 +427,13 @@ def unfinalize_version(changes_dir: str, version: str) -> list[str]:
     if not os.path.isfile(versioned):
         return []
 
-    os.chmod(versioned, 0o644)
-    os.rename(versioned, unreleased)
+    effects.chmod(versioned, 0o644)
+    effects.rename(versioned, unreleased)
 
     changed: list[str] = [unreleased]
 
     if os.path.isfile(versioned_md):
-        os.unlink(versioned_md)
+        effects.remove(versioned_md)
         changed.append(versioned_md)
 
     return changed
@@ -455,12 +456,12 @@ def writable_jsonl(path):
     """
     was_ro = is_read_only(path)
     if was_ro:
-        os.chmod(path, 0o644)
+        effects.chmod(path, 0o644)
     try:
         yield path
     finally:
         if was_ro:
-            os.chmod(path, 0o444)
+            effects.chmod(path, 0o444)
 
 
 def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
@@ -538,10 +539,10 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
             try:
                 os.write(fd, content.encode("utf-8"))
                 os.close(fd)
-                os.replace(tmp_path, filepath)
+                effects.replace(tmp_path, filepath)
             except BaseException:
                 if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+                    effects.remove(tmp_path)
                 raise
 
         results.append(RemapResult(

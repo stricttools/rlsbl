@@ -3,7 +3,6 @@
 import ast
 import os
 import re
-import shutil
 import tempfile
 import tomllib
 
@@ -261,9 +260,9 @@ class PypiTarget(BaseTarget):
             doc = tomlkit.parse(f.read())
         doc["project"]["version"] = pep440_version
         tmp_path = path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             f.write(tomlkit.dumps(doc))
-        os.replace(tmp_path, path)
+        effects.replace(tmp_path, path)
 
         modified = ["pyproject.toml"]
         dunder_path = self._update_dunder_version(dir_path, doc, pep440_version)
@@ -319,9 +318,9 @@ class PypiTarget(BaseTarget):
 
         if new_content != content:
             tmp = init_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
+            with effects.open_write(tmp, "w", encoding="utf-8") as f:
                 f.write(new_content)
-            os.replace(tmp, init_path)
+            effects.replace(tmp, init_path)
             return init_rel
 
         return None
@@ -459,16 +458,16 @@ class PypiTarget(BaseTarget):
                 return [c for c in contents if c == "__pycache__" or c.endswith(".pyc")]
 
             tmp_project = os.path.join(tmp_dir, "project")
-            shutil.copytree(dir_path, tmp_project, ignore=_ignore)
+            effects.copytree(dir_path, tmp_project, ignore=_ignore)
 
             # Overwrite pyproject.toml with rewritten version
             tmp_pyproject = os.path.join(tmp_project, "pyproject.toml")
-            with open(tmp_pyproject, "w", encoding="utf-8") as f:
+            with effects.open_write(tmp_pyproject, "w", encoding="utf-8") as f:
                 f.write(rewritten_content)
 
             # Build in the temp dir, output to the real project's dist/
             dist_dir = os.path.abspath(os.path.join(dir_path, "dist"))
-            os.makedirs(dist_dir, exist_ok=True)
+            effects.makedirs(dist_dir, exist_ok=True)
             effects.run(
                 ["uv", "build", "--out-dir", dist_dir],
                 cwd=tmp_project,
@@ -479,7 +478,7 @@ class PypiTarget(BaseTarget):
                 timeout=timeout,
             )
         finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+            effects.rmtree(tmp_dir, ignore_errors=True)
 
     def check_project_exists(self, dir_path):
         """Return True if pyproject.toml exists in dir_path."""

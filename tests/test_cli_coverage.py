@@ -223,7 +223,7 @@ class TestCmdReleaseInit:
 class TestCmdReleaseRetry:
     """Cover retry handler paths (lines 283-314)."""
 
-    @patch("os.remove")
+    @patch("rlsbl.effects.remove")
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.release_file.get_retry_file_path", return_value="/fake/retry.toml")
     @patch("os.path.exists", return_value=True)

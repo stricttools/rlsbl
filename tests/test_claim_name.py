@@ -20,7 +20,7 @@ def real_tmpdir(tmp_path):
     written files after run_cmd returns.
     """
     with patch("rlsbl.commands.claim_name.tempfile.mkdtemp", return_value=str(tmp_path)), \
-         patch("rlsbl.commands.claim_name.shutil.rmtree"):
+         patch("rlsbl.effects.rmtree"):
         yield tmp_path
 
 

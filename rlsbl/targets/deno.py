@@ -7,6 +7,7 @@ import re
 from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
+from .. import effects
 
 
 class DenoTarget(BaseTarget):
@@ -105,9 +106,9 @@ class DenoTarget(BaseTarget):
             new_content = json.dumps(data, indent=indent, ensure_ascii=False) + trailing_newline
 
         tmp_path = config_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             f.write(new_content)
-        os.replace(tmp_path, config_path)
+        effects.replace(tmp_path, config_path)
         return [os.path.basename(config_path)]
 
     def version_file(self, dir_path=None):

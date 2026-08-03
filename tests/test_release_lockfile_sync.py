@@ -75,7 +75,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("uv.lock", 1000, 2000)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
+            patch("shutil.which", return_value="/usr/bin/uv"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -103,7 +103,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("package-lock.json", 100, 200)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/npm"),
+            patch("shutil.which", return_value="/usr/bin/npm"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -130,7 +130,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("go.sum", 100, 200)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/go"),
+            patch("shutil.which", return_value="/usr/bin/go"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -155,7 +155,7 @@ class TestSyncLockfiles:
         log = MagicMock()
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value=None),
+            patch("shutil.which", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             _sync_lockfiles(target_paths, files_to_commit, log)
@@ -179,7 +179,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("uv.lock", 100, 100)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
+            patch("shutil.which", return_value="/usr/bin/uv"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect(
                       sync_result=subprocess.CalledProcessError(1, "uv lock"))),
@@ -203,7 +203,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("uv.lock", 100, 100)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
+            patch("shutil.which", return_value="/usr/bin/uv"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect(
                       sync_result=subprocess.TimeoutExpired("uv lock", 30))),
@@ -228,7 +228,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("uv.lock", 1000, 1000)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
+            patch("shutil.which", return_value="/usr/bin/uv"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -247,7 +247,7 @@ class TestSyncLockfiles:
         log = MagicMock()
 
         with (
-            patch("rlsbl.commands.release.shutil.which") as mock_which,
+            patch("shutil.which") as mock_which,
             patch("rlsbl.effects.run") as mock_run,
         ):
             _sync_lockfiles(target_paths, files_to_commit, log)
@@ -291,7 +291,7 @@ class TestSyncLockfiles:
             return _real_stat(path, *args, **kwargs)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/tool"),
+            patch("shutil.which", return_value="/usr/bin/tool"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -314,7 +314,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("uv.lock", 100, 200)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
+            patch("shutil.which", return_value="/usr/bin/uv"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -333,7 +333,7 @@ class TestSyncLockfiles:
         fake_stat = _make_stat_interceptor("uv.lock", 100, 200)
 
         with (
-            patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
+            patch("shutil.which", return_value="/usr/bin/uv"),
             patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect(gitignored=True)) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),

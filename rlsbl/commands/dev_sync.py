@@ -218,9 +218,9 @@ def _write_sentinel(project_root, overlays):
 
     target = os.path.join(str(project_root), SENTINEL_FILENAME)
     tmp = target + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp, "w", encoding="utf-8") as f:
         f.write(tomlkit.dumps(doc))
-    os.replace(tmp, target)
+    effects.replace(tmp, target)
 
 
 def run_status(project_root):

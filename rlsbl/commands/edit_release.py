@@ -8,6 +8,7 @@ from ..member_context import resolve_member_context
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run_gh
 from ..workspace import find_workspace_root, resolve_project
+from .. import effects
 
 
 def run_cmd(args, flags, project_root):
@@ -135,13 +136,13 @@ def run_cmd(args, flags, project_root):
     notes_file = f".rlsbl-notes-{int(time.time() * 1000)}.tmp"
     writing_file = notes_file + ".writing"
     try:
-        with open(writing_file, "w", encoding="utf-8") as f:
+        with effects.open_write(writing_file, "w", encoding="utf-8") as f:
             f.write(changelog_entry)
-        os.rename(writing_file, notes_file)
+        effects.rename(writing_file, notes_file)
         run_gh(["release", "edit", tag, "--notes-file", notes_file])
     finally:
         for tmp in (notes_file, writing_file):
             if os.path.exists(tmp):
-                os.unlink(tmp)
+                effects.remove(tmp)
 
     print(f"Updated GitHub Release notes for {tag}")

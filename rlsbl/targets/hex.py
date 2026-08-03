@@ -6,6 +6,7 @@ import re
 from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
+from .. import effects
 
 
 class HexTarget(BaseTarget):
@@ -60,9 +61,9 @@ class HexTarget(BaseTarget):
             content,
         )
         tmp_path = mix_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
             f.write(new_content)
-        os.replace(tmp_path, mix_path)
+        effects.replace(tmp_path, mix_path)
         return [self.version_file()]
 
     def version_file(self, dir_path=None):

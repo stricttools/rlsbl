@@ -282,7 +282,7 @@ def _scaffold_releasable_sections(workspace_root, projects, batch_path, filter_n
     doc.add("releasables", section_table)
 
     releases_dir = os.path.dirname(batch_path)
-    os.makedirs(releases_dir, exist_ok=True)
+    effects.makedirs(releases_dir, exist_ok=True)
 
     toml_text = tomlkit.dumps(doc)
 
@@ -375,7 +375,7 @@ def _scaffold_package_sections(workspace_root, projects, batch_path, filter_name
     doc.add("packages", packages_table)
 
     releases_dir = os.path.dirname(batch_path)
-    os.makedirs(releases_dir, exist_ok=True)
+    effects.makedirs(releases_dir, exist_ok=True)
 
     toml_text = tomlkit.dumps(doc)
 

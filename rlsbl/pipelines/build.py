@@ -12,18 +12,19 @@ import shutil
 import subprocess
 
 from ..utils import run
+from .. import effects
 
 
 def build_npm_assets(dir_path: str, version: str, dist_dir: str) -> list[str]:
     """Pack an npm tarball into *dist_dir* and return the list of .tgz paths."""
-    os.makedirs(dist_dir, exist_ok=True)
+    effects.makedirs(dist_dir, exist_ok=True)
     run("npm", ["pack", "--pack-destination", dist_dir], cwd=dir_path)
     return sorted(glob.glob(os.path.join(dist_dir, "*.tgz")))
 
 
 def build_pypi_assets(dir_path: str, version: str, dist_dir: str) -> list[str]:
     """Build sdist and wheel into *dist_dir* and return the list of artifact paths."""
-    os.makedirs(dist_dir, exist_ok=True)
+    effects.makedirs(dist_dir, exist_ok=True)
     run("uv", ["build", "--out-dir", dist_dir], env=os.environ, cwd=dir_path)
     return sorted(glob.glob(os.path.join(dist_dir, "*")))
 
@@ -34,7 +35,7 @@ def build_go_assets(dir_path: str, version: str, dist_dir: str) -> list[str]:
     Uses goreleaser for cross-compilation when available, falling back
     to ``go build`` (host platform only) otherwise.
     """
-    os.makedirs(dist_dir, exist_ok=True)
+    effects.makedirs(dist_dir, exist_ok=True)
 
     if shutil.which("goreleaser"):
         try:
@@ -64,6 +65,6 @@ def _build_go_with_goreleaser(dir_path: str, dist_dir: str) -> list[str]:
         for fentry in sorted(os.scandir(direntry.path), key=lambda e: e.name):
             if fentry.is_file() and not fentry.name.startswith("."):
                 dest = os.path.join(dist_dir, f"{direntry.name}__{fentry.name}")
-                shutil.copy2(fentry.path, dest)
+                effects.copy_file(fentry.path, dest)
                 artifacts.append(dest)
     return sorted(artifacts)

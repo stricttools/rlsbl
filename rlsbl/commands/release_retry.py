@@ -90,11 +90,11 @@ def _scaffold_retry_file(
     doc.add(tomlkit.comment("Release tag passed as workflow_dispatch input (checkout ref)"))
     doc.add("tag", tag)
 
-    os.makedirs(os.path.dirname(retry_path), exist_ok=True)
+    effects.makedirs(os.path.dirname(retry_path), exist_ok=True)
     tmp_path = retry_path + ".writing"
-    with open(tmp_path, "w", encoding="utf-8") as f:
+    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
         tomlkit.dump(doc, f)
-    os.rename(tmp_path, retry_path)
+    effects.rename(tmp_path, retry_path)
 
     log(f"Auto-scaffolded retry file: {retry_path}")
     with open(retry_path, "r", encoding="utf-8") as f:
@@ -202,7 +202,7 @@ def run_cmd(retry_config, flags, project_root):
                 # Clean up the invalid file so it doesn't block subsequent
                 # `rlsbl release run` with a dirty working tree.
                 if os.path.exists(retry_path):
-                    os.remove(retry_path)
+                    effects.remove(retry_path)
                 print(f"Error in retry file: {e}", file=sys.stderr)
                 print(
                     "Hint: `rlsbl release retry` is for dispatching CI after a "
@@ -224,7 +224,7 @@ def run_cmd(retry_config, flags, project_root):
                 # Clean up the auto-scaffolded file -- it's untracked and
                 # would block subsequent `rlsbl release run`.
                 if os.path.exists(retry_path):
-                    os.remove(retry_path)
+                    effects.remove(retry_path)
                 print(f"Error in retry file: {e}", file=sys.stderr)
                 print(
                     "Hint: `rlsbl release retry` is for dispatching CI after a "

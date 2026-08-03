@@ -44,6 +44,7 @@ success, and left in place on failure.
 import json
 import os
 import tempfile
+from ... import effects
 
 
 STATE_FILENAME = "in-progress.json"
@@ -271,16 +272,16 @@ def find_releasable_state_files(workspace_root) -> list[tuple[str, str]]:
 def save_release_state(state_path: str, state_dict: dict) -> None:
     """Atomically write the release state dict to disk (tmp + os.replace)."""
     parent = os.path.dirname(state_path)
-    os.makedirs(parent, exist_ok=True)
+    effects.makedirs(parent, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=parent, prefix=".in-progress.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(state_dict, f, indent=2)
             f.write("\n")
-        os.replace(tmp, state_path)
+        effects.replace(tmp, state_path)
     except BaseException:
         try:
-            os.unlink(tmp)
+            effects.remove(tmp)
         except OSError:
             pass
         raise
@@ -350,7 +351,7 @@ def clear_release_state(state_path: str) -> None:
     mutating phase is tracked; publishing happens in CI).
     """
     try:
-        os.unlink(state_path)
+        effects.remove(state_path)
     except FileNotFoundError:
         pass
     # Remove parent directory if it's now empty (best-effort).
@@ -359,7 +360,7 @@ def clear_release_state(state_path: str) -> None:
     try:
         parent = os.path.dirname(state_path)
         if parent and os.path.isdir(parent) and not os.listdir(parent):
-            os.rmdir(parent)
+            effects.rmdir(parent)
     except OSError:
         pass
 

@@ -21,6 +21,7 @@ import json
 import os
 import time
 from typing import Protocol, runtime_checkable
+from . import effects
 
 
 class Verdict(enum.Enum):
@@ -242,7 +243,7 @@ def write_undo_audit(audit_dir, version, tag, gate_result, operator_context=None
     Returns:
         path to the written audit file.
     """
-    os.makedirs(audit_dir, exist_ok=True)
+    effects.makedirs(audit_dir, exist_ok=True)
     audit_path = os.path.join(audit_dir, "undo-audit.json")
 
     record = {
@@ -269,7 +270,7 @@ def write_undo_audit(audit_dir, version, tag, gate_result, operator_context=None
 
     existing.append(record)
 
-    with open(audit_path, "w", encoding="utf-8") as f:
+    with effects.open_write(audit_path, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2)
         f.write("\n")
 

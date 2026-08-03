@@ -2,7 +2,6 @@
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -98,7 +97,7 @@ def run_cmd(target, args, flags):
         print(e.stderr, file=sys.stderr)
         sys.exit(1)
     finally:
-        shutil.rmtree(tmpdir)
+        effects.rmtree(tmpdir)
 
 
 def _claim_npm(name, tmpdir):
@@ -107,7 +106,7 @@ def _claim_npm(name, tmpdir):
         "version": "0.0.0",
         "description": "Name reservation",
     }
-    with open(os.path.join(tmpdir, "package.json"), "w") as f:
+    with effects.open_write(os.path.join(tmpdir, "package.json"), "w") as f:
         json.dump(package_json, f, indent=2)
         f.write("\n")
 
@@ -125,9 +124,9 @@ def _claim_npm(name, tmpdir):
 def _claim_pypi(name, tmpdir):
     name_underscored = name.replace("-", "_")
     pkg_dir = os.path.join(tmpdir, name_underscored)
-    os.makedirs(pkg_dir)
+    effects.makedirs(pkg_dir)
 
-    with open(os.path.join(pkg_dir, "__init__.py"), "w") as f:
+    with effects.open_write(os.path.join(pkg_dir, "__init__.py"), "w") as f:
         pass
 
     pyproject_toml = f"""\
@@ -141,7 +140,7 @@ requires-python = ">=3.11"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 """
-    with open(os.path.join(tmpdir, "pyproject.toml"), "w") as f:
+    with effects.open_write(os.path.join(tmpdir, "pyproject.toml"), "w") as f:
         f.write(pyproject_toml)
 
     effects.run(

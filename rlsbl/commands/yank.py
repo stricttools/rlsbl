@@ -250,7 +250,7 @@ def _yank_go(target, project_dir, version, tag, dry_run):
         retract_line = f"retract v{version}"
         if retract_line not in content:
             content = content.rstrip() + f"\n\n{retract_line}\n"
-            with open(go_mod, "w", encoding="utf-8") as f:
+            with effects.open_write(go_mod, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"  go: added retract directive for v{version} to go.mod")
             print(f"  go: commit and release a new version to publish the retraction")
@@ -307,15 +307,15 @@ def _mark_github_release(tag, reason, use, dry_run):
     notes_file = f".rlsbl-yank-{int(time.time() * 1000)}.tmp"
     writing_file = notes_file + ".writing"
     try:
-        with open(writing_file, "w", encoding="utf-8") as f:
+        with effects.open_write(writing_file, "w", encoding="utf-8") as f:
             f.write(new_body)
-        os.rename(writing_file, notes_file)
+        effects.rename(writing_file, notes_file)
         run_gh(["release", "edit", tag, "--prerelease", "--notes-file", notes_file])
         print(f"  github: marked {tag} as pre-release")
     finally:
         for tmp in (notes_file, writing_file):
             if os.path.exists(tmp):
-                os.unlink(tmp)
+                effects.remove(tmp)
 
 
 def _build_yank_notice(reason, use):

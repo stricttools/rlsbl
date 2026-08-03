@@ -25,6 +25,7 @@ class HookError(Exception):
 
 
 from ...release_file import VALID_BUMP_TYPES
+from ... import effects
 
 
 def validate_release_targets(release_config, project_root, *,
@@ -1150,10 +1151,10 @@ def _patch_schema_version(project_dir, version):
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
             f.write("\n")
-        os.replace(tmp_path, schema_path)
+        effects.replace(tmp_path, schema_path)
     except BaseException:
         try:
-            os.unlink(tmp_path)
+            effects.remove(tmp_path)
         except OSError:
             pass
         raise
