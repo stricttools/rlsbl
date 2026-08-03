@@ -40,6 +40,7 @@ from .batch_plan import (
     validate_plan_against_config,
     write_batch_plan,
 )
+from ..release.execute import ForeignCommitError
 from ..release.validate import (
     ReleaseValidationError,
     HookError,
@@ -115,7 +116,33 @@ def _batch_release_flags(flags, **extra):
     return release_flags
 
 
-def _batch_ci_gate(workspace_root, flags, log):
+def _head(workspace_root):
+    """HEAD of the workspace repo (used for the batch's own pin/trail)."""
+    return run("git", ["rev-parse", "HEAD"], cwd=workspace_root).strip()
+
+
+def _commits_between(start, end, workspace_root):
+    """The commits in ``start..end``, newest first."""
+    out = run("git", ["rev-list", f"{start}..{end}"], cwd=workspace_root)
+    return [c.strip() for c in out.splitlines() if c.strip()]
+
+
+def _batch_release_trail(pending, inline_commits):
+    """The union of every batch member's own release-commit trail.
+
+    Members still mid-flight keep their trail in their in-progress state file.
+    A member whose release ran to completion inside its own call cleared that
+    file, so the orchestrator records the commits that appeared across its call
+    in *inline_commits* instead.
+    """
+    trail = set(inline_commits)
+    for entry in pending:
+        state = read_state_for_resume(entry[2])
+        trail.update((state or {}).get("release_commits", []))
+    return trail
+
+
+def _batch_ci_gate(workspace_root, flags, log, *, pin_sha=None, trail=()):
     """Run ONE CI gate for the whole batch and return the verified SHA.
 
     Every member's candidate has been pushed by this point (the first pass runs
@@ -123,14 +150,26 @@ def _batch_ci_gate(workspace_root, flags, log):
     verdict covers the batch. Each member is then tagged on exactly this
     commit, so every tag in the batch points at a CI-verified tree.
 
+    Refuse-on-drift: the tip is guarded against foreign commits before it is
+    gated. The per-member guards only cover each member's own call, so a commit
+    that landed between the last candidate push and this gate -- a concurrent
+    session sharing the worktree, say -- would otherwise ride into every tag in
+    the batch. It is a hard error naming the SHAs; nothing is rolled back
+    (the candidates are already on the remote).
+
     Returns the verified SHA. Raises :class:`ReleaseValidationError` when CI is
-    red or unreachable -- the candidates stay on the branch untagged, nothing
-    is finalized, and no version number is burnt.
+    red, unresolved or unreachable -- the candidates stay on the branch
+    untagged, nothing is finalized, and no version number is burnt.
     """
     from ...utils import get_ci_timeout
-    from ..watch import CI_GREEN, CI_NOT_CONFIGURED, CIWaitError
+    from ..release.execute import guard_foreign_commits
+    from ..watch import CI_GREEN, CI_NOT_CONFIGURED, CI_TIMEOUT, CIWaitError
 
-    sha = run("git", ["rev-parse", "HEAD"], cwd=workspace_root).strip()
+    guard_foreign_commits(
+        pin_sha, trail, cwd=workspace_root, phase="batch CI gate",
+    )
+
+    sha = _head(workspace_root)
     # Config is per-project in a workspace; the batch gate is a workspace-level
     # wait, so only the CLI override applies here (no single config owns it).
     timeout = get_ci_timeout(None, override=flags.get("ci-timeout"))
@@ -143,13 +182,39 @@ def _batch_ci_gate(workspace_root, flags, log):
         raise ReleaseValidationError(str(exc)) from exc
 
     if verdict == CI_NOT_CONFIGURED:
-        log(
-            "No push-triggered CI workflow is configured in .github/workflows; "
-            "proceeding without a CI gate."
+        # Unconditional and on stderr: this notice is the operator's only
+        # signal that the batch shipped with NO CI gate, and --quiet must not
+        # be able to swallow it.
+        print(
+            "rlsbl: no push-triggered CI workflow is configured in "
+            ".github/workflows; proceeding without a CI gate.",
+            file=sys.stderr,
         )
         return sha
+    if verdict == CI_TIMEOUT:
+        unresolved = ", ".join(
+            r["name"] for r in results if r.get("timed_out")
+        ) or "unknown"
+        raise ReleaseValidationError(
+            f"The CI wait for the batch release candidate {sha} ran out of "
+            f"time before every run concluded.\n"
+            f"  Unresolved workflow(s) after {timeout}s: {unresolved}\n"
+            f"\n"
+            f"This is NOT a CI failure: those runs may still be in progress, "
+            f"and nothing was proven about the candidate either way.\n"
+            f"Nothing in this batch was tagged, released or finalized -- no "
+            f"version number was burnt.\n"
+            f"\n"
+            f"Check the runs with `rlsbl watch {sha[:12]}`. When they are "
+            f"green, re-run `rlsbl monorepo release run`: each member resumes "
+            f"at its own unchanged version. If CI is merely slow, raise the "
+            f"budget with `--ci-timeout`."
+        )
     if verdict != CI_GREEN:
-        red = ", ".join(r["name"] for r in results if not r["passed"]) or "unknown"
+        red = ", ".join(
+            r["name"] for r in results
+            if not r["passed"] and not r.get("timed_out")
+        ) or "unknown"
         raise ReleaseValidationError(
             f"CI did not pass on the batch release candidate {sha}.\n"
             f"  Failing workflow(s): {red}\n"
@@ -447,6 +512,11 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
     released = []
     last_sha = None
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
+        # Workspace-level pin, taken before the first candidate is built. Every
+        # commit that appears in pin..HEAD must be one a member's own release
+        # call created; anything else is a ride-in and aborts the gate.
+        batch_pin = None if dry_run else _head(workspace_root)
+        inline_commits = []
         # Pass 1: push every member's candidate untagged (the CI gate is
         # deferred so ONE wait covers the whole batch).
         pending = []
@@ -485,6 +555,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                     flags, **({} if dry_run else {"ci-defer": True}),
                 )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
+                _before = None if dry_run else _head(workspace_root)
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
                 if dry_run:
                     released.append(rel_name)
@@ -505,6 +576,12 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                         # gate below is the correctness backstop.
                         released.append(rel_name)
                         last_sha = run("git", ["rev-parse", "HEAD"])
+                        # Its trail died with its state file; the commits that
+                        # appeared across its call are the batch's own.
+                        inline_commits.extend(
+                            _commits_between(_before, last_sha.strip(),
+                                             workspace_root)
+                        )
             except SystemExit as e:
                 if e.code != 0:
                     print(
@@ -520,7 +597,17 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
         # release each member on the verified candidate.
         if pending:
             try:
-                verified_sha = _batch_ci_gate(workspace_root, flags, log)
+                verified_sha = _batch_ci_gate(
+                    workspace_root, flags, log,
+                    pin_sha=batch_pin,
+                    trail=_batch_release_trail(pending, inline_commits),
+                )
+            except ForeignCommitError as e:
+                # A ride-in on the batch tip. Never rolled back: those commits
+                # are exactly what must be preserved. Every member's candidate
+                # is on the branch untagged and no version is burnt.
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
             except ReleaseValidationError as e:
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
@@ -634,6 +721,11 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
     released = []
     last_sha = None
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
+        # Workspace-level pin, taken before the first candidate is built. Every
+        # commit that appears in pin..HEAD must be one a member's own release
+        # call created; anything else is a ride-in and aborts the gate.
+        batch_pin = None if dry_run else _head(workspace_root)
+        inline_commits = []
         # Pass 1: push every package's candidate untagged (the CI gate is
         # deferred so ONE wait covers the whole batch).
         pending = []
@@ -666,6 +758,7 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                     flags, **({} if dry_run else {"ci-defer": True}),
                 )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
+                _before = None if dry_run else _head(workspace_root)
                 run_cmd(release_config, release_flags, ctx=pkg_ctx)
                 if dry_run:
                     released.append(pkg_name)
@@ -680,6 +773,12 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                         # own call. The archive gate below is the backstop.
                         released.append(pkg_name)
                         last_sha = run("git", ["rev-parse", "HEAD"])
+                        # Its trail died with its state file; the commits that
+                        # appeared across its call are the batch's own.
+                        inline_commits.extend(
+                            _commits_between(_before, last_sha.strip(),
+                                             workspace_root)
+                        )
             except SystemExit as e:
                 if e.code != 0:
                     print(
@@ -695,7 +794,17 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
         # release each package on the verified candidate.
         if pending:
             try:
-                verified_sha = _batch_ci_gate(workspace_root, flags, log)
+                verified_sha = _batch_ci_gate(
+                    workspace_root, flags, log,
+                    pin_sha=batch_pin,
+                    trail=_batch_release_trail(pending, inline_commits),
+                )
+            except ForeignCommitError as e:
+                # A ride-in on the batch tip. Never rolled back: those commits
+                # are exactly what must be preserved. Every member's candidate
+                # is on the branch untagged and no version is burnt.
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
             except ReleaseValidationError as e:
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)

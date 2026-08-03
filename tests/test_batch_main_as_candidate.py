@@ -23,6 +23,7 @@ import pytest
 
 from githarness import git
 
+from rlsbl.commands.monorepo import batch_release
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 from rlsbl.commands.release.release_state import get_state_path, load_release_state
 from rlsbl.release_file import get_batch_release_file_path
@@ -234,3 +235,129 @@ class TestBatchCandidateGate:
             ["git", "merge-base", "--is-ancestor", observed["sha"], "HEAD"],
             cwd=str(tmp_project),
         ).returncode == 0
+
+
+class TestBatchGateRideInWindow:
+    """The batch tip must carry only commits the batch itself created.
+
+    Regression: the gate took HEAD with no foreign-commit guard at all. Every
+    member's per-release guard only covers that member's own call, so a commit
+    landing between the last candidate push and the gate -- a concurrent
+    session sharing the worktree -- was gated, tagged and released under every
+    member's version without ever being reviewed.
+    """
+
+    def _ride_in_at_gate(self, root):
+        """Wrap the trail computation so a foreign commit lands just before it.
+
+        _batch_release_trail() is evaluated as an argument to _batch_ci_gate,
+        i.e. exactly in the window between the last candidate push and the
+        gate's guard.
+        """
+        real_trail = batch_release._batch_release_trail
+
+        def _wrapped(pending, inline_commits):
+            (root / "rider.txt").write_text("rider\n")
+            git(root, "add", "rider.txt")
+            git(root, "commit", "-q", "-m", "concurrent session: unrelated work")
+            return real_trail(pending, inline_commits)
+
+        return _wrapped
+
+    def test_a_ride_in_before_the_gate_is_a_hard_error(self, tmp_project, capsys):
+        _setup_batch_workspace(tmp_project)
+        gate_calls = []
+
+        def fake_wait(sha, **kwargs):
+            gate_calls.append(sha)
+            return "green", []
+
+        with patch.object(batch_release, "_batch_release_trail",
+                          side_effect=self._ride_in_at_gate(tmp_project)):
+            with pytest.raises(SystemExit) as exc:
+                _run_batch(tmp_project, ci_side_effect=fake_wait)
+        assert exc.value.code == 1
+
+        rider = git(tmp_project, "rev-parse", "HEAD")
+        err = capsys.readouterr().err
+        assert rider[:12] in err, "the foreign commit must be named by SHA"
+        assert "concurrent session: unrelated work" in err, (
+            "the foreign commit's subject must be shown"
+        )
+
+        assert gate_calls == [], "a ride-in must abort BEFORE the CI wait"
+        tags = git(tmp_project, "tag", "-l").split()
+        assert "alpha@v1.0.1" not in tags and "beta@v1.0.1" not in tags
+
+    def test_the_ride_in_is_never_rolled_back(self, tmp_project):
+        """The guard refuses to SHIP foreign work, never to destroy it."""
+        _setup_batch_workspace(tmp_project)
+
+        with patch.object(batch_release, "_batch_release_trail",
+                          side_effect=self._ride_in_at_gate(tmp_project)):
+            with pytest.raises(SystemExit):
+                _run_batch(tmp_project, ci_return=("green", []))
+
+        assert (tmp_project / "rider.txt").exists()
+        subjects = git(tmp_project, "log", "--format=%s", "-n", "1")
+        assert subjects == "concurrent session: unrelated work"
+
+    def test_a_clean_batch_is_not_flagged(self, tmp_project):
+        """Every commit the batch itself creates must stay off the foreign list."""
+        _setup_batch_workspace(tmp_project)
+        _run_batch(tmp_project, ci_return=("green", []))
+        tags = git(tmp_project, "tag", "-l").split()
+        assert "alpha@v1.0.1" in tags and "beta@v1.0.1" in tags
+
+
+class TestBatchGateTimeoutVerdict:
+    """A CI-wait TIMEOUT is not a red batch."""
+
+    def test_timeout_reports_unresolved_not_failed(self, tmp_project, capsys):
+        _setup_batch_workspace(tmp_project)
+
+        with pytest.raises(SystemExit) as exc:
+            _run_batch(tmp_project, ci_return=("timeout", [
+                {"name": "ci", "passed": False, "timed_out": True},
+            ]))
+        assert exc.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "ran out of time" in err
+        assert "may still be in progress" in err
+        assert "NOT a CI failure" in err
+        assert "did not pass" not in err, (
+            "a timeout must not be reported as a CI failure"
+        )
+        assert "rlsbl watch" in err, "the operator must be told how to check"
+
+        tags = git(tmp_project, "tag", "-l").split()
+        assert "alpha@v1.0.1" not in tags and "beta@v1.0.1" not in tags
+
+    def test_a_real_failure_alongside_a_timeout_is_still_red(self, tmp_project, capsys):
+        _setup_batch_workspace(tmp_project)
+
+        with pytest.raises(SystemExit):
+            _run_batch(tmp_project, ci_return=("red", [
+                {"name": "lint", "passed": False},
+                {"name": "slow-matrix", "passed": False, "timed_out": True},
+            ]))
+
+        err = capsys.readouterr().err
+        assert "CI did not pass" in err
+        assert "lint" in err
+        assert "slow-matrix" not in err, (
+            "an unresolved run must not be listed as a failing workflow"
+        )
+
+
+class TestBatchNoCiNotice:
+    """The 'proceeding without a CI gate' notice must survive --quiet."""
+
+    def test_notice_reaches_stderr_under_quiet(self, tmp_project, capsys):
+        _setup_batch_workspace(tmp_project)
+        _run_batch(tmp_project, ci_return=("no-ci", []))
+        err = capsys.readouterr().err
+        assert "without a CI gate" in err, (
+            "--quiet must not swallow the no-CI-gate notice"
+        )
