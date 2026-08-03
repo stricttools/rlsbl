@@ -37,12 +37,16 @@ from .release_reconcile import (
     tag_name_from_refname as _tag_name_from_refname,
 )
 
-# Minimum safegit release the scrub flow is built against: the flow depends
-# on >= 0.22.0 for --remap-shas-in (in-history changelog hash remapping), the
-# persisted rewrite journal (.git/safegit/rewrite-maps.jsonl), and the
-# cleanup_ok/cleanup_errors/pre_rewrite_remotes JSON fields. The integration
-# test harness builds exactly this version.
-SAFEGIT_MIN_VERSION = (0, 22, 0)
+# Minimum safegit release the scrub flow is built against: the flow depends on
+# --remap-shas-in (in-history changelog hash remapping), the persisted rewrite
+# journal (.git/safegit/rewrite-maps.jsonl), and the
+# cleanup_ok/cleanup_errors/pre_rewrite_remotes JSON fields (all >= 0.22.0),
+# and on >= 0.25.0 for two coupled behaviour changes: destructive rewrites in
+# rlsbl-managed repos no longer require an orchestration handshake, and --json
+# no longer answers the destructive confirmation, so the invocation below
+# passes --yes explicitly. The integration test harness builds exactly this
+# version.
+SAFEGIT_MIN_VERSION = (0, 25, 0)
 
 
 def _save_step(path, data, step_name):
@@ -133,9 +137,13 @@ def _build_safegit_args(flags, mode, remap_globs):
     commit hashes inside the glob-matched changelog files at EVERY commit of
     the rewritten history, so all historical versions -- including HEAD --
     stay self-consistent.
+
+    ``--yes`` is explicit in every mode: safegit's destructive confirmation is
+    deliberate, and ``--json`` does not answer it. Running this command IS the
+    consent; the force-push that follows is confirmed separately.
     """
     if mode == "match":
-        args = ["scrub", "match", "--json"]
+        args = ["scrub", "match", "--json", "--yes"]
         if flags.get("dry-run"):
             args.append("--dry-run")
         args.extend(["--pattern", flags["pattern"]])
@@ -153,7 +161,7 @@ def _build_safegit_args(flags, mode, remap_globs):
 
     if mode == "file":
         # File mode: positional path last, --from mandatory.
-        args = ["scrub", "file", "--json"]
+        args = ["scrub", "file", "--json", "--yes"]
         if flags.get("dry-run"):
             args.append("--dry-run")
         args.extend(["--from", flags["from-commit"]])
@@ -163,7 +171,7 @@ def _build_safegit_args(flags, mode, remap_globs):
         return args
 
     # Recipe mode: positional recipe path, range flags, reason.
-    args = ["scrub", "run", "--json"]
+    args = ["scrub", "run", "--json", "--yes"]
     if flags.get("dry-run"):
         args.append("--dry-run")
     args.append(flags["recipe"])
@@ -726,11 +734,8 @@ def run_cmd(flags, *, ctx):
         )
         safegit_args = _build_safegit_args(flags, mode, remap_globs)
 
-        # Orchestration handshake: tells safegit this scrub is driven by
-        # rlsbl (safegit will enforce this in a future release).
-        scrub_env = {**os.environ, "RLSBL_SCRUB_ORCHESTRATED": "1"}
         try:
-            output = run("safegit", safegit_args, timeout=600, env=scrub_env)
+            output = run("safegit", safegit_args, timeout=600)
         except Exception as e:
             print(f"Error: safegit scrub failed: {e}", file=sys.stderr)
             sys.exit(1)

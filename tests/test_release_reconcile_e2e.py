@@ -92,19 +92,18 @@ def _setup_released_repo(env):
 def _raw_safegit_scrub(repo):
     """Rewrite history OUT OF BAND: raw safegit, no rlsbl orchestration.
 
-    The pinned safegit still carries the rlsbl-managed rewrite guard, which
-    refuses a direct scrub in a repo with a .rlsbl/ directory, so the
-    handshake var is set purely to get past it. Nothing else about this
-    invocation is orchestrated: rlsbl never sees it, no --remap-shas-in is
-    passed, and no release state is written -- which is exactly the situation
-    `rlsbl release reconcile` exists to repair.
+    Nothing about this invocation is orchestrated: rlsbl never sees it, no
+    --remap-shas-in is passed, and no release state is written -- which is
+    exactly the situation `rlsbl release reconcile` exists to repair. safegit
+    does not stand in the way of a direct scrub in a repo with a .rlsbl/
+    directory; `--yes` is here only because the destructive confirmation is
+    deliberate and `--json` does not answer it.
     """
-    env = {**os.environ, "RLSBL_SCRUB_ORCHESTRATED": "1"}
     result = subprocess.run(
-        ["safegit", "scrub", "match", "--json",
+        ["safegit", "scrub", "match", "--json", "--yes",
          "--pattern", SECRET, "--replace", REPLACEMENT,
          "--entire-history", "--reason", "remove leaked token"],
-        cwd=str(repo), capture_output=True, text=True, env=env,
+        cwd=str(repo), capture_output=True, text=True,
     )
     assert result.returncode == 0, (
         f"raw safegit scrub failed ({result.returncode}):\n"
