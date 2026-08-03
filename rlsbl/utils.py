@@ -304,6 +304,19 @@ def get_hook_timeout(config=None, *, override=None):
     return _resolve_timeout(config, "hook_timeout", None, override=override)
 
 
+def validate_timeout_override(config_key, value):
+    """Validate a CLI timeout override, naming the FLAG in the error.
+
+    ``--check-timeout`` and ``--hook-timeout`` reach their consumers by being
+    written into the in-memory config (see ``apply_timeout_overrides``), which
+    means an invalid flag value used to surface much later as "Invalid
+    check_timeout in .rlsbl/config.json" -- pointing the operator at a file
+    they never touched. Validating at the argv boundary keeps the blame where
+    it belongs.
+    """
+    _resolve_timeout(None, config_key, None, override=value)
+
+
 def remote_branch_exists(branch, cwd=None):
     """Check whether origin/{branch} exists as a valid ref."""
     try:

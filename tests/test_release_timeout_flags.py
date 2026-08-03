@@ -119,3 +119,44 @@ class TestCliSurface:
         assert f"--{flag}" in result.stdout, (
             f"`rlsbl {' '.join(argv)}` must expose --{flag}"
         )
+
+
+class TestInvalidOverrideNamesTheFlag:
+    """An invalid --check-timeout/--hook-timeout must blame the FLAG.
+
+    Regression: apply_timeout_overrides wrote flag values straight into the
+    in-memory config, so a bad value resurfaced downstream as "Invalid
+    check_timeout in .rlsbl/config.json" -- pointing the operator at a file
+    they never touched.
+    """
+
+    @pytest.mark.parametrize("flag,cli", [
+        ("push-timeout", "--push-timeout"),
+        ("ci-timeout", "--ci-timeout"),
+        ("check-timeout", "--check-timeout"),
+        ("hook-timeout", "--hook-timeout"),
+    ])
+    def test_error_names_the_flag_not_the_config_file(self, flag, cli):
+        with pytest.raises(ConfigError) as exc:
+            apply_timeout_overrides({}, {flag: -5})
+        msg = str(exc.value)
+        assert cli in msg, msg
+        assert ".rlsbl/config.json" not in msg, (
+            "the value came from argv, not from the config file"
+        )
+
+    def test_an_invalid_value_never_lands_in_the_config(self):
+        config = {"check_timeout": 111}
+        with pytest.raises(ConfigError):
+            apply_timeout_overrides(config, {"check-timeout": 0 - 5})
+        assert config == {"check_timeout": 111}
+
+    def test_validation_happens_even_without_a_config(self):
+        with pytest.raises(ConfigError) as exc:
+            apply_timeout_overrides(None, {"hook-timeout": -1})
+        assert "--hook-timeout" in str(exc.value)
+
+    def test_a_valid_value_still_applies(self):
+        config = {}
+        apply_timeout_overrides(config, {"check-timeout": 7})
+        assert get_check_timeout(config) == 7

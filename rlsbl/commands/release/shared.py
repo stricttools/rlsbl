@@ -46,11 +46,21 @@ def apply_timeout_overrides(config, flags):
 
     A flag that was not passed is None and leaves the config untouched, so the
     documented precedence (flag > config key > shipped default) holds.
+
+    Each value is validated BEFORE it is written, so an invalid flag value is
+    reported against the flag ("Invalid --check-timeout value: -5") instead of
+    resurfacing downstream as "Invalid check_timeout in .rlsbl/config.json" --
+    a file the operator never touched.
     """
-    if config is None:
-        return config
+    from ...utils import validate_timeout_override
+
     for flag, key in _TIMEOUT_FLAG_KEYS:
         value = flags.get(flag)
-        if value is not None:
+        if value is None:
+            continue
+        # Validated whether or not there is a config to write into: an invalid
+        # flag value is invalid on its own terms.
+        validate_timeout_override(key, value)
+        if config is not None:
             config[key] = value
     return config
