@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference: config.json pipelines, batch limits, timeouts, test block, external_checks and their release-context env, and workspace.toml."
+description: "Configuration reference: config.json pipelines, batch limits, timeouts, test block, the sandboxed test runner, external_checks and their release-context env, and workspace.toml."
 ---
 
 # Configuration reference
@@ -71,7 +71,7 @@ Inside the sandbox the real repo is bound read-only, the suite runs in a writabl
 | `default_args` | string | No | Arguments used when the runner is invoked with none (e.g. `-q -n auto`). |
 | `caches` | array | No | Toolchain caches to make available, from the closed set `uv`, `go`, `python_user_base`. An unlisted ecosystem costs nothing and requires none of its tools to be installed. Unknown names are a hard error, never a silently-ignored bind. |
 | `prewarm` | array | No | Shell commands run OUTSIDE the sandbox (network allowed) from the project root, before the sandbox is entered — for warming a cache the offline in-sandbox build then hits. A non-zero exit aborts the run. |
-| `extra_env` | array | No | Additional `NAME: value` pairs exported inside the sandbox. `STRICTTEST_SANDBOX` is always exported and cannot be redeclared here. |
+| `extra_env` | object | No | Additional environment variables exported inside the sandbox, as a name-to-value map. `STRICTTEST_SANDBOX` is always exported and cannot be redeclared here. |
 | `ci_workflows` | array | No | Workflow files that must invoke the runner. The `stricttest-floor` check hard-fails when a listed workflow does not — a repo that claims CI runs the suite sandboxed, but does not, is broken. |
 
 ```json
