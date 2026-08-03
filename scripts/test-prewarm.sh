@@ -60,6 +60,10 @@ mkdir -p "${GO_DOWNLOAD_CACHE}"
 if ls "${GO_DOWNLOAD_CACHE}"/github.com/smm-h/safegit/@v/"${SAFEGIT_PIN}".info \
       >/dev/null 2>&1; then
   echo "[prewarm] safegit ${SAFEGIT_PIN} already in the module cache" >&2
+  # The pin is published, so a locally-built stand-in for it is now a lie.
+  # Drop it; the fixture prefers the module anyway, but leaving a stale
+  # binary named after a released version invites confusion.
+  rm -f "${STAGED_BIN}"
   exit 0
 fi
 

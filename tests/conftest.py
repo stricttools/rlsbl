@@ -524,16 +524,11 @@ def _acquire_safegit(pin, gobin, binary):
     """
     gobin.mkdir(parents=True, exist_ok=True)
 
-    # 1. A binary the sandbox pre-warm already staged in the repo tree.
-    staged = Path(__file__).resolve().parent.parent / SAFEGIT_STAGE_DIR / f"safegit-{pin}"
-    if staged.is_file():
-        shutil.copy2(str(staged), str(binary))
-        os.chmod(str(binary), 0o755)
-        print(f"[safegit_bin] using staged safegit {pin} from {staged}")
-        return None
-
-    # 2. The published module. Reproducible everywhere -- and offline inside
-    #    the sandbox, where GOPROXY points at the pre-warmed module cache.
+    # 1. The published module, ALWAYS tried first. Reproducible everywhere --
+    #    and offline inside the sandbox, where GOPROXY points at the
+    #    pre-warmed module cache. Trying it before the staged binary is what
+    #    keeps a locally-built stand-in from shadowing the real release the
+    #    day the floor is published.
     env = {**os.environ, "GOBIN": str(gobin)}
     proxy = subprocess.run(
         ["go", "install", f"github.com/smm-h/safegit@{pin}"],
@@ -542,8 +537,22 @@ def _acquire_safegit(pin, gobin, binary):
     if proxy.returncode == 0:
         return None
 
-    # 3. An unpublished pin: build it from a local checkout, stamping the
-    #    pinned version so the binary reports what the floor demands.
+    # 2. A binary the sandbox pre-warm staged in the repo tree. Inside the
+    #    sandbox this is the only reachable stand-in for an unpublished pin:
+    #    no network, and no view of a sibling safegit checkout.
+    staged = Path(__file__).resolve().parent.parent / SAFEGIT_STAGE_DIR / f"safegit-{pin}"
+    if staged.is_file():
+        shutil.copy2(str(staged), str(binary))
+        os.chmod(str(binary), 0o755)
+        print(
+            f"[safegit_bin] {pin} is not published; using the pre-warm-staged "
+            f"build at {staged}"
+        )
+        return None
+
+    # 3. An unpublished pin outside the sandbox: build it from a local
+    #    checkout, stamping the pinned version so the binary reports what the
+    #    floor demands.
     source = _safegit_local_source()
     if source is None:
         return (
