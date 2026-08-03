@@ -40,6 +40,7 @@
   "release.deprecate",
   "release.edit",
   "release.init",
+  "release.reconcile",
   "release.resume",
   "release.retry",
   "release.run",
