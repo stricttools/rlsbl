@@ -52,6 +52,7 @@ from ...workspace import (
     members_of,
     read_releasable_version,
 )
+from ... import effects
 
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -112,7 +113,7 @@ def _resolve_tag_commit(root, tag):
 
 def _saferm_file(path):
     """Delete a stale cache file via saferm (audit trail; -f skips if missing)."""
-    subprocess.run(
+    effects.run(
         [
             "saferm", "delete", "-f",
             "--description",

@@ -27,7 +27,7 @@ def real_tmpdir(tmp_path):
 class TestClaimName:
     """Tests for claim-name command."""
 
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_npm_claim_available_publishes(self, mock_check, mock_run, real_tmpdir):
         """check-name returns available, mock npm publish succeeds."""
@@ -48,7 +48,7 @@ class TestClaimName:
         assert pkg_json["version"] == "0.0.0"
         assert pkg_json["description"] == "Name reservation"
 
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_pypi_claim_available_publishes(self, mock_check, mock_run, real_tmpdir):
         """check-name returns available, mock uv build+publish succeeds."""
@@ -130,7 +130,7 @@ class TestClaimName:
         assert "foo.bar" in err
         assert rule in err
 
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_taken_with_yes_publishes(self, mock_check, mock_run, real_tmpdir):
         """check-name returns taken, --yes passed. Publish is attempted."""
@@ -153,7 +153,7 @@ class TestClaimName:
             run_cmd("npm", ["err-pkg"], {"yes": False})
         assert exc_info.value.code == 2
 
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_npm_publish_failure_exits(self, mock_check, mock_run, real_tmpdir):
         """npm publish subprocess fails. Error message shown, exits 1."""
@@ -165,7 +165,7 @@ class TestClaimName:
                 run_cmd("npm", ["my-pkg"], {"yes": True})
         assert exc_info.value.code == 1
 
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_pypi_publish_failure_exits(self, mock_check, mock_run, real_tmpdir):
         """uv publish fails. Error message shown, exits 1."""
@@ -210,7 +210,7 @@ class TestClaimNameDryRun:
 
     @patch("builtins.input", return_value="n")
     @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_npm_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_input, capsys):
         mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
@@ -225,7 +225,7 @@ class TestClaimNameDryRun:
 
     @patch("builtins.input", return_value="n")
     @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_pypi_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_input, capsys):
         mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "reason": None}
@@ -242,7 +242,7 @@ class TestClaimNameConfirmation:
     publishing; declining aborts before any publish, accepting proceeds."""
 
     @patch("builtins.input", return_value="n")
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_available_prompt_declined_aborts(self, mock_check, mock_run, mock_input):
         mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
@@ -254,7 +254,7 @@ class TestClaimNameConfirmation:
         mock_run.assert_not_called()
 
     @patch("builtins.input", return_value="y")
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_available_prompt_accepted_publishes(self, mock_check, mock_run, mock_input, real_tmpdir):
         mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
@@ -266,7 +266,7 @@ class TestClaimNameConfirmation:
         assert mock_run.call_args[0][0] == ["npm", "publish", "--access", "public"]
 
     @patch("builtins.input")
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_yes_skips_prompt_and_publishes(self, mock_check, mock_run, mock_input, real_tmpdir):
         mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
@@ -283,7 +283,7 @@ class TestClaimNamePublishPromptEOF:
     remediation -- never an EOFError traceback."""
 
     @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_publish_prompt_eof_errors_with_remediation(self, mock_check, mock_run, exc, capsys):
         mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}

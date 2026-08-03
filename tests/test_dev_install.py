@@ -115,7 +115,7 @@ class _Capture:
 def fake_run(monkeypatch):
     """Replace subprocess.run inside rlsbl.commands.dev with a recorder."""
     cap = _Capture()
-    monkeypatch.setattr("rlsbl.commands.dev.subprocess.run", cap)
+    monkeypatch.setattr("rlsbl.effects.run", cap)
     return cap
 
 
@@ -263,7 +263,7 @@ def test_missing_tool_is_skipped(tmp_project, fake_run, monkeypatch, capsys):
 def test_install_failure_returns_nonzero(tmp_project, monkeypatch, all_tools_present):
     _make_pypi(str(tmp_project))
     cap = _Capture(returncode=2)
-    monkeypatch.setattr("rlsbl.commands.dev.subprocess.run", cap)
+    monkeypatch.setattr("rlsbl.effects.run", cap)
     rc = run_install({}, project_root=".")
     assert rc == 1
     assert len(cap.calls) == 1

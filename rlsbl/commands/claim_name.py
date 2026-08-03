@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from .. import effects
 
 
 def run_cmd(target, args, flags):
@@ -110,7 +111,7 @@ def _claim_npm(name, tmpdir):
         json.dump(package_json, f, indent=2)
         f.write("\n")
 
-    subprocess.run(
+    effects.run(
         ["npm", "publish", "--access", "public"],
         cwd=tmpdir,
         capture_output=True,
@@ -143,7 +144,7 @@ build-backend = "hatchling.build"
     with open(os.path.join(tmpdir, "pyproject.toml"), "w") as f:
         f.write(pyproject_toml)
 
-    subprocess.run(
+    effects.run(
         ["uv", "build"],
         cwd=tmpdir,
         capture_output=True,
@@ -154,7 +155,7 @@ build-backend = "hatchling.build"
 
     token = os.environ.get("UV_PUBLISH_TOKEN") or os.environ["PYPI_TOKEN"]
 
-    subprocess.run(
+    effects.run(
         ["uv", "publish", "--token", token],
         cwd=tmpdir,
         capture_output=True,

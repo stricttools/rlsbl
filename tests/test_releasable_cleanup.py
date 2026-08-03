@@ -59,7 +59,7 @@ def _make_rlsbl_dir(project_dir, subdirs=None, files=None):
 class TestCleanupRemovesState:
     """cleanup_per_package_release_state removes changes/ and releases/ for releasable members."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_removes_changes_dir(self, mock_run, tmp_project):
         """changes/ directory is removed for a releasable member."""
         pkg = tmp_project / "pkg"
@@ -81,7 +81,7 @@ releasable = "core"
         assert args[0] == "saferm"
         assert "-r" in args
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_removes_releases_dir(self, mock_run, tmp_project):
         """releases/ directory is removed for a releasable member."""
         pkg = tmp_project / "pkg"
@@ -99,7 +99,7 @@ releasable = "core"
         assert len(removed) == 1
         assert removed[0] == str(pkg / ".rlsbl" / "releases")
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_removes_both_dirs(self, mock_run, tmp_project):
         """Both changes/ and releases/ are removed when present."""
         pkg = tmp_project / "pkg"
@@ -120,7 +120,7 @@ releasable = "core"
         assert str(pkg / ".rlsbl" / "releases") in paths
         assert mock_run.call_count == 2
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_skips_when_dirs_absent(self, mock_run, tmp_project):
         """No saferm calls when changes/ and releases/ don't exist."""
         pkg = tmp_project / "pkg"
@@ -142,7 +142,7 @@ releasable = "core"
         assert removed == []
         mock_run.assert_not_called()
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_multiple_projects_in_releasable(self, mock_run, tmp_project):
         """Cleanup works across multiple projects in the same releasable."""
         for name in ("a", "b", "c"):
@@ -179,7 +179,7 @@ releasable = "core"
 class TestCleanupSkipsNonReleasable:
     """Cleanup skips projects with releasable = false."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_skips_releasable_false(self, mock_run, tmp_project):
         """Projects with releasable = false are not cleaned."""
         pkg = tmp_project / "tests"
@@ -202,7 +202,7 @@ releasable = false
         assert removed == []
         mock_run.assert_not_called()
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_skips_dev_node(self, mock_run, tmp_project):
         """Legacy dev_node projects (non-releasable) are not cleaned."""
         pkg = tmp_project / "tests"
@@ -225,7 +225,7 @@ dev_node = true
         assert removed == []
         mock_run.assert_not_called()
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_only_cleans_releasable_members(self, mock_run, tmp_project):
         """Mixed workspace: only releasable members are cleaned."""
         for name in ("core-lib", "tests", "utils"):
@@ -265,7 +265,7 @@ releasable = "core"
 class TestCleanupSkipsNoReleasables:
     """Cleanup does nothing when workspace has no [[releasables]]."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_no_releasables_no_cleanup(self, mock_run, tmp_project):
         """Without [[releasables]], cleanup returns empty list."""
         pkg = tmp_project / "pkg"
@@ -279,7 +279,7 @@ name = "pkg"
         assert removed == []
         mock_run.assert_not_called()
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_no_releasables_with_dev_node(self, mock_run, tmp_project):
         """Without [[releasables]] and dev_node projects, still does nothing."""
         for name in ("a", "b"):
@@ -320,11 +320,11 @@ path = "pkg"
 name = "pkg"
 releasable = "core"
 """)
-        with patch("rlsbl.releasable_cleanup.subprocess.run", side_effect=FileNotFoundError):
+        with patch("rlsbl.effects.run", side_effect=FileNotFoundError):
             with pytest.raises(RuntimeError, match="saferm is not installed"):
                 cleanup_per_package_release_state(str(tmp_project))
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_saferm_description_includes_project_name(self, mock_run, tmp_project):
         """saferm is called with a descriptive message including the project name."""
         pkg = tmp_project / "mylib"
@@ -354,7 +354,7 @@ releasable = "core"
 class TestCleanupPreloaded:
     """Cleanup accepts pre-loaded projects and releasables."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_preloaded_projects_and_releasables(self, mock_run, tmp_project):
         """Passing pre-loaded data avoids re-reading workspace.toml."""
         pkg = tmp_project / "pkg"
@@ -545,7 +545,7 @@ class TestRootMemberExemption:
     """Members whose path resolves to the workspace root are exempt from
     cleanup: their .rlsbl/ and CHANGELOG.md are workspace-level files."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_root_member_untouched(self, mock_run, tmp_project):
         _make_rlsbl_dir(tmp_project, subdirs=["changes", "releases"],
                         files=["version"])
@@ -568,7 +568,7 @@ releasable = "solo"
 
 class TestCleanupDryRun:
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_dry_run_collects_without_deleting(self, mock_run, tmp_project):
         pkg = tmp_project / "pkg"
         _make_rlsbl_dir(pkg, subdirs=["changes", "releases"], files=["version"])
@@ -722,7 +722,7 @@ class TestCleanupCommand:
                 os.unlink(target)
             return real_subprocess.CompletedProcess(args=cmd, returncode=0)
         # subprocess is a shared module object, so patching
-        # rlsbl.releasable_cleanup.subprocess.run patches it globally --
+        # rlsbl.effects.run patches it globally --
         # delegate to the original captured at module import time.
         return _REAL_SUBPROCESS_RUN(cmd, *args, **kwargs)
 
@@ -769,7 +769,7 @@ releasable = "core"
         monkeypatch.chdir(tmp_project)
 
         with _patch(
-            "rlsbl.releasable_cleanup.subprocess.run",
+            "rlsbl.effects.run",
             side_effect=self._mock_saferm_delete,
         ):
             removed = run_cleanup_command(str(tmp_project), yes=True)
@@ -805,7 +805,7 @@ releasable = "core"
         monkeypatch.chdir(tmp_project)
 
         with _patch(
-            "rlsbl.releasable_cleanup.subprocess.run",
+            "rlsbl.effects.run",
             side_effect=self._mock_saferm_delete,
         ):
             would = run_cleanup_command(str(tmp_project), dry_run=True)

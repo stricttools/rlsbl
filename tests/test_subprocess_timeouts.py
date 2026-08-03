@@ -32,7 +32,7 @@ class TestMavenLinterTimeout:
                 return_value=["./gradlew", "detekt"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 side_effect=subprocess.TimeoutExpired(
                     cmd=["./gradlew", "detekt"], timeout=120
                 ),
@@ -61,7 +61,7 @@ class TestMavenLinterTimeout:
                 return_value=["./gradlew", "detekt"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ) as mock_run,
         ):
@@ -83,7 +83,7 @@ class TestMavenLinterTimeout:
                 return_value=["./gradlew", "detekt"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ) as mock_run,
         ):
@@ -108,7 +108,7 @@ class TestMavenTestsTimeout:
         os.chmod(str(gradlew), 0o755)
 
         with patch(
-            "rlsbl.testing.subprocess.run",
+            "rlsbl.effects.run",
             side_effect=subprocess.TimeoutExpired(
                 cmd=["./gradlew", "test"], timeout=120
             ),
@@ -127,7 +127,7 @@ class TestMavenTestsTimeout:
         mock_result.returncode = 0
 
         with patch(
-            "rlsbl.testing.subprocess.run",
+            "rlsbl.effects.run",
             return_value=mock_result,
         ) as mock_run:
             run_project_tests(
@@ -151,7 +151,7 @@ class TestPypiTestsTimeout:
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
             patch(
-                "rlsbl.testing.subprocess.run",
+                "rlsbl.effects.run",
             ) as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -179,7 +179,7 @@ class TestPypiTestsTimeout:
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
             patch(
-                "rlsbl.testing.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ) as mock_run,
         ):
@@ -198,7 +198,7 @@ class TestGoTestsTimeout:
     def test_go_timeout_returns_false(self, tmp_path):
         """When go test times out, run_project_tests returns False."""
         with patch(
-            "rlsbl.testing.subprocess.run",
+            "rlsbl.effects.run",
             side_effect=subprocess.TimeoutExpired(
                 cmd=["go", "test", "./...", "-race", "-short", "-count=1"],
                 timeout=120,
@@ -214,7 +214,7 @@ class TestGoTestsTimeout:
         mock_result.returncode = 0
 
         with patch(
-            "rlsbl.testing.subprocess.run",
+            "rlsbl.effects.run",
             return_value=mock_result,
         ) as mock_run:
             run_project_tests(

@@ -11,6 +11,7 @@ import fnmatch
 import re
 import subprocess
 import sys
+from . import effects
 
 
 def get_commit_files(sha):
@@ -24,7 +25,7 @@ def get_commit_files(sha):
     touched no files, so every project-scope match against it failed.
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "diff-tree", "--no-commit-id", "--name-only", "-r",
              "-m", "--first-parent", "--root", sha],
             capture_output=True,
@@ -155,7 +156,7 @@ def validate_subtree_remote_ssh_host(subtree_remote, project_root):
     """
     # Read origin URL
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "remote", "get-url", "origin"],
             capture_output=True,
             text=True,
@@ -208,13 +209,13 @@ def get_push_changed_files(refs):
         try:
             if remote_sha == zero_sha:
                 # New branch: get files in commits not yet on any remote
-                result = subprocess.run(
+                result = effects.run(
                     ["git", "log", "--name-only", "--pretty=format:", local_sha,
                      "--not", "--remotes"],
                     capture_output=True, text=True, timeout=30,
                 )
             else:
-                result = subprocess.run(
+                result = effects.run(
                     ["git", "diff", "--name-only", f"{remote_sha}..{local_sha}"],
                     capture_output=True, text=True, timeout=30,
                 )

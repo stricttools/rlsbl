@@ -12,6 +12,7 @@ from ..go_introspect import (
     validate_install_paths,
 )
 from ..utils import read_go_module_path, require_tool, run
+from .. import effects
 
 # `go install` may compile the module and its dependency tree from scratch,
 # so it gets a more generous bound than the network-only proxy call (120s).
@@ -104,7 +105,7 @@ class GoPipeline(BasePipeline):
         paths = validate_install_paths(dir_path, install_paths)
         for path in paths:
             try:
-                subprocess.run(
+                effects.run(
                     ["go", "install", path],
                     cwd=dir_path,
                     check=True,

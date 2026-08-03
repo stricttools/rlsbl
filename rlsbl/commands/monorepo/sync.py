@@ -2,7 +2,6 @@
 
 import glob
 import os
-import subprocess
 import sys
 from ruamel.yaml.scalarstring import LiteralScalarString
 
@@ -23,6 +22,7 @@ from ...utils import commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
 from ...tag_glob import _mixed_tag_schemes, _mixed_scheme_error
+from ... import effects
 
 # Backward-compatible aliases (private names used by monorepo __init__.py re-exports)
 _inject_working_directory = inject_working_directory
@@ -437,7 +437,7 @@ def _saferm_workflow(filepath, description):
     subprocess.CalledProcessError if saferm exits non-zero.
     """
     try:
-        subprocess.run(
+        effects.run(
             ["saferm", "delete", "--description", description, filepath],
             check=True,
             capture_output=True,

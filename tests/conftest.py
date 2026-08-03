@@ -728,7 +728,6 @@ def _mock_saferm():
       selfdoc.json exists at a fake workspace root like /ws)
     """
     import subprocess as real_subprocess
-    original_run = real_subprocess.run
 
     def _mock_run(cmd, *args, **kwargs):
         if isinstance(cmd, list) and cmd:
@@ -742,11 +741,12 @@ def _mock_saferm():
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             if cmd[0] == "selfdoc":
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
-        return original_run(cmd, *args, **kwargs)
+        # Resolved at CALL time, not fixture-setup time: this fixture now sits
+        # one layer above subprocess (it patches the effect chokepoint), so a
+        # test that patches subprocess.run itself must still win here.
+        return real_subprocess.run(cmd, *args, **kwargs)
 
-    with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=_mock_run), \
-         patch("rlsbl.commands.monorepo.sync.subprocess.run", side_effect=_mock_run), \
-         patch("rlsbl.commands.release.subprocess.run", side_effect=_mock_run):
+    with patch("rlsbl.effects.run", side_effect=_mock_run):
         yield
 
 

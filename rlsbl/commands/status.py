@@ -18,6 +18,7 @@ from ..utils import (
     run,
 )
 from ..workspace import find_workspace_root, load_workspace, resolve_project
+from .. import effects
 
 
 def _compare_versions(local, remote):
@@ -113,7 +114,7 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     scoped_tag = _get_last_version_tag(tag_glob)
     try:
         range_spec = _unreleased_range(tag_glob=tag_glob)
-        result = subprocess.run(
+        result = effects.run(
             ["git", "log", "--format=%H", range_spec],
             capture_output=True, text=True, timeout=30,
         )

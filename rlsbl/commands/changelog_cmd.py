@@ -35,6 +35,7 @@ from ..workspace import (
     resolve_project,
     resolve_releasable_for_project,
 )
+from .. import effects
 
 
 class _ResolvedContext:
@@ -1071,7 +1072,7 @@ def cmd_remap(flags, project_root):
 def _sync_github_release(version: str) -> None:
     """Sync GitHub Release notes for a version (best-effort, warns on failure)."""
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["rlsbl", "release", "edit", version],
             capture_output=True,
             text=True,
@@ -1098,7 +1099,7 @@ def _filter_dirty_files(paths: list[str], repo_root: str) -> list[str]:
     generation where the generated files live outside the member project.
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "status", "--porcelain", "--", *paths],
             capture_output=True,
             text=True,
@@ -1123,7 +1124,7 @@ def _get_generated_files(project_path: str) -> list[str]:
     Checks git status for CHANGELOG.md and .rlsbl/changes/*.md files.
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "status", "--porcelain"],
             capture_output=True,
             text=True,

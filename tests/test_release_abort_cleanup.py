@@ -276,7 +276,7 @@ class TestReleaseAbortCleanup:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("rlsbl.commands.release.subprocess.run", side_effect=fake_run),
+            patch("rlsbl.effects.run", side_effect=fake_run),
         ):
             # _run_selfdoc_check does not catch CalledProcessError, so it
             # propagates up through run_cmd. Either way the on-disk invariant

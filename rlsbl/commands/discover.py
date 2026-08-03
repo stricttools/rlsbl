@@ -3,11 +3,11 @@
 import json
 import os
 import shutil
-import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
+from .. import effects
 
 
 SEARCH_URL = "https://api.github.com/search/repositories?q=topic:rlsbl&sort=updated&per_page=100"
@@ -21,7 +21,7 @@ def _get_github_token():
     if token:
         return token
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["gh", "auth", "token"],
             capture_output=True, text=True, check=True, timeout=10,
         )

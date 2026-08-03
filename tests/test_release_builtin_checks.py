@@ -116,7 +116,7 @@ class TestSelfdocCheck:
 
         with (
             patch("rlsbl.commands.release.require_tool") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/selfdoc"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -130,7 +130,7 @@ class TestSelfdocCheck:
 
     def test_selfdoc_check_skipped_when_no_config(self, tmp_project):
         """When selfdoc.json does not exist, function returns without running."""
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = _run_selfdoc_check({})
 
             assert result is True
@@ -142,7 +142,7 @@ class TestSelfdocCheck:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=None),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             result = _run_selfdoc_check({})
 
@@ -158,7 +158,7 @@ class TestSelfdocCheck:
         with (
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch(
-                "rlsbl.commands.release.subprocess.run",
+                "rlsbl.effects.run",
                 side_effect=subprocess.CalledProcessError(1, ["selfdoc", "check", "--no-auto-commit"]),
             ),
         ):
@@ -173,7 +173,7 @@ class TestSelfdocCheck:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
@@ -188,7 +188,7 @@ class TestSelfdocCheck:
         """When dry-run flag is set, selfdoc check is skipped."""
         (tmp_project / "selfdoc.json").write_text("{}")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = _run_selfdoc_check({"dry-run": True})
 
             assert result is True
@@ -208,7 +208,7 @@ class TestSelfdocGen:
 
         with (
             patch("rlsbl.commands.release.require_tool") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_which.return_value = "/usr/bin/selfdoc"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -222,7 +222,7 @@ class TestSelfdocGen:
 
     def test_selfdoc_gen_skipped_when_no_config(self, tmp_project):
         """When selfdoc.json does not exist, function returns without running."""
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = _run_selfdoc_gen({})
 
             assert result is True
@@ -234,7 +234,7 @@ class TestSelfdocGen:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=None),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             result = _run_selfdoc_gen({})
 
@@ -250,7 +250,7 @@ class TestSelfdocGen:
         with (
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch(
-                "rlsbl.commands.release.subprocess.run",
+                "rlsbl.effects.run",
                 side_effect=subprocess.CalledProcessError(1, ["selfdoc", "gen", "--no-auto-commit"]),
             ),
         ):
@@ -265,7 +265,7 @@ class TestSelfdocGen:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
@@ -280,7 +280,7 @@ class TestSelfdocGen:
         """When dry-run flag is set, selfdoc gen is skipped with a log message."""
         (tmp_project / "selfdoc.json").write_text("{}")
 
-        with patch("rlsbl.commands.release.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = _run_selfdoc_gen({"dry-run": True})
 
             assert result is True

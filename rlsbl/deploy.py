@@ -9,6 +9,7 @@ import time
 import urllib.request
 
 from .errors import ConfigError
+from . import effects
 
 
 REQUIRED_DEPLOY_FIELDS = {"name", "host", "steps", "only_on"}
@@ -181,7 +182,7 @@ def ssh_run(host, user, command, ssh_key=None, directory=None, env=None, timeout
     remote_command = " && ".join(remote_parts)
     ssh_cmd.append(remote_command)
 
-    result = subprocess.run(
+    result = effects.run(
         ssh_cmd, capture_output=True, text=True, timeout=timeout,
     )
     return result.stdout, result.stderr, result.returncode
@@ -304,7 +305,7 @@ def deploy_target(target_config, current_branch):
             # DeployResult message carries the expanded command.
             print(f"[{name}] Local step {i + 1}/{len(local_steps)}: {expanded_step}")
             try:
-                subprocess.run(
+                effects.run(
                     expanded_step, shell=True, check=True,
                     cwd=directory,
                 )

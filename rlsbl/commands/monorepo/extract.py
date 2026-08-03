@@ -41,6 +41,7 @@ from ...workspace import (
     resolve_releasable_for_project,
     save_workspace,
 )
+from ... import effects
 
 
 class ExtractError(RlsblError):
@@ -65,7 +66,7 @@ def require_filter_repo():
 
 def _run_git(cwd, *args):
     """Run a git command and return stdout. Raises subprocess.CalledProcessError on failure."""
-    result = subprocess.run(
+    result = effects.run(
         ["git"] + list(args),
         cwd=str(cwd),
         capture_output=True,
@@ -83,7 +84,7 @@ def _run_filter_repo(cwd, *args):
     actionable error including filter-repo's own stderr.
     """
     try:
-        subprocess.run(
+        effects.run(
             ["git-filter-repo", *args],
             cwd=str(cwd), check=True, capture_output=True, text=True,
         )
@@ -124,7 +125,7 @@ def _git_tag_list(repo, pattern=None):
 
 def _commit_resolves(repo, commit_hash):
     """Whether ``commit_hash`` resolves to an existing commit object in ``repo``."""
-    result = subprocess.run(
+    result = effects.run(
         ["git", "cat-file", "-e", commit_hash + "^{commit}"],
         cwd=str(repo), capture_output=True, text=True,
     )
@@ -331,7 +332,7 @@ def _commit_extracted_state(repo):
     Captures every working-tree change (workspace.toml/config edits, remapped
     JSONL, migrated changelog files). No-op when the tree is already clean.
     """
-    result = subprocess.run(
+    result = effects.run(
         ["git", "status", "--porcelain"],
         cwd=str(repo), capture_output=True, text=True, check=True,
     )
@@ -946,7 +947,7 @@ def cmd_absorb(
     try:
         clone_path = os.path.join(tmp_root, "clone")
         _run_git(workspace_root, "clone", "--no-local", source_repo_path, clone_path)
-        subprocess.run(
+        effects.run(
             ["git-filter-repo", "--to-subdirectory-filter", dest_path, "--force"],
             cwd=clone_path, check=True, capture_output=True, text=True,
         )
@@ -1087,7 +1088,7 @@ def _commit_absorb_followup(workspace_root, name):
     # Parse porcelain without stripping: each line is "XY <path>" and the
     # leading status columns must be preserved (a global strip would eat the
     # first line's leading space and corrupt its path).
-    result = subprocess.run(
+    result = effects.run(
         ["git", "status", "--porcelain"],
         cwd=str(workspace_root), capture_output=True, text=True, check=True,
     )

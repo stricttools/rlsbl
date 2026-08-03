@@ -230,6 +230,7 @@ app.register_check_provider(make_external_check_provider(_read_config_for_cwd))
 
 # Register check implementations on the strictcli check system.
 from .checks import register_checks
+from . import effects
 register_checks(app)
 
 
@@ -456,7 +457,7 @@ def cmd_release_resume(ctx, dry_run, yes, quiet, watch, push_timeout, ci_timeout
     pre_release_sha = saved.get("pre_release_sha", "").strip()
     if pre_release_sha:
         try:
-            result = subprocess.run(
+            result = effects.run(
                 ["git", "merge-base", "--is-ancestor", pre_release_sha, "HEAD"],
                 capture_output=True,
             )

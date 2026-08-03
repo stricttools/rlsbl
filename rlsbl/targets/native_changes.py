@@ -5,6 +5,7 @@ changes) or whether a full build release is required (native code changed).
 """
 
 import subprocess
+from .. import effects
 
 # Directories and file patterns that indicate native platform code changes.
 # Changes in these paths require a full build release (not OTA).
@@ -27,7 +28,7 @@ def detect_native_changes(project_dir: str, since_ref: str) -> list[str]:
     Returns an empty list if no native changes are found (OTA is safe).
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "diff", "--name-only", f"{since_ref}..HEAD", "--", project_dir],
             capture_output=True,
             text=True,

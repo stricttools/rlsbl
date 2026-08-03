@@ -18,6 +18,7 @@ except ImportError:
 from itertools import product  # noqa: E402
 
 from rlsbl.targets.utils import normalize_npm, normalize_pypi  # noqa: E402
+from .. import effects
 
 
 def _request_with_backoff(url, timeout=5, max_retries=3, headers=None):
@@ -154,7 +155,7 @@ def check_npm_availability(name):
     Distinguishes 404 (truly available) from network/other errors.
     """
     try:
-        subprocess.run(
+        effects.run(
             ["npm", "view", name, "name"],
             capture_output=True, text=True, check=True, timeout=30,
         )

@@ -1071,7 +1071,7 @@ class TestUndo:
 class TestCheck:
     """Tests for rlsbl.commands.check -- npm availability checks."""
 
-    @patch("rlsbl.commands.check.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_check_npm_available(self, mock_subprocess_run):
         """When npm view raises CalledProcessError with 404, name is available."""
         from rlsbl.commands.check import check_npm_availability
@@ -1082,7 +1082,7 @@ class TestCheck:
         result = check_npm_availability("nonexistent-pkg-xyz")
         assert result["status"] == "available"
 
-    @patch("rlsbl.commands.check.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_check_npm_taken(self, mock_subprocess_run):
         """When npm view succeeds, name is taken."""
         from rlsbl.commands.check import check_npm_availability

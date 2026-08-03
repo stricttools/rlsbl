@@ -1,8 +1,8 @@
 """Base classes for release pipelines, including no-op defaults for optional methods and token/credential authentication mixins."""
 
 import os
-import subprocess
 import sys
+from .. import effects
 
 # Error message signatures that registries use for "already published":
 # npm: E403 "You cannot publish over the previously published versions"
@@ -146,7 +146,7 @@ class BasePipeline:
             # the command before execution for an audit trail. No timeout:
             # build commands are unbounded operator-defined work.
             print(f"  Building custom asset '{name}': {build_cmd}")
-            result = subprocess.run(
+            result = effects.run(
                 build_cmd,
                 shell=True,
                 capture_output=True,

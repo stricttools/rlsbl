@@ -1,7 +1,6 @@
 """Developer utilities for locally installing rlsbl-managed projects in editable mode, dispatching to each detected target's native install command (uv tool install, npm link, go install, and others)."""
 
 import os
-import subprocess
 import sys
 
 from ..config import read_project_config
@@ -9,6 +8,7 @@ from ..context import ProjectContext
 from ..targets import TARGETS, detect_targets
 from ..utils import require_tool
 from ..workspace import find_workspace_root, load_workspace
+from .. import effects
 
 
 def run_install(flags, project_root):
@@ -83,7 +83,7 @@ def _install_single(project_dir, flags):
         action = "Uninstalling" if uninstall else "Installing"
         print(f"{action} {name} from {target_dir}...")
         any_handled = True
-        result = subprocess.run([spec["tool"]] + args, cwd=target_dir)
+        result = effects.run([spec["tool"]] + args, cwd=target_dir)
         if result.returncode != 0:
             print(
                 f"Error: {action.lower()} failed for {name} (exit {result.returncode})",

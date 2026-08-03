@@ -76,7 +76,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
@@ -104,7 +104,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/npm"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
@@ -131,7 +131,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/go"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
@@ -156,7 +156,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value=None),
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             _sync_lockfiles(target_paths, files_to_commit, log)
 
@@ -180,7 +180,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect(
                       sync_result=subprocess.CalledProcessError(1, "uv lock"))),
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -204,7 +204,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect(
                       sync_result=subprocess.TimeoutExpired("uv lock", 30))),
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
@@ -229,7 +229,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
@@ -248,7 +248,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which") as mock_which,
-            patch("rlsbl.commands.release.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             _sync_lockfiles(target_paths, files_to_commit, log)
 
@@ -292,7 +292,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/tool"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
@@ -315,7 +315,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect()) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
@@ -334,7 +334,7 @@ class TestSyncLockfiles:
 
         with (
             patch("rlsbl.commands.release.shutil.which", return_value="/usr/bin/uv"),
-            patch("rlsbl.commands.release.subprocess.run",
+            patch("rlsbl.effects.run",
                   side_effect=_make_subprocess_run_side_effect(gitignored=True)) as mock_run,
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):

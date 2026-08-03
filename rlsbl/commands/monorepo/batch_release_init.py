@@ -10,6 +10,7 @@ from ...release_file import get_batch_release_file_path, is_pristine_batch_relea
 from ...targets import collect_releasable_targets, detect_targets, resolve_releasable_config_dir, TARGETS
 from ...utils import commit_scaffold_file
 from ...workspace import find_workspace_root, load_workspace
+from ... import effects
 
 
 def _handle_existing_batch(batch_path):
@@ -62,7 +63,7 @@ def _get_unreleased_commit_count(proj, workspace_root):
     # Find last version tag
     last_tag = None
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "tag", "-l", tag_glob, "--sort=-v:refname"],
             capture_output=True, text=True, timeout=10,
             cwd=workspace_root,
@@ -77,7 +78,7 @@ def _get_unreleased_commit_count(proj, workspace_root):
     # Get commits in range
     range_spec = f"{last_tag}..HEAD" if last_tag else "HEAD"
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "log", "--format=%H", range_spec],
             capture_output=True, text=True, timeout=30,
             cwd=workspace_root,

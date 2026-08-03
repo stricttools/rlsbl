@@ -35,7 +35,7 @@ class _Capture:
 @pytest.fixture
 def fake_run(monkeypatch):
     cap = _Capture()
-    monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", cap)
+    monkeypatch.setattr("rlsbl.effects.run", cap)
     return cap
 
 
@@ -357,7 +357,7 @@ def test_sync_failure_aborts_before_installs(
 ):
     _two_overlays(tmp_project)
     cap = _Capture(returncode=3)
-    monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", cap)
+    monkeypatch.setattr("rlsbl.effects.run", cap)
     rc = run_sync(str(tmp_project))
     assert rc == 1
     # Only the sync ran; no editable installs after the failure.
@@ -378,7 +378,7 @@ def test_editable_install_failure_is_hard_error(
             return result
 
     cap = _FailSecond()
-    monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", cap)
+    monkeypatch.setattr("rlsbl.effects.run", cap)
     rc = run_sync(str(tmp_project))
     assert rc == 1
     # Stopped at the failed install: sync + first (failing) editable install.
@@ -604,7 +604,7 @@ def test_run_sync_does_not_write_sentinel_on_failure(
                 return subprocess.CompletedProcess(args=cmd, returncode=1)
             return result
 
-    monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", _FailInstall())
+    monkeypatch.setattr("rlsbl.effects.run", _FailInstall())
     assert run_sync(str(tmp_project)) == 1
     assert not (tmp_project / SENTINEL_FILENAME).exists()
 
@@ -634,7 +634,7 @@ def test_run_sync_preexisting_sentinel_untouched_on_failure(
                 return subprocess.CompletedProcess(args=cmd, returncode=1)
             return result
 
-    monkeypatch.setattr("rlsbl.commands.dev_sync.subprocess.run", _FailInstall())
+    monkeypatch.setattr("rlsbl.effects.run", _FailInstall())
     assert run_sync(str(tmp_project)) == 1
 
     # The old sentinel is preserved exactly -- no partial rewrite.

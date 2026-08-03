@@ -26,6 +26,7 @@ from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import check_gh_auth, check_gh_installed, run, run_gh
 from ..workspace import find_workspace_root, resolve_project
 from .watch import run_cmd as watch_run_cmd
+from .. import effects
 
 
 def _find_dispatch_workflows():
@@ -105,7 +106,7 @@ def _scaffold_retry_file(
 def _cleanup_retry_file(retry_path, log):
     """Delete retry.toml via saferm after successful retry."""
     try:
-        subprocess.run(
+        effects.run(
             ["saferm", "delete", "--description", "Retry completed successfully", retry_path],
             check=True,
             capture_output=True,

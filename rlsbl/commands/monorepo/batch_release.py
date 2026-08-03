@@ -52,6 +52,7 @@ from ..release.validate import (
     validate_gh_cli,
     validate_gh_push_access,
 )
+from ... import effects
 
 
 def _run_root_selfdoc(flags, workspace_root, log):
@@ -119,18 +120,17 @@ def _batch_release_flags(flags, **extra):
 def _commits_between(start, end, workspace_root):
     """The commits in ``start..end``, newest first; empty when unresolvable.
 
-    Bookkeeping for the batch drift guard, so it goes through ``subprocess``
-    directly rather than the release flow's mock-patched ``run`` -- the same
-    rationale as :func:`~rlsbl.commands.release.execute.head_sha`. An
-    unresolvable range yields no trail entries, and an unresolvable pin
-    disables the guard outright, so neither can fabricate a foreign commit.
+    Bookkeeping for the batch drift guard, so it goes through
+    ``effects.run`` directly rather than the release flow's mock-patched
+    ``run`` -- the same rationale as
+    :func:`~rlsbl.commands.release.execute.head_sha`. An unresolvable range
+    yields no trail entries, and an unresolvable pin disables the guard
+    outright, so neither can fabricate a foreign commit.
     """
-    import subprocess
-
     if not start or not end:
         return []
     try:
-        out = subprocess.run(
+        out = effects.run(
             ["git", "rev-list", f"{start}..{end}"],
             capture_output=True, text=True, check=True, cwd=workspace_root,
         ).stdout

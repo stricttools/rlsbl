@@ -753,7 +753,7 @@ def _run_selfdoc_gen(flags, project_dir=None, version=None):
     ``--version-override`` so version-bearing generated content is written for
     the new version rather than the (still un-bumped) one on disk.
     """
-    from . import require_tool, subprocess as _subprocess
+    from . import require_tool, effects as _effects, subprocess as _subprocess
 
     check_dir = project_dir if project_dir else "."
     selfdoc_config = os.path.join(check_dir, "selfdoc.json")
@@ -777,7 +777,7 @@ def _run_selfdoc_gen(flags, project_dir=None, version=None):
 
     print("Running selfdoc gen...")
     try:
-        _subprocess.run(
+        _effects.run(
             ["selfdoc", "gen", "--no-auto-commit"] + version_args,
             cwd=project_dir, check=True,
         )
@@ -801,7 +801,7 @@ def _run_selfdoc_check(flags, project_dir=None, version=None):
     generated content against the version the gen step just wrote, not the
     still-un-bumped one on disk.
     """
-    from . import require_tool, subprocess as _subprocess
+    from . import require_tool, effects as _effects, subprocess as _subprocess
 
     if flags.get("dry-run"):
         return True
@@ -817,7 +817,7 @@ def _run_selfdoc_check(flags, project_dir=None, version=None):
 
     print("Running selfdoc check...")
     try:
-        _subprocess.run(
+        _effects.run(
             ["selfdoc", "check", "--no-auto-commit"]
             + _selfdoc_version_args(version),
             cwd=project_dir, check=True,
@@ -1081,7 +1081,7 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     detected aborts validation (ReleaseValidationError) -- a silent skip
     would ship a stale schema.
     """
-    from . import subprocess as _subprocess
+    from . import effects as _effects, subprocess as _subprocess
     from ...strictcli_detect import StrictcliDetectError
 
     try:
@@ -1104,7 +1104,7 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     log(f"Dumping strictcli schema ({entry_point})...")
 
     try:
-        _subprocess.run(
+        _effects.run(
             cmd,
             cwd=project_dir,
             timeout=_SCHEMA_DUMP_TIMEOUT,

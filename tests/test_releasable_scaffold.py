@@ -335,7 +335,7 @@ class TestMonorepoAddReleasable:
         self._setup_explicit_workspace(mock_git_repo)
         self._make_project_dir(mock_git_repo, "app")
 
-        with patch("rlsbl.commands.monorepo.commands.subprocess.run"):
+        with patch("rlsbl.effects.run"):
             _cmd_add(["app"], {
                 "releasable": "www",
                 "auto-commit": False,
@@ -350,7 +350,7 @@ class TestMonorepoAddReleasable:
         self._setup_explicit_workspace(mock_git_repo)
         self._make_project_dir(mock_git_repo, "infra")
 
-        with patch("rlsbl.commands.monorepo.commands.subprocess.run"):
+        with patch("rlsbl.effects.run"):
             _cmd_add(["infra"], {
                 "releasable": "false",
                 "auto-commit": False,
@@ -387,7 +387,7 @@ class TestMonorepoAddReleasable:
         save_workspace(str(mock_git_repo), [])
         self._make_project_dir(mock_git_repo, "lib")
 
-        with patch("rlsbl.commands.monorepo.commands.subprocess.run"):
+        with patch("rlsbl.effects.run"):
             _cmd_add(["lib"], {
                 "auto-commit": False,
             }, project_root=mock_git_repo)

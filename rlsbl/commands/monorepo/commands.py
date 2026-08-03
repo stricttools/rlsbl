@@ -2,7 +2,6 @@
 
 import os
 import re
-import subprocess
 import sys
 import time
 
@@ -204,7 +203,7 @@ def _cmd_add(args, flags, project_root, dry_run=False):
                 cmd.extend(["--target", explicit_target])
             if no_commit:
                 cmd.append("--no-auto-commit")
-            subprocess.run(
+            effects.run(
                 cmd,
                 cwd=path,
                 check=False,
@@ -217,7 +216,7 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         sync_cmd = [sys.executable, "-m", "rlsbl", "monorepo", "sync"]
         if no_commit:
             sync_cmd.append("--no-auto-commit")
-        subprocess.run(
+        effects.run(
             sync_cmd,
             cwd=root,
             check=False,
@@ -282,7 +281,7 @@ def _latest_tag_for_glob(tag_glob):
     latest_tag = "(none)"
     latest_tag_version = None
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "tag", "-l", tag_glob, "--sort=-v:refname"],
             capture_output=True, text=True, check=True,
         )
@@ -454,7 +453,7 @@ def _cmd_status(flags, project_root):
                 tag_glob = TARGETS[first_target_name].monorepo_tag_glob(name, path=path)
             else:
                 tag_glob = f"{name}@v*"
-            result = subprocess.run(
+            result = effects.run(
                 ["git", "tag", "-l", tag_glob, "--sort=-v:refname"],
                 capture_output=True, text=True, check=True,
             )
@@ -596,6 +595,7 @@ def _cmd_status(flags, project_root):
 # Canonical definitions live in rlsbl.constraints; imported here for
 # backward compatibility with callers that import via commands.monorepo.
 from ...constraints import _evaluate_constraint, _parse_version_tuple  # noqa: F401
+from ... import effects
 
 
 def _cmd_outdated(flags, project_root):

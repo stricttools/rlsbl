@@ -676,7 +676,7 @@ class TestNotifyUrl:
     """Tests for _notify with URL opening and _open_url."""
 
     @patch("rlsbl.commands.watch._open_url")
-    @patch("rlsbl.commands.watch.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.watch.require_tool", return_value=True)
     def test_notify_opens_url_on_action_click(self, mock_tool, mock_run, mock_open):
         """When user clicks the notification action, _open_url is called."""
@@ -687,7 +687,7 @@ class TestNotifyUrl:
         mock_open.assert_called_once_with("https://example.com")
 
     @patch("rlsbl.commands.watch._open_url")
-    @patch("rlsbl.commands.watch.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.watch.require_tool", return_value=True)
     def test_notify_no_open_on_dismiss(self, mock_tool, mock_run, mock_open):
         """When notification is dismissed without clicking, _open_url is not called."""
@@ -711,7 +711,7 @@ class TestNotifyUrl:
         _notify("title", "body")
         mock_open.assert_not_called()
 
-    @patch("rlsbl.commands.watch.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_open_url_linux(self, mock_subproc):
         """On Linux, _open_url calls xdg-open."""
         with patch("rlsbl.commands.watch.sys") as mock_sys:
@@ -721,7 +721,7 @@ class TestNotifyUrl:
                 ["xdg-open", "https://example.com"], timeout=5, capture_output=True
             )
 
-    @patch("rlsbl.commands.watch.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_open_url_macos(self, mock_subproc):
         """On macOS, _open_url calls open."""
         with patch("rlsbl.commands.watch.sys") as mock_sys:
@@ -731,7 +731,7 @@ class TestNotifyUrl:
                 ["open", "https://example.com"], timeout=5, capture_output=True
             )
 
-    @patch("rlsbl.commands.watch.subprocess.run", side_effect=FileNotFoundError)
+    @patch("rlsbl.effects.run", side_effect=FileNotFoundError)
     def test_open_url_nonfatal(self, mock_subproc):
         """_open_url silently ignores errors."""
         _open_url("https://example.com")  # should not raise

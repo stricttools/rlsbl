@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 
+from ... import effects  # noqa: F401  (late-bound by hooks.py/validate.py; patchable in tests)
 from ...changelog import (
     changes_dir_exists,
     finalize_version,

@@ -29,6 +29,7 @@ from .workspace import (
     members_of,
     write_releasable_version,
 )
+from . import effects
 
 
 # ---------------------------------------------------------------------------
@@ -531,7 +532,7 @@ def _create_consolidation_tag(workspace_root, releasable_name, tag_format,
     """
     tag = tag_format.format(name=releasable_name, version=version)
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "rev-parse", "HEAD"],
             cwd=workspace_root,
             capture_output=True,
@@ -547,7 +548,7 @@ def _create_consolidation_tag(workspace_root, releasable_name, tag_format,
         return None
 
     try:
-        subprocess.run(
+        effects.run(
             ["git", "tag", tag, head_sha],
             cwd=workspace_root,
             check=True,
@@ -731,7 +732,7 @@ def create_migration_tag(workspace_root, releasable_name, tag_format,
     tag_exists = _git_rev_parse(new_tag, workspace_root) is not None
     if not tag_exists:
         try:
-            subprocess.run(
+            effects.run(
                 ["git", "tag", new_tag, commit],
                 cwd=workspace_root,
                 check=True,
@@ -764,7 +765,7 @@ def _git_describe_tag(tag_glob, cwd):
     Returns the tag string or None.
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "describe", "--tags", "--abbrev=0", "--match", tag_glob],
             cwd=cwd,
             capture_output=True,
@@ -784,7 +785,7 @@ def _git_rev_parse(ref, cwd):
     Returns the SHA string or None.
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "rev-parse", ref],
             cwd=cwd,
             capture_output=True,
@@ -831,7 +832,7 @@ def _find_most_recent_tag(tags, cwd):
     # Use git log to walk from HEAD in topo order, and return the first
     # commit that matches one of our tag SHAs. That is the most recent.
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "log", "--format=%H", "--topo-order"],
             cwd=cwd,
             capture_output=True,

@@ -1,13 +1,13 @@
 """Pgdesign release target for projects using pgdesign to manage database schemas, with version tracking in pgdesign.toml."""
 
 import os
-import subprocess
 import sys
 
 import tomlkit
 
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
+from .. import effects
 
 
 class PgdesignTarget(BaseTarget):
@@ -103,7 +103,7 @@ class PgdesignTarget(BaseTarget):
         """Validate the pgdesign schema. Fails the release if errors exist."""
         timeout = self._resolve_build_timeout(config)
         schema_dir = self._schema_dir(dir_path)
-        result = subprocess.run(
+        result = effects.run(
             ["pgdesign", "validate", schema_dir],
             capture_output=True,
             text=True,

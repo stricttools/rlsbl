@@ -29,13 +29,13 @@ commit -- a contract violation -- and is a hard error that touches nothing.
 import json
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass, field
 
 from ...git_util import validate_subtree_remote_ssh_host
 from ...workspace import find_workspace_root, load_workspace
+from ... import effects
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ class MirrorPlan:
 
 def _git(args, cwd=None, timeout=180):
     """Run a git command, returning the CompletedProcess (never raises)."""
-    return subprocess.run(
+    return effects.run(
         ["git", *args],
         cwd=str(cwd) if cwd else None,
         capture_output=True,
@@ -480,7 +480,7 @@ def _run_scaffold(clone_dir, sub_config_path):
         json.dump(config, f, indent=2)
         f.write("\n")
 
-    result = subprocess.run(
+    result = effects.run(
         [sys.executable, "-m", "rlsbl", "scaffold", "--no-auto-commit"],
         cwd=clone_dir,
         capture_output=True,

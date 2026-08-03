@@ -11,10 +11,10 @@ truth -- callers must never fall back to file scanning.
 
 import os
 import shutil
-import subprocess
 from dataclasses import dataclass
 
 from .errors import RlsblError
+from . import effects
 
 _GO_LIST_TIMEOUT = 60
 
@@ -54,7 +54,7 @@ def list_packages(project_dir: str) -> list[GoPackage]:
             f"no go.mod found in {project_dir}: cannot introspect packages "
             "in a module-less directory"
         )
-    result = subprocess.run(
+    result = effects.run(
         ["go", "list", "-e", "-f", "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}", "./..."],
         cwd=project_dir,
         capture_output=True,

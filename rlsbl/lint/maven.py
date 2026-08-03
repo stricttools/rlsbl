@@ -5,6 +5,7 @@ import subprocess
 from ..testing import CHECK_TIMEOUT_HINT
 from .config import LanguageLintConfig
 from .result import LintResult
+from .. import effects
 
 
 class MavenLinter:
@@ -34,7 +35,7 @@ class MavenLinter:
             return []
 
         try:
-            result = subprocess.run(
+            result = effects.run(
                 cmd,
                 cwd=project_path,
                 capture_output=True,

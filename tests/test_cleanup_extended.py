@@ -76,7 +76,7 @@ class TestCleanupPreservesHooks:
     """cleanup_per_package_release_state preserves hooks/ -- per-package
     script hooks are a live feature (run_releasable_hooks)."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_hooks_dir_preserved(self, mock_run, tmp_project):
         """hooks/ directory is NOT removed for a releasable member."""
         pkg = tmp_project / "pkg"
@@ -101,7 +101,7 @@ class TestCleanupPreservesHooks:
 class TestCleanupRemovesBases:
     """cleanup_per_package_release_state removes bases/ directory."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_bases_dir_removed(self, mock_run, tmp_project):
         """bases/ directory is removed for a releasable member."""
         pkg = tmp_project / "pkg"
@@ -142,7 +142,7 @@ def _write_releasable_lint(tmp_path, releasable_name, files):
 class TestCleanupRemovesLintConditional:
     """lint/ is removed only when byte-identical to the releasable-level config."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_lint_removed_when_identical(self, mock_run, tmp_project):
         """lint/ is removed when byte-identical to the releasable-level lint."""
         pkg = tmp_project / "pkg"
@@ -160,7 +160,7 @@ class TestCleanupRemovesLintConditional:
         assert len(lint_calls) == 1
         assert "-r" in lint_calls[0]
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_lint_preserved_when_different(self, mock_run, tmp_project):
         """lint/ is preserved when it overrides the releasable-level lint."""
         pkg = tmp_project / "pkg"
@@ -175,7 +175,7 @@ class TestCleanupRemovesLintConditional:
         assert "lint" not in removed_names
         assert (pkg / ".rlsbl" / "lint").is_dir()
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_lint_preserved_when_no_releasable_base(self, mock_run, tmp_project):
         """lint/ is preserved when there is no releasable-level lint to fall
         back to (removing it would lose the config)."""
@@ -200,7 +200,7 @@ class TestCleanupRemovesLintConditional:
 class TestCleanupRemovesChangelog:
     """cleanup_per_package_release_state removes CHANGELOG.md."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_changelog_removed(self, mock_run, tmp_project):
         """CHANGELOG.md is removed for a releasable member."""
         pkg = tmp_project / "pkg"
@@ -218,7 +218,7 @@ class TestCleanupRemovesChangelog:
         assert len(changelog_calls) == 1
         assert "-r" not in changelog_calls[0]
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_changelog_not_removed_when_absent(self, mock_run, tmp_project):
         """CHANGELOG.md is not removed when it does not exist."""
         pkg = tmp_project / "pkg"
@@ -239,7 +239,7 @@ class TestCleanupRemovesChangelog:
 class TestCleanupRemovesVersion:
     """cleanup_per_package_release_state removes .rlsbl/version file."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_version_file_removed(self, mock_run, tmp_project):
         """.rlsbl/version file is removed for a releasable member."""
         pkg = tmp_project / "pkg"
@@ -256,7 +256,7 @@ class TestCleanupRemovesVersion:
         assert len(version_calls) == 1
         assert "-r" not in version_calls[0]
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_version_file_not_removed_when_absent(self, mock_run, tmp_project):
         """.rlsbl/version is not removed when it does not exist."""
         pkg = tmp_project / "pkg"
@@ -277,7 +277,7 @@ class TestCleanupRemovesVersion:
 class TestCleanupConfigIdentical:
     """cleanup_per_package_release_state removes config.json when matching releasable."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_config_removed_when_identical(self, mock_run, tmp_project):
         """config.json is removed when identical to releasable-level config."""
         pkg = tmp_project / "pkg"
@@ -293,7 +293,7 @@ class TestCleanupConfigIdentical:
         removed_names = [os.path.basename(p) for p in removed]
         assert "config.json" in removed_names
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_config_removed_when_both_empty(self, mock_run, tmp_project):
         """config.json is removed when both pkg and releasable configs are empty dicts."""
         pkg = tmp_project / "pkg"
@@ -315,7 +315,7 @@ class TestCleanupConfigIdentical:
 class TestCleanupConfigDifferent:
     """cleanup_per_package_release_state keeps config.json when it differs."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_config_kept_when_different(self, mock_run, tmp_project):
         """config.json is kept when it differs from releasable-level config."""
         pkg = tmp_project / "pkg"
@@ -332,7 +332,7 @@ class TestCleanupConfigDifferent:
         removed_names = [os.path.basename(p) for p in removed]
         assert "config.json" not in removed_names
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_config_kept_when_value_differs(self, mock_run, tmp_project):
         """config.json is kept when a value differs from releasable config."""
         pkg = tmp_project / "pkg"
@@ -349,7 +349,7 @@ class TestCleanupConfigDifferent:
         removed_names = [os.path.basename(p) for p in removed]
         assert "config.json" not in removed_names
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_config_kept_when_releasable_has_no_config(self, mock_run, tmp_project):
         """config.json with content is kept when releasable has no config (empty dict)."""
         pkg = tmp_project / "pkg"
@@ -500,7 +500,7 @@ class TestVerifyMinimalFlagsUnexpected:
 class TestCleanupAllNewTargets:
     """Verify that all new cleanup targets are removed in a single pass."""
 
-    @patch("rlsbl.releasable_cleanup.subprocess.run")
+    @patch("rlsbl.effects.run")
     def test_full_cleanup_removes_all(self, mock_run, tmp_project):
         """All cleanup targets are removed for a releasable member in one call."""
         pkg = tmp_project / "pkg"

@@ -44,7 +44,7 @@ class TestPypiTarget:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -64,7 +64,7 @@ class TestPypiTarget:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -89,7 +89,7 @@ class TestPypiTarget:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -113,7 +113,7 @@ class TestPypiTarget:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
@@ -130,7 +130,7 @@ class TestPypiTarget:
         """When uv is not available but pytest is, falls back to bare pytest."""
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             def tool_side_effect(name, *args, **kwargs):
                 if name == "uv":
@@ -152,7 +152,7 @@ class TestPypiTarget:
         """Neither uv nor pytest installed -> hard fail (no silent skip)."""
         with (
             patch("rlsbl.testing.require_tool", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
@@ -178,7 +178,7 @@ class TestPypiMarkers:
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests(
@@ -198,7 +198,7 @@ class TestPypiMarkers:
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests(
@@ -219,7 +219,7 @@ class TestPypiMarkers:
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests(
@@ -239,7 +239,7 @@ class TestPypiMarkers:
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests(
@@ -262,7 +262,7 @@ class TestPypiMarkers:
 
         with (
             patch("rlsbl.testing.require_tool", side_effect=tool_side_effect),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests(
@@ -282,7 +282,7 @@ class TestPypiMarkers:
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests("pypi", project_dir=str(tmp_project), config={})
@@ -299,7 +299,7 @@ class TestGoTarget:
 
     def test_go_runs_go_test(self, tmp_project):
         """go target runs go test ./... -race -short -count=1."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = run_project_tests("go", project_dir=str(tmp_project))
@@ -313,7 +313,7 @@ class TestGoTarget:
 
     def test_go_failure_returns_false(self, tmp_project):
         """When go test fails, returns False."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
 
             result = run_project_tests("go", project_dir=str(tmp_project))
@@ -332,7 +332,7 @@ class TestNpmTarget:
         """npm target runs npm test when package.json has a test script."""
         _setup_npm_project(tmp_project, test_script="jest")
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = run_project_tests("npm", project_dir=str(tmp_project))
@@ -346,7 +346,7 @@ class TestNpmTarget:
         """npm target skips when package.json has no test script."""
         _setup_npm_project(tmp_project, test_script=None)
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
             assert result is True
@@ -354,7 +354,7 @@ class TestNpmTarget:
 
     def test_npm_no_package_json_fails(self, tmp_project):
         """npm target hard-fails when no package.json exists (broken declaration)."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
             assert result is False
@@ -363,7 +363,7 @@ class TestNpmTarget:
     def test_npm_corrupt_package_json_fails(self, tmp_project):
         """npm target hard-fails when package.json is unreadable."""
         (tmp_project / "package.json").write_text("{ this is not json")
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
             assert result is False
@@ -372,7 +372,7 @@ class TestNpmTarget:
     def test_npm_missing_tool_fails(self, tmp_project):
         """npm not installed (FileNotFoundError) -> hard fail, not an exception."""
         _setup_npm_project(tmp_project, test_script="jest")
-        with patch("rlsbl.testing.subprocess.run", side_effect=FileNotFoundError("npm")):
+        with patch("rlsbl.effects.run", side_effect=FileNotFoundError("npm")):
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
             assert result is False
@@ -381,7 +381,7 @@ class TestNpmTarget:
         """When npm test fails, returns False."""
         _setup_npm_project(tmp_project, test_script="jest")
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
 
             result = run_project_tests("npm", project_dir=str(tmp_project))
@@ -399,7 +399,7 @@ class TestMavenTarget:
     def test_maven_no_build_file_fails(self, tmp_project):
         """maven target with neither gradlew nor pom.xml -> hard fail
         (a maven target was declared, so a missing manifest is broken, not n/a)."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
             assert result is False
@@ -408,7 +408,7 @@ class TestMavenTarget:
     def test_maven_mvn_missing_tool_fails(self, tmp_project):
         """mvn not installed (FileNotFoundError) -> hard fail, not an exception."""
         (tmp_project / "pom.xml").write_text("<project></project>\n")
-        with patch("rlsbl.testing.subprocess.run", side_effect=FileNotFoundError("mvn")):
+        with patch("rlsbl.effects.run", side_effect=FileNotFoundError("mvn")):
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
             assert result is False
@@ -423,7 +423,7 @@ class TestUnknownTarget:
 
     def test_unknown_target_returns_true(self, tmp_project):
         """Unknown targets return True without running any subprocess."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("cargo", project_dir=str(tmp_project))
 
             assert result is True
@@ -441,7 +441,7 @@ class TestDryRun:
         """When dry_run=True, no subprocess calls are made."""
         _setup_npm_project(tmp_project, test_script="jest")
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests(
                 "npm", project_dir=str(tmp_project), dry_run=True
             )
@@ -451,7 +451,7 @@ class TestDryRun:
 
     def test_dry_run_skips_pypi(self, tmp_project):
         """dry_run skips pypi tests too."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests(
                 "pypi", project_dir=str(tmp_project), dry_run=True
             )
@@ -461,7 +461,7 @@ class TestDryRun:
 
     def test_dry_run_skips_go(self, tmp_project):
         """dry_run skips go tests too."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests(
                 "go", project_dir=str(tmp_project), dry_run=True
             )
@@ -488,7 +488,7 @@ class TestWorkspaceRoot:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=workspace),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -515,7 +515,7 @@ class TestWorkspaceRoot:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(tmp_project)),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -542,7 +542,7 @@ class TestWorkspaceRoot:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -570,7 +570,7 @@ class TestSyncWorkspace:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -589,7 +589,7 @@ class TestSyncWorkspace:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -606,7 +606,7 @@ class TestSyncWorkspace:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
@@ -807,7 +807,7 @@ class TestTimeoutHint:
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run", side_effect=self._timeout),
+            patch("rlsbl.effects.run", side_effect=self._timeout),
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
@@ -823,7 +823,7 @@ class TestTimeoutHint:
 
         with (
             patch("rlsbl.testing.require_tool", side_effect=tool_side_effect),
-            patch("rlsbl.testing.subprocess.run", side_effect=self._timeout),
+            patch("rlsbl.effects.run", side_effect=self._timeout),
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
@@ -832,7 +832,7 @@ class TestTimeoutHint:
 
     def test_go_timeout_prints_hint(self, tmp_project, capsys):
         """go timeout message includes the remediation hint."""
-        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+        with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("go", project_dir=str(tmp_project))
 
         assert result is False
@@ -842,7 +842,7 @@ class TestTimeoutHint:
         """maven (gradlew path) timeout message includes the remediation hint."""
         gradlew = tmp_project / "gradlew"
         gradlew.write_text("#!/bin/sh\n")
-        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+        with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
         assert result is False
@@ -853,7 +853,7 @@ class TestTimeoutHint:
     def test_maven_mvn_timeout_prints_hint(self, tmp_project, capsys):
         """maven (mvn/pom.xml path) timeout message includes the remediation hint."""
         (tmp_project / "pom.xml").write_text("<project></project>\n")
-        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+        with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
         assert result is False
@@ -864,7 +864,7 @@ class TestTimeoutHint:
     def test_npm_timeout_prints_hint(self, tmp_project, capsys):
         """npm timeout message includes the remediation hint."""
         _setup_npm_project(tmp_project, test_script="jest")
-        with patch("rlsbl.testing.subprocess.run", side_effect=self._timeout):
+        with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
         assert result is False
@@ -877,7 +877,7 @@ class TestTimeoutHint:
         )
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.subprocess.run", side_effect=self._timeout),
+            patch("rlsbl.effects.run", side_effect=self._timeout),
         ):
             result = sync_workspace(str(tmp_project))
 
@@ -899,7 +899,7 @@ class TestPypiIntegration:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -926,7 +926,7 @@ class TestPypiIntegration:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -946,7 +946,7 @@ class TestPypiIntegration:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -981,7 +981,7 @@ class TestPypiIntegration:
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
             patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
-            patch("rlsbl.testing.subprocess.run") as mock_run,
+            patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)

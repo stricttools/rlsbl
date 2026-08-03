@@ -374,7 +374,7 @@ class TestMavenTestExecutionGradle:
         (tmp_project / "gradlew").write_text("#!/bin/sh\n")
         os.chmod(str(tmp_project / "gradlew"), 0o755)
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
@@ -388,7 +388,7 @@ class TestMavenTestExecutionGradle:
         (tmp_project / "gradlew").write_text("#!/bin/sh\n")
         os.chmod(str(tmp_project / "gradlew"), 0o755)
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
@@ -402,7 +402,7 @@ class TestMavenTestExecutionMaven:
     def test_mvn_test(self, tmp_project):
         (tmp_project / "pom.xml").write_text(COMPLETE_POM_NO_NS)
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
@@ -415,7 +415,7 @@ class TestMavenTestExecutionMaven:
     def test_mvn_test_failure(self, tmp_project):
         (tmp_project / "pom.xml").write_text(COMPLETE_POM_NO_NS)
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
@@ -428,7 +428,7 @@ class TestMavenTestExecutionMaven:
         os.chmod(str(tmp_project / "gradlew"), 0o755)
         (tmp_project / "pom.xml").write_text(COMPLETE_POM_NO_NS)
 
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
@@ -439,7 +439,7 @@ class TestMavenTestExecutionMaven:
     def test_no_gradlew_no_pom_fails(self, tmp_project):
         """When neither gradlew nor pom.xml exist, a declared maven target is a
         broken declaration -> hard fail (no silent skip)."""
-        with patch("rlsbl.testing.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
             assert result is False

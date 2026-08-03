@@ -278,7 +278,7 @@ class TestScanArtifactsMocked:
             )
 
         monkeypatch.setattr(
-            "rlsbl.secret_scan.subprocess.run", fake_run
+            "rlsbl.effects.run", fake_run
         )
         with pytest.raises(SecretScanError, match="exit code 2"):
             scan_artifacts_for_secrets(str(tmp_path))
@@ -296,7 +296,7 @@ class TestScanArtifactsMocked:
             )
 
         monkeypatch.setattr(
-            "rlsbl.secret_scan.subprocess.run", fake_run
+            "rlsbl.effects.run", fake_run
         )
         with pytest.raises(SecretScanError, match="secrets"):
             scan_artifacts_for_secrets(str(tmp_path))
@@ -312,7 +312,7 @@ class TestScanArtifactsMocked:
             )
 
         monkeypatch.setattr(
-            "rlsbl.secret_scan.subprocess.run", fake_run
+            "rlsbl.effects.run", fake_run
         )
         messages = []
         scan_artifacts_for_secrets(str(tmp_path), log=messages.append)
@@ -333,7 +333,7 @@ class TestScanArtifactsMocked:
             )
 
         monkeypatch.setattr(
-            "rlsbl.secret_scan.subprocess.run", fake_run
+            "rlsbl.effects.run", fake_run
         )
         scan_artifacts_for_secrets(str(tmp_path))
         assert len(captured_cmds) == 1
@@ -356,7 +356,7 @@ class TestScanArtifactsMocked:
             )
 
         monkeypatch.setattr(
-            "rlsbl.secret_scan.subprocess.run", fake_run
+            "rlsbl.effects.run", fake_run
         )
         scan_artifacts_for_secrets(str(tmp_path))
         assert len(captured_cmds) == 1

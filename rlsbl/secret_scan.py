@@ -8,13 +8,13 @@ in the release flow.
 import glob
 import os
 import shutil
-import subprocess
 import sys
 import tarfile
 import tempfile
 import zipfile
 
 from .utils import require_tool
+from . import effects
 
 
 _GITLEAKS_INSTALL_HINT = (
@@ -171,7 +171,7 @@ def _run_gitleaks(scan_dir, config_path=None):
     cmd = ["gitleaks", "dir", scan_dir]
     if config_path and os.path.isfile(config_path):
         cmd.extend(["--config", config_path])
-    result = subprocess.run(
+    result = effects.run(
         cmd,
         capture_output=True,
         text=True,

@@ -227,8 +227,10 @@ def run_config_hooks(hook_name, config, project_dir, env, timeout, *,
     if display_name is None:
         display_name = hook_name
 
-    # Late-bind subprocess through the package namespace so tests can patch
-    # rlsbl.commands.release.subprocess and the mock is visible here.
+    # Late-bind the effect chokepoint (and subprocess, for its exception types)
+    # through the package namespace so tests can patch
+    # rlsbl.commands.release.effects and the mock is visible here.
+    from . import effects as _effects
     from . import subprocess as _subprocess
 
     for entry in entries:
@@ -246,7 +248,7 @@ def run_config_hooks(hook_name, config, project_dir, env, timeout, *,
             run_env.update(normalized["env"])
 
         try:
-            _subprocess.run(
+            _effects.run(
                 ["bash", "-c", cmd], env=run_env, check=True,
                 timeout=timeout, cwd=cwd,
             )
@@ -341,8 +343,10 @@ def run_release_hook(hook_name, hook_path, project_dir, env, timeout,
             return
 
     # Fall back to script-based hooks
-    # Late-bind subprocess through the package namespace so tests can patch
-    # rlsbl.commands.release.subprocess and the mock is visible here.
+    # Late-bind the effect chokepoint (and subprocess, for its exception types)
+    # through the package namespace so tests can patch
+    # rlsbl.commands.release.effects and the mock is visible here.
+    from . import effects as _effects
     from . import subprocess as _subprocess
 
     if not os.path.exists(hook_path):
@@ -350,7 +354,7 @@ def run_release_hook(hook_name, hook_path, project_dir, env, timeout,
 
     hook_path = os.path.abspath(hook_path)
     try:
-        _subprocess.run(
+        _effects.run(
             ["bash", hook_path], env=env, check=True,
             timeout=timeout, cwd=project_dir,
         )

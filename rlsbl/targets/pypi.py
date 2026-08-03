@@ -4,7 +4,6 @@ import ast
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 import tomllib
 
@@ -13,6 +12,7 @@ import tomlkit
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
 from ..utils import run
+from .. import effects
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
 
@@ -469,7 +469,7 @@ class PypiTarget(BaseTarget):
             # Build in the temp dir, output to the real project's dist/
             dist_dir = os.path.abspath(os.path.join(dir_path, "dist"))
             os.makedirs(dist_dir, exist_ok=True)
-            subprocess.run(
+            effects.run(
                 ["uv", "build", "--out-dir", dist_dir],
                 cwd=tmp_project,
                 check=True,

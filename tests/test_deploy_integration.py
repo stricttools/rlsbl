@@ -192,7 +192,7 @@ class TestReleaseDeployFailureContinues:
                     post_release_hook_ran[0] = True
                 return sp.CompletedProcess(args=cmd, returncode=0)
 
-        monkeypatch.setattr("rlsbl.commands.release.subprocess", FakeSubprocessModule())
+        monkeypatch.setattr("rlsbl.commands.release.effects", FakeSubprocessModule())
         monkeypatch.setattr("rlsbl.commands.release.finalize_version", lambda *a, **kw: None)
         monkeypatch.setattr("rlsbl.commands.release.generate_version_file", lambda *a, **kw: None)
         monkeypatch.setattr("rlsbl.commands.release.generate_changelog", lambda *a, **kw: None)

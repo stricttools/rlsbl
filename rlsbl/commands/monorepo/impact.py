@@ -7,6 +7,7 @@ import sys
 
 from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import WorkspaceGraph
+from ... import effects
 
 
 def _map_file_to_package(file_path, projects, root):
@@ -32,7 +33,7 @@ def _map_file_to_package(file_path, projects, root):
 def _get_changed_files_from_git(since_ref, root):
     """Run git diff --name-only {since_ref}..HEAD and return file paths."""
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "diff", "--name-only", f"{since_ref}..HEAD"],
             cwd=root,
             capture_output=True,

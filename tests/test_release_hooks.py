@@ -92,7 +92,7 @@ class TestPreReleaseHookOutput:
         # mock_run side effects: fetch, rev-list, tag -l current, tag -l bumped
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -147,7 +147,7 @@ class TestPreReleaseHookOutput:
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nexit 2\n")
         mock_run.side_effect = ["", "0", "", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.side_effect = subprocess.CalledProcessError(2, "bash")
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -190,7 +190,7 @@ class TestPreReleaseHookOutput:
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.generate_changelog"),
             patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}}),
-            patch("rlsbl.commands.release.subprocess") as mock_sp,
+            patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_run.side_effect = ["", "0", "", ""]
             mock_sp.CalledProcessError = subprocess.CalledProcessError
@@ -269,7 +269,7 @@ class TestPostReleaseHookOutput:
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.subprocess") as mock_sp,
+            patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.side_effect = fake_subprocess_run
             mock_sp.CalledProcessError = subprocess.CalledProcessError
@@ -368,7 +368,7 @@ class TestWatchSHABeforePostHook:
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.subprocess") as mock_sp,
+            patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.side_effect = fake_subprocess_run
             mock_sp.CalledProcessError = subprocess.CalledProcessError
@@ -444,7 +444,7 @@ class TestHookTimeout:
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\nsleep 999\n")
         mock_run.side_effect = ["", "0", "", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.side_effect = subprocess.TimeoutExpired("bash", 45)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -496,7 +496,7 @@ class TestHookCwdStandalone:
         _setup_project(tmp_project, "pre-checks.sh", "#!/bin/bash\necho ok\n")
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -544,7 +544,7 @@ class TestHookCwdStandalone:
         _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho ok\n")
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -612,7 +612,7 @@ class TestHookCwdStandalone:
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.subprocess") as mock_sp,
+            patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
@@ -682,7 +682,7 @@ class TestHookCwdMonorepo:
 
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -748,7 +748,7 @@ class TestHookCwdMonorepo:
 
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -833,7 +833,7 @@ class TestHookCwdMonorepo:
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
-            patch("rlsbl.commands.release.subprocess") as mock_sp,
+            patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError

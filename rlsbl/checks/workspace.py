@@ -19,6 +19,7 @@ from ._common import (
     _build_dep_import_cache,
 )
 from . import PROJECT_MANIFESTS
+from .. import effects
 
 
 def register_workspace_checks(app):
@@ -172,7 +173,7 @@ def register_workspace_checks(app):
 
         gitignored = set()
         try:
-            result = subprocess.run(
+            result = effects.run(
                 ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "--directory"],
                 cwd=root,
                 capture_output=True,
@@ -452,7 +453,7 @@ def register_workspace_checks(app):
         for name, cwd, argv in runs:
             prefix = f"{name}: " if name else ""
             try:
-                result = subprocess.run(
+                result = effects.run(
                     argv,
                     cwd=cwd,
                     capture_output=True,

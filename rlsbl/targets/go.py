@@ -19,6 +19,7 @@ from ..npm_wrapper import (
     npm_wrapper_template_mappings,
 )
 from ..utils import read_go_module_path
+from .. import effects
 
 VERSION_FILE = "VERSION"
 
@@ -84,7 +85,7 @@ class GoTarget(BaseTarget):
         tag = f"v{version}"
 
         try:
-            result = subprocess.run(
+            result = effects.run(
                 ["git", "ls-remote", "--tags", "origin", tag],
                 cwd=dir_path,
                 capture_output=True,

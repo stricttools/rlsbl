@@ -13,12 +13,13 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .errors import ConfigError, GitError, VersionError
+from . import effects
 
 
 def run(cmd, args=None, timeout=120, env=None, cwd=None):
     """Run a command with args, return trimmed stdout. Raise on failure."""
     full_cmd = [cmd] + (args or [])
-    result = subprocess.run(full_cmd, capture_output=True, text=True, check=True, timeout=timeout, env=env, cwd=cwd)
+    result = effects.run(full_cmd, capture_output=True, text=True, check=True, timeout=timeout, env=env, cwd=cwd)
     return result.stdout.strip()
 
 
@@ -387,7 +388,7 @@ def remote_tag_commit(tag, cwd=None, remote="origin", timeout=30):
     """
     full_ref = f"refs/tags/{tag}"
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "ls-remote", "--tags", remote, full_ref, f"{full_ref}^{{}}"],
             capture_output=True,
             text=True,

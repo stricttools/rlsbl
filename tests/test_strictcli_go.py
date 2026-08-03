@@ -292,7 +292,7 @@ class TestSchemaDumpBranching:
             lambda d: (".", "go"),
         )
         monkeypatch.setattr(
-            "rlsbl.commands.release.subprocess.run",
+            "rlsbl.effects.run",
             fake_subprocess_run,
         )
 
@@ -316,7 +316,7 @@ class TestSchemaDumpBranching:
             lambda d: ("myapp", "python"),
         )
         monkeypatch.setattr(
-            "rlsbl.commands.release.subprocess.run",
+            "rlsbl.effects.run",
             fake_subprocess_run,
         )
 

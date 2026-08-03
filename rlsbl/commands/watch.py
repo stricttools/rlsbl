@@ -10,15 +10,16 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..utils import require_tool, run, run_gh
+from .. import effects
 
 
 def _open_url(url):
     """Open a URL in the default browser. Non-fatal if unavailable."""
     try:
         if sys.platform == "darwin":
-            subprocess.run(["open", url], timeout=5, capture_output=True)
+            effects.run(["open", url], timeout=5, capture_output=True)
         else:
-            subprocess.run(["xdg-open", url], timeout=5, capture_output=True)
+            effects.run(["xdg-open", url], timeout=5, capture_output=True)
     except Exception:
         pass
 
@@ -42,7 +43,7 @@ def _notify(title, body, url=None):
         if sys.platform == "darwin":
             escaped_title = title.replace('"', '\\"')
             escaped_body = body.replace('"', '\\"')
-            subprocess.run(
+            effects.run(
                 ["osascript", "-e",
                  f'display notification "{escaped_body}" with title "{escaped_title}"'],
                 timeout=5, capture_output=True,
@@ -52,7 +53,7 @@ def _notify(title, body, url=None):
             if url:
                 cmd += ["--action", "open=Open"]
             cmd += [title, body]
-            result = subprocess.run(cmd, timeout=120, capture_output=True, text=True)
+            result = effects.run(cmd, timeout=120, capture_output=True, text=True)
             if url and result.stdout.strip() == "open":
                 _open_url(url)
     except Exception:

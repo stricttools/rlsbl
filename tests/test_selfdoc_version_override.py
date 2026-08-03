@@ -35,9 +35,9 @@ def _selfdoc_project(tmp_path):
     return tmp_path
 
 
-def _argv_of(mock_subprocess):
-    assert mock_subprocess.run.called, "selfdoc must have been invoked"
-    return list(mock_subprocess.run.call_args[0][0])
+def _argv_of(mock_effects):
+    assert mock_effects.run.called, "selfdoc must have been invoked"
+    return list(mock_effects.run.call_args[0][0])
 
 
 class TestVersionArgs:
@@ -56,14 +56,13 @@ class TestOverrideReachesTheSubprocess:
 
     def _run(self, tmp_path, fn, **kwargs):
         _selfdoc_project(tmp_path)
-        fake_subprocess = MagicMock()
-        fake_subprocess.CalledProcessError = Exception
+        fake_effects = MagicMock()
         with (
             patch(f"{MOD}.require_tool", return_value=True),
-            patch(f"{MOD}.subprocess", fake_subprocess),
+            patch(f"{MOD}.effects", fake_effects),
         ):
             fn({}, project_dir=str(tmp_path), **kwargs)
-        return _argv_of(fake_subprocess)
+        return _argv_of(fake_effects)
 
     def test_gen_receives_the_override(self, tmp_path):
         argv = self._run(tmp_path, _run_selfdoc_gen, version="2.0.0")

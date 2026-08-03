@@ -3,13 +3,13 @@
 import json
 import os
 import re
-import subprocess
 import xml.etree.ElementTree as ET
 
 import tomlkit
 
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
+from .. import effects
 
 
 class MavenTarget(BaseTarget):
@@ -546,7 +546,7 @@ class MavenTarget(BaseTarget):
         timeout = self._resolve_build_timeout(config)
         gradlew = os.path.join(dir_path, "gradlew")
         if os.path.exists(gradlew):
-            result = subprocess.run(
+            result = effects.run(
                 ["./gradlew", "build"], cwd=dir_path,
                 capture_output=True, text=True,
                 timeout=timeout,
@@ -560,7 +560,7 @@ class MavenTarget(BaseTarget):
 
         pom_path = os.path.join(dir_path, "pom.xml")
         if os.path.exists(pom_path):
-            result = subprocess.run(
+            result = effects.run(
                 ["mvn", "package"], cwd=dir_path,
                 capture_output=True, text=True,
                 timeout=timeout,

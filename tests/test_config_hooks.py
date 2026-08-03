@@ -102,7 +102,7 @@ def mock_subprocess():
     mock.CalledProcessError = subprocess.CalledProcessError
     mock.TimeoutExpired = subprocess.TimeoutExpired
     mock.run = MagicMock(return_value=MagicMock(returncode=0))
-    with patch("rlsbl.commands.release.subprocess", mock):
+    with patch("rlsbl.commands.release.effects", mock):
         yield mock
 
 

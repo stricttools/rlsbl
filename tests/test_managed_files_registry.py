@@ -107,7 +107,7 @@ class TestOrphanDetection:
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             with patch("rlsbl.commands.init_cmd._install_or_update_pre_push_hook"):
-                with patch("rlsbl.commands.init_cmd.subprocess.run",
+                with patch("rlsbl.effects.run",
                            side_effect=mock_subprocess_run):
                     _finalize_scaffold(
                         [new_hashes_dict],

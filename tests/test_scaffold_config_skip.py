@@ -319,7 +319,7 @@ class TestSafermInvocation:
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             return original_run(cmd, *args, **kwargs)
 
-        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+        with patch("rlsbl.effects.run", side_effect=tracking_run):
             warnings = []
             removed = _skip_redundant_releasable_configs(proj_dir, warnings)
 
@@ -376,7 +376,7 @@ class TestSafermInvocation:
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             return original_run(cmd, *args, **kwargs)
 
-        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+        with patch("rlsbl.effects.run", side_effect=tracking_run):
             config = {"targets": ["plain"], "publish_mode": "ci"}
             created = []
             _finalize_scaffold(
@@ -454,7 +454,7 @@ class TestOrphanBaseSweep:
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             return original_run(cmd, *args, **kwargs)
 
-        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+        with patch("rlsbl.effects.run", side_effect=tracking_run):
             config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
@@ -503,7 +503,7 @@ class TestOrphanBaseSweep:
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             return original_run(cmd, *args, **kwargs)
 
-        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+        with patch("rlsbl.effects.run", side_effect=tracking_run):
             config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
@@ -568,7 +568,7 @@ class TestOrphanBaseSweep:
         # The current scaffold run still produces this file
         current_hashes = {managed_rel: managed_hash}
 
-        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+        with patch("rlsbl.effects.run", side_effect=tracking_run):
             config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[current_hashes],
@@ -620,7 +620,7 @@ class TestEmptyDirectoryCleanup:
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             return original_run(cmd, *args, **kwargs)
 
-        with patch("rlsbl.commands.init_cmd.subprocess.run", side_effect=tracking_run):
+        with patch("rlsbl.effects.run", side_effect=tracking_run):
             config = {"targets": ["plain"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],

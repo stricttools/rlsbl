@@ -5,6 +5,7 @@ import sys
 
 from .base import BasePipeline
 from ..utils import require_tool
+from .. import effects
 
 
 class CloudflarePagesPipeline(BasePipeline):
@@ -28,7 +29,7 @@ class CloudflarePagesPipeline(BasePipeline):
             sys.exit(1)
 
         try:
-            subprocess.run(
+            effects.run(
                 ["selfdoc", "deploy"],
                 cwd=dir_path,
                 check=True,

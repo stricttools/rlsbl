@@ -19,6 +19,7 @@ from .release_state import (
     save_step_failure,
     clear_release_state,
 )
+from ... import effects
 
 
 class ReleaseAbortError(Exception):
@@ -195,7 +196,7 @@ def _track_release_commit(state_path, sha=None, cwd=None):
     try:
         if sha is None:
             import subprocess
-            result = subprocess.run(
+            result = effects.run(
                 ["git", "rev-parse", "HEAD"],
                 capture_output=True, text=True, check=True,
                 cwd=cwd,
@@ -241,7 +242,7 @@ def _guard_rollback(pre_release_sha, state_path, cwd=None):
 
     # Find all commits between pre_release_sha and HEAD
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "rev-list", f"{pre_release_sha.strip()}..HEAD"],
             capture_output=True, text=True, check=True,
             cwd=cwd,
@@ -326,7 +327,7 @@ def head_sha(cwd=None):
     import subprocess
 
     try:
-        return subprocess.run(
+        return effects.run(
             ["git", "rev-parse", "HEAD"],
             capture_output=True, text=True, check=True, cwd=cwd,
         ).stdout.strip() or None
@@ -372,7 +373,7 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
     trail = set(trail or ())
 
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "rev-list", f"{pin_sha.strip()}..HEAD"],
             capture_output=True, text=True, check=True, cwd=cwd,
         )
@@ -394,7 +395,7 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
     ]
     for sha in foreign:
         try:
-            subject = subprocess.run(
+            subject = effects.run(
                 ["git", "log", "-1", "--format=%s", sha],
                 capture_output=True, text=True, check=True, cwd=cwd,
             ).stdout.strip()
@@ -559,6 +560,9 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
     """
     import shutil
 
+    # Late-bound through the package namespace so tests can patch
+    # rlsbl.commands.release.effects (and subprocess, for its exception types).
+    from . import effects as _effects
     from . import subprocess
 
     for _target_name, t_path in target_paths.items():
@@ -588,7 +592,7 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                 mtime_before = None
 
             try:
-                subprocess.run(
+                _effects.run(
                     sync_cmd,
                     cwd=t_path,
                     timeout=_LOCKFILE_SYNC_TIMEOUT,
@@ -609,7 +613,7 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
                 norm_path = os.path.normpath(lockfile_path)
                 # Skip gitignored lockfiles -- git add would fail
                 try:
-                    result = subprocess.run(
+                    result = _effects.run(
                         ["git", "check-ignore", "-q", norm_path],
                         cwd=t_path,
                         capture_output=True,

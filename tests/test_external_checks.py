@@ -1084,11 +1084,10 @@ class TestReleaseContextEnv:
             return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
 
         # Rebind the NAME in external_checks only -- patching the shared
-        # subprocess module would also swallow the git calls the env resolver
+        # effect chokepoint would also swallow the git calls the env resolver
         # itself makes.
         monkeypatch.setattr(
-            external_checks, "subprocess",
-            SimpleNamespace(run=fake_run, TimeoutExpired=subprocess.TimeoutExpired),
+            external_checks, "effects", SimpleNamespace(run=fake_run),
         )
         ctx = ProjectContext(
             project_root=Path(str(mock_git_repo)), workspace_root=None, config={},

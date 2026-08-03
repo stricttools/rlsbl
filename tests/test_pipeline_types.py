@@ -369,7 +369,7 @@ class TestGoPipeline:
             lambda d, paths: paths,
         )
         monkeypatch.setattr(
-            "rlsbl.pipelines.go.subprocess.run",
+            "rlsbl.effects.run",
             lambda cmd, **kw: installs.append(cmd)
             or subprocess.CompletedProcess(args=cmd, returncode=0),
         )
@@ -470,7 +470,7 @@ class TestCloudflarePagesPipeline:
             lambda name, fatal=True: "/usr/bin/selfdoc",
         )
         monkeypatch.setattr(
-            "subprocess.run",
+            "rlsbl.effects.run",
             lambda cmd, **kw: calls.append(cmd),
         )
         p = CloudflarePagesPipeline(name="cf", pipeline_type="cloudflare-pages",

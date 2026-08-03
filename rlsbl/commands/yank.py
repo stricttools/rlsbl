@@ -18,6 +18,7 @@ from ..publication_probe import PublicationStatus
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
+from .. import effects
 
 
 def run_cmd(args, flags, project_root):
@@ -213,7 +214,7 @@ def _yank_npm(target, project_dir, version, reason, dry_run):
 
     import subprocess
     try:
-        subprocess.run(
+        effects.run(
             ["npm", "deprecate", spec, deprecation_msg],
             check=True,
             capture_output=True,

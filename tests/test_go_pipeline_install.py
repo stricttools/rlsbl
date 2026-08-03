@@ -96,7 +96,7 @@ class TestPublishHardErrors:
                 # Validation passes (identity); the go install call itself fails.
                 with patch("rlsbl.pipelines.go.validate_install_paths",
                            side_effect=lambda d, paths: paths):
-                    with patch("rlsbl.pipelines.go.subprocess.run",
+                    with patch("rlsbl.effects.run",
                                side_effect=subprocess.CalledProcessError(1, "go")):
                         with pytest.raises(RuntimeError, match="go install failed"):
                             p.publish(str(tmp_path), "1.0.0", None)
@@ -117,7 +117,7 @@ class TestPublishHardErrors:
             with patch("rlsbl.pipelines.go.run"):
                 with patch("rlsbl.pipelines.go.validate_install_paths",
                            side_effect=lambda d, paths: paths):
-                    with patch("rlsbl.pipelines.go.subprocess.run",
+                    with patch("rlsbl.effects.run",
                                side_effect=fake_install):
                         p.publish(str(tmp_path), "1.0.0", None)
 
@@ -132,7 +132,7 @@ class TestPublishHardErrors:
             with patch("rlsbl.pipelines.go.run"):
                 with patch("rlsbl.pipelines.go.validate_install_paths",
                            side_effect=lambda d, paths: paths):
-                    with patch("rlsbl.pipelines.go.subprocess.run",
+                    with patch("rlsbl.effects.run",
                                side_effect=subprocess.TimeoutExpired("go", 300)):
                         with pytest.raises(RuntimeError, match="go install failed"):
                             p.publish(str(tmp_path), "1.0.0", None)
@@ -158,7 +158,7 @@ class TestPublishHardErrors:
                         return fake_install(cmd, **kwargs)
                     return real_run(cmd, **kwargs)
 
-                with patch("rlsbl.pipelines.go.subprocess.run", side_effect=dispatch):
+                with patch("rlsbl.effects.run", side_effect=dispatch):
                     p.publish(str(tmp_path), "1.0.0", None)
 
         assert installed == [["go", "install", "./cmd/x"]]

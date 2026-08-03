@@ -16,7 +16,6 @@ Why a wrapper is required (verified against uv 0.9.17):
 """
 
 import os
-import subprocess
 import sys
 import tomllib
 
@@ -32,6 +31,7 @@ from ..overlay_state import (
     load_sentinel,
 )
 from ..utils import require_tool
+from .. import effects
 
 OVERRIDES_FILENAME = "dev-sources.toml.local-only"
 
@@ -311,7 +311,7 @@ def run_sync(project_root):
     for overlay in overlays:
         sync_cmd += ["--no-install-package", overlay["package"]]
     print(f"Syncing environment (excluding {len(overlays)} overlaid package(s))...")
-    result = subprocess.run(sync_cmd, cwd=project_root, env=env)
+    result = effects.run(sync_cmd, cwd=project_root, env=env)
     if result.returncode != 0:
         print(
             f"Error: uv sync failed (exit {result.returncode}); "
@@ -326,7 +326,7 @@ def run_sync(project_root):
         package = overlay["package"]
         version = overlay["version"] or "(dynamic version)"
         print(f"Overlaying {package} {version} from {overlay['path']}")
-        result = subprocess.run(
+        result = effects.run(
             ["uv", "pip", "install", "-e", overlay["path"]],
             cwd=project_root,
             env=env,

@@ -532,7 +532,7 @@ class TestClaimNameAdditionalCoverage:
         captured = capsys.readouterr()
         assert "Ambiguous status" in captured.err
 
-    @patch("rlsbl.commands.claim_name.subprocess.run")
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
     def test_ambiguous_status_with_yes_proceeds(self, mock_check, mock_run, capsys, tmp_path):
         mock_check.return_value = {
@@ -952,7 +952,7 @@ class TestCleanupRetryFile:
     def test_successful_cleanup(self, monkeypatch):
         log_msgs = []
         monkeypatch.setattr(
-            "subprocess.run",
+            "rlsbl.effects.run",
             MagicMock(return_value=MagicMock(returncode=0)),
         )
         _cleanup_retry_file("/fake/retry.toml", lambda msg: log_msgs.append(msg))
@@ -960,7 +960,7 @@ class TestCleanupRetryFile:
 
     def test_cleanup_failure_is_non_fatal(self, monkeypatch, capsys):
         monkeypatch.setattr(
-            "subprocess.run",
+            "rlsbl.effects.run",
             MagicMock(side_effect=subprocess.CalledProcessError(1, "saferm")),
         )
         log_msgs = []
@@ -970,7 +970,7 @@ class TestCleanupRetryFile:
 
     def test_cleanup_file_not_found_non_fatal(self, monkeypatch, capsys):
         monkeypatch.setattr(
-            "subprocess.run",
+            "rlsbl.effects.run",
             MagicMock(side_effect=FileNotFoundError("no saferm")),
         )
         _cleanup_retry_file("/fake/retry.toml", lambda msg: None)

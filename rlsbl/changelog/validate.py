@@ -19,6 +19,7 @@ from ..config import get_changelog_validation_config
 from ..git_util import filter_commits_for_project, filter_commits_for_releasable
 from ..errors import ChangelogError, ConfigError
 from ..utils import commit_files_if_changed
+from .. import effects
 
 
 def _filter_commits_for_scope(commits, project):
@@ -87,7 +88,7 @@ def _get_batch_limits_config(config) -> dict:
 def _git_head() -> str | None:
     """Get the current HEAD commit hash."""
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "rev-parse", "HEAD"],
             capture_output=True,
             text=True,
@@ -126,7 +127,7 @@ def filter_exempt_commits(commits: list[str]) -> tuple[list[str], ExemptionStats
 def _is_ancestor(ancestor: str, descendant: str) -> bool:
     """Check if ancestor is an ancestor of descendant."""
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "merge-base", "--is-ancestor", ancestor, descendant],
             capture_output=True,
             text=True,

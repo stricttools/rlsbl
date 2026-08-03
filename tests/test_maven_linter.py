@@ -27,7 +27,7 @@ class TestMavenLinterLint:
                 return_value=["./gradlew", "detekt"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ) as mock_run,
         ):
@@ -53,7 +53,7 @@ class TestMavenLinterLint:
                 return_value=["./gradlew", "detekt"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 side_effect=subprocess.TimeoutExpired(cmd=["./gradlew", "detekt"], timeout=1),
             ),
         ):
@@ -79,7 +79,7 @@ class TestMavenLinterLint:
                 return_value=["./gradlew", "detekt"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ),
         ):
@@ -120,7 +120,7 @@ class TestMavenLinterLint:
                 return_value=["./gradlew", "check"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ),
         ):
@@ -187,7 +187,7 @@ class TestLintLibraryMavenIntegration:
                 return_value=["./gradlew", "check"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ),
         ):
@@ -210,7 +210,7 @@ class TestLintLibraryMavenIntegration:
                 return_value=["./gradlew", "checkstyleMain"],
             ),
             patch(
-                "rlsbl.lint.maven.subprocess.run",
+                "rlsbl.effects.run",
                 return_value=mock_result,
             ),
         ):

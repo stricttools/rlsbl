@@ -12,6 +12,7 @@ import tomllib
 
 from .errors import ConfigError
 from .utils import detect_uv_workspace_root, get_check_timeout, require_tool
+from . import effects
 
 # Shared remediation hint appended to every "command timed out" failure message
 # so agents know which knob controls the budget. Kept identical across all sites.
@@ -42,7 +43,7 @@ def sync_workspace(
     if not verbose:
         sync_cmd.append("--quiet")
     try:
-        result = subprocess.run(sync_cmd, cwd=workspace_root, timeout=check_timeout)
+        result = effects.run(sync_cmd, cwd=workspace_root, timeout=check_timeout)
     except subprocess.TimeoutExpired:
         print(f"Error: command timed out after {check_timeout}s: {sync_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
         return False
@@ -235,14 +236,14 @@ def _run_pypi_tests(
 
         cmd = cmd + marker_args
         try:
-            result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
+            result = effects.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
             print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
     elif require_tool("pytest", fatal=False):
         fallback_cmd = ["python", "-m", "pytest"] + marker_args
         try:
-            result = subprocess.run(fallback_cmd, cwd=project_dir, timeout=check_timeout)
+            result = effects.run(fallback_cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
             print(f"Error: command timed out after {check_timeout}s: {fallback_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
@@ -260,7 +261,7 @@ def _run_go_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
     """Run Go tests."""
     cmd = ["go", "test", "./...", "-race", "-short", "-count=1"]
     try:
-        result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
+        result = effects.run(cmd, cwd=project_dir, timeout=check_timeout)
     except subprocess.TimeoutExpired:
         print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
         return False
@@ -278,7 +279,7 @@ def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bo
     if os.path.exists(gradlew):
         cmd = ["./gradlew", "test"]
         try:
-            result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
+            result = effects.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
             print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
@@ -291,7 +292,7 @@ def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bo
     if os.path.exists(pom_path):
         cmd = ["mvn", "test"]
         try:
-            result = subprocess.run(cmd, cwd=project_dir, timeout=check_timeout)
+            result = effects.run(cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:
             print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
@@ -331,7 +332,7 @@ def _run_npm_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool
 
     npm_cmd = ["npm", "test"]
     try:
-        result = subprocess.run(npm_cmd, cwd=project_dir, timeout=check_timeout)
+        result = effects.run(npm_cmd, cwd=project_dir, timeout=check_timeout)
     except subprocess.TimeoutExpired:
         print(f"Error: command timed out after {check_timeout}s: {npm_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
         return False

@@ -201,7 +201,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         )
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -253,7 +253,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _setup_project(tmp_project, hook_body=_V1_TEMPLATE)
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -304,7 +304,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         _setup_project(tmp_project, hook_body=None)  # no hook
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -353,7 +353,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
         )
         mock_run.side_effect = ["", "0", "", ""]
 
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired

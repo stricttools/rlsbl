@@ -9,6 +9,7 @@ from ..git_util import filter_commits_for_project
 from ..targets import TARGETS, detect_targets
 from ..utils import get_last_version_tag
 from ..workspace import find_workspace_root, load_workspace, resolve_project
+from .. import effects
 
 
 def _get_commits_since(tag):
@@ -25,7 +26,7 @@ def _get_commits_since(tag):
         range_spec = "HEAD"
 
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "log", range_spec, f"--format={fmt}"],
             capture_output=True, text=True, check=True, timeout=30,
         )

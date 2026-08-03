@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import xml.etree.ElementTree as ET
+from . import effects
 
 
 # POM namespace used by Maven 4.0.0 model
@@ -208,7 +209,7 @@ def _try_generate_pom(dir_path):
         return None
 
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["./gradlew", "generatePomFileForMavenPublication"],
             cwd=dir_path,
             capture_output=True,

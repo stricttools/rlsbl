@@ -10,7 +10,6 @@ automatic invocation during scaffold or release.
 """
 
 import os
-import subprocess
 
 from .config import read_json_config
 from .workspace import (
@@ -20,6 +19,7 @@ from .workspace import (
     load_releasables,
     load_workspace,
 )
+from . import effects
 
 
 # Files and directories expected to remain in a per-package .rlsbl/ after
@@ -206,7 +206,7 @@ def run_cleanup_command(workspace_root, *, dry_run=False, yes=False):
     # Commit the deletions of tracked paths so trees stay clean. Untracked
     # residue (e.g. an uncommitted .rlsbl/version) vanishes without a
     # git-visible change and must not be passed to the commit tool.
-    status = subprocess.run(
+    status = effects.run(
         ["git", "status", "--porcelain", "--", *removed],
         capture_output=True, text=True, cwd=str(workspace_root),
     )
@@ -308,7 +308,7 @@ def _saferm_dir(path, project_name, subdir_name):
         f"-- release state moved to per-releasable directory"
     )
     try:
-        subprocess.run(
+        effects.run(
             [
                 "saferm", "delete", "-r",
                 "--description", description,
@@ -336,7 +336,7 @@ def _saferm_file(path, project_name, file_name):
         f"-- state moved to per-releasable directory"
     )
     try:
-        subprocess.run(
+        effects.run(
             [
                 "saferm", "delete",
                 "--description", description,

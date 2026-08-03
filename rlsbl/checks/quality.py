@@ -9,6 +9,7 @@ import os
 from ..check_context import WorkspaceCheckContext
 from ..utils import get_check_timeout
 from ._common import _sibling_exclude_dirs
+from .. import effects
 
 # Minimum ruff release the ruff-lint check is built against: the JSON output
 # schema (code/message/fix/location/filename fields) and the default rule set
@@ -89,7 +90,7 @@ def register_quality_checks(app):
         # Version floor: the JSON output shape and rule set are pinned to a
         # known-good floor, mirroring the SAFEGIT_MIN_VERSION pattern.
         try:
-            version_proc = _sp.run(
+            version_proc = effects.run(
                 ["ruff", "--version"],
                 capture_output=True,
                 text=True,
@@ -114,7 +115,7 @@ def register_quality_checks(app):
             return reporter.found(f"ruff {found_ver} is below the {min_ver} floor")
 
         try:
-            result = _sp.run(
+            result = effects.run(
                 [
                     "ruff", "check", str(ctx.project_root),
                     "--output-format=json", "--quiet",

@@ -31,6 +31,7 @@ import tomllib
 from strictcli import error_check_spec
 
 from .utils import detect_uv_workspace_root, get_check_timeout, get_last_version_tag
+from . import effects
 
 
 # Leading environment-assignment pattern (``VAR=value``).  Shell-legal as a
@@ -455,7 +456,7 @@ def _make_external_check_fn(command, cwd, name):
         check_cwd = _resolve_cwd(ctx, cwd)
         budget = _resolve_check_budget(ctx)
         try:
-            result = subprocess.run(
+            result = effects.run(
                 command,
                 shell=True,
                 cwd=check_cwd,
@@ -490,7 +491,7 @@ def _make_structured_check_fn(tool, paths, cwd, name):
         budget = _resolve_check_budget(ctx)
         argv = _compose_structured_argv(tool, paths, check_cwd)
         try:
-            result = subprocess.run(
+            result = effects.run(
                 argv,
                 cwd=check_cwd,
                 capture_output=True,

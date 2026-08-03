@@ -246,7 +246,7 @@ class TestBuildGradle:
         (tmp_project / "gradlew").write_text("#!/bin/sh\n")
         os.chmod(str(tmp_project / "gradlew"), 0o755)
 
-        with patch("rlsbl.targets.maven.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
@@ -262,7 +262,7 @@ class TestBuildGradle:
         (tmp_project / "gradlew").write_text("#!/bin/sh\n")
         os.chmod(str(tmp_project / "gradlew"), 0o755)
 
-        with patch("rlsbl.targets.maven.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout="", stderr="BUILD FAILED"
             )
@@ -278,7 +278,7 @@ class TestBuildMaven:
     def test_runs_mvn_package(self, tmp_project):
         (tmp_project / "pom.xml").write_text("<project><version>1.0.0</version></project>\n")
 
-        with patch("rlsbl.targets.maven.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )
@@ -293,7 +293,7 @@ class TestBuildMaven:
     def test_mvn_package_failure_raises(self, tmp_project):
         (tmp_project / "pom.xml").write_text("<project><version>1.0.0</version></project>\n")
 
-        with patch("rlsbl.targets.maven.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout="", stderr="BUILD FAILURE"
             )
@@ -308,7 +308,7 @@ class TestBuildMaven:
         os.chmod(str(tmp_project / "gradlew"), 0o755)
         (tmp_project / "pom.xml").write_text("<project><version>1.0.0</version></project>\n")
 
-        with patch("rlsbl.targets.maven.subprocess.run") as mock_run:
+        with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout="", stderr=""
             )

@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 
 from ..utils import get_last_version_tag
+from .. import effects
 
 
 def resolve_hash(hash_str: str, *, cwd: str | None = None) -> str | None:
@@ -17,7 +18,7 @@ def resolve_hash(hash_str: str, *, cwd: str | None = None) -> str | None:
     Returns None if the hash doesn't resolve in that repo.
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "rev-parse", "--verify", f"{hash_str}^{{commit}}"],
             capture_output=True,
             text=True,
@@ -55,7 +56,7 @@ def _git_log_hashes(range_spec: str) -> list[str]:
     Returns a list of full 40-char SHAs, or empty list on error.
     """
     try:
-        result = subprocess.run(
+        result = effects.run(
             ["git", "log", "--format=%H", range_spec],
             capture_output=True,
             text=True,

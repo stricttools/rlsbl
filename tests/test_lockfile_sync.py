@@ -35,7 +35,7 @@ class TestLockfileSpecsSchema:
 class TestSyncLockfilesGuardFile:
     """Test that _sync_lockfiles respects the guard_file field."""
 
-    @patch("rlsbl.commands.release.subprocess")
+    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value="/usr/bin/go")
     def test_go_work_sum_skipped_without_go_work(self, mock_which, mock_subprocess, tmp_path):
         """go.work.sum should not be synced when go.work does not exist."""
@@ -53,7 +53,7 @@ class TestSyncLockfilesGuardFile:
         assert not mock_subprocess.run.called
         assert files_to_commit == []
 
-    @patch("rlsbl.commands.release.subprocess")
+    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value="/usr/bin/go")
     def test_go_work_sum_synced_with_go_work(self, mock_which, mock_subprocess, tmp_path):
         """go.work.sum should be synced when go.work exists."""
@@ -97,7 +97,7 @@ class TestSyncLockfilesGuardFile:
             capture_output=True,
         )
 
-    @patch("rlsbl.commands.release.subprocess")
+    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value="/usr/bin/uv")
     def test_uv_lock_synced_without_guard(self, mock_which, mock_subprocess, tmp_path):
         """uv.lock has no guard file and should be synced when present."""
@@ -279,7 +279,7 @@ class TestWorkspaceRootUnconditionalInclusion:
 class TestGradleLockfileWrapperCheck:
     """Test that gradle lockfile sync uses path existence check, not shutil.which."""
 
-    @patch("rlsbl.commands.release.subprocess")
+    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value=None)
     def test_gradlew_present_syncs_despite_no_gradle_on_path(
         self, mock_which, mock_subprocess, tmp_path
@@ -311,7 +311,7 @@ class TestGradleLockfileWrapperCheck:
             capture_output=True,
         )
 
-    @patch("rlsbl.commands.release.subprocess")
+    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value=None)
     def test_gradlew_missing_skips_with_warning(
         self, mock_which, mock_subprocess, tmp_path

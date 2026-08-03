@@ -75,7 +75,7 @@ class TestStrictcliSchemaDumpFunction:
             '\n[project.scripts]\nmyapp = "myapp:main"\n'
         )
         messages = []
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.side_effect = subprocess.CalledProcessError(1, "uv")
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -94,7 +94,7 @@ class TestStrictcliSchemaDumpFunction:
             '\n[project.scripts]\nmyapp = "myapp:main"\n'
         )
         messages = []
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.side_effect = subprocess.TimeoutExpired("uv", 30)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -113,7 +113,7 @@ class TestStrictcliSchemaDumpFunction:
             '\n[project.scripts]\nmyapp = "myapp:main"\n'
         )
         messages = []
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -142,7 +142,7 @@ class TestStrictcliSchemaDumpFunction:
         schema_path.write_text(json.dumps({"version": "1.0.0", "commands": []}))
 
         messages = []
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -170,7 +170,7 @@ class TestStrictcliSchemaDumpFunction:
         schema_path.write_text(json.dumps({"version": "1.0.0", "commands": []}))
 
         messages = []
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -191,7 +191,7 @@ class TestStrictcliSchemaDumpFunction:
             '\n[project.scripts]\nmyapp = "myapp:main"\n'
         )
         messages = []
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
@@ -216,7 +216,7 @@ class TestStrictcliSchemaDumpFunction:
         schema_path.write_text(json.dumps({"commands": []}))
 
         messages = []
-        with patch("rlsbl.commands.release.subprocess") as mock_sp:
+        with patch("rlsbl.commands.release.effects") as mock_sp:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired

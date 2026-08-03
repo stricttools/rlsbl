@@ -8,6 +8,7 @@ import sys
 import tempfile
 
 from .validate import HookError, ReleaseValidationError
+from ... import effects
 
 # Names like run, require_tool, load_pipelines, warn_exception are imported
 # from the parent package at call time (via `from . import X`) so that
@@ -100,7 +101,7 @@ def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
         except Exception:
             pass  # Best-effort; release URL is optional
 
-        subprocess.run(cmd, cwd=project_dir, check=True)
+        effects.run(cmd, cwd=project_dir, check=True)
     except subprocess.CalledProcessError as e:
         raise HookError(
             f"selfblog post generate failed (exit code {e.returncode})."

@@ -12,6 +12,7 @@ import sys
 from .changelog import get_changes_dir, list_versioned_files, parse_jsonl, read_unreleased, resolve_hashes
 from .errors import ConfigError
 from .changelog.validate import filter_exempt_commits
+from . import effects
 
 
 DEFAULT_RELEASE_BRANCHES = ["main", "master"]
@@ -83,7 +84,7 @@ def _check_gitignore_guard(dir_path, *, extra_paths=None):
     gitignored = []
     for path in paths:
         try:
-            result = subprocess.run(
+            result = effects.run(
                 ["git", "check-ignore", "-q", path],
                 capture_output=True,
                 text=True,
@@ -176,7 +177,7 @@ def _get_pushed_commits(refs):
         try:
             if remote_sha == zero_sha:
                 # New branch: commits not on any remote
-                result = subprocess.run(
+                result = effects.run(
                     ["git", "log", "--format=%H", local_sha, "--not", "--remotes"],
                     capture_output=True, text=True, timeout=30,
                 )
@@ -186,7 +187,7 @@ def _get_pushed_commits(refs):
                 # range empty. Previously that produced a silent, accidental
                 # pass; make the skip explicit and loud instead. Pass/fail
                 # semantics are unchanged.
-                probe = subprocess.run(
+                probe = effects.run(
                     ["git", "rev-parse", "--verify", "--quiet",
                      f"{remote_sha}^{{commit}}"],
                     capture_output=True, text=True, timeout=30,
@@ -199,7 +200,7 @@ def _get_pushed_commits(refs):
                         file=sys.stderr,
                     )
                     continue
-                result = subprocess.run(
+                result = effects.run(
                     ["git", "log", "--format=%H", f"{remote_sha}..{local_sha}"],
                     capture_output=True, text=True, timeout=30,
                 )
