@@ -259,10 +259,7 @@ class PypiTarget(BaseTarget):
         with open(path, "r", encoding="utf-8") as f:
             doc = tomlkit.parse(f.read())
         doc["project"]["version"] = pep440_version
-        tmp_path = path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(tomlkit.dumps(doc))
-        effects.replace(tmp_path, path)
+        effects.atomic_write_text(path, tomlkit.dumps(doc))
 
         modified = ["pyproject.toml"]
         dunder_path = self._update_dunder_version(dir_path, doc, pep440_version)
@@ -317,10 +314,7 @@ class PypiTarget(BaseTarget):
         new_content = "".join(lines)
 
         if new_content != content:
-            tmp = init_path + ".tmp"
-            with effects.open_write(tmp, "w", encoding="utf-8") as f:
-                f.write(new_content)
-            effects.replace(tmp, init_path)
+            effects.atomic_write_text(init_path, new_content)
             return init_rel
 
         return None

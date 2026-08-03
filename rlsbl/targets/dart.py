@@ -1,5 +1,6 @@
 """Dart release target that manages version tracking in pubspec.yaml and scaffolds CI workflows for publishing to pub.dev."""
 
+import io
 import os
 
 from ruamel.yaml import YAML
@@ -65,10 +66,9 @@ class DartTarget(BaseTarget):
 
         data["version"] = new_version
 
-        tmp_path = pubspec + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            yaml.dump(data, f)
-        effects.replace(tmp_path, pubspec)
+        buffer = io.StringIO()
+        yaml.dump(data, buffer)
+        effects.atomic_write_text(pubspec, buffer.getvalue())
         return [self.version_file()]
 
     def _compute_version_with_build_number(self, old_version, new_semver, dir_path, ctx):

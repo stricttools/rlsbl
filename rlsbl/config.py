@@ -11,7 +11,6 @@ user-level defaults.
 import json
 import os
 import sys
-import tempfile
 
 from .errors import ConfigError
 from . import effects
@@ -1044,12 +1043,7 @@ def clean_stale_exclusions(config_path):
         return 0
 
     batch_limits["exclusions"] = cleaned
-    # Atomic write: tmp file then replace
-    tmp_path = config_path + ".tmp"
-    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    effects.replace(tmp_path, config_path)
+    effects.atomic_write_text(config_path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
     return removed
 
 
@@ -1063,11 +1057,7 @@ def update_last_build_release(project_dir, version):
             f"{config_path} is corrupted or unreadable — fix it before releasing: {e}"
         ) from e
     config["last_build_release"] = version
-    tmp_path = config_path + ".tmp"
-    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-        f.write("\n")
-    effects.replace(tmp_path, config_path)
+    effects.atomic_write_text(config_path, json.dumps(config, indent=2) + "\n")
 
 
 def write_project_config(key, value, project_root):
@@ -1080,17 +1070,9 @@ def write_project_config(key, value, project_root):
     effects.makedirs(parent, exist_ok=True)
     existing = read_json_config(config_path)
     existing[key] = value
-    # Atomic write: serialize into a temp file in the same dir, then replace.
-    # A failure mid-write leaves the original config.json untouched, and the
-    # temp file is cleaned up so no residue is left behind.
-    fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(existing, f, indent=2)
-            f.write("\n")
-        effects.replace(tmp_path, config_path)
-    except BaseException:
-        if os.path.exists(tmp_path):
-            effects.remove(tmp_path)
-        raise
+    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
+    # here before the chokepoint absorbed it (see the effects module).
+    effects.atomic_write_text(
+        config_path, json.dumps(existing, indent=2) + "\n", file_mode=0o600,
+    )
     return existing

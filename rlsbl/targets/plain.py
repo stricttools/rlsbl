@@ -74,10 +74,7 @@ class PlainTarget(BaseTarget):
         Returns a list of relative file paths that were modified.
         """
         version_path = os.path.join(dir_path, VERSION_FILE)
-        tmp_path = version_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(version + "\n")
-        effects.replace(tmp_path, version_path)
+        effects.atomic_write_text(version_path, version + "\n")
 
         modified = [self.version_file()]
 
@@ -89,10 +86,7 @@ class PlainTarget(BaseTarget):
             project = doc.get("project")
             if project is not None and "version" in project:
                 doc["project"]["version"] = version
-                tmp_pyproject = pyproject_path + ".tmp"
-                with effects.open_write(tmp_pyproject, "w", encoding="utf-8") as f:
-                    f.write(tomlkit.dumps(doc))
-                effects.replace(tmp_pyproject, pyproject_path)
+                effects.atomic_write_text(pyproject_path, tomlkit.dumps(doc))
                 modified.append("pyproject.toml")
 
         return modified

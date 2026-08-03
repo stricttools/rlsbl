@@ -53,10 +53,7 @@ class SwiftTarget(BaseTarget):
         Returns a list of relative file paths that were modified.
         """
         version_path = os.path.join(dir_path, VERSION_FILE)
-        tmp_path = version_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(version + "\n")
-        effects.replace(tmp_path, version_path)
+        effects.atomic_write_text(version_path, version + "\n")
         return [self.version_file()]
 
     def version_file(self, dir_path=None):

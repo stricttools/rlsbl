@@ -90,10 +90,7 @@ class PgdesignTarget(BaseTarget):
         if "project" not in doc:
             doc["project"] = tomlkit.table()
         doc["project"]["version"] = version
-        tmp_path = path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(tomlkit.dumps(doc))
-        effects.replace(tmp_path, path)
+        effects.atomic_write_text(path, tomlkit.dumps(doc))
         return [os.path.relpath(path, dir_path)]
 
     def version_file(self, dir_path=None):

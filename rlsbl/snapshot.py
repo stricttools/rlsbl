@@ -118,10 +118,7 @@ def write_snapshot(root, snapshot):
     target = os.path.join(ws_dir, SNAPSHOT_FILE)
 
     content = json.dumps(snapshot, indent=2) + "\n"
-    tmp = target + ".tmp"
-    with effects.open_write(tmp, "w", encoding="utf-8") as f:
-        f.write(content)
-    effects.replace(tmp, target)
+    effects.atomic_write_text(target, content)
 
     return os.path.join(WORKSPACE_DIR, SNAPSHOT_FILE)
 

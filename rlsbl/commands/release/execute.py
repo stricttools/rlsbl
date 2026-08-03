@@ -189,13 +189,12 @@ def _track_release_commit(state_path, sha=None, cwd=None):
     guard treats all commits as foreign and refuses rollback -- the
     safe default.
 
-    If ``sha`` is not provided, reads HEAD via subprocess directly
+    If ``sha`` is not provided, reads HEAD via ``effects.run`` directly
     (bypasses the mock-patched ``run`` function used by the release
     flow, avoiding mock side-effect exhaustion in tests).
     """
     try:
         if sha is None:
-            import subprocess
             result = effects.run(
                 ["git", "rev-parse", "HEAD"],
                 capture_output=True, text=True, check=True,
@@ -229,14 +228,12 @@ def _guard_rollback(pre_release_sha, state_path, cwd=None):
     target, not concurrent work.  Untracked files survive
     ``git reset --hard`` anyway.
 
-    Uses ``subprocess`` directly (not the mock-patched ``run`` function)
+    Uses ``effects.run`` directly (not the mock-patched ``run`` function)
     to avoid consuming mock side-effect entries in tests.
 
     Raises :class:`RollbackClobberError` with details and manual
     recovery instructions when rollback is unsafe.
     """
-    import subprocess
-
     state = load_release_state(state_path)
     release_commits = set((state or {}).get("release_commits", []))
 
@@ -319,13 +316,11 @@ def _is_resumable_failure(exc, branch_pushed, candidate_push_attempted, complete
 def head_sha(cwd=None):
     """Return HEAD's SHA, or None when it cannot be resolved.
 
-    Uses ``subprocess`` directly rather than the release flow's ``run``: this
+    Uses ``effects.run`` directly rather than the release flow's ``run``: this
     is bookkeeping for the drift guard, and it must never consume a mock side
     effect (or shift a call sequence) in tests that stub the release's git
     calls. Same rationale as :func:`_track_release_commit`.
     """
-    import subprocess
-
     try:
         return effects.run(
             ["git", "rev-parse", "HEAD"],
@@ -358,15 +353,13 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
     in the changelog and re-run) or move it aside. Nothing is rolled back.
 
     ``phase`` names the checkpoint in the error text (entry / candidate push /
-    CI gate / final push). Uses ``subprocess`` directly, not the mock-patched
+    CI gate / final push). Uses ``effects.run`` directly, not the mock-patched
     ``run``, so the guard is never starved of a mock side effect in tests.
 
     The batch orchestrator uses this directly with a workspace-level pin and
     the union of its members' trails; :func:`_guard_foreign_commits` is the
     single-release wrapper that reads the trail out of a state file.
     """
-    import subprocess
-
     if not pin_sha:
         return
 
@@ -430,8 +423,6 @@ def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
 
 def _bump_selfdoc_version(project_dir, new_version):
     """Bump version in selfdoc.json if it exists. Returns list of modified file paths."""
-    import tempfile
-
     config_path = os.path.join(project_dir, "selfdoc.json")
     if not os.path.exists(config_path):
         return []
@@ -453,16 +444,9 @@ def _bump_selfdoc_version(project_dir, new_version):
             break
 
     new_content = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
-    fd, tmp_path = tempfile.mkstemp(
-        dir=project_dir, prefix=".selfdoc.json.", suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(new_content)
-        effects.replace(tmp_path, config_path)
-    except BaseException:
-        effects.remove(tmp_path)
-        raise
+    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
+    # here before the chokepoint absorbed it (see the effects module).
+    effects.atomic_write_text(config_path, new_content, file_mode=0o600)
     return ["selfdoc.json"]
 
 

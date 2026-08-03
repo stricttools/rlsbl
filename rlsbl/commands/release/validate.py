@@ -8,7 +8,6 @@ version/tag computation, and changelog state validation.
 import json
 import os
 import sys
-import tempfile
 
 from ...strictcli_detect import detect_strictcli
 from ...utils import run_gh
@@ -1145,19 +1144,11 @@ def _patch_schema_version(project_dir, version):
 
     data["version"] = version
 
-    schema_dir = os.path.dirname(schema_path)
-    fd, tmp_path = tempfile.mkstemp(dir=schema_dir, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-        effects.replace(tmp_path, schema_path)
-    except BaseException:
-        try:
-            effects.remove(tmp_path)
-        except OSError:
-            pass
-        raise
+    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
+    # here before the chokepoint absorbed it (see the effects module).
+    effects.atomic_write_text(
+        schema_path, json.dumps(data, indent=2) + "\n", file_mode=0o600,
+    )
 
 
 def validate_blog_body(project_dir, blog_enabled, *, releases_dir=None):

@@ -533,17 +533,9 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
         content = "".join(lines)
 
         with writable_jsonl(filepath):
-            fd, tmp_path = tempfile.mkstemp(
-                dir=os.path.dirname(filepath), suffix=".tmp"
-            )
-            try:
-                os.write(fd, content.encode("utf-8"))
-                os.close(fd)
-                effects.replace(tmp_path, filepath)
-            except BaseException:
-                if os.path.exists(tmp_path):
-                    effects.remove(tmp_path)
-                raise
+            # file_mode pins what the mkstemp-based hand-rolled write left
+            # here; writable_jsonl relocks released files on exit regardless.
+            effects.atomic_write_text(filepath, content, file_mode=0o600)
 
         results.append(RemapResult(
             path=filepath,

@@ -96,11 +96,7 @@ def write_batch_plan(path: str, plan: BatchPlan) -> None:
         ],
     }
     effects.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp_path = path + ".tmp"
-    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, sort_keys=True)
-        f.write("\n")
-    effects.replace(tmp_path, path)
+    effects.atomic_write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def read_batch_plan(path: str) -> BatchPlan:

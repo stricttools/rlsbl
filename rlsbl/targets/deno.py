@@ -105,10 +105,7 @@ class DenoTarget(BaseTarget):
             trailing_newline = "\n" if raw.endswith("\n") else ""
             new_content = json.dumps(data, indent=indent, ensure_ascii=False) + trailing_newline
 
-        tmp_path = config_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
-        effects.replace(tmp_path, config_path)
+        effects.atomic_write_text(config_path, new_content)
         return [os.path.basename(config_path)]
 
     def version_file(self, dir_path=None):

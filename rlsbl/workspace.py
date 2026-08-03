@@ -1,7 +1,6 @@
 """Workspace data layer for monorepo support handling discovery, loading, saving, and resolution of workspaces from workspace.toml config."""
 
 import os
-import tempfile
 import tomllib
 
 import tomlkit
@@ -79,18 +78,9 @@ def write_releasable_version(workspace_root, releasable_name, version):
     target_dir = os.path.dirname(path)
     effects.makedirs(target_dir, exist_ok=True)
 
-    fd, tmp_path = tempfile.mkstemp(dir=target_dir, prefix=".version.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(version + "\n")
-        effects.replace(tmp_path, path)
-    except BaseException:
-        # Clean up the temp file on any failure
-        try:
-            effects.remove(tmp_path)
-        except OSError:
-            pass
-        raise
+    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
+    # here before the chokepoint absorbed it (see the effects module).
+    effects.atomic_write_text(path, version + "\n", file_mode=0o600)
 
 
 def is_explicit_mode(workspace_root):
@@ -497,10 +487,7 @@ def save_workspace(root, projects, releasables=None):
                 aot.append(_build_project_table(d))
             doc.add("projects", aot)
 
-    tmp = target + ".tmp"
-    with effects.open_write(tmp, "w", encoding="utf-8") as f:
-        f.write(tomlkit.dumps(doc))
-    effects.replace(tmp, target)
+    effects.atomic_write_text(target, tomlkit.dumps(doc))
 
 
 def resolve_project(root, cwd="."):

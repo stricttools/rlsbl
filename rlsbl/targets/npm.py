@@ -159,11 +159,7 @@ class NpmTarget(BaseTarget):
         # Preserve trailing newline if present
         trailing_newline = "\n" if raw.endswith("\n") else ""
         output = json.dumps(pkg, indent=indent, ensure_ascii=False) + trailing_newline
-        # Atomic write: write to temp file, then rename
-        tmp_path = pkg_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(output)
-        effects.replace(tmp_path, pkg_path)
+        effects.atomic_write_text(pkg_path, output)
         return [self.version_file()]
 
     def version_file(self, dir_path=None):

@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 
 from ..changelog.files import (
     NULL_SHA,
@@ -854,16 +853,9 @@ def cmd_edit(flags, project_root):
         all_entries[line_index] = entry
         lines = [serialize_entry(e) + "\n" for e in all_entries]
         content = "".join(lines)
-        parent = os.path.dirname(target_path)
-        fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=".tmp")
-        try:
-            os.write(fd, content.encode("utf-8"))
-            os.close(fd)
-            effects.replace(tmp_path, target_path)
-        except BaseException:
-            if os.path.exists(tmp_path):
-                effects.remove(tmp_path)
-            raise
+        # file_mode pins the 0o600 the mkstemp-based hand-rolled write
+        # produced here; released files are relocked by writable_jsonl anyway.
+        effects.atomic_write_text(target_path, content, file_mode=0o600)
 
     if is_released:
         with writable_jsonl(file_path):

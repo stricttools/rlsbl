@@ -85,7 +85,10 @@ class TestWriteProjectConfig:
         original = {"tag": True, "existing": "value"}
         config_path.write_text(json.dumps(original) + "\n")
 
-        with mock.patch("rlsbl.config.json.dump", side_effect=RuntimeError("boom")):
+        # Inject the failure at the rename, the last step of the chokepoint's
+        # atomic write: the temp file exists and is fully written by then, so
+        # this is the only moment at which residue or corruption could appear.
+        with mock.patch("rlsbl.effects.os.replace", side_effect=RuntimeError("boom")):
             with pytest.raises(RuntimeError):
                 write_project_config("new_key", "x", str(tmp_path))
 

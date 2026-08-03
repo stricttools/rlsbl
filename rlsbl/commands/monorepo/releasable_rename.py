@@ -163,10 +163,7 @@ def _apply_workspace_rename(root, old, new):
                 changed = True
 
     if changed:
-        tmp = path + ".tmp"
-        with effects.open_write(tmp, "w", encoding="utf-8") as f:
-            f.write(tomlkit.dumps(doc))
-        effects.replace(tmp, path)
+        effects.atomic_write_text(path, tomlkit.dumps(doc))
 
     return changed
 

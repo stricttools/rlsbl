@@ -3,7 +3,6 @@
 import glob
 import os
 import re
-import tempfile
 
 from .base import BaseTarget
 from ..errors import VersionError
@@ -173,17 +172,9 @@ class NativeIosTarget(BaseTarget):
 
 
 def _atomic_write(path, content):
-    """Write content to path atomically via tmpfile + os.replace."""
-    dir_name = os.path.dirname(path)
-    fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-        effects.replace(tmp_path, path)
-    except BaseException:
-        # Clean up temp file on failure
-        try:
-            effects.remove(tmp_path)
-        except OSError:
-            pass
-        raise
+    """Write content to path atomically.
+
+    file_mode pins the 0o600 this helper's mkstemp-based body produced before
+    the chokepoint absorbed it (see the effects module).
+    """
+    effects.atomic_write_text(path, content, file_mode=0o600)

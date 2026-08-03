@@ -506,11 +506,7 @@ def _sync_import_names(root, projects):
             table["import_name"] = import_name
             print(f"Auto-detected import_name for {proj_name}: {import_name}")
 
-    # Write back atomically
-    tmp = ws_path + ".tmp"
-    with effects.open_write(tmp, "w", encoding="utf-8") as f:
-        f.write(tomlkit.dumps(doc))
-    effects.replace(tmp, ws_path)
+    effects.atomic_write_text(ws_path, tomlkit.dumps(doc))
 
     return ws_path
 

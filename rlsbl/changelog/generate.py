@@ -16,9 +16,7 @@ Per-version file permission model:
 from __future__ import annotations
 
 import os
-import stat
 import sys
-import tempfile
 
 import tomlkit
 
@@ -217,25 +215,7 @@ def _atomic_write_preserving_mode(path: str, content: str) -> None:
     change it); a brand-new file uses the umask-derived default, matching the
     prior ``open(path, "w")`` behavior.
     """
-    directory = os.path.dirname(path) or "."
-    if os.path.exists(path):
-        target_mode = stat.S_IMODE(os.stat(path).st_mode)
-    else:
-        # Mirror open(path, "w") for a new file: 0o666 masked by the umask.
-        current_umask = os.umask(0)
-        os.umask(current_umask)
-        target_mode = 0o666 & ~current_umask
-
-    fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
-    try:
-        os.write(fd, content.encode("utf-8"))
-        os.close(fd)
-        effects.chmod(tmp_path, target_mode)
-        effects.replace(tmp_path, path)
-    except BaseException:
-        if os.path.exists(tmp_path):
-            effects.remove(tmp_path)
-        raise
+    effects.atomic_write_text(path, content, preserve_mode=True)
 
 
 def generate_version_file(

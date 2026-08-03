@@ -295,17 +295,9 @@ def _prune_dangling_entries(changes_dir, repo_root):
             continue
         content = "".join(serialize_entry(e) + "\n" for e in new_entries)
         with writable_jsonl(filepath):
-            fd, tmp_path = tempfile.mkstemp(
-                dir=os.path.dirname(filepath), suffix=".tmp"
-            )
-            try:
-                os.write(fd, content.encode("utf-8"))
-                os.close(fd)
-                effects.replace(tmp_path, filepath)
-            except BaseException:
-                if os.path.exists(tmp_path):
-                    effects.remove(tmp_path)
-                raise
+            # file_mode pins what the mkstemp-based hand-rolled write left
+            # here; writable_jsonl relocks released files on exit regardless.
+            effects.atomic_write_text(filepath, content, file_mode=0o600)
     return dropped
 
 

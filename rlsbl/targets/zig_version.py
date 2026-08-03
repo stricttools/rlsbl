@@ -53,10 +53,7 @@ def write_zig_version(dir_path, version):
     """
     # Write VERSION atomically
     version_path = os.path.join(dir_path, VERSION_FILE)
-    tmp_path = version_path + ".tmp"
-    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-        f.write(version + "\n")
-    effects.replace(tmp_path, version_path)
+    effects.atomic_write_text(version_path, version + "\n")
 
     modified = [VERSION_FILE]
 
@@ -78,10 +75,7 @@ def write_zig_version(dir_path, version):
         )
         return modified
 
-    zon_tmp = zon_path + ".tmp"
-    with effects.open_write(zon_tmp, "w", encoding="utf-8") as f:
-        f.write(new_content)
-    effects.replace(zon_tmp, zon_path)
+    effects.atomic_write_text(zon_path, new_content)
     modified.append(ZON_FILE)
 
     return modified

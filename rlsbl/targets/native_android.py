@@ -84,11 +84,7 @@ class NativeAndroidTarget(BaseTarget):
                 count=1,
             )
 
-        # Atomic write
-        tmp_path = gradle_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        effects.replace(tmp_path, gradle_path)
+        effects.atomic_write_text(gradle_path, content)
         return [rel_path]
 
     def version_file(self, dir_path=None):

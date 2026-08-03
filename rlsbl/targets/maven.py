@@ -343,11 +343,7 @@ class MavenTarget(BaseTarget):
 
         versions[key] = version
 
-        # Atomic write
-        tmp_path = catalog_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            tomlkit.dump(doc, f)
-        effects.replace(tmp_path, catalog_path)
+        effects.atomic_write_text(catalog_path, tomlkit.dumps(doc))
 
         return os.path.relpath(catalog_path, dir_path)
 
@@ -472,11 +468,7 @@ class MavenTarget(BaseTarget):
         else:
             raise VersionError(f"Unknown format: {fmt}")
 
-        # Atomic write for non-XML formats
-        tmp_path = filepath + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
-        effects.replace(tmp_path, filepath)
+        effects.atomic_write_text(filepath, new_content)
         return [rel_path]
 
     def version_file(self, dir_path=None):

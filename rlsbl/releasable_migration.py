@@ -510,11 +510,7 @@ def _migrate_batch_exclusions(workspace_root, releasable_name,
     existing = bl.setdefault("exclusions", [])
     existing.extend(new_exclusions)
 
-    tmp_path = config_path + ".tmp"
-    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    effects.replace(tmp_path, config_path)
+    effects.atomic_write_text(config_path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 
     return len(new_exclusions)
 

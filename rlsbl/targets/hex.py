@@ -60,10 +60,7 @@ class HexTarget(BaseTarget):
             f'\\1"{version}"',
             content,
         )
-        tmp_path = mix_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
-        effects.replace(tmp_path, mix_path)
+        effects.atomic_write_text(mix_path, new_content)
         return [self.version_file()]
 
     def version_file(self, dir_path=None):

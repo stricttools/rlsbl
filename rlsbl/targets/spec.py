@@ -72,11 +72,7 @@ class SpecTarget(BaseTarget):
         else:
             data = {}
         data["version"] = version
-        tmp_path = path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-        effects.replace(tmp_path, path)
+        effects.atomic_write_text(path, json.dumps(data, indent=2) + "\n")
         return [os.path.relpath(path, dir_path)]
 
     def version_file(self, dir_path=None):

@@ -43,7 +43,6 @@ success, and left in place on failure.
 
 import json
 import os
-import tempfile
 from ... import effects
 
 
@@ -273,18 +272,11 @@ def save_release_state(state_path: str, state_dict: dict) -> None:
     """Atomically write the release state dict to disk (tmp + os.replace)."""
     parent = os.path.dirname(state_path)
     effects.makedirs(parent, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=parent, prefix=".in-progress.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(state_dict, f, indent=2)
-            f.write("\n")
-        effects.replace(tmp, state_path)
-    except BaseException:
-        try:
-            effects.remove(tmp)
-        except OSError:
-            pass
-        raise
+    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
+    # here before the chokepoint absorbed it (see the effects module).
+    effects.atomic_write_text(
+        state_path, json.dumps(state_dict, indent=2) + "\n", file_mode=0o600,
+    )
 
 
 def load_release_state(state_path: str) -> dict | None:

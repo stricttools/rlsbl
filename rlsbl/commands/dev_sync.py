@@ -217,10 +217,7 @@ def _write_sentinel(project_root, overlays):
     doc["overlay"] = aot
 
     target = os.path.join(str(project_root), SENTINEL_FILENAME)
-    tmp = target + ".tmp"
-    with effects.open_write(tmp, "w", encoding="utf-8") as f:
-        f.write(tomlkit.dumps(doc))
-    effects.replace(tmp, target)
+    effects.atomic_write_text(target, tomlkit.dumps(doc))
 
 
 def run_status(project_root):

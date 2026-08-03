@@ -38,11 +38,7 @@ def ensure_npm_keyword(dir_path=".", quiet=False, *, project_root):
     trailing_newline = "\n" if raw.endswith("\n") else ""
     output = json.dumps(pkg, indent=indent, ensure_ascii=False) + trailing_newline
 
-    # Atomic write: write to temp file, then rename
-    tmp_path = pkg_path + ".tmp"
-    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-        f.write(output)
-    effects.replace(tmp_path, pkg_path)
+    effects.atomic_write_text(pkg_path, output)
 
     if not quiet:
         print('Tagged package.json with "rlsbl" keyword')
@@ -69,10 +65,7 @@ def ensure_pypi_keyword(dir_path=".", quiet=False, *, project_root):
     else:
         keywords.append("rlsbl")
 
-    tmp_path = pyproject_path + ".tmp"
-    with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-        f.write(tomlkit.dumps(doc))
-    effects.replace(tmp_path, pyproject_path)
+    effects.atomic_write_text(pyproject_path, tomlkit.dumps(doc))
 
     if not quiet:
         print('Tagged pyproject.toml with "rlsbl" keyword')

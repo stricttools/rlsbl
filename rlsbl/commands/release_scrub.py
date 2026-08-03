@@ -52,10 +52,7 @@ SAFEGIT_MIN_VERSION = (0, 25, 0)
 def _save_step(path, data, step_name):
     """Record a completed step in the scrub result file."""
     data["completed_steps"].append(step_name)
-    tmp = path + ".tmp"
-    with effects.open_write(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    effects.replace(tmp, path)
+    effects.atomic_write_text(path, json.dumps(data, indent=2))
 
 
 def _fail(msg):
@@ -518,10 +515,7 @@ def _require_cleanup_ok(scrub_data, scrub_result_path):
             "Continuing."
         )
         scrub_data["cleanup_ok"] = True
-        tmp = scrub_result_path + ".tmp"
-        with effects.open_write(tmp, "w", encoding="utf-8") as f:
-            json.dump(scrub_data, f, indent=2)
-        effects.replace(tmp, scrub_result_path)
+        effects.atomic_write_text(scrub_result_path, json.dumps(scrub_data, indent=2))
         return
 
     still_present = []
@@ -539,10 +533,7 @@ def _require_cleanup_ok(scrub_data, scrub_result_path):
             "completed since. Continuing."
         )
         scrub_data["cleanup_ok"] = True
-        tmp = scrub_result_path + ".tmp"
-        with effects.open_write(tmp, "w", encoding="utf-8") as f:
-            json.dump(scrub_data, f, indent=2)
-        effects.replace(tmp, scrub_result_path)
+        effects.atomic_write_text(scrub_result_path, json.dumps(scrub_data, indent=2))
         return
 
     print(
@@ -789,10 +780,7 @@ def run_cmd(flags, *, ctx):
         scrub_data["completed_steps"] = []
         scrub_data["remote_refs"] = remote_refs or {}
         effects.makedirs(os.path.dirname(scrub_result_path), exist_ok=True)
-        tmp_path = scrub_result_path + ".tmp"
-        with effects.open_write(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(scrub_data, f, indent=2)
-        effects.replace(tmp_path, scrub_result_path)
+        effects.atomic_write_text(scrub_result_path, json.dumps(scrub_data, indent=2))
 
     # -- Parse results --
     rewrites = scrub_data.get("rewrites", {})
@@ -950,10 +938,7 @@ def run_cmd(flags, *, ctx):
                 archive_path = _get_archive_path(scrub_result_path, new_head)
                 effects.makedirs(os.path.dirname(archive_path), exist_ok=True)
                 archive = _build_scrub_archive(scrub_data, mode, flags["reason"])
-                tmp_archive = archive_path + ".tmp"
-                with effects.open_write(tmp_archive, "w", encoding="utf-8") as f:
-                    json.dump(archive, f, indent=2)
-                effects.replace(tmp_archive, archive_path)
+                effects.atomic_write_text(archive_path, json.dumps(archive, indent=2))
                 modified_files.append(archive_path)
 
             # Only commit if there are modified files
