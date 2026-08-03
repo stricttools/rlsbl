@@ -21,6 +21,17 @@ CHECK_TIMEOUT_HINT = (
     "— the check still hard-fails on real hangs)"
 )
 
+# We invoke pytest as ``python -P -m pytest`` rather than ``python -m pytest``.
+# ``python -m`` prepends the current working directory to sys.path[0], and since
+# tests run with cwd set to the target project's directory, a flat-layout module
+# there that shadows a stdlib name (e.g. a package-root html.py shadowing stdlib
+# ``html``) would break unrelated imports during pytest startup (plugin loading,
+# e.g. pytest-playwright -> slugify -> ``from html.entities import ...``).
+# ``-P`` (PYTHONSAFEPATH) keeps interpreter resolution intact (the reason we use
+# ``python -m`` at all) while suppressing the CWD injection. It does NOT remove
+# site-packages, so the project's own package and pytest remain importable.
+# Requires Python 3.11+, which is the floor for all rlsbl-managed projects.
+
 
 def sync_workspace(
     workspace_root: str, *, verbose: bool = False, check_timeout: int = 120
@@ -102,7 +113,7 @@ def _resolve_pytest_invocation(
 ) -> list[str]:
     """Build the pytest command for a project based on its environment.
 
-    For workspace members, returns plain ``uv run python -m pytest`` (the
+    For workspace members, returns plain ``uv run python -P -m pytest`` (the
     workspace venv has everything). For standalone projects, probes
     pyproject.toml to determine the correct uv flags.
 
@@ -110,7 +121,7 @@ def _resolve_pytest_invocation(
     """
     uv_ws_root = detect_uv_workspace_root(project_dir)
     if uv_ws_root is not None:
-        return ["uv", "run", "python", "-m", "pytest"]
+        return ["uv", "run", "python", "-P", "-m", "pytest"]
 
     location = _probe_pytest_location(project_dir)
     if location is None:
@@ -122,13 +133,13 @@ def _resolve_pytest_invocation(
     source_type, name = location
     if source_type == "dependency-group":
         if name == "dev":
-            return ["uv", "run", "python", "-m", "pytest"]
-        return ["uv", "run", "--group", name, "python", "-m", "pytest"]
+            return ["uv", "run", "python", "-P", "-m", "pytest"]
+        return ["uv", "run", "--group", name, "python", "-P", "-m", "pytest"]
     elif source_type == "optional-dep":
-        return ["uv", "run", "--extra", name, "python", "-m", "pytest"]
+        return ["uv", "run", "--extra", name, "python", "-P", "-m", "pytest"]
     else:
         # uv-dev: uv syncs dev deps by default
-        return ["uv", "run", "python", "-m", "pytest"]
+        return ["uv", "run", "python", "-P", "-m", "pytest"]
 
 
 def _pytest_marker_args(config: dict) -> list[str]:
@@ -208,9 +219,9 @@ def _run_pypi_tests(
     """Run Python tests via uv or bare pytest.
 
     For workspace members: syncs at workspace root, then runs
-    ``uv run python -m pytest``. For standalone projects: skips sync
+    ``uv run python -P -m pytest``. For standalone projects: skips sync
     (``uv run`` handles it), uses ``_resolve_pytest_invocation`` to build the
-    correct command. Falls back to ``python -m pytest`` when uv is not installed.
+    correct command. Falls back to ``python -P -m pytest`` when uv is not installed.
     """
     uv_verbose = config.get("uv_sync_verbose", False)
     effective_dir = project_dir or "."
@@ -223,13 +234,13 @@ def _run_pypi_tests(
         )
 
         if is_workspace_member:
-            # Workspace member: sync at workspace root, run uv run python -m pytest
+            # Workspace member: sync at workspace root, run uv run python -P -m pytest
             if not skip_sync:
                 if not sync_workspace(
                     workspace_root, verbose=uv_verbose, check_timeout=check_timeout
                 ):
                     return False
-            cmd = ["uv", "run", "python", "-m", "pytest"]
+            cmd = ["uv", "run", "python", "-P", "-m", "pytest"]
         else:
             # Standalone: uv run handles sync; resolve the right invocation
             cmd = _resolve_pytest_invocation(effective_dir, workspace_root)
@@ -241,7 +252,7 @@ def _run_pypi_tests(
             print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
             return False
     elif require_tool("pytest", fatal=False):
-        fallback_cmd = ["python", "-m", "pytest"] + marker_args
+        fallback_cmd = ["python", "-P", "-m", "pytest"] + marker_args
         try:
             result = effects.run(fallback_cmd, cwd=project_dir, timeout=check_timeout)
         except subprocess.TimeoutExpired:

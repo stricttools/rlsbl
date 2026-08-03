@@ -1,7 +1,9 @@
 """Tests for the shared test-running module rlsbl.testing."""
 
 import json
+import os
 import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -54,7 +56,7 @@ class TestPypiTarget:
             assert result is True
             # Standalone: no sync, just uv run pytest
             assert mock_run.call_count == 1
-            assert mock_run.call_args_list[0][0][0] == ["uv", "run", "python", "-m", "pytest"]
+            assert mock_run.call_args_list[0][0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
 
     def test_pypi_workspace_member_syncs_and_runs(self, tmp_project):
         """pypi workspace member runs uv sync + uv run pytest."""
@@ -79,7 +81,7 @@ class TestPypiTarget:
             assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
             assert mock_run.call_args_list[0].kwargs.get("cwd") == str(ws_root)
             # Second call: uv run pytest at project dir
-            assert mock_run.call_args_list[1][0][0] == ["uv", "run", "python", "-m", "pytest"]
+            assert mock_run.call_args_list[1][0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
 
     def test_pypi_uv_sync_verbose(self, tmp_project):
         """When uv_sync_verbose is set, uv sync runs without --quiet (workspace member)."""
@@ -146,7 +148,7 @@ class TestPypiTarget:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["python", "-m", "pytest"]
+            assert mock_run.call_args[0][0] == ["python", "-P", "-m", "pytest"]
 
     def test_pypi_no_uv_no_pytest_fails(self, tmp_project):
         """Neither uv nor pytest installed -> hard fail (no silent skip)."""
@@ -186,7 +188,7 @@ class TestPypiMarkers:
             )
             assert result is True
             assert mock_run.call_args[0][0] == [
-                "uv", "run", "python", "-m", "pytest", "-m", "not integration"
+                "uv", "run", "python", "-P", "-m", "pytest", "-m", "not integration"
             ]
 
     def test_standalone_named_group_appends_markers(self, tmp_project):
@@ -206,7 +208,7 @@ class TestPypiMarkers:
             )
             assert result is True
             assert mock_run.call_args[0][0] == [
-                "uv", "run", "--group", "testing", "python", "-m", "pytest",
+                "uv", "run", "--group", "testing", "python", "-P", "-m", "pytest",
                 "-m", "not integration",
             ]
 
@@ -227,7 +229,7 @@ class TestPypiMarkers:
             )
             assert result is True
             assert mock_run.call_args[0][0] == [
-                "uv", "run", "--extra", "test", "python", "-m", "pytest",
+                "uv", "run", "--extra", "test", "python", "-P", "-m", "pytest",
                 "-m", "not integration",
             ]
 
@@ -252,7 +254,7 @@ class TestPypiMarkers:
             assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
             # pytest call carries the markers
             assert mock_run.call_args_list[1][0][0] == [
-                "uv", "run", "python", "-m", "pytest", "-m", "not integration"
+                "uv", "run", "python", "-P", "-m", "pytest", "-m", "not integration"
             ]
 
     def test_fallback_bare_pytest_appends_markers(self, tmp_project):
@@ -270,7 +272,7 @@ class TestPypiMarkers:
             )
             assert result is True
             assert mock_run.call_args[0][0] == [
-                "python", "-m", "pytest", "-m", "not integration"
+                "python", "-P", "-m", "pytest", "-m", "not integration"
             ]
 
     def test_absent_test_section_is_byte_identical(self, tmp_project):
@@ -287,7 +289,7 @@ class TestPypiMarkers:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests("pypi", project_dir=str(tmp_project), config={})
             assert result is True
-            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +507,7 @@ class TestWorkspaceRoot:
             assert sync_call.kwargs.get("cwd") == workspace
             # uv run pytest runs at project dir
             pytest_call = mock_run.call_args_list[1]
-            assert pytest_call[0][0] == ["uv", "run", "python", "-m", "pytest"]
+            assert pytest_call[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
             assert pytest_call.kwargs.get("cwd") == project
 
     def test_pypi_workspace_skip_sync(self, tmp_project):
@@ -528,7 +530,7 @@ class TestWorkspaceRoot:
             assert result is True
             # Only pytest should run, not uv sync
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
             assert mock_run.call_args.kwargs.get("cwd") == project
 
     def test_pypi_standalone_no_sync(self, tmp_project):
@@ -552,7 +554,7 @@ class TestWorkspaceRoot:
             assert result is True
             # No sync call -- only pytest
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
             assert mock_run.call_args.kwargs.get("cwd") == project
 
 
@@ -724,7 +726,7 @@ class TestResolvePytestInvocation:
         """Workspace members get plain uv run pytest."""
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value="/ws"):
             result = _resolve_pytest_invocation(str(tmp_project), "/ws")
-        assert result == ["uv", "run", "python", "-m", "pytest"]
+        assert result == ["uv", "run", "python", "-P", "-m", "pytest"]
 
     def test_standalone_dev_group(self, tmp_project):
         """Standalone with pytest in [dependency-groups].dev gets uv run pytest."""
@@ -734,7 +736,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "python", "-m", "pytest"]
+        assert result == ["uv", "run", "python", "-P", "-m", "pytest"]
 
     def test_standalone_named_group(self, tmp_project):
         """Standalone with pytest in a named group gets --group flag."""
@@ -744,7 +746,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "--group", "test", "python", "-m", "pytest"]
+        assert result == ["uv", "run", "--group", "test", "python", "-P", "-m", "pytest"]
 
     def test_standalone_optional_dep(self, tmp_project):
         """Standalone with pytest in optional-dependencies gets --extra flag."""
@@ -754,7 +756,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "--extra", "test", "python", "-m", "pytest"]
+        assert result == ["uv", "run", "--extra", "test", "python", "-P", "-m", "pytest"]
 
     def test_standalone_uv_dev(self, tmp_project):
         """Standalone with pytest in [tool.uv].dev-dependencies gets uv run pytest."""
@@ -764,7 +766,7 @@ class TestResolvePytestInvocation:
         )
         with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
-        assert result == ["uv", "run", "python", "-m", "pytest"]
+        assert result == ["uv", "run", "python", "-P", "-m", "pytest"]
 
     def test_standalone_not_declared_raises(self, tmp_project):
         """Standalone with no pytest declaration raises ConfigError."""
@@ -914,7 +916,7 @@ class TestPypiIntegration:
             assert sync_cmd == ["uv", "sync", "--all-packages", "--quiet"]
             assert mock_run.call_args_list[0].kwargs["cwd"] == str(ws_root)
             pytest_cmd = mock_run.call_args_list[1][0][0]
-            assert pytest_cmd == ["uv", "run", "python", "-m", "pytest"]
+            assert pytest_cmd == ["uv", "run", "python", "-P", "-m", "pytest"]
             assert mock_run.call_args_list[1].kwargs["cwd"] == str(pkg)
 
     def test_standalone_optional_dep_test(self, tmp_project):
@@ -935,7 +937,7 @@ class TestPypiIntegration:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "--extra", "test", "python", "-m", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "--extra", "test", "python", "-P", "-m", "pytest"]
 
     def test_standalone_dev_group_default(self, tmp_project):
         """Non-workspace, pytest in [dependency-groups].dev: uv run pytest (default dev)."""
@@ -955,7 +957,7 @@ class TestPypiIntegration:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-m", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
 
     def test_standalone_not_declared_raises(self, tmp_project):
         """Non-workspace, pytest not declared anywhere: raises ConfigError."""
@@ -990,4 +992,82 @@ class TestPypiIntegration:
 
             assert result is True
             assert mock_run.call_count == 1
-            assert mock_run.call_args[0][0] == ["uv", "run", "--group", "testing", "python", "-m", "pytest"]
+            assert mock_run.call_args[0][0] == ["uv", "run", "--group", "testing", "python", "-P", "-m", "pytest"]
+
+
+# ---------------------------------------------------------------------------
+# Regression: PYTHONSAFEPATH (-P) prevents CWD-shadowing at pytest startup
+# ---------------------------------------------------------------------------
+
+class TestPythonSafePathShadowing:
+    """The pytest invocation uses ``python -P -m pytest`` so a target project's
+    flat-layout module shadowing a stdlib name (e.g. a package-root ``html.py``)
+    cannot break third-party plugin imports during pytest startup.
+
+    ``python -m`` injects the cwd into sys.path[0]; plugins loaded at startup
+    (before any test directory is added) then resolve stdlib names against the
+    target project's root. ``-P`` (PYTHONSAFEPATH) suppresses that injection
+    while keeping interpreter resolution intact.
+
+    Subprocess-level red-green proof: the same scenario FAILS under
+    ``python -m pytest`` and PASSES under ``python -P -m pytest``. This mirrors
+    the real failure (pytest-playwright -> slugify -> ``from html.entities ...``)
+    without needing those third-party packages installed.
+
+    The probe plugin is loaded via the ``PYTEST_PLUGINS`` env var, which imports
+    it during plugin-manager init -- the same early phase as setuptools
+    entry-point plugins (pytest-playwright etc.), before pytest inserts the
+    rootdir into sys.path. This makes the reproduction independent of the
+    ``-p <name>`` vs conftest ordering, which varies across pytest versions.
+    """
+
+    def _build_scenario(self, tmp_path):
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        # Flat-layout module shadowing stdlib ``html``; raises on import so a
+        # successful stdlib import (the correct behavior) is unambiguous.
+        (proj / "html.py").write_text(
+            'raise RuntimeError("local html.py shadowed stdlib during plugin load")\n'
+        )
+        (proj / "test_trivial.py").write_text("def test_ok():\n    assert True\n")
+
+        plugindir = tmp_path / "plugindir"
+        plugindir.mkdir()
+        # A third-party-style pytest plugin that imports a stdlib submodule at
+        # load time. Lives outside the project dir (on PYTHONPATH), so only the
+        # cwd injection from ``python -m`` can cause the stdlib name to resolve
+        # to the project's shadowing module.
+        (plugindir / "shadowprobe.py").write_text(
+            "from html.entities import codepoint2name\n"
+            'assert codepoint2name[38] == "amp"\n'
+        )
+        return proj, plugindir
+
+    def _run(self, proj, plugindir, extra_flags):
+        env = dict(os.environ)
+        # Set PYTHONPATH to exactly the plugin dir. Never append an inherited
+        # value with a trailing separator: an empty PYTHONPATH component means
+        # cwd, which would reintroduce the shadow and defeat -P regardless.
+        env["PYTHONPATH"] = str(plugindir)
+        env["PYTEST_PLUGINS"] = "shadowprobe"
+        cmd = [
+            sys.executable, *extra_flags, "-m", "pytest", "-q",
+            "-p", "no:cacheprovider",
+        ]
+        return subprocess.run(
+            cmd, cwd=str(proj), env=env, capture_output=True, text=True
+        )
+
+    def test_without_safepath_fails(self, tmp_path):
+        """RED: ``python -m pytest`` breaks -- plugin load hits the shadow."""
+        proj, plugindir = self._build_scenario(tmp_path)
+        result = self._run(proj, plugindir, [])
+        assert result.returncode != 0
+        assert "shadowed stdlib" in (result.stdout + result.stderr)
+
+    def test_with_safepath_passes(self, tmp_path):
+        """GREEN: ``python -P -m pytest`` succeeds -- cwd not injected, stdlib wins."""
+        proj, plugindir = self._build_scenario(tmp_path)
+        result = self._run(proj, plugindir, ["-P"])
+        assert result.returncode == 0, (result.stdout + result.stderr)
+        assert "1 passed" in result.stdout
