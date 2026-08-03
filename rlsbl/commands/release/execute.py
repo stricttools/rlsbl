@@ -7,6 +7,8 @@ import re
 import sys
 import time
 
+from ...errors import RlsblError
+
 from .release_state import (
     get_state_path,
     get_missing_steps,
@@ -275,6 +277,106 @@ def _is_resumable_failure(exc, branch_pushed, candidate_push_attempted, complete
     if branch_pushed or "BRANCH_PUSHED" in completed:
         return True
     return candidate_push_attempted and _is_push_timeout_exc(exc)
+
+
+def head_sha(cwd=None):
+    """Return HEAD's SHA, or None when it cannot be resolved.
+
+    Uses ``subprocess`` directly rather than the release flow's ``run``: this
+    is bookkeeping for the drift guard, and it must never consume a mock side
+    effect (or shift a call sequence) in tests that stub the release's git
+    calls. Same rationale as :func:`_track_release_commit`.
+    """
+    import subprocess
+
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True, cwd=cwd,
+        ).stdout.strip() or None
+    except Exception:
+        return None
+
+
+class ForeignCommitError(RlsblError):
+    """Raised when commits outside the release's own trail rode into it.
+
+    The forward twin of :class:`RollbackClobberError`: that guard refuses to
+    DESTROY a concurrent session's commits, this one refuses to SHIP them.
+    """
+
+
+def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
+    """Refuse to continue if commits in ``pin_sha..HEAD`` are not this
+    release's own.
+
+    The release pins HEAD at the top of its entry and records every commit it
+    creates in the state file's ``release_commits`` trail. Anything in the pin
+    range that is not in the trail arrived from somewhere else -- a concurrent
+    session sharing the worktree, an editor's auto-commit, a hook. Releasing it
+    would ship unreviewed work under this version's changelog, and the range
+    is recomputed at run time, so a ride-in between two attempts used to join
+    the release silently.
+
+    Fail-closed and by name: the error lists every foreign SHA with its
+    subject, so the operator can decide whether to include the work (record it
+    in the changelog and re-run) or move it aside.
+
+    ``phase`` names the checkpoint in the error text (entry / candidate push /
+    final push). Uses ``subprocess`` directly, not the mock-patched ``run``, so
+    the guard is never starved of a mock side effect in tests.
+    """
+    import subprocess
+
+    if not pin_sha:
+        return
+
+    state = load_release_state(state_path)
+    trail = set((state or {}).get("release_commits", []))
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", f"{pin_sha.strip()}..HEAD"],
+            capture_output=True, text=True, check=True, cwd=cwd,
+        )
+    except Exception:
+        # An unresolvable pin cannot prove drift either way; the rollback
+        # guard takes the same stance on an unusable range.
+        return
+
+    commits = [c.strip() for c in result.stdout.splitlines() if c.strip()]
+    foreign = [c for c in commits if c not in trail]
+    if not foreign:
+        return
+
+    lines = [
+        f"Release aborted at the {phase}: commits that this release did not "
+        f"create appeared on the branch after it started.",
+        "",
+        "Foreign commits (not part of this release):",
+    ]
+    for sha in foreign:
+        try:
+            subject = subprocess.run(
+                ["git", "log", "-1", "--format=%s", sha],
+                capture_output=True, text=True, check=True, cwd=cwd,
+            ).stdout.strip()
+        except Exception:
+            subject = "(subject unavailable)"
+        lines.append(f"  {sha[:12]}  {subject}")
+    lines.extend([
+        "",
+        f"The release range is computed from the branch at run time, so these "
+        f"would ship under this version without ever being reviewed as part "
+        f"of it. Pinned at {pin_sha.strip()[:12]}.",
+        "",
+        "Resolve one way or the other, then re-run:",
+        "  - to include them: record them with `rlsbl changelog add` and start "
+        "a fresh release",
+        "  - to exclude them: move them off this branch (commit them on a "
+        "branch of their own) first",
+    ])
+    raise ForeignCommitError("\n".join(lines))
 
 
 def _bump_selfdoc_version(project_dir, new_version):
@@ -754,6 +856,13 @@ class ReleaseState:
     # State
     pre_existing_dirty: set | None = None
     hook_generated: set | None = None
+    # HEAD pinned at the top of the release ENTRY, before any mutation
+    # (including the pre-mutating selfdoc auto-commit). Everything in
+    # pin_sha..HEAD must be in the release's own commit trail.
+    pin_sha: str | None = None
+    # Commits this release created BEFORE the state file existed (the selfdoc
+    # auto-commit). They seed the state file's release_commits trail.
+    prior_release_commits: list[str] = dataclasses.field(default_factory=list)
     companion_tags: list[str] = dataclasses.field(default_factory=list)
     completed_steps: list[str] = dataclasses.field(default_factory=list)
 
@@ -977,11 +1086,22 @@ def _run_release_mutating(state: ReleaseState):
         if _existing_state is not None
         else {}
     )
+    # Seed the trail with the commits the release already made before the
+    # state file existed (the pre-mutating selfdoc auto-commit), preserving
+    # anything a prior attempt recorded.
+    _prior_trail = list(
+        (_existing_state or {}).get("release_commits", [])
+    )
+    for _sha in state.prior_release_commits or []:
+        if _sha and _sha not in _prior_trail:
+            _prior_trail.append(_sha)
     _state_dict = {
         "new_version": new_version,
         "tag": tag,
         "branch": branch,
         "pre_release_sha": pre_release_sha,
+        "pin_sha": state.pin_sha or pre_release_sha,
+        "release_commits": _prior_trail,
         "bump_type": bump_type,
         "registry": registry,
         "completed_steps": list(_prior_completed),
@@ -998,6 +1118,14 @@ def _run_release_mutating(state: ReleaseState):
         "blog": state.blog,
     }
     save_release_state(_state_path, _state_dict)
+    # Refuse-on-drift, checkpoint 1 of 4 (mutating entry). Re-checked before
+    # the candidate push, immediately after the CI gate (the long window, and
+    # the last moment before anything irreversible), and before the final
+    # push.
+    _pin_sha = _state_dict["pin_sha"]
+    _guard_foreign_commits(
+        _pin_sha, _state_path, cwd=_git_root, phase="mutating entry",
+    )
     # Load completed_steps to check which steps are already done (empty on
     # fresh start; populated when resuming from a prior failed attempt).
     _completed = set(_state_dict.get("completed_steps", []))
@@ -1569,6 +1697,9 @@ def _run_release_mutating(state: ReleaseState):
             except Exception:
                 pass  # Remote branch might not exist yet
 
+            _guard_foreign_commits(
+                _pin_sha, _state_path, cwd=_git_root, phase="candidate push",
+            )
             if _cand_needs_push:
                 candidate_push_attempted = True
                 push_if_needed(
@@ -1630,6 +1761,14 @@ def _run_release_mutating(state: ReleaseState):
 
             save_step(_state_path, "CI_VERIFIED")
             _completed.add("CI_VERIFIED")
+
+        # Refuse-on-drift, checkpoint 3 of 4: the CI wait is a minutes-long
+        # window, and it sits immediately before the irreversible half of the
+        # release. A commit that landed while we waited must abort HERE --
+        # before any finalization or tag -- not after.
+        _guard_foreign_commits(
+            _pin_sha, _state_path, cwd=_git_root, phase="CI gate",
+        )
 
         # The commit the tag, the CI-SHA marker and the publish gate all
         # address. In batch mode the orchestrator verifies the batch tip and
@@ -1873,6 +2012,9 @@ def _run_release_mutating(state: ReleaseState):
             except Exception:
                 pass  # Remote branch might not exist yet
 
+            _guard_foreign_commits(
+                _pin_sha, _state_path, cwd=_git_root, phase="final push",
+            )
             if _branch_needs_push:
                 push_if_needed(
                     branch, config=ctx.config, cwd=project_dir, sha=_local_head,
@@ -1909,6 +2051,13 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Pushed to origin/{branch}")
             save_step(_state_path, "PUSHED")
             _completed.add("PUSHED")
+    except ForeignCommitError as e:
+        # A concurrent session's commits rode onto the branch mid-release.
+        # Never roll back: those commits are exactly what must be preserved
+        # (the rollback guard refuses the same thing from the other side).
+        # Nothing was tagged or released, so the version survives.
+        print(f"Error: {e}", file=sys.stderr)
+        raise
     except ReleaseCIError as e:
         # CI did not pass on the pushed candidate. The candidate commit is on
         # the remote, so there is nothing to roll back; and no tag, GitHub
