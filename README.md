@@ -132,7 +132,7 @@ Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
 ```
 rlsbl scaffold              # create or update CI/CD for all detected registries
 rlsbl scaffold --force      # overwrite managed files (user-owned files still preserved)
-rlsbl scaffold --no-commit  # skip auto-commit of scaffolded files
+rlsbl scaffold --no-auto-commit  # skip auto-commit of scaffolded files
 ```
 
 Created files are committed automatically by default.
