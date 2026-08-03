@@ -476,23 +476,122 @@ def make_commit(repo, filename="file.txt", message="change"):
 # ---------------------------------------------------------------------------
 
 
+# Directory (gitignored, repo-relative) where the sandbox pre-warm stages a
+# safegit binary it built outside the sandbox. Kept in the repo tree because it
+# is the only writable-then-readable channel into the bwrap sandbox: the
+# pre-warm runs before the throwaway working copy is rsync'd, so whatever it
+# leaves here rides along into the sandbox, which has neither network nor a
+# view of a sibling safegit checkout.
+SAFEGIT_STAGE_DIR = ".rlsbl-test-tools"
+
+# Override for the local safegit source checkout used when the pinned version
+# is not published yet.
+SAFEGIT_SRC_ENV = "RLSBL_SAFEGIT_SRC"
+
+
+def _safegit_local_source():
+    """Return a local safegit source checkout, or None if none is reachable.
+
+    Checked in order: an explicit RLSBL_SAFEGIT_SRC, a sibling of this repo,
+    and ~/Projects/safegit. A candidate counts only if it really is the
+    safegit module (its go.mod declares the module path).
+    """
+    candidates = []
+    override = os.environ.get(SAFEGIT_SRC_ENV)
+    if override:
+        candidates.append(Path(override))
+    repo_root = Path(__file__).resolve().parent.parent
+    candidates.append(repo_root.parent / "safegit")
+    candidates.append(Path.home() / "Projects" / "safegit")
+
+    for candidate in candidates:
+        gomod = candidate / "go.mod"
+        try:
+            if gomod.is_file() and "module github.com/smm-h/safegit" in gomod.read_text():
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
+def _acquire_safegit(pin, gobin, binary):
+    """Put a safegit binary at ``binary`` at exactly version ``pin``.
+
+    Returns None on success, or a human-readable reason string explaining
+    precisely why the pinned version could not be obtained. Both acquisition
+    routes announce themselves, so a run is never ambiguous about which
+    safegit it exercised.
+    """
+    gobin.mkdir(parents=True, exist_ok=True)
+
+    # 1. A binary the sandbox pre-warm already staged in the repo tree.
+    staged = Path(__file__).resolve().parent.parent / SAFEGIT_STAGE_DIR / f"safegit-{pin}"
+    if staged.is_file():
+        shutil.copy2(str(staged), str(binary))
+        os.chmod(str(binary), 0o755)
+        print(f"[safegit_bin] using staged safegit {pin} from {staged}")
+        return None
+
+    # 2. The published module. Reproducible everywhere -- and offline inside
+    #    the sandbox, where GOPROXY points at the pre-warmed module cache.
+    env = {**os.environ, "GOBIN": str(gobin)}
+    proxy = subprocess.run(
+        ["go", "install", f"github.com/smm-h/safegit@{pin}"],
+        env=env, timeout=600, capture_output=True, text=True,
+    )
+    if proxy.returncode == 0:
+        return None
+
+    # 3. An unpublished pin: build it from a local checkout, stamping the
+    #    pinned version so the binary reports what the floor demands.
+    source = _safegit_local_source()
+    if source is None:
+        return (
+            f"safegit {pin} is unavailable. The module proxy cannot resolve "
+            f"github.com/smm-h/safegit@{pin} -- rlsbl's SAFEGIT_MIN_VERSION "
+            f"floor is not published yet -- and no local safegit source "
+            f"checkout is reachable from here (set {SAFEGIT_SRC_ENV}=/path/to/"
+            f"safegit, or run outside the sandbox where a sibling checkout is "
+            f"visible). Real-binary safegit tests cannot run.\n"
+            f"go install stderr: {proxy.stderr.strip()[-500:]}"
+        )
+
+    build = subprocess.run(
+        ["go", "build", "-o", str(binary),
+         "-ldflags", f"-X main.version={pin}", "."],
+        cwd=str(source), env=env, timeout=600, capture_output=True, text=True,
+    )
+    if build.returncode != 0:
+        return (
+            f"safegit {pin} is unavailable. The module proxy cannot resolve "
+            f"github.com/smm-h/safegit@{pin} (the floor is not published yet), "
+            f"and building it from the local checkout at {source} failed.\n"
+            f"go build stderr: {build.stderr.strip()[-500:]}"
+        )
+    print(
+        f"[safegit_bin] {pin} is not published; built it from the local "
+        f"checkout at {source} with -X main.version={pin}"
+    )
+    return None
+
+
 @pytest.fixture(scope="session")
 def safegit_bin(tmp_path_factory):
-    """Build the pinned safegit release once and return the binary path.
+    """Provide the pinned safegit binary and return its path.
 
-    The pin is derived from SAFEGIT_MIN_VERSION (the exact version the scrub
-    flow declares as its minimum), installed via
-    ``go install github.com/smm-h/safegit@v<pin>`` into a shared directory.
-    Module-proxy installs are reproducible, so this pins properly on every
-    machine and in CI.
+    The pin is derived from SAFEGIT_MIN_VERSION -- the exact version the scrub
+    flow declares as its minimum. It is obtained from a pre-warm-staged copy,
+    from the module proxy, or (when the floor is declared but not yet
+    published) by building a local safegit checkout with the pinned version
+    stamped in. See ``_acquire_safegit``.
 
-    NO skip-if-absent: if the Go toolchain or network is unavailable the
-    tests FAIL. CI runners have Go preinstalled.
+    When none of those work the affected tests SKIP with a reason naming the
+    unpublished floor -- they never silently pass against some other safegit.
 
     Cross-worker/session safety: the build directory lives in the shared
     pytest temp root (one level above the per-session basetemp, which is also
     shared by xdist workers) and is guarded by an O_EXCL lock file plus a
-    .done marker, so concurrent workers build exactly once.
+    .done / .unavailable marker, so concurrent workers build exactly once.
     """
     from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION
 
@@ -501,10 +600,11 @@ def safegit_bin(tmp_path_factory):
     gobin = shared_root / f"safegit-{pin}"
     binary = gobin / "safegit"
     done_marker = gobin / ".done"
+    unavailable_marker = gobin / ".unavailable"
     lock_path = shared_root / f"safegit-{pin}.lock"
 
     deadline = time.monotonic() + 600
-    while not done_marker.exists():
+    while not (done_marker.exists() or unavailable_marker.exists()):
         try:
             fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
@@ -516,18 +616,18 @@ def safegit_bin(tmp_path_factory):
             time.sleep(1)
             continue
         try:
-            if not done_marker.exists():
-                gobin.mkdir(parents=True, exist_ok=True)
-                env = {**os.environ, "GOBIN": str(gobin)}
-                subprocess.run(
-                    ["go", "install", f"github.com/smm-h/safegit@{pin}"],
-                    env=env, check=True, timeout=600,
-                    capture_output=True, text=True,
-                )
-                done_marker.touch()
+            if not (done_marker.exists() or unavailable_marker.exists()):
+                reason = _acquire_safegit(pin, gobin, binary)
+                if reason is None:
+                    done_marker.touch()
+                else:
+                    unavailable_marker.write_text(reason, encoding="utf-8")
         finally:
             os.close(fd)
             os.unlink(str(lock_path))
+
+    if unavailable_marker.exists():
+        pytest.skip(unavailable_marker.read_text(encoding="utf-8"))
 
     assert binary.exists(), f"safegit binary missing after build: {binary}"
     return binary

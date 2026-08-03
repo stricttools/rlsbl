@@ -20,6 +20,9 @@ dist/
 docs/_build/
 .coverage
 .pytest-tmp/
+# Binaries the sandbox pre-warm builds so the sandboxed suite can reach a
+# safegit pin the module proxy does not have yet (scripts/test-prewarm.sh).
+.rlsbl-test-tools/
 
 build/
 target/

@@ -46,11 +46,54 @@ PIN_RAW="$(grep -oP 'SAFEGIT_MIN_VERSION\s*=\s*\(\K[0-9,\s]+' \
   "${REPO_ROOT}/rlsbl/commands/release_scrub.py")"
 SAFEGIT_PIN="v$(echo "${PIN_RAW}" | tr -d ' ' | tr ',' '.')"
 
+# Where a locally-built safegit is staged for the sandbox. The sandbox has no
+# network and no view of a sibling safegit checkout, so the only way in is the
+# repo tree itself: this dir is gitignored and rsync copies it into the
+# throwaway working copy, where tests/conftest.py picks it up.
+STAGE_DIR="${REPO_ROOT}/.rlsbl-test-tools"
+STAGED_BIN="${STAGE_DIR}/safegit-${SAFEGIT_PIN}"
+
+# Local safegit source checkout, used only when the pin is not published.
+SAFEGIT_SRC="${RLSBL_SAFEGIT_SRC:-$(dirname "${REPO_ROOT}")/safegit}"
+
 mkdir -p "${GO_DOWNLOAD_CACHE}"
-if ! ls "${GO_DOWNLOAD_CACHE}"/github.com/smm-h/safegit/@v/"${SAFEGIT_PIN}".info \
+if ls "${GO_DOWNLOAD_CACHE}"/github.com/smm-h/safegit/@v/"${SAFEGIT_PIN}".info \
       >/dev/null 2>&1; then
-  echo "[prewarm] fetching safegit ${SAFEGIT_PIN} into the module cache (network)..." >&2
-  GOBIN="$(mktemp -d)" go install "github.com/smm-h/safegit@${SAFEGIT_PIN}"
-else
   echo "[prewarm] safegit ${SAFEGIT_PIN} already in the module cache" >&2
+  exit 0
 fi
+
+if [ -f "${STAGED_BIN}" ]; then
+  echo "[prewarm] safegit ${SAFEGIT_PIN} already staged at ${STAGED_BIN}" >&2
+  exit 0
+fi
+
+echo "[prewarm] fetching safegit ${SAFEGIT_PIN} into the module cache (network)..." >&2
+if GOBIN="$(mktemp -d)" go install "github.com/smm-h/safegit@${SAFEGIT_PIN}"; then
+  exit 0
+fi
+
+# The pin is declared but not published (rlsbl raises SAFEGIT_MIN_VERSION
+# before safegit ships it). Build it from the local checkout with the pinned
+# version stamped in, so the sandbox exercises the real binary the floor
+# describes instead of skipping the whole real-binary suite.
+if [ -f "${SAFEGIT_SRC}/go.mod" ] && \
+   grep -q '^module github.com/smm-h/safegit$' "${SAFEGIT_SRC}/go.mod"; then
+  echo "[prewarm] safegit ${SAFEGIT_PIN} is not published; building it from" >&2
+  echo "          ${SAFEGIT_SRC} and staging it at ${STAGED_BIN}" >&2
+  mkdir -p "${STAGE_DIR}"
+  ( cd "${SAFEGIT_SRC}" && go build -o "${STAGED_BIN}" \
+      -ldflags "-X main.version=${SAFEGIT_PIN}" . )
+  exit 0
+fi
+
+# Neither route worked. Do not abort the whole suite over it: the safegit_bin
+# fixture skips the real-binary tests with a reason naming the unpublished
+# floor, which is louder and more precise than a pre-warm failure here.
+{
+  echo "[prewarm] WARNING: safegit ${SAFEGIT_PIN} could not be obtained."
+  echo "  The module proxy does not have it (the floor is not published yet)"
+  echo "  and no local safegit checkout was found at ${SAFEGIT_SRC}."
+  echo "  Real-binary safegit tests will SKIP. Set RLSBL_SAFEGIT_SRC to a"
+  echo "  safegit checkout to build the pin locally."
+} >&2
