@@ -620,3 +620,18 @@ fast = true
 pure = true
 needs_network = false
 depends_on = ["config-schema"]
+
+# stricttest floor adoption: the sandboxed test runner rlsbl distributes.
+# Feature-flagged by adoption -- skips visibly when the repo declares neither a
+# test_sandbox config section nor a stricttest dependency; hard-fails on a
+# broken adopted state (runner missing or not executable, config family
+# incomplete, a declared CI workflow that does not invoke the runner). Pure
+# (reads committed JSON/TOML/YAML text, no subprocess or network). In
+# "preflight" so a broken floor blocks a release.
+[checks.stricttest-floor]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["config-schema"]

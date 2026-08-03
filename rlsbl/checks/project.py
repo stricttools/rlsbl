@@ -4,7 +4,7 @@ Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
 publish-mode-workflow, npm-private-mismatch, target-version-readable,
 dunder-version-missing, selfdoc-version-drift, scaffold-conflicts,
-cross-repo-path-sources.
+cross-repo-path-sources, stricttest-floor.
 """
 
 import json
@@ -597,11 +597,48 @@ def register_project_checks(app):
         except ConfigError as e:
             errors.append(str(e))
 
+        # Validate the optional sandboxed-test-runner config family
+        from ..test_sandbox import validate_test_sandbox_config
+        try:
+            validate_test_sandbox_config(config)
+        except ConfigError as e:
+            errors.append(str(e))
+
         if errors:
             for err in errors:
                 reporter.error(err)
             return reporter.found(f"{len(errors)} config error(s)")
         return reporter.passed("config schema valid")
+
+    @app.error_check("stricttest-floor")
+    def check_stricttest_floor(ctx, reporter):
+        """An adopted stricttest floor must have a working sandbox runner.
+
+        Skips visibly on repos that have adopted neither the ``test_sandbox``
+        config family nor the stricttest plugin. Once adopted, a missing or
+        non-executable runner, an incomplete config family, or a CI workflow
+        that does not invoke the declared runner is a hard error.
+        """
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
+
+        from ..test_sandbox import evaluate_floor
+
+        verdict = evaluate_floor(ctx.config, str(ctx.project_root))
+        if not verdict.adopted:
+            return reporter.skipped(verdict.skip_reason)
+
+        if verdict.ok:
+            if verdict.notes:
+                return reporter.passed("; ".join(verdict.notes[:3]))
+            return reporter.passed("stricttest floor adopted")
+
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(
+            f"{len(verdict.problems)} stricttest floor problem(s)"
+        )
 
     @app.error_check("requires-services")
     def check_requires_services(ctx, reporter):

@@ -53,6 +53,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "private-hook-stale": None,
     "config-schema": None,
     "strictspec-certificate-gate": None,
+    "stricttest-floor": None,
     "license-file": None,
     # --- release tag (universal) ---
     "local-tag": None,

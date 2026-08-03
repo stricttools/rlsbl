@@ -101,6 +101,8 @@ EXPECTED_CHECKS = [
     "wrapper-producer",
     # strictspec certificate deploy gate
     "strictspec-certificate-gate",
+    # stricttest floor adoption (sandboxed test runner)
+    "stricttest-floor",
 ]
 
 # ``cli-test-coverage`` is a strictcli framework BUILT-IN check provider,
