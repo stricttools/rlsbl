@@ -211,7 +211,7 @@ class TestGateJob:
 
     def test_build_gate_job_env_and_permissions(self):
         job = build_gate_job(check_regex="^(test)$")
-        assert job["permissions"] == {"checks": "read"}
+        assert job["permissions"] == {"checks": "read", "contents": "read"}
         assert job["env"]["CI_CHECK_REGEX"] == "^(test)$"
         assert job["env"]["GH_TOKEN"] == "${{ secrets.GITHUB_TOKEN }}"
         assert job["env"]["GATE_TIMEOUT_MINUTES"] == "20"
@@ -507,7 +507,7 @@ class TestRouterGateRegexFromBuilder:
         job = build_router_gate_job(
             [("pkga-v", "^(pkga) / "), ("pkgb-v", "^(pkgb) / ")]
         )
-        assert job["permissions"] == {"checks": "read"}
+        assert job["permissions"] == {"checks": "read", "contents": "read"}
         resolver = job["steps"][0]["run"]
         assert '"pkga-v"*)' in resolver
         poll = job["steps"][1]["run"]

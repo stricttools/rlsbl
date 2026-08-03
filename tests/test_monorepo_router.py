@@ -405,3 +405,19 @@ class TestGateRegexWorkspaceProject:
         resolver = _safe_load(content)["jobs"]["gate"]["steps"][0]["run"]
         assert r"pkg\-ci\-pypi" in resolver
         assert r"^(pkg\-ci) / " not in resolver
+
+
+class TestGatePermissions:
+    """The publish gate resolves the release commit from the ``rlsbl-ci-sha``
+    marker embedded in the GitHub Release body, read via ``gh release view``.
+    That read requires ``contents: read``; without it the marker is never
+    visible and the gate silently falls back to ``$GITHUB_SHA`` (the tag
+    commit), which in a monorepo is a metadata/version-bump commit whose
+    path-filtered CI was skipped -- so the gate fails every retry.
+    """
+
+    def test_gate_job_grants_contents_read_for_marker_lookup(self):
+        from rlsbl.publish_gate import build_router_gate_job
+
+        job = build_router_gate_job([("pkg@v", r"^(pkg\-ci) / ")])
+        assert job["permissions"] == {"checks": "read", "contents": "read"}

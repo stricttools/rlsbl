@@ -297,7 +297,13 @@ def build_gate_job(check_regex: str | None = None, resolver_script: str | None =
         "runs-on": "ubuntu-latest",
         # Job-level permissions: exactly what the gate needs, regardless of
         # (restrictive) workflow-level permission blocks around it.
-        "permissions": {"checks": "read"},
+        # - checks:read   -> poll the release commit's CI check-runs.
+        # - contents:read -> `gh release view` to read the rlsbl-ci-sha marker
+        #   from the Release body (the commit CI actually ran on). Without it
+        #   the marker read fails, the gate falls back to $GITHUB_SHA (the tag
+        #   commit, whose path-filtered CI is skipped in a monorepo), and every
+        #   publish is blocked.
+        "permissions": {"checks": "read", "contents": "read"},
         "env": env,
         "steps": steps,
     }
