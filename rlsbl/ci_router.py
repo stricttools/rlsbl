@@ -19,7 +19,13 @@ def _router_ci_job_keys(project) -> list[str]:
     ``<prefix> / <ci job name>``, which is what the shared gate matches.
     """
     name = project["name"]
-    ci_files = project.get("_ci_files") if isinstance(project, dict) else None
+    # ``project`` is a Mapping-like object -- a plain dict or a
+    # ``WorkspaceProject`` (returned by ``load_workspace``), both of which
+    # support ``.get``. Guarding on ``isinstance(project, dict)`` silently
+    # dropped ``_ci_files`` for ``WorkspaceProject`` and fell back to
+    # ``<name>-ci``, producing a gate regex that never matched the real
+    # per-target check-run name ``<name>-ci-<target> / test``.
+    ci_files = project.get("_ci_files")
     if not ci_files:
         ci_files = [f"{name}-ci.yml"]
     return [ci_file.removesuffix(".yml") for ci_file in ci_files]

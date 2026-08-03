@@ -363,3 +363,45 @@ class TestRouterDispatchRecovery:
         assert 'TAG_INPUT' in resolver_step["run"]
         assert 'tag_ref' in resolver_step["run"]
         assert 'case "$tag_ref"' in resolver_step["run"]
+
+
+class TestGateRegexWorkspaceProject:
+    """The publish gate's CI check-run regex must match the ci-router's actual
+    job-key prefixes, which carry the per-target suffix (e.g. ``pkg-ci-pypi``)
+    for projects whose CI source is ``ci-<target>.yml`` rather than ``ci.yml``.
+
+    Regression: ``load_workspace`` returns ``WorkspaceProject`` objects, not
+    plain dicts. ``_router_ci_job_keys`` gated its ``_ci_files`` lookup behind
+    ``isinstance(project, dict)``, which is False for ``WorkspaceProject``, so
+    it silently fell back to ``<name>-ci`` and generated a gate regex
+    (``^(pkg\\-ci) / ``) that never matched the real check-run name
+    ``pkg-ci-pypi / test`` -- blocking every publish for such projects.
+    """
+
+    def test_router_ci_check_regex_reads_ci_files_from_workspace_project(self):
+        from rlsbl.ci_router import _router_ci_check_regex
+        from rlsbl.workspace_types import WorkspaceProject
+
+        proj = WorkspaceProject(
+            {"name": "selfdoc", "_ci_files": ["selfdoc-ci-pypi.yml"]}
+        )
+        assert _router_ci_check_regex(proj) == r"^(selfdoc\-ci\-pypi) / "
+
+    def test_gate_regex_preserves_target_suffix_for_workspace_project(self, tmp_path):
+        from rlsbl.workspace_types import WorkspaceProject
+
+        root = str(tmp_path)
+        _setup_project(root, "pkg", PYPI_PUBLISH_WF)
+        projects = [
+            WorkspaceProject(
+                {"name": "pkg", "path": "pkg", "_ci_files": ["pkg-ci-pypi.yml"]}
+            )
+        ]
+        with patch(
+            "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
+            side_effect=_mock_tag_prefix,
+        ):
+            content = generate_inline_publish_router(projects, root)
+        resolver = _safe_load(content)["jobs"]["gate"]["steps"][0]["run"]
+        assert r"pkg\-ci\-pypi" in resolver
+        assert r"^(pkg\-ci) / " not in resolver
