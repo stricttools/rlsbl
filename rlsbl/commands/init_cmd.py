@@ -923,6 +923,15 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
             plan["heal_notice"] = heal_notice
         plans.append(plan)
 
+    # Propagate the mapping-level executable bit onto its plan. Targets are
+    # unique within a mapping list, so matching by target is unambiguous.
+    executable_targets = {
+        m["target"] for m in mappings if m.get("executable")
+    }
+    for plan in plans:
+        if plan.get("target") in executable_targets:
+            plan["executable"] = True
+
     return plans
 
 
@@ -988,6 +997,13 @@ def apply_plans(plans):
                 warnings.append(plan["warning"])
             check_unreplaced_vars(target, plan.get("unreplaced"))
             continue
+
+    # Executable templates (the sandboxed test runner) must land runnable, and
+    # stay runnable if a checkout or an editor stripped the bit.
+    for plan in plans:
+        target = plan.get("target")
+        if plan.get("executable") and target and os.path.exists(target):
+            os.chmod(target, 0o755)
 
     return created, skipped, warnings, new_hashes
 
@@ -1693,6 +1709,9 @@ def run_cmd(registry, args, flags, ctx):
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
         vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
+        # Sandboxed test-runner vars (empty dict when test_sandbox is absent).
+        from ..test_sandbox import template_vars as _test_sandbox_vars
+        vars_dict.update(_test_sandbox_vars(ctx.config))
 
         # Publish gate: publish workflows wait for this repo's CI check
         # runs on the release commit. The filter covers every scaffolded
@@ -2795,6 +2814,9 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
         vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
+        # Sandboxed test-runner vars (empty dict when test_sandbox is absent).
+        from ..test_sandbox import template_vars as _test_sandbox_vars
+        vars_dict.update(_test_sandbox_vars(ctx.config))
 
         # Process per-target CI templates: each target gets its own ci-{name}.yml.
         # Workspace roots skip CI templates -- the ci-router handles
