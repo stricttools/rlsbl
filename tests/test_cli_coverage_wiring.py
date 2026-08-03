@@ -178,6 +178,27 @@ class TestReleaseGroupWiring:
         assert args == ["0.9.1"]
         assert flags["reason"] == "broken"
 
+    def test_reconcile(self):
+        result, m = _dispatch(
+            ["release", "reconcile", "--push-timeout", "45", "--dry-run"],
+            "rlsbl.commands.release_reconcile.run_cmd",
+        )
+        assert result.exit_code == 0, result.stderr
+        flags = m.call_args[0][0]
+        assert flags["push-timeout"] == 45
+        assert flags["dry-run"] is True
+        assert flags["yes"] is False
+        assert flags["quiet"] is False
+
+    def test_reconcile_zero_push_timeout_means_unset(self):
+        """0 is the "use the configured default" sentinel, not a real timeout."""
+        result, m = _dispatch(
+            ["release", "reconcile"],
+            "rlsbl.commands.release_reconcile.run_cmd",
+        )
+        assert result.exit_code == 0, result.stderr
+        assert m.call_args[0][0]["push-timeout"] is None
+
 
 # ---------------------------------------------------------------------------
 # release run / monorepo release run -- flag surface (build_release_flags)
