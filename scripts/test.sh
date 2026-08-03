@@ -377,8 +377,15 @@ if ! bwrap \
 fi
 rm -f "${PROBE_ERR}"
 
-exec bwrap \
+# Deliberately NOT `exec`: exec replaces this shell, and with it the EXIT
+# trap, so the scratch dirs survived every run -- successful ones included --
+# not merely killed ones. bwrap runs as a child and its status is forwarded
+# after cleanup. Signals still reach it: it shares this foreground process
+# group and carries --die-with-parent.
+status=0
+bwrap \
   "${BIND_ARGS[@]}" \
   "${ENV_ARGS[@]}" \
   --chdir "${WORK}" \
-  bash -c "${INNER}"
+  bash -c "${INNER}" || status=$?
+exit "${status}"
