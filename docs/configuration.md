@@ -24,6 +24,7 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | check_timeout | int | Timeout in seconds for check subprocesses (built-in tests, etc.). Default: 900. A declared budget, not a bypass — the check still hard-fails on a real hang. |
 | push_timeout | int | Timeout in seconds for each `git push` during a release. Default: 300. Overridable per-invocation with `--push-timeout`. |
 | hook_timeout | int | Timeout in seconds for release hooks. Default: absent, meaning no timeout — hooks run to completion. |
+| ci_timeout | int | Timeout in seconds for the release CI gate — the in-process wait for CI to conclude on the pushed release candidate. Default: 3600. Run discovery is spent inside this budget and capped at half of it, so the completion wait always keeps at least half. Overridable per-invocation with `--ci-timeout`. |
 | build_timeout | int or object | Timeout in seconds for target build steps. An int applies to every target; an object is keyed by target name with an optional `default` entry. Falls back to each target's shipped default (120s for most, 300s for maven, 60s for pgdesign). |
 | test | object | Per-target test-selection filters. See [test](#test) below. |
 | external_checks | array | Config-declared subprocess checks that run during `rlsbl check` and the release preflight. Each entry declares a `kind` (`structured` or `freeform`). See [external_checks](#external_checks) below. |
@@ -257,7 +258,7 @@ with the first-release case handled by testing `[ -z "$RLSBL_LAST_TAG" ]`.
 
 #### Timeout
 
-Both kinds route their subprocess timeout through the configured check budget — the `check_timeout` key in `.rlsbl/config.json`, else the shipped default (900s). The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
+Both kinds resolve their subprocess timeout per run from the configured check budget — `--check-timeout` if passed, else the `check_timeout` key in `.rlsbl/config.json`, else the shipped default (900s). This is the same precedence every built-in check uses. The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
 
 ### Pipeline config
 
@@ -381,6 +382,9 @@ Some CLI flags override config.json keys for a single invocation, providing temp
 | `--allow-dirty` | (none) | release only | Skips clean working tree check |
 | `--watch`/`--no-watch` | (none) | release only | Controls CI monitoring after push |
 | `--push-timeout` | `push_timeout` | release only | Push timeout in seconds for this invocation (0, the default, means use the config key, else the shipped 300s) |
+| `--ci-timeout` | `ci_timeout` | release only | CI-gate timeout in seconds for this invocation (0, the default, means use the config key, else the shipped 3600s) |
+| `--check-timeout` | `check_timeout` | release only | Check-subprocess timeout in seconds for this invocation, covering built-in checks, config-declared external checks and their scope guards (0, the default, means use the config key, else the shipped 900s) |
+| `--hook-timeout` | `hook_timeout` | release only | Release-hook timeout in seconds for this invocation (0, the default, means use the config key, else no timeout) |
 
 Global flags `--dry-run`, `--yes`, and `--quiet` are runtime-only and have no `config.json` equivalent. They affect the current invocation but are never persisted to configuration.
 
