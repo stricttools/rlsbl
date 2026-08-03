@@ -727,11 +727,31 @@ def parse_porcelain_paths(porcelain_output):
     return dirty_files
 
 
-def _run_selfdoc_gen(flags, project_dir=None):
+def _selfdoc_version_args(version):
+    """Return the ``--version-override`` argv fragment for *version*, if any.
+
+    selfdoc resolves version-bearing content (the CLI index's Version line,
+    root-file version directives) from the project's CURRENT version. During a
+    release the version on disk is still the OLD one when selfdoc runs -- the
+    bump happens later, in the mutating phase -- so every generated
+    version-bearing line shipped exactly one release stale, and the same churn
+    tripped the doc-staleness check on the very next release.
+
+    Passing the about-to-be-released version closes that loop: generated
+    content is written for the version this release is producing.
+    """
+    return ["--version-override", str(version)] if version else []
+
+
+def _run_selfdoc_gen(flags, project_dir=None, version=None):
     """Run selfdoc gen if selfdoc.json exists in the project directory.
 
     Regenerates documentation pages from source before the selfdoc check step,
     ensuring the check validates fresh content rather than stale pages.
+
+    ``version`` is the version this release is producing; it is forwarded as
+    ``--version-override`` so version-bearing generated content is written for
+    the new version rather than the (still un-bumped) one on disk.
     """
     from . import require_tool, subprocess as _subprocess
 
@@ -740,8 +760,13 @@ def _run_selfdoc_gen(flags, project_dir=None):
     if not os.path.exists(selfdoc_config):
         return True
 
+    version_args = _selfdoc_version_args(version)
+
     if flags.get("dry-run"):
-        print("Would run: selfdoc gen --no-auto-commit")
+        print(
+            "Would run: selfdoc gen --no-auto-commit "
+            + " ".join(version_args)
+        )
         return True
 
     if not require_tool("selfdoc", fatal=False):
@@ -752,7 +777,10 @@ def _run_selfdoc_gen(flags, project_dir=None):
 
     print("Running selfdoc gen...")
     try:
-        _subprocess.run(["selfdoc", "gen", "--no-auto-commit"], cwd=project_dir, check=True)
+        _subprocess.run(
+            ["selfdoc", "gen", "--no-auto-commit"] + version_args,
+            cwd=project_dir, check=True,
+        )
     except _subprocess.CalledProcessError as e:
         print(
             f"Error: selfdoc gen failed (exit code {e.returncode}).",
@@ -762,12 +790,16 @@ def _run_selfdoc_gen(flags, project_dir=None):
     return True
 
 
-def _run_selfdoc_check(flags, project_dir=None):
+def _run_selfdoc_check(flags, project_dir=None, version=None):
     """Run selfdoc check if selfdoc.json exists in the project directory.
 
     Checks documentation consistency before releasing. Non-fatal if selfdoc
     is not installed; fatal if it is installed and the check fails.
     When project_dir is set (monorepo mode), checks are resolved relative to it.
+
+    ``version`` is forwarded as ``--version-override`` so the check judges the
+    generated content against the version the gen step just wrote, not the
+    still-un-bumped one on disk.
     """
     from . import require_tool, subprocess as _subprocess
 
@@ -785,7 +817,11 @@ def _run_selfdoc_check(flags, project_dir=None):
 
     print("Running selfdoc check...")
     try:
-        _subprocess.run(["selfdoc", "check", "--no-auto-commit"], cwd=project_dir, check=True)
+        _subprocess.run(
+            ["selfdoc", "check", "--no-auto-commit"]
+            + _selfdoc_version_args(version),
+            cwd=project_dir, check=True,
+        )
     except _subprocess.CalledProcessError as e:
         print(
             f"Error: selfdoc check failed (exit code {e.returncode}).",

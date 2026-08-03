@@ -850,8 +850,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         _pre_selfdoc_output = run("git", ["status", "--porcelain"])
         _pre_selfdoc_dirty = parse_porcelain_paths(_pre_selfdoc_output) if _pre_selfdoc_output else set()
 
-    _run_selfdoc_gen(flags, project_dir=project_dir)
-    _run_selfdoc_check(flags, project_dir=project_dir)
+    # Pass the about-to-be-released version: the bump has not been written to
+    # disk yet, so without it every version-bearing generated line is one
+    # release stale (and its churn trips the staleness check next time).
+    _run_selfdoc_gen(flags, project_dir=project_dir, version=new_version)
+    _run_selfdoc_check(flags, project_dir=project_dir, version=new_version)
 
     _run_selfblog_post_generate(
         flags,
