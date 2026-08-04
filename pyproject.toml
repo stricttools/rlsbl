@@ -9,7 +9,7 @@ requires-python = ">=3.11"
 keywords = ["release", "npm", "pypi", "go", "goreleaser", "publish", "cli", "scaffold", "rlsbl"]
 dependencies = [
     "ruamel-yaml",
-    "strictcli",
+    "strictcli>=0.35.3",
     "strictspec>=0.1.0",
     "tomlkit>=0.12",
     "tree-sitter>=0.24",

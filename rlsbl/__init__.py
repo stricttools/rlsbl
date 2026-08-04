@@ -2192,58 +2192,13 @@ def _extract_variadic_args():
 # Entry point
 # ---------------------------------------------------------------------------
 
-# The framework-owned flags, in every spelling strictcli accepts for them.
-_RESERVED_FLAG_TOKENS = frozenset(
-    [f"--{n}" for n in ("dry-run", "yes", "quiet", "verbose")]
-    + [f"--no-{n}" for n in ("dry-run", "yes", "quiet", "verbose")]
-)
-
-
-def hoist_reserved_flags(argv):
-    """Move framework-owned flags in *argv* ahead of the command token.
-
-    strictcli extracts `--dry-run`, `--yes`, `--quiet` and `--verbose` in a
-    pre-scan that stops at the first non-flag token, so it only sees them
-    BEFORE the command name -- while every rlsbl invocation ever documented
-    writes them after it (`rlsbl release run --no-allow-dirty --watch --yes`).
-    Command parsing then rejects them as unknown flags.
-
-    Rather than rewrite every doc, hook and habit around a scan position, the
-    tokens are moved to the front here.  The four names are unconditionally
-    banned as command flag names, so a token equal to one of them can never
-    belong to a command and moving it can never change what a command sees.
-    Nothing after a bare `--` is touched: that region is `rlsbl commit`'s file
-    list, and a file may legitimately be named `--yes`.
-
-    This is a positional fix, not a behavior change; when strictcli's own
-    pre-scan reaches past the command token, delete this function and its call.
-    """
-    if len(argv) < 2:
-        return argv
-    head, rest = argv[:1], argv[1:]
-    hoisted, remainder = [], []
-    seen_command = False
-    for i, tok in enumerate(rest):
-        if tok == "--":
-            remainder.extend(rest[i:])
-            break
-        if seen_command and tok in _RESERVED_FLAG_TOKENS:
-            hoisted.append(tok)
-            continue
-        if not tok.startswith("-"):
-            seen_command = True
-        remainder.append(tok)
-    return head + hoisted + remainder
-
-
 def main():
     """CLI entry point: extract variadic args and run the strictcli app."""
     global _variadic_args
-    # Variadic extraction first: it reads the command token at argv[1] and
-    # rebuilds sys.argv around it, so hoisting a reserved flag in front of the
-    # command before it ran would hide the command from it.
+    # strictcli >= 0.35.3 recognizes --dry-run/--yes/--quiet/--verbose anywhere
+    # in argv, so `rlsbl release run --yes` reaches the framework as written and
+    # needs no argv rewriting here.
     _variadic_args = _extract_variadic_args()
-    sys.argv = hoist_reserved_flags(sys.argv)
     try:
         app.run()
     except subprocess.CalledProcessError as e:

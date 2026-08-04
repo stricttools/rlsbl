@@ -113,48 +113,38 @@ def test_no_handler_swallows_kwargs():
     assert not offenders, f"handlers carrying **_kwargs: {sorted(offenders)}"
 
 
-class TestReservedFlagHoisting:
+class TestReservedFlagsAfterTheCommand:
     """`rlsbl <command> --dry-run` must work, not just `rlsbl --dry-run <command>`.
 
-    strictcli's reserved-flag pre-scan stops at the first non-flag token, so it
-    only sees the four framework flags BEFORE the command name -- while every
-    documented rlsbl invocation writes them after it. `main()` moves them to
-    the front before dispatch; these tests pin that, including its interaction
-    with the variadic-argument extraction that also rewrites argv.
+    Every documented rlsbl invocation writes the framework-owned flags AFTER the
+    command name (`rlsbl release run --no-allow-dirty --watch --yes`). strictcli
+    >= 0.35.3 recognizes them anywhere in argv, so this works with no argv
+    rewriting on rlsbl's side; `main()` carried a hoisting shim until then.
+    These tests pin the property, not the removed shim.
     """
 
-    def test_flag_after_the_command_is_hoisted(self):
-        from rlsbl import hoist_reserved_flags
+    def test_flag_after_the_command_reaches_the_framework(self):
+        result = app.test(["monorepo", "remove", "some/path", "--dry-run"])
+        assert result.exit_code == 1
+        assert "does not support --dry-run" in result.stderr
 
-        assert hoist_reserved_flags(
-            ["rlsbl", "release", "run", "--allow-dirty", "--yes"]
-        ) == ["rlsbl", "--yes", "release", "run", "--allow-dirty"]
+    def test_flag_after_a_nested_subcommand_reaches_the_framework(self):
+        result = app.test(["release", "init", "--dry-run"])
+        assert result.exit_code == 1
+        assert "does not support --dry-run" in result.stderr
 
-    def test_negated_forms_hoist_too(self):
-        from rlsbl import hoist_reserved_flags
+    def test_yes_after_the_command_is_not_an_unknown_flag(self):
+        """The exact shape the RLSBL protocol prescribes."""
+        result = app.test(["status", "--yes"])
+        assert "unknown flag" not in result.stderr
 
-        assert hoist_reserved_flags(["rlsbl", "status", "--no-quiet"]) == [
-            "rlsbl", "--no-quiet", "status",
-        ]
+    def test_variadic_extraction_leaves_a_post_command_flag_in_place(
+        self, monkeypatch
+    ):
+        """Extraction reads argv[1] and rebuilds argv around it.
 
-    def test_flag_already_leading_is_left_alone(self):
-        from rlsbl import hoist_reserved_flags
-
-        argv = ["rlsbl", "--dry-run", "status"]
-        assert hoist_reserved_flags(argv) == argv
-
-    def test_nothing_after_a_bare_separator_is_touched(self):
-        """`rlsbl commit -- --yes` names a file, however badly."""
-        from rlsbl import hoist_reserved_flags
-
-        argv = ["rlsbl", "commit", "-m", "x", "--", "--yes", "a.txt"]
-        assert hoist_reserved_flags(argv) == argv
-
-    def test_variadic_extraction_still_sees_the_command(self, monkeypatch):
-        """Extraction reads argv[1]; hoisting must not run before it.
-
-        `rlsbl commit --dry-run -m x -- file` reached the hoist first once, and
-        the file list was then parsed as if `--dry-run` were the command.
+        It must not consume or reorder the reserved flag: strictcli picks it up
+        from the command region on its own.
         """
         import rlsbl
 
@@ -163,6 +153,17 @@ class TestReservedFlagHoisting:
         )
         variadic = rlsbl._extract_variadic_args()
         assert variadic == ["a.txt"]
-        assert rlsbl.hoist_reserved_flags(__import__("sys").argv) == [
-            "rlsbl", "--dry-run", "commit", "-m", "x",
+        assert __import__("sys").argv == [
+            "rlsbl", "commit", "--dry-run", "-m", "x",
         ]
+
+    def test_a_file_named_like_a_reserved_flag_stays_a_file(self, monkeypatch):
+        """`rlsbl commit -- --yes` names a file, however badly."""
+        import rlsbl
+
+        monkeypatch.setattr(
+            "sys.argv", ["rlsbl", "commit", "-m", "x", "--", "--yes", "a.txt"],
+        )
+        variadic = rlsbl._extract_variadic_args()
+        assert variadic == ["--yes", "a.txt"]
+        assert __import__("sys").argv == ["rlsbl", "commit", "-m", "x"]

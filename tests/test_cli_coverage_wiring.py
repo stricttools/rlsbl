@@ -180,9 +180,9 @@ class TestReleaseGroupWiring:
 
     def test_reconcile(self):
         result, m = _dispatch(
-            # --dry-run leads: strictcli's reserved-flag pre-scan stops at the
-            # first non-flag token (the real CLI hoists it there for you).
-            ["--dry-run", "release", "reconcile", "--push-timeout", "45"],
+            # The documented shape: the reserved flag follows the command.
+            # strictcli recognizes the quartet anywhere in argv.
+            ["release", "reconcile", "--push-timeout", "45", "--dry-run"],
             "rlsbl.commands.release_reconcile.run_cmd",
         )
         assert result.exit_code == 0, result.stderr
