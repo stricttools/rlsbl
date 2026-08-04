@@ -396,6 +396,69 @@ def read_release_file(path: str) -> ReleaseConfig:
     return _bind_release_config(data)
 
 
+def write_archived_release_file(
+    releases_dir: str,
+    version: str,
+    *,
+    bump: str,
+    include,
+    exclude=(),
+    description: str,
+    context: str = "",
+    preid: str = "",
+    blog: bool = False,
+) -> str:
+    """Write ``v{version}.toml`` for a release that had no ``unreleased.toml``.
+
+    A standalone release finalizes by RENAMING its release file to
+    ``v{version}.toml``, and every later changelog regeneration reads the
+    version's description, context and bump type back out of that archive.
+
+    A batch release has no per-member release file -- its members' metadata
+    lives in the workspace-level batch TOML, archived under a different name --
+    so nothing was ever written here, and regeneration silently stripped the
+    description and context from the version's ``.md`` and its ``CHANGELOG.md``
+    section.  Materializing the archive puts the metadata exactly where every
+    reader already looks, rather than teaching each reader a second source.
+
+    The result is a complete, schema-valid release document (``read_release_file``
+    accepts it, which matters because ``rlsbl release undo`` restores it as
+    ``unreleased.toml``), and read-only like every other archived release file.
+
+    Returns the path written.
+    """
+    doc = tomlkit.document()
+    doc.add(tomlkit.comment(
+        "Archived by rlsbl at release time. This release had no unreleased.toml"
+    ))
+    doc.add(tomlkit.comment(
+        "(a batch member takes its metadata from the batch release file); the"
+    ))
+    doc.add(tomlkit.comment(
+        "archive is written so later changelog regenerations keep the"
+    ))
+    doc.add(tomlkit.comment("description and context."))
+    doc.add(tomlkit.comment("strictspec document version gate (do not remove)"))
+    doc.add("format_version", 1)
+    doc.add("bump", bump)
+    doc.add("include", list(include))
+    doc.add("exclude", list(exclude))
+    doc.add("description", description)
+    if context:
+        doc.add("context", context)
+    if preid:
+        doc.add("preid", preid)
+    if blog:
+        doc.add("blog", True)
+
+    effects.makedirs(releases_dir, exist_ok=True)
+    path = os.path.join(releases_dir, f"v{version}.toml")
+    # file_mode, not a write-then-chmod: the archive is immutable from the
+    # instant it exists, exactly like the renamed-and-chmodded standalone one.
+    effects.atomic_write_text(path, tomlkit.dumps(doc), file_mode=0o444)
+    return path
+
+
 def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
     """Reverse a release-file finalization: restore vX.Y.Z.toml to unreleased.toml.
 

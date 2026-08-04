@@ -2084,19 +2084,49 @@ def _run_release_mutating(state: ReleaseState):
                 _completed.add("RELEASE_FILE_FINALIZED")
                 log("Skipping release file finalization (already archived)")
 
-        if not _release_file_already_finalized and os.path.exists(release_file_path):
+        # A release either HAS a release file to archive (standalone and
+        # releasable releases) or carries its metadata inline (batch members,
+        # whose description/context/bump come from the workspace-level batch
+        # TOML). Both must end with the same archived v{version}.toml, because
+        # that archive is the only thing later changelog regenerations read the
+        # description and context back out of -- a batch-released version used
+        # to lose both on the next regeneration.
+        _synthesize_archive = (
+            not _release_file_already_finalized
+            and not os.path.exists(release_file_path)
+            and bool((description or "").strip())
+            and bool(bump_type)
+        )
+        if not _release_file_already_finalized and (
+            os.path.exists(release_file_path) or _synthesize_archive
+        ):
             releases_dir = os.path.dirname(release_file_path)
             versioned_release = os.path.join(releases_dir, f"v{new_version}.toml")
-            effects.rename(release_file_path, versioned_release)
-            effects.chmod(versioned_release, 0o444)
-            # Archive blog body file if it exists (unreleased.md -> v{version}.md)
-            blog_body_dst = archive_blog_body(releases_dir, new_version)
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
-                _rel_to_git_root(release_file_path, _git_root),
             ]
-            if blog_body_dst:
-                release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))
+            if _synthesize_archive:
+                from ...release_file import write_archived_release_file
+                write_archived_release_file(
+                    releases_dir, new_version,
+                    bump=bump_type,
+                    include=list(state.include) or [registry],
+                    exclude=list(state.exclude),
+                    description=(description or "").strip(),
+                    context=(context or "").strip(),
+                    preid=state.preid,
+                    blog=state.blog,
+                )
+            else:
+                effects.rename(release_file_path, versioned_release)
+                effects.chmod(versioned_release, 0o444)
+                release_finalize_files.append(
+                    _rel_to_git_root(release_file_path, _git_root)
+                )
+                # Archive blog body file if it exists (unreleased.md -> v{version}.md)
+                blog_body_dst = archive_blog_body(releases_dir, new_version)
+                if blog_body_dst:
+                    release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
             _track_release_commit(_state_path)
             log(f"Finalized release file for {new_version}")
