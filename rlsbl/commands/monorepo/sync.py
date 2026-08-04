@@ -128,6 +128,25 @@ def _releasable_finalize_artifact(project, releasables):
     return f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{rel.name}/CHANGELOG.md"
 
 
+def router_filter_patterns(project, releasables=None):
+    """The dorny/paths-filter patterns the router emits for one project.
+
+    A push whose diff matches none of these patterns leaves that project's CI
+    job ``skipped`` on the pushed commit -- and the publish gate refuses to
+    treat a skipped check as passing. The release engine therefore has to
+    guarantee that the commit it tags rode in on a push whose diff matches
+    every participating project's patterns, which is why this list is a
+    published function rather than a local in :func:`_generate_router`.
+    """
+    clean_path = project['path'].rstrip('/')
+    patterns = [f"{clean_path}/**"]
+    patterns.extend(project.get("watch", []))
+    finalize_artifact = _releasable_finalize_artifact(project, releasables)
+    if finalize_artifact:
+        patterns.append(finalize_artifact)
+    return patterns
+
+
 def _generate_router(projects, releasables=None):
     """Generate ci-router.yml content with every project's CI jobs inlined.
 
@@ -150,12 +169,7 @@ def _generate_router(projects, releasables=None):
     # Build the filters block as a multi-line string (dorny/paths-filter format)
     filter_lines = []
     for p in projects:
-        clean_path = p['path'].rstrip('/')
-        patterns = [f"{clean_path}/**"]
-        patterns.extend(p.get("watch", []))
-        finalize_artifact = _releasable_finalize_artifact(p, releasables)
-        if finalize_artifact:
-            patterns.append(finalize_artifact)
+        patterns = router_filter_patterns(p, releasables)
         if len(patterns) == 1:
             filter_lines.append(f"{p['name']}: '{patterns[0]}'")
         else:

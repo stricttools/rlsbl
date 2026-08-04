@@ -22,7 +22,7 @@ from ...release_file import (
     get_batch_release_file_path,
     read_batch_release_file,
 )
-from ...errors import ReleaseFileError
+from ...errors import GitError, ReleaseFileError
 from ...lock import rlsbl_lock
 from ...utils import commit_files, run
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
@@ -154,34 +154,86 @@ def _batch_release_trail(pending, inline_commits):
     return trail
 
 
-def _batch_ci_gate(workspace_root, flags, log, *, pin_sha=None, trail=()):
-    """Run ONE CI gate for the whole batch and return the verified SHA.
+def _publish_batch_candidate(workspace_root, pending, flags, log, *,
+                             pin_sha=None, trail=()):
+    """Guard the tip, then publish the whole batch as ONE candidate push.
 
-    Every member's candidate has been pushed by this point (the first pass runs
-    with ``ci-defer``), so the branch tip contains all of them and a single CI
-    verdict covers the batch. Each member is then tagged on exactly this
-    commit, so every tag in the batch points at a CI-verified tree.
+    Pass 1 runs every member with ``ci-defer``, which COMMITS but never pushes,
+    so by the time this runs the branch tip carries every member's release
+    commits and a single push publishes all of them together.
 
-    Refuse-on-drift: the tip is guarded against foreign commits before it is
-    gated. The per-member guards only cover each member's own call, so a commit
-    that landed between the last candidate push and this gate -- a concurrent
-    session sharing the worktree, say -- would otherwise ride into every tag in
-    the batch. It is a hard error naming the SHAs; nothing is rolled back
-    (the candidates are already on the remote).
+    That single push is what makes the batch verifiable at all. The generated
+    CI router filters paths against the push's own before-SHA, so a push per
+    member carries a one-project diff: on the commit every tag would point at,
+    all the other members' CI jobs conclude ``skipped``, and their publish
+    gates refuse a skipped check (correctly -- it proves nothing about that
+    commit). One push whose diff spans every participating project triggers
+    every project's CI job on exactly the commit all the tags land on.
 
-    Returns the verified SHA. Raises :class:`ReleaseValidationError` when CI is
-    red, unresolved or unreachable -- the candidates stay on the branch
-    untagged, nothing is finalized, and no version number is burnt.
+    Refuse-on-drift runs FIRST, so a ride-in is never published: the per-member
+    guards only cover each member's own call, and a commit that landed between
+    the last member and this push -- a concurrent session sharing the worktree,
+    say -- would otherwise ship under every tag in the batch. It is a hard
+    error naming the SHAs; nothing is rolled back and nothing has been pushed.
+
+    Returns the published SHA: the commit the CI gate verifies and every
+    member's tag lands on.
     """
-    from ...utils import get_ci_timeout
+    from ...utils import get_current_branch
+    # Late-bound through the release package namespace, exactly like the
+    # per-member push site, so one mock.patch covers every push in a batch.
+    from ..release import push_if_needed
     from ..release.execute import guard_foreign_commits
-    from ..watch import CI_GREEN, CI_NOT_CONFIGURED, CI_TIMEOUT, CIWaitError
+    from ..release.release_state import (
+        load_release_state, save_release_state, save_step,
+    )
 
     guard_foreign_commits(
-        pin_sha, trail, cwd=workspace_root, phase="batch CI gate",
+        pin_sha, trail, cwd=workspace_root, phase="batch candidate push",
     )
 
     sha = run("git", ["rev-parse", "HEAD"], cwd=workspace_root).strip()
+    branch = get_current_branch(cwd=workspace_root)
+    # No single project's config owns a workspace-level push, so only the CLI
+    # override applies (the same stance :func:`_batch_ci_gate` takes on the
+    # CI-wait timeout).
+    push_config = (
+        {"push_timeout": flags["push-timeout"]}
+        if flags.get("push-timeout") else None
+    )
+    push_if_needed(branch, config=push_config, cwd=workspace_root, sha=sha)
+    log(
+        f"Pushed the batch release candidate {sha[:12]} to origin/{branch} "
+        f"(untagged, {len(pending)} member(s))"
+    )
+
+    # Record the publication in every member's state: the candidate is on the
+    # remote now, so a later resume must neither re-push it nor roll back past
+    # it, and each member's pass-2 resume finds its own BRANCH_PUSHED marker.
+    for _name, _project_dir, state_path in pending:
+        state = load_release_state(state_path) or {}
+        state["candidate_sha"] = sha
+        save_release_state(state_path, state)
+        save_step(state_path, "BRANCH_PUSHED")
+
+    return sha
+
+
+def _batch_ci_gate(workspace_root, flags, log, sha):
+    """Run ONE CI gate for the whole batch on the published candidate *sha*.
+
+    The batch's commits were published by a single push
+    (:func:`_publish_batch_candidate`), so one CI verdict covers every member
+    and each is then tagged on exactly this commit -- a commit whose CI
+    genuinely ran for every participating project.
+
+    Returns the verified SHA. Raises :class:`ReleaseValidationError` when CI is
+    red, unresolved or unreachable -- the candidate stays on the branch
+    untagged, nothing is finalized, and no version number is burnt.
+    """
+    from ...utils import get_ci_timeout
+    from ..watch import CI_GREEN, CI_NOT_CONFIGURED, CI_TIMEOUT, CIWaitError
+
     # Config is per-project in a workspace; the batch gate is a workspace-level
     # wait, so only the CLI override applies here (no single config owns it).
     timeout = get_ci_timeout(None, override=flags.get("ci-timeout"))
@@ -528,8 +580,9 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
         # call created; anything else is a ride-in and aborts the gate.
         batch_pin = None if dry_run else head_sha(cwd=workspace_root)
         inline_commits = []
-        # Pass 1: push every member's candidate untagged (the CI gate is
-        # deferred so ONE wait covers the whole batch).
+        # Pass 1: COMMIT every member's release locally (``ci-defer``). The
+        # push and the CI gate are deferred so ONE push publishes the whole
+        # batch and ONE wait covers it.
         pending = []
         for rel_name in release_order:
             release_config = batch_config.packages[rel_name]
@@ -604,20 +657,34 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
 
             log("")
 
-        # One CI gate for the whole batch, then pass 2: finalize, tag and
-        # release each member on the verified candidate.
+        # ONE push for the whole batch, ONE CI gate on it, then pass 2:
+        # finalize, tag and release each member on the verified candidate.
         if pending:
             try:
-                verified_sha = _batch_ci_gate(
-                    workspace_root, flags, log,
+                candidate_sha = _publish_batch_candidate(
+                    workspace_root, pending, flags, log,
                     pin_sha=batch_pin,
                     trail=_batch_release_trail(pending, inline_commits),
                 )
+                verified_sha = _batch_ci_gate(
+                    workspace_root, flags, log, candidate_sha,
+                )
             except ForeignCommitError as e:
                 # A ride-in on the batch tip. Never rolled back: those commits
-                # are exactly what must be preserved. Every member's candidate
-                # is on the branch untagged and no version is burnt.
+                # are exactly what must be preserved. The batch's own commits
+                # are local and unpushed, and no version is burnt.
                 print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+            except GitError as e:
+                # The candidate push failed. Every member's release commits sit
+                # on the local branch, nothing is tagged, and re-running the
+                # batch republishes and re-gates the same commits.
+                print(
+                    f"Error: the batch release candidate could not be pushed: "
+                    f"{e}\nNothing was tagged, released or finalized. Re-run "
+                    f"`rlsbl monorepo release run` once pushing works again.",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             except ReleaseValidationError as e:
                 print(f"Error: {e}", file=sys.stderr)
@@ -736,8 +803,9 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
         # call created; anything else is a ride-in and aborts the gate.
         batch_pin = None if dry_run else head_sha(cwd=workspace_root)
         inline_commits = []
-        # Pass 1: push every package's candidate untagged (the CI gate is
-        # deferred so ONE wait covers the whole batch).
+        # Pass 1: COMMIT every package's release locally (``ci-defer``). The
+        # push and the CI gate are deferred so ONE push publishes the whole
+        # batch and ONE wait covers it.
         pending = []
         for pkg_name in release_order:
             release_config = batch_config.packages[pkg_name]
@@ -800,20 +868,34 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
 
             log("")
 
-        # One CI gate for the whole batch, then pass 2: finalize, tag and
-        # release each package on the verified candidate.
+        # ONE push for the whole batch, ONE CI gate on it, then pass 2:
+        # finalize, tag and release each package on the verified candidate.
         if pending:
             try:
-                verified_sha = _batch_ci_gate(
-                    workspace_root, flags, log,
+                candidate_sha = _publish_batch_candidate(
+                    workspace_root, pending, flags, log,
                     pin_sha=batch_pin,
                     trail=_batch_release_trail(pending, inline_commits),
                 )
+                verified_sha = _batch_ci_gate(
+                    workspace_root, flags, log, candidate_sha,
+                )
             except ForeignCommitError as e:
                 # A ride-in on the batch tip. Never rolled back: those commits
-                # are exactly what must be preserved. Every member's candidate
-                # is on the branch untagged and no version is burnt.
+                # are exactly what must be preserved. The batch's own commits
+                # are local and unpushed, and no version is burnt.
                 print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+            except GitError as e:
+                # The candidate push failed. Every member's release commits sit
+                # on the local branch, nothing is tagged, and re-running the
+                # batch republishes and re-gates the same commits.
+                print(
+                    f"Error: the batch release candidate could not be pushed: "
+                    f"{e}\nNothing was tagged, released or finalized. Re-run "
+                    f"`rlsbl monorepo release run` once pushing works again.",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             except ReleaseValidationError as e:
                 print(f"Error: {e}", file=sys.stderr)

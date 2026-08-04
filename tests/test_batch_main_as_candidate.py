@@ -9,11 +9,14 @@ verified commit, and released.
 The properties under test are the batch mirror of the standalone ones:
 
 - exactly one CI wait, whatever the batch size;
+- exactly one candidate PUSH, whose diff matches every participating member's
+  generated paths filter (see TestBatchSingleCandidatePush);
 - every member's tag points at the single CI-verified commit;
 - a red batch leaves no tag, no GitHub Release and no finalized changelog for
   any member, so no version number is burnt.
 """
 
+import fnmatch
 import json
 import os
 import subprocess
@@ -25,10 +28,20 @@ from githarness import git
 
 from rlsbl.commands.monorepo import batch_release
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
+from rlsbl.commands.monorepo.sync import router_filter_patterns
 from rlsbl.commands.release.release_state import get_state_path, load_release_state
 from rlsbl.release_file import get_batch_release_file_path
 from rlsbl.utils import run as real_run
-from rlsbl.workspace import WORKSPACE_DIR, save_workspace
+from rlsbl.workspace import (
+    WORKSPACE_DIR,
+    Releasable,
+    get_releasable_changes_dir,
+    get_releasable_dir,
+    load_releasables,
+    load_workspace,
+    save_workspace,
+    write_releasable_version,
+)
 
 
 BATCH_TOML = (
@@ -94,11 +107,88 @@ def _setup_batch_workspace(root):
         git(root, "commit", "-q", "-m", f"changelog: {name} feature")
 
 
-def _write_batch_file(root):
+def _write_batch_file(root, content=BATCH_TOML):
     path = get_batch_release_file_path(str(root))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        f.write(BATCH_TOML)
+        f.write(content)
+
+
+RELEASABLE_BATCH_TOML = (
+    '[releasables.alpha]\n'
+    'bump = "patch"\ndescription = "Alpha patch"\n'
+    'include = ["npm"]\nexclude = []\n'
+    '\n'
+    '[releasables.beta]\n'
+    'bump = "patch"\ndescription = "Beta patch"\n'
+    'include = ["npm"]\nexclude = []\n'
+)
+
+
+def _setup_releasable_batch_workspace(root):
+    """Two single-member releasables (explicit mode), npm targets.
+
+    The shape the two half-published releases were observed on: several
+    releasables, each of whose CI job is path-filtered onto its own member's
+    directory.
+    """
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.email", "test@test.local")
+    git(root, "config", "user.name", "Test")
+
+    for name in ("alpha", "beta"):
+        d = root / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "package.json").write_text(
+            json.dumps({"name": name, "version": "1.0.0"}, indent=2) + "\n"
+        )
+
+    save_workspace(
+        str(root),
+        [
+            {"path": "alpha", "name": "alpha-pkg", "releasable": "alpha"},
+            {"path": "beta", "name": "beta-pkg", "releasable": "beta"},
+        ],
+        releasables=[Releasable(name="alpha"), Releasable(name="beta")],
+    )
+
+    for name in ("alpha", "beta"):
+        write_releasable_version(str(root), name, "1.0.0")
+        changes_dir = get_releasable_changes_dir(str(root), name)
+        os.makedirs(changes_dir, exist_ok=True)
+        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+            f.write("")
+        with open(
+            os.path.join(get_releasable_dir(str(root), name), "config.json"), "w"
+        ) as f:
+            json.dump(
+                {"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}, f,
+            )
+
+    _write_batch_file(root, RELEASABLE_BATCH_TOML)
+
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "initial")
+    git(root, "tag", "alpha@v1.0.0")
+    git(root, "tag", "beta@v1.0.0")
+
+    for name in ("alpha", "beta"):
+        (root / name / "feature.txt").write_text("feature\n")
+        git(root, "add", f"{name}/feature.txt")
+        git(root, "commit", "-q", "-m", f"{name}: add feature")
+        sha = git(root, "rev-parse", "HEAD")
+        jsonl = os.path.join(
+            get_releasable_changes_dir(str(root), name), "unreleased.jsonl",
+        )
+        with open(jsonl, "w") as f:
+            f.write(json.dumps({
+                "commits": [sha],
+                "user_facing": True,
+                "description": f"**{name} feature.** It works.",
+                "type": "feature",
+            }) + "\n")
+        git(root, "add", os.path.relpath(jsonl, str(root)))
+        git(root, "commit", "-q", "-m", f"changelog: {name} feature")
 
 
 def _fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
@@ -112,10 +202,13 @@ def _fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
     return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
 
-def _batch_patches(ci_return=None, ci_side_effect=None):
+def _batch_patches(ci_return=None, ci_side_effect=None, push_side_effect=None):
     ci_kwargs = (
         {"side_effect": ci_side_effect} if ci_side_effect is not None
         else {"return_value": ci_return}
+    )
+    push_kwargs = (
+        {"side_effect": push_side_effect} if push_side_effect is not None else {}
     )
     return [
         patch("rlsbl.commands.monorepo.batch_release.validate_gh_cli"),
@@ -126,7 +219,10 @@ def _batch_patches(ci_return=None, ci_side_effect=None):
               return_value="main"),
         patch("rlsbl.commands.release.check_gh_installed", return_value=True),
         patch("rlsbl.commands.release.check_gh_auth", return_value=True),
-        patch("rlsbl.commands.release.push_if_needed"),
+        # The batch orchestrator's own candidate push resolves through this
+        # same package namespace (late-bound, like the release flow's), so one
+        # patch covers every push site in the batch.
+        patch("rlsbl.commands.release.push_if_needed", **push_kwargs),
         patch("rlsbl.commands.release.run_gh", return_value=""),
         patch("rlsbl.commands.release.run", side_effect=_fake_run),
         patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
@@ -134,8 +230,11 @@ def _batch_patches(ci_return=None, ci_side_effect=None):
     ]
 
 
-def _run_batch(root, *, ci_return=None, ci_side_effect=None):
-    patches = _batch_patches(ci_return=ci_return, ci_side_effect=ci_side_effect)
+def _run_batch(root, *, ci_return=None, ci_side_effect=None, push_side_effect=None):
+    patches = _batch_patches(
+        ci_return=ci_return, ci_side_effect=ci_side_effect,
+        push_side_effect=push_side_effect,
+    )
     for p in patches:
         p.start()
     try:
@@ -361,3 +460,141 @@ class TestBatchNoCiNotice:
         assert "without a CI gate" in err, (
             "--quiet must not swallow the no-CI-gate notice"
         )
+
+
+def _path_matches(path, pattern):
+    """Approximate dorny/paths-filter (picomatch) matching for one pattern.
+
+    Only the shapes rlsbl's router generates are modelled: a ``dir/**``
+    prefix, a literal repo-relative path, and plain globs from ``watch``.
+    """
+    if pattern.endswith("/**"):
+        prefix = pattern[:-3]
+        return path == prefix or path.startswith(prefix + "/")
+    return fnmatch.fnmatch(path, pattern.replace("**", "*"))
+
+
+def _covers(paths, patterns):
+    return any(_path_matches(p, pat) for p in paths for pat in patterns)
+
+
+class _PushRecorder:
+    """Records every candidate push as the (before, after) window it publishes.
+
+    ``before`` is what the remote branch held prior to that push, so a
+    window's diff is exactly the diff GitHub Actions hands
+    ``dorny/paths-filter`` on the resulting push event.
+    """
+
+    def __init__(self, root, base):
+        self.root = root
+        self.remote = base
+        self.windows = []
+
+    def __call__(self, branch, *, config=None, cwd=None, sha=None):
+        pushed = sha or git(self.root, "rev-parse", "HEAD")
+        self.windows.append((self.remote, pushed))
+        self.remote = pushed
+
+    def window_ending_at(self, sha):
+        for before, after in self.windows:
+            if after == sha:
+                return before, after
+        raise AssertionError(
+            f"no push published {sha[:12]}; pushes were "
+            f"{[(b[:12], a[:12]) for b, a in self.windows]}"
+        )
+
+    def paths_in(self, window):
+        before, after = window
+        out = git(self.root, "diff", "--name-only", f"{before}..{after}")
+        return [line for line in out.splitlines() if line.strip()]
+
+
+class TestBatchSingleCandidatePush:
+    """A batch publishes ONE candidate push, and every member's CI runs on it.
+
+    Regression (two confirmed half-published releases). Pass 1 used to push
+    each member's candidate SEPARATELY, then gate CI on the LAST candidate and
+    tag every member there. The generated router filters paths against the
+    push's own before-SHA, so each push only ever triggered the one project it
+    touched: on the commit every tag pointed at, all the OTHER projects' CI
+    jobs concluded ``skipped``. Their publish gates then refused (correctly --
+    a skipped check proves nothing), so tags and GitHub Releases existed for
+    versions that never reached their registries, with no retry that could
+    ever go green.
+
+    The property the engine must hold: the batch's tagged commit arrives in a
+    single push whose diff matches EVERY participating member's paths filter.
+    """
+
+    def _gate_and_push(self, root, setup):
+        setup(root)
+        base = git(root, "rev-parse", "HEAD")
+        recorder = _PushRecorder(root, base)
+        gate = {}
+
+        def fake_wait(sha, **kwargs):
+            gate["sha"] = sha
+            gate["pushes_at_gate"] = list(recorder.windows)
+            return "green", []
+
+        _run_batch(root, ci_side_effect=fake_wait, push_side_effect=recorder)
+        return recorder, gate
+
+    def test_exactly_one_candidate_push_precedes_the_gate(self, tmp_project):
+        recorder, gate = self._gate_and_push(tmp_project, _setup_batch_workspace)
+
+        assert len(gate["pushes_at_gate"]) == 1, (
+            "a batch must publish ONE candidate; a push per member gives each "
+            "push a diff covering only that member, so every other member's "
+            "CI job is skipped on the commit the batch tags. Pushes: "
+            f"{[(b[:12], a[:12]) for b, a in gate['pushes_at_gate']]}"
+        )
+        assert gate["pushes_at_gate"][0][1] == gate["sha"], (
+            "the gated commit must be the one the candidate push published"
+        )
+
+    def test_the_gated_push_matches_every_members_paths_filter(self, tmp_project):
+        recorder, gate = self._gate_and_push(tmp_project, _setup_batch_workspace)
+
+        window = recorder.window_ending_at(gate["sha"])
+        paths = recorder.paths_in(window)
+        projects = load_workspace(str(tmp_project))
+        for project in projects:
+            patterns = router_filter_patterns(project)
+            assert _covers(paths, patterns), (
+                f"the CI-gated push does not touch anything matching "
+                f"{project['name']}'s router filter {patterns}; its CI job "
+                f"would be skipped on the very commit its tag points at. "
+                f"Pushed paths: {paths}"
+            )
+
+    def test_releasable_mode_gates_one_push_covering_every_releasable(
+        self, tmp_project,
+    ):
+        """The shape both real half-published releases had."""
+        recorder, gate = self._gate_and_push(
+            tmp_project, _setup_releasable_batch_workspace,
+        )
+
+        assert len(gate["pushes_at_gate"]) == 1, (
+            "a releasable batch must publish ONE candidate; pushes: "
+            f"{[(b[:12], a[:12]) for b, a in gate['pushes_at_gate']]}"
+        )
+
+        window = recorder.window_ending_at(gate["sha"])
+        paths = recorder.paths_in(window)
+        projects = load_workspace(str(tmp_project))
+        releasables = load_releasables(str(tmp_project), projects)
+        for project in projects:
+            patterns = router_filter_patterns(project, releasables)
+            assert _covers(paths, patterns), (
+                f"the CI-gated push does not touch anything matching "
+                f"{project['name']}'s router filter {patterns}. "
+                f"Pushed paths: {paths}"
+            )
+
+        # And the tags really do land on that verified commit.
+        for tag in ("alpha@v1.0.1", "beta@v1.0.1"):
+            assert git(tmp_project, "rev-list", "-n", "1", tag) == gate["sha"]

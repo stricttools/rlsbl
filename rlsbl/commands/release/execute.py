@@ -1715,6 +1715,23 @@ def _run_release_mutating(state: ReleaseState):
                 save_step(_state_path, "CI_VERIFIED")
                 _completed.add("CI_VERIFIED")
         else:
+            if flags.get("ci-defer"):
+                # Batch mode, pass 1: COMMIT ONLY -- the candidate stays local.
+                # The orchestrator publishes the whole batch in ONE push once
+                # every member has committed, and gates that single commit.
+                #
+                # Pushing per member instead gave each push a one-project diff,
+                # and the generated CI router filters paths against the push's
+                # own before-SHA: on the commit every tag then pointed at, all
+                # the OTHER members' CI jobs concluded `skipped`. Their publish
+                # gates refuse a skipped check (correctly -- it proves nothing),
+                # so tags and GitHub Releases existed for versions that never
+                # reached their registries, with no re-run that could ever go
+                # green. Two real batch releases half-published that way.
+                log("Deferring the candidate push and CI gate to the batch "
+                    "orchestrator")
+                return
+
             # A resume after a red CI re-pins the candidate on the CURRENT tip
             # (the fix commit), so BRANCH_PUSHED is deliberately re-evaluated
             # whenever CI_VERIFIED is missing.
@@ -1750,14 +1767,6 @@ def _run_release_mutating(state: ReleaseState):
             )
             save_step(_state_path, "BRANCH_PUSHED")
             _completed.add("BRANCH_PUSHED")
-
-            if flags.get("ci-defer"):
-                # Batch mode, pass 1: every item's candidate is pushed first
-                # and ONE CI wait covers the whole batch. The orchestrator
-                # resumes each item with ci-verified-sha once that wait is
-                # green. State is preserved on disk for the resume.
-                log("Deferring the CI gate to the batch orchestrator")
-                return
 
             if flags.get("ci-verified-sha"):
                 log(
