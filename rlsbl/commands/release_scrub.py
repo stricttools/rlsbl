@@ -171,11 +171,11 @@ def _build_safegit_args(flags, mode, remap_globs):
     and ``--json`` does not answer that prompt. Running this command IS the
     consent; the force-push that follows is confirmed separately.
 
-    The flag is placed BEFORE the command tokens. strictcli recognizes the
-    reserved quartet anywhere in argv on the Python side, but the Go build
-    safegit ships today only scans the pre-command region, and pre-command has
-    always been recognized in every implementation -- so this one position
-    works against both and cannot break when safegit catches up.
+    The flag is placed BEFORE the command tokens. Anywhere-in-argv
+    recognition is the current contract, but it is a recent amendment and the
+    Go implementation acquired it later than the Python one; the pre-command
+    position is the one every implementation and every version has always
+    recognized, so it cannot break on a callee whose framework build lags.
     """
     if mode == "match":
         args = ["--approve-consequential", "scrub", "match", "--json"]
