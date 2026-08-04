@@ -359,6 +359,59 @@ class TestResumeDryRun:
                      "GITHUB_RELEASE"):
             assert step in out, f"the preview must list the remaining step {step}"
 
+    def test_a_dry_run_release_does_not_delete_a_completed_state_file(
+        self, mock_git_repo, capsys,
+    ):
+        """`release run` auto-clears a leftover complete state file.
+
+        That is a real deletion, and it happened under --dry-run too: the
+        auto-clear sat above the dry-run gate. A preview must report the
+        leftover, not remove it.
+        """
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.commands.release.release_state import RELEASE_STEPS
+        from rlsbl.release_file import ReleaseConfig
+
+        _setup_releasable_npm_project(mock_git_repo)
+        state_path = get_state_path(str(mock_git_repo))
+        save_release_state(state_path, {
+            "new_version": "1.0.1",
+            "tag": "v1.0.1",
+            "branch": "main",
+            "registry": "npm",
+            "completed_steps": list(RELEASE_STEPS),
+            "failed_steps": {},
+        })
+        before = Path(state_path).read_bytes()
+
+        patches = _resume_patches()
+        patches.append(
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True)
+        )
+        patches.append(
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True)
+        )
+        for p in patches:
+            p.start()
+        try:
+            run_cmd(
+                ReleaseConfig(
+                    bump="patch", include=["npm"], exclude=[],
+                    description="test release",
+                ),
+                {"dry-run": True, "yes": True, "quiet": False,
+                 "allow-dirty": True},
+                ctx=_make_ctx(mock_git_repo),
+            )
+        finally:
+            for p in patches:
+                p.stop()
+
+        assert os.path.exists(state_path), \
+            "--dry-run must not delete the leftover release state file"
+        assert Path(state_path).read_bytes() == before
+        assert "would clear" in capsys.readouterr().out.lower()
+
     def test_the_mutating_phase_refuses_to_run_under_dry_run(self):
         """Structural backstop: no entry point can walk into it by omission."""
         from rlsbl.commands.release.execute import ReleaseState, _run_release_mutating

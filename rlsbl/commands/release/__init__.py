@@ -484,9 +484,14 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             # Provably complete (all steps marked, no fatal failure): the
             # previous run finished but crashed before clearing its state
             # (or a legacy complete file was left behind). Auto-clear.
+            # Deleting it is a real mutation, so a dry run only reports it --
+            # this sits above the dry-run gate below and used to delete the
+            # file during a preview.
+            _ip_dry = flags.get("dry-run", False)
             log(
                 f"Found completed release state for v{_ip_version} "
-                f"(all steps marked, no fatal failures); clearing it."
+                f"(all steps marked, no fatal failures); "
+                + ("would clear it." if _ip_dry else "clearing it.")
             )
             _ip_failed = get_failed_steps(_ip_state)
             if _ip_failed:
@@ -497,7 +502,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 )
                 for _step, _msg in _ip_failed.items():
                     print(f"  {_step}: {_msg}", file=sys.stderr)
-            clear_release_state(_ip_state_path)
+            if not _ip_dry:
+                clear_release_state(_ip_state_path)
         else:
             _ip_completed = set(_ip_state.get("completed_steps", []))
             _ip_done = len([s for s in RELEASE_STEPS if s in _ip_completed])
