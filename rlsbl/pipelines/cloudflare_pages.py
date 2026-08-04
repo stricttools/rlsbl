@@ -32,7 +32,7 @@ class CloudflarePagesPipeline(BasePipeline):
             effects.run(
                 # --yes: `deploy` is a `mutating` strictcli command and this is a
                 # tool-driven subprocess (see validate.py's selfdoc calls).
-                ["selfdoc", "deploy", "--yes"],
+                ["selfdoc", "deploy"],
                 cwd=dir_path,
                 check=True,
                 timeout=300,

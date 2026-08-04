@@ -808,8 +808,7 @@ def _run_selfdoc_gen(flags, project_dir=None, version=None):
 
     if flags.get("dry-run"):
         print(
-            "Would run: selfdoc gen --no-auto-commit "
-            + "--yes " + " ".join(version_args)
+            "Would run: selfdoc gen --no-auto-commit " + " ".join(version_args)
         )
         return True
 
@@ -822,11 +821,11 @@ def _run_selfdoc_gen(flags, project_dir=None, version=None):
     print("Running selfdoc gen...")
     try:
         _effects.run(
-            # --yes: selfdoc's gen/check are `mutating` under strictcli's effects
-            # regime, and a tool-driven subprocess is exactly the case the
-            # confirm protocol wants --yes for. Without it the child errors on
-            # non-interactive stdin, or prompts mid-release from a terminal.
-            ["selfdoc", "gen", "--no-auto-commit", "--yes"] + version_args,
+            # No confirm-skip flag: strictcli's confirm protocol keys on a
+            # declared `consequential`, not on `mutating`, and selfdoc's
+            # gen/check/deploy are mutating but not consequential, so they never
+            # prompt. `--yes` no longer exists on a strictcli app at all.
+            ["selfdoc", "gen", "--no-auto-commit"] + version_args,
             cwd=project_dir, check=True,
         )
     except _subprocess.CalledProcessError as e:
@@ -866,7 +865,7 @@ def _run_selfdoc_check(flags, project_dir=None, version=None):
     print("Running selfdoc check...")
     try:
         _effects.run(
-            ["selfdoc", "check", "--no-auto-commit", "--yes"]
+            ["selfdoc", "check", "--no-auto-commit"]
             + _selfdoc_version_args(version),
             cwd=project_dir, check=True,
         )
