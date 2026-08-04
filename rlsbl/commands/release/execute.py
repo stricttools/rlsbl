@@ -338,6 +338,20 @@ class ForeignCommitError(RlsblError):
     """
 
 
+class UnverifiedCandidateError(RlsblError):
+    """Raised when the CI-verified commit a resume must tag cannot be proven.
+
+    A resume that skips the candidate push and the CI gate does so because a
+    prior attempt already recorded ``CI_VERIFIED``.  The tag it then creates is
+    stamped "(CI-verified)", and the publish gate believes that claim, so the
+    SHA it lands on must be the commit CI actually judged.  When the recorded
+    candidate is missing, unresolvable, or not in the current history, the
+    claim cannot be made honestly and the release stops -- it never falls back
+    to HEAD, which is exactly how an untested commit once got tagged, released
+    and handed to the publish gate.
+    """
+
+
 def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
     """Refuse to continue if commits in ``pin_sha..HEAD`` are not in *trail*.
 
@@ -408,6 +422,68 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
         "branch of their own) first",
     ])
     raise ForeignCommitError("\n".join(lines))
+
+
+def require_recorded_candidate(state_path, cwd=None, *, version):
+    """The CI-verified commit this release is sealed to, or a hard error.
+
+    Called only where the executor SKIPS the candidate push and the CI gate
+    because an earlier attempt already recorded ``CI_VERIFIED``.  The tag that
+    follows is stamped "(CI-verified)" and the publish gate trusts that claim,
+    so the SHA must be the commit CI actually judged.
+
+    Three ways the claim can fail, all hard errors and none of them a fallback
+    to HEAD:
+
+    * no ``candidate_sha`` in the state file (the state was written by a
+      version that did not record it, or was hand-edited),
+    * a ``candidate_sha`` this repository cannot resolve (history rewritten
+      under the release),
+    * a ``candidate_sha`` that is not an ancestor of HEAD, which means the
+      branch no longer contains the verified commit at all.
+
+    Falling back to HEAD here is precisely how a commit with zero CI runs was
+    tagged, released, and refused by the publish gate.
+    """
+    state = load_release_state(state_path) or {}
+    recorded = (state.get("candidate_sha") or "").strip()
+    remedy = (
+        f"\n\nThe release cannot honestly claim CI verification for "
+        f"{version}. Either roll back with `rlsbl release undo` and release "
+        f"again, or push the intended commit and let a fresh "
+        f"`rlsbl release run` gate it."
+    )
+    if not recorded:
+        raise UnverifiedCandidateError(
+            f"the release state records CI_VERIFIED but carries no "
+            f"candidate_sha, so the commit CI verified is unknown."
+            + remedy
+        )
+    try:
+        resolved = effects.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{recorded}^{{commit}}"],
+            capture_output=True, text=True, check=True, cwd=cwd,
+        ).stdout.strip()
+    except Exception:
+        resolved = ""
+    if not resolved:
+        raise UnverifiedCandidateError(
+            f"the CI-verified candidate recorded for {version} "
+            f"({recorded[:12]}) does not resolve in this repository."
+            + remedy
+        )
+    ancestry = effects.run(
+        ["git", "merge-base", "--is-ancestor", resolved, "HEAD"],
+        capture_output=True, text=True, cwd=cwd,
+    )
+    if ancestry.returncode != 0:
+        raise UnverifiedCandidateError(
+            f"the CI-verified candidate recorded for {version} "
+            f"({resolved[:12]}) is not an ancestor of HEAD, so the current "
+            f"branch does not contain the commit CI verified."
+            + remedy
+        )
+    return resolved
 
 
 def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
@@ -933,6 +1009,21 @@ class ReleaseState:
 
 def _run_release_mutating(state: ReleaseState):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
+    # Structural backstop against the whole bug class, not one instance of it.
+    # Every entry point (fresh release, resume, batch member) is supposed to
+    # print its dry-run preview and return before reaching here. `release
+    # resume` did not, and `--dry-run` consequently committed, tagged, pushed
+    # to the release branch, created a GitHub Release and dispatched the
+    # publish workflows. Gating each caller relies on each caller remembering;
+    # refusing at the single door every mutation goes through does not.
+    if (state.flags or {}).get("dry-run", False):
+        raise RlsblError(
+            "internal error: the mutating release phase was entered with "
+            "--dry-run set. Every release entry point must return at its "
+            "dry-run preview before this point -- reaching here would commit, "
+            "tag, push and publish for real. This is a bug in rlsbl; please "
+            "report the command that produced it."
+        )
     # Unpack frequently-used state into locals for readability and to preserve
     # the existing closure/reference patterns (commit_msg, primary_path, and
     # target_paths are conditionally reassigned below).
@@ -1133,7 +1224,16 @@ def _run_release_mutating(state: ReleaseState):
     for _sha in state.prior_release_commits or []:
         if _sha and _sha not in _prior_trail:
             _prior_trail.append(_sha)
-    _state_dict = {
+    # Start from what a prior attempt recorded, THEN overwrite this attempt's
+    # own fields. Rebuilding from a bare literal instead silently erased every
+    # key the literal did not happen to mention -- ``candidate_sha`` above all,
+    # which is the only record of the commit CI verified. A resume therefore
+    # forgot its verified candidate the moment it entered this function, and
+    # the reader below fell back to "whatever HEAD is now"; an untested commit
+    # got tagged "(CI-verified)" and handed to the publish gate. Merging keeps
+    # that class closed for any future in-flight key as well.
+    _state_dict = dict(_existing_state or {})
+    _state_dict.update({
         "new_version": new_version,
         "tag": tag,
         "branch": branch,
@@ -1154,7 +1254,7 @@ def _run_release_mutating(state: ReleaseState):
         "exclude": list(state.exclude),
         "preid": state.preid,
         "blog": state.blog,
-    }
+    })
     save_release_state(_state_path, _state_dict)
     # Refuse-on-drift, checkpoint 1 of 4 (mutating entry). Re-checked before
     # the candidate push, immediately after the CI gate (the long window, and
@@ -1700,14 +1800,23 @@ def _run_release_mutating(state: ReleaseState):
         if "CI_VERIFIED" in _completed or (
             _batch_verified and "BRANCH_PUSHED" in _completed
         ):
-            candidate_sha = (
-                (load_release_state(_state_path) or {}).get("candidate_sha")
-                or run("git", ["rev-parse", "HEAD"]).strip()
-            )
+            # This branch SKIPS the gate, so the verified commit can only come
+            # from the record an earlier attempt left. Fail-closed: there is no
+            # fallback to HEAD, because "the current tip" is not evidence that
+            # CI ran on anything.
             branch_pushed = True
             if "CI_VERIFIED" in _completed:
-                log("Skipping candidate push and CI gate (already verified)")
+                candidate_sha = require_recorded_candidate(
+                    _state_path, cwd=_git_root, version=new_version,
+                )
+                log(
+                    f"Skipping candidate push and CI gate (already verified "
+                    f"on {candidate_sha[:12]})"
+                )
             else:
+                # Batch pass 2: the orchestrator gated the batch tip and passes
+                # it in explicitly, so IT is the verified commit.
+                candidate_sha = str(_batch_verified).strip()
                 log(
                     "CI gate satisfied by the batch orchestrator "
                     f"({str(_batch_verified)[:12]})"
@@ -1838,7 +1947,19 @@ def _run_release_mutating(state: ReleaseState):
         # The commit the tag, the CI-SHA marker and the publish gate all
         # address. In batch mode the orchestrator verifies the batch tip and
         # passes it here, so every member tag points at a CI-green commit.
-        verified_sha = flags.get("ci-verified-sha") or candidate_sha
+        verified_sha = (flags.get("ci-verified-sha") or candidate_sha or "").strip()
+        if not verified_sha:
+            raise UnverifiedCandidateError(
+                f"no CI-verified commit could be established for "
+                f"{new_version}; refusing to tag."
+            )
+        # Persist it as THE candidate, so a later resume of this same release
+        # reads back exactly the commit that was tagged rather than deriving a
+        # new one. Every path into the tag step now agrees on one SHA.
+        _vs_state = load_release_state(_state_path) or {}
+        if _vs_state.get("candidate_sha") != verified_sha:
+            _vs_state["candidate_sha"] = verified_sha
+            save_release_state(_state_path, _vs_state)
 
         # Finalize JSONL changelog: rename unreleased.jsonl to x.y.z.jsonl.
         # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
@@ -2215,12 +2336,31 @@ def _run_release_mutating(state: ReleaseState):
 
     # The CI-verified commit: the tag target, the publish gate's subject, and
     # the SHA the post-release watch follows. It is stable across post-release
-    # hooks that create further commits. On a resume that skipped straight past
-    # the CI gate the state file carries it; fall back to the tag's own commit.
-    if verified_sha is None:
+    # hooks that create further commits. It is normally already resolved above;
+    # a recovered post-push failure can fall through here without it, and the
+    # state file's record (or, failing that, the tag's own commit -- the tag is
+    # only ever created FROM the verified SHA) supplies it. Never HEAD: this
+    # SHA becomes the publish gate's rlsbl-ci-sha marker, and a wrong marker
+    # points the gate at a commit CI never judged.
+    if not verified_sha:
         verified_sha = (
-            (load_release_state(_state_path) or {}).get("candidate_sha")
-            or run("git", ["rev-parse", f"refs/tags/{tag}^{{}}"]).strip()
+            (load_release_state(_state_path) or {}).get("candidate_sha") or ""
+        ).strip()
+    if not verified_sha:
+        try:
+            verified_sha = run(
+                "git", ["rev-parse", f"refs/tags/{tag}^{{}}"],
+            ).strip()
+        except Exception:
+            verified_sha = ""
+    if not verified_sha:
+        raise UnverifiedCandidateError(
+            f"the CI-verified commit for {new_version} could not be "
+            f"established after the mutating phase, so the GitHub Release "
+            f"would carry no (or a wrong) rlsbl-ci-sha marker and the publish "
+            f"gate would judge the wrong commit. Run `rlsbl release resume` "
+            f"again once {tag} exists locally, or roll back with "
+            f"`rlsbl release undo`."
         )
     pushed_sha = verified_sha
 

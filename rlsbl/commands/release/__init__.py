@@ -77,6 +77,7 @@ from .validate import (
     validate_branch_and_remote, resolve_monorepo_context,
     compute_release_version, validate_changelog_state,
     print_dry_run_summary,
+    print_resume_dry_run_summary,
     _format_releasable_tag, _releasable_tag_glob,
 )
 from .hooks import (
@@ -218,10 +219,40 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
 
     project_dir = str(project_root)
 
-    # Range pin. A resume is its own entry: it re-pins at the CURRENT tip, so
-    # a deliberate fix-forward commit made between attempts is the baseline
-    # rather than drift, while anything landing DURING the resume is caught.
-    _pin_sha = head_sha(cwd=project_dir)
+    _resume_completed = set(saved_state.get("completed_steps", []))
+    # Whether the release is SEALED to a commit CI has already judged.
+    _ci_sealed = "CI_VERIFIED" in _resume_completed
+
+    # Range pin. A resume is its own entry into the mutating phase, and where
+    # it pins decides which commits it is willing to adopt. The split is the CI
+    # gate, because that is exactly where the executor stops re-deriving the
+    # candidate from the branch tip:
+    #
+    #   - Pre-gate (CI_VERIFIED absent) -- the fix-forward window. A red or
+    #     unreachable CI verdict leaves the candidate unverified, and the
+    #     documented remedy is to commit the fix on the release branch and
+    #     resume. Re-pinning at the CURRENT tip makes that fix the baseline;
+    #     the executor re-pushes the tip as a new candidate and CI judges it
+    #     again, so nothing reaches a tag without a verdict.
+    #   - Post-gate (CI_VERIFIED present) -- SEALED. The release is committed
+    #     to the commit CI passed; the only commits allowed to appear after it
+    #     are the release's own finalization commits, all of which are in the
+    #     state file's trail. The pin therefore STAYS where the original run
+    #     put it, and anything else in the range is a ride-in the drift guard
+    #     hard-errors on by name.
+    #
+    # Re-pinning unconditionally is how a concurrent session's commit was once
+    # adopted by a resume and pushed to the release branch under this version:
+    # it had landed BEFORE the resume started, so the fresh pin put it inside
+    # the baseline instead of inside the range the guard checks.
+    if _ci_sealed:
+        _pin_sha = (
+            saved_state.get("pin_sha")
+            or saved_state.get("candidate_sha")
+            or head_sha(cwd=project_dir)
+        )
+    else:
+        _pin_sha = head_sha(cwd=project_dir)
 
     # Per-invocation timeout overrides, same as the fresh-release path.
     from .shared import apply_timeout_overrides
@@ -314,7 +345,6 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     # so it must be regenerated while the release is still pre-finalization --
     # otherwise the fix's entry would be sealed into <version>.jsonl by
     # finalize_version but never appear in the changelog anyone reads.
-    _resume_completed = set(saved_state.get("completed_steps", []))
     if (changes_dir
             and "CHANGELOG_FINALIZED" not in _resume_completed
             and not flags.get("dry-run", False)):
@@ -337,6 +367,21 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
         if os.path.exists(changelog_path):
             changelog_entry = extract_changelog_entry(changelog_path, new_version)
         log("Regenerated CHANGELOG.md from the current unreleased entries")
+
+    # --- Dry run: preview the remaining work and return ---
+    # Everything below this point mutates: the advisory lock is a file, and
+    # the mutating phase commits, tags, pushes, creates the GitHub Release and
+    # dispatches the publish workflows. The gate sits HERE, ahead of all of
+    # it, because a `--dry-run` resume that reaches any of those has already
+    # done the thing the operator asked to preview.
+    if flags.get("dry-run", False):
+        print_resume_dry_run_summary(
+            log, saved_state,
+            verified_sha=(saved_state.get("candidate_sha") if _ci_sealed
+                          else None),
+            head=None if _ci_sealed else head_sha(cwd=project_dir),
+        )
+        return
 
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
     lock_root = monorepo_root if monorepo_name else project_root

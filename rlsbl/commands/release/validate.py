@@ -704,6 +704,47 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
     log("--- No changes made ---")
 
 
+def print_resume_dry_run_summary(log, saved_state, *, verified_sha=None,
+                                 head=None):
+    """Print what ``rlsbl release resume`` WOULD do, and change nothing.
+
+    The fresh-release preview (:func:`print_dry_run_summary`) describes a
+    release that has not started.  A resume is the opposite situation: part of
+    the release already happened, and the only useful preview is which steps
+    are left, which commit the tag would land on, and whether the CI gate is
+    already satisfied.
+
+    This exists because the dry-run gate used to live ONLY in the fresh-release
+    entry point.  ``rlsbl release resume --dry-run`` therefore executed the
+    whole release for real -- commits, tag, push to the release branch, GitHub
+    Release, publish dispatches.
+    """
+    from .release_state import RELEASE_STEPS, get_failed_steps, get_missing_steps
+
+    completed = [s for s in RELEASE_STEPS
+                 if s in set(saved_state.get("completed_steps") or ())]
+    remaining = get_missing_steps(saved_state)
+    failed = get_failed_steps(saved_state)
+
+    log("\n--- Dry run summary (resume) ---")
+    log(f"Version:   {saved_state.get('new_version', '(unknown)')}")
+    log(f"Tag:       {saved_state.get('tag', '(unknown)')}")
+    log(f"Branch:    {saved_state.get('branch', '(unknown)')}")
+    log(f"Done:      {len(completed)}/{len(RELEASE_STEPS)} "
+        f"({', '.join(completed) or 'none'})")
+    if failed:
+        for step, message in failed.items():
+            log(f"Failed:    {step}: {message}")
+    if verified_sha:
+        log(f"Would tag: {verified_sha[:12]} (the CI-verified candidate "
+            f"recorded by the earlier attempt)")
+    elif head:
+        log(f"Would tag: {head[:12]} (the current tip -- it would be pushed "
+            f"as a new candidate and re-gated by CI first)")
+    log(f"Would run: {', '.join(remaining) or 'nothing (state is complete)'}")
+    log("--- No changes made ---")
+
+
 _SCHEMA_DUMP_TIMEOUT = 30
 
 
