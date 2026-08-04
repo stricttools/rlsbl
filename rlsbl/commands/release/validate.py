@@ -233,7 +233,10 @@ def validate_gh_push_access(config=None):
 
     try:
         result = run_gh(
-            ["api", f"repos/{repo}", "--jq", ".permissions.push"],
+            # --method GET spells the read out: the app's observe allowlist
+            # matches the ["gh","api","--method","GET"] prefix, so a preview
+            # really performs this probe instead of recording it as a change.
+            ["api", "--method", "GET", f"repos/{repo}", "--jq", ".permissions.push"],
             config=config,
         )
     except Exception:
@@ -249,7 +252,7 @@ def validate_gh_push_access(config=None):
 
     # Push access denied -- gather diagnostics
     try:
-        user = run_gh(["api", "user", "--jq", ".login"], config=config)
+        user = run_gh(["api", "--method", "GET", "user", "--jq", ".login"], config=config)
     except Exception:
         user = "(unknown)"
 

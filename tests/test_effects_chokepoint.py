@@ -25,8 +25,14 @@ RLSBL_DIR = os.path.join(PROJECT_ROOT, "rlsbl")
 
 # Every exemption needs a reason.  Keep this list tiny.
 EXEMPT_FILES = {
-    # The chokepoint itself: it IS the authorized stdlib caller.
+    # The chokepoint's public surface: it routes each operation either to the
+    # strictcli effects handle or to the primitives below.
     "effects.py",
+    # The primitives themselves: the one authorized stdlib caller.  Split out
+    # of effects.py so that strictcli's own effects-bypass lint -- which roots
+    # at handlers and at functions reaching for ``ctx.effects`` -- does not
+    # walk into them.
+    "_effects_direct.py",
 }
 
 EXEMPT_DIRS = {

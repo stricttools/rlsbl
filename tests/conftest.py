@@ -385,6 +385,36 @@ from rlsbl.workspace import (
 )
 
 
+class _CliCtx:
+    """A stand-in for the strictcli dispatch Context in direct handler calls.
+
+    Command handlers read the framework-owned reserved flags off the context
+    (``ctx.dry_run`` / ``ctx.yes`` / ``ctx.quiet``) instead of receiving them
+    as kwargs, so a test that calls a handler directly needs an object that
+    carries them.  ``effects`` deliberately raises: minting effects needs a
+    real dispatch, and a test that wants a preview must go through
+    ``app.test(["--dry-run", ...])`` so the framework records and renders it.
+    """
+
+    def __init__(self, dry_run=False, yes=False, quiet=False, verbose=False):
+        self.dry_run = dry_run
+        self.yes = yes
+        self.quiet = quiet
+        self.verbose = verbose
+
+    @property
+    def effects(self):
+        raise AssertionError(
+            "cli_ctx() has no effects handle: drive this through "
+            'app.test(["--dry-run", ...]) to exercise a preview'
+        )
+
+
+def cli_ctx(dry_run=False, yes=False, quiet=False, verbose=False):
+    """Build a stand-in dispatch context for a direct command-handler call."""
+    return _CliCtx(dry_run=dry_run, yes=yes, quiet=quiet, verbose=verbose)
+
+
 def make_ctx(project_root, config=None):
     """Create a minimal ProjectContext for tests.
 
@@ -741,12 +771,18 @@ def _mock_saferm():
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
             if cmd[0] == "selfdoc":
                 return real_subprocess.CompletedProcess(args=cmd, returncode=0)
-        # Resolved at CALL time, not fixture-setup time: this fixture now sits
-        # one layer above subprocess (it patches the effect chokepoint), so a
-        # test that patches subprocess.run itself must still win here.
+        # Resolved at CALL time, not fixture-setup time: this fixture sits
+        # one layer above subprocess, so a test that patches subprocess.run
+        # itself must still win here.
         return real_subprocess.run(cmd, *args, **kwargs)
 
-    with patch("rlsbl.effects.run", side_effect=_mock_run):
+    # Patch the PRIMITIVE, not the chokepoint's public surface: patching
+    # rlsbl.effects.run would replace the mode routing itself, so a --dry-run
+    # test would execute every subprocess for real through this shim instead
+    # of recording it on the effects handle.  rlsbl._effects_direct.run is the
+    # layer that actually reaches subprocess, and it is only consulted in live
+    # mode -- which is exactly what this fixture is neutralizing.
+    with patch("rlsbl._effects_direct.run", side_effect=_mock_run):
         yield
 
 

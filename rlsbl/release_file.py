@@ -611,6 +611,18 @@ class RetryConfig:
     tag: str  # release tag (e.g. "v1.2.3"), passed as workflow_dispatch input
 
 
+def discard_invalid_retry_file(retry_path: str) -> None:
+    """Delete a retry file that failed to parse.
+
+    An unparseable retry.toml is not recoverable state: leaving it on disk
+    dirties the working tree and blocks the next `rlsbl release run`. Lives
+    beside the retry-file readers (and out of the command registration module,
+    which must stay free of effect calls for the effects-bypass lint).
+    """
+    if os.path.exists(retry_path):
+        effects.remove(retry_path)
+
+
 def get_retry_file_path(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
     """Return the path to retry.toml (same releases-dir home as unreleased.toml).
 

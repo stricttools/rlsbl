@@ -6,6 +6,7 @@ import os
 import re
 import sys
 
+from .. import effects
 from ..changelog.files import (
     can_remap_hash,
     changelog_remap_globs,
@@ -730,6 +731,20 @@ def run_cmd(flags, *, ctx):
         except Exception as e:
             print(f"Error: safegit scrub failed: {e}", file=sys.stderr)
             sys.exit(1)
+
+        if effects.unsettled(output):
+            # Under --dry-run the child is recorded, never forked (a preview
+            # that forks is a preview that can be wrong about what it forked),
+            # so safegit's own findings are not available here. The would-do
+            # log the framework prints names the exact invocation, including
+            # the --dry-run it carries; running that command directly is how
+            # you see safegit's counts.
+            print(
+                "Preview recorded the safegit invocation instead of running "
+                "it; run the command shown in the preview to see safegit's "
+                "own match counts."
+            )
+            return
 
         # safegit emits NO JSON (empty stdout) when there is nothing to
         # rewrite, in both execute and some scoped paths.

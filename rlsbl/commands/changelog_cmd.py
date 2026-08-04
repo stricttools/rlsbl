@@ -1065,7 +1065,7 @@ def _sync_github_release(version: str) -> None:
     """Sync GitHub Release notes for a version (best-effort, warns on failure)."""
     try:
         result = effects.run(
-            ["rlsbl", "release", "edit", version],
+            ["rlsbl", "--yes", "release", "edit", version],
             capture_output=True,
             text=True,
             timeout=30,

@@ -17,9 +17,19 @@ from . import effects
 
 
 def run(cmd, args=None, timeout=120, env=None, cwd=None):
-    """Run a command with args, return trimmed stdout. Raise on failure."""
+    """Run a command with args, return trimmed stdout. Raise on failure.
+
+    Under ``--dry-run`` a non-observe command is recorded rather than executed,
+    and there is no stdout to trim: the carrier standing in for the run is
+    returned instead.  A caller that ignores the return value (every mutation
+    that only needed to happen) previews cleanly; a caller that reads the
+    string truncates the preview, which is the honest answer for output that
+    was never produced.
+    """
     full_cmd = [cmd] + (args or [])
     result = effects.run(full_cmd, capture_output=True, text=True, check=True, timeout=timeout, env=env, cwd=cwd)
+    if effects.unsettled(result):
+        return result
     return result.stdout.strip()
 
 
@@ -980,6 +990,8 @@ def run_gh(args: list, config: dict | None = None, **kwargs) -> str:
         env=env,
         cwd=cwd,
     )
+    if effects.unsettled(result):
+        return result
     return result.stdout.strip()
 
 
@@ -1002,6 +1014,8 @@ def run_gh_unscoped(args: list, *, timeout: int = 120, cwd: str | None = None) -
         text=True,
         check=True,
     )
+    if effects.unsettled(result):
+        return result
     return result.stdout.strip()
 
 

@@ -138,14 +138,25 @@ class TestRun:
         assert result.stdout == "hi\n"
 
     def test_only_non_default_keywords_reach_subprocess(self):
-        """Defaults are omitted so the underlying call matches the direct one."""
-        with patch("rlsbl.effects.subprocess.run") as mock_run:
-            effects.run(["true"])
+        """Defaults are omitted so the underlying call matches the direct one.
+
+        Asserted against the primitive module: ``rlsbl.effects.run`` is now a
+        router that decides between recording on the effects handle and
+        executing here, and it forwards its whole parameter set downwards.
+        The kwarg pruning that keeps the executed call byte-identical to the
+        direct one it replaced belongs to the primitive.
+        """
+        from rlsbl import _effects_direct
+
+        with patch("rlsbl._effects_direct.subprocess.run") as mock_run:
+            _effects_direct.run(["true"])
             assert mock_run.call_args == ((["true"],), {})
 
     def test_explicit_keywords_are_forwarded(self, tmp_path):
-        with patch("rlsbl.effects.subprocess.run") as mock_run:
-            effects.run(["true"], cwd=str(tmp_path), timeout=5, check=True)
+        from rlsbl import _effects_direct
+
+        with patch("rlsbl._effects_direct.subprocess.run") as mock_run:
+            _effects_direct.run(["true"], cwd=str(tmp_path), timeout=5, check=True)
             kwargs = mock_run.call_args[1]
             assert kwargs == {"cwd": str(tmp_path), "timeout": 5, "check": True}
 

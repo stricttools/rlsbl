@@ -1629,7 +1629,8 @@ def _trigger_monorepo_sync(auto_commit=True):
             # -P (PYTHONSAFEPATH): running via ``python -m`` in a foreign project
             # dir injects that CWD into sys.path; a root module there shadowing a
             # stdlib/dep name could break rlsbl's own imports. -P suppresses that.
-            cmd = [sys.executable, "-P", "-m", "rlsbl", "monorepo", "sync"]
+            # --yes: a child mutating command with no TTY.
+            cmd = [sys.executable, "-P", "-m", "rlsbl", "--yes", "monorepo", "sync"]
             if not auto_commit:
                 cmd.append("--no-auto-commit")
             effects.run(

@@ -14,6 +14,24 @@ import sys
 from . import effects
 
 
+def is_ancestor(ancestor: str, descendant: str, cwd: str | None = None) -> bool:
+    """True when *ancestor* is reachable from *descendant* in git history.
+
+    Lives here rather than in a command handler because strictcli's
+    effects-bypass lint reads a handler's own body: a ``ctx.effects`` call made
+    through rlsbl's chokepoint module is indistinguishable, to that lint, from
+    a raw subprocess call. Keeping effectful work out of the registration
+    module is the shape the lint is asking for, and it is where this belongs
+    anyway.
+    """
+    result = effects.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        capture_output=True,
+        cwd=cwd,
+    )
+    return result.returncode == 0
+
+
 def get_commit_files(sha):
     """Get the list of files changed by a single commit.
 

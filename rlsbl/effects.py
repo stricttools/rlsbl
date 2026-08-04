@@ -5,25 +5,120 @@ Every subprocess launch, filesystem mutation, and network call made by
 ``subprocess.run``, ``open(path, "w")``, ``os.replace``, ``shutil.rmtree``,
 ``urllib.request.urlopen``, or their siblings directly --
 ``tests/test_effects_chokepoint.py`` enforces that with an AST scan and a tiny
-explicit exemption list.
+explicit exemption list (this module and :mod:`rlsbl._effects_direct`, which
+holds the primitives).
 
-Why a chokepoint: rlsbl is migrating onto strictcli's ``ctx.effects`` regime,
-where every mutation is declared, previewable under ``--dry-run``, and
-recorded.  With every effect funnelled through this one module, that migration
-adapts one file instead of ~380 call sites.
+Why a chokepoint: rlsbl rides strictcli's ``ctx.effects`` regime, where every
+mutation is declared, previewable under ``--dry-run``, and recorded.  With
+every effect funnelled through this one module, that regime is adapted in one
+file instead of ~380 call sites.
 
-The wrappers are deliberately thin and behavior-preserving: they forward to the
-stdlib with the same arguments and let the stdlib's own exceptions
-(``subprocess.CalledProcessError``, ``TimeoutExpired``, ``OSError``, ...)
-propagate unchanged, so call sites keep their existing ``except`` clauses.
+The mode rule (declared, never inferred)
+----------------------------------------
+
+A command handler binds the dispatch context here (``@effects.handler``), and
+from then on:
+
+* **Preview mode** (``--dry-run``; ``ctx.dry_run`` is true) -- *every*
+  operation below is minted on ``ctx.effects``.  Mutations are recorded, never
+  executed, and return strictcli's ``Unsettled`` carrier; a caller that
+  forwards the carrier into a later effect keeps the preview going, and a
+  caller that reads a field off it truncates the preview with the framework's
+  own error.  Subprocess runs whose argv matches the app's
+  ``proc_observe_allowlist`` are observes: they really execute and return real
+  values, which is what lets the release engine's read-then-branch code walk a
+  preview end to end.
+* **Live mode** -- the operations execute through
+  :mod:`rlsbl._effects_direct`, with their full rlsbl semantics: per-call
+  timeouts, byte-mode captures, ``atomic_write_text``'s temp-file + rename
+  (the only way to rewrite a 0o444 released changelog), and the
+  ``exist_ok`` / ``missing_ok`` distinctions call sites branch on.  The
+  contract's closed method set expresses none of those, so routing a live run
+  through it would silently drop a hang guard or a permission-preserving
+  rename.
+
+The split is by *mode*, decided before anything runs, and identical on every
+invocation -- it is not a fallback: nothing here ever tries the handle, fails,
+and retries elsewhere.  What preview mode buys (recording, read-only
+enforcement, the would-do log) it buys in full; what live mode keeps
+(timeouts, atomicity, byte fidelity) it keeps in full.
+
+Unbound calls -- the library path -- execute directly too.  rlsbl's checks,
+its programmatic API and its own test suite call these functions outside any
+command dispatch; there is no handle to mint on there.
+``tests/test_effects_binding.py`` asserts that every registered command
+handler carries ``@effects.handler``, so a bound path is never missed by
+accident.
 """
 
+import functools
+import io
 import os
-import shutil
-import stat
 import subprocess
-import tempfile
-import urllib.request
+from contextvars import ContextVar
+
+import strictcli
+
+from . import _effects_direct as _direct
+
+# The dispatch context of the command currently running, or None outside a
+# command dispatch (checks, library callers, direct unit-test calls).
+_CTX: ContextVar = ContextVar("rlsbl_effects_ctx", default=None)
+
+
+def handler(fn):
+    """Bind the dispatch context to this module for the length of a handler.
+
+    Applied innermost on every rlsbl command handler, under the
+    ``@app.command(...)`` / ``@strictcli.flag(...)`` stack.  ``functools.wraps``
+    keeps ``inspect.signature`` reporting the wrapped handler's real parameters,
+    so strictcli's guard v2 still validates the declared flags and args against
+    the signature it would have seen without the wrapper -- no ``forwarding=``
+    waiver is needed.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(ctx, *args, **kwargs):
+        token = _CTX.set(ctx)
+        try:
+            return fn(ctx, *args, **kwargs)
+        finally:
+            _CTX.reset(token)
+
+    wrapper.__rlsbl_effects_handler__ = True
+    return wrapper
+
+
+def unsettled(value):
+    """True when *value* is a carrier standing in for a recorded mutation.
+
+    The one thing a caller may do with a carrier besides forwarding it into a
+    later effect: recognize it, and decline to read a result that does not
+    exist.  ``rlsbl.utils.run`` and its ``gh`` siblings use it to return the
+    carrier itself instead of reaching for ``.stdout`` -- so a preview walks
+    past a mutation whose output nobody needed, and truncates (honestly) at the
+    first caller that does need it.
+    """
+    return isinstance(value, strictcli.Unsettled)
+
+
+def previewing():
+    """True when the current dispatch is previewing rather than executing."""
+    return _handle() is not None
+
+
+def _handle():
+    """The strictcli effects handle to mint on, or None to execute directly."""
+    ctx = _CTX.get()
+    if ctx is None or not getattr(ctx, "dry_run", False):
+        return None
+    return ctx.effects
+
+
+def _p(path):
+    """Render a path operand as text for the handle."""
+    return os.fspath(path)
+
 
 # ---------------------------------------------------------------------------
 # Process effects
@@ -40,15 +135,16 @@ def run(
     capture_output=False,
     text=False,
     shell=False,
+    resource=None,
+    skip_if_current=None,
+    grant=None,
 ):
     """Run a command and return the :class:`subprocess.CompletedProcess`.
 
-    A behavior-preserving passthrough to ``subprocess.run``.  Every keyword is
-    explicit (no ``**kwargs``) so the accepted surface stays closed and the
-    later ``ctx.effects.run`` adaptation has a finite signature to map.
-
-    Only non-default keywords reach ``subprocess.run``, so the underlying call
-    is byte-identical to the direct call this wrapper replaced.
+    In preview mode the call is minted on ``ctx.effects.run``: an allowlisted
+    observe really executes and returns a ``CompletedProcess`` as always, and
+    anything else is recorded and returns the ``Unsettled`` carrier standing in
+    for the run that did not happen.
 
     Args:
         argv: argument list, or a shell string when *shell* is true.
@@ -59,23 +155,64 @@ def run(
         capture_output: capture stdout/stderr instead of inheriting them.
         text: decode captured streams as text.
         shell: run *argv* through the system shell.
+        resource: opaque token naming what this run produces (preview only).
+        skip_if_current: token the preview annotates the line with, spelling
+            out that the handler skips this step when the resource is current.
+        grant: name of a grant declared on the running command, whose reason
+            is rendered beside the step in the preview.
     """
-    kwargs = {}
-    if cwd is not None:
-        kwargs["cwd"] = cwd
-    if env is not None:
-        kwargs["env"] = env
-    if timeout is not None:
-        kwargs["timeout"] = timeout
-    if check:
-        kwargs["check"] = True
-    if capture_output:
-        kwargs["capture_output"] = True
-    if text:
-        kwargs["text"] = True
-    if shell:
-        kwargs["shell"] = True
-    return subprocess.run(argv, **kwargs)
+    h = _handle()
+    if h is None:
+        return _direct.run(
+            argv,
+            cwd=cwd,
+            env=env,
+            timeout=timeout,
+            check=check,
+            capture_output=capture_output,
+            text=text,
+            shell=shell,
+        )
+
+    # ``shell=True`` is exactly ``/bin/sh -c <string>``; the contract's method
+    # set takes argv lists only, so the shell is spelled out.
+    listed = ["/bin/sh", "-c", argv] if shell else list(argv)
+    result = h.run(
+        listed,
+        cwd=cwd,
+        env=env,
+        check=False,
+        stream=not capture_output,
+        resource=resource,
+        skip_if_current=skip_if_current,
+        grant=grant,
+    )
+    if isinstance(result, strictcli.Unsettled):
+        # A recorded mutation: nothing ran, so there is no exit code to test.
+        # Forwarding this into a later effect keeps the preview going; reading
+        # a field off it truncates, which is the honest outcome.
+        return result
+
+    stdout, stderr = result.stdout, result.stderr
+    if not capture_output:
+        stdout = stderr = None
+    elif not text:
+        stdout, stderr = stdout.encode(), stderr.encode()
+    if check and result.exit_code != 0:
+        raise subprocess.CalledProcessError(result.exit_code, listed, stdout, stderr)
+    return subprocess.CompletedProcess(listed, result.exit_code, stdout, stderr)
+
+
+def spawn(argv, *, cwd=None, env=None):
+    """Start a child process without waiting for it (``PROC_SPAWN``).
+
+    In preview mode the spawn is recorded and no child is ever forked -- which
+    is the whole reason the regime needs no cross-process mode token.
+    """
+    h = _handle()
+    if h is None:
+        return _direct.spawn(argv, cwd=cwd, env=env)
+    return h.spawn(list(argv), cwd=cwd, env=env)
 
 
 # ---------------------------------------------------------------------------
@@ -126,10 +263,24 @@ def urlopen(url, *, timeout=None):
 
     *url* is a URL string or a ``urllib.request.Request``.  The return value is
     a context manager, exactly as ``urllib.request.urlopen`` returns.
+
+    A ``GET`` or ``HEAD`` is a network *read* and executes in every mode --
+    reads are never effects, and a preview that could not probe a registry
+    would have nothing to preview.  Any other method is a network mutation and
+    is minted on ``ctx.effects.http``, so a preview records it instead of
+    performing it.
     """
-    if timeout is None:
-        return urllib.request.urlopen(url)
-    return urllib.request.urlopen(url, timeout=timeout)
+    h = _handle()
+    method = url.get_method() if hasattr(url, "get_method") else "GET"
+    if h is None or method in ("GET", "HEAD"):
+        return _direct.urlopen(url, timeout=timeout)
+    return h.http(
+        method,
+        url.full_url,
+        body=url.data,
+        headers=dict(url.header_items()),
+        check=False,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +288,46 @@ def urlopen(url, *, timeout=None):
 # ---------------------------------------------------------------------------
 
 
-def open_write(path, mode="w", *, encoding=None, newline=None):
+class _RecordedWriter(io.StringIO):
+    """A file-like sink that mints one ``write`` effect when it is closed.
+
+    ``open_write`` hands streaming writers (``json.dump``, loops of
+    ``f.write``) a real file object in live mode.  The contract has no
+    streaming write, so in preview mode the content accumulates here and the
+    single resulting ``write`` carries the byte count the file would have had.
+    """
+
+    def __init__(self, handle, path, mode, resource=None, skip_if_current=None):
+        super().__init__()
+        self._handle = handle
+        self._path = path
+        self._append = "a" in mode
+        self._resource = resource
+        self._skip_if_current = skip_if_current
+
+    def close(self):
+        if self.closed:
+            return
+        content = self.getvalue()
+        if self._append and os.path.exists(self._path):
+            with open(self._path, encoding="utf-8") as f:
+                content = f.read() + content
+        self._handle.write(
+            self._path, content,
+            resource=self._resource, skip_if_current=self._skip_if_current,
+        )
+        super().close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
+
+def open_write(path, mode="w", *, encoding=None, newline=None, resource=None,
+               skip_if_current=None):
     """Open *path* for writing and return the file object.
 
     A thin ``open`` wrapper for streaming writers (``json.dump``, loops of
@@ -147,29 +337,46 @@ def open_write(path, mode="w", *, encoding=None, newline=None):
     """
     if "w" not in mode and "a" not in mode and "x" not in mode:
         raise ValueError(f"open_write requires a write mode, got {mode!r}")
-    return open(path, mode, encoding=encoding, newline=newline)
+    h = _handle()
+    if h is None:
+        return _direct.open_write(path, mode, encoding=encoding, newline=newline)
+    return _RecordedWriter(h, _p(path), mode, resource, skip_if_current)
 
 
 def write_text(path, content, *, encoding="utf-8", newline=None):
     """Write *content* to *path*, truncating any existing file."""
-    with open(path, "w", encoding=encoding, newline=newline) as f:
-        f.write(content)
+    h = _handle()
+    if h is None:
+        _direct.write_text(path, content, encoding=encoding, newline=newline)
+        return
+    h.write(_p(path), content)
 
 
 def append_text(path, content, *, encoding="utf-8"):
     """Append *content* to *path*, creating it when absent."""
-    with open(path, "a", encoding=encoding) as f:
-        f.write(content)
+    h = _handle()
+    if h is None:
+        _direct.append_text(path, content, encoding=encoding)
+        return
+    existing = ""
+    if os.path.exists(path):
+        with open(path, encoding=encoding) as f:
+            existing = f.read()
+    h.write(_p(path), existing + content)
 
 
 def write_bytes(path, data):
     """Write *data* to *path*, truncating any existing file."""
-    with open(path, "wb") as f:
-        f.write(data)
+    h = _handle()
+    if h is None:
+        _direct.write_bytes(path, data)
+        return
+    h.write(_p(path), data)
 
 
 def atomic_write_text(
-    path, content, *, encoding="utf-8", preserve_mode=False, file_mode=None
+    path, content, *, encoding="utf-8", preserve_mode=False, file_mode=None,
+    resource=None, skip_if_current=None
 ):
     """Write *content* to *path* atomically (temp file + :func:`os.replace`).
 
@@ -177,7 +384,8 @@ def atomic_write_text(
     sibling temp file that is renamed over the target in one directory
     operation.  Because the rename is a directory operation it also succeeds
     when *path* itself is read-only (0o444 changelog files), with no unlock
-    step.
+    step -- which is why this one never routes through the handle in live mode:
+    the contract's ``write`` is a plain write and would fail on those files.
 
     Permission bits of the result, in precedence order:
 
@@ -186,34 +394,37 @@ def atomic_write_text(
       deliberately locked file (a 0o444 released changelog, say) must not
       silently become writable.
     * otherwise the umask-derived default, matching plain ``open(path, "w")``.
-
-    The mode is always set explicitly because ``tempfile.mkstemp`` creates
-    0o600 files; inheriting that would silently narrow every rewritten file.
     """
     if file_mode is not None and preserve_mode:
         raise ValueError("pass either file_mode or preserve_mode, not both")
-
-    directory = os.path.dirname(path) or "."
+    h = _handle()
+    if h is None:
+        _direct.atomic_write_text(
+            path,
+            content,
+            encoding=encoding,
+            preserve_mode=preserve_mode,
+            file_mode=file_mode,
+        )
+        return
+    h.write(_p(path), content, resource=resource, skip_if_current=skip_if_current)
     if file_mode is not None:
-        target_mode = file_mode
-    elif preserve_mode and os.path.exists(path):
-        target_mode = stat.S_IMODE(os.stat(path).st_mode)
-    else:
-        # Mirror open(path, "w") for a new file: 0o666 masked by the umask.
-        current_umask = os.umask(0)
-        os.umask(current_umask)
-        target_mode = 0o666 & ~current_umask
+        h.chmod(_p(path), file_mode)
 
-    fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding=encoding) as f:
-            f.write(content)
-        os.chmod(tmp_path, target_mode)
-        os.replace(tmp_path, path)
-    except BaseException:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        raise
+
+def cache_write_text(path, content, *, encoding="utf-8"):
+    """Write a derived cache file, in every mode.
+
+    rlsbl's counterpart to the framework-blessed ``CACHE_WRITE`` (strictcli's
+    own schema dump and coverage shards, which execute even under
+    ``--dry-run``): a file that is derived, self-healing, and never part of
+    what a user is previewing -- the changelog validation cache is the whole
+    list.  Suppressing it in a preview would make the next real run redo work
+    it had already proven; recording it would put a line in the would-do log
+    that describes nothing a reader cares about.  It is deliberately NOT
+    reachable through the handle, so a ``read_only`` command may call it.
+    """
+    _direct.write_text(path, content, encoding=encoding)
 
 
 # ---------------------------------------------------------------------------
@@ -227,62 +438,115 @@ def makedirs(path, *, exist_ok=False):
     The default mirrors ``os.makedirs`` exactly (an existing *path* raises)
     so translating a call site never changes its behavior.
     """
-    os.makedirs(path, exist_ok=exist_ok)
+    h = _handle()
+    if h is None:
+        _direct.makedirs(path, exist_ok=exist_ok)
+        return
+    h.mkdir(_p(path))
 
 
 def mkdir(path):
     """Create a single directory *path* (parents must already exist)."""
-    os.mkdir(path)
+    h = _handle()
+    if h is None:
+        _direct.mkdir(path)
+        return
+    h.mkdir(_p(path))
 
 
 def rename(src, dst):
     """Rename *src* to *dst*, failing if *dst* exists (POSIX: overwrites)."""
-    os.rename(src, dst)
+    h = _handle()
+    if h is None:
+        _direct.rename(src, dst)
+        return
+    h.rename(_p(src), _p(dst))
 
 
 def replace(src, dst):
     """Atomically move *src* onto *dst*, overwriting *dst* if it exists."""
-    os.replace(src, dst)
+    h = _handle()
+    if h is None:
+        _direct.replace(src, dst)
+        return
+    h.rename(_p(src), _p(dst))
 
 
 def remove(path, *, missing_ok=False):
     """Delete the file at *path*."""
-    if missing_ok:
-        try:
-            os.unlink(path)
-        except FileNotFoundError:
-            return
-    else:
-        os.unlink(path)
+    h = _handle()
+    if h is None:
+        _direct.remove(path, missing_ok=missing_ok)
+        return
+    h.remove(_p(path))
 
 
 def rmdir(path):
     """Remove the empty directory at *path*."""
-    os.rmdir(path)
+    h = _handle()
+    if h is None:
+        _direct.rmdir(path)
+        return
+    h.remove(_p(path))
 
 
 def removedirs(path):
     """Remove *path* and then each now-empty parent directory."""
-    os.removedirs(path)
+    h = _handle()
+    if h is None:
+        _direct.removedirs(path)
+        return
+    h.remove(_p(path))
 
 
 def rmtree(path, *, ignore_errors=False):
     """Recursively delete the directory tree at *path*."""
-    shutil.rmtree(path, ignore_errors=ignore_errors)
+    h = _handle()
+    if h is None:
+        _direct.rmtree(path, ignore_errors=ignore_errors)
+        return
+    h.remove(_p(path))
 
 
 def chmod(path, mode):
     """Set the permission bits of *path*."""
-    os.chmod(path, mode)
+    h = _handle()
+    if h is None:
+        _direct.chmod(path, mode)
+        return
+    h.chmod(_p(path), mode)
 
 
 def copy_file(src, dst):
     """Copy *src* to *dst*, preserving metadata (``shutil.copy2``)."""
-    return shutil.copy2(src, dst)
+    h = _handle()
+    if h is None:
+        return _direct.copy_file(src, dst)
+    # The contract has no copy: reading the source is not an effect, writing
+    # the destination is the one that gets recorded.
+    with open(src, "rb") as f:
+        h.write(_p(dst), f.read())
+    return dst
 
 
 def copytree(src, dst, *, dirs_exist_ok=False, ignore=None, symlinks=False):
     """Recursively copy the directory tree *src* to *dst*."""
-    return shutil.copytree(
-        src, dst, dirs_exist_ok=dirs_exist_ok, ignore=ignore, symlinks=symlinks
-    )
+    h = _handle()
+    if h is None:
+        return _direct.copytree(
+            src, dst, dirs_exist_ok=dirs_exist_ok, ignore=ignore, symlinks=symlinks
+        )
+    # One mkdir plus one write per file, so the preview names every path the
+    # copy would create rather than a single opaque "copy tree" line.
+    for dirpath, dirnames, filenames in os.walk(src):
+        rel = os.path.relpath(dirpath, src)
+        skip = ignore(dirpath, dirnames + filenames) if ignore else ()
+        dirnames[:] = [d for d in dirnames if d not in skip]
+        target_dir = dst if rel == "." else os.path.join(dst, rel)
+        h.mkdir(target_dir)
+        for name in filenames:
+            if name in skip:
+                continue
+            with open(os.path.join(dirpath, name), "rb") as f:
+                h.write(os.path.join(target_dir, name), f.read())
+    return dst

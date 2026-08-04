@@ -251,6 +251,7 @@ def run_config_hooks(hook_name, config, project_dir, env, timeout, *,
             _effects.run(
                 ["bash", "-c", cmd], env=run_env, check=True,
                 timeout=timeout, cwd=cwd,
+                resource=f"hook:{hook_name}",
             )
         except _subprocess.CalledProcessError as e:
             if fatal:
@@ -357,6 +358,10 @@ def run_release_hook(hook_name, hook_path, project_dir, env, timeout,
         _effects.run(
             ["bash", hook_path], env=env, check=True,
             timeout=timeout, cwd=project_dir,
+            # Names the hook slot in the preview's structured record, so a
+            # reader can tell a pre-checks line from a post-release one
+            # without parsing the script path.
+            resource=f"hook:{hook_name}",
         )
     except _subprocess.CalledProcessError as e:
         raise HookError(

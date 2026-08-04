@@ -49,35 +49,255 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.110.2",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 52 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
-  "global_flags": [
-    {
-      "name": "dry-run",
-      "type": "bool",
-      "help": "Preview changes without applying them",
-      "default": false,
-      "negatable": true
-    },
-    {
-      "name": "yes",
-      "type": "bool",
-      "help": "Skip confirmation prompts",
-      "short": "y",
-      "default": false,
-      "negatable": true
-    },
-    {
-      "name": "quiet",
-      "type": "bool",
-      "help": "Suppress non-essential output",
-      "default": false,
-      "negatable": true
-    }
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "proc_observe_allowlist": [
+    [
+      "git",
+      "rev-parse"
+    ],
+    [
+      "git",
+      "rev-list"
+    ],
+    [
+      "git",
+      "status"
+    ],
+    [
+      "git",
+      "log"
+    ],
+    [
+      "git",
+      "show"
+    ],
+    [
+      "git",
+      "describe"
+    ],
+    [
+      "git",
+      "fetch"
+    ],
+    [
+      "git",
+      "diff"
+    ],
+    [
+      "git",
+      "diff-tree"
+    ],
+    [
+      "git",
+      "diff-index"
+    ],
+    [
+      "git",
+      "ls-files"
+    ],
+    [
+      "git",
+      "ls-remote"
+    ],
+    [
+      "git",
+      "ls-tree"
+    ],
+    [
+      "git",
+      "cat-file"
+    ],
+    [
+      "git",
+      "merge-base"
+    ],
+    [
+      "git",
+      "check-ignore"
+    ],
+    [
+      "git",
+      "for-each-ref"
+    ],
+    [
+      "git",
+      "symbolic-ref"
+    ],
+    [
+      "git",
+      "name-rev"
+    ],
+    [
+      "git",
+      "shortlog"
+    ],
+    [
+      "git",
+      "var"
+    ],
+    [
+      "git",
+      "config",
+      "--get"
+    ],
+    [
+      "git",
+      "config",
+      "--get-all"
+    ],
+    [
+      "git",
+      "config",
+      "--list"
+    ],
+    [
+      "git",
+      "remote",
+      "get-url"
+    ],
+    [
+      "git",
+      "remote",
+      "-v"
+    ],
+    [
+      "git",
+      "branch",
+      "--show-current"
+    ],
+    [
+      "git",
+      "branch",
+      "--contains"
+    ],
+    [
+      "git",
+      "branch",
+      "-a"
+    ],
+    [
+      "git",
+      "branch",
+      "--list"
+    ],
+    [
+      "git",
+      "tag",
+      "-l"
+    ],
+    [
+      "git",
+      "tag",
+      "--list"
+    ],
+    [
+      "git",
+      "tag",
+      "--points-at"
+    ],
+    [
+      "git",
+      "stash",
+      "list"
+    ],
+    [
+      "git",
+      "merge-file",
+      "-p"
+    ],
+    [
+      "git",
+      "--version"
+    ],
+    [
+      "gh",
+      "api",
+      "--method",
+      "GET"
+    ],
+    [
+      "gh",
+      "auth",
+      "status"
+    ],
+    [
+      "gh",
+      "auth",
+      "token"
+    ],
+    [
+      "gh",
+      "release",
+      "view"
+    ],
+    [
+      "gh",
+      "release",
+      "list"
+    ],
+    [
+      "gh",
+      "repo",
+      "view"
+    ],
+    [
+      "gh",
+      "run",
+      "list"
+    ],
+    [
+      "gh",
+      "run",
+      "view"
+    ],
+    [
+      "gh",
+      "pr",
+      "list"
+    ],
+    [
+      "gh",
+      "workflow",
+      "list"
+    ],
+    [
+      "gh",
+      "--version"
+    ],
+    [
+      "npm",
+      "view"
+    ],
+    [
+      "go",
+      "list"
+    ],
+    [
+      "uv",
+      "--version"
+    ],
+    [
+      "ruff",
+      "--version"
+    ],
+    [
+      "safegit",
+      "--version"
+    ],
+    [
+      "saferm",
+      "--version"
+    ],
+    [
+      "selfdoc",
+      "--version"
+    ]
   ],
   "commands": {
     "check": {
       "name": "check",
       "help": "Run project checks registered via the check framework and report results",
+      "effect": "read_only",
       "flags": [
         {
           "name": "all",
@@ -118,19 +338,16 @@
           "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
           "default": false,
           "negatable": true
-        },
-        {
-          "name": "verbose",
-          "type": "bool",
-          "help": "Show per-check notes and durations (including on passing checks) plus a trailing pass/fail/warn/skip count summary",
-          "default": false,
-          "negatable": true
         }
-      ]
+      ],
+      "forwarding": {
+        "reason": "framework-internal: absorbs app-defined global flag values"
+      }
     },
     "status": {
       "name": "status",
       "help": "Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.",
+      "effect": "read_only",
       "flags": [
         {
           "name": "target",
@@ -157,6 +374,7 @@
     "scaffold": {
       "name": "scaffold",
       "help": "Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.",
+      "effect": "mutating",
       "flags": [
         {
           "name": "target",
@@ -196,6 +414,7 @@
     "check-name": {
       "name": "check-name",
       "help": "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
+      "effect": "read_only",
       "flags": [
         {
           "name": "target",
@@ -223,6 +442,7 @@
     "claim-name": {
       "name": "claim-name",
       "help": "Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.",
+      "effect": "mutating",
       "flags": [
         {
           "name": "target",
@@ -230,11 +450,19 @@
           "help": "Target package registry to publish the placeholder to (npm or pypi)",
           "default": ""
         }
+      ],
+      "grants": [
+        {
+          "name": "publish",
+          "reason": "claiming a name publishes a real package to a public registry, and neither npm nor PyPI lets you take it back",
+          "kind": "proc_mutate"
+        }
       ]
     },
     "discover": {
       "name": "discover",
       "help": "Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.",
+      "effect": "read_only",
       "flags": [
         {
           "name": "mine",
@@ -248,6 +476,7 @@
     "watch": {
       "name": "watch",
       "help": "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.",
+      "effect": "read_only",
       "flags": [
         {
           "name": "target",
@@ -274,15 +503,18 @@
     },
     "pre-push-check": {
       "name": "pre-push-check",
-      "help": "Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it."
+      "help": "Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.",
+      "effect": "read_only"
     },
     "prs": {
       "name": "prs",
-      "help": "List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work."
+      "help": "List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work.",
+      "effect": "read_only"
     },
     "unreleased": {
       "name": "unreleased",
       "help": "List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.",
+      "effect": "read_only",
       "flags": [
         {
           "name": "json",
@@ -295,11 +527,13 @@
     },
     "targets": {
       "name": "targets",
-      "help": "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found."
+      "help": "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found.",
+      "effect": "read_only"
     },
     "deploy": {
       "name": "deploy",
       "help": "Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced.",
+      "effect": "mutating",
       "flags": [
         {
           "name": "target",
@@ -319,6 +553,7 @@
     "commit": {
       "name": "commit",
       "help": "Commit one or more files with an Autogenerated trailer, marking the commit as machine-generated so it is automatically exempted from changelog coverage checks.",
+      "effect": "mutating",
       "flags": [
         {
           "name": "message",
@@ -337,6 +572,7 @@
         "run": {
           "name": "run",
           "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "push-timeout",
@@ -397,6 +633,7 @@
         "resume": {
           "name": "resume",
           "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "push-timeout",
@@ -432,11 +669,13 @@
         },
         "init": {
           "name": "init",
-          "help": "Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets."
+          "help": "Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.",
+          "effect": "mutating"
         },
         "retry": {
           "name": "retry",
           "help": "Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is auto-scaffolded with sensible defaults if missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered against the configured ref (defaults to the release tag).",
+          "effect": "mutating",
           "flags": [
             {
               "name": "watch",
@@ -449,6 +688,7 @@
         "edit": {
           "name": "edit",
           "help": "Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.",
+          "effect": "mutating",
           "args": [
             {
               "name": "version",
@@ -460,6 +700,7 @@
         "undo": {
           "name": "undo",
           "help": "Revert a release. Without --version, reverts the latest release (deletes GitHub Release, removes git tag, reverts version bump commit). With --version, reverts a non-latest release if it is provably unpublished (probes registries for evidence, deletes GitHub Release + tag only, un-finalizes changelog).",
+          "effect": "mutating",
           "flags": [
             {
               "name": "target",
@@ -478,6 +719,7 @@
         "deprecate": {
           "name": "deprecate",
           "help": "Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "reason",
@@ -502,6 +744,7 @@
         "yank": {
           "name": "yank",
           "help": "Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "reason",
@@ -526,6 +769,7 @@
         "scrub": {
           "name": "scrub",
           "help": "Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "replace",
@@ -605,6 +849,7 @@
         "reconcile": {
           "name": "reconcile",
           "help": "Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "push-timeout",
@@ -623,6 +868,7 @@
         "add": {
           "name": "add",
           "help": "Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed by default. Use --no-user-facing to mark internal changes that should not appear in the published changelog.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "commits",
@@ -668,6 +914,7 @@
         "generate": {
           "name": "generate",
           "help": "Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "auto-commit",
@@ -681,6 +928,7 @@
         "amend": {
           "name": "amend",
           "help": "Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-validate-hashes to skip hash validation for old or amended commits.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "version",
@@ -729,6 +977,7 @@
         "edit": {
           "name": "edit",
           "help": "Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash or entry ID, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "commits",
@@ -772,6 +1021,7 @@
         "remap": {
           "name": "remap",
           "help": "Remap stale commit hashes in JSONL changelog files using a mapping of old SHAs to new SHAs. Reads the mapping from a file (--map-file), the safegit rewrite journal (--from-journal), or stdin (--stdin). At least one source is required. Auto-commits with Autogenerated trailer.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "map-file",
@@ -799,11 +1049,12 @@
     },
     "monorepo": {
       "name": "monorepo",
-      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 18 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, mirror, graph, impact, extract, absorb, extract-releasable, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.",
+      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 19 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, extract-releasable, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.",
       "commands": {
         "init": {
           "name": "init",
           "help": "Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "auto-commit",
@@ -817,6 +1068,7 @@
         "add": {
           "name": "add",
           "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "name",
@@ -890,6 +1142,7 @@
         "remove": {
           "name": "remove",
           "help": "Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.",
+          "effect": "mutating",
           "args": [
             {
               "name": "path",
@@ -899,11 +1152,13 @@
         },
         "list": {
           "name": "list",
-          "help": "Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library."
+          "help": "Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.",
+          "effect": "read_only"
         },
         "sync": {
           "name": "sync",
           "help": "Inline every project's CI jobs into a single generated ci-router.yml (and publish jobs into publish.yml) in the shared .github/workflows directory at the repository root. Jobs are inlined rather than routed via reusable-workflow calls because GitHub rejects workflows that reference 20 or more reusable workflows. Stale per-project workflow copies at the root are removed via saferm.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "auto-commit",
@@ -916,11 +1171,13 @@
         },
         "status": {
           "name": "status",
-          "help": "Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date."
+          "help": "Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.",
+          "effect": "read_only"
         },
         "check-names": {
           "name": "check-names",
           "help": "Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.",
+          "effect": "read_only",
           "flags": [
             {
               "name": "target",
@@ -949,24 +1206,23 @@
         },
         "outdated": {
           "name": "outdated",
-          "help": "Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases."
+          "help": "Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.",
+          "effect": "read_only"
         },
         "snapshot": {
           "name": "snapshot",
-          "help": "Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure. Use --check to verify the snapshot is up-to-date without regenerating it (exits 1 if stale).",
-          "flags": [
-            {
-              "name": "check",
-              "type": "bool",
-              "help": "Verify snapshot.json is up-to-date (exit 1 if stale)",
-              "default": false,
-              "negatable": true
-            }
-          ]
+          "help": "Regenerate the committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure, and commit it. Verifying without regenerating is a separate command, `rlsbl monorepo snapshot-check`. Under --dry-run the artifact is computed but neither written nor committed, and the preview names both steps.",
+          "effect": "mutating"
+        },
+        "snapshot-check": {
+          "name": "snapshot-check",
+          "help": "Verify that .rlsbl-monorepo/snapshot.json matches the workspace it describes, without regenerating it. Exits 1 when the artifact is stale or missing. This is the read-only half of the former `monorepo snapshot --check` flag; `rlsbl monorepo snapshot` is the half that writes.",
+          "effect": "read_only"
         },
         "mirror": {
           "name": "mirror",
           "help": "Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.",
+          "effect": "mutating",
           "args": [
             {
               "name": "project",
@@ -977,6 +1233,7 @@
         "graph": {
           "name": "graph",
           "help": "Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "format",
@@ -1012,6 +1269,7 @@
         "impact": {
           "name": "impact",
           "help": "Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.",
+          "effect": "read_only",
           "flags": [
             {
               "name": "format",
@@ -1035,6 +1293,7 @@
         "extract": {
           "name": "extract",
           "help": "Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.",
+          "effect": "mutating",
           "args": [
             {
               "name": "package_name",
@@ -1049,6 +1308,7 @@
         "absorb": {
           "name": "absorb",
           "help": "Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "name",
@@ -1083,6 +1343,7 @@
         "extract-releasable": {
           "name": "extract-releasable",
           "help": "Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.",
+          "effect": "mutating",
           "args": [
             {
               "name": "releasable_name",
@@ -1096,11 +1357,13 @@
         },
         "cleanup": {
           "name": "cleanup",
-          "help": "Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`."
+          "help": "Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.",
+          "effect": "mutating"
         },
         "migrate-releasable": {
           "name": "migrate-releasable",
           "help": "Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).",
+          "effect": "mutating",
           "args": [
             {
               "name": "releasable_name",
@@ -1111,6 +1374,7 @@
         "rename-releasable": {
           "name": "rename-releasable",
           "help": "Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.",
+          "effect": "mutating",
           "args": [
             {
               "name": "old_name",
@@ -1131,6 +1395,7 @@
             "run": {
               "name": "run",
               "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
+              "effect": "mutating",
               "flags": [
                 {
                   "name": "push-timeout",
@@ -1173,6 +1438,7 @@
             "init": {
               "name": "init",
               "help": "Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.",
+              "effect": "mutating",
               "flags": [
                 {
                   "name": "packages",
@@ -1184,7 +1450,8 @@
             },
             "order": {
               "name": "order",
-              "help": "Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors."
+              "help": "Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.",
+              "effect": "read_only"
             }
           }
         }
@@ -1197,6 +1464,7 @@
         "install": {
           "name": "install",
           "help": "Install the project locally for development by running each detected target's own install command. --global (default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go (go install), deno (deno install), and -- since they have no system-wide install concept -- zig (zig build install), swift (swift build), and hex (mix deps.get). --venv installs into the project's local environment instead and is supported by pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install where the target supports it (pypi, npm, deno). In monorepo mode, pair with --all, --include, or --exclude.",
+          "effect": "mutating",
           "flags": [
             {
               "name": "all",
@@ -1242,11 +1510,13 @@
         },
         "sync": {
           "name": "sync",
-          "help": "Overlay local editable checkouts of sibling projects onto this project's locked environment. Reads dev-sources.toml.local-only for overlay entries, runs uv sync --inexact excluding overlaid packages, then uv pip install -e per entry. Requires UV_NO_SYNC=1 in the environment to prevent bare uv run from reverting overlays."
+          "help": "Overlay local editable checkouts of sibling projects onto this project's locked environment. Reads dev-sources.toml.local-only for overlay entries, runs uv sync --inexact excluding overlaid packages, then uv pip install -e per entry. Requires UV_NO_SYNC=1 in the environment to prevent bare uv run from reverting overlays.",
+          "effect": "mutating"
         },
         "status": {
           "name": "status",
-          "help": "Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared."
+          "help": "Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared.",
+          "effect": "read_only"
         }
       }
     }
@@ -2005,5 +2275,13 @@
         "config-schema"
       ]
     }
+  },
+  "infra": {
+    "handshakes": [
+      {
+        "env_var": "RLSBL_PUSH_STDIN",
+        "help": "Pre-push ref lines (`<local ref> <local sha> <remote ref> <remote sha>`) for `rlsbl check --tag prepush`, when the caller has already consumed git's hook stdin."
+      }
+    ]
   }
 }
