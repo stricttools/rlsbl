@@ -217,9 +217,14 @@ class TestBatchReleaseRootSelfdocIntegration:
 
 
 class TestSelfdocSubprocessArgv:
-    """selfdoc's gen/check/deploy are `mutating` strictcli commands, so a
-    tool-driven subprocess must pass --yes. Without it the child hard-errors on
-    non-interactive stdin, or prompts a human in the middle of a release."""
+    """selfdoc's gen/check/deploy carry NO confirmation-skip flag.
+
+    strictcli's confirm protocol keys on a declared ``consequential``, not on
+    ``mutating``; none of selfdoc's three commands declares it, so none of them
+    prompts and none of them accepts a skip flag. ``--yes`` was removed from
+    strictcli entirely and is a banned flag name, so passing it here would make
+    every release die with ``unknown flag '--yes'`` at the docs step.
+    """
 
     def _argv(self, monkeypatch, tmp_path, fn):
         (tmp_path / "selfdoc.json").write_text('{"version": "0.1.0"}')
@@ -236,20 +241,26 @@ class TestSelfdocSubprocessArgv:
         fn({}, project_dir=str(tmp_path))
         return seen["argv"]
 
-    def test_gen_passes_yes(self, monkeypatch, tmp_path):
+    def test_gen_passes_no_confirm_flag(self, monkeypatch, tmp_path):
         from rlsbl.commands.release.validate import _run_selfdoc_gen
 
-        assert "--yes" in self._argv(monkeypatch, tmp_path, _run_selfdoc_gen)
+        argv = self._argv(monkeypatch, tmp_path, _run_selfdoc_gen)
+        assert "--yes" not in argv
+        assert "--approve-consequential" not in argv
 
-    def test_check_passes_yes(self, monkeypatch, tmp_path):
+    def test_check_passes_no_confirm_flag(self, monkeypatch, tmp_path):
         from rlsbl.commands.release.validate import _run_selfdoc_check
 
-        assert "--yes" in self._argv(monkeypatch, tmp_path, _run_selfdoc_check)
+        argv = self._argv(monkeypatch, tmp_path, _run_selfdoc_check)
+        assert "--yes" not in argv
+        assert "--approve-consequential" not in argv
 
-    def test_deploy_passes_yes(self):
+    def test_deploy_passes_no_confirm_flag(self):
         import inspect
 
         from rlsbl.pipelines import cloudflare_pages
 
         src = inspect.getsource(cloudflare_pages)
-        assert '["selfdoc", "deploy", "--yes"]' in src
+        assert '["selfdoc", "deploy"]' in src
+        assert "--yes" not in src
+        assert "--approve-consequential" not in src

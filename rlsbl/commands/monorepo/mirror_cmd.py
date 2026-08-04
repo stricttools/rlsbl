@@ -482,10 +482,9 @@ def _run_scaffold(clone_dir, sub_config_path):
     result = effects.run(
         # -P: suppress CWD injection from ``python -m`` run in the mirror clone dir
         # (a root module shadowing a stdlib/dep name would break rlsbl imports).
-        # --yes: the child is a mutating command with no TTY, and the
-        # framework confirm protocol would abort it on a non-interactive
-        # stdin.  This call site IS the confirmation.
-        [sys.executable, "-P", "-m", "rlsbl", "--yes", "scaffold", "--no-auto-commit"],
+        # No confirmation-skip flag: `scaffold` is `mutating` but not
+        # `consequential`, so the child never reaches the confirm protocol.
+        [sys.executable, "-P", "-m", "rlsbl", "scaffold", "--no-auto-commit"],
         cwd=clone_dir,
         capture_output=True,
         text=True,

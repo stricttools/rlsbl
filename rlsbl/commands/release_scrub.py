@@ -45,8 +45,8 @@ from .. import effects
 # and on >= 0.25.0 for two coupled behaviour changes: destructive rewrites in
 # rlsbl-managed repos no longer require an orchestration handshake, and --json
 # no longer answers the destructive confirmation, so the invocation below
-# passes --yes explicitly. The integration test harness builds exactly this
-# version.
+# passes the confirmation-skip flag explicitly. The integration test harness
+# builds exactly this version.
 SAFEGIT_MIN_VERSION = (0, 25, 0)
 
 
@@ -136,12 +136,13 @@ def _build_safegit_args(flags, mode, remap_globs):
     the rewritten history, so all historical versions -- including HEAD --
     stay self-consistent.
 
-    ``--yes`` is explicit in every mode: safegit's destructive confirmation is
-    deliberate, and ``--json`` does not answer it. Running this command IS the
+    ``--approve-consequential`` is explicit in every mode: safegit declares
+    all three scrub modes ``consequential``, so each prompts before dispatch
+    and ``--json`` does not answer that prompt. Running this command IS the
     consent; the force-push that follows is confirmed separately.
     """
     if mode == "match":
-        args = ["scrub", "match", "--json", "--yes"]
+        args = ["scrub", "match", "--json", "--approve-consequential"]
         if flags.get("dry-run"):
             args.append("--dry-run")
         args.extend(["--pattern", flags["pattern"]])
@@ -159,7 +160,7 @@ def _build_safegit_args(flags, mode, remap_globs):
 
     if mode == "file":
         # File mode: positional path last, --from mandatory.
-        args = ["scrub", "file", "--json", "--yes"]
+        args = ["scrub", "file", "--json", "--approve-consequential"]
         if flags.get("dry-run"):
             args.append("--dry-run")
         args.extend(["--from", flags["from-commit"]])
@@ -169,7 +170,7 @@ def _build_safegit_args(flags, mode, remap_globs):
         return args
 
     # Recipe mode: positional recipe path, range flags, reason.
-    args = ["scrub", "run", "--json", "--yes"]
+    args = ["scrub", "run", "--json", "--approve-consequential"]
     if flags.get("dry-run"):
         args.append("--dry-run")
     args.append(flags["recipe"])

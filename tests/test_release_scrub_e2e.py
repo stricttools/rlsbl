@@ -491,10 +491,10 @@ class TestJournalRecoveryE2E:
         # Pre-scrub lease snapshot, exactly as run_cmd captures it.
         remote_refs = _snapshot_remote_refs(repo)
 
-        # Direct scrub WITHOUT remap globs. --yes is explicit: --json does
-        # not answer safegit's destructive confirmation.
+        # Direct scrub WITHOUT remap globs. --approve-consequential is
+        # explicit: --json does not answer safegit's confirmation prompt.
         result = subprocess.run(
-            ["safegit", "scrub", "match", "--json", "--yes",
+            ["safegit", "scrub", "match", "--json", "--approve-consequential",
              "--pattern", SECRET, "--replace", REPLACEMENT,
              "--entire-history", "--reason", "direct scrub"],
             cwd=str(repo),
@@ -573,7 +573,7 @@ class TestNoMatchJournalRepairE2E:
         # Direct scrub WITHOUT remap globs: prunes c1, leaves the worktree
         # JSONL dangling, persists the rewrite journal.
         subprocess.run(
-            ["safegit", "scrub", "match", "--json", "--yes",
+            ["safegit", "scrub", "match", "--json", "--approve-consequential",
              "--pattern", SECRET, "--replace", REPLACEMENT,
              "--entire-history", "--reason", "direct scrub"],
             cwd=str(repo),

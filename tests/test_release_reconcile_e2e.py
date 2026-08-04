@@ -96,11 +96,11 @@ def _raw_safegit_scrub(repo):
     --remap-shas-in is passed, and no release state is written -- which is
     exactly the situation `rlsbl release reconcile` exists to repair. safegit
     does not stand in the way of a direct scrub in a repo with a .rlsbl/
-    directory; `--yes` is here only because the destructive confirmation is
-    deliberate and `--json` does not answer it.
+    directory; `--approve-consequential` is here only because safegit declares
+    scrub consequential and `--json` does not answer its prompt.
     """
     result = subprocess.run(
-        ["safegit", "scrub", "match", "--json", "--yes",
+        ["safegit", "scrub", "match", "--json", "--approve-consequential",
          "--pattern", SECRET, "--replace", REPLACEMENT,
          "--entire-history", "--reason", "remove leaked token"],
         cwd=str(repo), capture_output=True, text=True,

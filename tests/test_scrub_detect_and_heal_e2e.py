@@ -113,12 +113,12 @@ def _setup_managed_repo(env):
 def _raw_safegit_scrub(repo):
     """The unorchestrated rewrite: raw safegit, nothing announced to rlsbl.
 
-    No handshake environment variable is set -- none exists. ``--yes`` is the
-    deliberate consent for a destructive operation (``--json`` does not answer
-    that confirmation); it says nothing about orchestration.
+    No handshake environment variable is set -- none exists. ``--approve-consequential`` is the
+    deliberate consent for a command safegit declares consequential (``--json``
+    does not answer that prompt); it says nothing about orchestration.
     """
     return subprocess.run(
-        ["safegit", "scrub", "match", "--json", "--yes",
+        ["safegit", "scrub", "match", "--json", "--approve-consequential",
          "--pattern", SECRET, "--replace", REPLACEMENT,
          "--entire-history", "--reason", "remove leaked token"],
         cwd=str(repo), capture_output=True, text=True,
@@ -239,7 +239,7 @@ class TestRawRewriteIsDetectedAndHealed:
         monkeypatch.chdir(repo)
 
         result = subprocess.run(
-            ["safegit", "--yes", "author", "rewrite",
+            ["safegit", "author", "rewrite", "--approve-consequential",
              "--old-name", "E2E", "--new-name", "Renamed"],
             cwd=str(repo), capture_output=True, text=True,
         )

@@ -30,8 +30,9 @@ class CloudflarePagesPipeline(BasePipeline):
 
         try:
             effects.run(
-                # --yes: `deploy` is a `mutating` strictcli command and this is a
-                # tool-driven subprocess (see validate.py's selfdoc calls).
+                # No confirmation-skip flag: strictcli prompts only for
+                # commands that declare `consequential`, and selfdoc's
+                # `deploy` does not (see validate.py's selfdoc calls).
                 ["selfdoc", "deploy"],
                 cwd=dir_path,
                 check=True,

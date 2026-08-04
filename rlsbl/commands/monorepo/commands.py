@@ -200,8 +200,9 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         try:
             # -P: suppress CWD injection from ``python -m`` run in a foreign dir
             # (a root module shadowing a stdlib/dep name would break rlsbl imports).
-            # --yes: a child mutating command with no TTY (see mirror_cmd).
-            cmd = [sys.executable, "-P", "-m", "rlsbl", "--yes", "scaffold"]
+            # No confirmation-skip flag: `scaffold` is `mutating` but not
+            # `consequential`, so strictcli never prompts for it.
+            cmd = [sys.executable, "-P", "-m", "rlsbl", "scaffold"]
             if explicit_target:
                 cmd.extend(["--target", explicit_target])
             if no_commit:
@@ -216,7 +217,7 @@ def _cmd_add(args, flags, project_root, dry_run=False):
 
     # Sync CI workflows
     try:
-        sync_cmd = [sys.executable, "-P", "-m", "rlsbl", "--yes", "monorepo", "sync"]
+        sync_cmd = [sys.executable, "-P", "-m", "rlsbl", "monorepo", "sync"]
         if no_commit:
             sync_cmd.append("--no-auto-commit")
         effects.run(
