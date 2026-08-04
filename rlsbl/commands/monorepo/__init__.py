@@ -23,7 +23,7 @@ from .impact import _cmd_impact
 
 from .mirror_cmd import _cmd_mirror
 
-from .snapshot_cmd import _cmd_snapshot
+from .snapshot_cmd import _cmd_snapshot, _cmd_snapshot_check
 
 from .extract import (
     require_filter_repo,
@@ -67,6 +67,7 @@ __all__ = [
     "_cmd_impact",
     "_cmd_mirror",
     "_cmd_snapshot",
+    "_cmd_snapshot_check",
     # extract/absorb
     "require_filter_repo",
     "cmd_extract",

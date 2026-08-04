@@ -329,10 +329,10 @@ class TestCmdSnapshot:
         # Mock commit_files_if_changed to avoid needing a real git repo
         import rlsbl.commands.monorepo.snapshot_cmd as snap_mod
         committed = []
-        monkeypatch.setattr(snap_mod, "commit_files_if_changed", lambda *a, **kw: committed.append(a))
+        monkeypatch.setattr(snap_mod, "commit_files", lambda *a, **kw: committed.append(a))
 
         from rlsbl.commands.monorepo import _cmd_snapshot
-        _cmd_snapshot({"check": False}, project_root=".")
+        _cmd_snapshot({}, project_root=".")
 
         captured = capsys.readouterr()
         assert "Wrote" in captured.out
@@ -365,8 +365,8 @@ class TestCmdSnapshot:
         snapshot = generate_snapshot(root, projects, graph)
         write_snapshot(root, snapshot)
 
-        from rlsbl.commands.monorepo import _cmd_snapshot
-        _cmd_snapshot({"check": True}, project_root=".")
+        from rlsbl.commands.monorepo import _cmd_snapshot_check
+        _cmd_snapshot_check({}, project_root=".")
 
         captured = capsys.readouterr()
         assert "up-to-date" in captured.out
@@ -392,21 +392,22 @@ class TestCmdSnapshot:
             '[project]\nname = "alpha"\nversion = "9.9.9"\n'
         )
 
-        from rlsbl.commands.monorepo import _cmd_snapshot
+        from rlsbl.commands.monorepo import _cmd_snapshot_check
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_snapshot({"check": True}, project_root=".")
+            _cmd_snapshot_check({}, project_root=".")
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "stale" in captured.err
 
-    def test_dry_run_writes_nothing_and_commits_nothing(
+    def test_dry_run_records_the_write_and_the_commit(
         self, tmp_path, monkeypatch, capsys,
     ):
-        """`monorepo snapshot --dry-run` accepted the flag and ignored it.
+        """A preview writes nothing, commits nothing, and names both steps.
 
-        The global --dry-run flag reached the command and was dropped on the
-        floor: the snapshot was regenerated on disk and committed anyway.
+        The command has no dry-run branch of its own any more: the write and
+        the commit go through the effect chokepoint, so `--dry-run` records
+        them instead of performing them and the would-do log IS the preview.
         """
         root, projects = _make_workspace(tmp_path, [
             {"name": "alpha", "path": "packages/alpha", "target": "pypi",
@@ -419,25 +420,20 @@ class TestCmdSnapshot:
         )
         monkeypatch.chdir(tmp_path)
 
-        import rlsbl.commands.monorepo.snapshot_cmd as snap_mod
-        committed = []
-        monkeypatch.setattr(
-            snap_mod, "commit_files_if_changed",
-            lambda *a, **kw: committed.append(a),
-        )
+        from rlsbl import app
+        result = app.test(["--dry-run", "--yes", "monorepo", "snapshot"])
 
-        from rlsbl.commands.monorepo import _cmd_snapshot
-        _cmd_snapshot({"check": False, "dry-run": True}, project_root=".")
-
+        assert result.exit_code == 0, result.stderr
         assert not (ws_dir / SNAPSHOT_FILE).exists(), \
             "--dry-run must not write snapshot.json"
-        assert committed == [], "--dry-run must not commit"
-        assert "Would write" in capsys.readouterr().out, \
-            "--dry-run must say what it would have done"
+        assert "DRY RUN" in result.stdout
+        assert f"write: {ws_dir / SNAPSHOT_FILE}" in result.stdout, result.stdout
+        assert "run: safegit commit" in result.stdout, result.stdout
 
-    def test_dry_run_reports_an_up_to_date_snapshot_as_unchanged(
+    def test_dry_run_of_a_current_snapshot_records_no_commit(
         self, tmp_path, monkeypatch, capsys,
     ):
+        """An up-to-date artifact still previews its write, but not a commit."""
         root, projects = _make_workspace(tmp_path, [
             {"name": "alpha", "path": "packages/alpha", "target": "pypi",
              "version": "1.0.0"},
@@ -453,14 +449,35 @@ class TestCmdSnapshot:
         write_snapshot(root, generate_snapshot(root, projects, graph))
         before = (ws_dir / SNAPSHOT_FILE).read_bytes()
 
-        import rlsbl.commands.monorepo.snapshot_cmd as snap_mod
-        monkeypatch.setattr(
-            snap_mod, "commit_files_if_changed",
-            lambda *a, **kw: pytest.fail("--dry-run must not commit"),
-        )
+        from rlsbl import app
+        result = app.test(["--dry-run", "--yes", "monorepo", "snapshot"])
 
-        from rlsbl.commands.monorepo import _cmd_snapshot
-        _cmd_snapshot({"check": False, "dry-run": True}, project_root=".")
-
+        assert result.exit_code == 0, result.stderr
         assert (ws_dir / SNAPSHOT_FILE).read_bytes() == before
-        assert "unchanged" in capsys.readouterr().out
+        assert "Snapshot unchanged." in result.stdout
+        assert "commit" not in result.stdout.split("Would do:")[1]
+
+    def test_snapshot_check_is_read_only_under_dry_run(
+        self, tmp_path, monkeypatch,
+    ):
+        """The check half records nothing at all -- it changes nothing."""
+        root, projects = _make_workspace(tmp_path, [
+            {"name": "alpha", "path": "packages/alpha", "target": "pypi",
+             "version": "1.0.0"},
+        ])
+        ws_dir = tmp_path / WORKSPACE_DIR
+        ws_dir.mkdir(exist_ok=True)
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+        )
+        monkeypatch.chdir(tmp_path)
+        graph = WorkspaceGraph(root, projects)
+        write_snapshot(root, generate_snapshot(root, projects, graph))
+
+        from rlsbl import app
+        result = app.test(["--dry-run", "monorepo", "snapshot-check"])
+
+        assert result.exit_code == 0, result.stderr
+        assert result.stdout.rstrip().endswith(
+            "DRY RUN — no changes were made. Would do:"
+        ), result.stdout

@@ -118,7 +118,14 @@ def write_snapshot(root, snapshot):
     target = os.path.join(ws_dir, SNAPSHOT_FILE)
 
     content = json.dumps(snapshot, indent=2) + "\n"
-    effects.atomic_write_text(target, content)
+    # The token names what this write produces, and the conditional annotation
+    # spells out, in the preview, the branch the caller already makes: a
+    # snapshot matching the workspace is not rewritten.
+    effects.atomic_write_text(
+        target, content,
+        resource="snapshot:workspace",
+        skip_if_current="snapshot:workspace",
+    )
 
     return os.path.join(WORKSPACE_DIR, SNAPSHOT_FILE)
 
