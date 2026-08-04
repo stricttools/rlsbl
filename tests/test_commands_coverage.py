@@ -166,36 +166,24 @@ class TestUndoNoTagsFound:
         assert exc_info.value.code == 1
 
 
-class TestUndoInteractiveAbort:
-    """Covers lines 97-104: user says 'n' or EOF at prompt."""
+class TestUndoHasNoOwnPrompt:
+    """The destructive-operation confirmation is the framework's.
 
-    @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
-    @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
-    @patch(f"{MOD_UNDO}.run", return_value="v1.0.0")
-    def test_aborted_on_no(self, _run, _inst, _auth, _clean, _ws):
-        from rlsbl.commands.undo import run_cmd
+    `release undo` is classified `mutating`; strictcli asks once before
+    dispatch and `--yes` skips it.  The command's own "This is destructive.
+    Proceed?" prompt is gone, so a closed stdin no longer produces a second,
+    differently-worded refusal.
+    """
 
-        with patch("builtins.input", return_value="n"):
-            with patch("sys.stdout", new_callable=StringIO):
-                with pytest.raises(SystemExit) as exc_info:
-                    run_cmd("npm", [], {}, ctx=_ctx())
-        assert exc_info.value.code == 0
+    def test_no_prompt_remains_in_the_module(self):
+        import inspect
 
-    @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
-    @patch(f"{MOD_UNDO}.is_clean_tree", return_value=True)
-    @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
-    @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
-    @patch(f"{MOD_UNDO}.run", return_value="v1.0.0")
-    def test_aborted_on_eof(self, _run, _inst, _auth, _clean, _ws):
-        from rlsbl.commands.undo import run_cmd
+        from rlsbl.commands import undo
 
-        with patch("builtins.input", side_effect=EOFError):
-            with patch("sys.stdout", new_callable=StringIO):
-                with pytest.raises(SystemExit) as exc_info:
-                    run_cmd("npm", [], {}, ctx=_ctx())
-        assert exc_info.value.code == 1
+        assert "input(" not in inspect.getsource(undo), (
+            "release undo must not prompt: the framework confirm protocol "
+            "owns the one confirmation this command has"
+        )
 
 
 class TestUndoGhDeleteFails:

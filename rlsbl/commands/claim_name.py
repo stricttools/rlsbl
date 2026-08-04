@@ -24,7 +24,6 @@ def run_cmd(target, args, flags):
         sys.exit(1)
 
     name = args[0]
-    dry_run = flags.get("dry-run", False)
 
     if target not in ("npm", "pypi"):
         print(f"Unsupported target: {target!r}. Must be 'npm' or 'pypi'.", file=sys.stderr)
@@ -64,28 +63,12 @@ def run_cmd(target, args, flags):
             print("Neither PYPI_TOKEN nor UV_PUBLISH_TOKEN environment variable is set.", file=sys.stderr)
             sys.exit(1)
 
-    if dry_run:
-        print(f"Dry run: would publish placeholder '{name}' to {target}")
-        return
-
-    # Confirmation before publishing a real placeholder package. Reached on the
-    # available path (yes=False) and on the yes-overridden taken/ambiguous paths
-    # (where flags["yes"] is True, so the prompt is skipped). --yes skips it.
-    if not flags.get("yes"):
-        try:
-            answer = input(
-                f"Claim '{name}' on {target} by publishing a placeholder package? [y/N] "
-            ).strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print(
-                f"\nError: stdin is not interactive; pass --yes to confirm "
-                f"publishing a placeholder to {target}.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if answer not in ("y", "yes"):
-            print("Aborted.", file=sys.stderr)
-            sys.exit(1)
+    # No hand-rolled preview and no hand-rolled prompt: `claim-name` is a
+    # mutating command, so strictcli asks for confirmation before dispatch
+    # (--yes skips it), and under --dry-run every write and every publish below
+    # is RECORDED instead of performed.  The preview is therefore the real code
+    # path -- the incident this command is named for (a "dry run" that
+    # published for real) cannot recur by a branch being forgotten.
 
     tmpdir = tempfile.mkdtemp()
     try:
@@ -112,13 +95,18 @@ def _claim_npm(name, tmpdir):
 
     effects.run(
         ["npm", "publish", "--access", "public"],
+        grant="publish",
+        resource=f"npm:{name}",
         cwd=tmpdir,
         capture_output=True,
         text=True,
         check=True,
         timeout=60,
     )
-    print(f"Successfully claimed '{name}' on npm: https://www.npmjs.com/package/{name}")
+    if not effects.previewing():
+        # A preview published nothing, so it must not claim it did; the
+        # would-do log the framework prints is the preview's own report.
+        print(f"Successfully claimed '{name}' on npm: https://www.npmjs.com/package/{name}")
 
 
 def _claim_pypi(name, tmpdir):
@@ -152,14 +140,20 @@ build-backend = "hatchling.build"
         timeout=60,
     )
 
+    # The token rides the environment, never argv: it must not reach a process
+    # listing, and it must not reach the would-do log a preview prints.
     token = os.environ.get("UV_PUBLISH_TOKEN") or os.environ["PYPI_TOKEN"]
 
     effects.run(
-        ["uv", "publish", "--token", token],
+        ["uv", "publish"],
+        grant="publish",
+        resource=f"pypi:{name}",
+        env={**os.environ, "UV_PUBLISH_TOKEN": token},
         cwd=tmpdir,
         capture_output=True,
         text=True,
         check=True,
         timeout=60,
     )
-    print(f"Successfully claimed '{name}' on PyPI: https://pypi.org/project/{name}/")
+    if not effects.previewing():
+        print(f"Successfully claimed '{name}' on PyPI: https://pypi.org/project/{name}/")

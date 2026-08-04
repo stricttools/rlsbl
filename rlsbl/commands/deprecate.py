@@ -109,21 +109,9 @@ def run_cmd(args, flags, project_root):
         print("Cannot verify whether this is the latest release. Aborting for safety.", file=sys.stderr)
         sys.exit(1)
 
-    # Confirmation prompt (skipped with --yes or --dry-run)
-    if not dry_run and not flags.get("yes"):
-        prompt = f"Will mark {tag} as deprecated. Continue? [y/N] "
-        try:
-            answer = input(prompt).strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print(
-                f"\nError: stdin is not interactive; pass --yes to confirm "
-                f"marking {tag} as deprecated.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if answer != "y":
-            print("Aborted.")
-            sys.exit(0)
+    # No hand-rolled prompt: `release deprecate` is a mutating command, so
+    # strictcli confirms before dispatch and --yes skips it, with one prompt
+    # wording and one non-interactive error across every rlsbl command.
 
     _soft_deprecate(tag, reason, use, dry_run)
 

@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from rlsbl.commands.deprecate import run_cmd, _build_notice
+from conftest import cli_ctx
 
 
 class TestSoftDeprecate(unittest.TestCase):
@@ -198,36 +199,34 @@ class TestBuildNotice(unittest.TestCase):
         self.assertEqual(result, "> **Deprecated:** Use v0.9.2 instead.")
 
 
-class TestDeprecateConfirmationEOF:
-    """A non-interactive stdin at the deprecate confirmation prompt must fail
-    with a clean hard error naming the deprecation consequence and the --yes
-    remediation -- never publish an edit, never a bare 'Aborted.'."""
+class TestDeprecateNoLongerPromptsItself:
+    """The confirmation belongs to the framework, not to this command.
 
-    @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
+    `release deprecate` is classified `mutating`, so strictcli asks once,
+    before dispatch, in the one wording every rlsbl command uses -- and refuses
+    on a non-interactive stdin with the one `--yes` remediation.  The command's
+    own prompt is deleted rather than kept alongside it.
+    """
+
     @patch("rlsbl.commands.deprecate.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.deprecate.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.deprecate.run_gh")
     @patch("rlsbl.commands.deprecate.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.deprecate.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_eof_at_confirmation_errors_with_remediation(
-        self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, exc, capsys,
+    def test_no_input_call_and_the_edit_proceeds(
+        self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth,
     ):
         mock_run_gh.side_effect = [
             "",         # gh release view v0.9.1 (exists check)
             "v0.9.2",   # gh release list (latest, not our target)
+            "",         # gh release view --json body
+            "",         # gh release edit
         ]
-        with patch("builtins.input", side_effect=exc()):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd(["0.9.1"], {"yes": False}, project_root=".")
-        assert exc_info.value.code == 1
-        err = capsys.readouterr().err
-        assert "--yes" in err
-        assert "deprecated" in err
-        # The gh release edit (the deprecation write) must never have run.
+        with patch("builtins.input", side_effect=AssertionError("must not prompt")):
+            run_cmd(["0.9.1"], {"yes": False}, project_root=".")
         edit_calls = [c for c in mock_run_gh.call_args_list
                       if c[0][0] and "edit" in c[0][0]]
-        assert edit_calls == []
-
+        assert edit_calls, "the deprecation edit must run once confirmed"
 
 class TestCmdReleaseDeprecateDelegation:
     """Verify the CLI handler delegates correctly to the command module."""
@@ -236,10 +235,7 @@ class TestCmdReleaseDeprecateDelegation:
     @patch("rlsbl.commands.deprecate.run_cmd")
     def test_delegates(self, mock_run, _):
         import rlsbl
-        rlsbl.cmd_release_deprecate(None, quiet=False, 
-            reason="security", use="1.2.4",
-            dry_run=True, yes=True, version="1.2.3",
-        )
+        rlsbl.cmd_release_deprecate(cli_ctx(dry_run=True, yes=True), reason="security", use="1.2.4", version="1.2.3")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][1]
         assert flags["reason"] == "security"

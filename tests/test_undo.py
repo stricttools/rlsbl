@@ -293,32 +293,18 @@ class TestDryRun:
 # (b2) Non-interactive stdin at the two undo prompts
 # --------------------------------------------------------------------------- #
 
-class TestPromptEOF:
-    """EOF/KeyboardInterrupt handling at undo's two confirmation prompts."""
+class TestNoOwnPrompts:
+    """`release undo` asks nothing of its own any more.
 
-    @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
-    def test_eof_at_destructive_prompt_errors_with_remediation(self, tmp_path, monkeypatch, capsys, exc):
-        """The pre-op destructive prompt: a closed stdin must hard-error naming
-        the rollback consequence and the --yes remediation, and touch nothing."""
-        repo = tmp_path / "repo"
-        _make_released_repo(repo, n_commits=3)
-        monkeypatch.chdir(repo)
+    It is classified `mutating`, so strictcli confirms the whole operation once
+    before dispatch (and refuses on a non-interactive stdin with the `--yes`
+    remediation).  The command used to ask twice on top of that: once
+    "This is destructive. Proceed?" before starting, and once "Push changes to
+    remote?" halfway through the rollback -- the second of which could leave
+    the remote holding the release that had just been undone locally.
+    """
 
-        head_before = git(repo, "rev-parse", "HEAD")
-        with patch("builtins.input", side_effect=exc()):
-            with pytest.raises(SystemExit) as exc_info:
-                _run_undo(repo, {})
-        assert exc_info.value.code == 1
-        err = capsys.readouterr().err
-        assert "--yes" in err
-        assert "rollback" in err.lower()
-        # Nothing destructive happened before the prompt refusal.
-        assert git(repo, "rev-parse", "HEAD") == head_before
-
-    def test_eof_at_push_prompt_skips_push_but_completes(self, tmp_path, monkeypatch, capsys):
-        """The post-revert push prompt is fail-safe: a closed stdin skips the
-        push (should_push stays False) but the undo still completes, with an
-        informational hint that --yes would have pushed."""
+    def test_rollback_runs_without_prompting_and_pushes(self, tmp_path, monkeypatch, capsys):
         repo = tmp_path / "repo"
         _make_released_repo(repo, n_commits=3)
         monkeypatch.chdir(repo)
@@ -329,14 +315,10 @@ class TestPromptEOF:
              patch("rlsbl.commands.undo.run_gh", side_effect=gh), \
              patch("rlsbl.commands.undo.run_evidence_gate", side_effect=_cleared_gate), \
              patch("rlsbl.commands.undo.push_if_needed") as mock_push, \
-             patch("builtins.input", side_effect=["y", EOFError()]):
+             patch("builtins.input", side_effect=AssertionError("must not prompt")):
             run_cmd("npm", [], {}, ctx=_ctx(repo))
 
-        mock_push.assert_not_called()
-        out = capsys.readouterr().out
-        assert "--yes" in out
-        assert "push" in out.lower()
-        # The undo still ran to completion (reverts applied).
+        mock_push.assert_called_once()
         pkg = json.loads((repo / "package.json").read_text())
         assert pkg["version"] == "1.0.0"
 

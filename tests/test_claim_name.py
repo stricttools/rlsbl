@@ -64,7 +64,10 @@ class TestClaimName:
         assert build_call[0][0] == ["uv", "build"]
         assert build_call[1]["cwd"] == str(real_tmpdir)
         publish_call = mock_run.call_args_list[1]
-        assert publish_call[0][0] == ["uv", "publish", "--token", "tok456"]
+        # The token rides the environment, never argv: a process listing and
+        # the dry-run would-do log both see the command without the secret.
+        assert publish_call[0][0] == ["uv", "publish"]
+        assert publish_call[1]["env"]["UV_PUBLISH_TOKEN"] == "tok456"
         assert publish_call[1]["cwd"] == str(real_tmpdir)
         # Verify pyproject.toml was written
         toml_text = (real_tmpdir / "pyproject.toml").read_text()
@@ -204,97 +207,113 @@ class TestClaimName:
         assert exc_info.value.code == 1
 
 
-class TestClaimNameDryRun:
-    """--dry-run must run all preconditions (availability + token) but never
-    create a tempdir or invoke a publish subprocess, and must not prompt."""
+class TestClaimNamePreview:
+    """`--dry-run` publishes nothing and RECORDS what it would publish.
 
-    @patch("builtins.input", return_value="n")
-    @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
-    @patch("rlsbl.effects.run")
-    @patch("rlsbl.commands.check._check_single_name")
-    def test_npm_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_input, capsys):
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
-        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": True})
-        mock_run.assert_not_called()
-        mock_mkdtemp.assert_not_called()
-        mock_input.assert_not_called()
-        out = capsys.readouterr().out
-        assert "would publish" in out.lower()
-        assert "my-pkg" in out
+    This command is the reason the chokepoint exists: a hand-rolled dry-run
+    branch once sat above the publish and a later edit walked around it, so a
+    "dry run" claimed a name for real.  There is no branch to walk around any
+    more -- the writes and the publish go through the effect chokepoint, and
+    under --dry-run the framework records them instead of performing them.
+    """
 
-    @patch("builtins.input", return_value="n")
-    @patch("rlsbl.commands.claim_name.tempfile.mkdtemp")
-    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
-    def test_pypi_dry_run_does_not_publish(self, mock_check, mock_run, mock_mkdtemp, mock_input, capsys):
-        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", "status": "available", "variants": None, "reason": None}
-        with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
-            run_cmd("pypi", ["my-pkg"], {"yes": False, "dry-run": True})
-        mock_run.assert_not_called()
-        mock_mkdtemp.assert_not_called()
-        mock_input.assert_not_called()
-        out = capsys.readouterr().out
-        assert "would publish" in out.lower()
+    def test_npm_preview_records_the_publish_and_runs_nothing(
+        self, mock_check, monkeypatch, tmp_path,
+    ):
+        mock_check.return_value = {
+            "name": "my-pkg", "registry": "npm", "status": "available",
+            "variants": None, "reason": None,
+        }
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("NPM_TOKEN", "tok123")
+        ran = []
+        monkeypatch.setattr(
+            "rlsbl._effects_direct.run",
+            lambda *a, **k: ran.append(a) or MagicMock(returncode=0),
+        )
+
+        import rlsbl
+        rlsbl._variadic_args = ["my-pkg"]
+        try:
+            result = rlsbl.app.test(
+                ["--dry-run", "--yes", "claim-name", "--target", "npm"]
+            )
+        finally:
+            rlsbl._variadic_args = []
+
+        assert result.exit_code == 0, result.stderr
+        assert ran == [], "a preview must not run a publish"
+        assert "write: " in result.stdout and "package.json" in result.stdout
+        assert "run: npm publish --access public" in result.stdout, result.stdout
+
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_pypi_preview_never_renders_the_token(
+        self, mock_check, monkeypatch, tmp_path,
+    ):
+        """The would-do log is printed output: a secret in argv would leak."""
+        mock_check.return_value = {
+            "name": "my-pkg", "registry": "pypi", "status": "available",
+            "variants": None, "reason": None,
+        }
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("PYPI_TOKEN", "s3cr3t-token-value")
+        monkeypatch.setattr(
+            "rlsbl._effects_direct.run",
+            lambda *a, **k: pytest.fail("a preview must not run a publish"),
+        )
+
+        import rlsbl
+        rlsbl._variadic_args = ["my-pkg"]
+        try:
+            result = rlsbl.app.test(
+                ["--dry-run", "--yes", "claim-name", "--target", "pypi"]
+            )
+        finally:
+            rlsbl._variadic_args = []
+
+        assert result.exit_code == 0, result.stderr
+        assert "run: uv publish" in result.stdout, result.stdout
+        assert "s3cr3t-token-value" not in result.stdout
+        assert "s3cr3t-token-value" not in result.stderr
+
 
 class TestClaimNameConfirmation:
-    """An available name with neither --yes nor --dry-run must prompt before
-    publishing; declining aborts before any publish, accepting proceeds."""
+    """The publish confirmation is the framework's, not this command's.
 
-    @patch("builtins.input", return_value="n")
-    @patch("rlsbl.effects.run")
-    @patch("rlsbl.commands.check._check_single_name")
-    def test_available_prompt_declined_aborts(self, mock_check, mock_run, mock_input):
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
-        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": False})
-        assert exc_info.value.code == 1
-        mock_input.assert_called_once()
-        mock_run.assert_not_called()
+    `claim-name` is classified `mutating`, so strictcli prompts before dispatch
+    and `--yes` skips it.  The command's own prompt (and its own non-TTY error)
+    is deleted: two confirmations for one decision, worded differently, is how
+    a user learns to answer without reading.
+    """
 
-    @patch("builtins.input", return_value="y")
-    @patch("rlsbl.effects.run")
+    @patch("builtins.input")
+    @patch("rlsbl._effects_direct.run")
     @patch("rlsbl.commands.check._check_single_name")
-    def test_available_prompt_accepted_publishes(self, mock_check, mock_run, mock_input, real_tmpdir):
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
+    def test_command_no_longer_prompts_itself(
+        self, mock_check, mock_run, mock_input, real_tmpdir,
+    ):
+        mock_check.return_value = {
+            "name": "my-pkg", "registry": "npm", "status": "available",
+            "variants": None, "reason": None,
+        }
         mock_run.return_value = MagicMock(returncode=0)
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": False})
-        mock_input.assert_called_once()
+            run_cmd("npm", ["my-pkg"], {"yes": False})
+        mock_input.assert_not_called()
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == ["npm", "publish", "--access", "public"]
 
     @patch("builtins.input")
-    @patch("rlsbl.effects.run")
+    @patch("rlsbl._effects_direct.run")
     @patch("rlsbl.commands.check._check_single_name")
-    def test_yes_skips_prompt_and_publishes(self, mock_check, mock_run, mock_input, real_tmpdir):
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
+    def test_yes_publishes(self, mock_check, mock_run, mock_input, real_tmpdir):
+        mock_check.return_value = {
+            "name": "my-pkg", "registry": "npm", "status": "available",
+            "variants": None, "reason": None,
+        }
         mock_run.return_value = MagicMock(returncode=0)
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"yes": True, "dry-run": False})
+            run_cmd("npm", ["my-pkg"], {"yes": True})
         mock_input.assert_not_called()
         mock_run.assert_called_once()
-
-
-class TestClaimNamePublishPromptEOF:
-    """A closed/non-interactive stdin at the publish-placeholder prompt must
-    fail with a clean hard error naming the consequence and the --yes
-    remediation -- never an EOFError traceback."""
-
-    @pytest.mark.parametrize("exc", [EOFError, KeyboardInterrupt])
-    @patch("rlsbl.effects.run")
-    @patch("rlsbl.commands.check._check_single_name")
-    def test_publish_prompt_eof_errors_with_remediation(self, mock_check, mock_run, exc, capsys):
-        mock_check.return_value = {"name": "my-pkg", "registry": "npm", "status": "available", "variants": None, "reason": None}
-        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}), \
-             patch("builtins.input", side_effect=exc()):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-pkg"], {"yes": False, "dry-run": False})
-        assert exc_info.value.code == 1
-        err = capsys.readouterr().err
-        assert "--yes" in err
-        assert "placeholder" in err
-        assert "npm" in err
-        # Never published on abort.
-        mock_run.assert_not_called()

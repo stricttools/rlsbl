@@ -671,25 +671,17 @@ def _execute_plan(plan, uc, flags, ctx):
         _restore_release_file(plan, uc, results)
 
     # 7. Push the branch (revert + restore + audit commits) to remote
-    should_push = flags.get("yes")
-    if not should_push:
-        try:
-            answer = input("\nPush changes to remote? [y/N] ").strip().lower()
-            should_push = answer == "y"
-        except (EOFError, KeyboardInterrupt):
-            should_push = False
-            print(
-                "\nSkipping push (stdin is not interactive); "
-                "pass --yes to push the rollback commits to origin."
-            )
-    if should_push:
-        try:
-            branch = get_current_branch(cwd=plan.project_path)
-            push_if_needed(branch, config=ctx.config, cwd=plan.project_path)
-            results.append(("Push", OK, "-"))
-        except Exception:
-            traceback.print_exc()
-            results.append(("Push", FAILED, "git push"))
+    # No second prompt: strictcli already confirmed this mutating command
+    # before dispatch (--yes skips that one), and asking again mid-rollback
+    # left the remote holding the release this command had just undone
+    # locally -- the half-undone state the rollback exists to avoid.
+    try:
+        branch = get_current_branch(cwd=plan.project_path)
+        push_if_needed(branch, config=ctx.config, cwd=plan.project_path)
+        results.append(("Push", OK, "-"))
+    except Exception:
+        traceback.print_exc()
+        results.append(("Push", FAILED, "git push"))
 
     # 8. Summary + state cleanup
     has_failure = any(status == FAILED for _, status, _ in results)
@@ -727,18 +719,9 @@ def run_cmd(registry, args, flags, *, ctx):
         print("\n[dry-run] No changes were made.")
         return
 
-    if not flags.get("yes"):
-        try:
-            answer = input("\nThis is destructive. Proceed? [y/N] ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print(
-                "\nError: stdin is not interactive; pass --yes to confirm "
-                "this destructive release rollback.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if answer != "y":
-            print("Aborted.")
-            sys.exit(0)
+    # The destructive-operation confirmation is the framework's: `release
+    # undo` is a mutating command, so strictcli prompts before dispatch and
+    # --yes skips it.  A second prompt here asked the same question in
+    # different words and had its own non-interactive error text.
 
     _execute_plan(plan, uc, flags, ctx)

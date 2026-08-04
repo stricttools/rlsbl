@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 
 import rlsbl
+from conftest import cli_ctx
 
 
 # ============================================================================
@@ -144,11 +145,7 @@ class TestCmdReleaseRun:
     def test_exits_from_monorepo_root(self, mock_ctx, *_):
         mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
-                dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0,
-                bump="", description="", preid="",
-            )
+            rlsbl.cmd_release_run(cli_ctx(yes=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="")
         assert exc.value.code == 1
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake/project"))
@@ -158,11 +155,7 @@ class TestCmdReleaseRun:
     @patch("os.path.exists", return_value=False)
     def test_exits_when_no_release_file(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
-                dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0,
-                bump="", description="", preid="",
-            )
+            rlsbl.cmd_release_run(cli_ctx(yes=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="")
         assert exc.value.code == 1
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake/project"))
@@ -173,11 +166,7 @@ class TestCmdReleaseRun:
     @patch("rlsbl.release_file.read_release_file", side_effect=rlsbl.ReleaseFileError("bad"))
     def test_exits_on_release_file_error(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
-                dry_run=False, yes=True, quiet=False,
-                allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0,
-                bump="", description="", preid="",
-            )
+            rlsbl.cmd_release_run(cli_ctx(yes=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="")
         assert exc.value.code == 1
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake/project"))
@@ -189,11 +178,7 @@ class TestCmdReleaseRun:
     @patch("rlsbl.commands.release.run_cmd")
     def test_delegates_to_release_run_cmd(self, mock_run, mock_read, *_):
         mock_read.return_value = MagicMock()
-        rlsbl.cmd_release_run(None, 
-            dry_run=True, yes=True, quiet=False,
-            allow_dirty=True, watch=True, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0,
-            bump="", description="", preid="",
-        )
+        rlsbl.cmd_release_run(cli_ctx(dry_run=True, yes=True), allow_dirty=True, watch=True, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="")
         mock_run.assert_called_once()
         call_args = mock_run.call_args
         flags = call_args[0][1]
@@ -211,7 +196,7 @@ class TestCmdReleaseInit:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.release_init.run_cmd")
     def test_delegates(self, mock_run, _):
-        rlsbl.cmd_release_init(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_release_init(cli_ctx())
         mock_run.assert_called_once_with(project_root=Path("/fake"))
 
 
@@ -230,10 +215,7 @@ class TestCmdReleaseRetry:
     @patch("rlsbl.release_file.read_retry_file", side_effect=rlsbl.ReleaseFileError("bad"))
     def test_exits_on_retry_file_error(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_retry(None, 
-                dry_run=False, yes=True, quiet=False,
-                watch=False,
-            )
+            rlsbl.cmd_release_retry(cli_ctx(yes=True), watch=False)
         assert exc.value.code == 1
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
@@ -241,10 +223,7 @@ class TestCmdReleaseRetry:
     @patch("os.path.exists", return_value=False)
     @patch("rlsbl.commands.release_retry.run_cmd")
     def test_passes_none_config_when_no_file(self, mock_run, *_):
-        rlsbl.cmd_release_retry(None, 
-            dry_run=True, yes=False, quiet=False,
-            watch=True,
-        )
+        rlsbl.cmd_release_retry(cli_ctx(dry_run=True), watch=True)
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] is None
         flags = mock_run.call_args[0][1]
@@ -263,7 +242,7 @@ class TestCmdStatus:
     @patch("rlsbl._resolve_target", return_value="npm")
     @patch("rlsbl.commands.status.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_status(None, dry_run=False, yes=False, quiet=False, target="npm", json=True, registry=False)
+        rlsbl.cmd_status(cli_ctx(), target="npm", json=True, registry=False)
         mock_run.assert_called_once()
         assert mock_run.call_args[0][2] == {"json": True, "registry": False}
 
@@ -278,12 +257,12 @@ class TestCmdCheckName:
 
     def test_exits_when_no_target(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=[], delay="200", json=False)
+            rlsbl.cmd_check_name(cli_ctx(), target=[], delay="200", json=False)
         assert exc.value.code == 1
 
     def test_exits_on_invalid_targets(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["bogus"], delay="200", json=False)
+            rlsbl.cmd_check_name(cli_ctx(), target=["bogus"], delay="200", json=False)
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.check.run_cmd")
@@ -291,7 +270,7 @@ class TestCmdCheckName:
         rlsbl._variadic_args = ["my-package"]
         mock_run.return_value = (0, [])
         with pytest.raises(SystemExit):
-            rlsbl.cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["npm", "pypi"], delay="500", json=False)
+            rlsbl.cmd_check_name(cli_ctx(), target=["npm", "pypi"], delay="500", json=False)
         assert mock_run.call_count == 2
         assert mock_run.call_args_list[0][0][0] == "npm"
         assert mock_run.call_args_list[1][0][0] == "pypi"
@@ -307,24 +286,24 @@ class TestCmdClaimName:
 
     def test_exits_when_no_target(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(None, dry_run=False, quiet=False, target="", yes=False)
+            rlsbl.cmd_claim_name(cli_ctx(), target="")
         assert exc.value.code == 1
 
     def test_exits_on_invalid_target(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(None, dry_run=False, quiet=False, target="bogus", yes=False)
+            rlsbl.cmd_claim_name(cli_ctx(), target="bogus")
         assert exc.value.code == 1
 
     def test_exits_when_multiple_names(self):
         rlsbl._variadic_args = ["name1", "name2"]
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(None, dry_run=False, quiet=False, target="npm", yes=False)
+            rlsbl.cmd_claim_name(cli_ctx(), target="npm")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.claim_name.run_cmd")
     def test_delegates(self, mock_run):
         rlsbl._variadic_args = ["my-package"]
-        rlsbl.cmd_claim_name(None, dry_run=False, quiet=False, target="npm", yes=True)
+        rlsbl.cmd_claim_name(cli_ctx(yes=True), target="npm")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == "npm"
 
@@ -338,7 +317,7 @@ class TestCmdReleaseEdit:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.edit_release.run_cmd")
     def test_with_version(self, mock_run, _):
-        rlsbl.cmd_release_edit(None, yes=False, quiet=False, dry_run=True, version="1.2.3")
+        rlsbl.cmd_release_edit(cli_ctx(dry_run=True), version="1.2.3")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == ["1.2.3"]
         assert mock_run.call_args[0][1] == {"dry-run": True}
@@ -346,7 +325,7 @@ class TestCmdReleaseEdit:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.edit_release.run_cmd")
     def test_without_version(self, mock_run, _):
-        rlsbl.cmd_release_edit(None, yes=False, quiet=False, dry_run=False)
+        rlsbl.cmd_release_edit(cli_ctx())
         assert mock_run.call_args[0][0] == []
 
 
@@ -361,7 +340,7 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_release_undo(None, quiet=False, target="npm", version="", yes=True, dry_run=False)
+        rlsbl.cmd_release_undo(cli_ctx(yes=True), target="npm", version="")
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["ctx"] is not None
         flags = mock_run.call_args[0][2]
@@ -373,7 +352,7 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates_with_version(self, mock_run, *_):
-        rlsbl.cmd_release_undo(None, quiet=False, target="", version="0.9.0", yes=True, dry_run=False)
+        rlsbl.cmd_release_undo(cli_ctx(yes=True), target="", version="0.9.0")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][2]
         assert flags["version"] == "0.9.0"
@@ -383,7 +362,7 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates_dry_run(self, mock_run, *_):
-        rlsbl.cmd_release_undo(None, quiet=False, target="", version="", yes=False, dry_run=True)
+        rlsbl.cmd_release_undo(cli_ctx(dry_run=True), target="", version="")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][2]
         assert flags["dry-run"] is True
@@ -398,10 +377,7 @@ class TestCmdReleaseDeprecate:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.deprecate.run_cmd")
     def test_delegates(self, mock_run, _):
-        rlsbl.cmd_release_deprecate(None, quiet=False, 
-            reason="security", use="1.2.4",
-            dry_run=True, yes=True, version="1.2.3",
-        )
+        rlsbl.cmd_release_deprecate(cli_ctx(dry_run=True, yes=True), reason="security", use="1.2.4", version="1.2.3")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][1]
         assert flags["reason"] == "security"
@@ -420,11 +396,7 @@ class TestCmdReleaseScrub:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.release_scrub.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_release_scrub(None, quiet=False, 
-            pattern="secret", file=None, recipe=None, replace="XXX",
-            mangle=False, from_commit="abc123", entire_history=False,
-            reason="test", dry_run=True, yes=True,
-        )
+        rlsbl.cmd_release_scrub(cli_ctx(dry_run=True, yes=True), pattern="secret", file=None, recipe=None, replace="XXX", mangle=False, from_commit="abc123", entire_history=False, reason="test")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][0]
         assert flags["pattern"] == "secret"
@@ -538,7 +510,7 @@ class TestReleaseScrubCliParsing:
 class TestCmdDiscover:
     @patch("rlsbl.commands.discover.run_cmd")
     def test_delegates(self, mock_run):
-        rlsbl.cmd_discover(None, dry_run=False, yes=False, quiet=False, mine=True)
+        rlsbl.cmd_discover(cli_ctx(), mine=True)
         mock_run.assert_called_once()
         assert mock_run.call_args[0][2] == {"mine": True}
 
@@ -551,18 +523,18 @@ class TestCmdDiscover:
 class TestCmdWatch:
     def test_sha_and_run_id_mutual_exclusion(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=["123"], sha="abc")
+            rlsbl.cmd_watch(cli_ctx(), target="", run_id=["123"], sha="abc")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.watch.run_cmd")
     def test_sha_only(self, mock_run):
-        rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="npm", run_id=[], sha="abc123")
+        rlsbl.cmd_watch(cli_ctx(), target="npm", run_id=[], sha="abc123")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == ["abc123"]
 
     @patch("rlsbl.commands.watch.run_cmd")
     def test_no_args_uses_head(self, mock_run):
-        rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=[])
+        rlsbl.cmd_watch(cli_ctx(), target="", run_id=[])
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == []
 
@@ -575,7 +547,7 @@ class TestCmdWatch:
 class TestCmdPrePushCheck:
     def test_exits_with_removed_message(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_pre_push_check(None, dry_run=False, yes=False, quiet=False)
+            rlsbl.cmd_pre_push_check(cli_ctx())
         assert exc.value.code == 1
 
 
@@ -587,7 +559,7 @@ class TestCmdPrePushCheck:
 class TestCmdPrs:
     @patch("rlsbl.commands.prs.run_cmd")
     def test_delegates(self, mock_run):
-        rlsbl.cmd_prs(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_prs(cli_ctx())
         mock_run.assert_called_once_with(None, [], {})
 
 
@@ -600,7 +572,7 @@ class TestCmdUnreleased:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.unreleased.run_cmd")
     def test_delegates(self, mock_run, _):
-        rlsbl.cmd_unreleased(None, dry_run=False, yes=False, quiet=False, json=True)
+        rlsbl.cmd_unreleased(cli_ctx(), json=True)
         mock_run.assert_called_once()
         assert mock_run.call_args[0][2] == {"json": True}
 
@@ -614,7 +586,7 @@ class TestCmdTargets:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.targets_cmd.run_cmd")
     def test_delegates(self, mock_run, _):
-        rlsbl.cmd_targets(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_targets(cli_ctx())
         mock_run.assert_called_once()
 
 
@@ -628,7 +600,7 @@ class TestCmdDeploy:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.deploy_cmd.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_deploy(None, yes=False, quiet=False, target="npm", dry_run=True, target_name="staging")
+        rlsbl.cmd_deploy(cli_ctx(dry_run=True), target="npm", target_name="staging")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == ["staging"]
         assert mock_run.call_args[0][2]["dry-run"] is True
@@ -643,13 +615,13 @@ class TestCmdCommit:
     def test_exits_when_no_files(self):
         rlsbl._variadic_args = []
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_commit(None, dry_run=False, yes=False, quiet=False, message="test")
+            rlsbl.cmd_commit(cli_ctx(), message="test")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.commit_cmd.run_cmd")
     def test_delegates(self, mock_run):
         rlsbl._variadic_args = ["file1.txt", "file2.txt"]
-        rlsbl.cmd_commit(None, dry_run=False, yes=False, quiet=False, message="test commit")
+        rlsbl.cmd_commit(cli_ctx(), message="test commit")
         mock_run.assert_called_once_with("test commit", ["file1.txt", "file2.txt"])
 
 
@@ -662,11 +634,7 @@ class TestCmdChlogAdd:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.changelog_cmd.cmd_add")
     def test_delegates(self, mock_add, _):
-        rlsbl.cmd_chlog_add(None, yes=False, quiet=False, 
-            commits="abc123", description="New feature", type="feature",
-            user_facing=True, auto_commit=False, allow_batch=False,
-            dry_run=False,
-        )
+        rlsbl.cmd_chlog_add(cli_ctx(), commits="abc123", description="New feature", type="feature", user_facing=True, auto_commit=False, allow_batch=False)
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][0]
         assert flags["commits"] == "abc123"
@@ -678,7 +646,7 @@ class TestCmdChlogGenerate:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.changelog_cmd.cmd_generate")
     def test_delegates(self, mock_gen, _):
-        rlsbl.cmd_chlog_generate(None, yes=False, quiet=False, dry_run=True, auto_commit=True)
+        rlsbl.cmd_chlog_generate(cli_ctx(dry_run=True), auto_commit=True)
         mock_gen.assert_called_once()
         flags = mock_gen.call_args[0][0]
         assert flags["dry-run"] is True
@@ -688,11 +656,7 @@ class TestCmdChlogAmend:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.changelog_cmd.cmd_amend")
     def test_delegates(self, mock_amend, _):
-        rlsbl.cmd_chlog_amend(None, yes=False, quiet=False, 
-            version="1.0.0", commits="abc", id="", description="fix",
-            type="fix", user_facing=True, validate_hashes=False,
-            dry_run=False,
-        )
+        rlsbl.cmd_chlog_amend(cli_ctx(), version="1.0.0", commits="abc", id="", description="fix", type="fix", user_facing=True, validate_hashes=False)
         mock_amend.assert_called_once()
         flags = mock_amend.call_args[0][0]
         assert flags["version"] == "1.0.0"
@@ -704,11 +668,7 @@ class TestCmdChlogEdit:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.changelog_cmd.cmd_edit")
     def test_delegates(self, mock_edit, _):
-        rlsbl.cmd_chlog_edit(None, yes=False, quiet=False, 
-            commits="abc", id="", type="fix", description="updated",
-            user_facing=True, auto_commit=True,
-            dry_run=False,
-        )
+        rlsbl.cmd_chlog_edit(cli_ctx(), commits="abc", id="", type="fix", description="updated", user_facing=True, auto_commit=True)
         mock_edit.assert_called_once()
         flags = mock_edit.call_args[0][0]
         assert flags["user-facing"] is True
@@ -724,7 +684,7 @@ class TestCmdMonoInit:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_init")
     def test_delegates(self, mock_init, _):
-        rlsbl.cmd_mono_init(None, dry_run=False, yes=False, quiet=False, auto_commit=False)
+        rlsbl.cmd_mono_init(cli_ctx(), auto_commit=False)
         mock_init.assert_called_once()
         assert mock_init.call_args[0][0]["auto-commit"] is False
 
@@ -733,13 +693,7 @@ class TestCmdMonoAdd:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_add")
     def test_delegates_with_all_flags(self, mock_add, _):
-        rlsbl.cmd_mono_add(None, dry_run=False, yes=False, quiet=False,
-            name="mylib", target="npm", watch="*.ts,*.js",
-            subtree_remote="git@github.com:user/mylib.git",
-            depends_on="core,utils", library="true", dev_only="true",
-            releasable="core", registry_name="mylib-npm", auto_commit=False,
-            path="packages/mylib",
-        )
+        rlsbl.cmd_mono_add(cli_ctx(), name="mylib", target="npm", watch="*.ts,*.js", subtree_remote="git@github.com:user/mylib.git", depends_on="core,utils", library="true", dev_only="true", releasable="core", registry_name="mylib-npm", auto_commit=False, path="packages/mylib")
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][1]
         assert flags["name"] == "mylib"
@@ -752,7 +706,7 @@ class TestCmdMonoRemove:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_remove")
     def test_delegates(self, mock_remove, _):
-        rlsbl.cmd_mono_remove(None, dry_run=False, yes=False, quiet=False, path="packages/old")
+        rlsbl.cmd_mono_remove(cli_ctx(), path="packages/old")
         mock_remove.assert_called_once_with(["packages/old"], {}, project_root=Path("/fake"))
 
 
@@ -760,7 +714,7 @@ class TestCmdMonoList:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_list")
     def test_delegates(self, mock_list, _):
-        rlsbl.cmd_mono_list(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_mono_list(cli_ctx())
         mock_list.assert_called_once()
 
 
@@ -768,7 +722,7 @@ class TestCmdMonoSync:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_sync")
     def test_delegates(self, mock_sync, _):
-        rlsbl.cmd_mono_sync(None, dry_run=False, yes=False, quiet=False, auto_commit=False)
+        rlsbl.cmd_mono_sync(cli_ctx(), auto_commit=False)
         mock_sync.assert_called_once()
 
 
@@ -776,7 +730,7 @@ class TestCmdMonoStatus:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_status")
     def test_delegates(self, mock_status, _):
-        rlsbl.cmd_mono_status(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_mono_status(cli_ctx())
         mock_status.assert_called_once()
 
 
@@ -785,9 +739,7 @@ class TestCmdMonoCheckNames:
     @patch("rlsbl.commands.monorepo._cmd_check_names")
     def test_delegates(self, mock_check, _):
         rlsbl._variadic_args = ["pkg-a"]
-        rlsbl.cmd_mono_check_names(None, dry_run=False, yes=False, quiet=False, 
-            target="npm", prefix="@scope/", suffix="", delay="500",
-        )
+        rlsbl.cmd_mono_check_names(cli_ctx(), target="npm", prefix="@scope/", suffix="", delay="500")
         mock_check.assert_called_once()
         flags = mock_check.call_args[0][1]
         assert flags["prefix"] == "@scope/"
@@ -797,7 +749,7 @@ class TestCmdMonoReleaseOrder:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_release_order")
     def test_delegates(self, mock_order, _):
-        rlsbl.cmd_mono_release_order(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_mono_release_order(cli_ctx())
         mock_order.assert_called_once()
 
 
@@ -805,7 +757,7 @@ class TestCmdMonoOutdated:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_outdated")
     def test_delegates(self, mock_out, _):
-        rlsbl.cmd_mono_outdated(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_mono_outdated(cli_ctx())
         mock_out.assert_called_once()
 
 
@@ -813,16 +765,16 @@ class TestCmdMonoSnapshot:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_snapshot")
     def test_delegates(self, mock_snap, _):
-        rlsbl.cmd_mono_snapshot(None, dry_run=False, yes=False, quiet=False, check=True)
+        rlsbl.cmd_mono_snapshot(cli_ctx())
         mock_snap.assert_called_once()
-        assert mock_snap.call_args[0][0]["check"] is True
+        assert mock_snap.call_args[0][0] == {}
 
 
 class TestCmdMonoMirror:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_mirror")
     def test_delegates(self, mock_mirror, _):
-        rlsbl.cmd_mono_mirror(None, dry_run=False, yes=False, quiet=False, project="mylib")
+        rlsbl.cmd_mono_mirror(cli_ctx(), project="mylib")
         mock_mirror.assert_called_once()
         assert mock_mirror.call_args[0][0]["project"] == "mylib"
 
@@ -831,10 +783,7 @@ class TestCmdMonoGraph:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_graph")
     def test_delegates_with_options(self, mock_graph, _):
-        rlsbl.cmd_mono_graph(None, dry_run=False, yes=False, quiet=False, 
-            format="dot", output="graph.dot", root="core",
-            reverse="", depth=3,
-        )
+        rlsbl.cmd_mono_graph(cli_ctx(), format="dot", output="graph.dot", root="core", reverse="", depth=3)
         mock_graph.assert_called_once()
         flags = mock_graph.call_args[0][0]
         assert flags["format"] == "dot"
@@ -849,7 +798,7 @@ class TestCmdMonoImpact:
     @patch("rlsbl.commands.monorepo._cmd_impact")
     def test_delegates(self, mock_impact, _):
         rlsbl._variadic_args = ["packages/core"]
-        rlsbl.cmd_mono_impact(None, dry_run=False, yes=False, quiet=False, format="json", depth=2, since="HEAD~3")
+        rlsbl.cmd_mono_impact(cli_ctx(), format="json", depth=2, since="HEAD~3")
         mock_impact.assert_called_once()
         flags = mock_impact.call_args[0][1]
         assert flags["since"] == "HEAD~3"
@@ -860,7 +809,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_delegates(self, mock_release, _):
-        rlsbl.cmd_mono_release_run(None, dry_run=True, yes=True, quiet=False, allow_dirty=True, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0)
+        rlsbl.cmd_mono_release_run(cli_ctx(dry_run=True, yes=True), allow_dirty=True, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0)
         mock_release.assert_called_once()
         flags = mock_release.call_args[0][0]
         assert flags["allow-dirty"] is True
@@ -868,7 +817,7 @@ class TestCmdMonoRelease:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release")
     def test_watch_flag_passed(self, mock_release, _):
-        rlsbl.cmd_mono_release_run(None, dry_run=False, yes=True, quiet=False, allow_dirty=False, watch=True, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0)
+        rlsbl.cmd_mono_release_run(cli_ctx(yes=True), allow_dirty=False, watch=True, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0)
         flags = mock_release.call_args[0][0]
         assert flags["watch"] is True
 
@@ -877,7 +826,7 @@ class TestCmdMonoReleaseInit:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release_init")
     def test_delegates(self, mock_init, _):
-        rlsbl.cmd_mono_release_init(None, dry_run=False, yes=False, quiet=False, packages="core,web")
+        rlsbl.cmd_mono_release_init(cli_ctx(), packages="core,web")
         mock_init.assert_called_once()
         assert mock_init.call_args[1]["packages"] == "core,web"
 
@@ -887,7 +836,7 @@ class TestCmdMonoExtract:
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     def test_exits_when_no_workspace(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract(None, yes=False, quiet=False, dry_run=False, package_name="pkg", target_path="/out")
+            rlsbl.cmd_mono_extract(cli_ctx(), package_name="pkg", target_path="/out")
         assert exc.value.code == 1
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
@@ -898,7 +847,7 @@ class TestCmdMonoExtract:
             "package_name": "pkg", "package_path": "packages/pkg",
             "target_path": "/out",
         }
-        rlsbl.cmd_mono_extract(None, yes=False, quiet=False, dry_run=True, package_name="pkg", target_path="/out")
+        rlsbl.cmd_mono_extract(cli_ctx(dry_run=True), package_name="pkg", target_path="/out")
         mock_extract.assert_called_once()
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
@@ -909,14 +858,14 @@ class TestCmdMonoExtract:
             "package_name": "pkg", "package_path": "packages/pkg",
             "target_path": "/out", "entries_migrated": 5, "files_written": 2,
         }
-        rlsbl.cmd_mono_extract(None, yes=False, quiet=False, dry_run=False, package_name="pkg", target_path="/out")
+        rlsbl.cmd_mono_extract(cli_ctx(), package_name="pkg", target_path="/out")
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
     @patch("rlsbl.commands.monorepo.cmd_extract", side_effect=ValueError("bad"))
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract(None, yes=False, quiet=False, dry_run=False, package_name="pkg", target_path="/out")
+            rlsbl.cmd_mono_extract(cli_ctx(), package_name="pkg", target_path="/out")
         assert exc.value.code == 1
 
 
@@ -925,10 +874,7 @@ class TestCmdMonoAbsorb:
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     def test_exits_when_no_workspace(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
-                dry_run=False, name="", registry_name="", releasable="",
-                source_repo="/src", dest_path="pkgs/pkg",
-            )
+            rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
         assert exc.value.code == 1
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
@@ -939,10 +885,7 @@ class TestCmdMonoAbsorb:
             "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
             "tags_to_import": ["0.1.0", "0.2.0"],
         }
-        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
-            dry_run=True, name="", registry_name="", releasable="core",
-            source_repo="/src", dest_path="pkgs/pkg",
-        )
+        rlsbl.cmd_mono_absorb(cli_ctx(dry_run=True), name="", registry_name="", releasable="core", source_repo="/src", dest_path="pkgs/pkg")
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
@@ -952,10 +895,7 @@ class TestCmdMonoAbsorb:
             "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
             "entries_migrated": 3, "tags_imported": ["pkg@v0.1.0"],
         }
-        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
-            dry_run=False, name="", registry_name="", releasable="",
-            source_repo="/src", dest_path="pkgs/pkg",
-        )
+        rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
@@ -966,10 +906,7 @@ class TestCmdMonoAbsorb:
             "entries_migrated": 1, "tags_imported": ["pkg@v0.1.0"],
             "skipped_tags": ["nightly", "legacy-build"],
         }
-        rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
-            dry_run=False, name="", registry_name="", releasable="",
-            source_repo="/src", dest_path="pkgs/pkg",
-        )
+        rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
         out = capsys.readouterr().out
         assert "Skipped 2 non-version tag(s): nightly, legacy-build" in out
 
@@ -978,10 +915,7 @@ class TestCmdMonoAbsorb:
     @patch("rlsbl.commands.monorepo.cmd_absorb", side_effect=ValueError("bad"))
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_absorb(None, yes=False, quiet=False,
-                dry_run=False, name="", registry_name="", releasable="",
-                source_repo="/src", dest_path="pkgs/pkg",
-            )
+            rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
         assert exc.value.code == 1
 
 
@@ -990,9 +924,7 @@ class TestCmdMonoExtractReleasable:
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     def test_exits_when_no_workspace(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract_releasable(None, yes=False, quiet=False, 
-                dry_run=False, releasable_name="core", target_path="/out",
-            )
+            rlsbl.cmd_mono_extract_releasable(cli_ctx(), releasable_name="core", target_path="/out")
         assert exc.value.code == 1
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
@@ -1003,9 +935,7 @@ class TestCmdMonoExtractReleasable:
             "releasable_name": "core", "is_monorepo": True,
             "target_path": "/out", "member_packages": ["pkg-a", "pkg-b"],
         }
-        rlsbl.cmd_mono_extract_releasable(None, yes=False, quiet=False, 
-            dry_run=True, releasable_name="core", target_path="/out",
-        )
+        rlsbl.cmd_mono_extract_releasable(cli_ctx(dry_run=True), releasable_name="core", target_path="/out")
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
@@ -1016,18 +946,14 @@ class TestCmdMonoExtractReleasable:
             "target_path": "/out", "member_packages": ["pkg-a"],
             "entries_migrated": 5, "files_written": 2,
         }
-        rlsbl.cmd_mono_extract_releasable(None, yes=False, quiet=False, 
-            dry_run=False, releasable_name="core", target_path="/out",
-        )
+        rlsbl.cmd_mono_extract_releasable(cli_ctx(), releasable_name="core", target_path="/out")
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
     @patch("rlsbl.commands.monorepo.cmd_extract_releasable", side_effect=ValueError("bad"))
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract_releasable(None, yes=False, quiet=False, 
-                dry_run=False, releasable_name="core", target_path="/out",
-            )
+            rlsbl.cmd_mono_extract_releasable(cli_ctx(), releasable_name="core", target_path="/out")
         assert exc.value.code == 1
 
 
@@ -1039,19 +965,13 @@ class TestCmdMonoExtractReleasable:
 class TestCmdDevInstall:
     def test_global_and_venv_mutual_exclusion(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_dev_install(None, dry_run=False, yes=False, quiet=False, 
-                all=False, include="", exclude="", uninstall=False,
-                global_=True, venv=True,
-            )
+            rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, global_=True, venv=True)
         assert exc.value.code == 2
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.dev.run_install", return_value=0)
     def test_delegates_global_mode(self, mock_run, _):
-        rlsbl.cmd_dev_install(None, dry_run=False, yes=False, quiet=False, 
-            all=False, include="core", exclude="", uninstall=False,
-            global_=False, venv=False,
-        )
+        rlsbl.cmd_dev_install(cli_ctx(), all=False, include="core", exclude="", uninstall=False, global_=False, venv=False)
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][0]
         assert flags["global"] is True
@@ -1061,10 +981,7 @@ class TestCmdDevInstall:
     @patch("rlsbl.commands.dev.run_install", return_value=1)
     def test_exits_on_nonzero_return(self, mock_run, _):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_dev_install(None, dry_run=False, yes=False, quiet=False, 
-                all=False, include="", exclude="", uninstall=False,
-                global_=False, venv=True,
-            )
+            rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, global_=False, venv=True)
         assert exc.value.code == 1
 
 
@@ -1072,14 +989,14 @@ class TestCmdDevSync:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.dev_sync.run_sync", return_value=0)
     def test_delegates_to_run_sync(self, mock_run, _):
-        rlsbl.cmd_dev_sync(None, dry_run=False, yes=False, quiet=False)
+        rlsbl.cmd_dev_sync(cli_ctx())
         mock_run.assert_called_once_with(Path("/fake"))
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.dev_sync.run_sync", return_value=1)
     def test_exits_on_nonzero_return(self, mock_run, _):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_dev_sync(None, dry_run=False, yes=False, quiet=False)
+            rlsbl.cmd_dev_sync(cli_ctx())
         assert exc.value.code == 1
 
 
@@ -1250,10 +1167,7 @@ class TestCmdScaffold:
         with patch("rlsbl.detect_registries", return_value=[]):
             with patch("rlsbl.utils.find_project_root", return_value=None):
                 with pytest.raises(SystemExit) as exc:
-                    rlsbl.cmd_scaffold(None, yes=False, quiet=False, 
-                        target="", publish_mode="ci", auto_commit=True,
-                        skip_shared=False, auto_tag=True, dry_run=False,
-                    )
+                    rlsbl.cmd_scaffold(cli_ctx(), target="", publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
                 assert exc.value.code == 1
 
     def test_single_target_auto_detected(self, tmp_project):
@@ -1261,10 +1175,7 @@ class TestCmdScaffold:
             with patch("rlsbl.context.create_context") as mock_ctx:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
-                    rlsbl.cmd_scaffold(None, yes=False, quiet=False, 
-                        target="", publish_mode="ci", auto_commit=True,
-                        skip_shared=False, auto_tag=True, dry_run=False,
-                    )
+                    rlsbl.cmd_scaffold(cli_ctx(), target="", publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
                     mock_run.assert_called_once()
 
     def test_multi_target_auto_detected(self, tmp_project):
@@ -1272,28 +1183,19 @@ class TestCmdScaffold:
             with patch("rlsbl.context.create_context") as mock_ctx:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd_multi") as mock_run_multi:
-                    rlsbl.cmd_scaffold(None, yes=False, quiet=False, 
-                        target="", publish_mode="ci", auto_commit=True,
-                        skip_shared=False, auto_tag=True, dry_run=False,
-                    )
+                    rlsbl.cmd_scaffold(cli_ctx(), target="", publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
                     mock_run_multi.assert_called_once()
 
     def test_explicit_unknown_target_exits(self, tmp_project):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_scaffold(None, yes=False, quiet=False, 
-                target="nonexistent", publish_mode="ci", auto_commit=True,
-                skip_shared=False, auto_tag=True, dry_run=False,
-            )
+            rlsbl.cmd_scaffold(cli_ctx(), target="nonexistent", publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
         assert exc.value.code == 1
 
     def test_explicit_valid_target(self, tmp_project):
         with patch("rlsbl.context.create_context") as mock_ctx:
             mock_ctx.return_value = _ctx()
             with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
-                rlsbl.cmd_scaffold(None, yes=False, quiet=False, 
-                    target="npm", publish_mode="none", auto_commit=False,
-                    skip_shared=True, auto_tag=False, dry_run=True,
-                )
+                rlsbl.cmd_scaffold(cli_ctx(dry_run=True), target="npm", publish_mode="none", auto_commit=False, skip_shared=True, auto_tag=False)
                 mock_run.assert_called_once()
                 flags = mock_run.call_args[0][2]
                 assert "force" not in flags
@@ -1512,16 +1414,18 @@ class TestDeprecateCoverageSoftDeprecate:
     @patch(f"{MOD_DEPRECATE}.check_gh_installed", return_value=True)
     @patch(f"{MOD_DEPRECATE}.check_gh_auth", return_value=True)
     @patch(f"{MOD_DEPRECATE}.run_gh")
-    def test_deprecate_prompt_eof(self, mock_run, *_):
+    def test_deprecate_does_not_prompt(self, mock_run, *_):
+        """The confirmation is the framework's; this command asks nothing."""
         mock_run.side_effect = [
             "",  # gh release view
             "v2.0.0",  # latest is different
+            "existing body",  # gh release view --json body
+            "",  # gh release edit
         ]
         from rlsbl.commands.deprecate import run_cmd
-        with patch("builtins.input", side_effect=EOFError):
-            with pytest.raises(SystemExit) as exc:
-                run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
-            assert exc.value.code == 1
+        with patch("builtins.input", side_effect=AssertionError("must not prompt")):
+            run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
+        assert any("edit" in c[0][0] for c in mock_run.call_args_list)
 
 
 class TestDeprecateCoverageBuildNotice:
