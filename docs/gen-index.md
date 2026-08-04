@@ -12,6 +12,7 @@ order: 90
 
 - [rlsbl](rlsbl.html)
 - [rlsbl.__main__](rlsbl-__main__.html)
+- [rlsbl._effects_direct](rlsbl-_effects_direct.html)
 - [rlsbl.action_versions](rlsbl-action_versions.html)
 - [rlsbl.changelog.exemptions](rlsbl-changelog-exemptions.html)
 - [rlsbl.changelog.files](rlsbl-changelog-files.html)
@@ -82,6 +83,7 @@ order: 90
 - [rlsbl.dep_rewrite](rlsbl-dep_rewrite.html)
 - [rlsbl.dep_validation](rlsbl-dep_validation.html)
 - [rlsbl.deploy](rlsbl-deploy.html)
+- [rlsbl.effects](rlsbl-effects.html)
 - [rlsbl.errors](rlsbl-errors.html)
 - [rlsbl.evidence_gate](rlsbl-evidence_gate.html)
 - [rlsbl.external_checks](rlsbl-external_checks.html)

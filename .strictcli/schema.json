@@ -443,12 +443,20 @@
       "name": "claim-name",
       "help": "Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.",
       "effect": "mutating",
+      "consequential": true,
       "flags": [
         {
           "name": "target",
           "type": "str",
           "help": "Target package registry to publish the placeholder to (npm or pypi)",
           "default": ""
+        },
+        {
+          "name": "force-publish",
+          "type": "bool",
+          "help": "Publish even when the availability check reports the name as taken or returns an ambiguous status. Distinct from the framework's --approve-consequential, which only skips the confirmation prompt.",
+          "default": false,
+          "negatable": false
         }
       ],
       "grants": [
@@ -534,6 +542,7 @@
       "name": "deploy",
       "help": "Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced.",
       "effect": "mutating",
+      "consequential": true,
       "flags": [
         {
           "name": "target",
@@ -571,8 +580,9 @@
       "commands": {
         "run": {
           "name": "run",
-          "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, non-interactive mode with --yes, and --allow-dirty to skip the clean working tree check.",
+          "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, --approve-consequential to skip the confirmation prompt in non-interactive contexts, and --allow-dirty to skip the clean working tree check.",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "push-timeout",
@@ -634,6 +644,7 @@
           "name": "resume",
           "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "push-timeout",
@@ -676,6 +687,7 @@
           "name": "retry",
           "help": "Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is auto-scaffolded with sensible defaults if missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered against the configured ref (defaults to the release tag).",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "watch",
@@ -701,6 +713,7 @@
           "name": "undo",
           "help": "Revert a release. Without --version, reverts the latest release (deletes GitHub Release, removes git tag, reverts version bump commit). With --version, reverts a non-latest release if it is provably unpublished (probes registries for evidence, deletes GitHub Release + tag only, un-finalizes changelog).",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "target",
@@ -720,6 +733,7 @@
           "name": "deprecate",
           "help": "Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "reason",
@@ -745,6 +759,7 @@
           "name": "yank",
           "help": "Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "reason",
@@ -770,6 +785,7 @@
           "name": "scrub",
           "help": "Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "replace",
@@ -850,6 +866,7 @@
           "name": "reconcile",
           "help": "Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "push-timeout",
@@ -1223,6 +1240,7 @@
           "name": "mirror",
           "help": "Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.",
           "effect": "mutating",
+          "consequential": true,
           "args": [
             {
               "name": "project",
@@ -1294,6 +1312,7 @@
           "name": "extract",
           "help": "Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.",
           "effect": "mutating",
+          "consequential": true,
           "args": [
             {
               "name": "package_name",
@@ -1309,6 +1328,7 @@
           "name": "absorb",
           "help": "Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.",
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
               "name": "name",
@@ -1344,6 +1364,7 @@
           "name": "extract-releasable",
           "help": "Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.",
           "effect": "mutating",
+          "consequential": true,
           "args": [
             {
               "name": "releasable_name",
@@ -1394,8 +1415,9 @@
           "commands": {
             "run": {
               "name": "run",
-              "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --yes, --allow-dirty flags.",
+              "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --approve-consequential and --allow-dirty flags.",
               "effect": "mutating",
+              "consequential": true,
               "flags": [
                 {
                   "name": "push-timeout",

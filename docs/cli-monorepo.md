@@ -9,7 +9,7 @@ nav_order: 9
 
 # rlsbl monorepo
 
-Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 18 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, mirror, graph, impact, extract, absorb, extract-releasable, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.
+Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 19 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, extract-releasable, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.
 
 ## monorepo init
 
@@ -93,13 +93,11 @@ Scan all projects in the monorepo workspace for intra-workspace dependencies tha
 
 ## monorepo snapshot
 
-Generate a committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure. Use --check to verify the snapshot is up-to-date without regenerating it (exits 1 if stale).
+Regenerate the committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure, and commit it. Verifying without regenerating is a separate command, `rlsbl monorepo snapshot-check`. Under --dry-run the artifact is computed but neither written nor committed, and the preview names both steps.
 
-### Flags
+## monorepo snapshot-check
 
-| Name | Short | Type | Default | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--check` |  | bool |  |  | Verify snapshot.json is up-to-date (exit 1 if stale) |
+Verify that .rlsbl-monorepo/snapshot.json matches the workspace it describes, without regenerating it. Exits 1 when the artifact is stale or missing. This is the read-only half of the former `monorepo snapshot --check` flag; `rlsbl monorepo snapshot` is the half that writes.
 
 ## monorepo mirror
 

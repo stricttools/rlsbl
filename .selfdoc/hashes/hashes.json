@@ -177,6 +177,11 @@
     "description": "7f9a3b46a774a3a6f5944cbac9c91fde87ab7bb41f0059526e0f23a66a2bfc46",
     "source_docstring": "957d3761863b6d170cde24c0a84e162d2507b52608a3a4bd7269e934341462b0"
   },
+  "en/rlsbl-_effects_direct.md": {
+    "content": "167906bb0669aa712dc44bafef69860947b7a1fc83622d1778209c56edc0346c",
+    "description": "47371c832afe03b5bbab3378503c1db71f0b605e20f1de228742b5a0da6af688",
+    "seed_hash": "47371c832afe03b5bbab3378503c1db71f0b605e20f1de228742b5a0da6af688"
+  },
   "en/rlsbl-action_versions.md": {
     "content": "cfeef44d7d7888c6727f89e927906801a3a8646cc44cf465631b997118888ff6",
     "description": "5dcebe0f05bd2dd423087ed852f1310689c2ee0a89edf61cbd5bc9aad4a3bde3",
@@ -546,6 +551,11 @@
     "content": "6e851f54dea8fa1240915f1d3ee4f6d43b156ac778bca89a6c467e124ad028d8",
     "description": "f441c910862159fe6f122b139a2936d6c2d564145431f45134327ae5065d9220",
     "source_docstring": "f441c910862159fe6f122b139a2936d6c2d564145431f45134327ae5065d9220"
+  },
+  "en/rlsbl-effects.md": {
+    "content": "2b9aa6ada8890a8d444b97063cd67484f3d3ddb7fad22fa92831d9b4b9a3445e",
+    "description": "cbe68d058986944150f7c8f3ffc32e3762155b72a4bb3c08dc1e8554452c218e",
+    "seed_hash": "cbe68d058986944150f7c8f3ffc32e3762155b72a4bb3c08dc1e8554452c218e"
   },
   "en/rlsbl-errors.md": {
     "content": "076d7a0d358ebc2998f5a714b310059db42ce229067cc65a50d532c6baa570dc",

@@ -178,6 +178,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-_effects_direct.md",
+      "title": "rlsbl._effects_direct",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-action_versions.md",
       "title": "rlsbl.action_versions",
       "type": "doc"
@@ -525,6 +530,11 @@
     {
       "path": "rlsbl-deploy.md",
       "title": "rlsbl.deploy",
+      "type": "doc"
+    },
+    {
+      "path": "rlsbl-effects.md",
+      "title": "rlsbl.effects",
       "type": "doc"
     },
     {
@@ -965,5 +975,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-03T10:12:56.777987+00:00"
+  "last_gen": "2026-08-04T21:57:20.043800+00:00"
 }
