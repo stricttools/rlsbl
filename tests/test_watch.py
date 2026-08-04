@@ -35,6 +35,8 @@ from rlsbl.commands.watch import (
 )
 
 
+from conftest import cli_ctx
+
 class TestIsPublishWorkflow:
     """Unit tests for _is_publish_workflow name matching."""
 
@@ -526,7 +528,7 @@ class TestMutualExclusivity:
         """cmd_watch rejects SHA + --run-id combination."""
         import rlsbl
         with pytest.raises(SystemExit) as exc_info:
-            rlsbl.cmd_watch(None, dry_run=False, yes=False, quiet=False, target="", run_id=["123"], sha="abc123")
+            rlsbl.cmd_watch(cli_ctx(), target="", run_id=["123"], sha="abc123")
         assert exc_info.value.code == 1
 
 

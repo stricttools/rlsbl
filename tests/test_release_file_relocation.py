@@ -54,6 +54,8 @@ from rlsbl.workspace import (
 # ---------------------------------------------------------------------------
 
 
+from conftest import cli_ctx
+
 def _git(repo, *args):
     subprocess.run(
         ["git"] + list(args),
@@ -498,11 +500,7 @@ class TestCliReadsReleasableReleaseFile:
         monkeypatch.chdir(core)
 
         with patch("rlsbl.commands.release.run_cmd") as mock_run:
-            rlsbl_mod.cmd_release_run(None, 
-                dry_run=False, yes=True, quiet=True,
-                allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0,
-                bump="", description="", preid="",
-            )
+            rlsbl_mod.cmd_release_run(cli_ctx(yes=True, quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="")
         mock_run.assert_called_once()
         cfg = mock_run.call_args[0][0]
         assert cfg.bump == "patch"

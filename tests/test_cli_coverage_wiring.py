@@ -180,7 +180,9 @@ class TestReleaseGroupWiring:
 
     def test_reconcile(self):
         result, m = _dispatch(
-            ["release", "reconcile", "--push-timeout", "45", "--dry-run"],
+            # --dry-run leads: strictcli's reserved-flag pre-scan stops at the
+            # first non-flag token (the real CLI hoists it there for you).
+            ["--dry-run", "release", "reconcile", "--push-timeout", "45"],
             "rlsbl.commands.release_reconcile.run_cmd",
         )
         assert result.exit_code == 0, result.stderr
@@ -403,13 +405,20 @@ class TestMonorepoDirectWiring:
 
     def test_snapshot(self):
         result, m = _dispatch(
-            ["monorepo", "snapshot", "--check"],
+            ["monorepo", "snapshot"],
             "rlsbl.commands.monorepo._cmd_snapshot",
         )
         assert result.exit_code == 0, result.stderr
-        # dry-run must reach the handler: the global flag used to be accepted
-        # and silently dropped, so `snapshot --dry-run` wrote and committed.
-        assert _flags(m) == {"check": True, "dry-run": False}
+        assert _flags(m) == {}
+
+    def test_snapshot_check(self):
+        """The read-only half is its own command, not a flag on the writer."""
+        result, m = _dispatch(
+            ["monorepo", "snapshot-check"],
+            "rlsbl.commands.monorepo._cmd_snapshot_check",
+        )
+        assert result.exit_code == 0, result.stderr
+        assert _flags(m) == {}
 
     def test_mirror(self):
         result, m = _dispatch(

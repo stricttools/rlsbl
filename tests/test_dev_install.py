@@ -7,6 +7,7 @@ import subprocess
 import pytest
 
 from rlsbl.commands.dev import run_install
+from conftest import cli_ctx
 
 
 def _make_pypi(dir_path, name="mypkg"):
@@ -659,14 +660,7 @@ def test_cli_global_and_venv_are_mutually_exclusive():
     with _pytest.raises(SystemExit) as excinfo:
         # We expect the handler to bail before touching the filesystem, so
         # passing no project setup is fine.
-        cmd_dev_install(None, dry_run=False, yes=False, quiet=False, 
-            all=False,
-            include="",
-            exclude="",
-            uninstall=False,
-            global_=True,
-            venv=True,
-        )
+        cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, global_=True, venv=True)
     assert excinfo.value.code == 2
 
 

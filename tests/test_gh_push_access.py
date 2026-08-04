@@ -22,7 +22,9 @@ class TestValidateGhPushAccess:
         mock_run_gh.return_value = "true"
         validate_gh_push_access(config={"github_repo": "owner/repo"})
         mock_run_gh.assert_called_once_with(
-            ["api", "repos/owner/repo", "--jq", ".permissions.push"],
+            # --method GET is what puts this probe on the app's observe
+            # allowlist, so a --dry-run release really performs it.
+            ["api", "--method", "GET", "repos/owner/repo", "--jq", ".permissions.push"],
             config={"github_repo": "owner/repo"},
         )
 

@@ -568,7 +568,11 @@ class TestTimeoutRouting:
         fn(FakeCtx(), ErrorReporter())
         assert captured["timeout"] == 1800
         assert captured["argv"] == ["uv", "run", "mypy", "src"]
-        assert captured.get("shell") is None  # list argv, no shell
+        # A structured check composes an argv list; the shell is not involved.
+        # ``effects.run`` names every parameter explicitly now (it must, to
+        # decide what the effects handle can express), so the recorded value is
+        # an explicit False rather than an absent key.
+        assert captured.get("shell") is False
 
 
 class TestCheckTimeoutFlagReachesExternalChecks:

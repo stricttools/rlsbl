@@ -43,7 +43,7 @@ def _setup_project(tmp_path, hook_name, hook_body):
     (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
     # Config with required private key and targets
     (tmp_path / ".rlsbl" / "config.json").write_text(
-        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
     )
     # Hook script
     hooks_dir = tmp_path / ".rlsbl" / "hooks"
@@ -56,7 +56,6 @@ def _setup_project(tmp_path, hook_name, hook_body):
 
 class TestPreReleaseHookOutput:
     """Tests for pre-release hook streaming and error handling."""
-
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
@@ -70,7 +69,7 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
-    def test_hook_streams_output(
+    def test_dry_run_records_the_hook_instead_of_running_it(
         self,
         _vrt,
         _validate,
@@ -87,28 +86,41 @@ class TestPreReleaseHookOutput:
         _remote_exists,
         tmp_project,
     ):
-        """A successful hook is called via subprocess.run without capture_output."""
-        _setup_project(tmp_project, "pre-release.sh", "#!/bin/bash\necho hello\n")
-        # mock_run side effects: fetch, rev-list, tag -l current, tag -l bumped
-        mock_run.side_effect = ["", "0", "", ""]
+        """A hook is a spawn, and a dry run records spawns instead of forking them.
 
-        with patch("rlsbl.commands.release.effects") as mock_sp:
-            mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
-            mock_sp.CalledProcessError = subprocess.CalledProcessError
-            mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+        This replaces a test that asserted the opposite: it drove a dry run
+        with the effects module mocked out and checked that the hook was
+        invoked, which is exactly the behavior the effects regime removes.  A
+        preview that executes a user-owned script has already changed whatever
+        that script changes, and calling it "no changes were made" is a lie.
+        """
+        sentinel = tmp_project / "hook-ran"
+        hook = _setup_project(
+            tmp_project, "pre-release.sh",
+            f"#!/bin/bash\ntouch {sentinel}\n",
+        )
+        # The CLI path runs more git reads than the direct-call tests do, so
+        # answer by shape rather than by position: every count-like read is 0,
+        # everything else is empty.
+        def _git(cmd, args=None, **kwargs):
+            joined = " ".join(args or [])
+            return "0" if "rev-list" in joined else ""
 
-            from rlsbl.commands.release import run_cmd
+        mock_run.side_effect = _git
+        from rlsbl import app
 
-            # dry-run to avoid needing full release mocks
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+        result = app.test([
+            "--dry-run", "--yes", "release", "run",
+            "--bump", "patch", "--description", "hook preview",
+            "--no-watch", "--allow-dirty",
+        ])
 
-            # Verify subprocess.run was called for the hook
-            assert mock_sp.run.call_count == 1
-            call_args = mock_sp.run.call_args
-            # Should NOT have capture_output in kwargs
-            assert "capture_output" not in call_args.kwargs
-            # Should have check=True
-            assert call_args.kwargs.get("check") is True
+        assert not sentinel.exists(), (
+            "the pre-release hook executed during a dry run: "
+            f"stdout={result.stdout!r}"
+        )
+        assert "DRY RUN" in result.stdout
+        assert f"run: bash {hook}" in result.stdout, result.stdout
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
@@ -173,7 +185,7 @@ class TestPreReleaseHookOutput:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (tmp_project / ".rlsbl" / "config.json").write_text(
-            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
         )
         # No .rlsbl/hooks/pre-release.sh created
 
@@ -909,7 +921,7 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     changes_dir.mkdir(parents=True)
     (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
     )
     _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
@@ -1089,7 +1101,7 @@ class TestHookGeneratedFiles:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (tmp_project / ".rlsbl" / "config.json").write_text(
-            json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
+            json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
         )
         _git(tmp_project, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
         _git(tmp_project, "commit", "-q", "-m", "initial")

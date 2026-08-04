@@ -9,6 +9,7 @@ import pytest
 
 from rlsbl.commands.yank import run_cmd, _build_yank_notice
 from rlsbl.publication_probe import PublicationProbeResult, PublicationStatus
+from conftest import cli_ctx
 
 
 MOD = "rlsbl.commands.yank"
@@ -366,10 +367,7 @@ class TestCmdReleaseYankDelegation:
     @patch("rlsbl.commands.yank.run_cmd")
     def test_delegates(self, mock_run, _):
         import rlsbl
-        rlsbl.cmd_release_yank(None, quiet=False, 
-            reason="security", use="1.2.4",
-            dry_run=True, yes=True, version="1.2.3",
-        )
+        rlsbl.cmd_release_yank(cli_ctx(dry_run=True, yes=True), reason="security", use="1.2.4", version="1.2.3")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][1]
         assert flags["reason"] == "security"

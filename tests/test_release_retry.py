@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 from rlsbl.commands.release_retry import run_cmd, _find_dispatch_workflows
 from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import RetryConfig
+from conftest import cli_ctx
 
 
 def _make_retry_config(version="0.41.7", dispatch=None, ref=None, tag=None):
@@ -1136,12 +1137,7 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
                  patch("rlsbl.release_file.get_retry_file_path", return_value=retry_path):
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with self.assertRaises(SystemExit) as ctx:
-                        cmd_release_retry(None, 
-                            dry_run=False,
-                            yes=True,
-                            quiet=True,
-                            watch=False,
-                        )
+                        cmd_release_retry(cli_ctx(yes=True, quiet=True), watch=False)
 
             self.assertEqual(ctx.exception.code, 1)
 

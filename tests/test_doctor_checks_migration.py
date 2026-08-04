@@ -111,7 +111,13 @@ EXPECTED_CHECKS = [
 # until the check providers are materialized (``_materialize_check_providers``),
 # after which strictcli tracks it in ``app._provider_sourced_names``. It is
 # asserted separately from the TOML-declared checks above.
-BUILTIN_PROVIDER_CHECKS = ["cli-test-coverage"]
+# Provider-registered built-ins that ship with strictcli itself: the CLI
+# test-coverage check plus the two the effects regime added.
+BUILTIN_PROVIDER_CHECKS = [
+    "cli-test-coverage",
+    "effects-bypass",
+    "observe-allowlist-breadth",
+]
 
 
 class TestCheckDeclarations:
@@ -399,7 +405,7 @@ class TestCheckDryRun:
     """``check --all --dry-run`` previews which checks would run."""
 
     def test_dry_run_lists_all_checks(self):
-        result = app.test(["check", "--all", "--dry-run"])
+        result = app.test(["--dry-run", "check", "--all"])
         assert result.exit_code == 0
         for name in EXPECTED_CHECKS + BUILTIN_PROVIDER_CHECKS:
             assert name in result.stdout
@@ -413,7 +419,7 @@ class TestCheckTagFiltering:
     """``check --tag <expr>`` filters checks by tag."""
 
     def test_tag_project(self):
-        result = app.test(["check", "--tag", "project", "--dry-run"])
+        result = app.test(["--dry-run", "check", "--tag", "project"])
         assert result.exit_code == 0
         assert "lock" in result.stdout
         assert "version-consistency" in result.stdout
@@ -421,7 +427,7 @@ class TestCheckTagFiltering:
         assert "branch-sync" not in result.stdout
 
     def test_tag_release(self):
-        result = app.test(["check", "--tag", "release", "--dry-run"])
+        result = app.test(["--dry-run", "check", "--tag", "release"])
         assert result.exit_code == 0
         assert "local-tag" in result.stdout
         assert "branch-sync" in result.stdout
@@ -429,7 +435,7 @@ class TestCheckTagFiltering:
         assert "lock" not in result.stdout
 
     def test_tag_changelog(self):
-        result = app.test(["check", "--tag", "changelog", "--dry-run"])
+        result = app.test(["--dry-run", "check", "--tag", "changelog"])
         assert result.exit_code == 0
         assert "changelog-entry" in result.stdout
         # New changelog validation checks should also appear
@@ -442,7 +448,7 @@ class TestCheckTagFiltering:
         assert "changelog-batch-entries" in result.stdout
 
     def test_tag_workspace(self):
-        result = app.test(["check", "--tag", "workspace", "--dry-run"])
+        result = app.test(["--dry-run", "check", "--tag", "workspace"])
         assert result.exit_code == 0
         assert "workspace-ci-router" in result.stdout
         assert "workspace-ci-synced" in result.stdout

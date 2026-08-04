@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import FakeResponse
+from conftest import cli_ctx, FakeResponse
 from rlsbl.commands.check import (
     _check_single_name,
     _format_single_result,
@@ -27,7 +27,7 @@ class TestGithubValidTarget:
 
         mock_run_cmd.return_value = (0, [])
         with pytest.raises(SystemExit):
-            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["github"], delay="200", json=False)
+            cmd_check_name(cli_ctx(), target=["github"], delay="200", json=False)
         assert mock_run_cmd.call_count == 1
         assert mock_run_cmd.call_args_list[0][0][0] == "github"
 
@@ -39,7 +39,7 @@ class TestGithubValidTarget:
 
         mock_run_cmd.return_value = (0, [])
         with pytest.raises(SystemExit):
-            cmd_check_name(None, dry_run=False, yes=False, quiet=False, target=["npm", "github"], delay="200", json=False)
+            cmd_check_name(cli_ctx(), target=["npm", "github"], delay="200", json=False)
         assert mock_run_cmd.call_count == 2
         targets_called = [c[0][0] for c in mock_run_cmd.call_args_list]
         assert "npm" in targets_called

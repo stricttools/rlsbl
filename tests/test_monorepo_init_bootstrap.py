@@ -17,6 +17,7 @@ from rlsbl.workspace import (
     WORKSPACE_FILE,
 )
 from rlsbl.commands.monorepo.commands import _cmd_init
+from conftest import cli_ctx
 
 
 class TestMonorepoInitBootstrap:
@@ -79,7 +80,7 @@ class TestMonorepoInitBootstrap:
 
         from rlsbl import cmd_mono_init
         with pytest.raises(SystemExit):
-            cmd_mono_init(None, dry_run=False, yes=False, quiet=False, auto_commit=False)
+            cmd_mono_init(cli_ctx(), auto_commit=False)
 
     def test_init_at_standalone_project_root_succeeds(self, tmp_path, monkeypatch):
         """monorepo init at a project root with .rlsbl/ succeeds (conversion case)."""

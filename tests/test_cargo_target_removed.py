@@ -17,6 +17,7 @@ import rlsbl
 from rlsbl.pipelines import PIPELINE_TYPES
 from rlsbl.registry import _REGISTRY_DISPATCH
 from rlsbl.targets import TARGETS
+from conftest import cli_ctx
 
 app = rlsbl.app
 
@@ -74,10 +75,7 @@ class TestCliSurface:
             sys, "argv", ["rlsbl", "check-name", "serde", "--target", "crates"]
         )
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(
-                None, target=["crates"], delay=0, json=False,
-                dry_run=False, yes=False, quiet=False,
-            )
+            rlsbl.cmd_check_name(cli_ctx(), target=["crates"], delay=0, json=False)
         assert exc.value.code == 1
         err = capsys.readouterr().err
         assert "crates" in err
@@ -90,9 +88,7 @@ class TestCliSurface:
             sys, "argv", ["rlsbl", "claim-name", "serde", "--target", "crates"]
         )
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(
-                None, target="crates", dry_run=False, yes=False, quiet=False,
-            )
+            rlsbl.cmd_claim_name(cli_ctx(), target="crates")
         assert exc.value.code == 1
         err = capsys.readouterr().err
         assert "crates" in err

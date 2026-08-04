@@ -32,6 +32,7 @@
   "monorepo.remove",
   "monorepo.rename-releasable",
   "monorepo.snapshot",
+  "monorepo.snapshot-check",
   "monorepo.status",
   "monorepo.sync",
   "pre-push-check",

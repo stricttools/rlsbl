@@ -110,7 +110,7 @@ class TestResumeFromWorkspaceRootCli:
         _setup_workspace_with_inflight_state(tmp_project)
 
         with patch("rlsbl.commands.release.resume_cmd") as mock_resume:
-            result = app.test(["release", "resume", "--no-watch", "--yes"])
+            result = app.test(["--yes", "release", "resume", "--no-watch"])
 
         assert result.exit_code == 0, (
             f"resume from the workspace root must not exit: "
@@ -129,7 +129,7 @@ class TestResumeFromWorkspaceRootCli:
         rel_dir = get_releasable_dir(str(tmp_project), "alpha")
         os.unlink(os.path.join(rel_dir, "releases", "in-progress.json"))
 
-        result = app.test(["release", "resume", "--no-watch", "--yes"])
+        result = app.test(["--yes", "release", "resume", "--no-watch"])
         assert result.exit_code == 1
         combined = (result.stdout or "") + (result.stderr or "")
         assert "cannot resume from monorepo root" in combined

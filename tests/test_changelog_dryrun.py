@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import run_git as _run_git, make_commit as _make_commit, git_head
+from conftest import cli_ctx, run_git as _run_git, make_commit as _make_commit, git_head
 from rlsbl.changelog.files import get_changes_dir, read_unreleased
 from rlsbl.commands.changelog_cmd import cmd_add, cmd_amend, cmd_edit
 
@@ -250,11 +250,7 @@ class TestWrapperThreading:
     def test_add_wrapper_threads_dry_run(self, mock_add, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_add(None, yes=False, quiet=False, 
-            commits="abc", description="d", type="fix",
-            user_facing=True, auto_commit=True, allow_batch=False,
-            dry_run=True,
-        )
+        rlsbl.cmd_chlog_add(cli_ctx(dry_run=True), commits="abc", description="d", type="fix", user_facing=True, auto_commit=True, allow_batch=False)
         flags = mock_add.call_args[0][0]
         assert flags.get("dry-run") is True
 
@@ -263,11 +259,7 @@ class TestWrapperThreading:
     def test_amend_wrapper_threads_dry_run(self, mock_amend, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_amend(None, yes=False, quiet=False, 
-            version="0.1.0", commits="abc", id="", description="d", type="fix",
-            user_facing=True, validate_hashes=True,
-            dry_run=True,
-        )
+        rlsbl.cmd_chlog_amend(cli_ctx(dry_run=True), version="0.1.0", commits="abc", id="", description="d", type="fix", user_facing=True, validate_hashes=True)
         flags = mock_amend.call_args[0][0]
         assert flags.get("dry-run") is True
 
@@ -276,10 +268,6 @@ class TestWrapperThreading:
     def test_edit_wrapper_threads_dry_run(self, mock_edit, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_edit(None, yes=False, quiet=False, 
-            commits="abc", id="", type="fix", description="d",
-            user_facing=None, auto_commit=True,
-            dry_run=True,
-        )
+        rlsbl.cmd_chlog_edit(cli_ctx(dry_run=True), commits="abc", id="", type="fix", description="d", user_facing=None, auto_commit=True)
         flags = mock_edit.call_args[0][0]
         assert flags.get("dry-run") is True

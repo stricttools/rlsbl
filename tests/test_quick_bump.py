@@ -10,6 +10,7 @@ import rlsbl
 from rlsbl.errors import ConfigError
 from rlsbl.release_file import ReleaseConfig
 from rlsbl.targets import TargetEntry
+from conftest import cli_ctx
 
 
 def _ctx():
@@ -22,9 +23,6 @@ def _ctx():
 
 # Common kwargs shared by all calls to cmd_release_run
 _BASE_KWARGS = dict(
-    dry_run=False,
-    yes=True,
-    quiet=False,
     allow_dirty=False,
     watch=False,
     push_timeout=0,
@@ -45,7 +43,7 @@ class TestQuickBumpHappyPath:
     @patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("pypi", ".")])
     @patch("rlsbl.commands.release.run_cmd")
     def test_constructs_release_config(self, mock_run, mock_detect, *_):
-        rlsbl.cmd_release_run(None, 
+        rlsbl.cmd_release_run(cli_ctx(yes=True),
             **_BASE_KWARGS,
             bump="patch",
             description="Bug fix",
@@ -68,7 +66,7 @@ class TestQuickBumpHappyPath:
     ])
     @patch("rlsbl.commands.release.run_cmd")
     def test_multi_target(self, mock_run, mock_detect, *_):
-        rlsbl.cmd_release_run(None, 
+        rlsbl.cmd_release_run(cli_ctx(yes=True),
             **_BASE_KWARGS,
             bump="minor",
             description="New feature",
@@ -87,7 +85,7 @@ class TestQuickBumpErrors:
     def test_bump_without_description(self, mock_ctx, *_):
         mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="",
@@ -100,7 +98,7 @@ class TestQuickBumpErrors:
     def test_description_without_bump(self, mock_ctx, *_):
         mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="",
                 description="Some description",
@@ -113,7 +111,7 @@ class TestQuickBumpErrors:
     @patch("os.path.exists", return_value=True)  # unreleased.toml exists
     def test_bump_with_existing_release_file(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="Fix",
@@ -127,7 +125,7 @@ class TestQuickBumpErrors:
     @patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("flutter", ".")])
     def test_flutter_target_rejected(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="Fix",
@@ -141,7 +139,7 @@ class TestQuickBumpErrors:
     @patch("rlsbl.targets.detect_targets", side_effect=ConfigError("no targets"))
     def test_detect_targets_config_error(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="Fix",
@@ -154,7 +152,7 @@ class TestQuickBumpErrors:
     def test_invalid_bump_type(self, mock_ctx, *_):
         mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="huge",
                 description="Fix",
@@ -172,7 +170,7 @@ class TestFileFallback:
     @patch("os.path.exists", return_value=False)
     def test_no_flags_requires_release_file(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="",
                 description="",
@@ -189,7 +187,7 @@ class TestQuickBumpErrorMessages:
     def test_bump_without_description_message(self, _mock_ctx, _mock_ws, _mock_root, capsys):
         _mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit):
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="",
@@ -203,7 +201,7 @@ class TestQuickBumpErrorMessages:
     def test_description_without_bump_message(self, _mock_ctx, _mock_ws, _mock_root, capsys):
         _mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit):
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="",
                 description="Fix",
@@ -218,7 +216,7 @@ class TestQuickBumpErrorMessages:
     def test_existing_release_file_message(self, _mock_exists, _mock_ctx, _mock_ws, _mock_root, capsys):
         _mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit):
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="Fix",
@@ -234,7 +232,7 @@ class TestQuickBumpErrorMessages:
     def test_flutter_error_message(self, _mock_detect, _mock_exists, _mock_ctx, _mock_ws, _mock_root, capsys):
         _mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit):
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="Fix",
@@ -251,7 +249,7 @@ class TestQuickBumpErrorMessages:
     def test_detect_targets_error_message(self, _mock_detect, _mock_exists, _mock_ctx, _mock_ws, _mock_root, capsys):
         _mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit):
-            rlsbl.cmd_release_run(None, 
+            rlsbl.cmd_release_run(cli_ctx(yes=True),
                 **_BASE_KWARGS,
                 bump="patch",
                 description="Fix",

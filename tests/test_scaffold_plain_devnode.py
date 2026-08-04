@@ -163,7 +163,10 @@ class TestBareScaffoldPlainTarget:
         """Without .rlsbl/config.json and no manifest files, scaffold errors."""
         import subprocess
         result = subprocess.run(
-            ["python", "-m", "rlsbl", "scaffold"],
+            # --yes: scaffold is a mutating command and this subprocess has no
+            # interactive stdin, so the framework confirm protocol would abort
+            # it before the error under test.
+            ["python", "-m", "rlsbl", "--yes", "scaffold"],
             capture_output=True, text=True,
             cwd=str(tmp_project),
         )
