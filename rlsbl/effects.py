@@ -412,21 +412,6 @@ def atomic_write_text(
         h.chmod(_p(path), file_mode)
 
 
-def cache_write_text(path, content, *, encoding="utf-8"):
-    """Write a derived cache file, in every mode.
-
-    rlsbl's counterpart to the framework-blessed ``CACHE_WRITE`` (strictcli's
-    own schema dump and coverage shards, which execute even under
-    ``--dry-run``): a file that is derived, self-healing, and never part of
-    what a user is previewing -- the changelog validation cache is the whole
-    list.  Suppressing it in a preview would make the next real run redo work
-    it had already proven; recording it would put a line in the would-do log
-    that describes nothing a reader cares about.  It is deliberately NOT
-    reachable through the handle, so a ``read_only`` command may call it.
-    """
-    _direct.write_text(path, content, encoding=encoding)
-
-
 # ---------------------------------------------------------------------------
 # Filesystem effects -- directories, moves, deletions, modes
 # ---------------------------------------------------------------------------
