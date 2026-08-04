@@ -217,13 +217,21 @@ class TestBatchReleaseRootSelfdocIntegration:
 
 
 class TestSelfdocSubprocessArgv:
-    """selfdoc's gen/check/deploy carry NO confirmation-skip flag.
+    """The three selfdoc invocations carry exactly the right confirm flag.
 
     strictcli's confirm protocol keys on a declared ``consequential``, not on
-    ``mutating``; none of selfdoc's three commands declares it, so none of them
-    prompts and none of them accepts a skip flag. ``--yes`` was removed from
-    strictcli entirely and is a banned flag name, so passing it here would make
-    every release die with ``unknown flag '--yes'`` at the docs step.
+    ``mutating``. ``selfdoc gen`` and ``selfdoc check`` do not declare it -- they
+    regenerate and validate docs in the working tree, which is ordinary,
+    git-recoverable work -- so they must run bare. ``selfdoc deploy`` DOES
+    declare it (a Cloudflare Pages deployment goes live on landing; the GitHub
+    Pages provider force-pushes gh-pages), so the pipeline must pass
+    ``--approve-consequential`` or the release dies on the runner's
+    non-interactive stdin. Both directions are pinned: a bare deploy breaks
+    releases, and a flag on gen/check would be a decision nobody asked for.
+
+    ``--yes`` was removed from strictcli entirely and is a banned flag name, so
+    passing it anywhere here would make every release die with
+    ``unknown flag '--yes'``.
     """
 
     def _argv(self, monkeypatch, tmp_path, fn):
@@ -255,12 +263,21 @@ class TestSelfdocSubprocessArgv:
         assert "--yes" not in argv
         assert "--approve-consequential" not in argv
 
-    def test_deploy_passes_no_confirm_flag(self):
-        import inspect
+    def test_deploy_passes_approve_consequential(self, monkeypatch):
+        from rlsbl.pipelines.cloudflare_pages import CloudflarePagesPipeline
 
-        from rlsbl.pipelines import cloudflare_pages
+        calls = []
+        monkeypatch.setattr(
+            "rlsbl.pipelines.cloudflare_pages.require_tool",
+            lambda name, fatal=True: "/usr/bin/selfdoc",
+        )
+        monkeypatch.setattr(
+            "rlsbl.effects.run", lambda cmd, **kw: calls.append(cmd)
+        )
+        pipeline = CloudflarePagesPipeline(
+            name="cf", pipeline_type="cloudflare-pages", local=True, config={}
+        )
+        pipeline.publish(".", "1.0.0", None)
 
-        src = inspect.getsource(cloudflare_pages)
-        assert '["selfdoc", "deploy"]' in src
-        assert "--yes" not in src
-        assert "--approve-consequential" not in src
+        assert calls == [["selfdoc", "deploy", "--approve-consequential"]]
+        assert "--yes" not in calls[0]

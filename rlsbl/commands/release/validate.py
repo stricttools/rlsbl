@@ -822,10 +822,13 @@ def _run_selfdoc_gen(flags, project_dir=None, version=None):
     try:
         _effects.run(
             # No confirm-skip flag: strictcli's confirm protocol keys on a
-            # declared `consequential`, not on `mutating`, and selfdoc's
-            # gen/check/deploy are mutating but not consequential, so they
-            # never prompt. `--yes` no longer exists on a strictcli app at all
-            # -- it is a banned flag name.
+            # declared `consequential`, not on `mutating`. selfdoc's `gen` and
+            # `check` are mutating but not consequential -- regenerating docs
+            # in the working tree is ordinary, git-recoverable work -- so they
+            # never prompt. (`selfdoc deploy` IS consequential and the
+            # cloudflare-pages pipeline passes the flag; these two are not.)
+            # `--yes` no longer exists on a strictcli app at all -- it is a
+            # banned flag name.
             ["selfdoc", "gen", "--no-auto-commit"] + version_args,
             cwd=project_dir, check=True,
         )

@@ -476,4 +476,4 @@ class TestCloudflarePagesPipeline:
         p = CloudflarePagesPipeline(name="cf", pipeline_type="cloudflare-pages",
                                     local=True, config={})
         p.publish(".", "1.0.0", None)
-        assert calls == [["selfdoc", "deploy"]]
+        assert calls == [["selfdoc", "deploy", "--approve-consequential"]]

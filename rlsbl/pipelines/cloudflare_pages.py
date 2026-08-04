@@ -30,10 +30,15 @@ class CloudflarePagesPipeline(BasePipeline):
 
         try:
             effects.run(
-                # No confirmation-skip flag: strictcli prompts only for
-                # commands that declare `consequential`, and selfdoc's
-                # `deploy` does not (see validate.py's selfdoc calls).
-                ["selfdoc", "deploy"],
+                # `selfdoc deploy` declares itself `consequential` -- it makes
+                # a Cloudflare Pages deployment live, or force-pushes gh-pages.
+                # The approval was already taken one level up: this runs only
+                # inside `rlsbl release run`, which is itself consequential and
+                # has already asked. Without the flag the child hard-errors on
+                # the release runner's non-interactive stdin, or re-asks the
+                # same question on a TTY. selfdoc's `gen` and `check` are NOT
+                # consequential and stay bare (see validate.py).
+                ["selfdoc", "deploy", "--approve-consequential"],
                 cwd=dir_path,
                 check=True,
                 timeout=300,
