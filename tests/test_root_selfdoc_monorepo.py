@@ -214,3 +214,42 @@ class TestBatchReleaseRootSelfdocIntegration:
         call_args = mock_root_selfdoc.call_args
         assert call_args[0][0] == flags  # flags
         assert call_args[0][1] == str(tmp_path)  # workspace_root
+
+
+class TestSelfdocSubprocessArgv:
+    """selfdoc's gen/check/deploy are `mutating` strictcli commands, so a
+    tool-driven subprocess must pass --yes. Without it the child hard-errors on
+    non-interactive stdin, or prompts a human in the middle of a release."""
+
+    def _argv(self, monkeypatch, tmp_path, fn):
+        (tmp_path / "selfdoc.json").write_text('{"version": "0.1.0"}')
+        seen = {}
+
+        def fake_run(argv, **kwargs):
+            seen["argv"] = argv
+            return MagicMock(returncode=0)
+
+        monkeypatch.setattr("rlsbl.commands.release.effects.run", fake_run)
+        monkeypatch.setattr(
+            "rlsbl.commands.release.require_tool", lambda *a, **kw: True
+        )
+        fn({}, project_dir=str(tmp_path))
+        return seen["argv"]
+
+    def test_gen_passes_yes(self, monkeypatch, tmp_path):
+        from rlsbl.commands.release.validate import _run_selfdoc_gen
+
+        assert "--yes" in self._argv(monkeypatch, tmp_path, _run_selfdoc_gen)
+
+    def test_check_passes_yes(self, monkeypatch, tmp_path):
+        from rlsbl.commands.release.validate import _run_selfdoc_check
+
+        assert "--yes" in self._argv(monkeypatch, tmp_path, _run_selfdoc_check)
+
+    def test_deploy_passes_yes(self):
+        import inspect
+
+        from rlsbl.pipelines import cloudflare_pages
+
+        src = inspect.getsource(cloudflare_pages)
+        assert '["selfdoc", "deploy", "--yes"]' in src
