@@ -399,3 +399,68 @@ class TestCmdSnapshot:
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "stale" in captured.err
+
+    def test_dry_run_writes_nothing_and_commits_nothing(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        """`monorepo snapshot --dry-run` accepted the flag and ignored it.
+
+        The global --dry-run flag reached the command and was dropped on the
+        floor: the snapshot was regenerated on disk and committed anyway.
+        """
+        root, projects = _make_workspace(tmp_path, [
+            {"name": "alpha", "path": "packages/alpha", "target": "pypi",
+             "version": "1.0.0"},
+        ])
+        ws_dir = tmp_path / WORKSPACE_DIR
+        ws_dir.mkdir(exist_ok=True)
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+        )
+        monkeypatch.chdir(tmp_path)
+
+        import rlsbl.commands.monorepo.snapshot_cmd as snap_mod
+        committed = []
+        monkeypatch.setattr(
+            snap_mod, "commit_files_if_changed",
+            lambda *a, **kw: committed.append(a),
+        )
+
+        from rlsbl.commands.monorepo import _cmd_snapshot
+        _cmd_snapshot({"check": False, "dry-run": True}, project_root=".")
+
+        assert not (ws_dir / SNAPSHOT_FILE).exists(), \
+            "--dry-run must not write snapshot.json"
+        assert committed == [], "--dry-run must not commit"
+        assert "Would write" in capsys.readouterr().out, \
+            "--dry-run must say what it would have done"
+
+    def test_dry_run_reports_an_up_to_date_snapshot_as_unchanged(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        root, projects = _make_workspace(tmp_path, [
+            {"name": "alpha", "path": "packages/alpha", "target": "pypi",
+             "version": "1.0.0"},
+        ])
+        ws_dir = tmp_path / WORKSPACE_DIR
+        ws_dir.mkdir(exist_ok=True)
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+        )
+        monkeypatch.chdir(tmp_path)
+
+        graph = WorkspaceGraph(root, projects)
+        write_snapshot(root, generate_snapshot(root, projects, graph))
+        before = (ws_dir / SNAPSHOT_FILE).read_bytes()
+
+        import rlsbl.commands.monorepo.snapshot_cmd as snap_mod
+        monkeypatch.setattr(
+            snap_mod, "commit_files_if_changed",
+            lambda *a, **kw: pytest.fail("--dry-run must not commit"),
+        )
+
+        from rlsbl.commands.monorepo import _cmd_snapshot
+        _cmd_snapshot({"check": False, "dry-run": True}, project_root=".")
+
+        assert (ws_dir / SNAPSHOT_FILE).read_bytes() == before
+        assert "unchanged" in capsys.readouterr().out

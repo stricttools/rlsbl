@@ -1342,7 +1342,7 @@ def cmd_mono_snapshot(ctx, check, dry_run, yes, quiet):
     """Generate or verify the workspace snapshot.json artifact."""
     root = _require_project_root()
     from .commands.monorepo import _cmd_snapshot
-    _cmd_snapshot({"check": check}, project_root=root)
+    _cmd_snapshot({"check": check, "dry-run": dry_run}, project_root=root)
 
 
 @mono.command(name="mirror", help="Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.")

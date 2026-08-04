@@ -407,7 +407,9 @@ class TestMonorepoDirectWiring:
             "rlsbl.commands.monorepo._cmd_snapshot",
         )
         assert result.exit_code == 0, result.stderr
-        assert _flags(m) == {"check": True}
+        # dry-run must reach the handler: the global flag used to be accepted
+        # and silently dropped, so `snapshot --dry-run` wrote and committed.
+        assert _flags(m) == {"check": True, "dry-run": False}
 
     def test_mirror(self):
         result, m = _dispatch(
