@@ -144,12 +144,12 @@ class TestScrubPreviewRecordsTheChild:
             assert not effects.unsettled("real output")
 
         # The guard's shape is what matters: the module reads the seam's
-        # predicate rather than trying to json.loads a recorded run's result.
+        # predicate rather than trying to parse a recorded run's result.
         import inspect
 
         src = inspect.getsource(release_scrub.run_cmd)
         idx_guard = src.index("effects.unsettled(output)")
-        idx_parse = src.index("json.loads(output)")
+        idx_parse = src.index("_parse_safegit_json(output)")
         assert idx_guard < idx_parse, (
             "the recorded-run guard must come before the JSON parse, or a "
             "preview crashes on output that was never produced"

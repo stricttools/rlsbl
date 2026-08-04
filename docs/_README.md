@@ -40,7 +40,7 @@ All commands auto-detect targets (versioning) from project files (`package.json`
 
 :-: table-commands
 
-Global flags: `--help`, `--version`, `--dry-run`, `--yes`, `--quiet`, `--verbose`.
+Global flags: `--help`, `--version`, `--dry-run`, `--approve-consequential`, `--quiet`, `--verbose`.
 
 ## Release flow
 
@@ -67,8 +67,12 @@ When you run `rlsbl release run`:
 19. Prints `Watch CI: rlsbl watch <sha>`
 
 Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
-would-do log rather than performed. Use `--yes` for non-interactive mode (CI, AI agents) --
-without it, a mutating command asks for confirmation and refuses on a non-interactive stdin.
+would-do log rather than performed. A small set of commands declares itself `consequential`
+(`release run`/`resume`/`retry`/`undo`/`deprecate`/`yank`/`scrub`/`reconcile`, `claim-name`,
+`deploy`, `monorepo release run`/`mirror`/`absorb`/`extract`/`extract-releasable`) and asks
+for confirmation before running; pass `--approve-consequential` in non-interactive contexts
+(CI, AI agents), where the prompt is a hard error instead. Every other command runs without
+asking.
 
 Create the release file with `rlsbl release init`, which auto-detects project targets and scaffolds the TOML file.
 
@@ -137,8 +141,8 @@ rlsbl check --name lock        # run a single check
 ## Undo
 
 ```
-rlsbl release undo         # interactive: confirms before each destructive step
-rlsbl release undo --yes   # non-interactive: auto-confirms, auto-pushes
+rlsbl release undo                          # interactive: confirms once, then auto-pushes
+rlsbl release undo --approve-consequential  # non-interactive: skips the confirmation
 ```
 
 Reverts the last release:
@@ -146,7 +150,7 @@ Reverts the last release:
 1. Deletes the GitHub Release
 2. Deletes the git tag (remote + local)
 3. Reverts the version bump commit (if HEAD matches the tag)
-4. Pushes the revert commit (with confirmation, or automatic with `--yes`)
+4. Pushes the revert commit (the single confirmation covers the whole rollback)
 
 On partial failure, prints a structured summary table with remediation commands for each failed step.
 

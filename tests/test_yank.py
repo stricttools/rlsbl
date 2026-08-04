@@ -244,7 +244,7 @@ class TestYankCommand:
 
         with patch(f"rlsbl.commands.yank.TARGETS", {"npm": target}), \
              patch("sys.stdout", new_callable=StringIO) as out:
-            run_cmd(["1.0.0"], {"dry-run": True, "yes": True}, project_root=".")
+            run_cmd(["1.0.0"], {"dry-run": True}, project_root=".")
 
         output = out.getvalue()
         assert "npm" in output
@@ -275,7 +275,7 @@ class TestYankCommand:
         with patch(f"rlsbl.commands.yank.TARGETS", {"plain": target}), \
              patch("sys.stderr", new_callable=StringIO) as err:
             with pytest.raises(SystemExit) as exc:
-                run_cmd(["1.0.0"], {"yes": True}, project_root=".")
+                run_cmd(["1.0.0"], {}, project_root=".")
         assert exc.value.code == 1
         assert "cannot determine publication status" in err.getvalue()
 
@@ -311,7 +311,7 @@ class TestYankCommand:
              patch("os.rename"), \
              patch("builtins.open", unittest.mock.mock_open()), \
              patch("sys.stdout", new_callable=StringIO) as out:
-            run_cmd(["1.0.0"], {"yes": True}, project_root=".")
+            run_cmd(["1.0.0"], {}, project_root=".")
 
         output = out.getvalue()
         assert "skipping" in output.lower()
@@ -332,7 +332,7 @@ class TestYankCommand:
             "v1.0.0",  # latest IS our target
         ]
         with pytest.raises(SystemExit) as exc:
-            run_cmd(["1.0.0"], {"yes": True}, project_root=Path("/fake"))
+            run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
         assert exc.value.code == 1
 
 
@@ -367,7 +367,7 @@ class TestCmdReleaseYankDelegation:
     @patch("rlsbl.commands.yank.run_cmd")
     def test_delegates(self, mock_run, _):
         import rlsbl
-        rlsbl.cmd_release_yank(cli_ctx(dry_run=True, yes=True), reason="security", use="1.2.4", version="1.2.3")
+        rlsbl.cmd_release_yank(cli_ctx(dry_run=True), reason="security", use="1.2.4", version="1.2.3")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][1]
         assert flags["reason"] == "security"

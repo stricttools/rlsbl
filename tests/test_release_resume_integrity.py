@@ -325,7 +325,7 @@ class TestResumeDryRun:
         _resume(
             mock_git_repo,
             load_release_state(state_path),
-            {"dry-run": True, "yes": True, "quiet": False},
+            {"dry-run": True, "quiet": False},
         )
 
         mutations = recorder.mutations()
@@ -346,7 +346,7 @@ class TestResumeDryRun:
         _resume(
             mock_git_repo,
             load_release_state(state_path),
-            {"dry-run": True, "yes": True, "quiet": False},
+            {"dry-run": True, "quiet": False},
         )
         out = capsys.readouterr().out
 
@@ -399,7 +399,7 @@ class TestResumeDryRun:
                     bump="patch", include=["npm"], exclude=[],
                     description="test release",
                 ),
-                {"dry-run": True, "yes": True, "quiet": False,
+                {"dry-run": True, "quiet": False,
                  "allow-dirty": True},
                 ctx=_make_ctx(mock_git_repo),
             )
@@ -448,7 +448,7 @@ class TestResumeTagsTheVerifiedCandidate:
         _resume(
             mock_git_repo,
             load_release_state(state_path),
-            {"yes": True, "quiet": True},
+            {"quiet": True},
         )
 
         tagged = _git_output(mock_git_repo, "rev-list", "-n", "1", "v1.0.1")
@@ -469,7 +469,7 @@ class TestResumeTagsTheVerifiedCandidate:
         output = _resume_expect_abort(
             mock_git_repo,
             load_release_state(state_path),
-            {"yes": True, "quiet": True},
+            {"quiet": True},
             capsys,
         )
 
@@ -489,7 +489,7 @@ class TestResumeTagsTheVerifiedCandidate:
         output = _resume_expect_abort(
             mock_git_repo,
             load_release_state(state_path),
-            {"yes": True, "quiet": True},
+            {"quiet": True},
             capsys,
         )
         assert "does not resolve" in output
@@ -513,7 +513,7 @@ class TestResumeTagsTheVerifiedCandidate:
             with pytest.raises(UnverifiedCandidateError):
                 _resume_cmd_inner(
                     load_release_state(state_path),
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=_make_ctx(mock_git_repo),
                 )
         finally:
@@ -549,7 +549,7 @@ class TestResumeTagsTheVerifiedCandidate:
             with pytest.raises(BaseException):
                 resume_cmd(
                     load_release_state(state_path),
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=_make_ctx(mock_git_repo),
                 )
         finally:
@@ -589,7 +589,7 @@ class TestResumeRideIns:
         output = _resume_expect_abort(
             mock_git_repo,
             load_release_state(state_path),
-            {"yes": True, "quiet": True},
+            {"quiet": True},
             capsys,
         )
 
@@ -614,7 +614,7 @@ class TestResumeRideIns:
             with pytest.raises(ForeignCommitError):
                 _resume_cmd_inner(
                     load_release_state(state_path),
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=_make_ctx(mock_git_repo),
                 )
         finally:
@@ -655,7 +655,7 @@ class TestResumeRideIns:
         _resume(
             mock_git_repo,
             load_release_state(state_path),
-            {"yes": True, "quiet": True},
+            {"quiet": True},
             ci_side_effect=fake_wait,
         )
 

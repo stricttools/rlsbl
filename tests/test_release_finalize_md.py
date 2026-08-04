@@ -131,7 +131,6 @@ class TestReleaseFinalizeMd:
             run_cmd(
                 _rc(),
                 {
-                    "yes": True,
                     "quiet": True,
                 },
             

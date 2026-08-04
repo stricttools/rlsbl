@@ -299,12 +299,12 @@ This means an unmodified scaffold hook or a missing hook file is considered "eff
 | Flag | Effect |
 | --- | --- |
 | `--dry-run` | Preview the entire flow without making changes (no commits, tags, pushes, or GitHub Releases) |
-| `--yes` | Non-interactive mode, skip all confirmation prompts |
+| `--approve-consequential` | Skip the confirmation prompt a `consequential` command asks before it runs |
 | `--watch` | After release, automatically watch CI runs to completion (blocking, in-process) |
 | `--no-watch` | After release, print the watch command hint without watching |
 | `--allow-dirty` | Skip the clean working tree check (step 1) |
 
-`--dry-run`, `--yes`, `--quiet` and `--verbose` are framework-owned flags available on all rlsbl commands. `--allow-dirty` and `--watch` are release-specific. The same `--watch` / `--no-watch` pair applies to `rlsbl release resume`, `rlsbl release retry`, and `rlsbl monorepo release run`.
+`--dry-run`, `--approve-consequential`, `--quiet` and `--verbose` are framework-owned flags available on all rlsbl commands. `--allow-dirty` and `--watch` are release-specific. The same `--watch` / `--no-watch` pair applies to `rlsbl release resume`, `rlsbl release retry`, and `rlsbl monorepo release run`.
 
 Watching is always in-process: there is no detached background watcher. To watch later, run `rlsbl watch <sha>` — the hint `--no-watch` prints is exactly that command.
 
@@ -363,7 +363,7 @@ Error recovery: if the command fails partway, `scrub-result.json` preserves the 
 
 A direct `safegit scrub` in an rlsbl-managed repository is not blocked, but it leaves rlsbl's release metadata behind: the JSONL changelogs keep pre-rewrite hashes, the tags still point at pruned commits, and the GitHub Releases go stale. `rlsbl release scrub` does the rewrite and that repair in one pass; after an out-of-band rewrite, `rlsbl release reconcile` repairs the metadata from safegit's rewrite journal.
 
-Requires safegit 0.25.0+, for `--remap-shas-in`, the persisted rewrite journal, and the cleanup_ok/pre_rewrite_remotes JSON fields (0.22.0), and for destructive rewrites that no longer take `--json` as consent, so rlsbl passes `--yes` explicitly (0.25.0).
+Requires safegit 0.25.0+, for `--remap-shas-in`, the persisted rewrite journal, and the cleanup_ok/pre_rewrite_remotes JSON fields (0.22.0), and for destructive rewrites that no longer take `--json` as consent, so rlsbl passes `--approve-consequential` explicitly (0.25.0); safegit declares all three scrub modes `consequential`.
 
 ## Examples
 
@@ -403,7 +403,7 @@ rlsbl release init
 #    description = "Add retry logic and fix timeout handling"
 
 # 6. Run the release
-rlsbl release run --no-allow-dirty --watch --yes
+rlsbl release run --no-allow-dirty --watch --approve-consequential
 #   Reading .rlsbl/releases/unreleased.toml ...
 #   Bump: minor (0.5.2 -> 0.6.0)
 #   Validating JSONL changelog ... OK
@@ -426,7 +426,7 @@ rlsbl release run --no-allow-dirty --watch --yes
 Preview what a release would do without making any changes to the repository, registry, or GitHub. The dry-run flag runs the full validation pipeline (JSONL checks, version consistency, test suite) but stops before writing version files, committing, tagging, pushing, or creating GitHub Releases. Use this to verify that all checks pass and the bump type produces the expected version before executing a real release:
 
 ```bash
-rlsbl release run --no-allow-dirty --no-watch --yes --dry-run
+rlsbl release run --no-allow-dirty --no-watch --approve-consequential --dry-run
 #   [DRY RUN] Bump: patch (0.6.0 -> 0.6.1)
 #   [DRY RUN] Would write version 0.6.1 to pyproject.toml
 #   [DRY RUN] Would commit, push the candidate, gate on CI, tag v0.6.1, and push

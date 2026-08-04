@@ -166,7 +166,6 @@ class TestReleaseGroupWiring:
         flags = m.call_args[0][2]
         assert target_arg is None  # no --target -> None
         assert flags["version"] == "0.1.0"
-        assert flags["yes"] is False
 
     def test_yank(self):
         result, m = _dispatch(
@@ -189,7 +188,6 @@ class TestReleaseGroupWiring:
         flags = m.call_args[0][0]
         assert flags["push-timeout"] == 45
         assert flags["dry-run"] is True
-        assert flags["yes"] is False
         assert flags["quiet"] is False
 
     def test_reconcile_zero_push_timeout_means_unset(self):
@@ -252,7 +250,6 @@ class TestReleaseFlagSurface:
         flags = _flags(m)
         assert flags == {
             "dry-run": False,
-            "yes": False,
             "quiet": False,
             "allow-dirty": False,
             "watch": True,
@@ -288,7 +285,7 @@ class TestStandaloneWiring:
         assert result.exit_code == 0, result.stderr
         assert m.call_args[0][0] == "npm"
         assert m.call_args[0][1] == ["mypkg"]
-        assert m.call_args[0][2] == {"yes": False, "dry-run": False}
+        assert m.call_args[0][2] == {"dry-run": False, "force-publish": False}
 
     def test_commit(self):
         result, m = _dispatch(
@@ -566,10 +563,9 @@ class TestMonorepoWorkspaceGatedWiring:
             },
         )
         assert result.exit_code == 0, result.stderr
-        # run_cleanup_command(ws_root, dry_run=..., yes=...)
+        # run_cleanup_command(ws_root, dry_run=...)
         assert m.call_args[0][0] == _FAKE_WS
         assert m.call_args.kwargs["dry_run"] is True
-        assert m.call_args.kwargs["yes"] is False
 
     def test_migrate_releasable(self):
         result, m = _dispatch(
@@ -579,7 +575,7 @@ class TestMonorepoWorkspaceGatedWiring:
             extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
         )
         assert result.exit_code == 0, result.stderr
-        # cmd_migrate_releasable(ws_root, releasable_name, dry_run=..., yes=...)
+        # cmd_migrate_releasable(ws_root, releasable_name, dry_run=...)
         assert m.call_args[0][0] == _FAKE_WS
         assert m.call_args[0][1] == "myrel"
         assert m.call_args.kwargs["dry_run"] is True
@@ -592,7 +588,7 @@ class TestMonorepoWorkspaceGatedWiring:
             extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
         )
         assert result.exit_code == 0, result.stderr
-        # rename_releasable(ws_root, old_name, new_name, dry_run=..., yes=...)
+        # rename_releasable(ws_root, old_name, new_name, dry_run=...)
         # Correct binding: first token -> old_name, second -> new_name.
         assert m.call_args[0][0] == _FAKE_WS
         assert m.call_args[0][1] == "oldname"

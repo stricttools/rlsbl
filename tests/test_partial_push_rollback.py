@@ -148,7 +148,7 @@ class TestPartialPushRollback:
             with pytest.raises((SystemExit, subprocess.CalledProcessError)):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=ProjectContext(
                         project_root=Path("."),
                         workspace_root=None,
@@ -271,7 +271,7 @@ class TestFinalizeFailureAfterCandidatePush:
             with pytest.raises((SystemExit, RlsblError, subprocess.CalledProcessError)):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=ProjectContext(
                         project_root=Path("."), workspace_root=None,
                         config={"publish_mode": "ci", "pipelines": {}},
@@ -419,7 +419,7 @@ class TestPostTaggedPushResumable:
             with pytest.raises(SystemExit) as _exc:
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=ProjectContext(
                         project_root=Path("."), workspace_root=None,
                         config={"publish_mode": "ci", "pipelines": {}},
@@ -482,7 +482,7 @@ class TestPostTaggedPushResumable:
             with pytest.raises(SystemExit) as _exc:
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=ProjectContext(
                         project_root=Path("."), workspace_root=None,
                         config={"publish_mode": "ci", "pipelines": {}},

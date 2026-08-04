@@ -421,7 +421,7 @@ class TestCmdSnapshot:
         monkeypatch.chdir(tmp_path)
 
         from rlsbl import app
-        result = app.test(["--dry-run", "--yes", "monorepo", "snapshot"])
+        result = app.test(["--dry-run", "monorepo", "snapshot"])
 
         assert result.exit_code == 0, result.stderr
         assert not (ws_dir / SNAPSHOT_FILE).exists(), \
@@ -450,7 +450,7 @@ class TestCmdSnapshot:
         before = (ws_dir / SNAPSHOT_FILE).read_bytes()
 
         from rlsbl import app
-        result = app.test(["--dry-run", "--yes", "monorepo", "snapshot"])
+        result = app.test(["--dry-run", "monorepo", "snapshot"])
 
         assert result.exit_code == 0, result.stderr
         assert (ws_dir / SNAPSHOT_FILE).read_bytes() == before

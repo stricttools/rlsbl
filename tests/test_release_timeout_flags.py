@@ -53,7 +53,7 @@ class TestBuildReleaseFlags:
 
     def test_all_four_timeouts_are_carried(self):
         flags = build_release_flags(
-            False, True, False, False, watch=False,
+            False, False, False, watch=False,
             push_timeout=10, ci_timeout=20, check_timeout=30, hook_timeout=40,
         )
         assert flags["push-timeout"] == 10
@@ -62,7 +62,7 @@ class TestBuildReleaseFlags:
         assert flags["hook-timeout"] == 40
 
     def test_unpassed_flags_are_none(self):
-        flags = build_release_flags(False, True, False, False)
+        flags = build_release_flags(False, False, False)
         for key in TIMEOUT_FLAGS:
             assert flags[key] is None, key
 
@@ -72,7 +72,7 @@ class TestApplyTimeoutOverrides:
     def test_overrides_land_where_the_consumers_read_them(self):
         config = {}
         flags = build_release_flags(
-            False, True, False, False,
+            False, False, False,
             push_timeout=11, ci_timeout=22, check_timeout=33, hook_timeout=44,
         )
         apply_timeout_overrides(config, flags)
@@ -86,7 +86,7 @@ class TestApplyTimeoutOverrides:
 
     def test_an_unpassed_flag_leaves_the_config_key_alone(self):
         config = {"check_timeout": 111}
-        apply_timeout_overrides(config, build_release_flags(False, True, False, False))
+        apply_timeout_overrides(config, build_release_flags(False, False, False))
         assert config == {"check_timeout": 111}
         assert get_check_timeout(config) == 111
 
@@ -94,7 +94,7 @@ class TestApplyTimeoutOverrides:
         config = {"check_timeout": 111, "hook_timeout": 222}
         apply_timeout_overrides(
             config,
-            build_release_flags(False, True, False, False, check_timeout=7),
+            build_release_flags(False, False, False, check_timeout=7),
         )
         assert get_check_timeout(config) == 7
         assert get_hook_timeout(config) == 222

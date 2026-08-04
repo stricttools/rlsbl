@@ -389,16 +389,17 @@ class _CliCtx:
     """A stand-in for the strictcli dispatch Context in direct handler calls.
 
     Command handlers read the framework-owned reserved flags off the context
-    (``ctx.dry_run`` / ``ctx.yes`` / ``ctx.quiet``) instead of receiving them
-    as kwargs, so a test that calls a handler directly needs an object that
-    carries them.  ``effects`` deliberately raises: minting effects needs a
+    (``ctx.dry_run`` / ``ctx.approve_consequential`` / ``ctx.quiet``) instead
+    of receiving them as kwargs, so a test that calls a handler directly needs
+    an object that carries them.  ``effects`` deliberately raises: minting effects needs a
     real dispatch, and a test that wants a preview must go through
     ``app.test(["--dry-run", ...])`` so the framework records and renders it.
     """
 
-    def __init__(self, dry_run=False, yes=False, quiet=False, verbose=False):
+    def __init__(self, dry_run=False, approve_consequential=False,
+                 quiet=False, verbose=False):
         self.dry_run = dry_run
-        self.yes = yes
+        self.approve_consequential = approve_consequential
         self.quiet = quiet
         self.verbose = verbose
 
@@ -410,9 +411,11 @@ class _CliCtx:
         )
 
 
-def cli_ctx(dry_run=False, yes=False, quiet=False, verbose=False):
+def cli_ctx(dry_run=False, approve_consequential=False, quiet=False,
+            verbose=False):
     """Build a stand-in dispatch context for a direct command-handler call."""
-    return _CliCtx(dry_run=dry_run, yes=yes, quiet=quiet, verbose=verbose)
+    return _CliCtx(dry_run=dry_run, approve_consequential=approve_consequential,
+                   quiet=quiet, verbose=verbose)
 
 
 def make_ctx(project_root, config=None):

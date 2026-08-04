@@ -75,7 +75,7 @@ def _run(member_dir, root, *, verdict, gh_recorder=None):
     for p in patches:
         p.start()
     try:
-        run_cmd(_rc(), {"yes": True, "quiet": True, "skip-lock": True}, ctx=ctx)
+        run_cmd(_rc(), {"quiet": True, "skip-lock": True}, ctx=ctx)
     finally:
         for p in patches:
             p.stop()
@@ -94,7 +94,7 @@ def _resume(member_dir, root, *, verdict, gh_recorder=None):
     for p in patches:
         p.start()
     try:
-        resume_cmd(state, {"yes": True, "quiet": True, "skip-lock": True}, ctx=ctx)
+        resume_cmd(state, {"quiet": True, "skip-lock": True}, ctx=ctx)
     finally:
         for p in patches:
             p.stop()
@@ -289,7 +289,7 @@ class TestCandidateIsPushedBeforeTheGate:
         for p in patches:
             p.start()
         try:
-            run_cmd(_rc(), {"yes": True, "quiet": True, "skip-lock": True}, ctx=ctx)
+            run_cmd(_rc(), {"quiet": True, "skip-lock": True}, ctx=ctx)
         finally:
             for p in patches:
                 p.stop()

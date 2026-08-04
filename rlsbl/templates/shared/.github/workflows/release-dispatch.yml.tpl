@@ -57,6 +57,6 @@ jobs:
             --bump "${{ inputs.bump }}" \
             --description "${{ inputs.description }}" \
             $PREID_FLAG \
-            --yes --no-watch
+            --approve-consequential --no-watch
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}

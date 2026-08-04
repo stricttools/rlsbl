@@ -257,7 +257,7 @@ class TestReleasableReleaseFileArchival:
         with p1, p2, p3, p4, p5, p6:
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True, "skip-lock": True},
+                {"quiet": True, "skip-lock": True},
                 ctx=_make_ctx(core, tmp_project),
             )
 
@@ -300,7 +300,7 @@ class TestReleasableReleaseFileArchival:
         with p1, p2, p3, p4, p5, p6:
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True, "skip-lock": True},
+                {"quiet": True, "skip-lock": True},
                 ctx=_make_ctx(core, tmp_project),
             )
 
@@ -326,7 +326,7 @@ class TestLegacyReleaseFileDetection:
         with pytest.raises(SystemExit):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True, "skip-lock": True},
+                {"quiet": True, "skip-lock": True},
                 ctx=_make_ctx(core, tmp_project),
             )
 
@@ -470,7 +470,7 @@ class TestUndoRestoresReleasableReleaseFile:
             patch("rlsbl.commands.undo.run_evidence_gate", side_effect=cleared_gate),
             patch("rlsbl.commands.undo.push_if_needed"),
         ):
-            undo_run_cmd(None, [], {"yes": True}, ctx=ctx)
+            undo_run_cmd(None, [], {}, ctx=ctx)
 
         releases_dir = Path(get_releasable_dir(str(tmp_project), "alpha")) / "releases"
         assert (releases_dir / "unreleased.toml").exists(), (
@@ -500,7 +500,7 @@ class TestCliReadsReleasableReleaseFile:
         monkeypatch.chdir(core)
 
         with patch("rlsbl.commands.release.run_cmd") as mock_run:
-            rlsbl_mod.cmd_release_run(cli_ctx(yes=True, quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="")
+            rlsbl_mod.cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="")
         mock_run.assert_called_once()
         cfg = mock_run.call_args[0][0]
         assert cfg.bump == "patch"
@@ -546,7 +546,7 @@ class TestRetryFileReleasable:
             patch("rlsbl.commands.release_retry.run_gh", return_value=""),
         ):
             retry_run_cmd(
-                None, {"yes": True, "dry-run": True}, project_root=str(core),
+                None, {"dry-run": True}, project_root=str(core),
             )
 
         out = capsys.readouterr().out

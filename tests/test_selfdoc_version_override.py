@@ -146,7 +146,7 @@ class TestReleaseFlowThreadsTheNewVersion:
         for p in patches:
             p.start()
         try:
-            run_cmd(_rc(), {"yes": True, "quiet": True, "skip-lock": True},
+            run_cmd(_rc(), {"quiet": True, "skip-lock": True},
                     ctx=ctx)
         finally:
             for p in patches:

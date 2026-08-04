@@ -103,7 +103,7 @@ def _run_release(member_dir, root, extra_patches=()):
     try:
         run_cmd(
             _rc(),
-            {"yes": True, "quiet": True, "skip-lock": True},
+            {"quiet": True, "skip-lock": True},
             ctx=ctx,
         )
     finally:
@@ -222,7 +222,7 @@ def _run_standalone_release(repo):
     for p in patches:
         p.start()
     try:
-        run_cmd(_rc(), {"yes": True, "quiet": True, "skip-lock": True}, ctx=ctx)
+        run_cmd(_rc(), {"quiet": True, "skip-lock": True}, ctx=ctx)
     finally:
         for p in patches:
             p.stop()

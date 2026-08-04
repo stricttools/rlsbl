@@ -63,7 +63,7 @@ def _undo_patches(gate=_cleared_gate):
 
 
 def _run_undo(ctx, flags=None, *, gate=_cleared_gate, extra_patches=None):
-    flags = flags or {"yes": True}
+    flags = flags or {}
     patches = _undo_patches(gate=gate) + list(extra_patches or [])
     for p in patches:
         p.start()
@@ -222,7 +222,7 @@ class TestUndoReleasablePaths:
 
         _run_undo(
             ctx,
-            flags={"yes": True, "version": "1.0.1"},
+            flags={"version": "1.0.1"},
             extra_patches=[patch(
                 "rlsbl.commands.release.execute.collect_companion_tags",
                 return_value=["core/v1.0.1"],

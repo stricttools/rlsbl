@@ -110,7 +110,7 @@ class TestPreReleaseHookOutput:
         from rlsbl import app
 
         result = app.test([
-            "--dry-run", "--yes", "release", "run",
+            "--dry-run", "release", "run",
             "--bump", "patch", "--description", "hook preview",
             "--no-watch", "--allow-dirty",
         ])
@@ -167,7 +167,7 @@ class TestPreReleaseHookOutput:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+                run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
             assert exc_info.value.code == 1
             captured = capsys.readouterr()
@@ -211,7 +211,7 @@ class TestPreReleaseHookOutput:
             from rlsbl.commands.release import run_cmd
 
             # dry-run: should complete without subprocess.run being called for hooks
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
             mock_sp.run.assert_not_called()
 
 
@@ -290,7 +290,7 @@ class TestPostReleaseHookOutput:
             from rlsbl.commands.release import run_cmd
 
             # Should NOT raise -- post-release hook failure is non-fatal
-            run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         captured = capsys.readouterr()
         assert "exited with code 3" in captured.err
@@ -388,7 +388,7 @@ class TestWatchSHABeforePostHook:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         captured = capsys.readouterr()
         # The watch message must use the SHA captured before the post-release hook
@@ -464,7 +464,7 @@ class TestHookTimeout:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "hook_timeout": 45}))
+                run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "hook_timeout": 45}))
 
             assert exc_info.value.code == 1
             captured = capsys.readouterr()
@@ -515,7 +515,7 @@ class TestHookCwdStandalone:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
             assert mock_sp.run.call_count >= 1
             # The pre-checks hook call should have cwd=project_dir (".")
@@ -563,7 +563,7 @@ class TestHookCwdStandalone:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
             assert mock_sp.run.call_count >= 1
             # The pre-release hook call should have cwd=project_dir (".")
@@ -632,7 +632,7 @@ class TestHookCwdStandalone:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
             # Find the post-release hook call (it's the one with post-release.sh in args)
             post_release_calls = [
@@ -701,7 +701,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"publish_mode": "ci", "pipelines": {}}))
 
             # Find the pre-checks hook call
             pre_checks_calls = [
@@ -767,7 +767,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(include=["pypi"]), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=Path(str(ns.root)), config={"publish_mode": "ci", "pipelines": {}}))
 
             # Find the pre-release hook call
             pre_release_calls = [
@@ -853,7 +853,7 @@ class TestHookCwdMonorepo:
 
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(include=["pypi"]), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(include=["pypi"]), {"quiet": True}, ctx=ProjectContext(project_root=ns.python_dir, workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
             # Find the post-release hook call
             post_release_calls = [
@@ -1013,7 +1013,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd(_rc(), {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Verify the release commit includes schema.json
         # The release commit is HEAD~1 (before the finalize commit)
@@ -1059,7 +1059,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd(_rc(), {"yes": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Find the release commit
         result = subprocess.run(
@@ -1134,7 +1134,7 @@ class TestHookGeneratedFiles:
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
             patch("rlsbl.commands.release.run", side_effect=_fake_run_intercepting_remote),
         ):
-            run_cmd(_rc(), {"yes": True, "quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Verify that the release completed
         pkg = json.loads((tmp_project / "package.json").read_text())
@@ -1198,7 +1198,7 @@ class TestHookGeneratedFiles:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True, "allow-dirty": True},
+                {"quiet": True, "allow-dirty": True},
             
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )

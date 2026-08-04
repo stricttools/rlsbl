@@ -501,40 +501,40 @@ class TestClaimNameAdditionalCoverage:
 
     def test_wrong_arg_count_exits(self, capsys):
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("npm", [], {"yes": False})
+            claim_run_cmd("npm", [], {})
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "Expected exactly one" in captured.err
 
     def test_two_args_exits(self, capsys):
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("npm", ["a", "b"], {"yes": False})
+            claim_run_cmd("npm", ["a", "b"], {})
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "Expected exactly one" in captured.err
 
     def test_unsupported_target_exits(self, capsys):
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("go", ["my-pkg"], {"yes": False})
+            claim_run_cmd("go", ["my-pkg"], {})
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "Unsupported target" in captured.err
 
     @patch("rlsbl.commands.check._check_single_name")
-    def test_ambiguous_status_without_yes_exits(self, mock_check, capsys):
+    def test_ambiguous_status_without_force_publish_exits(self, mock_check, capsys):
         mock_check.return_value = {
             "name": "pkg", "registry": "npm", "status": "unknown",
             "variants": None, "reason": None,
         }
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("npm", ["pkg"], {"yes": False})
+            claim_run_cmd("npm", ["pkg"], {"force-publish": False})
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "Ambiguous status" in captured.err
 
     @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
-    def test_ambiguous_status_with_yes_proceeds(self, mock_check, mock_run, capsys, tmp_path):
+    def test_ambiguous_status_with_force_publish_proceeds(self, mock_check, mock_run, capsys, tmp_path):
         mock_check.return_value = {
             "name": "pkg", "registry": "npm", "status": "unknown",
             "variants": None, "reason": None,
@@ -544,10 +544,10 @@ class TestClaimNameAdditionalCoverage:
         with patch("rlsbl.commands.claim_name.tempfile.mkdtemp", return_value=str(tmp_path)), \
              patch("rlsbl.effects.rmtree"), \
              patch.dict(os.environ, {"NPM_TOKEN": "tok"}):
-            claim_run_cmd("npm", ["pkg"], {"yes": True})
+            claim_run_cmd("npm", ["pkg"], {"force-publish": True})
 
         captured = capsys.readouterr()
-        assert "--yes passed" in captured.out
+        assert "--force-publish passed" in captured.out
 
 
 # ============================================================================
@@ -1023,71 +1023,11 @@ class TestReleaseRetryQuietMode:
         config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
-            retry_run_cmd(config, {"yes": True, "quiet": True}, project_root=".")
+            retry_run_cmd(config, {"quiet": True}, project_root=".")
 
         captured = capsys.readouterr()
         # Quiet mode should suppress "Dispatching workflows..." etc.
         assert "Dispatching" not in captured.out
-
-
-class TestReleaseRetryConfirmationEOFError:
-    """Tests for confirmation prompt edge cases."""
-
-    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
-    @patch("rlsbl.commands.release_retry.run")
-    @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.resolve_member_context")
-    @patch("rlsbl.commands.release_retry.TARGETS")
-    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_eof_during_confirmation(self, _gh_inst, _gh_auth, _ws_root,
-                                      mock_targets_dict, mock_detect,
-                                      _exists, mock_run, _run_gh, capsys):
-        target = MagicMock()
-        target.read_version.return_value = "1.0.0"
-        target.tag_format.side_effect = lambda v: f"v{v}"
-        entry = MagicMock()
-        entry.name = "npm"
-        entry.path = "."
-        mock_detect.return_value = MagicMock(targets=[entry])
-        mock_targets_dict.__getitem__ = lambda self, key: target
-
-        mock_run.return_value = "a" * 40  # git rev-list
-        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
-
-        with patch("builtins.input", side_effect=EOFError):
-            with pytest.raises(SystemExit) as exc_info:
-                retry_run_cmd(config, {}, project_root=".")
-        assert exc_info.value.code == 1
-
-    @patch("rlsbl.commands.release_retry.run_gh", return_value="")
-    @patch("rlsbl.commands.release_retry.run")
-    @patch("os.path.exists", return_value=True)
-    @patch("rlsbl.commands.release_retry.resolve_member_context")
-    @patch("rlsbl.commands.release_retry.TARGETS")
-    @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
-    @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_keyboard_interrupt_during_confirmation(self, _gh_inst, _gh_auth, _ws_root,
-                                                     mock_targets_dict, mock_detect,
-                                                     _exists, mock_run, _run_gh, capsys):
-        target = MagicMock()
-        target.read_version.return_value = "1.0.0"
-        target.tag_format.side_effect = lambda v: f"v{v}"
-        entry = MagicMock()
-        entry.name = "npm"
-        entry.path = "."
-        mock_detect.return_value = MagicMock(targets=[entry])
-        mock_targets_dict.__getitem__ = lambda self, key: target
-
-        mock_run.return_value = "a" * 40  # git rev-list
-        config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
-
-        with patch("builtins.input", side_effect=KeyboardInterrupt):
-            with pytest.raises(SystemExit) as exc_info:
-                retry_run_cmd(config, {}, project_root=".")
-        assert exc_info.value.code == 1
 
 
 class TestReleaseRetryNoTargets:
@@ -1100,7 +1040,7 @@ class TestReleaseRetryNoTargets:
     def test_no_targets_exits(self, _gh_inst, _gh_auth, _ws_root, _detect, capsys):
         config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
         with pytest.raises(SystemExit) as exc_info:
-            retry_run_cmd(config, {"yes": True}, project_root=".")
+            retry_run_cmd(config, {}, project_root=".")
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "no package.json" in captured.err
@@ -1143,7 +1083,7 @@ class TestReleaseRetryDispatchWarning:
         mock_run_gh.side_effect = run_gh_effect
         config = RetryConfig(version="1.0.0", dispatch=["ci.yml"], ref="v1.0.0", tag="v1.0.0")
 
-        retry_run_cmd(config, {"yes": True}, project_root=".")
+        retry_run_cmd(config, {}, project_root=".")
         captured = capsys.readouterr()
         assert "failed to dispatch" in captured.err
 

@@ -25,10 +25,9 @@ class TestBuildReleaseFlags:
 
     def test_defaults(self):
         """All False defaults produce expected dict."""
-        result = build_release_flags(False, False, False, False)
+        result = build_release_flags(False, False, False)
         assert result == {
             "dry-run": False,
-            "yes": False,
             "quiet": False,
             "allow-dirty": False,
             "watch": False,
@@ -40,25 +39,24 @@ class TestBuildReleaseFlags:
 
     def test_with_watch_true(self):
         """watch=True is preserved as a bool."""
-        result = build_release_flags(True, True, False, True, watch=True)
+        result = build_release_flags(True, False, True, watch=True)
         assert result["watch"] is True
         assert result["dry-run"] is True
-        assert result["yes"] is True
         assert result["allow-dirty"] is True
 
     def test_watch_coerced_from_truthy(self):
         """Truthy non-bool values are coerced to True."""
-        result = build_release_flags(False, False, False, False, watch="yes")
+        result = build_release_flags(False, False, False, watch="yes")
         assert result["watch"] is True
 
     def test_watch_coerced_from_none(self):
         """None is coerced to False."""
-        result = build_release_flags(False, False, False, False, watch=None)
+        result = build_release_flags(False, False, False, watch=None)
         assert result["watch"] is False
 
     def test_no_batch_mode_key(self):
         """build_release_flags does not add batch-mode."""
-        result = build_release_flags(False, False, False, False)
+        result = build_release_flags(False, False, False)
         assert "batch-mode" not in result
 
 
@@ -118,7 +116,7 @@ class TestPerPackageFlags:
     def _flags(self, **overrides):
         from rlsbl.commands.monorepo.batch_release import _batch_release_flags
 
-        base = {"dry-run": False, "yes": True, "quiet": False,
+        base = {"dry-run": False, "quiet": False,
                 "allow-dirty": False, "watch": True}
         base.update(overrides)
         return _batch_release_flags(base)

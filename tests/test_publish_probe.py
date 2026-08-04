@@ -613,7 +613,7 @@ class TestRecoveryDispatch(unittest.TestCase):
         import time
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         # Find the workflow run call via run_gh
         workflow_calls = [c for c in mock_run_gh.call_args_list

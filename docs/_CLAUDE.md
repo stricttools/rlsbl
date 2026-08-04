@@ -17,16 +17,17 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
 
 - Run `rlsbl release init` to scaffold `.rlsbl/releases/unreleased.toml`
 - Edit the release file: set bump type (patch/minor/major), include/exclude targets
-- Run `rlsbl release run --no-allow-dirty --watch --yes` to execute the release
+- Run `rlsbl release run --no-allow-dirty --watch --approve-consequential` to execute the release
 - CI handles publishing automatically via the publish workflow
 - Never publish manually -- always use `rlsbl release run`
 - Use `rlsbl release run --dry-run` to preview without making changes
-- `--dry-run`, `--yes`, `--quiet` and `--verbose` are framework-owned flags available on
-  all commands. Every command is classified `read_only` or `mutating`; a mutating command
-  asks for confirmation before it runs unless `--yes` is passed, and under `--dry-run` its
-  effects are recorded and printed as a would-do log instead of performed. A few commands
-  refuse `--dry-run` outright with a reason (`commit`, `release init`, `monorepo init`,
-  `monorepo remove`, `monorepo release init`).
+- `--dry-run`, `--approve-consequential`, `--quiet` and `--verbose` are framework-owned
+  flags available on all commands. Every command is classified `read_only` or `mutating`,
+  which decides whether `--dry-run` records its effects as a would-do log instead of
+  performing them. Confirmation is separate: a command asks before it runs only if it
+  declares itself `consequential`, and `--approve-consequential` skips that prompt. A few
+  commands refuse `--dry-run` outright with a reason (`commit`, `release init`,
+  `monorepo init`, `monorepo remove`, `monorepo release init`).
 - Release-specific required flags: `--allow-dirty`/`--no-allow-dirty`, `--watch`/`--no-watch` (no defaults -- must choose explicitly)
 
 ## Release pipeline order

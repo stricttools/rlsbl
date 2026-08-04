@@ -221,7 +221,7 @@ class TestBatchReleasePassesSkipLock:
                     with patch("rlsbl.commands.release.run_cmd", side_effect=fake_run_cmd) as mock_run:
                         from rlsbl.commands.monorepo.batch_release import _batch_release_packages
                         _batch_release_packages(
-                            {"dry-run": False, "yes": True, "quiet": True},
+                            {"dry-run": False, "quiet": True},
                             str(tmp_path), batch_path, batch_config, projects,
                         )
 
@@ -273,7 +273,7 @@ class TestBatchReleasePassesSkipLock:
                         with patch("rlsbl.workspace.members_of", return_value=[projects[0]]):
                             from rlsbl.commands.monorepo.batch_release import _batch_release_releasables
                             _batch_release_releasables(
-                                {"dry-run": False, "yes": True, "quiet": True},
+                                {"dry-run": False, "quiet": True},
                                 str(tmp_path), batch_path, batch_config, projects,
                             )
 

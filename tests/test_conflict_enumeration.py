@@ -232,7 +232,7 @@ class TestClaimNameConflictEnumeration:
         from rlsbl.commands.claim_name import run_cmd as claim_run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("pypi", ["foobar"], {"yes": False})
+            claim_run_cmd("pypi", ["foobar"], {"force-publish": False})
         assert exc_info.value.code == 1
 
         err = capsys.readouterr().err
@@ -253,7 +253,7 @@ class TestClaimNameConflictEnumeration:
         from rlsbl.commands.claim_name import run_cmd as claim_run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("npm", ["foobar"], {"yes": False})
+            claim_run_cmd("npm", ["foobar"], {"force-publish": False})
         assert exc_info.value.code == 1
 
         err = capsys.readouterr().err

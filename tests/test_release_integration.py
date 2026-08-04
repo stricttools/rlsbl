@@ -161,7 +161,7 @@ class TestReleaseDryRunFullFlow:
         ):
             run_cmd(
                 _rc(),
-                {"dry-run": True, "yes": True, "quiet": False},
+                {"dry-run": True, "quiet": False},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -200,7 +200,7 @@ class TestReleaseFullFlowRealGit:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -271,7 +271,7 @@ class TestReleaseVpathRelativePaths:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -323,7 +323,7 @@ class TestReleaseGhReleaseCreateFailure:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=_make_ctx(mock_git_repo),
                 )
 
@@ -379,7 +379,7 @@ class TestReleaseGhReleaseCreateFailure:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=_make_ctx(mock_git_repo),
                 )
 
@@ -444,7 +444,7 @@ class TestBuildFailureAbortsRelease:
             with pytest.raises((RuntimeError, SystemExit)):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=_make_ctx(mock_git_repo),
                 )
 

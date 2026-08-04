@@ -772,7 +772,7 @@ releasable = "core"
             "rlsbl.effects.run",
             side_effect=self._mock_saferm_delete,
         ):
-            removed = run_cleanup_command(str(tmp_project), yes=True)
+            removed = run_cleanup_command(str(tmp_project))
 
         # Residue removed (changes/, version, CHANGELOG.md, config.json --
         # identical to releasable config); hooks/ preserved

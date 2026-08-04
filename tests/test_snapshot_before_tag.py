@@ -120,7 +120,7 @@ class TestBatchModeSnapshotPreTag:
         core = _setup_releasable_workspace(tmp_project)
         _run_release_flags(
             core, tmp_project,
-            {"yes": True, "quiet": True, "skip-lock": True, "batch-mode": True},
+            {"quiet": True, "skip-lock": True, "batch-mode": True},
         )
 
         tag_sha = _rev(tmp_project, "alpha@v1.0.1")
@@ -157,7 +157,7 @@ class TestUndoUnwindsSnapshotCommit:
         add_remote(repo, repo.parent / "remote.git")
         monkeypatch.chdir(repo)
 
-        _run_undo(repo, {"yes": True})
+        _run_undo(repo, {})
 
         pkg = json.loads((repo / "package.json").read_text())
         assert pkg["version"] == "1.0.0", (
@@ -208,7 +208,7 @@ class TestOldOrderingResume:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 

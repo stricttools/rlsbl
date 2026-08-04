@@ -35,7 +35,7 @@ class TestClaimName:
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"yes": True})
+            run_cmd("npm", ["my-pkg"], {"force-publish": True})
 
         mock_check.assert_called_once_with("my-pkg", "npm")
         mock_run.assert_called_once()
@@ -56,7 +56,7 @@ class TestClaimName:
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
-            run_cmd("pypi", ["my-pkg"], {"yes": True})
+            run_cmd("pypi", ["my-pkg"], {"force-publish": True})
 
         mock_check.assert_called_once_with("my-pkg", "pypi")
         assert mock_run.call_count == 2
@@ -77,12 +77,12 @@ class TestClaimName:
         assert (real_tmpdir / "my_pkg" / "__init__.py").exists()
 
     @patch("rlsbl.commands.check._check_single_name")
-    def test_claim_taken_without_yes_exits(self, mock_check):
-        """check-name returns taken, no --yes. Exits 1 without publishing."""
+    def test_claim_taken_without_force_publish_exits(self, mock_check):
+        """check-name returns taken, no --force-publish. Exits 1 without publishing."""
         mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "reason": "registered"}
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["taken-pkg"], {"yes": False})
+            run_cmd("npm", ["taken-pkg"], {"force-publish": False})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.check._check_single_name")
@@ -100,7 +100,7 @@ class TestClaimName:
         }
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["selfdoc"], {"yes": False})
+            run_cmd("npm", ["selfdoc"], {"force-publish": False})
         assert exc_info.value.code == 1
 
         err = capsys.readouterr().err
@@ -125,7 +125,7 @@ class TestClaimName:
         }
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["foobar"], {"yes": False})
+            run_cmd("npm", ["foobar"], {"force-publish": False})
         assert exc_info.value.code == 1
 
         err = capsys.readouterr().err
@@ -135,13 +135,13 @@ class TestClaimName:
 
     @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
-    def test_claim_taken_with_yes_publishes(self, mock_check, mock_run, real_tmpdir):
-        """check-name returns taken, --yes passed. Publish is attempted."""
+    def test_claim_taken_with_force_publish_publishes(self, mock_check, mock_run, real_tmpdir):
+        """check-name returns taken, --force-publish passed. Publish is attempted."""
         mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "reason": "registered"}
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["taken-pkg"], {"yes": True})
+            run_cmd("npm", ["taken-pkg"], {"force-publish": True})
 
         mock_run.assert_called_once()
         call_args = mock_run.call_args
@@ -153,7 +153,7 @@ class TestClaimName:
         mock_check.return_value = {"name": "err-pkg", "registry": "npm", "status": "error", "variants": None, "reason": None, "error": "network timeout"}
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["err-pkg"], {"yes": False})
+            run_cmd("npm", ["err-pkg"], {"force-publish": False})
         assert exc_info.value.code == 2
 
     @patch("rlsbl.effects.run")
@@ -165,7 +165,7 @@ class TestClaimName:
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-pkg"], {"yes": True})
+                run_cmd("npm", ["my-pkg"], {"force-publish": True})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.effects.run")
@@ -181,7 +181,7 @@ class TestClaimName:
 
         with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("pypi", ["my-pkg"], {"yes": True})
+                run_cmd("pypi", ["my-pkg"], {"force-publish": True})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.check._check_single_name")
@@ -192,7 +192,7 @@ class TestClaimName:
         env = {k: v for k, v in os.environ.items() if k != "NPM_TOKEN"}
         with patch.dict(os.environ, env, clear=True):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-pkg"], {"yes": False})
+                run_cmd("npm", ["my-pkg"], {"force-publish": False})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.check._check_single_name")
@@ -203,7 +203,7 @@ class TestClaimName:
         env = {k: v for k, v in os.environ.items() if k not in ("PYPI_TOKEN", "UV_PUBLISH_TOKEN")}
         with patch.dict(os.environ, env, clear=True):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("pypi", ["my-pkg"], {"yes": True})
+                run_cmd("pypi", ["my-pkg"], {"force-publish": True})
         assert exc_info.value.code == 1
 
 
@@ -237,7 +237,7 @@ class TestClaimNamePreview:
         rlsbl._variadic_args = ["my-pkg"]
         try:
             result = rlsbl.app.test(
-                ["--dry-run", "--yes", "claim-name", "--target", "npm"]
+                ["--dry-run", "claim-name", "--target", "npm"]
             )
         finally:
             rlsbl._variadic_args = []
@@ -267,7 +267,7 @@ class TestClaimNamePreview:
         rlsbl._variadic_args = ["my-pkg"]
         try:
             result = rlsbl.app.test(
-                ["--dry-run", "--yes", "claim-name", "--target", "pypi"]
+                ["--dry-run", "claim-name", "--target", "pypi"]
             )
         finally:
             rlsbl._variadic_args = []
@@ -281,10 +281,10 @@ class TestClaimNamePreview:
 class TestClaimNameConfirmation:
     """The publish confirmation is the framework's, not this command's.
 
-    `claim-name` is classified `mutating`, so strictcli prompts before dispatch
-    and `--yes` skips it.  The command's own prompt (and its own non-TTY error)
-    is deleted: two confirmations for one decision, worded differently, is how
-    a user learns to answer without reading.
+    `claim-name` declares itself `consequential`, so strictcli prompts before
+    dispatch and `--approve-consequential` skips it.  The command's own prompt
+    (and its own non-TTY error) is deleted: two confirmations for one decision,
+    worded differently, is how a user learns to answer without reading.
     """
 
     @patch("builtins.input")
@@ -299,7 +299,7 @@ class TestClaimNameConfirmation:
         }
         mock_run.return_value = MagicMock(returncode=0)
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"yes": False})
+            run_cmd("npm", ["my-pkg"], {"force-publish": False})
         mock_input.assert_not_called()
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == ["npm", "publish", "--access", "public"]
@@ -314,6 +314,6 @@ class TestClaimNameConfirmation:
         }
         mock_run.return_value = MagicMock(returncode=0)
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"yes": True})
+            run_cmd("npm", ["my-pkg"], {"force-publish": True})
         mock_input.assert_not_called()
         mock_run.assert_called_once()

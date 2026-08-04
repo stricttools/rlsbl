@@ -515,4 +515,4 @@ class TestSubtreePublish:
         # publish code path is still exercised because it reads subtree_remote
         # from workspace.toml via resolve_project.
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))

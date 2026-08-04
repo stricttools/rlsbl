@@ -90,7 +90,7 @@ class TestBatchUpfrontValidation:
             with patch(RUN_CMD, run_cmd_mock):
                 with pytest.raises(SystemExit) as exc_info:
                     _cmd_batch_release(
-                        {"dry-run": False, "yes": True, "quiet": False},
+                        {"dry-run": False, "quiet": False},
                         project_root=mock_git_repo,
                     )
 
@@ -110,7 +110,7 @@ class TestBatchUpfrontValidation:
                 with patch(RUN_CMD, run_cmd_mock):
                     with pytest.raises(SystemExit) as exc_info:
                         _cmd_batch_release(
-                            {"dry-run": False, "yes": True, "quiet": False},
+                            {"dry-run": False, "quiet": False},
                             project_root=mock_git_repo,
                         )
 
@@ -131,7 +131,7 @@ class TestBatchUpfrontValidation:
                     with patch(RUN_CMD, run_cmd_mock):
                         with pytest.raises(SystemExit) as exc_info:
                             _cmd_batch_release(
-                                {"dry-run": False, "yes": True, "quiet": False},
+                                {"dry-run": False, "quiet": False},
                                 project_root=mock_git_repo,
                             )
 
@@ -155,7 +155,7 @@ class TestBatchUpfrontValidation:
                     with patch(FINALIZE):
                         with patch(RUN_CMD, mock_run_cmd):
                             _cmd_batch_release(
-                                {"dry-run": False, "yes": True, "quiet": False},
+                                {"dry-run": False, "quiet": False},
                                 project_root=mock_git_repo,
                             )
 
@@ -189,7 +189,7 @@ class TestBatchUpfrontValidation:
                     with patch(FINALIZE):
                         with patch(RUN_CMD, mock_run_cmd):
                             _cmd_batch_release(
-                                {"dry-run": False, "yes": True, "quiet": False},
+                                {"dry-run": False, "quiet": False},
                                 project_root=mock_git_repo,
                             )
 
@@ -208,7 +208,7 @@ class TestBatchUpfrontValidation:
         def mock_run_cmd(release_config, flags, **kwargs):
             pass
 
-        flags = {"dry-run": False, "yes": True, "quiet": False, "allow-dirty": True}
+        flags = {"dry-run": False, "quiet": False, "allow-dirty": True}
 
         with patch(VALIDATE_GH):
             with patch(VALIDATE_TREE, side_effect=capture_tree):

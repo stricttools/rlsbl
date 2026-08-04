@@ -390,18 +390,12 @@ def run_cmd(flags, *, ctx):
         )
         return
 
-    if not flags.get("yes"):
-        try:
-            answer = input(
-                f"Force-push {len(tags)} tag(s) and recreate their GitHub "
-                f"Releases? [y/N] "
-            ).strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAborted.")
-            raise SystemExit(1)
-        if answer != "y":
-            print("Aborted.")
-            return
+    # Announcement, not a gate: `release reconcile` declares itself
+    # `consequential`, so strictcli confirmed once before dispatch.
+    print(
+        f"Force-pushing {len(tags)} tag(s) and recreating their GitHub "
+        f"Releases."
+    )
 
     push_timeout = get_push_timeout(
         ctx.config, override=flags.get("push-timeout"),

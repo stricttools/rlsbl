@@ -99,7 +99,6 @@ class TestReleaseValidatedCache:
         with patch("sys.stdout", new_callable=StringIO):
             # Should NOT raise SystemExit -- .validated is expected
             run_cmd(_rc(), {
-                "yes": True,
                 "quiet": False,
             },
             ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
@@ -155,7 +154,6 @@ class TestReleaseValidatedCache:
         with patch("sys.stdout", new_callable=StringIO):
             with pytest.raises(SystemExit) as ctx:
                 run_cmd(_rc(), {
-                    "yes": True,
                     "quiet": False,
                 },
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),

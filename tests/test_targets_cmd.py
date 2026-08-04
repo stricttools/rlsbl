@@ -152,7 +152,7 @@ class TestMultiTargetRelease:
         from rlsbl.commands.release import run_cmd
 
         with patch("sys.stdout", StringIO()):
-            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(include=["npm", "spec"]), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Verify spec target build was called with config kwarg
         build_mock.assert_called_once_with(".", "1.0.1", config={"publish_mode": "ci", "pipelines": {}})
@@ -208,4 +208,4 @@ class TestMultiTargetRelease:
 
         # Secondary build failure now aborts the release
         with pytest.raises((RuntimeError, SystemExit)):
-            run_cmd(_rc(include=["npm", "spec"]), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(include=["npm", "spec"]), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))

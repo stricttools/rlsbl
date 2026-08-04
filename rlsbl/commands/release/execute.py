@@ -1171,25 +1171,21 @@ def _run_release_mutating(state: ReleaseState):
             if other_file:
                 preview_files.append(target_vpath(t_path, other_file))
 
-    # Confirmation prompt (skip with --yes)
-    if not flags.get("yes"):
-        bump_label = f" ({bump_type})" if bump_type else ""
-        print(f"\nAbout to release {new_version}{bump_label} on {branch}")
-        print(f"  Tag: {tag}")
-        if preview_files:
-            print(f"  Files: {', '.join(preview_files)}")
-        else:
-            print("  Files: (none -- version is the git tag)")
-        if should_tag(flags, ctx.config):
-            print("  Will add 'rlsbl' keyword to project manifests")
-        try:
-            answer = input("Proceed? [y/N] ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAborted.")
-            raise KeyboardInterrupt
-        if answer != "y":
-            print("Aborted.")
-            raise SystemExit(0)
+    # Announcement, not a gate.  `release run` declares itself
+    # `consequential`, so strictcli confirms once before dispatch and
+    # --approve-consequential skips that one prompt; a second prompt here
+    # asked the same question in different words and needed its own
+    # non-interactive error text.  What the old prompt SHOWED is kept, because
+    # the framework prompt cannot know the resolved version, tag or files.
+    bump_label = f" ({bump_type})" if bump_type else ""
+    print(f"\nReleasing {new_version}{bump_label} on {branch}")
+    print(f"  Tag: {tag}")
+    if preview_files:
+        print(f"  Files: {', '.join(preview_files)}")
+    else:
+        print("  Files: (none -- version is the git tag)")
+    if should_tag(flags, ctx.config):
+        print("  Will add 'rlsbl' keyword to project manifests")
 
     # Capture HEAD before any version-bump writes so we can roll back on failure.
     # This must happen before write_version() so that git reset --hard reverts

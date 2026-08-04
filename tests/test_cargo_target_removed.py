@@ -88,7 +88,7 @@ class TestCliSurface:
             sys, "argv", ["rlsbl", "claim-name", "serde", "--target", "crates"]
         )
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(cli_ctx(), target="crates")
+            rlsbl.cmd_claim_name(cli_ctx(), target="crates", force_publish=False)
         assert exc.value.code == 1
         err = capsys.readouterr().err
         assert "crates" in err

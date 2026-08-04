@@ -1,7 +1,7 @@
 """Shared utilities for release commands: project root detection, git auth verification, working tree guards, and release file loading."""
 
 
-def build_release_flags(dry_run, yes, quiet, allow_dirty, watch=False,
+def build_release_flags(dry_run, quiet, allow_dirty, watch=False,
                         push_timeout=None, ci_timeout=None,
                         check_timeout=None, hook_timeout=None):
     """Build the standard release flags dict from CLI arguments.
@@ -13,7 +13,6 @@ def build_release_flags(dry_run, yes, quiet, allow_dirty, watch=False,
     """
     return {
         "dry-run": dry_run,
-        "yes": yes,
         "quiet": quiet,
         "allow-dirty": allow_dirty,
         "watch": bool(watch),

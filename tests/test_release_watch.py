@@ -101,7 +101,7 @@ class TestNoWatchPrintsHint:
 
         run_cmd(
             _rc(),
-            {"dry-run": True, "quiet": False, "yes": True, "watch": False},
+            {"dry-run": True, "quiet": False, "watch": False},
         
             ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
@@ -159,7 +159,7 @@ class TestWatchInvokesWatchCmd:
 
         run_cmd(
             _rc(),
-            {"dry-run": True, "quiet": False, "yes": True, "watch": True},
+            {"dry-run": True, "quiet": False, "watch": True},
         
             ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
@@ -269,7 +269,7 @@ class TestWatchInvokedAfterRelease:
             mock_watch.return_value = None
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": False, "watch": True},
+                {"quiet": False, "watch": True},
             
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
@@ -344,7 +344,7 @@ class TestWatchInvokedAfterRelease:
              patch("rlsbl.commands.watch.run_cmd") as mock_watch:
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": False, "watch": False},
+                {"quiet": False, "watch": False},
 
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )

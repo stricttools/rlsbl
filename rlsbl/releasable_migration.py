@@ -948,8 +948,7 @@ def _validate_no_changelog_collisions(workspace_root, releasable_name,
 # ---------------------------------------------------------------------------
 
 
-def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
-                           yes=False):
+def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False):
     """Orchestrate the full migration of a releasable from per-package to releasable model.
 
     Steps:
@@ -965,7 +964,6 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
         workspace_root: path to the monorepo root.
         releasable_name: name of the releasable to migrate.
         dry_run: if True, report what would happen without making changes.
-        yes: if True, skip interactive confirmation prompts.
 
     Returns:
         A dict with:
@@ -1034,19 +1032,18 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False,
         result["tag_format"] = target_releasable.tag_format
         return result
 
-    # Interactive confirmation before destructive steps
-    if not yes:
-        member_names = [p.name for p in member_projects]
-        print(f"Migrating releasable '{releasable_name}' with members: "
-              f"{', '.join(member_names)}")
-        print("This will:")
-        print("  1. Merge per-package changelogs into the releasable directory")
-        print("  2. Consolidate member versions into the releasable version file")
-        print("  3. Create a releasable-format migration tag")
-        print("  4. Remove per-package .rlsbl/changes/ and .rlsbl/releases/ directories")
-        response = input("Proceed? [y/N] ").strip().lower()
-        if response not in ("y", "yes"):
-            raise WorkspaceError("Migration cancelled by user")
+    # Announcement, not a gate.  The migration is local: it rewrites workspace
+    # state, creates a LOCAL tag and removes per-package directories, all of it
+    # inside git and none of it leaving the repo, so the command is not
+    # `consequential`.  --dry-run reports the same plan without performing it.
+    member_names = [p.name for p in member_projects]
+    print(f"Migrating releasable '{releasable_name}' with members: "
+          f"{', '.join(member_names)}")
+    print("This will:")
+    print("  1. Merge per-package changelogs into the releasable directory")
+    print("  2. Consolidate member versions into the releasable version file")
+    print("  3. Create a releasable-format migration tag")
+    print("  4. Remove per-package .rlsbl/changes/ and .rlsbl/releases/ directories")
 
     # Step 2: consolidate versions (before changelogs, so we have the
     # version string for the consolidation-point tag)

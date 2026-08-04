@@ -15,8 +15,11 @@ def run_cmd(target, args, flags):
     placeholder package to reserve the name. Supports npm (via npm publish),
     and PyPI (via uv build + uv publish). Requires NPM_TOKEN for npm, or
     PYPI_TOKEN / UV_PUBLISH_TOKEN for PyPI.
-    When --yes is passed, proceeds even if the name appears taken or the
-    availability check returns an ambiguous status.
+    When --force-publish is passed, proceeds even if the name appears taken or
+    the availability check returns an ambiguous status. That is a decision
+    about the availability CHECK, deliberately not the framework's
+    --approve-consequential, which only skips the confirmation prompt: skipping
+    a prompt must never also override a "this name is taken" refusal.
     """
 
     if len(args) != 1:
@@ -39,8 +42,8 @@ def run_cmd(target, args, flags):
     elif status == "taken":
         detail = result.get("note") or result.get("reason", "unknown reason")
         print(f"Name '{name}' appears taken on {target}: {detail}.", file=sys.stderr)
-        if flags["yes"]:
-            print("--yes passed, attempting publish anyway...")
+        if flags["force-publish"]:
+            print("--force-publish passed, attempting publish anyway...")
         else:
             sys.exit(1)
     elif status == "error":
@@ -49,8 +52,8 @@ def run_cmd(target, args, flags):
         sys.exit(2)
     else:
         print(f"Ambiguous status '{status}' for '{name}' on {target}.", file=sys.stderr)
-        if flags["yes"]:
-            print("--yes passed, attempting publish anyway...")
+        if flags["force-publish"]:
+            print("--force-publish passed, attempting publish anyway...")
         else:
             sys.exit(1)
 
@@ -63,12 +66,13 @@ def run_cmd(target, args, flags):
             print("Neither PYPI_TOKEN nor UV_PUBLISH_TOKEN environment variable is set.", file=sys.stderr)
             sys.exit(1)
 
-    # No hand-rolled preview and no hand-rolled prompt: `claim-name` is a
-    # mutating command, so strictcli asks for confirmation before dispatch
-    # (--yes skips it), and under --dry-run every write and every publish below
-    # is RECORDED instead of performed.  The preview is therefore the real code
-    # path -- the incident this command is named for (a "dry run" that
-    # published for real) cannot recur by a branch being forgotten.
+    # No hand-rolled preview and no hand-rolled prompt: `claim-name` declares
+    # itself `consequential`, so strictcli asks for confirmation before
+    # dispatch (--approve-consequential skips it), and under --dry-run every
+    # write and every publish below is RECORDED instead of performed.  The
+    # preview is therefore the real code path -- the incident this command is
+    # named for (a "dry run" that published for real) cannot recur by a branch
+    # being forgotten.
 
     tmpdir = tempfile.mkdtemp()
     try:

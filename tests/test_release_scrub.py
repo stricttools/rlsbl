@@ -129,7 +129,7 @@ class TestFileModeRealSafegitContract:
 
         scrub_call = mock_run.call_args_list[1]
         args = scrub_call[0][1]
-        assert args[:2] == ["scrub", "file"]
+        assert args[:3] == ["--approve-consequential", "scrub", "file"]
         # Positional path is the LAST argument -- no --file flag exists.
         assert args[-1] == "secrets.env"
         assert "--file" not in args
@@ -199,7 +199,7 @@ class TestRecipeMode:
         run_cmd(flags, ctx=_ctx(str(tmp_path)))
 
         args = mock_run.call_args_list[1][0][1]
-        assert args[:2] == ["scrub", "run"]
+        assert args[:3] == ["--approve-consequential", "scrub", "run"]
         assert "--json" in args
         assert "--dry-run" in args
         assert str(recipe) in args
@@ -367,7 +367,7 @@ class TestEmptyOutputMeansNoMatches:
         ]
         flags = {
             "pattern": "nonexistent", "replace": "XXX",
-            "reason": "test", "entire-history": True, "yes": True,
+            "reason": "test", "entire-history": True,
         }
         run_cmd(flags, ctx=_ctx(str(tmp_path)))
         captured = capsys.readouterr()
@@ -537,7 +537,7 @@ class TestFullScrubFlow:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             return ""
 
@@ -556,7 +556,6 @@ class TestFullScrubFlow:
             "replace": "XXX",
             "reason": "remove leaked secret",
             "entire-history": True,
-            "yes": True,
         }
 
         ctx = _ctx(str(tmp_path))
@@ -725,7 +724,6 @@ class TestResumeFromScrubResult:
             "replace": "XXX",
             "reason": "remove secret",
             "entire-history": True,
-            "yes": True,
         }
 
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
@@ -841,7 +839,7 @@ class TestReleasableDirsRemapped:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 scrub_args.extend(args)
                 return safegit_result
             return ""
@@ -850,7 +848,7 @@ class TestReleasableDirsRemapped:
 
         flags = {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
         ctx = _ctx(str(proj_dir), workspace_root=str(ws_root))
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
@@ -916,7 +914,7 @@ class TestPushMechanics:
                 return SAFEGIT_OK
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             return ""
 
@@ -928,7 +926,7 @@ class TestPushMechanics:
 
         flags = {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
             run_cmd(flags, ctx=_ctx(str(tmp_path)))
@@ -957,7 +955,7 @@ class TestPushMechanics:
         )
         scrub_idx = next(
             i for i, (cmd, args, _) in enumerate(calls)
-            if cmd == "safegit" and args[:1] == ["scrub"]
+            if cmd == "safegit" and "scrub" in args[:2]
         )
         assert ls_remote_idx < scrub_idx
 
@@ -1029,7 +1027,7 @@ class TestPushMechanics:
                 return SAFEGIT_OK
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             return ""
 
@@ -1041,7 +1039,7 @@ class TestPushMechanics:
 
         flags = {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
             run_cmd(flags, ctx=_ctx(str(tmp_path)))
@@ -1152,7 +1150,7 @@ class TestScrubArchiveCommitted:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             return ""
 
@@ -1160,7 +1158,7 @@ class TestScrubArchiveCommitted:
 
         flags = {
             "pattern": "SECRETPATTERN", "replace": "REPLACEMENTXXX",
-            "reason": "clean leak", "entire-history": True, "yes": True,
+            "reason": "clean leak", "entire-history": True,
         }
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}):
             run_cmd(flags, ctx=_ctx(str(tmp_path)))
@@ -1235,7 +1233,7 @@ class TestPostRemapValidationGate:
 
         flags = {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
 
         failures = {str(unreleased): [bogus]}
@@ -1281,7 +1279,7 @@ class TestPostRemapValidationGate:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             return ""
 
@@ -1289,7 +1287,7 @@ class TestPostRemapValidationGate:
 
         flags = {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
         with patch(f"{MOD}.validate_all_hashes_resolve", return_value={}) as mock_gate:
             run_cmd(flags, ctx=_ctx(str(tmp_path)))
@@ -1354,7 +1352,7 @@ class TestJournalRecovery:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             if cmd == "git" and args == ["rev-parse", "--git-dir"]:
                 return str(gitdir)
@@ -1365,7 +1363,7 @@ class TestJournalRecovery:
     def _flags(self):
         return {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
 
     @patch(f"{MOD}.release_lock")
@@ -1578,7 +1576,7 @@ class TestJournalRecovery:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             if cmd == "git" and args == ["rev-parse", "--git-dir"]:
                 return str(gitdir)
@@ -1710,7 +1708,7 @@ class TestPreRewriteRemotesCrossCheck:
     def _flags(self):
         return {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
 
     def _run(self, tmp_path, mock_run, tracking_sha):
@@ -1731,7 +1729,7 @@ class TestPreRewriteRemotesCrossCheck:
                 return SAFEGIT_OK
             if cmd == "git" and args and args[0] == "ls-remote":
                 return ls_remote_out
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             return ""
 
@@ -1815,7 +1813,7 @@ class TestCleanupOkGate:
     def _flags(self):
         return {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
 
     def _safegit_result(self):
@@ -1846,7 +1844,7 @@ class TestCleanupOkGate:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             # git cat-file -e <old-sha> succeeds: the object still exists,
             # so the prune really is incomplete.
@@ -1900,7 +1898,7 @@ class TestCleanupOkGate:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             if cmd == "git" and args and args[:2] == ["cat-file", "-e"]:
                 raise Exception("object missing")
@@ -1956,7 +1954,7 @@ class TestCleanupOkGate:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             # git cat-file -e succeeds for EVERY sha: head and the identity
             # commits all exist (and always will).
@@ -1987,7 +1985,7 @@ class TestChangelogRegenerateUnchanged:
     def _flags(self):
         return {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
 
     def _run_effect(self):
@@ -1999,7 +1997,7 @@ class TestChangelogRegenerateUnchanged:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return safegit_result
             return ""
 
@@ -2120,7 +2118,6 @@ class TestNoMatchesExitsCleanly:
             "replace": "XXX",
             "reason": "test",
             "entire-history": True,
-            "yes": True,
         }
 
         # Should return normally (no sys.exit)
@@ -2151,7 +2148,7 @@ class TestNoMatchValidatesHashes:
     def _flags(self):
         return {
             "pattern": "secret", "replace": "XXX", "reason": "r",
-            "entire-history": True, "yes": True,
+            "entire-history": True,
         }
 
     def _setup(self, tmp_path, journal_groups, *, empty_stdout=False):
@@ -2180,7 +2177,7 @@ class TestNoMatchValidatesHashes:
         def run_effect(cmd, args=None, **kw):
             if cmd == "safegit" and args == ["--version"]:
                 return SAFEGIT_OK
-            if cmd == "safegit" and args and args[0] == "scrub":
+            if cmd == "safegit" and "scrub" in args[:2]:
                 return no_match_result
             if cmd == "git" and args == ["rev-parse", "--git-dir"]:
                 return str(gitdir)
@@ -2419,7 +2416,6 @@ class TestMonorepoTagCorrectProject:
             "replace": "XXX",
             "reason": "remove secret",
             "entire-history": True,
-            "yes": True,
         }
 
         ctx = _ctx(str(alpha_dir), workspace_root=str(ws_root))
@@ -2529,7 +2525,6 @@ class TestStandaloneTagNoPrefix:
             "replace": "XXX",
             "reason": "remove secret",
             "entire-history": True,
-            "yes": True,
         }
 
         ctx = _ctx(str(proj_dir), workspace_root=str(ws_root))
@@ -2549,3 +2544,42 @@ class TestStandaloneTagNoPrefix:
         gh_create_calls = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
         assert len(gh_create_calls) == 1
         assert "v1.0.0" in gh_create_calls[0][0][0]
+
+
+class TestSafegitJsonParsing:
+    """safegit's `--json --dry-run` stdout is JSON followed by a would-do log.
+
+    strictcli's dry mode prints its would-do log to STDOUT and never suppresses
+    it (contract 3.2/3.4), so a `--json` command's machine output and the
+    framework's human log share one stream. Plain ``json.loads`` on that stream
+    raises "Extra data" and `rlsbl release scrub --dry-run` died on it.
+    """
+
+    def test_json_followed_by_the_would_do_log_parses(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_json
+
+        stdout = (
+            '{\n  "version": 1,\n  "dry_run": true,\n  "file_matches": 1\n}\n'
+            "DRY RUN — no changes were made. Would do:\n"
+            "  1. run: git filter-repo\n"
+        )
+        assert _parse_safegit_json(stdout) == {
+            "version": 1, "dry_run": True, "file_matches": 1,
+        }
+
+    def test_plain_json_parses(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_json
+
+        assert _parse_safegit_json('{"version": 1}\n') == {"version": 1}
+
+    def test_unexpected_trailing_content_is_a_hard_error(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_json
+
+        with pytest.raises(ValueError, match="unexpected trailing content"):
+            _parse_safegit_json('{"version": 1}\n{"version": 2}\n')
+
+    def test_non_json_is_a_hard_error(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_json
+
+        with pytest.raises(ValueError, match="not JSON"):
+            _parse_safegit_json("not json at all\n")

@@ -80,7 +80,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         # gh release view was called via run_gh to verify existence
         mock_run_gh.assert_any_call(["release", "view", "v0.41.7"])
@@ -127,7 +127,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Dispatching workflows", output)
@@ -168,7 +168,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         # Both workflows must be dispatched via run_gh
         workflow_calls = [c for c in mock_run_gh.call_args_list
@@ -207,7 +207,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
             with self.assertRaises(SystemExit) as ctx:
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("no GitHub Release found", mock_stderr.getvalue())
@@ -256,11 +256,12 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_yes_skips_confirmation(self, _gh_inst, _gh_auth, _ws_root,
-                                     mock_targets_dict, mock_detect,
-                                     _exists, mock_run, mock_run_gh,
-                                     mock_cleanup):
-        """--yes flag skips the interactive confirmation prompt."""
+    def test_never_prompts_itself(self, _gh_inst, _gh_auth, _ws_root,
+                                   mock_targets_dict, mock_detect,
+                                   _exists, mock_run, mock_run_gh,
+                                   mock_cleanup):
+        """`release retry` declares itself consequential, so the framework
+        confirms before dispatch and the command has no prompt of its own."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
@@ -272,9 +273,9 @@ class TestReleaseRetry(unittest.TestCase):
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("builtins.input") as mock_input:
                 with patch("sys.stdout", new_callable=StringIO):
-                    run_cmd(config, {"yes": True}, project_root=".")
+                    run_cmd(config, {}, project_root=".")
 
-        # input() should never be called when --yes is set
+        # The command never prompts: the confirmation is the framework's.
         mock_input.assert_not_called()
 
         # Dispatch should have proceeded via run_gh
@@ -315,7 +316,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         # Monorepo tag format should be used
         target.monorepo_tag_format.assert_called_once_with("my-pkg", "0.41.7", path="packages/my-pkg")
@@ -361,7 +362,7 @@ class TestReleaseRetry(unittest.TestCase):
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
                 with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                    run_cmd(config, {"yes": True, "watch": True}, project_root=".")
+                    run_cmd(config, {"watch": True}, project_root=".")
 
                 # Watch was called with the commit SHA (no run IDs captured)
                 mock_watch.assert_called_once_with(
@@ -374,6 +375,7 @@ class TestReleaseRetry(unittest.TestCase):
                 output = mock_stdout.getvalue()
                 self.assertNotIn("Watch CI:", output)
 
+    @patch("rlsbl.commands.release_retry._cleanup_retry_file")
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
     @patch("rlsbl.commands.release_retry.run")
     @patch("os.path.exists", return_value=True)
@@ -382,10 +384,17 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_confirmation_prompt_abort(self, _gh_inst, _gh_auth, _ws_root,
-                                        mock_targets_dict, mock_detect,
-                                        _exists, mock_run, _run_gh):
-        """User says 'n' at 'Will dispatch' prompt -- aborts without dispatching."""
+    def test_no_second_prompt_even_when_stdin_would_answer_no(
+        self, _gh_inst, _gh_auth, _ws_root, mock_targets_dict, mock_detect,
+        _exists, mock_run, _run_gh, _cleanup,
+    ):
+        """A hand-rolled prompt would have aborted here; there is none.
+
+        Regression for the confirm redesign: `release retry` used to ask its
+        own "Will dispatch N workflow(s). Continue? [y/N]" on top of the
+        framework's, so one decision was asked twice in different words. The
+        framework's single prompt is now the only gate.
+        """
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
@@ -394,23 +403,17 @@ class TestReleaseRetry(unittest.TestCase):
 
         config = _make_retry_config("0.41.7")
 
-        with patch("builtins.input", return_value="n"):
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-                    with self.assertRaises(SystemExit) as ctx:
-                        run_cmd(config, {}, project_root=".")
+        with patch("rlsbl.commands.release_retry.time.sleep"):
+            with patch("builtins.input", return_value="n") as mock_input:
+                with patch("sys.stdout", new_callable=StringIO):
+                    run_cmd(config, {}, project_root=".")
 
-        self.assertEqual(ctx.exception.code, 1)
-        self.assertIn("Aborted", mock_stderr.getvalue())
+        mock_input.assert_not_called()
 
-        # "Will dispatch" prompt should have been shown
-        output = mock_stdout.getvalue()
-        self.assertIn("Will dispatch", output)
-
-        # No dispatch calls via run_gh
+        # The dispatch proceeded: a declined stdin answer is not a gate here.
         workflow_calls = [c for c in _run_gh.call_args_list
                           if len(c[0]) >= 1 and c[0][0][:2] == ["workflow", "run"]]
-        self.assertEqual(len(workflow_calls), 0)
+        self.assertGreater(len(workflow_calls), 0)
 
     def test_no_gh_installed_exits(self):
         """Missing gh CLI exits with error."""
@@ -465,7 +468,7 @@ class TestReleaseRetry(unittest.TestCase):
 
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with self.assertRaises(SystemExit) as ctx:
-                    run_cmd(None, {"yes": True}, project_root=".")
+                    run_cmd(None, {}, project_root=".")
 
         self.assertEqual(ctx.exception.code, 1)
         self.assertIn("ref must be set", mock_stderr.getvalue())
@@ -517,7 +520,7 @@ class TestReleaseRetry(unittest.TestCase):
                 # the real file we created above
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with self.assertRaises(SystemExit) as ctx:
-                        run_cmd(None, {"yes": True}, project_root=".")
+                        run_cmd(None, {}, project_root=".")
 
             self.assertEqual(ctx.exception.code, 1)
 
@@ -561,7 +564,7 @@ class TestReleaseRetry(unittest.TestCase):
                     with self.assertRaises(SystemExit) as ctx:
                         # Pass retry_config=None so run_cmd hits the internal
                         # read path (file exists but wasn't read by caller)
-                        run_cmd(None, {"yes": True}, project_root=".")
+                        run_cmd(None, {}, project_root=".")
 
             self.assertEqual(ctx.exception.code, 1)
 
@@ -608,7 +611,7 @@ class TestReleaseRetry(unittest.TestCase):
                 mock_run.side_effect = self._run_side_effect
 
                 with patch("sys.stdout", new_callable=StringIO):
-                    run_cmd(None, {"yes": True}, project_root=".")
+                    run_cmd(None, {}, project_root=".")
 
             # read_retry_file was called (existing file was read, not overwritten)
             mock_read_retry.assert_called_once_with(retry_path)
@@ -637,7 +640,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         # _cleanup_retry_file was called (which uses saferm internally)
         mock_cleanup.assert_called_once()
@@ -918,7 +921,7 @@ class TestRunIdCapture(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True, "watch": True}, project_root=".")
+                run_cmd(config, {"watch": True}, project_root=".")
 
             mock_watch.assert_called_once_with(None, [], {"run-id": ["98765"]})
 
@@ -955,7 +958,7 @@ class TestRunIdCapture(unittest.TestCase):
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
                 with patch("sys.stdout", new_callable=StringIO):
-                    run_cmd(config, {"yes": True, "watch": True}, project_root=".")
+                    run_cmd(config, {"watch": True}, project_root=".")
 
                 mock_watch.assert_called_once_with(None, [], {"run-id": ["55555"]})
 
@@ -992,7 +995,7 @@ class TestRunIdCapture(unittest.TestCase):
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
                 with patch("sys.stdout", new_callable=StringIO):
-                    run_cmd(config, {"yes": True, "watch": True}, project_root=".")
+                    run_cmd(config, {"watch": True}, project_root=".")
 
                 # Falls back to SHA-based watching
                 mock_watch.assert_called_once_with(
@@ -1033,7 +1036,7 @@ class TestRunIdCapture(unittest.TestCase):
         config = _make_retry_config("0.41.7", dispatch=["publish.yml", "ci.yml"])
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            run_cmd(config, {"yes": True}, project_root=".")
+            run_cmd(config, {}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Watch CI: rlsbl watch --run-id 111 --run-id 222", output)
@@ -1070,7 +1073,7 @@ class TestRunIdCapture(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                run_cmd(config, {"yes": True}, project_root=".")
+                run_cmd(config, {}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Watch CI: rlsbl watch abc123def456789012345678901234567890abcd", output)
@@ -1109,7 +1112,7 @@ class TestRunIdCapture(unittest.TestCase):
 
         with patch("rlsbl.commands.release_retry.watch_run_cmd") as mock_watch:
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(config, {"yes": True, "watch": True}, project_root=".")
+                run_cmd(config, {"watch": True}, project_root=".")
 
             mock_watch.assert_called_once_with(None, [], {"run-id": ["1001", "1002", "1003"]})
 
@@ -1137,7 +1140,7 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
                  patch("rlsbl.release_file.get_retry_file_path", return_value=retry_path):
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with self.assertRaises(SystemExit) as ctx:
-                        cmd_release_retry(cli_ctx(yes=True, quiet=True), watch=False)
+                        cmd_release_retry(cli_ctx(quiet=True), watch=False)
 
             self.assertEqual(ctx.exception.code, 1)
 

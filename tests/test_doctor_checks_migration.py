@@ -117,6 +117,9 @@ BUILTIN_PROVIDER_CHECKS = [
     "cli-test-coverage",
     "effects-bypass",
     "observe-allowlist-breadth",
+    # Warns when an escaping grant sits on a command that did not declare
+    # itself consequential (strictcli's confirm redesign, contract 8.1/11).
+    "consequential-grant-agreement",
 ]
 
 

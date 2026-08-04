@@ -160,17 +160,10 @@ def run_cmd(args, flags, project_root):
         for t, r in unpublished:
             print(f"  {t.name}: skipping ({r.message})")
 
-    # Confirmation prompt (skipped with --yes or --dry-run)
-    if not dry_run and not flags.get("yes"):
-        prompt = f"Proceed with yanking {tag}? [y/N] "
-        try:
-            answer = input(prompt).strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAborted.")
-            sys.exit(1)
-        if answer != "y":
-            print("Aborted.")
-            sys.exit(0)
+    # No hand-rolled prompt: `release yank` declares itself `consequential`,
+    # so strictcli confirms before dispatch and --approve-consequential skips
+    # it, with one prompt wording and one non-interactive error across every
+    # rlsbl command.  The per-registry breakdown above is still printed.
 
     # Execute registry-specific yank for each published target
     for t, r in published:

@@ -264,17 +264,9 @@ def run_cmd(retry_config, flags, project_root):
             log(f"  {filename}")
         return
 
-    # Confirmation prompt
-    if not flags.get("yes"):
-        log(f"Will dispatch {len(dispatch)} workflow(s) for {tag}. Continue? [y/N]")
-        try:
-            answer = input("").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAborted.", file=sys.stderr)
-            sys.exit(1)
-        if answer not in ("y", "yes"):
-            print("Aborted.", file=sys.stderr)
-            sys.exit(1)
+    # Announcement, not a gate: `release retry` declares itself
+    # `consequential`, so strictcli already confirmed before dispatch.
+    log(f"Dispatching {len(dispatch)} workflow(s) for {tag}.")
 
     # Dispatch all configured workflows and capture run IDs
     log("Dispatching workflows...")

@@ -75,7 +75,7 @@ class TestBatchDryRunSummary:
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
                 _cmd_batch_release(
-                    {"dry-run": True, "yes": True, "quiet": False},
+                    {"dry-run": True, "quiet": False},
                     project_root=mock_git_repo,
                 )
 
@@ -112,7 +112,7 @@ class TestBatchDryRunSummary:
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
                 _cmd_batch_release(
-                    {"dry-run": False, "yes": True, "quiet": False},
+                    {"dry-run": False, "quiet": False},
                     project_root=mock_git_repo,
                 )
 
@@ -174,7 +174,7 @@ class TestBatchDryRunSummary:
              patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"), \
              patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
             _cmd_batch_release(
-                {"dry-run": True, "yes": True, "quiet": False},
+                {"dry-run": True, "quiet": False},
                 project_root=mock_git_repo,
             )
 

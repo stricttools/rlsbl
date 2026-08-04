@@ -188,7 +188,7 @@ class TestPrModeConfigRejected:
         with pytest.raises(SystemExit):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": False},
+                {"quiet": False},
                 ctx=_make_ctx(mock_git_repo, config_override={
                     "publish_mode": "ci",
                     "pipelines": {},
@@ -217,7 +217,7 @@ class TestMalformedTestConfigAbortsRelease:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo, config_override={
                     "publish_mode": "ci",
                     "pipelines": {},
@@ -293,7 +293,7 @@ class TestImperativeModeUnchanged:
         ):
             run_cmd(
                 _rc(description="test"),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -319,7 +319,7 @@ class TestAnyReleaseModeKeyErrors:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo, config_override={
                     "publish_mode": "ci",
                     "pipelines": {},

@@ -209,7 +209,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             from rlsbl.commands.release import run_cmd
 
             run_cmd(
-                _rc(), {"dry-run": True, "yes": True},
+                _rc(), {"dry-run": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
                     config={"publish_mode": "ci", "pipelines": {}},
@@ -261,7 +261,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             from rlsbl.commands.release import run_cmd
 
             run_cmd(
-                _rc(), {"dry-run": True, "yes": True},
+                _rc(), {"dry-run": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
                     config={"publish_mode": "ci", "pipelines": {}},
@@ -312,7 +312,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             from rlsbl.commands.release import run_cmd
 
             run_cmd(
-                _rc(), {"dry-run": True, "quiet": True, "yes": True},
+                _rc(), {"dry-run": True, "quiet": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
                     config={"publish_mode": "ci", "pipelines": {}},
@@ -361,7 +361,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             from rlsbl.commands.release import run_cmd
 
             run_cmd(
-                _rc(), {"dry-run": True, "quiet": True, "yes": True},
+                _rc(), {"dry-run": True, "quiet": True},
                 ctx=ProjectContext(
                     project_root=Path("."), workspace_root=None,
                     config={"publish_mode": "ci", "pipelines": {}},
@@ -462,7 +462,7 @@ class TestExternalChecksVsHookCustomization:
 
                 run_cmd(
                     _rc(),
-                    {"quiet": True, "yes": True},
+                    {"quiet": True},
                     ctx=ProjectContext(
                         project_root=Path(str(tmp_project)),
                         workspace_root=None,
@@ -528,7 +528,7 @@ class TestExternalChecksVsHookCustomization:
 
                 run_cmd(
                     _rc(),
-                    {"dry-run": True, "yes": True},
+                    {"dry-run": True},
                     ctx=ProjectContext(
                         project_root=Path(str(tmp_project)),
                         workspace_root=None,

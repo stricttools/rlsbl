@@ -165,7 +165,6 @@ class TestReleaseUnexpectedFiles:
             run_cmd(
                 _rc(),
                 {
-                    "yes": True,
                     "quiet": True,
                 },
             
@@ -228,7 +227,6 @@ class TestReleaseUnexpectedFiles:
                 run_cmd(
                     _rc(),
                     {
-                        "yes": True,
                         "quiet": True,
                     },
                 

@@ -109,9 +109,10 @@ def run_cmd(args, flags, project_root):
         print("Cannot verify whether this is the latest release. Aborting for safety.", file=sys.stderr)
         sys.exit(1)
 
-    # No hand-rolled prompt: `release deprecate` is a mutating command, so
-    # strictcli confirms before dispatch and --yes skips it, with one prompt
-    # wording and one non-interactive error across every rlsbl command.
+    # No hand-rolled prompt: `release deprecate` declares itself
+    # `consequential`, so strictcli confirms before dispatch and
+    # --approve-consequential skips it, with one prompt wording and one
+    # non-interactive error across every rlsbl command.
 
     _soft_deprecate(tag, reason, use, dry_run)
 

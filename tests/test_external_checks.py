@@ -609,7 +609,7 @@ class TestCheckTimeoutFlagReachesExternalChecks:
         live = dict(on_disk)
         apply_timeout_overrides(
             live,
-            build_release_flags(False, True, False, False, check_timeout=13),
+            build_release_flags(False, False, False, check_timeout=13),
         )
 
         class ReleaseCtx:
@@ -636,7 +636,7 @@ class TestCheckTimeoutFlagReachesExternalChecks:
         live = dict(on_disk)
         apply_timeout_overrides(
             live,
-            build_release_flags(False, True, False, False, check_timeout=21),
+            build_release_flags(False, False, False, check_timeout=21),
         )
 
         class ReleaseCtx:

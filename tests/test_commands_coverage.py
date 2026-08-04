@@ -119,7 +119,7 @@ class TestUndoGhNotInstalled:
         from rlsbl.commands.undo import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+            run_cmd("npm", [], {}, ctx=_ctx())
         assert exc_info.value.code == 1
 
 
@@ -132,7 +132,7 @@ class TestUndoGhNotAuthed:
         from rlsbl.commands.undo import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+            run_cmd("npm", [], {}, ctx=_ctx())
         assert exc_info.value.code == 1
 
 
@@ -146,7 +146,7 @@ class TestUndoDirtyTree:
         from rlsbl.commands.undo import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+            run_cmd("npm", [], {}, ctx=_ctx())
         assert exc_info.value.code == 1
 
 
@@ -162,15 +162,15 @@ class TestUndoNoTagsFound:
         from rlsbl.commands.undo import run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+            run_cmd("npm", [], {}, ctx=_ctx())
         assert exc_info.value.code == 1
 
 
 class TestUndoHasNoOwnPrompt:
     """The destructive-operation confirmation is the framework's.
 
-    `release undo` is classified `mutating`; strictcli asks once before
-    dispatch and `--yes` skips it.  The command's own "This is destructive.
+    `release undo` declares itself `consequential`; strictcli asks once before
+    dispatch and `--approve-consequential` skips it.  The command's own "This is destructive.
     Proceed?" prompt is gone, so a closed stdin no longer produces a second,
     differently-worded refusal.
     """
@@ -214,7 +214,7 @@ class TestUndoGhDeleteFails:
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
         # Summary table should be printed (has FAILED step)
         assert "FAILED" in out.getvalue()
 
@@ -243,7 +243,7 @@ class TestUndoRemoteTagDeleteFails:
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
         assert "FAILED" in out.getvalue()
 
 
@@ -271,7 +271,7 @@ class TestUndoLocalTagDeleteFails:
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
         assert "FAILED" in out.getvalue()
 
 
@@ -279,7 +279,7 @@ class TestUndoRevertException:
     """Covers lines 202-204: git revert throws exception.
 
     Regression: this class previously mocked ``run``/``run_gh`` but NOT
-    ``push_if_needed``/``get_current_branch``. With ``flags={"yes": True}`` the
+    ``push_if_needed``/``get_current_branch``. With ``flags={}`` the
     undo flow reaches the push step, so an unmocked ``push_if_needed`` executed
     a REAL ``git push origin main`` from whatever repo the test process was in
     (the real rlsbl dev repo). The push result was swallowed, so the test
@@ -309,7 +309,7 @@ class TestUndoRevertException:
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
         assert "FAILED" in out.getvalue()
 
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
@@ -354,7 +354,7 @@ class TestUndoRevertException:
         with patch("subprocess.Popen", side_effect=_spy_popen):
             with patch("sys.stdout", new_callable=StringIO):
                 with patch("sys.stderr", new_callable=StringIO):
-                    run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                    run_cmd("npm", [], {}, ctx=_ctx())
 
         # push_if_needed is mocked, so it is invoked (belt) but spawns nothing.
         assert _push.called, "expected the undo flow to reach the push step"
@@ -390,7 +390,7 @@ class TestUndoChangelogRestoreFails:
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
         output = out.getvalue()
         assert "FAILED" in output
         assert "Restore changelog" in output
@@ -420,7 +420,7 @@ class TestUndoReleaseFileRestoreFails:
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
         assert "FAILED" in out.getvalue()
 
 
@@ -499,7 +499,7 @@ class TestUndoPushFails:
         ]
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
         assert "FAILED" in out.getvalue()
         assert "Push" in out.getvalue()
 
@@ -531,7 +531,7 @@ class TestUndoReleaseFileFinalize:
             "",                                                # git commit (release file restore)
         ]
         with patch("sys.stdout", new_callable=StringIO):
-            run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+            run_cmd("npm", [], {}, ctx=_ctx())
         assert mock_run.call_count == 9
 
 
@@ -579,7 +579,7 @@ class TestUndoFinalizeOnlyReverted:
 
         monkeypatch.chdir(repo)
         with patch("sys.stdout", new_callable=StringIO) as out:
-            run_cmd("npm", [], {"yes": True}, ctx=_ctx(repo, {"publish_mode": "ci"}))
+            run_cmd("npm", [], {}, ctx=_ctx(repo, {"publish_mode": "ci"}))
         assert "Undo of v1.0.0 complete" in out.getvalue()
         # The finalize was undone: the finalized JSONL is gone again.
         assert not (repo / ".rlsbl" / "changes" / "1.0.0.jsonl").exists()
@@ -626,7 +626,7 @@ class TestUndoCoverageNeverPollutesRealRepo:
         try:
             with patch("sys.stdout", new_callable=StringIO), \
                  patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {"yes": True}, ctx=_ctx())
+                run_cmd("npm", [], {}, ctx=_ctx())
             j_after = journal.read_bytes()
             c_after = changelog.read_bytes()
         finally:
@@ -1204,7 +1204,7 @@ class TestScrubFileMode:
         mock_run = _scrub_simple(tmp_path, [SAFEGIT_OK, safegit_result], flags)
         scrub_call = mock_run.call_args_list[1]
         args = scrub_call[0][1]
-        assert args[:2] == ["scrub", "file"]
+        assert args[:3] == ["--approve-consequential", "scrub", "file"]
         # Positional path last -- safegit scrub file has no --file/--mangle flags.
         assert args[-1] == "secrets.txt"
         assert "--file" not in args
@@ -1234,24 +1234,22 @@ class TestScrubSafegitFails:
         assert exc_info.value.code == 1
 
 
-class TestScrubConfirmationAbort:
-    """Covers lines 151-160: user declines confirmation."""
+class TestScrubHasNoPromptOfItsOwn:
+    """`release scrub` declares itself `consequential`; the framework asks.
 
-    def test_abort_on_no(self, tmp_path):
+    Regression for the confirm redesign: the command used to ask its own
+    "This will force-push rewritten history. Continue? [y/N]" on top of the
+    framework's prompt, so one decision was asked twice in different words.
+    A declined stdin answer is no longer a gate here.
+    """
+
+    def test_declined_stdin_does_not_abort(self, tmp_path):
         safegit_result = json.dumps({"rewrites": {"a": "b"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
-        with patch("builtins.input", return_value="n"):
-            with pytest.raises(SystemExit) as exc_info:
+        with patch("builtins.input", return_value="n") as mock_input:
+            with pytest.raises(SystemExit):
                 _scrub_simple(tmp_path, [SAFEGIT_OK, "", safegit_result], flags)
-        assert exc_info.value.code == 0
-
-    def test_abort_on_eof(self, tmp_path):
-        safegit_result = json.dumps({"rewrites": {"a": "b"}, "tags": [], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
-        with patch("builtins.input", side_effect=EOFError):
-            with pytest.raises(SystemExit) as exc_info:
-                _scrub_simple(tmp_path, [SAFEGIT_OK, "", safegit_result], flags)
-        assert exc_info.value.code == 1
+        mock_input.assert_not_called()
 
 
 class TestScrubBranchPushFails:
@@ -1262,7 +1260,7 @@ class TestScrubBranchPushFails:
         # rev-parse(branch target), push(fail), ls-remote(idempotence check
         # exhausts the list -> treated as unconfirmed -> hard error).
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         with pytest.raises(SystemExit) as exc_info:
             _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", Exception("push failed")], flags)
         assert exc_info.value.code == 1
@@ -1274,7 +1272,7 @@ class TestScrubCommitFails:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (tmp_path / "CHANGELOG.md").write_text("# Changelog\n")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Sequence: version, ls-remote, scrub, commit(fail). A failed commit
         # must ABORT (never push metadata-less history) and keep
         # scrub-result.json for resume.
@@ -1290,7 +1288,7 @@ class TestScrubTagPushFails:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse,
         # branch_push, tag_push(fail), ls-remote(exhausts -> hard error)
         with pytest.raises(SystemExit) as exc_info:
@@ -1305,7 +1303,7 @@ class TestScrubNoGhForReleases:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push
         mock_run = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags)
         assert mock_run.call_count == 7
@@ -1316,7 +1314,7 @@ class TestScrubReleaseDeleteFails:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete(fail) (run_gh)
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                     gh_auth=True, gh_installed=True,
@@ -1329,7 +1327,7 @@ class TestScrubVersionExtractFails:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/not-a-version"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete (run_gh)
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                     gh_auth=True, gh_installed=True,
@@ -1342,7 +1340,7 @@ class TestScrubGhReleaseCreateFails:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="notes")}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete, gh_create(fail) (run_gh)
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
@@ -1357,7 +1355,7 @@ class TestScrubFallbackNotes:
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (tmp_path / "CHANGELOG.md").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value=None)}
         # Calls: version, ls-remote, scrub, commit, rev-parse, branch_push, tag_push (run); gh_view, gh_delete, gh_create (run_gh)
         mock_run, mock_run_gh = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
@@ -1373,7 +1371,7 @@ class TestScrubNoReleaseForTag:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view(fail) (run_gh)
         mock_run, mock_run_gh = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                     gh_auth=True, gh_installed=True,
@@ -1387,7 +1385,7 @@ class TestScrubNoRefname:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": ""}, {"refname": "refs/tags/"}], "new_head": "abc"})
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Empty refnames -> no tag pushes, no gh release checks.
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", ""], flags, gh_auth=True, gh_installed=True)
@@ -1419,7 +1417,7 @@ class TestScrubMonorepoFallbackScan:
             "tags": [{"refname": "refs/tags/beta@v1.0.0"}],
             "new_head": "abc",
         })
-        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True, "yes": True}
+        flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # git calls: version, ls-remote, scrub, commit, rev-parse, branch_push, tag_push
         run_side = [SAFEGIT_OK, "", safegit_result, "", "", "", ""]
         mock_run = MagicMock(side_effect=run_side)
@@ -2168,7 +2166,7 @@ class TestBatchReleasePackageFailure:
                 with patch("rlsbl.context.create_context", return_value=_ctx()):
                     with patch("rlsbl.commands.release.run_cmd", side_effect=SystemExit(1)):
                         with pytest.raises(SystemExit):
-                            _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
+                            _cmd_batch_release({"quiet": True}, Path("/ws/pkg"))
 
 
 class TestBatchReleaseReleasablesMissing:
@@ -2265,7 +2263,7 @@ class TestBatchReleaseReleasableNoMembers:
                 with patch("rlsbl.workspace.load_releasables", return_value=[rel]):
                     with patch("rlsbl.workspace.members_of", return_value=[]):
                         with pytest.raises(SystemExit) as exc:
-                            _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
+                            _cmd_batch_release({"quiet": True}, Path("/ws/pkg"))
         assert exc.value.code == 1
 
 
@@ -2308,7 +2306,7 @@ class TestBatchReleaseReleasableFailure:
                         with patch("rlsbl.context.create_context", return_value=_ctx()):
                             with patch("rlsbl.commands.release.run_cmd", side_effect=SystemExit(1)):
                                 with pytest.raises(SystemExit):
-                                    _cmd_batch_release({"yes": True, "quiet": True}, Path("/ws/pkg"))
+                                    _cmd_batch_release({"quiet": True}, Path("/ws/pkg"))
 
 
 class TestFinalizeBatchFile:

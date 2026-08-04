@@ -268,7 +268,7 @@ def _simulate_release(ctx, released_sink=None):
 
 def _run_batch(ws, quiet=False):
     _cmd_batch_release(
-        {"dry-run": False, "yes": True, "quiet": quiet}, project_root=ws
+        {"dry-run": False, "quiet": quiet}, project_root=ws
     )
 
 

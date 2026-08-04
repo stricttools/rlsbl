@@ -104,7 +104,6 @@ def _batch_release_flags(flags, **extra):
     """Per-item release flags for the batch loop."""
     release_flags = {
         "dry-run": flags.get("dry-run", False),
-        "yes": flags.get("yes", False),
         "quiet": flags.get("quiet", False),
         "allow-dirty": flags.get("allow-dirty", False),
         "skip-lock": True,

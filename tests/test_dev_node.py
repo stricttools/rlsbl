@@ -270,7 +270,7 @@ class TestDevNodeReleaseBlocked:
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
         ):
             with pytest.raises(SystemExit) as exc_info:
-                release_run_cmd(rc, {"yes": True, "quiet": True}, ctx=ctx)
+                release_run_cmd(rc, {"quiet": True}, ctx=ctx)
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -310,7 +310,7 @@ class TestDevNodeReleaseBlockedRegardlessOfConfig:
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
         ):
             with pytest.raises(SystemExit) as exc_info:
-                release_run_cmd(rc, {"yes": True, "quiet": True}, ctx=ctx)
+                release_run_cmd(rc, {"quiet": True}, ctx=ctx)
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
@@ -351,7 +351,7 @@ class TestDevNodeReleaseBlockedRegardlessOfConfig:
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
         ):
             with pytest.raises(SystemExit) as exc_info:
-                release_run_cmd(rc, {"yes": True, "quiet": True}, ctx=ctx)
+                release_run_cmd(rc, {"quiet": True}, ctx=ctx)
             assert exc_info.value.code == 1
 
         captured = capsys.readouterr()

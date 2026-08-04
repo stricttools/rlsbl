@@ -162,7 +162,7 @@ class TestMatchModeFullFlowE2E:
         ctx = ProjectContext(project_root=alpha_dir, workspace_root=ws, config={})
         flags = {
             "pattern": SECRET, "replace": REPLACEMENT,
-            "reason": "remove leaked token", "entire-history": True, "yes": True,
+            "reason": "remove leaked token", "entire-history": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             run_cmd(flags, ctx=ctx)
@@ -291,7 +291,6 @@ class TestFileModeE2E:
             "file": "secrets.env",
             "from-commit": c1,
             "reason": "remove secrets file",
-            "yes": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             run_cmd(flags, ctx=ctx)
@@ -396,7 +395,7 @@ class TestRecipeModeE2E:
         ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
         flags = {
             "recipe": str(recipe),
-            "reason": "multi-op cleanup", "entire-history": True, "yes": True,
+            "reason": "multi-op cleanup", "entire-history": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             run_cmd(flags, ctx=ctx)
@@ -443,7 +442,7 @@ class TestValidationGateAbortE2E:
         ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
         flags = {
             "pattern": SECRET, "replace": REPLACEMENT,
-            "reason": "cleanup", "entire-history": True, "yes": True,
+            "reason": "cleanup", "entire-history": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
@@ -494,7 +493,7 @@ class TestJournalRecoveryE2E:
         # Direct scrub WITHOUT remap globs. --approve-consequential is
         # explicit: --json does not answer safegit's confirmation prompt.
         result = subprocess.run(
-            ["safegit", "scrub", "match", "--json", "--approve-consequential",
+            ["safegit", "--approve-consequential", "scrub", "match", "--json",
              "--pattern", SECRET, "--replace", REPLACEMENT,
              "--entire-history", "--reason", "direct scrub"],
             cwd=str(repo),
@@ -521,7 +520,7 @@ class TestJournalRecoveryE2E:
         ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
         flags = {
             "pattern": SECRET, "replace": REPLACEMENT,
-            "reason": "direct scrub", "entire-history": True, "yes": True,
+            "reason": "direct scrub", "entire-history": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             run_cmd(flags, ctx=ctx)
@@ -573,7 +572,7 @@ class TestNoMatchJournalRepairE2E:
         # Direct scrub WITHOUT remap globs: prunes c1, leaves the worktree
         # JSONL dangling, persists the rewrite journal.
         subprocess.run(
-            ["safegit", "scrub", "match", "--json", "--approve-consequential",
+            ["safegit", "--approve-consequential", "scrub", "match", "--json",
              "--pattern", SECRET, "--replace", REPLACEMENT,
              "--entire-history", "--reason", "direct scrub"],
             cwd=str(repo),
@@ -591,7 +590,7 @@ class TestNoMatchJournalRepairE2E:
         ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
         flags = {
             "pattern": SECRET, "replace": REPLACEMENT,
-            "reason": "second pass", "entire-history": True, "yes": True,
+            "reason": "second pass", "entire-history": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             run_cmd(flags, ctx=ctx)
@@ -645,7 +644,7 @@ class TestChangelogDiffAbortsE2E:
         ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
         flags = {
             "pattern": SECRET, "replace": REPLACEMENT,
-            "reason": "cleanup", "entire-history": True, "yes": True,
+            "reason": "cleanup", "entire-history": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             with pytest.raises(SystemExit) as exc_info:
@@ -699,7 +698,7 @@ class TestCleanupOkAbortE2E:
         ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
         flags = {
             "pattern": SECRET, "replace": REPLACEMENT,
-            "reason": "cleanup", "entire-history": True, "yes": True,
+            "reason": "cleanup", "entire-history": True,
         }
         with patch(f"{MOD}.check_gh_installed", return_value=False):
             with pytest.raises(SystemExit) as exc_info:

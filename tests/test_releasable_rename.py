@@ -158,7 +158,7 @@ class TestFullRename:
         # Sanity: the OLD prefix is in the generated publish.yml.
         assert "beta@v" in _publish_yml(root)
 
-        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        result = rr.rename_releasable(str(root), "beta", "beta2")
 
         # workspace.toml renamed (releasable + members), comments/format intact.
         ws = _read_ws(root)
@@ -192,9 +192,9 @@ class TestFullRename:
         monkeypatch.chdir(root)
         _build_monorepo(root)
 
-        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        rr.rename_releasable(str(root), "beta", "beta2")
         # Second run: resume path detects everything already done.
-        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        result = rr.rename_releasable(str(root), "beta", "beta2")
         assert result["mode"] == "resume"
         assert result["tag"]["status"] == "already_done"
 
@@ -212,7 +212,7 @@ class TestCrashHealing:
         assert rr._is_clean_tree(str(root))
 
         # Re-run the full command -> resume path finishes the tag step.
-        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        result = rr.rename_releasable(str(root), "beta", "beta2")
         assert result["mode"] == "resume"
         assert rr._tag_exists_local(str(root), "beta2@v0.1.0")
         assert rr._tag_exists_remote(str(root), "origin", "beta2@v0.1.0")
@@ -241,7 +241,7 @@ class TestCrashBeforeCommitHealing:
         # commit the pending rename, regenerate the gate prefix, THEN push the
         # alias tag -- never push a tag over an uncommitted rename with a stale
         # publish gate.
-        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        result = rr.rename_releasable(str(root), "beta", "beta2")
 
         # The rename is now committed: clean tree.
         assert rr._is_clean_tree(str(root)), \
@@ -263,7 +263,7 @@ class TestNoNameTagFormat:
         _build_monorepo(root, tag_format="v{version}")
 
         before_tags = set(_git(root, "tag", "--list").splitlines())
-        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        result = rr.rename_releasable(str(root), "beta", "beta2")
 
         # No alias tag created; name-only path taken.
         assert result.get("name_only") is True
@@ -283,7 +283,7 @@ class TestChangelogGlobResolves:
         monkeypatch.chdir(root)
         _build_monorepo(root, add_post_tag_commit=True)
 
-        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        rr.rename_releasable(str(root), "beta", "beta2")
 
         projects = load_workspace(str(root))
         releasables = load_releasables(str(root), projects)
@@ -341,7 +341,7 @@ class TestNameOnlyRenameNoGhAuth:
         # gh is explicitly unavailable; the name-only rename must still succeed.
         with patch.object(rr, "check_gh_installed", return_value=False), \
              patch.object(rr, "check_gh_auth", return_value=False):
-            result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+            result = rr.rename_releasable(str(root), "beta", "beta2")
 
         assert result.get("name_only") is True
         assert result["tag"] is None
@@ -371,7 +371,7 @@ class TestDevNodeMembersUntouched:
         _git(root, "add", "-A")
         _git(root, "commit", "-q", "-m", "add devnode")
 
-        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        rr.rename_releasable(str(root), "beta", "beta2")
 
         ws = _read_ws(root)
         # beta members renamed, but the dev-node project's releasable stays false.
@@ -391,7 +391,7 @@ class TestNeverReleasedNoSourceTag:
         _build_monorepo(root, create_tag=False)
         assert not rr._tag_exists_local(str(root), "beta@v0.1.0")
 
-        result = rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        result = rr.rename_releasable(str(root), "beta", "beta2")
 
         # The tag step reports there was nothing to alias.
         assert result["tag"]["status"] == "no_source_tag"
@@ -463,7 +463,7 @@ class TestAliasTagPushHygiene:
             return real_run(cmd, args, **kwargs)
 
         monkeypatch.setattr(rr, "run", spy)
-        rr.rename_releasable(str(root), "beta", "beta2", yes=True)
+        rr.rename_releasable(str(root), "beta", "beta2")
         assert calls, "no git push was issued"
         return calls[-1]
 

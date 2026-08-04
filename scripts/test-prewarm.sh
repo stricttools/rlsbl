@@ -67,11 +67,6 @@ if ls "${GO_DOWNLOAD_CACHE}"/github.com/smm-h/safegit/@v/"${SAFEGIT_PIN}".info \
   exit 0
 fi
 
-if [ -f "${STAGED_BIN}" ]; then
-  echo "[prewarm] safegit ${SAFEGIT_PIN} already staged at ${STAGED_BIN}" >&2
-  exit 0
-fi
-
 echo "[prewarm] fetching safegit ${SAFEGIT_PIN} into the module cache (network)..." >&2
 if GOBIN="$(mktemp -d)" go install "github.com/smm-h/safegit@${SAFEGIT_PIN}"; then
   exit 0
@@ -83,7 +78,13 @@ fi
 # describes instead of skipping the whole real-binary suite.
 if [ -f "${SAFEGIT_SRC}/go.mod" ] && \
    grep -q '^module github.com/smm-h/safegit$' "${SAFEGIT_SRC}/go.mod"; then
-  echo "[prewarm] safegit ${SAFEGIT_PIN} is not published; building it from" >&2
+  # ALWAYS rebuilt, never reused. An unpublished pin names a MOVING local
+  # checkout, so a binary staged yesterday is a stale snapshot of a version
+  # number that has not shipped yet, and reusing it silently exercises the
+  # wrong tool. That is not hypothetical: a safegit CLI change (the confirm
+  # protocol's flag rename) went undetected here for a day because the staged
+  # build from the day before kept satisfying the same pin.
+  echo "[prewarm] safegit ${SAFEGIT_PIN} is not published; rebuilding it from" >&2
   echo "          ${SAFEGIT_SRC} and staging it at ${STAGED_BIN}" >&2
   mkdir -p "${STAGE_DIR}"
   ( cd "${SAFEGIT_SRC}" && go build -o "${STAGED_BIN}" \

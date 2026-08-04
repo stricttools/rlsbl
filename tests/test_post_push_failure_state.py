@@ -161,7 +161,7 @@ class TestTransientTagPushRetrySuccess:
             patch("rlsbl.commands.release.run_gh", side_effect=fake_run_gh),
         ):
             # No SystemExit: the recovered push falls through to completion.
-            run_cmd(_rc(), {"yes": True, "quiet": True}, ctx=_ctx(mock_git_repo))
+            run_cmd(_rc(), {"quiet": True}, ctx=_ctx(mock_git_repo))
 
         assert len(tag_push_attempts) >= 2, \
             "the tag push must be retried after the transient failure"
@@ -215,7 +215,7 @@ class TestLiveLsRemoteBranchSkip:
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.run_gh", return_value=""),
         ):
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=_ctx(mock_git_repo))
+            run_cmd(_rc(), {"quiet": False}, ctx=_ctx(mock_git_repo))
 
         assert push_if_needed_called == [], \
             "branch push must be skipped when the live remote is at local HEAD"
@@ -268,7 +268,7 @@ class TestPermanentPushFailureCleanExit:
             patch("rlsbl.commands.release.run_gh", return_value=""),
         ):
             with pytest.raises(SystemExit) as exc:
-                run_cmd(_rc(), {"yes": True, "quiet": False},
+                run_cmd(_rc(), {"quiet": False},
                         ctx=_ctx(repo))
         assert exc.value.code == 1
 

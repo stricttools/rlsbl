@@ -152,7 +152,6 @@ class TestReleaseAbortCleanup:
                 run_cmd(
                     _rc(),
                     {
-                        "yes": True,
                         "quiet": True,
                     },
                 
@@ -203,7 +202,6 @@ class TestReleaseAbortCleanup:
                 run_cmd(
                     _rc(),
                     {
-                        "yes": True,
                         "quiet": True,
                     },
                 
@@ -285,7 +283,6 @@ class TestReleaseAbortCleanup:
                 run_cmd(
                     _rc(),
                     {
-                        "yes": True,
                         "quiet": True,
                     },
                     ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
@@ -392,7 +389,6 @@ class TestReleaseAbortCleanup:
                 run_cmd(
                     _rc(),
                     {
-                        "yes": True,
                         "quiet": True,
                     },
                     ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),

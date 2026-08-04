@@ -107,7 +107,7 @@ class TestWatchModuleSurface:
     def test_build_release_flags_has_no_watch_async(self):
         params = inspect.signature(build_release_flags).parameters
         assert "watch_async" not in params
-        flags = build_release_flags(False, False, False, False, watch=True)
+        flags = build_release_flags(False, False, False, watch=True)
         assert "watch-async" not in flags
         assert flags["watch"] is True
 

@@ -342,7 +342,7 @@ class TestTwoHookModel:
 
         from rlsbl.commands.release import run_cmd
 
-        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+        run_cmd(_rc(), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # The hook should have actually run and created the marker
         assert marker.exists(), "pre-checks.sh should have created the marker file"
@@ -393,7 +393,7 @@ class TestTwoHookModel:
 
         from rlsbl.commands.release import run_cmd
 
-        run_cmd(_rc(), {"dry-run": True, "quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+        run_cmd(_rc(), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # pre-release hook still executes in dry-run mode
         assert pre_release_marker.exists(), (
@@ -439,7 +439,7 @@ class TestTwoHookModel:
             from rlsbl.commands.release import run_cmd
 
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+                run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
             assert exc_info.value.code == 1
             # Changelog preflight runs before pre-checks hook, but
@@ -567,7 +567,7 @@ class TestFullFlowOrder:
         ):
             from rlsbl.commands.release import run_cmd
 
-            run_cmd(_rc(), {"quiet": True, "yes": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path(str(tmp_project)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Full execution order: preflight-changelog -> pre-checks -> preflight -> pre-release
         assert execution_order == ["preflight-changelog", "pre-checks", "preflight", "pre-release"]
@@ -643,7 +643,7 @@ class TestFullFlowOrder:
 
             run_cmd(
                 _rc(),
-                {"quiet": False, "yes": True},
+                {"quiet": False},
                 ctx=ProjectContext(
                     project_root=Path(str(tmp_project)),
                     workspace_root=None,

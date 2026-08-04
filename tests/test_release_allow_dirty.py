@@ -143,7 +143,6 @@ class TestReleaseAllowDirty:
             # treat the pre-existing dirty file as unexpected.
             run_cmd(_rc(), {
                 "allow-dirty": True,
-                "yes": True,
                 "quiet": False,
             },
             ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
@@ -193,7 +192,6 @@ class TestReleaseAllowDirty:
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd(_rc(), {
                     "allow-dirty": True,
-                    "yes": True,
                     "quiet": False,
                 },
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),

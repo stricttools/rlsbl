@@ -134,7 +134,7 @@ def _run(member_dir, root, extra=()):
     for p in patches:
         p.start()
     try:
-        run_cmd(_rc(), {"yes": True, "quiet": True, "skip-lock": True}, ctx=ctx)
+        run_cmd(_rc(), {"quiet": True, "skip-lock": True}, ctx=ctx)
     finally:
         for p in patches:
             p.stop()

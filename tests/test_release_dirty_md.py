@@ -196,7 +196,7 @@ class TestReleaseLeavesCleanPerVersionMd:
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
         ):
-            run_cmd(rc, {"yes": True, "quiet": True}, ctx=_make_ctx(repo))
+            run_cmd(rc, {"quiet": True}, ctx=_make_ctx(repo))
 
     def test_release_commits_backfilled_md_and_threads_metadata(self, mock_git_repo):
         _setup_released_project_with_stale_md(mock_git_repo)

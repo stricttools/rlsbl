@@ -100,7 +100,7 @@ def _raw_safegit_scrub(repo):
     scrub consequential and `--json` does not answer its prompt.
     """
     result = subprocess.run(
-        ["safegit", "scrub", "match", "--json", "--approve-consequential",
+        ["safegit", "--approve-consequential", "scrub", "match", "--json",
          "--pattern", SECRET, "--replace", REPLACEMENT,
          "--entire-history", "--reason", "remove leaked token"],
         cwd=str(repo), capture_output=True, text=True,
@@ -134,7 +134,7 @@ def _run_reconcile(repo, *, gh_calls=None, flags=None, gh_available=True):
     for p in patches:
         p.start()
     try:
-        run_cmd(flags or {"yes": True}, ctx=ctx)
+        run_cmd(flags or {}, ctx=ctx)
     finally:
         for p in patches:
             p.stop()
@@ -240,7 +240,7 @@ class TestReconcileAfterRawRewrite:
 
         gh_calls = []
         _run_reconcile(repo, gh_calls=gh_calls,
-                       flags={"yes": True, "dry-run": True})
+                       flags={"dry-run": True})
 
         out = capsys.readouterr().out
         assert "Dry run" in out

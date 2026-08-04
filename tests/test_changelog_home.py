@@ -87,7 +87,7 @@ def _fake_run_factory():
     return fake_run
 
 
-_RELEASE_PATCHES_KWARGS = dict(yes=True, quiet=True)
+_RELEASE_PATCHES_KWARGS = dict(quiet=True)
 
 
 def _run_release(member_dir, root, description=""):
@@ -104,7 +104,7 @@ def _run_release(member_dir, root, description=""):
     ):
         run_cmd(
             _rc(description=description),
-            {"yes": True, "quiet": True, "skip-lock": True},
+            {"quiet": True, "skip-lock": True},
             ctx=ctx,
         )
 

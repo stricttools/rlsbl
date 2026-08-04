@@ -823,8 +823,9 @@ def _run_selfdoc_gen(flags, project_dir=None, version=None):
         _effects.run(
             # No confirm-skip flag: strictcli's confirm protocol keys on a
             # declared `consequential`, not on `mutating`, and selfdoc's
-            # gen/check/deploy are mutating but not consequential, so they never
-            # prompt. `--yes` no longer exists on a strictcli app at all.
+            # gen/check/deploy are mutating but not consequential, so they
+            # never prompt. `--yes` no longer exists on a strictcli app at all
+            # -- it is a banned flag name.
             ["selfdoc", "gen", "--no-auto-commit"] + version_args,
             cwd=project_dir, check=True,
         )

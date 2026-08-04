@@ -273,6 +273,6 @@ class TestNonLatestUndoIntegration:
             )
 
             with pytest.raises(SystemExit) as exc:
-                run_cmd(None, [], {"version": "1.0.0", "yes": True}, ctx=ctx)
+                run_cmd(None, [], {"version": "1.0.0"}, ctx=ctx)
             assert exc.value.code == 1
             assert "cannot undo" in err.getvalue()

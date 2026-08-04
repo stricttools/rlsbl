@@ -374,7 +374,7 @@ class TestMigrateReleasableFullFlow:
         setup = _setup_migration_monorepo(tmp_project)
         root = str(setup["root"])
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         assert result["releasable_name"] == "core"
         assert result["dry_run"] is False
@@ -423,7 +423,7 @@ class TestMigrateReleasableFullFlow:
         subprocess.run(["git", "commit", "-q", "-m", "add releases dirs"],
                        cwd=root, check=True)
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         cleanup = result["cleanup"]
         assert cleanup is not None
@@ -443,7 +443,7 @@ class TestMigrateReleasableFullFlow:
         setup = _setup_migration_monorepo(tmp_project, tag_a=True, tag_b=False)
         root = str(setup["root"])
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         tag = result["tag"]
         assert tag["status"] == "created"
@@ -458,7 +458,7 @@ class TestMigrateReleasableFullFlow:
         setup = _setup_migration_monorepo(tmp_project, tag_a=False, tag_b=False)
         root = str(setup["root"])
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         tag = result["tag"]
         assert tag["status"] == "no_tags"
@@ -480,7 +480,7 @@ name = "a"
 
         from rlsbl.errors import WorkspaceError
         with pytest.raises(WorkspaceError, match="not in explicit mode"):
-            cmd_migrate_releasable(str(tmp_project), "core", dry_run=False, yes=True)
+            cmd_migrate_releasable(str(tmp_project), "core", dry_run=False)
 
     def test_migration_rejects_unknown_releasable(self, tmp_project):
         """Migration raises WorkspaceError for a non-existent releasable name."""
@@ -499,7 +499,7 @@ releasable = "core"
         from rlsbl.errors import WorkspaceError
         with pytest.raises(WorkspaceError, match="not found"):
             cmd_migrate_releasable(str(tmp_project), "nonexistent",
-                                   dry_run=False, yes=True)
+                                   dry_run=False)
 
 
 # ---------------------------------------------------------------------------
@@ -537,7 +537,7 @@ class TestConsolidationPointTag:
         setup = _setup_migration_monorepo(tmp_project)
         root = str(setup["root"])
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         # The consolidation tag should be reported in the changelogs result
         changelogs = result["changelogs"]
@@ -564,7 +564,7 @@ class TestConsolidationPointTag:
             cwd=root, capture_output=True, text=True, check=True,
         ).stdout.strip()
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         # The consolidation tag should point to HEAD at the time it was created
         tag_name = result["changelogs"]["consolidation_tag"]
@@ -583,7 +583,7 @@ class TestConsolidationPointTag:
         setup = _setup_migration_monorepo(tmp_project)
         root = str(setup["root"])
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
         tag_name = result["changelogs"]["consolidation_tag"]
 
         # git describe should find this tag as the latest matching core@v*
@@ -601,7 +601,7 @@ class TestConsolidationPointTag:
         setup = _setup_migration_monorepo(tmp_project)
         root = str(setup["root"])
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         # Migration tag step should report success (tag already existed)
         tag = result["tag"]
@@ -616,7 +616,7 @@ class TestConsolidationPointTag:
         setup = _setup_migration_monorepo(tmp_project)
         root = str(setup["root"])
 
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
 
         # Versions must be consolidated (ok status) for the tag to work
         assert result["versions"]["status"] == "ok"
@@ -800,7 +800,7 @@ releasable = "core"
         from rlsbl.errors import WorkspaceError
         with pytest.raises(WorkspaceError, match="Versioned changelog collision"):
             cmd_migrate_releasable(str(tmp_project), "core",
-                                   dry_run=False, yes=True)
+                                   dry_run=False)
 
     def test_unreleased_conflict_hard_error(self, tmp_project):
         """Releasable has non-empty unreleased.jsonl and member also has entries -> error."""
@@ -839,7 +839,7 @@ releasable = "core"
         from rlsbl.errors import WorkspaceError
         with pytest.raises(WorkspaceError, match="Unreleased changelog conflict"):
             cmd_migrate_releasable(str(tmp_project), "core",
-                                   dry_run=False, yes=True)
+                                   dry_run=False)
 
     @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
     @patch("rlsbl.releasable_cleanup._saferm_dir", side_effect=_mock_saferm_dir)
@@ -855,7 +855,7 @@ releasable = "core"
             pass  # empty file
 
         # Should succeed without error
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
         assert result["changelogs"]["entries_merged"] == 2
 
     @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
@@ -870,5 +870,5 @@ releasable = "core"
         assert not os.path.exists(rel_changes)
 
         # Should succeed
-        result = cmd_migrate_releasable(root, "core", dry_run=False, yes=True)
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
         assert result["changelogs"]["entries_merged"] == 2

@@ -231,7 +231,7 @@ class TestResumeAfterTagPushFailure:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -285,7 +285,7 @@ class TestResumeAfterPostTaggedPushTimeout:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -348,7 +348,7 @@ class TestResumeAfterGitHubReleaseFailure:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -387,7 +387,7 @@ class TestReleaseRunBlocksWhenInProgress:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=_make_ctx(mock_git_repo),
                 )
 
@@ -420,7 +420,7 @@ class TestInProgressGuardMessage:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=_make_ctx(mock_git_repo),
                 )
 
@@ -463,7 +463,7 @@ class TestGuardAutoClearsCompleteState:
             # Must NOT raise "previous release is in progress"
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": False},
+                {"quiet": False},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -498,7 +498,7 @@ class TestGuardAutoClearsCompleteState:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": False},
+                {"quiet": False},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -530,7 +530,7 @@ class TestGuardAutoClearsCompleteState:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": False},
+                    {"quiet": False},
                     ctx=_make_ctx(mock_git_repo),
                 )
 
@@ -606,7 +606,7 @@ class TestSuccessfulReleaseClearsState:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -642,7 +642,7 @@ class TestGitHubReleaseFailurePreservesState:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=_make_ctx(mock_git_repo),
                 )
 
@@ -700,7 +700,7 @@ class TestResumeStepGuards:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": False},
+                {"quiet": False},
                 ctx=_make_ctx(mock_git_repo),
             )
 

@@ -191,7 +191,7 @@ class TestPrereleaseFullFlowRealGit:
         ):
             run_cmd(
                 _rc_prerelease(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -276,7 +276,7 @@ class TestPrereleaseFullFlowRealGit:
         ):
             run_cmd(
                 _rc_prerelease(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 

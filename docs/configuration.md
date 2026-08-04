@@ -374,7 +374,7 @@ Example `~/.rlsbl/config.json`:
 
 ## CLI flag overrides
 
-Some CLI flags override config.json keys for a single invocation, providing temporary behavior changes without modifying the persistent configuration. Most global flags like `--dry-run`, `--yes`, and `--quiet` are runtime-only and have no persistent config equivalent, affecting only the current command execution.
+Some CLI flags override config.json keys for a single invocation, providing temporary behavior changes without modifying the persistent configuration. Most global flags like `--dry-run`, `--approve-consequential`, and `--quiet` are runtime-only and have no persistent config equivalent, affecting only the current command execution.
 
 | Flag | Config key | Scope | Effect |
 | --- | --- | --- | --- |
@@ -386,7 +386,7 @@ Some CLI flags override config.json keys for a single invocation, providing temp
 | `--check-timeout` | `check_timeout` | release only | Check-subprocess timeout in seconds for this invocation, covering built-in checks, config-declared external checks and their scope guards (0, the default, means use the config key, else the shipped 900s) |
 | `--hook-timeout` | `hook_timeout` | release only | Release-hook timeout in seconds for this invocation (0, the default, means use the config key, else no timeout) |
 
-Global flags `--dry-run`, `--yes`, and `--quiet` are runtime-only and have no `config.json` equivalent. They affect the current invocation but are never persisted to configuration.
+Global flags `--dry-run`, `--approve-consequential`, and `--quiet` are runtime-only and have no `config.json` equivalent. They affect the current invocation but are never persisted to configuration.
 
 Timeouts are never read from the environment. `RLSBL_PUSH_TIMEOUT`, `RLSBL_CHECK_TIMEOUT`, `RLSBL_HOOK_TIMEOUT`, `RLSBL_BUILD_TIMEOUT`, and `RLSBL_BUILD_TIMEOUT_<TARGET>` were removed: a timeout is declared in `.rlsbl/config.json` or passed explicitly on the command line, never picked up from ambient environment state.
 

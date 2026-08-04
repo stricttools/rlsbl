@@ -238,7 +238,7 @@ def _run_batch(root, *, ci_return=None, ci_side_effect=None, push_side_effect=No
     for p in patches:
         p.start()
     try:
-        _cmd_batch_release({"yes": True, "quiet": True}, project_root=str(root))
+        _cmd_batch_release({"quiet": True}, project_root=str(root))
     finally:
         for p in patches:
             p.stop()

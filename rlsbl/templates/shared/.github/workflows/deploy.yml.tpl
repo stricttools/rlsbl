@@ -15,8 +15,9 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install rlsbl
-      # --yes: `deploy` is a mutating command and CI has no interactive stdin,
-      # so without it the framework confirm protocol aborts the step.
-      - run: rlsbl --yes deploy
+      # --approve-consequential: `deploy` declares itself consequential and CI
+      # has no interactive stdin, so without it the framework confirm protocol
+      # aborts the step.
+      - run: rlsbl deploy --approve-consequential
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}

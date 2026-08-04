@@ -127,6 +127,36 @@ def _remap_glob_args(remap_globs):
     return args
 
 
+# The header strictcli's dry mode prints before its would-do log (contract
+# 3.2). It goes to STDOUT and is never suppressed -- not by --quiet and not by
+# a command's own --json -- so safegit's `--json --dry-run` stdout is one JSON
+# document followed by this log.
+_DRY_RUN_LOG_HEADER = "DRY RUN"
+
+
+def _parse_safegit_json(output):
+    """Parse safegit's --json stdout, tolerating the dry-run would-do log.
+
+    Under --dry-run the framework appends its would-do log to STDOUT after the
+    command's own JSON, so `json.loads` on the whole stream fails with "Extra
+    data". Read exactly one JSON document and require that whatever follows is
+    only that log: genuine garbage after the JSON is still a hard error, not
+    something silently swallowed.
+    """
+    decoder = json.JSONDecoder()
+    try:
+        data, end = decoder.raw_decode(output.lstrip())
+    except ValueError as exc:
+        raise ValueError(f"safegit --json output is not JSON: {exc}") from exc
+    trailer = output.lstrip()[end:].strip()
+    if trailer and not trailer.startswith(_DRY_RUN_LOG_HEADER):
+        raise ValueError(
+            "safegit --json output carries unexpected trailing content: "
+            f"{trailer[:200]!r}"
+        )
+    return data
+
+
 def _build_safegit_args(flags, mode, remap_globs):
     """Build the safegit scrub argument list for the selected mode.
 
@@ -140,9 +170,15 @@ def _build_safegit_args(flags, mode, remap_globs):
     all three scrub modes ``consequential``, so each prompts before dispatch
     and ``--json`` does not answer that prompt. Running this command IS the
     consent; the force-push that follows is confirmed separately.
+
+    The flag is placed BEFORE the command tokens. strictcli recognizes the
+    reserved quartet anywhere in argv on the Python side, but the Go build
+    safegit ships today only scans the pre-command region, and pre-command has
+    always been recognized in every implementation -- so this one position
+    works against both and cannot break when safegit catches up.
     """
     if mode == "match":
-        args = ["scrub", "match", "--json", "--approve-consequential"]
+        args = ["--approve-consequential", "scrub", "match", "--json"]
         if flags.get("dry-run"):
             args.append("--dry-run")
         args.extend(["--pattern", flags["pattern"]])
@@ -160,7 +196,7 @@ def _build_safegit_args(flags, mode, remap_globs):
 
     if mode == "file":
         # File mode: positional path last, --from mandatory.
-        args = ["scrub", "file", "--json", "--approve-consequential"]
+        args = ["--approve-consequential", "scrub", "file", "--json"]
         if flags.get("dry-run"):
             args.append("--dry-run")
         args.extend(["--from", flags["from-commit"]])
@@ -170,7 +206,7 @@ def _build_safegit_args(flags, mode, remap_globs):
         return args
 
     # Recipe mode: positional recipe path, range flags, reason.
-    args = ["scrub", "run", "--json", "--approve-consequential"]
+    args = ["--approve-consequential", "scrub", "run", "--json"]
     if flags.get("dry-run"):
         args.append("--dry-run")
     args.append(flags["recipe"])
@@ -760,7 +796,7 @@ def run_cmd(flags, *, ctx):
                 )
             return
 
-        scrub_data = json.loads(output)
+        scrub_data = _parse_safegit_json(output)
 
         if flags.get("dry-run"):
             _print_dry_run_summary(mode, scrub_data)
@@ -814,18 +850,14 @@ def run_cmd(flags, *, ctx):
         )
         return
 
-    # -- Confirmation prompt (unless --yes or resuming) --
-    if not resuming and not flags.get("yes"):
+    # -- Announcement, not a gate --
+    # `release scrub` declares itself `consequential`, so strictcli confirmed
+    # once before dispatch and --approve-consequential skips that one prompt.
+    # The counts are still printed: they are only known here, after safegit
+    # computed the rewrite, and the framework prompt cannot show them.
+    if not resuming:
         print(f"{len(rewrites)} commits rewritten, {len(tags)} tags affected.")
-        print("This will force-push rewritten history. Continue? [y/N]")
-        try:
-            answer = input().strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAborted.")
-            sys.exit(1)
-        if answer != "y":
-            print("Aborted.")
-            sys.exit(0)
+        print("Force-pushing rewritten history.")
 
     # -- Build tag prefix index for monorepo tag-to-project lookup --
     tag_prefix_index = None

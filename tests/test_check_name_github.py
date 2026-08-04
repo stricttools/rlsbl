@@ -248,7 +248,7 @@ class TestClaimNameNoGithub:
         from rlsbl.commands.claim_name import run_cmd as claim_run_cmd
 
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("github", ["test-pkg"], {"yes": False})
+            claim_run_cmd("github", ["test-pkg"], {})
         assert exc_info.value.code == 1
 
 

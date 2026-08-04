@@ -7,7 +7,7 @@ deletion, multi-commit reverts, working-tree state -- runs against real git.
 
 Regression coverage for the three production bugs the rework fixed:
   (a) full unwind of a 5-commit release restores the previous version;
-  (b) `undo --dry-run --yes` leaves tags/commits/tree byte-identical;
+  (b) `undo --dry-run` leaves tags/commits/tree byte-identical;
   (c) a published release is refused with yank/deprecate routing, and an
       inconclusive-evidence release is hard-blocked;
   (d) undoing when the latest tag is a published release refuses (the
@@ -210,7 +210,7 @@ class TestFullUnwind:
         _make_released_repo(repo, n_commits=5)
         monkeypatch.chdir(repo)
 
-        gh = _run_undo(repo, {"yes": True})
+        gh = _run_undo(repo, {})
 
         # Version file walked all the way back to the pre-release version.
         pkg = json.loads((repo / "package.json").read_text())
@@ -236,7 +236,7 @@ class TestFullUnwind:
         _make_released_repo(repo, n_commits=3)
         monkeypatch.chdir(repo)
 
-        _run_undo(repo, {"yes": True})
+        _run_undo(repo, {})
 
         pkg = json.loads((repo / "package.json").read_text())
         assert pkg["version"] == "1.0.0"
@@ -254,7 +254,7 @@ class TestFullUnwind:
         git(repo, "commit", "-q", "-m", "chore: post-release deploy notes")
         monkeypatch.chdir(repo)
 
-        _run_undo(repo, {"yes": True})
+        _run_undo(repo, {})
 
         pkg = json.loads((repo / "package.json").read_text())
         assert pkg["version"] == "1.0.0", "release commits reverted despite hook commit after tag"
@@ -278,7 +278,7 @@ class TestDryRun:
         remote_before = snapshot_remote_refs(repo)
         tree_before = git(repo, "rev-parse", "HEAD^{tree}")
 
-        gh = _run_undo(repo, {"yes": True, "dry-run": True})
+        gh = _run_undo(repo, {"dry-run": True})
 
         assert git(repo, "rev-parse", "HEAD") == head_before, "dry-run created no commit"
         assert git(repo, "tag", "-l") == tags_before, "dry-run deleted no tag"
@@ -296,9 +296,9 @@ class TestDryRun:
 class TestNoOwnPrompts:
     """`release undo` asks nothing of its own any more.
 
-    It is classified `mutating`, so strictcli confirms the whole operation once
-    before dispatch (and refuses on a non-interactive stdin with the `--yes`
-    remediation).  The command used to ask twice on top of that: once
+    It declares itself `consequential`, so strictcli confirms the whole
+    operation once before dispatch (and refuses on a non-interactive stdin
+    with the `--approve-consequential` remediation).  The command used to ask twice on top of that: once
     "This is destructive. Proceed?" before starting, and once "Push changes to
     remote?" halfway through the rollback -- the second of which could leave
     the remote holding the release that had just been undone locally.
@@ -336,7 +336,7 @@ class TestEvidenceGate:
 
         head_before = git(repo, "rev-parse", "HEAD")
         with pytest.raises(SystemExit) as exc:
-            _run_undo(repo, {"yes": True}, gate=_published_gate)
+            _run_undo(repo, {}, gate=_published_gate)
         assert exc.value.code == 1
 
         err = capsys.readouterr().err
@@ -352,7 +352,7 @@ class TestEvidenceGate:
 
         head_before = git(repo, "rev-parse", "HEAD")
         with pytest.raises(SystemExit) as exc:
-            _run_undo(repo, {"yes": True}, gate=_inconclusive_gate)
+            _run_undo(repo, {}, gate=_inconclusive_gate)
         assert exc.value.code == 1
         assert git(repo, "rev-parse", "HEAD") == head_before
         assert "v1.0.1" in git(repo, "tag", "-l").split()
@@ -372,7 +372,7 @@ class TestEvidenceGate:
 
         # git describe resolves the latest tag (v1.0.1); the gate says PUBLISHED.
         with pytest.raises(SystemExit) as exc:
-            _run_undo(repo, {"yes": True}, gate=_published_gate)
+            _run_undo(repo, {}, gate=_published_gate)
         assert exc.value.code == 1
         # The published release's tag survives untouched.
         assert "v1.0.1" in git(repo, "tag", "-l").split()
@@ -392,7 +392,7 @@ class TestEdgeCases:
         monkeypatch.chdir(repo)
 
         gh = _FakeGh(release_exists=False)
-        _run_undo(repo, {"yes": True}, gh=gh)
+        _run_undo(repo, {}, gh=gh)
 
         out = capsys.readouterr().out
         assert "FAILED" not in out
@@ -442,7 +442,7 @@ class TestEdgeCases:
 
         head_before = git(repo, "rev-parse", "HEAD")
         with pytest.raises(SystemExit) as exc:
-            _run_undo(repo, {"yes": True})
+            _run_undo(repo, {})
         assert exc.value.code == 1
 
         err = capsys.readouterr().err
@@ -460,6 +460,6 @@ class TestEdgeCases:
         monkeypatch.chdir(repo)
 
         with pytest.raises(SystemExit) as exc:
-            _run_undo(repo, {"yes": True})
+            _run_undo(repo, {})
         assert exc.value.code == 1
         assert "no tags" in capsys.readouterr().err.lower()

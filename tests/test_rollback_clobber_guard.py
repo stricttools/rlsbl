@@ -345,7 +345,7 @@ class TestRollbackClobberInReleaseFlow:
             with pytest.raises(SystemExit) as _exc:
                 run_cmd(
                     rc,
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=ProjectContext(
                         project_root=Path("."),
                         workspace_root=None,

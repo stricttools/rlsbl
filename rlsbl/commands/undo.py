@@ -671,8 +671,9 @@ def _execute_plan(plan, uc, flags, ctx):
         _restore_release_file(plan, uc, results)
 
     # 7. Push the branch (revert + restore + audit commits) to remote
-    # No second prompt: strictcli already confirmed this mutating command
-    # before dispatch (--yes skips that one), and asking again mid-rollback
+    # No second prompt: strictcli already confirmed this `consequential`
+    # command before dispatch (--approve-consequential skips that one), and
+    # asking again mid-rollback
     # left the remote holding the release this command had just undone
     # locally -- the half-undone state the rollback exists to avoid.
     try:
@@ -720,8 +721,9 @@ def run_cmd(registry, args, flags, *, ctx):
         return
 
     # The destructive-operation confirmation is the framework's: `release
-    # undo` is a mutating command, so strictcli prompts before dispatch and
-    # --yes skips it.  A second prompt here asked the same question in
-    # different words and had its own non-interactive error text.
+    # undo` declares itself `consequential`, so strictcli prompts before
+    # dispatch and --approve-consequential skips it.  A second prompt here
+    # asked the same question in different words and had its own
+    # non-interactive error text.
 
     _execute_plan(plan, uc, flags, ctx)

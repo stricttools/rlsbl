@@ -166,7 +166,7 @@ def cleanup_per_package_release_state(workspace_root, projects=None,
     return removed
 
 
-def run_cleanup_command(workspace_root, *, dry_run=False, yes=False):
+def run_cleanup_command(workspace_root, *, dry_run=False):
     """CLI entry for `rlsbl monorepo cleanup`.
 
     Removes per-package release-state residue from releasable member
@@ -189,17 +189,10 @@ def run_cleanup_command(workspace_root, *, dry_run=False, yes=False):
     if dry_run:
         return candidates
 
-    if not yes:
-        try:
-            answer = input(
-                f"\nRemove {len(candidates)} path(s) via saferm and commit? [y/N] "
-            ).strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAborted.")
-            raise SystemExit(1)
-        if answer != "y":
-            print("Aborted.")
-            raise SystemExit(0)
+    # No prompt.  `monorepo cleanup` is not `consequential`: every deletion
+    # goes through saferm (archived and undeletable) and is committed, so the
+    # act is recoverable twice over.  The candidate list above is the preview,
+    # and --dry-run stops before any of it happens.
 
     removed = cleanup_per_package_release_state(workspace_root)
 

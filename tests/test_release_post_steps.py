@@ -229,7 +229,7 @@ class TestSuccessMarksAllSteps:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -273,7 +273,7 @@ class TestPublishFailureIsFatal:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": True},
+                    {"quiet": True},
                     ctx=_make_ctx(mock_git_repo),
                 )
 
@@ -315,7 +315,7 @@ class TestPublishFailureIsFatal:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -357,7 +357,7 @@ class TestIncrementalPostReleaseResume:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -385,7 +385,7 @@ class TestIncrementalPostReleaseResume:
         ):
             resume_cmd(
                 load_release_state(state_path),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -427,7 +427,7 @@ class TestNonFatalFailures:
             # Must NOT raise: deploy failures are non-fatal
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
@@ -468,7 +468,7 @@ class TestNonFatalFailures:
         ):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True},
+                {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 

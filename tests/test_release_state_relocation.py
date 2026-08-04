@@ -201,7 +201,7 @@ class TestReleasableStateRelocation:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": True, "skip-lock": True},
+                    {"quiet": True, "skip-lock": True},
                     ctx=_make_ctx(core, tmp_project),
                 )
 
@@ -243,7 +243,7 @@ class TestReleasableStateRelocation:
             ):
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": True, "skip-lock": True},
+                    {"quiet": True, "skip-lock": True},
                     ctx=_make_ctx(core, tmp_project),
                 )
 
@@ -259,7 +259,7 @@ class TestReleasableStateRelocation:
         ):
             resume_cmd(
                 saved,
-                {"yes": True, "quiet": True, "skip-lock": True},
+                {"quiet": True, "skip-lock": True},
                 ctx=_make_ctx(core, tmp_project),
             )
 
@@ -286,7 +286,7 @@ class TestGuardReleasableAwareness:
         with pytest.raises(SystemExit):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True, "skip-lock": True},
+                {"quiet": True, "skip-lock": True},
                 ctx=_make_ctx(core, tmp_project),
             )
 
@@ -309,7 +309,7 @@ class TestGuardReleasableAwareness:
         with pytest.raises(SystemExit):
             run_cmd(
                 _rc(),
-                {"yes": True, "quiet": True, "skip-lock": True},
+                {"quiet": True, "skip-lock": True},
                 ctx=_make_ctx(core, tmp_project),
             )
 
@@ -514,7 +514,7 @@ class TestBatchOrchestratorAlignment:
                   return_value=True),
         ):
             _cmd_batch_release(
-                {"yes": True, "quiet": True, "dry-run": False},
+                {"quiet": True, "dry-run": False},
                 tmp_project,
             )
 

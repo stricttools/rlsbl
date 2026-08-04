@@ -203,7 +203,7 @@ class TestPrivatePublishGuardrail:
         mock_run.side_effect = fake_run_dispatch(head_sha="abc123")
 
         with patch("rlsbl.pipelines.npm.NpmPipeline.publish") as mock_publish:
-            run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False}}}))
+            run_cmd(_rc(), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False}}}))
             # publish() must NOT be called for private repos
             mock_publish.assert_not_called()
 
@@ -251,7 +251,7 @@ class TestPrivatePublishGuardrail:
         mock_tag_local.side_effect = [True, False, False]
         mock_run.side_effect = fake_run_dispatch(head_sha="abc123")
 
-        run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
+        run_cmd(_rc(), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
 
         # upload_release_assets must be called even for private repos
         mock_upload_assets.assert_called_once()

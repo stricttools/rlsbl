@@ -187,7 +187,7 @@ class TestMonorepoReleaseLockPlacement:
              patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=False), \
              patch("rlsbl.commands.release.acquire_lock", spy_acquire):
             with patch("sys.stdout", new_callable=StringIO):
-                run_cmd(_rc(), {"yes": True, "quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
+                run_cmd(_rc(), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=Path(str(mock_git_repo)), config={"publish_mode": "ci", "pipelines": {}}))
 
         assert lock_acquired_in == [".rlsbl-monorepo"]
         # .rlsbl/ should NOT exist at the repo root (only .rlsbl-monorepo/ should)

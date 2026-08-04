@@ -118,7 +118,7 @@ def _raw_safegit_scrub(repo):
     does not answer that prompt); it says nothing about orchestration.
     """
     return subprocess.run(
-        ["safegit", "scrub", "match", "--json", "--approve-consequential",
+        ["safegit", "--approve-consequential", "scrub", "match", "--json",
          "--pattern", SECRET, "--replace", REPLACEMENT,
          "--entire-history", "--reason", "remove leaked token"],
         cwd=str(repo), capture_output=True, text=True,
@@ -147,7 +147,7 @@ def _run_reconcile(repo, gh_calls):
     for p in patches:
         p.start()
     try:
-        reconcile_run_cmd({"yes": True}, ctx=ctx)
+        reconcile_run_cmd({}, ctx=ctx)
     finally:
         for p in patches:
             p.stop()
@@ -239,7 +239,7 @@ class TestRawRewriteIsDetectedAndHealed:
         monkeypatch.chdir(repo)
 
         result = subprocess.run(
-            ["safegit", "author", "rewrite", "--approve-consequential",
+            ["safegit", "--approve-consequential", "author", "rewrite",
              "--old-name", "E2E", "--new-name", "Renamed"],
             cwd=str(repo), capture_output=True, text=True,
         )

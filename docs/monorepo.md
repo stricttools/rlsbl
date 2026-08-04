@@ -203,7 +203,7 @@ Supports `--depth N` to limit BFS traversal depth (default: unlimited, traverses
 
 1. Run `rlsbl monorepo release init` to scaffold `.rlsbl-monorepo/releases/unreleased.toml`
 2. Edit the file: set bump type, description, and context per package
-3. Run `rlsbl monorepo release run --watch --yes`
+3. Run `rlsbl monorepo release run --watch --approve-consequential`
 
 ### release init scaffolding
 
@@ -422,7 +422,7 @@ rlsbl monorepo release init
 #   description = "Update CLI to use new async core API"
 
 # Release in dependency order (core first, then cli)
-rlsbl monorepo release run --no-allow-dirty --watch --yes
+rlsbl monorepo release run --no-allow-dirty --watch --approve-consequential
 #   Release order: core, cli
 #   Releasing core 0.1.0 -> 0.2.0 ...
 #     Validating ... OK

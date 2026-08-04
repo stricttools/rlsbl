@@ -117,7 +117,7 @@ class TestReleaseWithDeployTargets:
 
         _run_release_mutating(ReleaseState(
             resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"yes": True, "auto-tag": False},
+            flags={"auto-tag": False},
             quiet=False,
             log=lambda msg: None,
             new_version="1.0.1",
@@ -202,7 +202,7 @@ class TestReleaseDeployFailureContinues:
         # Should NOT raise -- deploy failure is non-fatal
         _run_release_mutating(ReleaseState(
             resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"yes": True, "auto-tag": False},
+            flags={"auto-tag": False},
             quiet=False,
             log=lambda msg: None,
             new_version="1.0.1",
@@ -262,7 +262,7 @@ class TestReleaseNoDeployConfig:
 
         _run_release_mutating(ReleaseState(
             resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"yes": True, "auto-tag": False},
+            flags={"auto-tag": False},
             quiet=False,
             log=lambda msg: None,
             new_version="1.0.1",
@@ -323,7 +323,7 @@ class TestReleaseDeployConfigErrors:
 
         _run_release_mutating(ReleaseState(
             resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"yes": True, "auto-tag": False},
+            flags={"auto-tag": False},
             quiet=False,
             log=lambda msg: None,
             new_version="1.0.1",
@@ -387,7 +387,7 @@ class TestReleaseStopsAtFirstDeployFailure:
 
         _run_release_mutating(ReleaseState(
             resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"yes": True, "auto-tag": False},
+            flags={"auto-tag": False},
             quiet=False,
             log=lambda msg: None,
             new_version="1.0.1",

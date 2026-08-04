@@ -162,7 +162,7 @@ class TestWatchCleanup:
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd(
                     _rc(),
-                    {"yes": True, "quiet": True, "watch": True},
+                    {"quiet": True, "watch": True},
                     ctx=_make_ctx(tmp_project),
                 )
 

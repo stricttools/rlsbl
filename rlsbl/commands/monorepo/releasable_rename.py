@@ -292,17 +292,16 @@ def _check_no_inflight(root, releasables):
             )
 
 
-def _confirm_rename(yes, old, new, alias_tag):
-    """Prompt for confirmation before any mutation. Returns True to proceed.
+def _announce_rename(old, new, alias_tag):
+    """Print what the rename is about to do, before any mutation.
 
-    The function's contract is raise-or-return (never ``sys.exit``), so a
-    declined prompt is signalled by returning False; the caller returns an
-    ``aborted`` result. ``yes`` short-circuits to True for non-interactive use.
+    An announcement, not a gate.  `monorepo rename-releasable` is not
+    `consequential`: the local half is an ordinary commit, and the only thing
+    that leaves the repo is one ADDITIVE alias tag that can be deleted.  The
+    flow is idempotent, so a re-run heals a partial rename.
     """
-    if yes:
-        return True
     lines = [
-        f"\nThis will rename releasable '{old}' -> '{new}':",
+        f"\nRenaming releasable '{old}' -> '{new}':",
         "  - rewrite workspace.toml and move the releasable state directory",
         "  - regenerate the publish gate prefix and commit the rename",
     ]
@@ -310,12 +309,7 @@ def _confirm_rename(yes, old, new, alias_tag):
         lines.append(
             f"  - create and PUSH the alias tag '{alias_tag}' to the remote"
         )
-    lines.append("Proceed? [y/N] ")
-    try:
-        answer = input("\n".join(lines)).strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        return False
-    return answer == "y"
+    print("\n".join(lines))
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +318,7 @@ def _confirm_rename(yes, old, new, alias_tag):
 
 
 def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
-                      yes=False, remote="origin"):
+                      remote="origin"):
     """Rename releasable ``old_name`` to ``new_name`` in a monorepo workspace.
 
     See the module docstring for the full ordered flow. Returns a result dict
@@ -392,11 +386,9 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
                 "(run 'gh auth login')."
             )
 
-        if not _confirm_rename(
-            yes, old_name, new_name, new_tag if name_in_format else None,
-        ):
-            result["aborted"] = True
-            return result
+        _announce_rename(
+            old_name, new_name, new_tag if name_in_format else None,
+        )
 
         _apply_local_rename(root, old_name, new_name)
         if name_in_format:
@@ -497,12 +489,10 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         )
         return result
 
-    # ---- confirmation (before ANY mutation) ----
-    if not _confirm_rename(
-        yes, old_name, new_name, new_tag if name_in_format else None,
-    ):
-        result["aborted"] = True
-        return result
+    # ---- announcement (before ANY mutation) ----
+    _announce_rename(
+        old_name, new_name, new_tag if name_in_format else None,
+    )
 
     # ---- mutations (steps 1-5) ----
     _apply_local_rename(root, old_name, new_name)

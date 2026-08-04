@@ -244,7 +244,7 @@ class TestBatchValidation:
         )
 
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_batch_release({"dry-run": False, "yes": True, "quiet": False}, project_root=mock_git_repo)
+            _cmd_batch_release({"dry-run": False, "quiet": False}, project_root=mock_git_repo)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -256,7 +256,7 @@ class TestBatchValidation:
         _init_workspace(mock_git_repo, [])
 
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_batch_release({"dry-run": False, "yes": True, "quiet": False}, project_root=mock_git_repo)
+            _cmd_batch_release({"dry-run": False, "quiet": False}, project_root=mock_git_repo)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -311,7 +311,7 @@ class TestBatchTopologicalOrder:
 
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
-                _cmd_batch_release({"dry-run": False, "yes": True, "quiet": False}, project_root=mock_git_repo)
+                _cmd_batch_release({"dry-run": False, "quiet": False}, project_root=mock_git_repo)
 
         # Verify release_order: C before B before A
         assert release_order == ["C", "B", "A"]
@@ -351,7 +351,7 @@ class TestBatchTopologicalOrder:
 
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
-                _cmd_batch_release({"dry-run": False, "yes": True, "quiet": False}, project_root=mock_git_repo)
+                _cmd_batch_release({"dry-run": False, "quiet": False}, project_root=mock_git_repo)
 
         # C should come before A (C is a leaf)
         assert release_order == ["C", "A"]
@@ -388,7 +388,7 @@ class TestBatchTopologicalOrder:
 
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
-                _cmd_batch_release({"dry-run": False, "yes": True, "quiet": False}, project_root=mock_git_repo)
+                _cmd_batch_release({"dry-run": False, "quiet": False}, project_root=mock_git_repo)
 
         # Topological sort is deterministic (alphabetical for ties)
         assert release_order == ["alpha", "zeta"]
@@ -507,7 +507,7 @@ class TestBatchReleaseDevNode:
 
         with pytest.raises(SystemExit) as exc_info:
             _cmd_batch_release(
-                {"dry-run": False, "yes": True, "quiet": False},
+                {"dry-run": False, "quiet": False},
                 project_root=mock_git_repo,
             )
 
@@ -550,7 +550,7 @@ class TestBatchReleaseDevNode:
         with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
             with patch("rlsbl.commands.release.run_cmd", mock_run_cmd):
                 _cmd_batch_release(
-                    {"dry-run": False, "yes": True, "quiet": False},
+                    {"dry-run": False, "quiet": False},
                     project_root=mock_git_repo,
                 )
 

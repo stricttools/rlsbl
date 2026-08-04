@@ -33,7 +33,7 @@ class TestSoftDeprecate(unittest.TestCase):
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout, \
              patch("builtins.open", unittest.mock.mock_open()):
-            run_cmd(["0.9.1"], {"yes": True}, project_root=".")
+            run_cmd(["0.9.1"], {}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Deprecated v0.9.1", output)
@@ -65,7 +65,7 @@ class TestSoftDeprecate(unittest.TestCase):
         mock_open = unittest.mock.mock_open()
         with patch("sys.stdout", new_callable=StringIO), \
              patch("builtins.open", mock_open):
-            run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2", "yes": True}, project_root=".")
+            run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2"}, project_root=".")
 
         # Check what was written to the notes file
         written = "".join(
@@ -202,9 +202,10 @@ class TestBuildNotice(unittest.TestCase):
 class TestDeprecateNoLongerPromptsItself:
     """The confirmation belongs to the framework, not to this command.
 
-    `release deprecate` is classified `mutating`, so strictcli asks once,
-    before dispatch, in the one wording every rlsbl command uses -- and refuses
-    on a non-interactive stdin with the one `--yes` remediation.  The command's
+    `release deprecate` declares itself `consequential`, so strictcli asks
+    once, before dispatch, in the one wording every rlsbl command uses -- and
+    refuses on a non-interactive stdin with the one `--approve-consequential`
+    remediation.  The command's
     own prompt is deleted rather than kept alongside it.
     """
 
@@ -223,7 +224,7 @@ class TestDeprecateNoLongerPromptsItself:
             "",         # gh release edit
         ]
         with patch("builtins.input", side_effect=AssertionError("must not prompt")):
-            run_cmd(["0.9.1"], {"yes": False}, project_root=".")
+            run_cmd(["0.9.1"], {}, project_root=".")
         edit_calls = [c for c in mock_run_gh.call_args_list
                       if c[0][0] and "edit" in c[0][0]]
         assert edit_calls, "the deprecation edit must run once confirmed"
@@ -235,7 +236,7 @@ class TestCmdReleaseDeprecateDelegation:
     @patch("rlsbl.commands.deprecate.run_cmd")
     def test_delegates(self, mock_run, _):
         import rlsbl
-        rlsbl.cmd_release_deprecate(cli_ctx(dry_run=True, yes=True), reason="security", use="1.2.4", version="1.2.3")
+        rlsbl.cmd_release_deprecate(cli_ctx(dry_run=True), reason="security", use="1.2.4", version="1.2.3")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][1]
         assert flags["reason"] == "security"

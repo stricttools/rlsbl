@@ -1,4 +1,4 @@
-"""Verify the framework owns --dry-run/--yes/--quiet/--verbose, and rlsbl does not.
+"""The framework owns --dry-run/--approve-consequential/--quiet/--verbose.
 
 The four names are reserved by strictcli: it registers them on every app,
 strips them from argv in its pre-scan, and delivers their values on the
@@ -15,8 +15,8 @@ from rlsbl import app
 # cycle-end state is zero exemptions.
 KWARGS_EXEMPT_HANDLERS = set()
 
-RESERVED_FLAG_NAMES = ("dry-run", "yes", "quiet", "verbose")
-RESERVED_PARAMS = ("dry_run", "yes", "quiet", "verbose")
+RESERVED_FLAG_NAMES = ("dry-run", "approve-consequential", "quiet", "verbose", "yes")
+RESERVED_PARAMS = ("dry_run", "approve_consequential", "quiet", "verbose", "yes")
 
 
 def _iter_project_commands():
@@ -117,8 +117,8 @@ class TestReservedFlagsAfterTheCommand:
     """`rlsbl <command> --dry-run` must work, not just `rlsbl --dry-run <command>`.
 
     Every documented rlsbl invocation writes the framework-owned flags AFTER the
-    command name (`rlsbl release run --no-allow-dirty --watch --yes`). strictcli
-    >= 0.35.3 recognizes them anywhere in argv, so this works with no argv
+    command name (`rlsbl release run --no-allow-dirty --watch
+    --approve-consequential`). strictcli recognizes them anywhere in argv, so this works with no argv
     rewriting on rlsbl's side; `main()` carried a hoisting shim until then.
     These tests pin the property, not the removed shim.
     """
@@ -133,10 +133,15 @@ class TestReservedFlagsAfterTheCommand:
         assert result.exit_code == 1
         assert "does not support --dry-run" in result.stderr
 
-    def test_yes_after_the_command_is_not_an_unknown_flag(self):
+    def test_approve_consequential_after_the_command_is_not_unknown(self):
         """The exact shape the RLSBL protocol prescribes."""
-        result = app.test(["status", "--yes"])
+        result = app.test(["status", "--approve-consequential"])
         assert "unknown flag" not in result.stderr
+
+    def test_yes_is_gone_and_stays_gone(self):
+        """`yes` is a banned flag name; nothing in rlsbl may resurrect it."""
+        result = app.test(["status", "--yes"])
+        assert "unknown flag" in result.stderr
 
     def test_variadic_extraction_leaves_a_post_command_flag_in_place(
         self, monkeypatch
@@ -158,12 +163,13 @@ class TestReservedFlagsAfterTheCommand:
         ]
 
     def test_a_file_named_like_a_reserved_flag_stays_a_file(self, monkeypatch):
-        """`rlsbl commit -- --yes` names a file, however badly."""
+        """`rlsbl commit -- --approve-consequential` names a file, however badly."""
         import rlsbl
 
         monkeypatch.setattr(
-            "sys.argv", ["rlsbl", "commit", "-m", "x", "--", "--yes", "a.txt"],
+            "sys.argv",
+            ["rlsbl", "commit", "-m", "x", "--", "--approve-consequential", "a.txt"],
         )
         variadic = rlsbl._extract_variadic_args()
-        assert variadic == ["--yes", "a.txt"]
+        assert variadic == ["--approve-consequential", "a.txt"]
         assert __import__("sys").argv == ["rlsbl", "commit", "-m", "x"]
