@@ -40,7 +40,7 @@ All commands auto-detect targets (versioning) from project files (`package.json`
 
 :-: table-commands
 
-Global flags: `--help`, `--version`, `--dry-run`, `--yes`, `--quiet`.
+Global flags: `--help`, `--version`, `--dry-run`, `--yes`, `--quiet`, `--verbose`.
 
 ## Release flow
 
@@ -66,7 +66,9 @@ When you run `rlsbl release run`:
 18. Runs `.rlsbl/hooks/post-release.sh` if present (non-fatal)
 19. Prints `Watch CI: rlsbl watch <sha>`
 
-Use `--dry-run` to preview without changes. Use `--yes` for non-interactive mode (CI, AI agents).
+Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
+would-do log rather than performed. Use `--yes` for non-interactive mode (CI, AI agents) --
+without it, a mutating command asks for confirmation and refuses on a non-interactive stdin.
 
 Create the release file with `rlsbl release init`, which auto-detects project targets and scaffolds the TOML file.
 

@@ -304,7 +304,7 @@ This means an unmodified scaffold hook or a missing hook file is considered "eff
 | `--no-watch` | After release, print the watch command hint without watching |
 | `--allow-dirty` | Skip the clean working tree check (step 1) |
 
-`--dry-run`, `--yes`, and `--quiet` are global flags available on all rlsbl commands. `--allow-dirty` and `--watch` are release-specific. The same `--watch` / `--no-watch` pair applies to `rlsbl release resume`, `rlsbl release retry`, and `rlsbl monorepo release run`.
+`--dry-run`, `--yes`, `--quiet` and `--verbose` are framework-owned flags available on all rlsbl commands. `--allow-dirty` and `--watch` are release-specific. The same `--watch` / `--no-watch` pair applies to `rlsbl release resume`, `rlsbl release retry`, and `rlsbl monorepo release run`.
 
 Watching is always in-process: there is no detached background watcher. To watch later, run `rlsbl watch <sha>` — the hint `--no-watch` prints is exactly that command.
 
