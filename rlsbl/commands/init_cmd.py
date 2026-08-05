@@ -1602,6 +1602,22 @@ def _print_private_summary():
     print("  Go:     go get github.com/owner/repo@vX.Y.Z")
 
 
+def _target_dir(target_name, ctx):
+    """Return *target_name*'s own directory, falling back to the project root.
+
+    A target declared as ``{"name": "go", "path": "go/"}`` lives in a
+    subdirectory; anything that introspects the target's ecosystem files must
+    look there, not at the project root.
+    """
+    try:
+        for entry in detect_targets("."):
+            if entry.name == target_name:
+                return entry.path
+    except ConfigError:
+        pass
+    return ctx.project_root
+
+
 def _ensure_pipeline_config(registries, ctx):
     """Generate default pipeline config for detected targets if not already present.
 
@@ -1616,7 +1632,11 @@ def _ensure_pipeline_config(registries, ctx):
 
     Go pipelines additionally set ``artifact`` to ``"library"`` or
     ``"binary"`` (auto-detected from the project's package layout). No
-    implicit default -- the key is always explicit.
+    implicit default -- the key is always explicit. Detection runs in the GO
+    TARGET's own directory: a go target declared at a subdirectory path has no
+    ``go.mod`` at the project root, so detecting there fails and falls back to
+    ``"binary"`` -- writing a wrong declaration that everything downstream then
+    (correctly) obeys.
 
     Writes the generated pipeline entries to config.json under the "pipelines" key.
     Skips if "pipelines" already exists in config.
@@ -1649,7 +1669,9 @@ def _ensure_pipeline_config(registries, ctx):
                 "target": target_name,
             }
             if target_name == "go":
-                entry["artifact"] = _detect_go_artifact_kind(ctx.project_root)
+                entry["artifact"] = _detect_go_artifact_kind(
+                    _target_dir(target_name, ctx)
+                )
             pipelines[target_name] = entry
 
     if pipelines:

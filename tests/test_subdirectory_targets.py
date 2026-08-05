@@ -385,3 +385,50 @@ class TestCIWorkingDirectoryInjection:
         assert first_content == second_content, (
             "Re-scaffold should produce identical output for subdirectory CI workflows"
         )
+
+
+class TestSubdirGoArtifactDetection:
+    """A subdirectory go target's ``artifact`` is detected in ITS OWN directory.
+
+    Regression: ``_ensure_pipeline_config`` ran Go package detection at the
+    project root. A go target declared at ``{"name": "go", "path": "go/"}`` has
+    no ``go.mod`` there, so detection failed and fell back to ``"binary"``,
+    writing a wrong declaration into the generated config -- which everything
+    downstream then correctly obeys, scaffolding goreleaser for a library.
+    """
+
+    def _setup(self, root, *, with_main):
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "sub"\nversion = "0.1.0"\n'
+            'requires-python = ">=3.11"\n'
+        )
+        go_dir = root / "go"
+        go_dir.mkdir()
+        (go_dir / "go.mod").write_text("module github.com/test/sub\n\ngo 1.23\n")
+        (go_dir / "VERSION").write_text("0.1.0\n")
+        if with_main:
+            (go_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
+        else:
+            (go_dir / "lib.go").write_text("package sub\n\nfunc Hello() {}\n")
+        rlsbl_dir = root / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps(
+            {"targets": ["pypi", {"name": "go", "path": "go/"}]}
+        ))
+
+    def _generated_artifact(self, root):
+        from rlsbl.commands.init_cmd import _ensure_pipeline_config
+
+        ctx = _scaffold_ctx()
+        with patch("sys.stdout", new_callable=StringIO):
+            _ensure_pipeline_config(["pypi", "go"], ctx)
+        with open(os.path.join(".rlsbl", "config.json")) as f:
+            return json.load(f)["pipelines"]["go"]["artifact"]
+
+    def test_subdir_library_detected_as_library(self, mock_git_repo):
+        self._setup(mock_git_repo, with_main=False)
+        assert self._generated_artifact(mock_git_repo) == "library"
+
+    def test_subdir_binary_detected_as_binary(self, mock_git_repo):
+        self._setup(mock_git_repo, with_main=True)
+        assert self._generated_artifact(mock_git_repo) == "binary"
