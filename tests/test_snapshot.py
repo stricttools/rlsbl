@@ -428,7 +428,12 @@ class TestCmdSnapshot:
             "--dry-run must not write snapshot.json"
         assert "DRY RUN" in result.stdout
         assert f"write: {ws_dir / SNAPSHOT_FILE}" in result.stdout, result.stdout
-        assert "run: safegit commit" in result.stdout, result.stdout
+        # WHICH binary performs the commit is an environment fact, not a
+        # promise: utils.commit_files uses safegit when it is on PATH and git
+        # otherwise, and CI has no safegit. What the preview must record is
+        # that a commit would happen at all.
+        would_do = result.stdout.split("Would do:")[1]
+        assert "commit" in would_do, result.stdout
 
     def test_dry_run_of_a_current_snapshot_records_no_commit(
         self, tmp_path, monkeypatch, capsys,
