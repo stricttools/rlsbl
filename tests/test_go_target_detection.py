@@ -171,3 +171,76 @@ class TestGoreleaserLdflags:
         content = open(tpl).read()
         assert "-X main.Version={{.Version}}" in content
         assert "main.version=" not in content
+
+
+class TestDeclaredArtifactIsAuthoritative:
+    """A go pipeline's declared ``artifact`` wins over filesystem introspection.
+
+    Regression: scaffold classified a Go project by scanning for ``package main``
+    anywhere in the tree, so a project that DECLARES ``artifact: "library"`` but
+    ships a dev helper under ``scripts/`` was scaffolded as a binary --
+    ``.goreleaser.yml`` pointed at the helper and a ``version.go`` was written
+    into it, while the publish workflow (which does honour the declaration)
+    correctly ran no goreleaser job. The declaration is the operator's committed
+    choice; detection only ever feeds the missing-key error message.
+    """
+
+    @staticmethod
+    def _library_project_with_dev_helper(root):
+        _write(root / "go.mod", GO_MOD)
+        _write(root / "lib.go", "package myapp\n\nfunc Hello() {}\n")
+        # A dev helper -- a real `package main`, but not a published binary.
+        _write(
+            root / "scripts" / "addeffect" / "main.go",
+            "package main\n\nfunc main() {}\n",
+        )
+        config = {
+            "publish_mode": "ci",
+            "targets": ["go"],
+            "pipelines": {
+                "go": {
+                    "type": "go",
+                    "local": False,
+                    "target": "go",
+                    "artifact": "library",
+                }
+            },
+        }
+        _write(root / ".rlsbl" / "config.json", json.dumps(config))
+        return config
+
+    def test_is_library_honours_declaration(self, tmp_path):
+        config = self._library_project_with_dev_helper(tmp_path)
+        target = GoTarget()
+        assert target._is_library(str(tmp_path), config) is True
+
+    def test_declared_binary_honoured_over_pure_module(self, tmp_path):
+        """The declaration wins in the other direction too."""
+        _write(tmp_path / "go.mod", GO_MOD)
+        _write(tmp_path / "lib.go", "package myapp\n")
+        config = {"pipelines": {"go": {"type": "go", "local": False,
+                                       "artifact": "binary"}}}
+        target = GoTarget()
+        assert target._is_library(str(tmp_path), config) is False
+
+    def test_undeclared_falls_back_to_introspection(self, tmp_path):
+        _write(tmp_path / "go.mod", GO_MOD)
+        _write(tmp_path / "main.go", "package main\n\nfunc main() {}\n")
+        target = GoTarget()
+        assert target._is_library(str(tmp_path)) is False
+
+    def test_no_goreleaser_artifacts_for_declared_library(self, tmp_path):
+        config = self._library_project_with_dev_helper(tmp_path)
+        target = GoTarget()
+        ctx = make_ctx(tmp_path, config)
+        targets = [m["target"] for m in target.template_mappings(ctx)]
+        assert ".goreleaser.yml" not in targets
+        assert not any(t.endswith("version.go") for t in targets)
+
+    def test_library_publish_setup_text(self, tmp_path):
+        config = self._library_project_with_dev_helper(tmp_path)
+        target = GoTarget()
+        ctx = make_ctx(tmp_path, config)
+        tvars = target.template_vars(str(tmp_path), ctx)
+        assert "goreleaser" not in tvars["publishSetup"].lower()
+        assert tvars["goreleaserMain"] == ""

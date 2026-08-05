@@ -7,6 +7,7 @@ import re
 
 from .base import BaseTarget, TemplateVars
 from ..go_introspect import (
+    go_pipeline_artifact,
     go_pipeline_install_paths,
     list_main_packages,
     resolve_main_package_dir,
@@ -138,8 +139,25 @@ class GoTarget(BaseTarget):
         #     return PublicationProbeResult(
         #         status=PublicationStatus.UNPROBEABLE, ...)
 
-    def _is_library(self, dir_path):
-        """Return True if the project has no `package main` package anywhere."""
+    def _is_library(self, dir_path, config=None):
+        """Return True when the project publishes a Go module, not a binary.
+
+        The go pipeline's ``artifact`` key is the operator's committed choice
+        and is AUTHORITATIVE -- ``validate_pipelines_config`` makes it
+        mandatory precisely because the two kinds produce different publish
+        workflows and a wrong guess yields a broken one. Filesystem
+        introspection only answers when nothing is declared (a project's very
+        first scaffold, before ``_ensure_pipeline_config`` writes the key).
+
+        Scanning for ``package main`` anywhere in the tree misclassifies a
+        declared library that ships a dev helper under ``scripts/``: scaffold
+        wrote a ``.goreleaser.yml`` aimed at the helper plus a ``version.go``
+        inside it, while the publish workflow -- which does read the
+        declaration -- correctly ran no goreleaser job.
+        """
+        declared = go_pipeline_artifact(config or {})
+        if declared is not None:
+            return declared == "library"
         return len(list_main_packages(dir_path)) == 0
 
     def _has_version_var(self, dir_path, main_dir="."):
@@ -242,7 +260,7 @@ class GoTarget(BaseTarget):
         except FileNotFoundError:
             version = "0.0.0"
 
-        is_library = self._is_library(dir_path)
+        is_library = self._is_library(dir_path, config)
         if is_library:
             publish_setup = "Go library -- no publish step needed. Tagged releases are available via go get."
             goreleaser_main = ""
@@ -335,7 +353,7 @@ class GoTarget(BaseTarget):
         # template_vars early return); binary scaffolding needs a module.
         if not os.path.exists(os.path.join(project_root, "go.mod")):
             return mappings
-        if not self._is_library(project_root):
+        if not self._is_library(project_root, ctx.config if ctx else {}):
             mappings.append(
                 {"template": "goreleaser.yml.tpl", "target": ".goreleaser.yml"},
             )
@@ -364,8 +382,8 @@ class GoTarget(BaseTarget):
         project_root = str(ctx.project_root)
         if not os.path.exists(os.path.join(project_root, "go.mod")):
             return mappings
-        if not self._is_library(project_root):
-            config = ctx.config if ctx else {}
+        config = ctx.config if ctx else {}
+        if not self._is_library(project_root, config):
             if npm_wrapper_enabled(config):
                 mappings.extend(npm_wrapper_template_mappings())
         return mappings

@@ -393,10 +393,9 @@ GO_LIBRARY_FIRST_STEP = (
 
 def _go_artifact_kind(config):
     """Return the artifact kind of the config's go pipeline, or None."""
-    for entry in ((config or {}).get("pipelines") or {}).values():
-        if isinstance(entry, dict) and entry.get("type") == "go":
-            return entry.get("artifact")
-    return None
+    from ..go_introspect import go_pipeline_artifact
+
+    return go_pipeline_artifact(config or {})
 
 
 def _next_steps_for(registry, config):

@@ -88,6 +88,22 @@ def list_main_packages(project_dir: str) -> list[GoPackage]:
     return [p for p in list_packages(project_dir) if p.name == "main"]
 
 
+def go_pipeline_artifact(config: dict) -> str | None:
+    """Return the ``artifact`` declared on the config's go-type pipeline.
+
+    ``None`` when the config declares no go pipeline, or the pipeline carries
+    no ``artifact`` key (only possible before the key is written -- it is
+    mandatory once validated). The declared value is authoritative everywhere:
+    it decides the publish template AND what scaffold writes, so detection
+    never overrides it.
+    """
+    for entry in (config.get("pipelines") or {}).values():
+        if isinstance(entry, dict) and entry.get("type") == "go":
+            artifact = entry.get("artifact")
+            return artifact if isinstance(artifact, str) and artifact else None
+    return None
+
+
 def go_pipeline_install_paths(config: dict) -> list[str] | None:
     """Read ``install_paths`` declared on the go-type pipeline entry.
 
