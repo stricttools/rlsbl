@@ -88,6 +88,32 @@ def _is_non_releasable_project(project_root):
     return not project.is_releasable
 
 
+def _skip_publish_scaffold(private, is_ws_root, project_root):
+    """Return True when this project must get no publish workflow.
+
+    Three cases, one rule -- a publish workflow is scaffolded only for
+    something that can actually be released:
+
+    - ``publish_mode: "none"`` -- publishing is suppressed by declaration;
+    - a workspace root -- not a package;
+    - a NON-RELEASABLE workspace project (``dev_node = true``, or
+      ``releasable = false``) -- ``rlsbl release run`` hard-errors on these, so
+      a publish workflow for one is unreachable and can only misfire.
+
+    The dev-node case is derived from the project's position in the workspace
+    graph rather than declared twice: ``dev_node`` lives in ``workspace.toml``
+    and ``publish_mode`` in the project's own ``.rlsbl/config.json``, and
+    ``"none"`` carries a different meaning (a private repo suppressing public
+    registry publishes). Requiring the operator to also set ``publish_mode:
+    "none"`` on every dev node would make correct, ordinary configs a hard
+    error. An already-scaffolded ``publish.yml`` is removed by the normal
+    orphan sweep, exactly as it is for ``publish_mode: "none"``.
+    """
+    if private or is_ws_root:
+        return True
+    return _is_non_releasable_project(project_root)
+
+
 def _is_releasable_member_project(project_root):
     """Check if the project belongs to a named releasable in explicit mode.
 
@@ -1780,10 +1806,11 @@ def run_cmd(registry, args, flags, ctx):
         # injected and packages-dir/version-file inputs rewritten, instead of the
         # root-anchored publish.yml the old per-pipeline raw render produced.
         # For a root target (path ".") no subdir rewriting occurs.
-        # (skip for publish_mode "none" and workspace roots)
+        # (skip for publish_mode "none", workspace roots, and non-releasable
+        # workspace projects -- see _skip_publish_scaffold)
         pipeline_plans = []
         shim_plans = []
-        if not private and not is_ws_root:
+        if not _skip_publish_scaffold(private, is_ws_root, project_root):
             _loaded_pipelines = load_pipelines(ctx.config)
             publish_target = os.path.join(".github", "workflows", "publish.yml")
             merged_content = _generate_merged_publish(
@@ -2913,7 +2940,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         # Load pipelines so _generate_merged_publish can use pipeline-driven
         # template resolution (Phase 6.7) instead of hardcoded target-name paths.
         merged_plans = []
-        if not private and not is_ws_root:
+        if not _skip_publish_scaffold(private, is_ws_root, project_root):
             _loaded_pipelines = load_pipelines(ctx.config)
             publish_target = os.path.join(".github", "workflows", "publish.yml")
             merged_content = _generate_merged_publish(
