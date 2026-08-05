@@ -9,13 +9,7 @@ import sys
 import tempfile
 
 from ..action_versions import format_action, UnknownActionError
-from ..ci_yaml import (
-    parse_ci_workflow,
-    emit_ci_workflow,
-    inject_working_directory,
-    make_ci_workflow_transform,
-    rewrite_version_file_inputs,
-)
+from ..ci_yaml import make_ci_workflow_transform
 from ..errors import ConfigError
 from ..config import (
     _detect_go_artifact_kind,
