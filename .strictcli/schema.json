@@ -379,7 +379,7 @@
         {
           "name": "target",
           "type": "str",
-          "help": "Target a specific registry (auto-detected if omitted)",
+          "help": "Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one.",
           "default": ""
         },
         {

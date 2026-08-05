@@ -669,3 +669,73 @@ class TestSubdirectoryNpmTarget:
 
         # Root should NOT have a package.json
         assert not (npm_subdir_project / "package.json").exists()
+
+
+class TestTargetFlagOnMultiTargetRepo:
+    """``rlsbl scaffold --target <t>`` must never orphan the OTHER targets' files.
+
+    Regression (data loss): ``--target`` routed to the single-target
+    ``run_cmd``, so ``all_new_hashes`` only covered that one target's files.
+    Every other target's managed file (``ci-<other>.yml``, ``.goreleaser.yml``,
+    ``VERSION``, ``.npmignore``) fell out of the plan set and was orphan-deleted
+    along with its stored merge base.
+    """
+
+    def _scaffold(self, target=""):
+        import rlsbl
+        from conftest import cli_ctx
+
+        with patch("sys.stdout", new_callable=StringIO):
+            rlsbl.cmd_scaffold(
+                cli_ctx(), target=target, publish_mode="ci",
+                auto_commit=False, skip_shared=False, auto_tag=False,
+            )
+
+    def test_other_targets_survive(self, dual_registry_project):
+        self._scaffold()  # bare: scaffolds both npm and pypi
+        ci_pypi = os.path.join(".github", "workflows", "ci-pypi.yml")
+        npmignore = ".npmignore"
+        assert os.path.exists(ci_pypi)
+        assert os.path.exists(npmignore)
+
+        self._scaffold(target="npm")
+
+        assert os.path.exists(ci_pypi), "pypi CI workflow was orphan-deleted by --target npm"
+        assert os.path.exists(npmignore)
+        base = os.path.join(".rlsbl", "bases", ci_pypi)
+        assert os.path.exists(base), "pypi CI merge base was orphan-deleted by --target npm"
+
+    def test_managed_registry_keeps_other_targets(self, dual_registry_project):
+        self._scaffold()
+        self._scaffold(target="npm")
+
+        with open(os.path.join(".rlsbl", "managed-files.json")) as f:
+            managed = json.load(f)["files"]
+        assert os.path.join(".github", "workflows", "ci-pypi.yml") in managed
+
+    def test_publish_workflow_keeps_all_target_jobs(self, dual_registry_project):
+        """The merged publish.yml is whole-project: narrowing must not drop jobs."""
+        self._scaffold()
+        self._scaffold(target="npm")
+
+        with open(os.path.join(".github", "workflows", "publish.yml")) as f:
+            content = f.read()
+        assert "npm publish" in content
+        assert ("pypi-publish" in content or "uv build" in content), (
+            "the pypi publish job vanished from the merged publish workflow"
+        )
+
+    def test_target_registers_a_new_target(self, dual_registry_project):
+        """--target still declares a target that detection alone would not find."""
+        self._scaffold()
+        with open(os.path.join(".rlsbl", "config.json")) as f:
+            assert "plain" not in json.load(f).get("targets", [])
+
+        self._scaffold(target="plain")
+
+        with open(os.path.join(".rlsbl", "config.json")) as f:
+            targets = json.load(f)["targets"]
+        assert "plain" in targets
+        assert "npm" in targets and "pypi" in targets
+        # And the pre-existing targets' files are still there.
+        assert os.path.exists(os.path.join(".github", "workflows", "ci-pypi.yml"))

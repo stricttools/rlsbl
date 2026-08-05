@@ -718,7 +718,7 @@ def cmd_status(ctx, target, json, registry):
 # ---------------------------------------------------------------------------
 
 @app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.", effect="mutating")
-@strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
+@strictcli.flag(name="target", type=str, help="Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one.", default="")
 @strictcli.flag(name="publish-mode", type=str, default="", help='Publish mode: "ci" to publish via CI pipelines, or "none" to suppress publishing. Required for private repos; public repos default to "ci".')
 @strictcli.flag(name="auto-commit", type=bool, default=True, help="Auto-commit scaffolded files after writing them to disk")
 @strictcli.flag(name="skip-shared", type=bool, default=False, help="Skip processing of shared workflow templates across targets")
@@ -775,30 +775,37 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
                 file=sys.stderr,
             )
             sys.exit(1)
-        from .commands.init_cmd import run_cmd
-        run_cmd(resolved_target, [], flags, ctx=ctx)
+
+    regs = detect_registries()
+    if not regs and ctx and ctx.config.get("targets"):
+        # Plain targets (and others whose detect() returns False) won't
+        # appear in detect_registries(), but the config records them.
+        regs = [t.get("name") if isinstance(t, dict) else t
+                for t in ctx.config["targets"]]
+    # --target DECLARES a target; it never narrows the run. Scaffold's outputs
+    # are whole-project -- the merged publish.yml, the managed-files registry
+    # that drives orphan deletion, the publish gate's CI check regex -- so a run
+    # covering a subset of the project's targets treats the rest as orphans and
+    # deletes their files (and their stored merge bases). Unioning makes that
+    # class impossible: every scaffold run always covers every known target.
+    if resolved_target and resolved_target not in regs:
+        regs = [*regs, resolved_target]
+    if not regs:
+        print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
+        sys.exit(1)
+    # Warn when auto-detection is used without explicit config
+    if ctx and "targets" not in ctx.config:
+        print(
+            f"Note: Auto-detected target(s): {', '.join(regs)}. "
+            "Run 'rlsbl scaffold' again after reviewing .rlsbl/config.json.",
+            file=sys.stderr,
+        )
+    if len(regs) > 1:
+        from .commands.init_cmd import run_cmd_multi
+        run_cmd_multi(regs, [], flags, ctx=ctx)
     else:
-        regs = detect_registries()
-        if not regs and ctx and ctx.config.get("targets"):
-            # Plain targets (and others whose detect() returns False) won't
-            # appear in detect_registries(), but the config records them.
-            regs = list(ctx.config["targets"])
-        if not regs:
-            print("Error: no package.json, pyproject.toml, or go.mod found.", file=sys.stderr)
-            sys.exit(1)
-        # Warn when auto-detection is used without explicit config
-        if ctx and "targets" not in ctx.config:
-            print(
-                f"Note: Auto-detected target(s): {', '.join(regs)}. "
-                "Run 'rlsbl scaffold' again after reviewing .rlsbl/config.json.",
-                file=sys.stderr,
-            )
-        if len(regs) > 1:
-            from .commands.init_cmd import run_cmd_multi
-            run_cmd_multi(regs, [], flags, ctx=ctx)
-        else:
-            from .commands.init_cmd import run_cmd
-            run_cmd(regs[0], [], flags, ctx=ctx)
+        from .commands.init_cmd import run_cmd
+        run_cmd(regs[0], [], flags, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
