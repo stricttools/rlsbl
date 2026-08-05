@@ -2,11 +2,23 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "A release can no longer burn a version number: main is the candidate, CI gates the tag, and a drift guard refuses to ship commits the release did not create -- alongside the effects regime, `release reconcile`, and the removal of dev-branch releases, `rlsbl push`, the watch daemon, cargo publishing, changeset-file mode and every timeout environment variable"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+The centrepiece is a reordering. rlsbl used to bump the version, commit, tag, push and create the GitHub Release, and only then find out whether CI agreed. When it did not, the version number was spent: a tag and a Release existed for a commit that could not publish, and the only way out was to skip a number and try again. The order is now candidate-first. The version-bump commit goes to the release branch untagged, rlsbl waits for CI on exactly that commit, and only a green verdict produces the tag, the Release and the changelog finalization. A red CI leaves you with an ordinary branch you can fix forward on, at the same version, as many times as it takes. Batch releases work the same way with one wait for the whole batch -- and one push, because the CI router filters paths per push, so a push per member would leave every other member's job skipped on the commit its tag was about to land on.
+
+Two gates that were supposed to answer the same question, and did not, are now one predicate. The release gate judged the workflow RUN; the publish gate judged the releasing project's own CHECK RUNS. In a monorepo those come apart whenever the paths filter finds no change under a project: its job concludes `skipped`, the run still concludes `success`, so the release tagged and the publish gate then refused the same commit. Both sides now ask "did this project's CI pass here?", only `success` passes, and a skipped or absent check is a hard error that names the filter mismatch.
+
+The forward drift guard is the other half of the rollback guard that already existed. A release pins HEAD when it starts and re-checks the branch at four points; any commit in that window it did not create -- a concurrent session sharing the worktree, most likely -- aborts the release by name instead of silently shipping under the tag.
+
+A lot was deleted, and the deletions share a rationale: every one of them was a second way to do something rlsbl already did once. Dev-branch releases and `rlsbl push` are gone, so a release starts from a release branch or it does not start. `RLSBL_RELEASE_PUSH` is gone, replaced by an internal `--no-verify` on release pushes and a pre-push hook that knows which ref namespaces it owns. The timeout environment variables are gone in favour of config keys and explicit flags -- an env var that silently changes how long a release waits is exactly the kind of invisible state this tool exists to remove. The detached watch daemon is gone; the CI wait is in-process now, which is what the new ordering needed anyway. Cargo publishing and the crates.io launcher are gone because nothing in the fleet ships a crate. Changeset-file coverage mode is gone because no configuration ever selected it.
+
+rlsbl also moved onto strictcli's effects regime as its reference consumer. Every subprocess launch, filesystem mutation and network call now routes through one internal module with a test that fails if a new one appears outside it, and every command is classified, so `--dry-run` records instead of acting. Confirmation is declared per command rather than inferred from "this mutates something", and the flag that skips it is `--approve-consequential`; `--yes` is gone. `rlsbl monorepo snapshot --check` split into `snapshot-check` for the same reason: one command cannot be both a pure read and a write.
+
+Finally, `rlsbl release reconcile` closes the loop on history rewrites. safegit stopped requiring a handshake before rewriting a release-managed repository, so rlsbl detects the damage afterwards instead -- the changelog's hash resolution fails loudly, `changelog remap --from-journal` repairs the entries from safegit's journal, and `release reconcile` re-pushes the moved tags and recreates their Releases. It is fail-closed: a tag whose divergence the journal cannot explain is an error, never a force-push. This is why the release now requires safegit 0.25.0 or newer.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
