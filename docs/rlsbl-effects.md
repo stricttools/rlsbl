@@ -1,8 +1,7 @@
 ---
 title: rlsbl.effects
-description: "The single authorized surface for effectful calls in rlsbl production code."
+description: "Single authorized surface for effects in rlsbl: subprocess launches, filesystem mutations and network requests route through it so --dry-run previews them."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 75
 ---

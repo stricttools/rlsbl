@@ -1,8 +1,7 @@
 ---
 title: rlsbl._effects_direct
-description: "The direct stdlib primitives behind :mod:`rlsbl.effects`."
+description: "Bottom of rlsbl's effect chokepoint: the only module that may call subprocess, filesystem and network primitives directly, as behavior-preserving wrappers."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 3
 ---

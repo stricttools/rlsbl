@@ -1,8 +1,7 @@
 ---
 title: rlsbl.ci_checks
-description: "One predicate for both CI gates: did THIS project's own CI RUN and PASS on a commit?"
+description: "One predicate behind both the release CI gate and the publish gate: did this project's own CI check actually run, and pass, on a given commit?"
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 23
 ---
