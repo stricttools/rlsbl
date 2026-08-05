@@ -278,6 +278,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-ci_checks.md",
+      "title": "rlsbl.ci_checks",
+      "type": "doc"
+    },
+    {
       "path": "rlsbl-ci_router.md",
       "title": "rlsbl.ci_router",
       "type": "doc"
@@ -975,5 +980,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-04T21:57:20.043800+00:00"
+  "last_gen": "2026-08-05T13:05:43.686920+00:00"
 }

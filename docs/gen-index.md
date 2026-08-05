@@ -32,6 +32,7 @@ order: 90
 - [rlsbl.checks.scope](rlsbl-checks-scope.html)
 - [rlsbl.checks.strictspec_gate](rlsbl-checks-strictspec_gate.html)
 - [rlsbl.checks.workspace](rlsbl-checks-workspace.html)
+- [rlsbl.ci_checks](rlsbl-ci_checks.html)
 - [rlsbl.ci_router](rlsbl-ci_router.html)
 - [rlsbl.ci_yaml](rlsbl-ci_yaml.html)
 - [rlsbl.commands](rlsbl-commands.html)
