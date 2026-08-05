@@ -9,17 +9,71 @@ from io import StringIO
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.error import YAMLError
 from ruamel.yaml.scalarstring import LiteralScalarString
 
+from .errors import ConfigError
 
-def parse_ci_workflow(content):
+CONFLICT_START = "<<<<<<<"
+CONFLICT_SEP = "======="
+CONFLICT_END = ">>>>>>>"
+
+
+def conflict_regions(text):
+    """Return the 1-based ``(start_line, end_line)`` of each conflict region.
+
+    A region runs from its ``<<<<<<<`` marker to the matching ``>>>>>>>``.
+    An unterminated region ends at the last line, so a truncated conflict is
+    still reported rather than silently ignored.
+    """
+    regions = []
+    start = None
+    lines = text.splitlines()
+    for i, line in enumerate(lines, start=1):
+        if line.startswith(CONFLICT_START):
+            start = i
+        elif line.startswith(CONFLICT_END) and start is not None:
+            regions.append((start, i))
+            start = None
+    if start is not None:
+        regions.append((start, len(lines)))
+    return regions
+
+
+def describe_conflicts(source, regions):
+    """Render a human-readable ``file:lines`` description of conflict regions."""
+    where = ", ".join(f"lines {a}-{b}" for a, b in regions)
+    return f"{source or '<string>'}: {where}"
+
+
+def parse_ci_workflow(content, source=None):
     """Parse CI workflow YAML content using round-trip mode (preserves comments, ordering).
 
     Returns the parsed document, or None if the content is empty or has no
     ``jobs:`` key.
+
+    Conflict-marked text is refused up front with a :class:`ConfigError` naming
+    *source* and the conflicting line ranges. Feeding merge output straight to
+    the YAML scanner produced a bare ``while scanning a simple key`` error that
+    named no file, so an unresolved scaffold conflict surfaced as an opaque
+    crash. Any other YAML error is likewise re-raised with *source* attached.
     """
+    regions = conflict_regions(content)
+    if regions:
+        raise ConfigError(
+            "unresolved merge conflict markers in "
+            f"{describe_conflicts(source, regions)}.\n"
+            "  This file was left conflicted by an earlier scaffold merge. "
+            "Resolve the marked regions (keep your edits, drop the markers), "
+            "then re-run scaffold."
+        )
     yaml = YAML(typ='rt')
-    doc = yaml.load(content)
+    try:
+        doc = yaml.load(content)
+    except YAMLError as e:
+        raise ConfigError(
+            f"{source or '<string>'}: could not parse as YAML -- {e}"
+        ) from e
     if doc is None or 'jobs' not in doc:
         return None
     return doc
@@ -278,50 +332,69 @@ def _inject_services_into_doc(doc, services, test_env):
             steps.insert(insert_idx + offset, step)
 
 
-def _inject_workflow_text(text, scoped_services, scoped_env):
+def _inject_workflow_text(text, scoped_services, scoped_env, source=None):
     """Parse *text*, inject services/env, and re-emit; passthrough on parse fail."""
-    doc = parse_ci_workflow(text)
+    doc = parse_ci_workflow(text, source=source)
     if doc is None:
         return text
     _inject_services_into_doc(doc, scoped_services, scoped_env)
     return _emit_ci_workflow_faithful(doc)
 
 
-def inject_services_into_ci_plans(plans, config, *, single_target=None):
-    """Post-process scaffold *plans*, injecting CI service containers.
+def make_ci_workflow_transform(config, *, single_target=None, working_dir=None):
+    """Build a ``plan_mappings`` transform for CI workflow templates, or None.
 
-    Reads ``services`` and ``test_env`` from *config*. For every plan whose
-    target is a test CI workflow (``ci.yml`` / ``ci-<target>.yml``, never
-    ``ci-custom.yml`` or publish workflows), injects the services scoped to
-    that target plus ``test_env`` (scoped to the union of all service targets)
-    into both the rendered ``content`` and the ``base_content`` merge base.
+    The returned callable takes ``(target_path, rendered_template_text)`` and
+    returns the text scaffold actually wants on disk: the subdirectory
+    working-directory injection (when *working_dir* names a subdirectory) plus
+    the service containers and ``test_env`` declared in *config*, scoped to the
+    release target the CI filename maps to.
 
-    The injection runs AFTER ``plan_mappings`` has computed the three-way merge
-    from the plain (service-less) template, so the merge may have stripped the
-    services out of the merged content -- this re-adds them idempotently and
-    also fixes up the plan's ``action``/``status`` so ``apply_plans`` actually
-    writes the result. ``base_content`` gets the services too, so the stored
-    merge base matches what scaffold now generates and a re-scaffold is clean.
+    These rewrites used to run AFTER ``plan_mappings`` had merged, patching the
+    plan's ``content`` and storing the rewritten text as the merge BASE while
+    "theirs" stayed the raw template. Base and theirs then differed by the whole
+    rewrite on every run, so any local edit overlapping the rewritten region
+    conflicted -- and the rewrite went on to parse that conflict-marked text as
+    YAML and crash. Applying the rewrite to "theirs" BEFORE the merge makes base
+    and theirs come out of one pipeline, which is what removes the phantom diff.
 
-    No-op when neither ``services`` nor ``test_env`` is declared.
+    Returns ``None`` when there is nothing to rewrite, so the common case costs
+    no parse/re-emit round trip (and cannot perturb a byte-stable template).
     """
     services = config.get("services") or {}
     test_env = config.get("test_env") or {}
-    if not services and not test_env:
-        return
+    needs_working_dir = working_dir not in (None, "", ".")
+    if not services and not test_env and not needs_working_dir:
+        return None
 
     env_targets = set()
     for svc in services.values():
         for t in svc.get("targets") or []:
             env_targets.add(t)
 
-    for plan in plans:
-        target_path = plan.get("target") or ""
+    wf_prefix = os.path.join(".github", "workflows", "")
+
+    def _transform(target_path, text):
+        target_path = target_path or ""
         basename = os.path.basename(target_path)
+        is_ci_workflow = (
+            target_path.startswith(wf_prefix)
+            and basename.startswith("ci")
+            and basename.endswith(".yml")
+        )
+        if not is_ci_workflow:
+            return text
+
+        if needs_working_dir:
+            doc = parse_ci_workflow(text, source=target_path)
+            if doc is not None:
+                inject_working_directory(doc, working_dir)
+                rewrite_version_file_inputs(doc, working_dir.rstrip("/"))
+                text = emit_ci_workflow(doc)
+
         ci_target = _ci_target_from_basename(basename, single_target)
         if ci_target is None:
-            continue
-
+            return text
         scoped_services = {
             name: svc
             for name, svc in services.items()
@@ -329,43 +402,9 @@ def inject_services_into_ci_plans(plans, config, *, single_target=None):
         }
         scoped_env = test_env if ci_target in env_targets else {}
         if not scoped_services and not scoped_env:
-            continue
+            return text
+        return _inject_workflow_text(
+            text, scoped_services, scoped_env, source=target_path,
+        )
 
-        # Determine the source text(s) to inject into. plan_mappings computes
-        # its plan from the PLAIN (service-less) template, so for an "unchanged"
-        # plan (base==ours==theirs) it carries neither ``content`` nor
-        # ``base_content`` -- only the on-disk file, which IS that plain
-        # rendered output. Fall back to reading it. ``target`` is project-root-
-        # relative during scaffold (cwd is the project root).
-        on_disk = None
-        if os.path.isfile(target_path):
-            with open(target_path, "r", encoding="utf-8") as f:
-                on_disk = f.read()
-
-        content_src = plan.get("content")
-        base_src = plan.get("base_content")
-        source = content_src if content_src is not None else on_disk
-        if source is None:
-            source = base_src
-        if source is None:
-            continue
-
-        new_content = _inject_workflow_text(source, scoped_services, scoped_env)
-        base_source = base_src if base_src is not None else source
-        new_base = _inject_workflow_text(base_source, scoped_services, scoped_env)
-
-        plan["content"] = new_content
-        plan["base_content"] = new_base
-
-        # Fix up action/status so apply_plans actually writes the injected
-        # result. Only write when the on-disk file differs (avoid churn on an
-        # idempotent re-scaffold); otherwise still persist the injected base so
-        # the stored merge base includes the services.
-        if on_disk != new_content:
-            plan["action"] = "write"
-            plan["status"] = "updated (CI services)"
-            plan["bucket"] = "created"
-        elif plan.get("action") not in ("write", "write_no_base"):
-            plan["action"] = "save_base_only"
-            plan["status"] = "unchanged"
-            plan["bucket"] = "skipped"
+    return _transform

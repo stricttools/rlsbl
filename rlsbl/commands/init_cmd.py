@@ -13,7 +13,7 @@ from ..ci_yaml import (
     parse_ci_workflow,
     emit_ci_workflow,
     inject_working_directory,
-    inject_services_into_ci_plans,
+    make_ci_workflow_transform,
     rewrite_version_file_inputs,
 )
 from ..errors import ConfigError
@@ -664,13 +664,21 @@ def _three_way_merge(ours_text, base_text, theirs_text):
                     pass
 
 
-def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
+def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None,
+                  transform=None):
     """Compute what process_mappings would do, without writing anything.
 
     When *required_vars* is provided (a set of variable names), it is
     forwarded to :func:`process_template` for every mapping. Any required
     variable that remains unresolved raises :class:`ValueError`, turning
     silent placeholder leaks into hard scaffold-time errors.
+
+    *transform*, when given, is ``callable(target_path, rendered_text) -> text``
+    applied to the rendered template ("theirs") BEFORE any merge decision. This
+    is the only place a post-render rewrite may happen: applying one afterwards
+    (patching ``content`` and storing the rewritten text as the merge base while
+    "theirs" stayed raw) made base and theirs differ by the rewrite on every
+    run, manufacturing conflicts out of unrelated local edits.
 
     Returns a list of plan dicts. Each plan represents one mapping and contains:
       - "target": the target file path
@@ -715,6 +723,8 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
         theirs, unreplaced = process_template(
             raw, vars_dict, template_path=template_path, required_vars=required_vars,
         )
+        if transform is not None:
+            theirs = transform(target, theirs)
 
         # --- User-owned files: never overwrite.
         if os.path.exists(target) and target in USER_OWNED:
@@ -900,6 +910,13 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
         else:
             merged, has_conflicts = _three_way_merge(ours, base, theirs)
             if has_conflicts:
+                from ..ci_yaml import conflict_regions, describe_conflicts
+                regions = conflict_regions(merged)
+                if regions:
+                    detail = describe_conflicts(target, regions)
+                else:
+                    # Negative merge-file exit: an error, not a marked conflict.
+                    detail = f"{target}: merge failed"
                 plan = {
                     "target": target,
                     "status": "CONFLICTS -- resolve manually",
@@ -907,7 +924,10 @@ def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None):
                     "action": "write",
                     "content": merged,
                     "base_content": theirs,
-                    "warning": f"{target}: merge conflicts detected, resolve manually",
+                    "warning": (
+                        f"merge conflicts detected in {detail} -- resolve the "
+                        "marked regions manually, then re-run scaffold"
+                    ),
                 }
             else:
                 plan = {
@@ -1744,15 +1764,15 @@ def run_cmd(registry, args, flags, ctx):
         if not is_ws_root:
             reg_mappings = reg.template_mappings(ctx)
 
+            # CI service containers (config services/test_env) are injected into
+            # the single-target CI workflow (ci.yml -> maps to this registry)
+            # as part of rendering "theirs", never as a post-merge patch.
             reg_plans = plan_mappings(
                 reg.template_dir(), reg_mappings, vars_dict,
                 required_vars={"name", "registryUrl"},
-            )
-
-            # Inject CI service containers (config services/test_env) into the
-            # single-target CI workflow (ci.yml -> maps to this registry).
-            inject_services_into_ci_plans(
-                reg_plans, ctx.config or {}, single_target=registry,
+                transform=make_ci_workflow_transform(
+                    ctx.config or {}, single_target=registry,
+                ),
             )
 
         # Publish workflow: route through the SAME merged generator the
@@ -2868,26 +2888,17 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                     # target is not the primary.
                     ci_vars = dict(vars_dict)
                     _overlay_target_vars(ci_vars, r)
+                    # Subdirectory working-directory injection and CI service
+                    # containers are part of rendering "theirs", so the stored
+                    # merge base and the next run's template come out of the
+                    # same pipeline (no phantom base/theirs diff).
                     new_plans = plan_mappings(
                         target_obj.template_dir(), ci_mappings, ci_vars,
+                        transform=make_ci_workflow_transform(
+                            ctx.config or {},
+                            working_dir=target_paths.get(r, "."),
+                        ),
                     )
-
-                    # Inject working-directory for subdirectory targets
-                    target_path = target_paths.get(r, ".")
-                    if target_path != ".":
-                        for plan in new_plans:
-                            if plan.get("content"):
-                                doc = parse_ci_workflow(plan["content"])
-                                if doc is not None:
-                                    inject_working_directory(doc, target_path)
-                                    rewrite_version_file_inputs(doc, target_path.rstrip("/"))
-                                    plan["content"] = emit_ci_workflow(doc)
-                                    if plan.get("base_content") is not None:
-                                        base_doc = parse_ci_workflow(plan["base_content"])
-                                        if base_doc is not None:
-                                            inject_working_directory(base_doc, target_path)
-                                            rewrite_version_file_inputs(base_doc, target_path.rstrip("/"))
-                                            plan["base_content"] = emit_ci_workflow(base_doc)
 
                     ci_plans.extend(new_plans)
 
@@ -2898,12 +2909,6 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                         extra_plans.extend(plan_mappings(
                             target_obj.template_dir(), [m], vars_dict,
                         ))
-
-            # Inject CI service containers (config services/test_env) into the
-            # per-target CI workflows (ci-<target>.yml). Each service is scoped
-            # to its declared targets, so a postgres service for the go target
-            # never lands in the pypi-wrapper CI.
-            inject_services_into_ci_plans(ci_plans, ctx.config or {})
 
         # Plan the merged publish workflow (skip for publish_mode "none" and workspace roots)
         # Load pipelines so _generate_merged_publish can use pipeline-driven

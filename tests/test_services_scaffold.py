@@ -1,6 +1,6 @@
 """Tests for CI service-container scaffold rendering (Phase 7.2).
 
-Covers :func:`rlsbl.ci_yaml.inject_services_into_ci_plans`:
+Covers :func:`rlsbl.ci_yaml.make_ci_workflow_transform`:
 - golden render: a postgres service + test_env expressed as config renders a
   workflow functionally equivalent to a hand-maintained services block;
 - idempotent re-scaffold;
@@ -12,7 +12,7 @@ Covers :func:`rlsbl.ci_yaml.inject_services_into_ci_plans`:
 import subprocess
 
 
-from rlsbl.ci_yaml import inject_services_into_ci_plans
+from rlsbl.ci_yaml import make_ci_workflow_transform
 
 
 # Plain Go CI workflow as rendered by the go template (pre-services).
@@ -82,11 +82,13 @@ def _pgdesign_config():
 
 
 def _inject(content, target="ci-go.yml", config=None, single_target=None):
-    plans = [{"target": f".github/workflows/{target}", "content": content}]
-    inject_services_into_ci_plans(
-        plans, config or _pgdesign_config(), single_target=single_target
+    """Render *content* through the scaffold's CI-workflow transform."""
+    transform = make_ci_workflow_transform(
+        config or _pgdesign_config(), single_target=single_target
     )
-    return plans[0]["content"]
+    if transform is None:
+        return content
+    return transform(f".github/workflows/{target}", content)
 
 
 class TestGoldenRender:
@@ -151,67 +153,58 @@ class TestScoping:
         assert "postgres:" in out
 
 
-class TestPlanFixup:
-    """The injection post-processes scaffold plan action/status so apply_plans
-    writes the injected result -- but must not report a misleading "updated"
-    label when the on-disk file already matches the injected output."""
+class TestPlanIntegration:
+    """The transform runs inside ``plan_mappings``, so the plan's status,
+    content and stored merge base all come out of one pipeline."""
 
-    def test_no_services_leaves_plans_untouched(self):
-        """A project with no services/test_env config is a strict no-op: the
-        plan's action, status, and content are all unchanged."""
-        plan = {
-            "target": ".github/workflows/ci-go.yml",
-            "content": BASE_GO_CI,
-            "base_content": BASE_GO_CI,
-            "action": "skip",
-            "status": "unchanged",
-            "bucket": "skipped",
-        }
-        plans = [dict(plan)]
-        inject_services_into_ci_plans(plans, {})
-        assert plans[0] == plan
+    @staticmethod
+    def _plan(tmp_path, on_disk=None, base=None, config=None):
+        """Plan a ci-go.yml mapping from a synthetic template dir."""
+        from rlsbl.commands.init_cmd import plan_mappings, _save_base
+
+        tpl_dir = tmp_path / "tpl"
+        tpl_dir.mkdir(exist_ok=True)
+        (tpl_dir / "ci.yml.tpl").write_text(BASE_GO_CI)
+        target = ".github/workflows/ci-go.yml"
+        if on_disk is not None:
+            wf = tmp_path / ".github" / "workflows"
+            wf.mkdir(parents=True, exist_ok=True)
+            (wf / "ci-go.yml").write_text(on_disk)
+        if base is not None:
+            _save_base(target, base)
+        return plan_mappings(
+            str(tpl_dir), [{"template": "ci.yml.tpl", "target": target}], {},
+            transform=make_ci_workflow_transform(
+                _pgdesign_config() if config is None else config
+            ),
+        )[0]
+
+    def test_no_services_is_a_strict_no_op(self, tmp_path, monkeypatch):
+        """No services/test_env and no subdirectory: there is no transform."""
+        assert make_ci_workflow_transform({}) is None
+
+    def test_first_scaffold_writes_the_services(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        plan = self._plan(tmp_path, on_disk=BASE_GO_CI, base=BASE_GO_CI)
+        assert plan["action"] == "write"
+        assert "services:" in plan["content"]
+        # The stored base carries the services too, so the NEXT run compares
+        # like against like.
+        assert "services:" in plan["base_content"]
 
     def test_rescaffold_identical_reports_unchanged(self, tmp_path, monkeypatch):
-        """A second scaffold run whose injected output is byte-identical to the
-        on-disk file reports 'unchanged' -- never a perpetual 'updated' label."""
         monkeypatch.chdir(tmp_path)
-        wf = tmp_path / ".github" / "workflows"
-        wf.mkdir(parents=True)
         injected = _inject(BASE_GO_CI)
-        (wf / "ci-go.yml").write_text(injected)
-        # A re-scaffold plan carrying the already-injected content, initially
-        # marked unchanged by plan_mappings' three-way merge.
-        plans = [{
-            "target": ".github/workflows/ci-go.yml",
-            "content": injected,
-            "base_content": BASE_GO_CI,
-            "action": "skip",
-            "status": "unchanged",
-            "bucket": "skipped",
-        }]
-        inject_services_into_ci_plans(plans, _pgdesign_config())
-        assert plans[0]["action"] != "write"
-        assert "updated" not in plans[0]["status"]
+        plan = self._plan(tmp_path, on_disk=injected, base=injected)
+        assert plan["action"] == "none"
+        assert plan["status"] == "unchanged"
 
-    def test_first_scaffold_reports_updated_and_writes(self, tmp_path, monkeypatch):
-        """When the on-disk file lacks the services, the plan is flipped to a
-        write with an 'updated (CI services)' status."""
+    def test_scoped_out_workflow_untouched(self, tmp_path, monkeypatch):
+        """A workflow the services are not scoped to renders as the plain template."""
         monkeypatch.chdir(tmp_path)
-        wf = tmp_path / ".github" / "workflows"
-        wf.mkdir(parents=True)
-        (wf / "ci-go.yml").write_text(BASE_GO_CI)  # plain, no services yet
-        plans = [{
-            "target": ".github/workflows/ci-go.yml",
-            "content": BASE_GO_CI,
-            "base_content": BASE_GO_CI,
-            "action": "skip",
-            "status": "unchanged",
-            "bucket": "skipped",
-        }]
-        inject_services_into_ci_plans(plans, _pgdesign_config())
-        assert plans[0]["action"] == "write"
-        assert "updated" in plans[0]["status"]
-        assert "services:" in plans[0]["content"]
+        transform = make_ci_workflow_transform(_pgdesign_config())
+        out = transform(".github/workflows/ci-pypi.yml", BASE_GO_CI)
+        assert out == BASE_GO_CI
 
 
 class TestMergeCleanliness:
