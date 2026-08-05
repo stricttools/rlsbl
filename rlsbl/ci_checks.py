@@ -1,0 +1,409 @@
+"""One predicate for both CI gates: did THIS project's own CI RUN and PASS on a commit?
+
+rlsbl gates a release twice on the same question, in two places:
+
+- the RELEASE gate (``rlsbl release run`` / ``resume`` / the batch
+  orchestrator) asks it before tagging the candidate commit;
+- the PUBLISH gate (the generated workflow in :mod:`rlsbl.publish_gate`)
+  asks it again before pushing artifacts to a registry.
+
+They used to answer it with different machinery. The release gate watched
+WORKFLOW RUNS (``gh run list --commit``) and accepted the run's own
+conclusion; the publish gate polls CHECK RUNS filtered by the releasing
+project's name regex and accepts only ``success``. In a monorepo those two
+answers come apart exactly when the CI router's ``dorny/paths-filter`` sees
+no change under a project's paths: the project's job concludes ``skipped``,
+the router's workflow run still concludes ``success``, so the release gate
+tagged and the publish gate then refused the same commit -- a tag and a
+GitHub Release for a version that can never publish.
+
+This module is the single predicate both gates now use:
+
+- the check-run NAME MATCHER is the publish gate's own
+  (:func:`rlsbl.publish_gate.ci_check_regex_for_targets` for standalone
+  repositories, :func:`rlsbl.ci_router._router_ci_check_regex` for monorepo
+  members), never a second matcher that can drift;
+- the CONCLUSION POLICY is :data:`PASSING_CONCLUSION`: only ``success``
+  passes. ``skipped`` and ``cancelled`` prove nothing about the commit and
+  are hard errors on both sides.
+
+Three outcomes stay explicitly distinct, and the release gate reports each
+differently (see :func:`verify_project_ci_ran`):
+
+1. The repository declares no push-triggered workflow at all -- handled
+   upstream by :func:`rlsbl.commands.watch.push_triggered_workflows`; the
+   release proceeds with a loud notice and this module is never consulted.
+2. A project in scope ships no CI workflow of its own (nothing was ever
+   inlined into the router for it) -- an observable fact about the project,
+   reported as its own loud notice, and its checks are not required.
+3. Workflows exist and the project HAS CI, but its checks are absent or
+   concluded anything other than ``success`` on the candidate -- a hard
+   error naming the filter and the remedy.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import time
+
+from .ci_router import _router_ci_check_regex, router_ci_files
+from .publish_gate import ci_check_regex_for_targets, gate_targets_from_config
+
+# The only check-run conclusion that proves the project's CI passed. Mirrors
+# the publish gate's `select(.conclusion != "success")` reject rule.
+PASSING_CONCLUSION = "success"
+
+# A just-pushed candidate's check runs can lag the workflow run's own
+# conclusion on a GitHub API read replica, so absence is retried before it is
+# believed. Same shape as the publish gate's grace window, much shorter:
+# by the time the release gate asks, every workflow run has already concluded.
+CHECK_DISCOVERY_ATTEMPTS = 6
+CHECK_DISCOVERY_INTERVAL = 5
+
+
+class CheckFilter:
+    """One project's check-run name filter for a single candidate commit.
+
+    ``regex`` is ``None`` when the project ships no CI workflow of its own --
+    outcome 2 in the module docstring, reported rather than enforced.
+    """
+
+    __slots__ = ("label", "regex")
+
+    def __init__(self, label: str, regex: str | None):
+        self.label = label
+        self.regex = regex
+
+    def __repr__(self):  # pragma: no cover - debugging aid
+        return f"CheckFilter(label={self.label!r}, regex={self.regex!r})"
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, CheckFilter)
+            and self.label == other.label
+            and self.regex == other.regex
+        )
+
+
+class ProjectCINotRunError(Exception):
+    """The releasing project's own CI did not RUN-and-PASS on the candidate.
+
+    Deliberately distinct from a red CI: the code at the candidate may be
+    perfectly fine, and the remedy is not "fix the failure" but "make the
+    candidate contain a commit this project's CI actually runs on".
+    """
+
+
+# ---------------------------------------------------------------------------
+# Filter resolution -- reuse the publish gate's matchers, never a second one
+# ---------------------------------------------------------------------------
+
+
+def standalone_check_filter(config, registry, *, label=None) -> CheckFilter:
+    """The filter a standalone repository's own publish gate bakes in.
+
+    Built from the same target set (:func:`gate_targets_from_config`) and the
+    same matcher (:func:`ci_check_regex_for_targets`) that
+    ``rlsbl scaffold`` renders into ``publish.yml``.
+    """
+    targets = gate_targets_from_config(config, registry)
+    return CheckFilter(
+        label or "this project",
+        ci_check_regex_for_targets(targets),
+    )
+
+
+def monorepo_check_filters(workspace_root, project_dirs) -> list[CheckFilter]:
+    """Filters for the workspace projects released under one tag.
+
+    *project_dirs* maps project name -> absolute project directory. Each
+    filter is the monorepo publish router's own
+    (:func:`rlsbl.ci_router._router_ci_check_regex`), recomputed from the
+    project's CI files on disk -- the same discovery ``monorepo sync`` used
+    to mint the router's job keys.
+    """
+    filters = []
+    for name in sorted(project_dirs):
+        project_dir = project_dirs[name]
+        if not router_ci_files(name, project_dir):
+            filters.append(CheckFilter(name, None))
+            continue
+        filters.append(
+            CheckFilter(name, _router_ci_check_regex({"name": name}, project_dir))
+        )
+    return filters
+
+
+def workspace_check_filters(workspace_root, project_dirs) -> list[CheckFilter]:
+    """Filters for every workspace project covered by *project_dirs*.
+
+    Each directory is resolved to its workspace project; a project belonging
+    to a releasable pulls in that releasable's other members, because one tag
+    publishes them all. Used by the batch orchestrator, whose single CI gate
+    stands in for every member's individual gate.
+    """
+    from .workspace import load_workspace, members_of, resolve_project
+
+    projects = load_workspace(str(workspace_root))
+    selected: dict[str, str] = {}
+    for project_dir in project_dirs:
+        proj = resolve_project(str(workspace_root), str(project_dir))
+        if proj is None:
+            raise ProjectCINotRunError(
+                f"{project_dir} is not inside any project registered in the "
+                f"workspace at {workspace_root}, so the release CI gate "
+                f"cannot determine which CI check runs belong to it. Register "
+                f"it with `rlsbl monorepo add` and re-run `rlsbl monorepo "
+                f"sync`, then resume."
+            )
+        releasable = proj.get("releasable")
+        group = members_of(releasable, projects) if releasable else [proj]
+        for member in group:
+            selected[member["name"]] = os.path.join(
+                str(workspace_root), member["path"]
+            )
+    return monorepo_check_filters(str(workspace_root), selected)
+
+
+def release_check_filters(*, config, registry, project_dir,
+                          workspace_root=None, monorepo_name=None,
+                          releasable_name=None):
+    """Resolve the check filters the release CI gate must satisfy.
+
+    Standalone repositories yield one filter. A monorepo yields one per
+    project released under the tag: the releasing project alone in implicit
+    mode, or every member of the releasable in explicit mode -- exactly the
+    set whose publish jobs the tag will trigger.
+
+    The releasing project is ALWAYS in the result, keyed by its own name and
+    directory. The workspace read only widens that set to the releasable's
+    other members; it can never narrow it away, so no workspace state can
+    leave the releasing project unverified.
+    """
+    if not (workspace_root and monorepo_name):
+        return [standalone_check_filter(config, registry)]
+
+    from .workspace import load_workspace, members_of
+
+    project_dirs = {monorepo_name: str(project_dir)}
+    if releasable_name:
+        # One tag publishes every member of the releasable, so every member's
+        # CI must have run on the candidate.
+        for member in members_of(
+            releasable_name, load_workspace(str(workspace_root))
+        ):
+            project_dirs.setdefault(
+                member["name"], os.path.join(str(workspace_root), member["path"])
+            )
+    return monorepo_check_filters(str(workspace_root), project_dirs)
+
+
+# ---------------------------------------------------------------------------
+# Evaluation -- the publish gate's jq pipeline, in Python
+# ---------------------------------------------------------------------------
+
+
+def latest_check_runs(check_runs, regex, *, exclude_run_id=None):
+    """Matching check runs, collapsed to the latest per name.
+
+    Mirrors the publish gate's jq pipeline: filter by name, drop this
+    workflow's own runs, group by name and keep the newest
+    (``started_at``, then numeric ``id``) so a retried run supersedes the
+    stale one it replaced.
+    """
+    pattern = re.compile(regex)
+    by_name: dict[str, dict] = {}
+    for run in check_runs:
+        name = run.get("name") or ""
+        if not pattern.search(name):
+            continue
+        if exclude_run_id and f"/actions/runs/{exclude_run_id}/" in (
+            run.get("details_url") or ""
+        ):
+            continue
+        key = (run.get("started_at") or "", int(run.get("id") or 0))
+        current = by_name.get(name)
+        if current is None or key >= current[0]:
+            by_name[name] = (key, run)
+    return [by_name[name][1] for name in sorted(by_name)]
+
+
+def failing_check_runs(runs):
+    """``(name, conclusion)`` for every run that did not conclude success.
+
+    An incomplete run counts as failing here: the release gate only asks
+    after every workflow run for the commit has already concluded, so a check
+    still in flight at that point is not a pass either.
+    """
+    problems = []
+    for run in runs:
+        if run.get("status") != "completed":
+            problems.append((run.get("name") or "?", run.get("status") or "pending"))
+        elif run.get("conclusion") != PASSING_CONCLUSION:
+            problems.append((run.get("name") or "?", run.get("conclusion") or "none"))
+    return problems
+
+
+def fetch_check_runs(sha, *, cwd=None, config=None):
+    """Every check run GitHub recorded for *sha*."""
+    from .utils import run_gh
+
+    raw = run_gh(
+        [
+            "api",
+            "--paginate",
+            f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100",
+        ],
+        config=config,
+        cwd=cwd,
+    )
+    runs = []
+    # --paginate on a non-array response concatenates one JSON object per
+    # page, so decode the stream rather than assuming a single document.
+    decoder = json.JSONDecoder()
+    idx = 0
+    text = raw.strip()
+    while idx < len(text):
+        obj, end = decoder.raw_decode(text, idx)
+        runs.extend(obj.get("check_runs") or [])
+        idx = end
+        while idx < len(text) and text[idx] in " \t\r\n":
+            idx += 1
+    return runs
+
+
+# ---------------------------------------------------------------------------
+# The gate
+# ---------------------------------------------------------------------------
+
+
+def _no_checks_message(sha, missing, all_names):
+    seen = ", ".join(sorted(all_names)) if all_names else "none"
+    lines = [
+        f"the release candidate {sha} produced no CI check run for "
+        f"{'this project' if len(missing) == 1 else 'these projects'}:",
+    ]
+    for flt in missing:
+        lines.append(f"  {flt.label}: no check run matches {flt.regex}")
+    lines.extend([
+        f"Check runs present on the candidate: {seen}",
+        "",
+        "CI ran on the candidate but not for this project, so nothing was "
+        "proven about it. The publish gate applies the SAME filter and would "
+        "refuse to publish the tag, which is why the release stops here "
+        "instead of burning the version on a tag that can never publish.",
+        "",
+        "The usual cause is the CI router's paths filter: the candidate's "
+        "commits touch no path this project's filter covers, so its job never "
+        "ran. The genuine fix is that the candidate must CONTAIN a commit "
+        "matching this project's paths filter (see the project's `watch` "
+        "patterns in .rlsbl-monorepo/workspace.toml and the `filters:` block "
+        "of .github/workflows/ci-router.yml).",
+    ])
+    return "\n".join(lines)
+
+
+def _failed_checks_message(sha, failures):
+    lines = [
+        f"the release candidate {sha} did not pass this project's own CI "
+        f"check runs:",
+    ]
+    skipped = False
+    for label, name, conclusion in failures:
+        lines.append(f"  {label}: {name}: {conclusion}")
+        if conclusion == "skipped":
+            skipped = True
+    lines.extend([
+        "",
+        f"Only '{PASSING_CONCLUSION}' counts as a pass, here and in the "
+        f"publish gate. A skipped or cancelled check proves nothing about the "
+        f"commit, so neither gate treats it as passing.",
+    ])
+    if skipped:
+        lines.extend([
+            "",
+            "A SKIPPED job means CI ran on the candidate but deliberately did "
+            "not run this project's part of it -- almost always the CI "
+            "router's paths filter finding no change under the project's "
+            "paths. The genuine fix is that the candidate must CONTAIN a "
+            "commit matching this project's paths filter (see the project's "
+            "`watch` patterns in .rlsbl-monorepo/workspace.toml and the "
+            "`filters:` block of .github/workflows/ci-router.yml). Releasing "
+            "this project together with the commits that touch it -- or "
+            "adding a commit under its paths and resuming -- makes its job "
+            "run for real.",
+        ])
+    return "\n".join(lines)
+
+
+def verify_project_ci_ran(sha, filters, *, cwd=None, config=None, log=None,
+                          fetch=None, attempts=CHECK_DISCOVERY_ATTEMPTS,
+                          interval=CHECK_DISCOVERY_INTERVAL,
+                          exclude_run_id=None):
+    """Hard-error unless every project in *filters* ran and passed CI on *sha*.
+
+    Raises :class:`ProjectCINotRunError` otherwise. Projects with no CI
+    workflow of their own (``CheckFilter.regex is None``) get a loud notice
+    on stderr and are not enforced -- an absent workflow is an observable
+    fact about the project, not a skipped job.
+    """
+    enforced = [f for f in filters if f.regex]
+    for flt in filters:
+        if flt.regex is None:
+            # Unconditional and on stderr: --quiet must not be able to swallow
+            # the notice that a project shipped with no CI gate of its own.
+            print(
+                f"rlsbl: {flt.label} has no CI workflow of its own "
+                f"(.github/workflows/ci*.yml); nothing was inlined into the CI "
+                f"router for it, so the release CI gate has no check runs to "
+                f"verify for it.",
+                file=sys.stderr,
+            )
+    if not enforced:
+        return
+
+    fetch = fetch or (lambda: fetch_check_runs(sha, cwd=cwd, config=config))
+
+    all_runs = []
+    matched: dict[str, list] = {}
+    for attempt in range(1, max(1, attempts) + 1):
+        all_runs = fetch()
+        matched = {
+            flt.label: latest_check_runs(
+                all_runs, flt.regex, exclude_run_id=exclude_run_id
+            )
+            for flt in enforced
+        }
+        if all(matched[flt.label] for flt in enforced):
+            break
+        if attempt < max(1, attempts):
+            if log is not None:
+                log(
+                    f"Candidate {sha[:12]}: this project's CI check runs are "
+                    f"not visible yet (attempt {attempt}/{attempts}); "
+                    f"retrying in {interval}s..."
+                )
+            time.sleep(interval)
+
+    missing = [flt for flt in enforced if not matched.get(flt.label)]
+    if missing:
+        raise ProjectCINotRunError(
+            _no_checks_message(sha, missing, {r.get("name") for r in all_runs})
+        )
+
+    failures = []
+    for flt in enforced:
+        for name, conclusion in failing_check_runs(matched[flt.label]):
+            failures.append((flt.label, name, conclusion))
+    if failures:
+        raise ProjectCINotRunError(_failed_checks_message(sha, failures))
+
+    if log is not None:
+        verified = ", ".join(
+            f"{flt.label} ({len(matched[flt.label])} check run(s))"
+            for flt in enforced
+        )
+        log(f"This project's own CI ran and passed on {sha[:12]}: {verified}")

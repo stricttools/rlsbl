@@ -79,6 +79,51 @@ def _ci_red_message(*, version, tag, branch, candidate_sha, detail):
     )
 
 
+def _ci_not_run_message(*, version, tag, branch, candidate_sha, detail):
+    """Remediation for a candidate whose CI never RAN for this project.
+
+    Distinct from red and from timeout: CI concluded, and it concluded green
+    -- for somebody else. The code at the candidate may be perfectly fine, so
+    "fix the failure" is the wrong instruction. What the candidate lacks is a
+    commit under this project's paths, which is what makes its CI job run at
+    all, and what the publish gate will later demand evidence of.
+    """
+    return (
+        f"CI never ran for this project on the release candidate for "
+        f"{version}.\n"
+        f"  {detail}\n"
+        f"  Candidate commit: {candidate_sha} (on origin/{branch})\n"
+        f"\n"
+        f"Nothing was tagged, released or finalized:\n"
+        f"  - no {tag} tag exists (local or remote)\n"
+        f"  - no GitHub Release exists\n"
+        f"  - the changelog is still unreleased.jsonl -- {version} was not\n"
+        f"    finalized, so there is no orphan version file to clean up\n"
+        f"  - nothing reached any registry\n"
+        f"\n"
+        f"This is NOT a CI failure and NOT a timeout: the workflow run went\n"
+        f"green, but this project's own job inside it never ran, so nothing\n"
+        f"was proven about the candidate. The publish gate applies the SAME\n"
+        f"filter, so tagging here would create {tag} for a version that can\n"
+        f"never publish.\n"
+        f"\n"
+        f"The version number is NOT burnt. Make the candidate contain a\n"
+        f"commit this project's CI actually runs on:\n"
+        f"  1. Commit a change under one of this project's paths on {branch}\n"
+        f"     (its `watch` patterns feed the `filters:` block of\n"
+        f"      .github/workflows/ci-router.yml -- record the commit with\n"
+        f"      `rlsbl changelog add` as usual), or release this project\n"
+        f"     together with the commits that already touch it.\n"
+        f"  2. rlsbl release resume\n"
+        f"     -- re-pushes the new tip as the candidate, re-runs the CI gate,\n"
+        f"        and completes the SAME version ({version}) when this\n"
+        f"        project's own CI goes green on it.\n"
+        f"\n"
+        f"Do not re-run CI on the same commit expecting a different answer: a\n"
+        f"paths filter that matched nothing matches nothing every time."
+    )
+
+
 def _ci_timeout_message(*, version, tag, branch, candidate_sha, detail):
     """Remediation text for a CI wait that ran OUT OF TIME, not out of luck.
 
@@ -1076,6 +1121,8 @@ def _run_release_mutating(state: ReleaseState):
         get_ci_timeout,
         wait_for_ci_green,
         CIWaitError,
+        ProjectCINotRunError,
+        release_check_filters,
         CI_GREEN,
         CI_NOT_CONFIGURED,
         CI_TIMEOUT,
@@ -1883,10 +1930,28 @@ def _run_release_mutating(state: ReleaseState):
                     ctx.config, override=flags.get("ci-timeout"),
                 )
                 try:
+                    # The publish gate's own check-run filter for exactly the
+                    # project(s) this tag will publish. Resolved here, applied
+                    # inside the wait: one predicate, both gates.
+                    _check_filters = release_check_filters(
+                        config=ctx.config,
+                        registry=registry,
+                        project_dir=project_dir,
+                        workspace_root=monorepo_root,
+                        monorepo_name=state.monorepo_name,
+                        releasable_name=releasable_name,
+                    )
                     _verdict, _ci_results = wait_for_ci_green(
-                        candidate_sha, timeout=_ci_timeout, log=log,
+                        candidate_sha, timeout=_ci_timeout,
+                        check_filters=_check_filters, log=log,
                         config=ctx.config, repo_root=_git_root,
                     )
+                except ProjectCINotRunError as _pn:
+                    save_step_failure(_state_path, "CI_VERIFIED", str(_pn))
+                    raise ReleaseCIError(_ci_not_run_message(
+                        version=new_version, tag=tag, branch=branch,
+                        candidate_sha=candidate_sha, detail=str(_pn),
+                    ))
                 except CIWaitError as _cw:
                     save_step_failure(_state_path, "CI_VERIFIED", str(_cw))
                     raise ReleaseCIError(_ci_red_message(

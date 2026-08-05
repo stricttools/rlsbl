@@ -1387,7 +1387,7 @@ class TestCIDiscoveryBudget:
             patch("rlsbl.commands.watch.time.sleep"),
         ):
             verdict, _results = wait_for_ci_green(
-                "0" * 40, timeout=120, repo_root=str(tmp_path),
+                "0" * 40, timeout=120, check_filters=[], repo_root=str(tmp_path),
                 log=lambda _m: None,
             )
 
@@ -1421,7 +1421,7 @@ class TestCIDiscoveryBudget:
             patch("rlsbl.commands.watch.time.sleep"),
         ):
             verdict, results = wait_for_ci_green(
-                "0" * 40, timeout=120, repo_root=str(tmp_path),
+                "0" * 40, timeout=120, check_filters=[], repo_root=str(tmp_path),
                 log=lambda _m: None,
             )
 

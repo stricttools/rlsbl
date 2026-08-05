@@ -1,6 +1,5 @@
 """Monorepo sync command and all sync helpers: working-directory injection, inline CI router generation."""
 
-import glob
 import os
 import sys
 from ruamel.yaml.scalarstring import LiteralScalarString
@@ -8,6 +7,7 @@ from ruamel.yaml.scalarstring import LiteralScalarString
 import tomlkit
 
 from ...action_versions import format_action
+from ...ci_router import discover_project_ci_sources, router_ci_dest_name
 from ...ci_yaml import (
     parse_ci_workflow,
     emit_ci_workflow,
@@ -628,14 +628,9 @@ def _cmd_sync(flags, project_root):
         # --- CI workflow(s): copy + transform ---
         # Support both single ci.yml and per-target ci-{target}.yml files
         proj_wf_dir = os.path.join(root, path, ".github", "workflows")
-        ci_sources = []
-        if os.path.isdir(proj_wf_dir):
-            single = os.path.join(proj_wf_dir, "ci.yml")
-            if os.path.isfile(single):
-                ci_sources.append(single)
-            for f in sorted(glob.glob(os.path.join(proj_wf_dir, "ci-*.yml"))):
-                if os.path.basename(f) != "ci-router.yml":
-                    ci_sources.append(f)
+        # Shared with the release CI gate (rlsbl.ci_checks): the router's job
+        # keys and the gate's check-run filter must come from ONE file set.
+        ci_sources = discover_project_ci_sources(os.path.join(root, path))
 
         if not ci_sources:
             print(f"Warning: {path} has no CI workflow(s) in {proj_wf_dir}", file=sys.stderr)
@@ -650,10 +645,7 @@ def _cmd_sync(flags, project_root):
 
                 # Per-file job prefix: ci.yml -> {name}-ci,
                 # ci-{target}.yml -> {name}-ci-{target}
-                if ci_basename == "ci.yml":
-                    ci_dest_name = f"{name}-ci.yml"
-                else:
-                    ci_dest_name = f"{name}-{ci_basename}"
+                ci_dest_name = router_ci_dest_name(name, ci_basename)
 
                 # Skip if the source is a generated router (path="." self-reference)
                 ci_src_real = os.path.realpath(ci_src)

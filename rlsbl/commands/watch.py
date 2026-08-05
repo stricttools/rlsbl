@@ -9,6 +9,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from ..ci_checks import verify_project_ci_ran
 from ..utils import require_tool, run, run_gh
 from .. import effects
 
@@ -584,15 +585,15 @@ def push_triggered_workflows(repo_root=None):
     return found
 
 
-def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
-                      repo_root=None, label=None,
+def wait_for_ci_green(commit_sha, *, timeout, check_filters, log=None,
+                      config=None, repo_root=None, label=None,
                       discovery_grace=CI_DISCOVERY_GRACE_SECONDS):
     """Block until every CI run for *commit_sha* concludes.
 
     Returns ``(verdict, results)`` where verdict is one of :data:`CI_GREEN`,
     :data:`CI_RED`, :data:`CI_TIMEOUT`, or :data:`CI_NOT_CONFIGURED`.
 
-    Four explicit outcomes, no silent waits:
+    Five explicit outcomes, no silent waits:
 
     - The repository declares no push-triggered workflow -> :data:`CI_NOT_CONFIGURED`
       immediately (nothing can ever run; blocking would hang the release).
@@ -604,6 +605,19 @@ def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
       :data:`CI_TIMEOUT`. Distinct from red on purpose: nothing was proven
       about those runs, so the remedy is to check their status, not to fix
       code that may be perfectly fine.
+    - Every run concludes green, but the RELEASING PROJECT'S OWN check runs
+      were absent or did not conclude ``success`` (typically ``skipped`` by
+      the monorepo CI router's paths filter) ->
+      :class:`rlsbl.ci_checks.ProjectCINotRunError` (hard error). A green
+      workflow run is not evidence that this project's CI ran: this is the
+      exact predicate the publish gate applies later, checked here so the two
+      gates cannot disagree and tag a version that can never publish.
+
+    *check_filters* is mandatory (a list of
+    :class:`rlsbl.ci_checks.CheckFilter`, from
+    :func:`rlsbl.ci_checks.release_check_filters`) precisely because it must
+    never be forgotten: a caller that omitted it would silently re-open the
+    divergence. Pass an empty list only when there is no project to verify.
 
     *timeout* is the WHOLE budget: discovery is spent inside it and is capped
     at half of it, so the completion wait always keeps at least half.
@@ -706,7 +720,17 @@ def wait_for_ci_green(commit_sha, *, timeout, log=None, config=None,
                             retried_workflows, timeout=remaining)
             )
 
-    return _timeout_verdict(results), results
+    verdict = _timeout_verdict(results)
+
+    # The workflow runs are green -- but a run whose only job for THIS project
+    # was skipped is green too. Confirm the project's own check runs with the
+    # publish gate's own predicate before the caller is allowed to tag.
+    if verdict == CI_GREEN:
+        verify_project_ci_ran(
+            commit_sha, check_filters, cwd=repo_root, config=config, log=_log,
+        )
+
+    return verdict, results
 
 
 def run_cmd(registry, args, flags):

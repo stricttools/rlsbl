@@ -218,7 +218,7 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
     return sha
 
 
-def _batch_ci_gate(workspace_root, flags, log, sha):
+def _batch_ci_gate(workspace_root, flags, log, sha, pending):
     """Run ONE CI gate for the whole batch on the published candidate *sha*.
 
     The batch's commits were published by a single push
@@ -226,10 +226,17 @@ def _batch_ci_gate(workspace_root, flags, log, sha):
     and each is then tagged on exactly this commit -- a commit whose CI
     genuinely ran for every participating project.
 
+    "Genuinely ran" is enforced, not assumed: the gate applies every
+    participating project's OWN publish-gate check filter
+    (:func:`rlsbl.ci_checks.workspace_check_filters`) to the candidate, so a
+    member whose router job concluded ``skipped`` blocks the whole batch
+    instead of being tagged for a version its publish gate will refuse.
+
     Returns the verified SHA. Raises :class:`ReleaseValidationError` when CI is
     red, unresolved or unreachable -- the candidate stays on the branch
     untagged, nothing is finalized, and no version number is burnt.
     """
+    from ...ci_checks import ProjectCINotRunError, workspace_check_filters
     from ...utils import get_ci_timeout
     from ..watch import CI_GREEN, CI_NOT_CONFIGURED, CI_TIMEOUT, CIWaitError
 
@@ -237,10 +244,35 @@ def _batch_ci_gate(workspace_root, flags, log, sha):
     # wait, so only the CLI override applies here (no single config owns it).
     timeout = get_ci_timeout(None, override=flags.get("ci-timeout"))
     try:
+        check_filters = workspace_check_filters(
+            workspace_root, [entry[1] for entry in pending],
+        )
         verdict, results = wait_for_ci_green(
-            sha, timeout=timeout, log=log, repo_root=workspace_root,
+            sha, timeout=timeout, check_filters=check_filters, log=log,
+            repo_root=workspace_root,
             label=f"batch candidate {sha[:12]}",
         )
+    except ProjectCINotRunError as exc:
+        raise ReleaseValidationError(
+            f"CI never ran for at least one member of this batch on the "
+            f"release candidate {sha}.\n"
+            f"  {exc}\n"
+            f"\n"
+            f"This is NOT a CI failure: the workflow run went green, but that "
+            f"member's own job inside it never ran, so nothing was proven "
+            f"about the candidate for it.\n"
+            f"Nothing in this batch was tagged, released or finalized -- no "
+            f"version number was burnt. The publish gate applies the SAME "
+            f"filter, so tagging here would create tags for versions that can "
+            f"never publish.\n"
+            f"\n"
+            f"Make the candidate contain a commit each listed project's CI "
+            f"actually runs on -- commit a change under its paths on the "
+            f"release branch (its `watch` patterns feed the `filters:` block "
+            f"of .github/workflows/ci-router.yml) -- then re-run `rlsbl "
+            f"monorepo release run`: each member resumes at its own unchanged "
+            f"version."
+        ) from exc
     except CIWaitError as exc:
         raise ReleaseValidationError(str(exc)) from exc
 
@@ -666,7 +698,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                     trail=_batch_release_trail(pending, inline_commits),
                 )
                 verified_sha = _batch_ci_gate(
-                    workspace_root, flags, log, candidate_sha,
+                    workspace_root, flags, log, candidate_sha, pending,
                 )
             except ForeignCommitError as e:
                 # A ride-in on the batch tip. Never rolled back: those commits
@@ -877,7 +909,7 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                     trail=_batch_release_trail(pending, inline_commits),
                 )
                 verified_sha = _batch_ci_gate(
-                    workspace_root, flags, log, candidate_sha,
+                    workspace_root, flags, log, candidate_sha, pending,
                 )
             except ForeignCommitError as e:
                 # A ride-in on the batch tip. Never rolled back: those commits

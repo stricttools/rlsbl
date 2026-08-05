@@ -115,6 +115,26 @@ def ci_check_regex_for_targets(targets: list[str]) -> str:
     return rf"^({alternation})( \(.*\))?$"
 
 
+def gate_targets_from_config(config: dict | None, registry: str | None) -> list[str]:
+    """Target names a standalone project's publish gate filter covers.
+
+    Config target entries may be dicts (``{"name": ..., "path": ...}``) for
+    subdirectory targets; this reduces them to bare names and appends the
+    primary registry. Shared by scaffold (which bakes the regex into the
+    generated publish workflow) and the release CI gate (which must apply the
+    SAME filter before tagging), so neither can gate on a different target
+    set than the other.
+    """
+    targets: list[str] = []
+    for entry in (config or {}).get("targets") or []:
+        name = entry.get("name") if isinstance(entry, dict) else entry
+        if name and name not in targets:
+            targets.append(name)
+    if registry and registry not in targets:
+        targets.append(registry)
+    return targets
+
+
 # The poll loop. Reads only environment provided by the runner and the gate
 # job env (CI_CHECK_REGEX, GATE_*): no GitHub expressions, no event payload.
 GATE_POLL_SCRIPT = """\

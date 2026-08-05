@@ -1789,18 +1789,13 @@ def run_cmd(registry, args, flags, ctx):
         # Publish gate: publish workflows wait for this repo's CI check
         # runs on the release commit. The filter covers every scaffolded
         # target's CI job names.
-        from ..publish_gate import ci_check_regex_for_targets, gate_job_template_snippet
-        # Config target entries may be dicts ({"name": ..., "path": ...}) for
-        # subdir targets; reduce to bare names before building the CI regex.
-        gate_targets = []
-        for t in (ctx.config or {}).get("targets") or []:
-            name = t.get("name") if isinstance(t, dict) else t
-            if name and name not in gate_targets:
-                gate_targets.append(name)
-        if registry not in gate_targets:
-            gate_targets.append(registry)
+        from ..publish_gate import (
+            ci_check_regex_for_targets,
+            gate_job_template_snippet,
+            gate_targets_from_config,
+        )
         vars_dict["publishGate"] = gate_job_template_snippet(
-            ci_check_regex_for_targets(gate_targets)
+            ci_check_regex_for_targets(gate_targets_from_config(ctx.config, registry))
         )
 
         # Process registry-specific templates (CI only, no publish).

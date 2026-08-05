@@ -62,6 +62,10 @@ from ..watch import (  # noqa: F401  (re-exported for execute.py's late-bound im
     CIWaitError,
     wait_for_ci_green,
 )
+from ...ci_checks import (  # noqa: F401  (same late-bound re-export path)
+    ProjectCINotRunError,
+    release_check_filters,
+)
 from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfblog_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config
 from .validate import (

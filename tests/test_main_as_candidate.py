@@ -312,7 +312,8 @@ class TestNoCIConfigured:
 
         assert push_triggered_workflows(str(tmp_project)) == []
         verdict, results = wait_for_ci_green(
-            "0" * 40, timeout=1, repo_root=str(tmp_project), log=lambda _m: None,
+            "0" * 40, timeout=1, check_filters=[], repo_root=str(tmp_project),
+            log=lambda _m: None,
         )
         assert verdict == CI_NOT_CONFIGURED
         assert results == []
@@ -344,7 +345,8 @@ class TestNoCIConfigured:
         ):
             with pytest.raises(CIWaitError) as exc:
                 wait_for_ci_green(
-                    "0" * 40, timeout=5, repo_root=str(tmp_path),
+                    "0" * 40, timeout=5, check_filters=[],
+                    repo_root=str(tmp_path),
                     discovery_grace=0, log=lambda _m: None,
                 )
         assert "ci.yml" in str(exc.value)
