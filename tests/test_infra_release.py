@@ -9,6 +9,7 @@ import tomlkit
 from conftest import run_git as _run_git, make_commit as _make_commit
 from rlsbl.changelog.generate import (
     _read_release_metadata_full,
+    generate_changelog,
     generate_version_section,
 )
 from rlsbl.changelog.schema import ChangelogEntry
@@ -178,6 +179,74 @@ class TestGenerateVersionSectionInfra:
         assert "- Fix timeout bug" in md
         assert "Root cause was a race condition" in md
         assert "No user-facing changes." not in md
+
+
+class TestInfraChangelogAssembly:
+    """The CHANGELOG.md ASSEMBLER must emit an infra release's section.
+
+    The renderer above was always correct; the assembler
+    (``generate_changelog``) skipped the section whenever unreleased.jsonl had
+    no entries -- which is exactly the shape of every infra release, since
+    user-facing entries are forbidden for that bump type. The result was that
+    every infra release fleet-wide shipped a CHANGELOG.md with no ``## X.Y.Z``
+    heading at all.
+    """
+
+    def _changes_dir(self, tmp_path):
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        return changes
+
+    def test_prerelease_assembly_emits_infra_section(self, tmp_path, monkeypatch):
+        """The pre-finalization call (empty unreleased.jsonl + version_override)
+        renders the infra section that gets committed as CHANGELOG.md."""
+        monkeypatch.chdir(tmp_path)
+        changes = self._changes_dir(tmp_path)
+        (changes / "unreleased.jsonl").write_text("")
+        (changes / "0.14.0.jsonl").write_text(
+            '{"commits":["aaa"],"user_facing":true,'
+            '"description":"A feature","type":"feature"}\n'
+        )
+
+        content = generate_changelog(
+            str(tmp_path),
+            version_override="0.14.1",
+            description="Re-publish after a broken artifact scan.",
+            bump_type="infra",
+        )
+
+        assert "## 0.14.1" in content
+        section = content[content.index("## 0.14.1"):content.index("## 0.14.0")]
+        assert "### Infrastructure" in section
+        assert "- Re-publish after a broken artifact scan." in section
+
+    def test_finalized_infra_version_regenerates_from_archive(
+        self, tmp_path, monkeypatch,
+    ):
+        """The heal path: a FINALIZED infra release (0-byte ``x.y.z.jsonl``)
+        regenerates its section from the archived release file, so a repo whose
+        CHANGELOG.md lost the section is repaired by ``changelog generate``."""
+        monkeypatch.chdir(tmp_path)
+        changes = self._changes_dir(tmp_path)
+        (changes / "unreleased.jsonl").write_text("")
+        (changes / "0.1.1.jsonl").write_text("")
+        (changes / "0.1.0.jsonl").write_text(
+            '{"commits":["aaa"],"user_facing":true,'
+            '"description":"Initial","type":"feature"}\n'
+        )
+        releases = tmp_path / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        doc = tomlkit.document()
+        doc.add("bump", "infra")
+        doc.add("description", "Scaffold refresh.")
+        (releases / "v0.1.1.toml").write_text(tomlkit.dumps(doc))
+
+        content = generate_changelog(str(tmp_path))
+
+        assert "## 0.1.1" in content
+        section = content[content.index("## 0.1.1"):content.index("## 0.1.0")]
+        assert "### Infrastructure" in section
+        assert "- Scaffold refresh." in section
 
 
 class TestLegacyHotfixArchiveHardError:

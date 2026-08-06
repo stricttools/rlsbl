@@ -394,10 +394,11 @@ def generate_changelog(
     modifying the filesystem. This lets callers preview the changelog before
     pre-release checks run, so an aborted release leaves a clean working tree.
 
-    When version_override is provided AND unreleased entries exist, the section
-    heading is "## {version_override}" instead of "## Unreleased". Versioned
-    sections (from existing JSONL files) are unaffected. Default None preserves
-    the original behaviour exactly.
+    When version_override is provided, the section heading is
+    "## {version_override}" instead of "## Unreleased", and the section is
+    emitted even when unreleased.jsonl is empty (that is what an infra release
+    is). Versioned sections (from existing JSONL files) are unaffected. With
+    version_override None and no unreleased entries, no section is emitted.
 
     ``description`` and ``context`` are applied to the unreleased section only
     (the current release being prepared). Previously released version sections
@@ -426,9 +427,17 @@ def generate_changelog(
     changes_dir = changes_dir_override or get_changes_dir(project_path)
     sections: list[str] = []
 
-    # Unreleased entries
+    # Unreleased entries.
+    #
+    # A version_override means a release is being assembled, and that section
+    # is emitted whether or not unreleased.jsonl has entries: an EMPTY
+    # unreleased.jsonl is precisely what an infra release looks like (it
+    # forbids user-facing entries), and skipping it shipped every infra
+    # release with no CHANGELOG.md section at all. With no override, an empty
+    # file still emits nothing -- a bare "## Unreleased / No user-facing
+    # changes." block would be noise.
     unreleased = read_unreleased(changes_dir)
-    if unreleased:
+    if unreleased or version_override:
         heading = version_override if version_override else "Unreleased"
         sections.append(generate_version_section(
             heading, unreleased, description=description, context=context,

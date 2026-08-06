@@ -591,8 +591,15 @@ class TestGenerateChangelog:
         assert "## 2.0.0" in content
         assert "## 1.0.0" in content
 
-    def test_version_override_with_no_unreleased_entries_is_noop(self, tmp_path, monkeypatch):
-        """When unreleased.jsonl is empty, version_override has no effect."""
+    def test_version_override_with_no_unreleased_entries_still_emits_section(
+        self, tmp_path, monkeypatch,
+    ):
+        """An empty unreleased.jsonl still gets a ``## X.Y.Z`` section.
+
+        An empty unreleased.jsonl is the DEFINITION of an infra release
+        (user-facing entries are forbidden there), so skipping the section
+        meant every infra release shipped a CHANGELOG.md with no entry at all.
+        """
         monkeypatch.chdir(tmp_path)
         changes = tmp_path / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
@@ -603,8 +610,54 @@ class TestGenerateChangelog:
         )
 
         content = generate_changelog(str(tmp_path), version_override="9.9.9")
-        # No section heading for the override since there were no unreleased entries
-        assert "## 9.9.9" not in content
+        assert "## 9.9.9" in content
+        assert "## Unreleased" not in content
+        assert "## 1.0.0" in content
+        # The override section leads the file, ahead of the released versions.
+        assert content.index("## 9.9.9") < content.index("## 1.0.0")
+
+    def test_infra_release_with_empty_unreleased_renders_infrastructure(
+        self, tmp_path, monkeypatch,
+    ):
+        """Red-green: an infra release (empty JSONL) produces ``## X.Y.Z`` plus
+        an ``### Infrastructure`` block carrying the release description."""
+        monkeypatch.chdir(tmp_path)
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+        (changes / "0.1.0.jsonl").write_text(
+            _jsonl_line(
+                commits=["a"], user_facing=True, description="First", type="feature",
+            ) + "\n"
+        )
+
+        content = generate_changelog(
+            str(tmp_path),
+            version_override="0.1.1",
+            description="Scaffold refresh across all workflows.",
+            bump_type="infra",
+        )
+
+        assert "## 0.1.1" in content
+        section = content[content.index("## 0.1.1"):content.index("## 0.1.0")]
+        assert "### Infrastructure" in section
+        assert "- Scaffold refresh across all workflows." in section
+        assert "No user-facing changes." not in section
+
+    def test_no_version_override_and_empty_unreleased_emits_nothing(
+        self, tmp_path, monkeypatch,
+    ):
+        """Negative control: without version_override an empty unreleased.jsonl
+        must NOT produce a stray ``## Unreleased`` section."""
+        monkeypatch.chdir(tmp_path)
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+        (changes / "1.0.0.jsonl").write_text(
+            _jsonl_line(commits=["a"], user_facing=True, description="Feat", type="feature") + "\n"
+        )
+
+        content = generate_changelog(str(tmp_path))
         assert "## Unreleased" not in content
         assert "## 1.0.0" in content
 
