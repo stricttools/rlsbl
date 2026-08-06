@@ -1,6 +1,7 @@
 """Release execution: version bump, commit, tag, push, GitHub Release creation, JSONL changelog finalization, and post-release hook invocation."""
 
 import dataclasses
+import fnmatch
 import json
 import os
 import re
@@ -158,6 +159,209 @@ def _ci_timeout_message(*, version, tag, branch, candidate_sha, detail):
         f"\n"
         f"Do not start a new release at a higher version to escape a slow CI."
     )
+
+
+def _empty_candidate_window_message(*, version, tag, branch, candidate_sha,
+                                    base_sha, patterns, changed, pushing):
+    """Remediation for a candidate whose push cannot trigger this project's CI.
+
+    Same terminal state as :func:`_ci_not_run_message` and the same remedy --
+    but reached BEFORE the push and before the CI wait, from the diff alone,
+    so the operator learns it in a second instead of after a full CI cycle.
+    """
+    listed = "\n".join(f"    {p}" for p in patterns) or "    (none)"
+    seen = "\n".join(f"    {p}" for p in sorted(changed)[:10]) or "    (nothing)"
+    if len(changed) > 10:
+        seen += f"\n    ... and {len(changed) - 10} more"
+    window = (
+        f"the push about to happen ({base_sha[:12]}..{candidate_sha[:12]})"
+        if pushing else
+        f"the push that already published this commit "
+        f"({base_sha[:12]}..{candidate_sha[:12]})"
+    )
+    return (
+        f"the release candidate for {version} cannot trigger this project's "
+        f"CI, so its gate could never pass.\n"
+        f"  Candidate commit: {candidate_sha}\n"
+        f"  Diff window: {window}\n"
+        f"\n"
+        f"The generated CI router filters each project's job by the paths a "
+        f"push touched, and nothing in that window matches this project's "
+        f"filters:\n"
+        f"  Filters:\n{listed}\n"
+        f"  Changed in the window:\n{seen}\n"
+        f"\n"
+        f"Its CI job would conclude `skipped`, and the publish gate refuses a "
+        f"skipped check (correctly -- it proves nothing about the commit), so "
+        f"{tag} would exist for a version that can never publish. Refused here "
+        f"rather than after a full CI wait that can only end one way.\n"
+        f"\n"
+        f"Nothing was pushed, tagged, released or finalized -- the version "
+        f"number is NOT burnt. Make the candidate contain a commit this "
+        f"project's CI runs on:\n"
+        f"  1. Commit a change under one of the paths above on {branch}\n"
+        f"     (they are the project's `path` and `watch` patterns, which feed\n"
+        f"      the `filters:` block of .github/workflows/ci-router.yml --\n"
+        f"      record the commit with `rlsbl changelog add` as usual), or\n"
+        f"     release this project together with the commits that touch it.\n"
+        f"  2. rlsbl release resume\n"
+        f"     -- re-pushes the new tip as the candidate and completes the SAME\n"
+        f"        version ({version})."
+    )
+
+
+def _router_pattern_matches(path, pattern):
+    """Does repo-relative *path* match one dorny/paths-filter pattern?
+
+    The router emits two shapes: a directory globstar (``packages/core/**``,
+    from the project's ``path``) and arbitrary globs (from ``watch``, plus the
+    releasable's CHANGELOG artifact). The globstar is a prefix test -- picomatch
+    matches direct children as well as nested ones -- and everything else goes
+    through ``fnmatch``, the same approximation ``file_matches_project`` uses
+    for watch globs.
+    """
+    if pattern.endswith("/**"):
+        prefix = pattern[: -len("/**")].rstrip("/")
+        return path == prefix or path.startswith(prefix + "/")
+    return fnmatch.fnmatch(path, pattern)
+
+
+def _release_router_patterns(monorepo_root, monorepo_name, releasable_name):
+    """Router filter patterns for every project the release's tag publishes.
+
+    The same set :func:`rlsbl.ci_checks.release_check_filters` builds for the
+    CI gate: the releasing project, plus every member of its releasable in
+    explicit mode. One tag publishes all of them, so every one of their CI
+    jobs has to have run on the candidate.
+    """
+    from ...workspace import load_releasables, load_workspace, members_of
+    from ..monorepo.sync import router_filter_patterns
+
+    projects = load_workspace(str(monorepo_root))
+    releasables = load_releasables(str(monorepo_root), projects)
+    wanted = {monorepo_name}
+    if releasable_name:
+        wanted |= {m["name"] for m in members_of(releasable_name, projects)}
+
+    patterns = []
+    for project in projects:
+        if project["name"] in wanted:
+            patterns.extend(router_filter_patterns(project, releasables))
+    return patterns
+
+
+def _git_read(args, *, cwd):
+    """Run a read-only git command, or return None when it cannot answer.
+
+    Goes through ``effects.run`` rather than the release flow's late-bound
+    ``run`` for the same reason :func:`head_sha` does: this is guard
+    bookkeeping, and it must never consume a mock side effect or shift a call
+    sequence in tests that stub the release's git calls.
+
+    ``None`` means "git declined" -- typically a SHA the local clone does not
+    have (a remote head that was never fetched). That is not evidence about
+    the window either way, so the caller falls through to the CI gate, which
+    remains the authority. A missing git binary or an internal bug raises.
+    """
+    result = effects.run(
+        ["git"] + list(args), capture_output=True, text=True, cwd=cwd,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def _diff_names(base_sha, head_sha_, *, cwd):
+    """Repo-relative paths changed between two commits, or None if unknowable."""
+    out = _git_read(["diff", "--name-only", f"{base_sha}..{head_sha_}"], cwd=cwd)
+    if out is None:
+        return None
+    return {line.strip() for line in out.splitlines() if line.strip()}
+
+
+def _widened_window_base(state_path, *, cwd):
+    """The parent of the earliest commit this release created, or None.
+
+    Used when the candidate is ALREADY on the remote: no push is about to
+    happen, so the CI run that will be examined is the one an earlier push
+    triggered, and its own before-SHA is not knowable locally. The release's
+    own commit trail is the best statement of what that push carried, so the
+    window widens to start just before the version-bump commit.
+    """
+    state = load_release_state(state_path) or {}
+    trail = [sha for sha in (state.get("release_commits") or []) if sha]
+    for sha in trail:
+        parent = _git_read(["rev-parse", f"{sha}^"], cwd=cwd)
+        if parent:
+            return parent.strip()
+    return None
+
+
+def _guard_empty_candidate_window(*, candidate_sha, remote_head, needs_push,
+                                  state_path, monorepo_root, monorepo_name,
+                                  releasable_name, version, tag, branch,
+                                  cwd, log):
+    """Refuse a candidate whose diff window cannot trigger this project's CI.
+
+    The generated monorepo router gates each project's CI job on a
+    dorny/paths-filter over the paths a push touched, computed against the
+    push's own before-SHA. When the window matches none of a project's
+    patterns its job concludes ``skipped``, the publish gate refuses the
+    skipped check, and the release deadlocks -- after a full CI wait, which is
+    the expensive part. The most common way to land there is a resume: the
+    candidate was already pushed, the fix commit touches somebody else's
+    paths, and the new window no longer contains the version bump at all.
+
+    Only monorepo projects have a router, so a standalone repository (whose CI
+    runs on every push) is not guarded. Neither is a branch with no remote
+    head -- there is no before-SHA, hence no window to reason about.
+
+    Raises :class:`ReleaseCIError`: nothing is pushed, tagged or finalized, the
+    state stays resumable, and the version is not burnt.
+    """
+    if not (monorepo_root and monorepo_name):
+        return
+    if not remote_head:
+        return
+
+    patterns = _release_router_patterns(
+        monorepo_root, monorepo_name, releasable_name,
+    )
+    if not patterns:
+        return
+
+    base_sha = remote_head
+    if not needs_push:
+        # The candidate is already the remote head: the run that will be
+        # examined came from the push that put it there.
+        base_sha = _widened_window_base(state_path, cwd=cwd) or remote_head
+
+    changed = _diff_names(base_sha, candidate_sha, cwd=cwd)
+    if changed is None:
+        # git declined the range (typically a remote head this clone never
+        # fetched). Not evidence of an empty window -- but say so, because a
+        # guard that quietly turns itself off is the shape this whole class of
+        # bug hides in. The CI gate below remains the authority.
+        print(
+            f"rlsbl: could not compute the candidate's diff window "
+            f"({base_sha[:12]}..{candidate_sha[:12]}); the router-filter "
+            f"pre-check is skipped and the CI gate decides.",
+            file=sys.stderr,
+        )
+        return
+    if any(
+        _router_pattern_matches(path, pattern)
+        for path in changed for pattern in patterns
+    ):
+        return
+
+    detail = _empty_candidate_window_message(
+        version=version, tag=tag, branch=branch, candidate_sha=candidate_sha,
+        base_sha=base_sha, patterns=patterns, changed=changed,
+        pushing=needs_push,
+    )
+    save_step_failure(state_path, "CI_VERIFIED", "empty candidate window")
+    raise ReleaseCIError(detail)
 
 
 # The publish gate's only precise statement of which commit CI must be green
@@ -1932,6 +2136,7 @@ def _run_release_mutating(state: ReleaseState):
             save_release_state(_state_path, _cand_state)
 
             _cand_needs_push = True
+            _remote_head = None
             try:
                 _ls_out = run(
                     "git", ["ls-remote", "origin", f"refs/heads/{branch}"]
@@ -1945,6 +2150,21 @@ def _run_release_mutating(state: ReleaseState):
 
             _guard_foreign_commits(
                 _pin_sha, _state_path, cwd=_git_root, phase="candidate push",
+            )
+            # Pre-push: a candidate whose diff window matches none of this
+            # project's router filters can only end in a skipped CI job and a
+            # refused publish gate. Refuse it here, from the diff, rather than
+            # after the minutes-long wait that can only confirm it.
+            _guard_empty_candidate_window(
+                candidate_sha=candidate_sha,
+                remote_head=_remote_head,
+                needs_push=_cand_needs_push,
+                state_path=_state_path,
+                monorepo_root=monorepo_root,
+                monorepo_name=state.monorepo_name,
+                releasable_name=releasable_name,
+                version=new_version, tag=tag, branch=branch,
+                cwd=_git_root, log=log,
             )
             if _cand_needs_push:
                 candidate_push_attempted = True
