@@ -38,7 +38,47 @@ dev = [
     "pytest-cov>=5.0",
     "pytest-xdist>=3.5",
     "ruff>=0.15.20",
+    # rlsbl distributes the stricttest floor's outer layer (the bwrap runner and
+    # the stricttest-floor check), so it runs the published plugin rather than a
+    # private copy of it. Floor at the version that first shipped every ini key
+    # used below (the five safety keys plus threshold / tmp_prefix / git
+    # identity / preserve).
+    "stricttest>=0.1.1",
 ]
+
+# The stricttest floor's configuration. Installing the plugin IS adoption: the
+# five safety keys are required and a missing one aborts the session.
+#
+# Stances, and why:
+#   sockets = deny        the suite reaches no network. Every outward call
+#                         (urlopen, socket.create_connection, gh, the registry
+#                         probes) is mocked; the sandbox has no network at all.
+#   *_allowlist = []      nothing is exempt from the above.
+#   loopback = deny       no test binds or dials a local port.
+#   sandbox_required      rlsbl HAS the runner (scripts/test.sh, emitted from
+#                         the test_sandbox config family), so the bare-run
+#                         threshold is enforced.
+#   threshold = 50        a targeted run (one file, a -k slice) stays bare-
+#                         runnable for iteration speed; anything bigger must go
+#                         through the sandbox.
+#   tmp_prefix            names rlsbl's throwaway env dirs recognizably.
+#   git identity          the session commit identity real-git fixtures inherit
+#                         when they configure none of their own.
+#   preserve              toolchain caches that must survive the HOME repoint:
+#                         the Go caches (the safegit_bin fixture go-installs the
+#                         pinned binary) and PYTHONUSERBASE (the extract/absorb
+#                         tests shell out to a system-python git-filter-repo).
+[tool.pytest.ini_options]
+stricttest_sockets = "deny"
+stricttest_socket_allowlist = []
+stricttest_unix_socket_allowlist = []
+stricttest_loopback = "deny"
+stricttest_sandbox_required = "true"
+stricttest_threshold = "50"
+stricttest_tmp_prefix = "rlsbl-test-env-"
+stricttest_git_user_name = "rlsbl-test"
+stricttest_git_user_email = "rlsbl-test@example.invalid"
+stricttest_preserve = ["go_path", "go_mod_cache", "go_cache", "python_user_base"]
 
 [tool.coverage.run]
 source = ["rlsbl"]

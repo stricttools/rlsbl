@@ -2,10 +2,8 @@
 
 import json
 import os
-import re
 import shutil
 import subprocess
-import tempfile
 import time
 import types
 from pathlib import Path
@@ -17,258 +15,27 @@ import pytest
 # ---------------------------------------------------------------------------
 # Three-layer test sandbox
 #
-# Layer 1 (this module, always-on): an env-poisoning floor installed in
-# ``pytest_configure`` so it binds before any test body or fixture runs. It
-# neutralizes every ambient credential / network / global-config vector so a
-# test can never reach the real developer identity, SSH agent, GitHub token,
-# or user/global git config -- see ``_install_env_poisoning_floor``.
+# Layer 1 (the ``stricttest`` pytest plugin, always-on): the env-poisoning
+# floor, the socket guard, the autouse tmp-cwd chdir, the push guard, the
+# TMPDIR-inside-repo refusal and the bare-run threshold. The plugin binds them
+# in ``pytest_load_initial_conftests`` -- before this module is even imported --
+# and is configured entirely from ``[tool.pytest.ini_options]`` in
+# pyproject.toml. rlsbl distributes that floor's outer layer, so it runs the
+# published plugin instead of a private copy; the guards below are the ones
+# that are genuinely rlsbl-specific and have no plugin equivalent.
 #
 # Layer 2 (scripts/test.sh): a bwrap sandbox that runs the FULL suite with the
 # real repo bound read-only, a writable ephemeral copy as cwd, private tmpfs
-# TMPDIR, and no network. It exports ``RLSBL_TEST_SANDBOX=1``. A bare-pytest
-# refusal (``pytest_collection_modifyitems`` below) blocks full-suite runs that
-# are NOT inside the sandbox, while keeping small targeted runs bare-runnable.
+# TMPDIR, and no network. It exports ``STRICTTEST_SANDBOX=1``, which lifts the
+# plugin's bare-run refusal (``stricttest_sandbox_required = true``) for
+# full-ish runs while keeping small targeted runs bare-runnable.
 #
 # Layer 3 (CI): the CI workflow runs the suite job inside the same bwrap
 # sandbox via scripts/test.sh.
 # ---------------------------------------------------------------------------
 
-# Session temp dir holding the Layer-1 throwaway HOME / git config. Created in
-# pytest_configure, removed in pytest_unconfigure. One per process (each xdist
-# worker installs its own, fully isolated).
-_SESSION_ENV_DIR = None
-
-# Layer-2 bare-pytest refusal threshold. A run collecting MORE than this many
-# tests is treated as a full-ish run and must go through scripts/test.sh (which
-# sets RLSBL_TEST_SANDBOX=1). Small targeted runs (a single file, a -k slice)
-# stay bare-runnable for fast inner-loop iteration -- the always-on Layer-1
-# floor plus the push/chdir guards still protect those.
-_SANDBOX_FULL_RUN_THRESHOLD = 50
-
-
-def _install_env_poisoning_floor():
-    """Layer 1: install the always-on env-poisoning floor (idempotent).
-
-    Runs once per process from ``pytest_configure`` (including each xdist
-    worker), before any test body or fixture executes. ``os.environ`` is
-    mutated directly rather than via ``monkeypatch`` because the floor is
-    session-wide and must outlive every individual test.
-    """
-    global _SESSION_ENV_DIR
-    if _SESSION_ENV_DIR is not None:
-        return
-
-    real_home = os.environ.get("HOME", "")
-
-    # Preserve the Go toolchain caches BEFORE repointing HOME. The module
-    # cache, build cache, and GOPATH all default to locations under the real
-    # HOME; a throwaway HOME would send Go into a cold rebuild and the
-    # ``safegit_bin`` fixture (go install of the pinned safegit) would refetch
-    # every dependency. Pin them explicitly at the real persistent locations.
-    gopath = os.environ.get("GOPATH") or (f"{real_home}/go" if real_home else None)
-    if gopath:
-        os.environ["GOPATH"] = gopath
-        os.environ.setdefault("GOMODCACHE", f"{gopath}/pkg/mod")
-    if real_home:
-        os.environ.setdefault("GOCACHE", f"{real_home}/.cache/go-build")
-
-    # Preserve the Python user-site base BEFORE repointing HOME. Tools like
-    # git-filter-repo install their importable module into
-    # ``$HOME/.local/lib/pythonX/site-packages`` (user site, derived from HOME).
-    # The extract / absorb / commit-map tests shell out to ``git filter-repo``
-    # (a system-python script that does ``import git_filter_repo``); a throwaway
-    # HOME would hide that module and the tool would die with ModuleNotFoundError.
-    # Pinning PYTHONUSERBASE keeps the real user site reachable regardless of
-    # HOME. This is toolchain preservation (like the Go caches above), not a
-    # credential vector -- user site holds packages, not secrets. The rlsbl test
-    # venv disables user site, so this cannot leak packages into the suite's own
-    # imports; it only matters for the system-python subprocesses git spawns.
-    if real_home:
-        os.environ.setdefault("PYTHONUSERBASE", f"{real_home}/.local")
-
-    session_dir = Path(tempfile.mkdtemp(prefix="rlsbl-test-env-"))
-    _SESSION_ENV_DIR = session_dir
-
-    # Throwaway HOME + XDG dirs so nothing reads (or writes) real dotfiles.
-    home = session_dir / "home"
-    home.mkdir()
-    (session_dir / "xdg-config").mkdir()
-    (session_dir / "xdg-data").mkdir()
-    os.environ["HOME"] = str(home)
-    os.environ["XDG_CONFIG_HOME"] = str(session_dir / "xdg-config")
-    os.environ["XDG_DATA_HOME"] = str(session_dir / "xdg-data")
-
-    # Throwaway git global + system config. Carries protocol.ssh.allow=never
-    # and a session commit identity so real-git fixtures that skip per-repo
-    # identity still commit.
-    #
-    # We deliberately do NOT set core.hooksPath here. core.hooksPath overrides
-    # REPO-LOCAL hooks too, which would silently disable the suite's real
-    # pre-push-hook tests (test_hook_v5_e2e, test_pre_push_check, ...). A global
-    # config cannot inject hooks on its own, so simply having no hooks entry in
-    # the throwaway global config is sufficient to keep real user/global hooks
-    # from firing -- and omitting hooksPath is required to keep the repo-local
-    # hook tests working.
-    gitconfig = session_dir / "gitconfig"
-    gitconfig.write_text(
-        "[user]\n"
-        "\tname = rlsbl-test\n"
-        "\temail = rlsbl-test@example.invalid\n"
-        '[protocol "ssh"]\n'
-        "\tallow = never\n"
-        "[init]\n"
-        "\tdefaultBranch = main\n"
-    )
-    os.environ["GIT_CONFIG_GLOBAL"] = str(gitconfig)
-    os.environ["GIT_CONFIG_SYSTEM"] = str(gitconfig)
-
-    # Transport lockdown: only the local ``file`` protocol may be used by git;
-    # ssh / proxy invocations hard-fail; no interactive or credential prompt
-    # can ever block a test or leak a real credential.
-    os.environ["GIT_ALLOW_PROTOCOL"] = "file"
-    os.environ["GIT_SSH_COMMAND"] = "/bin/false"
-    os.environ["GIT_PROXY_COMMAND"] = "/bin/false"
-    os.environ["GIT_TERMINAL_PROMPT"] = "0"
-    os.environ["GIT_ASKPASS"] = "/bin/false"
-
-    # Kill ambient credentials outright: no SSH agent socket, no GitHub token.
-    # Per-test ``mock_gh`` fixtures re-set a fake GITHUB_TOKEN via monkeypatch
-    # for the tests that need one.
-    os.environ.pop("SSH_AUTH_SOCK", None)
-    os.environ.pop("GITHUB_TOKEN", None)
-    os.environ.pop("GH_TOKEN", None)
-
-
-def pytest_unconfigure(config):
-    """Tear down the Layer-1 throwaway env directory for this process."""
-    global _SESSION_ENV_DIR
-    if _SESSION_ENV_DIR is not None:
-        shutil.rmtree(_SESSION_ENV_DIR, ignore_errors=True)
-        _SESSION_ENV_DIR = None
-
-
-def _enforce_sandbox_threshold(count):
-    """Raise ``UsageError`` if a bare run of ``count`` tests is too large.
-
-    No-op when inside the sandbox (``RLSBL_TEST_SANDBOX=1``) or when the run is
-    a small targeted slice (``count <= _SANDBOX_FULL_RUN_THRESHOLD``).
-    """
-    if os.environ.get("RLSBL_TEST_SANDBOX") == "1":
-        return
-    if count <= _SANDBOX_FULL_RUN_THRESHOLD:
-        return
-    raise pytest.UsageError(
-        f"Refusing to run {count} tests bare (> {_SANDBOX_FULL_RUN_THRESHOLD}). "
-        "A full-ish suite run must go through the bwrap sandbox:\n\n"
-        "    scripts/test.sh\n\n"
-        "The sandbox binds the real repo read-only, runs in a writable throwaway "
-        "copy on a private tmpfs, and has no network -- so a stray real git push, "
-        "an unanchored commit into the dev repo, or a live API call is physically "
-        "impossible. Small targeted runs stay allowed bare for iteration speed "
-        f"(<= {_SANDBOX_FULL_RUN_THRESHOLD} tests: a single file or a -k slice). "
-        "To run the full suite, use scripts/test.sh."
-    )
-
-
-@pytest.hookimpl(trylast=True)
-def pytest_collection_modifyitems(config, items):
-    """Layer 2: refuse a bare full-ish run outside the bwrap sandbox.
-
-    Small targeted runs stay allowed bare so the inner development loop (run one
-    file, a ``-k`` slice) is fast; the dangerous full-suite class -- real git,
-    real subprocesses, thousands of fixtures -- is sandbox-only.
-
-    ``trylast`` so this runs AFTER pytest's own ``-k`` / ``-m`` deselection,
-    which mutates ``items`` in place -- the count then reflects the SELECTED
-    tests, so a ``-k`` slice of a big file stays under the threshold and runs
-    bare instead of being refused on the pre-deselection total.
-
-    Enforcement is split by execution topology:
-    - Single process (no xdist): ``items`` is the full set here -- enforce.
-    - xdist worker (``PYTEST_XDIST_WORKER`` set): a shard; defer to the
-      controller so the error surfaces once, not once per worker.
-    - xdist controller (``numprocesses`` set): ``items`` is empty here because
-      workers do the collecting -- defer to
-      ``pytest_xdist_node_collection_finished`` which sees the real count.
-    """
-    if os.environ.get("PYTEST_XDIST_WORKER"):
-        return
-    if getattr(config.option, "numprocesses", None):
-        return
-    _enforce_sandbox_threshold(len(items))
-
-
-def pytest_xdist_node_collection_finished(node, ids):
-    """Layer 2 (xdist controller): enforce the threshold once collection lands.
-
-    The controller does not collect items itself; each worker reports its
-    collected ``ids`` here. All workers collect the same full set, so the first
-    report carries the true test count -- enforce on it.
-    """
-    _enforce_sandbox_threshold(len(ids))
-
-
-# ---------------------------------------------------------------------------
-# Structural push-guard: make a real ``git push`` to a NON-LOCAL remote
-# impossible from the test suite.
-#
-# Forensics found a test that mocked the undo command's ``run``/``run_gh`` but
-# NOT ``push_if_needed``/``get_current_branch``, so a full-suite run executed a
-# REAL ``git push origin main`` from the real rlsbl dev repo. This guard closes
-# that class of bug at the innermost real-execution boundary (``subprocess.Popen``,
-# which ``subprocess.run`` funnels through). Tests that mock ``subprocess.run``
-# in some namespace never reach Popen, so the guard composes with existing mock
-# layering instead of fighting it. Local filesystem paths and ``file://`` URLs
-# are ALLOWED -- the suite's fixtures push to local bare repos constantly.
-#
-# ``pytest.fail`` raises ``Failed`` (a ``BaseException`` subclass), so it slips
-# past production ``except Exception`` handlers and surfaces loudly even when a
-# caller would otherwise swallow the push error.
-# ---------------------------------------------------------------------------
-
 # Repo root (parent of the tests/ directory holding this conftest).
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-def pytest_configure(config):
-    """Session guard: refuse to run if the temp root is inside the repository.
-
-    The Jul junk-commit incidents happened because a TMPDIR (or pytest
-    basetemp) pointed inside the repo: fixtures created non-git directories
-    there, and unanchored git commands walked UP into the real repo and
-    committed junk. Fail loudly at startup rather than let that recur.
-    """
-    config.addinivalue_line(
-        "markers",
-        "repo_cwd: opt a test OUT of the autouse tmp-cwd isolation. Reserved "
-        "for the irreducible CLI-wiring tests that dispatch commands through "
-        "app.test() and must resolve the real rlsbl project from the process "
-        "cwd (and record strictcli coverage into the App-construction repo).",
-    )
-    candidates = []
-    basetemp = getattr(config.option, "basetemp", None)
-    if basetemp:
-        candidates.append(Path(basetemp))
-    tmpdir = os.environ.get("TMPDIR")
-    if tmpdir:
-        candidates.append(Path(tmpdir))
-    for cand in candidates:
-        try:
-            resolved = cand.resolve()
-        except OSError:
-            continue
-        if resolved == _REPO_ROOT or _REPO_ROOT in resolved.parents:
-            raise pytest.UsageError(
-                f"TMPDIR/basetemp {resolved} is inside the repository "
-                f"{_REPO_ROOT} -- refusing. Fixture temp dirs inside the repo "
-                f"let unanchored git commands walk up into the real repo and "
-                f"commit junk (the Jul junk-commit incidents). Point TMPDIR at a "
-                f"location OUTSIDE the repository and re-run."
-            )
-
-    # Layer 1: bind the env-poisoning floor now that TMPDIR is proven safe.
-    _install_env_poisoning_floor()
-
 
 # ---------------------------------------------------------------------------
 # Repo-root litter guard: no test may leave a NEW entry directly under the
@@ -335,109 +102,6 @@ def _guard_repo_root_litter():
             pytrace=False,
         )
 
-
-@pytest.fixture(autouse=True)
-def _chdir_into_tmp(request, tmp_path, monkeypatch):
-    """Autouse: never let a test run with the process cwd at the real repo.
-
-    A test whose process cwd is the real repo can make every unanchored git
-    command (status/commit/push, changelog regeneration, release-file
-    scaffolding) operate on the dev repo. Chdir-ing each test into its own
-    ``tmp_path`` makes implicit repo-cwd reliance a visible failure instead of
-    silent real-repo pollution. Fixtures that chdir into their own tmp_path
-    (the same ``tmp_path`` object) compose cleanly -- they land in the same
-    directory. Tests that genuinely need the repo cwd must anchor explicitly, or
-    opt out with ``@pytest.mark.repo_cwd`` (the CLI-wiring tests).
-    """
-    if request.node.get_closest_marker("repo_cwd") is not None:
-        yield
-        return
-    monkeypatch.chdir(tmp_path)
-    yield
-
-
-def _remote_is_local(url: str | None) -> bool:
-    """Classify a git remote URL/path as local (allowed) or non-local (blocked).
-
-    Local: ``file://`` URLs and bare filesystem paths (absolute or relative).
-    Non-local: any URL with a non-``file`` scheme (https://, ssh://, git://)
-    and SCP-like syntax (``git@host:owner/repo``). ``None``/empty is treated as
-    non-local (cannot prove locality -> block loudly).
-    """
-    if not url:
-        return False
-    if url.startswith("file://"):
-        return True
-    # Explicit scheme (scheme://...): only file:// is local.
-    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://", url):
-        return url.startswith("file://")
-    # SCP-like: [user@]host:path -- non-local. A bare Windows drive letter is
-    # irrelevant on the Linux CI/dev hosts, so any ``host:`` form is remote.
-    if re.match(r"^[^/\\]+@[^/\\]+:", url) or re.match(r"^[A-Za-z0-9.\-]+:", url):
-        return False
-    # Otherwise a filesystem path (absolute or relative) -- local.
-    return True
-
-
-def _extract_push_remote(cmd) -> str | None:
-    """Return the remote argument of a ``git push`` command list, or None."""
-    tokens = [str(t) for t in cmd]
-    try:
-        push_idx = tokens.index("push")
-    except ValueError:
-        return None
-    for tok in tokens[push_idx + 1:]:
-        if tok.startswith("-"):
-            continue
-        return tok
-    return None
-
-
-@pytest.fixture(autouse=True)
-def _guard_nonlocal_push():
-    """Autouse guard: block any real ``git push`` to a non-local remote."""
-    real_popen = subprocess.Popen
-
-    def _resolve_remote_url(remote: str, cwd) -> str | None:
-        try:
-            proc = real_popen(
-                ["git", "remote", "get-url", remote],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd,
-            )
-            out, _ = proc.communicate(timeout=10)
-            if proc.returncode == 0:
-                return out.strip()
-        except Exception:
-            return None
-        return None
-
-    def guarded_popen(args, *a, **kw):
-        cmd = args
-        if isinstance(cmd, (list, tuple)) and len(cmd) >= 2 and \
-                os.path.basename(str(cmd[0])) == "git" and "push" in [str(c) for c in cmd]:
-            remote = _extract_push_remote(cmd)
-            cwd = kw.get("cwd")
-            if len(a) >= 9:  # positional cwd is the 9th arg of Popen.__init__
-                cwd = a[8]
-            # A bare remote NAME (no scheme, no ':' , no '/') must be resolved
-            # to its URL; anything else is used as-is.
-            if remote and not re.search(r"[:/\\]", remote):
-                url = _resolve_remote_url(remote, cwd)
-            else:
-                url = remote
-            if not _remote_is_local(url):
-                pytest.fail(
-                    "BLOCKED: real 'git push' to a non-local remote from the "
-                    f"test suite. cmd={list(cmd)!r} remote={remote!r} "
-                    f"resolved_url={url!r} cwd={cwd!r}. A test is exercising a "
-                    "push path without mocking it; mock push_if_needed / the "
-                    "push subprocess, or point origin at a local bare repo.",
-                    pytrace=False,
-                )
-        return real_popen(args, *a, **kw)
-
-    with patch("subprocess.Popen", side_effect=guarded_popen):
-        yield
 
 from githarness import git as _git
 from rlsbl.context import ProjectContext

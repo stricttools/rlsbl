@@ -21,7 +21,29 @@ may legitimately fail (e.g. ``git show`` of a path that does not exist at a
 given revision).
 """
 
+import os
 import subprocess
+
+# The stricttest floor exports a throwaway commit identity in the ENVIRONMENT as
+# well as in the throwaway global git config, so a git invocation that ignores
+# the config file still cannot commit as the real developer. Environment
+# identity outranks every config level, including a repo's own
+# ``git config user.name`` -- which would make ``init_repo``'s ``name=`` /
+# ``email=`` arguments silently inert. This harness only ever touches throwaway
+# repos whose identity it just declared, so it drops the ambient identity and
+# lets that declaration win. Nothing is weakened: with the vars unset and no
+# repo-local identity, git falls back to the floor's throwaway global config.
+_IDENTITY_ENV = (
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+)
+
+
+def harness_env():
+    """The process environment minus the floor's ambient commit identity."""
+    return {k: v for k, v in os.environ.items() if k not in _IDENTITY_ENV}
 
 
 def git(repo, *args, check=True):
@@ -36,6 +58,7 @@ def git(repo, *args, check=True):
         capture_output=True,
         text=True,
         check=check,
+        env=harness_env(),
     )
     return result.stdout.strip()
 
