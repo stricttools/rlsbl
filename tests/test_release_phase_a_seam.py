@@ -427,7 +427,111 @@ class TestPreflightIsOutsideThePlan:
 
 
 # ---------------------------------------------------------------------------
-# 7. Narration is live-only: a preview never speaks in the past tense
+# 7. The preview render is reachable on EVERY previewing path
+# ---------------------------------------------------------------------------
+
+
+def _mutating_fn():
+    """The ``_run_release_mutating`` FunctionDef, parsed from source."""
+    from rlsbl.commands.release import execute
+
+    tree = ast.parse(inspect.getsource(execute))
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.FunctionDef)
+                and node.name == "_run_release_mutating"):
+            return node
+    raise AssertionError("_run_release_mutating not found")
+
+
+# Statement kinds whose body only *sometimes* runs. An assignment under one of
+# these is not a definition the preview render can count on.
+_CONDITIONAL_STMTS = (ast.If, ast.For, ast.While, ast.ExceptHandler, ast.Try)
+
+
+def _unconditionally_assigned(fn):
+    """Names *fn* assigns on every path through its body.
+
+    ``Try`` counts as conditional for its handlers and ``orelse``, but its
+    ``body`` is entered unconditionally -- so the walk descends into
+    ``Try.body`` and stops at everything else.
+    """
+    names = set()
+
+    def walk(stmts):
+        for stmt in stmts:
+            if isinstance(stmt, ast.Try):
+                walk(stmt.body)
+                continue
+            if isinstance(stmt, _CONDITIONAL_STMTS):
+                continue
+            for node in ast.walk(stmt):
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                    names.add(node.id)
+
+    walk(fn.body)
+    return names
+
+
+class TestThePreviewRenderIsAlwaysReachable:
+
+    def test_every_operand_of_the_preview_render_is_always_defined(self):
+        """The seam's render must not depend on which Phase-A path was taken.
+
+        ``_run_release_mutating`` has a branch that SKIPS Phase A entirely (a
+        resume past the CI gate, or a batch member the orchestrator already
+        gated). A preview still reaches the seam render on that path, so every
+        local the render is handed must be defined before the branch -- or the
+        preview dies with ``UnboundLocalError`` instead of printing.
+        """
+        fn = _mutating_fn()
+        calls = [
+            n for n in ast.walk(fn)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+            and n.func.id == "print_release_preview"
+        ]
+        assert calls, "the seam no longer renders a preview -- pin is vacuous"
+        always = _unconditionally_assigned(fn)
+        always |= {a.arg for a in fn.args.args}
+        for call in calls:
+            operands = [
+                a.id for a in list(call.args) + [k.value for k in call.keywords]
+                if isinstance(a, ast.Name)
+            ]
+            assert operands, "the render takes no locals -- pin is vacuous"
+            missing = [n for n in operands if n not in always]
+            assert not missing, (
+                f"print_release_preview is handed {missing}, which "
+                "_run_release_mutating only assigns on SOME paths. The "
+                "Phase-A-skipping branch (already CI-verified, or gated by the "
+                "batch orchestrator) reaches this render too, and an operand "
+                "assigned only in the other branch makes `release run "
+                "--dry-run` raise UnboundLocalError there."
+            )
+
+    def test_the_render_states_plainly_when_phase_a_was_not_owed(self):
+        """``plan is None`` is the declared shape for "Phase A issued nothing".
+
+        An empty table would read as "Phase A does nothing"; the truth on that
+        path is "Phase A was already done", and the preview has to say which.
+        """
+        lines = []
+        print_release_preview(
+            lines.append, None, _FixtureState(),
+            registry="npm", files_to_commit=[],
+        )
+        text = "\n".join(lines)
+        assert BOUNDARY_LINE in text, (
+            "a preview with no Phase-A plan still owes the boundary and the "
+            "declared Phase-B table"
+        )
+        assert "already" in text.lower(), (
+            "the preview must say Phase A was already satisfied rather than "
+            "rendering an empty plan table that reads as 'nothing to do'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 8. Narration is live-only: a preview never speaks in the past tense
 # ---------------------------------------------------------------------------
 
 

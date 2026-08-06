@@ -841,15 +841,28 @@ def print_release_preview(log, plan, state, *, registry, files_to_commit):
     run -- so they are reported first, as the plan that produced them. Then the
     boundary line. Then Phase B, which is declared and not recorded, because
     nothing below the line is knowable until CI has judged the candidate.
+
+    ``plan`` is None on the one path where Phase A is not owed at all: a resume
+    past the CI gate, or a batch member the orchestrator already gated. Nothing
+    was built and nothing was issued, so there is no table to print -- and an
+    empty one would read as "Phase A does nothing" rather than the truth,
+    "Phase A is already done". The preview says which.
     """
     from .phase_a import render_plan_table
 
     log("")
-    log("--- Recorded: Phase A (version bump -> candidate push) ---")
-    log("Every effect below was RECORDED, not performed; the would-do log at "
-        "the end of this run lists them verbatim.")
-    log(render_plan_table(plan))
-    log(f"Files in the release commit: {len(files_to_commit)}")
+    if plan is None:
+        log("--- Phase A (version bump -> candidate push): ALREADY DONE ---")
+        log("This release's candidate is already committed, pushed and "
+            "CI-verified (a resume past the gate, or a batch member the "
+            "orchestrator gated), so Phase A had nothing to issue and nothing "
+            "was recorded for it.")
+    else:
+        log("--- Recorded: Phase A (version bump -> candidate push) ---")
+        log("Every effect below was RECORDED, not performed; the would-do log "
+            "at the end of this run lists them verbatim.")
+        log(render_plan_table(plan))
+        log(f"Files in the release commit: {len(files_to_commit)}")
     log("")
     log(BOUNDARY_LINE)
     log("")
@@ -861,8 +874,13 @@ def print_release_preview(log, plan, state, *, registry, files_to_commit):
     # every dispatch, so it lands after this block no matter what the handler
     # prints. Say what it is, or a reader meets an effect log below a line that
     # just told them everything below it waits on CI.
-    log("(The would-do log that follows is the framework's own record of the "
-        "Phase-A effects above. Nothing from Phase B appears in it.)")
+    log(
+        "(The would-do log that follows is the framework's own record of the "
+        + ("preflight effects this run recorded. Nothing from Phase A -- which "
+           "was already done -- or Phase B appears in it.)"
+           if plan is None else
+           "Phase-A effects above. Nothing from Phase B appears in it.)")
+    )
     log("")
 
 

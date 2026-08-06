@@ -2232,6 +2232,13 @@ def _run_release_mutating(state: ReleaseState):
         # so it skips Phase A entirely and adopts the recorded candidate.
         _batch_verified = flags.get("ci-verified-sha")
         files_to_commit = []
+        # Both operands of the seam's preview render are defined BEFORE the
+        # branch below, because a preview reaches the render on either path.
+        # ``None`` is the declared shape for "Phase A issued nothing": the
+        # branch that skips it did so because the candidate is already pushed
+        # and verified, and the render says exactly that instead of printing an
+        # empty plan table that would read as "nothing to do".
+        _phase_a_plan = None
         if "CI_VERIFIED" in _completed or (
             _batch_verified and "BRANCH_PUSHED" in _completed
         ):
