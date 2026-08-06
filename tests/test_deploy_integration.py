@@ -11,6 +11,7 @@ import rlsbl.commands.release as _release_mod
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.context import ProjectContext
 from rlsbl.deploy import DeployResult
+from rlsbl.errors import PostReleaseError
 from rlsbl.resolved_target import ResolvedTarget
 from rlsbl.targets import TargetEntry
 
@@ -137,7 +138,14 @@ class TestReleaseWithDeployTargets:
 
 
 class TestReleaseDeployFailureContinues:
-    """Deploy fails but release still completes (post-release hook runs)."""
+    """Deploy fails: the release is NOT rolled back and the post-release hook
+    still runs, but the run ends in a PostReleaseError.
+
+    "Non-fatal" means the release stays put and stays resumable -- it never
+    meant "exit 0". The completion summary is the single decision point: a
+    recorded step failure makes the run report itself as failed while keeping
+    the state file, so `rlsbl release resume` re-attempts exactly that step.
+    """
 
     def test_release_deploy_failure_continues(self, mock_git_repo, monkeypatch, capsys):
         deploy_targets = [_minimal_target()]
@@ -199,20 +207,21 @@ class TestReleaseDeployFailureContinues:
         monkeypatch.setattr("rlsbl.commands.release.extract_changelog_entry", lambda *a, **kw: "- Fixed a bug")
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
-        # Should NOT raise -- deploy failure is non-fatal
-        _run_release_mutating(ReleaseState(
-            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"auto-tag": False},
-            quiet=False,
-            log=lambda msg: None,
-            new_version="1.0.1",
-            current_version="1.0.0",
-            bump_type="patch",
-            tag="v1.0.1",
-            branch="main",
-            changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
-        ))
+        # Not rolled back, hooks still run -- but the run reports the failure.
+        with pytest.raises(PostReleaseError, match="DEPLOYED"):
+            _run_release_mutating(ReleaseState(
+                resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
+                flags={"auto-tag": False},
+                quiet=False,
+                log=lambda msg: None,
+                new_version="1.0.1",
+                current_version="1.0.0",
+                bump_type="patch",
+                tag="v1.0.1",
+                branch="main",
+                changelog_entry="- Fixed a bug",
+                ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
+            ))
 
         captured = capsys.readouterr()
         assert "FAILED" in captured.err
@@ -284,7 +293,12 @@ class TestReleaseNoDeployConfig:
 
 
 class TestReleaseDeployConfigErrors:
-    """Invalid deploy config: warning printed, deploy skipped."""
+    """Invalid deploy config: deploy skipped, and the run reports the failure.
+
+    A deploy the operator configured and rlsbl refused to attempt is a step
+    that did not happen. It is recorded as a DEPLOYED failure, so the run
+    exits nonzero instead of announcing a release whose deploy never ran.
+    """
 
     def test_release_deploy_config_errors(self, mock_git_repo, monkeypatch, capsys):
         # Config with invalid deploy target (missing required fields)
@@ -321,19 +335,20 @@ class TestReleaseDeployConfigErrors:
         monkeypatch.setattr("rlsbl.commands.release.extract_changelog_entry", lambda *a, **kw: "- Fixed a bug")
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
-        _run_release_mutating(ReleaseState(
-            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"auto-tag": False},
-            quiet=False,
-            log=lambda msg: None,
-            new_version="1.0.1",
-            current_version="1.0.0",
-            bump_type="patch",
-            tag="v1.0.1",
-            branch="main",
-            changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
-        ))
+        with pytest.raises(PostReleaseError, match="DEPLOYED"):
+            _run_release_mutating(ReleaseState(
+                resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
+                flags={"auto-tag": False},
+                quiet=False,
+                log=lambda msg: None,
+                new_version="1.0.1",
+                current_version="1.0.0",
+                bump_type="patch",
+                tag="v1.0.1",
+                branch="main",
+                changelog_entry="- Fixed a bug",
+                ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
+            ))
 
         # deploy_target should never have been called (config has errors)
         assert len(deploy_calls) == 0
@@ -385,19 +400,20 @@ class TestReleaseStopsAtFirstDeployFailure:
         monkeypatch.setattr("rlsbl.commands.release.extract_changelog_entry", lambda *a, **kw: "- Fixed a bug")
         monkeypatch.setattr("rlsbl.commands.release.get_changes_dir", lambda *a, **kw: ".rlsbl/changes")
 
-        _run_release_mutating(ReleaseState(
-            resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
-            flags={"auto-tag": False},
-            quiet=False,
-            log=lambda msg: None,
-            new_version="1.0.1",
-            current_version="1.0.0",
-            bump_type="patch",
-            tag="v1.0.1",
-            branch="main",
-            changelog_entry="- Fixed a bug",
-            ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
-        ))
+        with pytest.raises(PostReleaseError, match="DEPLOYED"):
+            _run_release_mutating(ReleaseState(
+                resolved_targets=_npm_primary_resolved(mock_git_repo, monkeypatch),
+                flags={"auto-tag": False},
+                quiet=False,
+                log=lambda msg: None,
+                new_version="1.0.1",
+                current_version="1.0.0",
+                bump_type="patch",
+                tag="v1.0.1",
+                branch="main",
+                changelog_entry="- Fixed a bug",
+                ctx=ProjectContext(project_root=Path(str(mock_git_repo)), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}, "deploy": deploy_targets}),
+            ))
 
         # Only staging was attempted; prod was NOT attempted
         assert deploy_calls == ["staging"]
