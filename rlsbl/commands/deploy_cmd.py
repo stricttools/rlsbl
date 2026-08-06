@@ -14,6 +14,13 @@ def run_cmd(registry, args, flags, *, ctx):
         rlsbl deploy [name]       Deploy to target (auto-selects if only one)
         rlsbl deploy --dry-run    Show what would be deployed
     """
+    # 0. Load the shared env file. Deploy steps read credentials straight out
+    #    of the environment, and this is the same helper the release flow's
+    #    own deploy phase goes through -- `rlsbl deploy site` and the deploy
+    #    step of `rlsbl release run` must not see different environments.
+    from .release.shared import load_release_env
+    load_release_env(ctx.config)
+
     # 1. Read deploy config
     targets, errors = read_deploy_config(ctx.config)
 

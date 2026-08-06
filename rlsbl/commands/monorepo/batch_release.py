@@ -22,7 +22,7 @@ from ...release_file import (
     get_batch_release_file_path,
     read_batch_release_file,
 )
-from ...errors import GitError, ReleaseFileError
+from ...errors import ConfigError, GitError, ReleaseFileError
 from ...lock import rlsbl_lock
 from ...utils import commit_files, run
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
@@ -416,6 +416,19 @@ def _cmd_batch_release(flags, project_root):
     def log(msg):
         if not quiet:
             print(msg)
+
+    # The workspace root's own env file, loaded before anything runs. The
+    # orchestrator does root-level work of its own (root selfdoc, the batch
+    # candidate push, the CI gate) that no member's release_env covers, and a
+    # configured-but-missing file must stop the batch here rather than
+    # halfway through a member's release.
+    from ..release.shared import load_release_env
+    from ...config import read_project_config
+    try:
+        load_release_env(read_project_config(workspace_root))
+    except ConfigError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     projects = load_workspace(workspace_root)
     explicit = is_explicit_mode(workspace_root)

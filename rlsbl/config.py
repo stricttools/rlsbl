@@ -10,7 +10,6 @@ user-level defaults.
 
 import json
 import os
-import sys
 
 from .errors import ConfigError
 from . import effects
@@ -46,11 +45,24 @@ def load_env_file(path):
 
     Supports ~ expansion. Ignores comments (#) and blank lines.
     Strips surrounding quotes from values.
+
+    A configured file that does not exist is a HARD error. It used to print a
+    warning and return, so a release whose ``env_file`` had moved (or was
+    never present on this machine) went on to deploy, run its post-release
+    hooks and drive local publish pipelines with none of the credentials the
+    operator declared -- failing far downstream, after the tag and the
+    GitHub Release, with an error naming a missing token instead of the
+    missing file that explains it.
     """
     path = os.path.expanduser(path)
     if not os.path.exists(path):
-        print(f"Warning: env file not found: {path}", file=sys.stderr)
-        return
+        raise ConfigError(
+            f"env_file not found: {path}\n"
+            f"The release, deploy and hook environments are built from it, so "
+            f"continuing would run them without the variables it declares. "
+            f"Create the file, correct the `env_file` path in "
+            f".rlsbl/config.json, or remove the key."
+        )
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()

@@ -258,9 +258,12 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     else:
         _pin_sha = head_sha(cwd=project_dir)
 
-    # Per-invocation timeout overrides, same as the fresh-release path.
-    from .shared import apply_timeout_overrides
+    # Per-invocation timeout overrides and the shared env file, same as the
+    # fresh-release path. A resume re-enters at the deploy / post-release-hook
+    # steps, which are exactly the ones the env file exists for.
+    from .shared import apply_timeout_overrides, load_release_env
     apply_timeout_overrides(ctx.config, flags)
+    load_release_env(ctx.config)
 
     # Extract saved state fields
     new_version = saved_state["new_version"]
@@ -532,8 +535,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # Per-invocation timeout overrides (--push/--ci/--check/--hook-timeout)
     # land on the config before anything reads it, so the check framework and
     # hook runner -- which only ever see a ProjectContext -- honour them too.
-    from .shared import apply_timeout_overrides
+    # The shared env file lands here too: the pipeline-env preflight
+    # (validate_pipeline_config) checks required_env_vars against os.environ,
+    # so it has to be loaded before anything reads the environment.
+    from .shared import apply_timeout_overrides, load_release_env
     apply_timeout_overrides(config, flags)
+    load_release_env(config)
 
     # Range pin: HEAD at the top of the release entry, before ANY mutation
     # (including the pre-mutating selfdoc auto-commit below). Every commit
@@ -560,14 +567,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # so that member_dirs can be passed for releasable target union.
     validate_ota_mode(release_config, project_root, config)
     validate_config_integrity(config)
-
-    # Load env file if configured
-    env_file = config.get("env_file")
-    if env_file:
-        from ...config import load_env_file
-        load_env_file(env_file)
-        if "CF_ACCOUNT_ID" in os.environ and "CLOUDFLARE_ACCOUNT_ID" not in os.environ:
-            os.environ["CLOUDFLARE_ACCOUNT_ID"] = os.environ["CF_ACCOUNT_ID"]
 
     # Pipeline config validation is deferred until after releasable context
     # is resolved, so per-member pipeline validation can run in releasable

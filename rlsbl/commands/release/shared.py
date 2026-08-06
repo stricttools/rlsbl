@@ -1,5 +1,37 @@
 """Shared utilities for release commands: project root detection, git auth verification, working tree guards, and release file loading."""
 
+import os
+
+
+def load_release_env(config):
+    """Load the config's ``env_file`` into ``os.environ``. THE entry helper.
+
+    Every command that can reach a deploy step, a release hook or a local
+    publish pipeline must call this before it does -- ``release run``,
+    ``release resume``, ``deploy``, and the batch orchestrator for its own
+    root-level work. This used to live inline in ``_run_cmd_inner`` only, so a
+    ``release resume`` re-ran exactly the steps that need those credentials
+    (deploy, post-release hooks) with none of them loaded: the failure the
+    resume existed to fix came back wearing a different error message.
+
+    Returns the resolved ``env_file`` value, or ``None`` when none is
+    configured. A configured-but-absent file raises
+    :class:`~rlsbl.errors.ConfigError` (see :func:`rlsbl.config.load_env_file`).
+    """
+    env_file = (config or {}).get("env_file")
+    if not env_file:
+        return None
+
+    from ...config import load_env_file
+
+    load_env_file(env_file)
+    # Historical alias: the shared env file names the Cloudflare account
+    # ``CF_ACCOUNT_ID``; wrangler and the Cloudflare SDKs read
+    # ``CLOUDFLARE_ACCOUNT_ID``. Mirrored, never overwritten.
+    if "CF_ACCOUNT_ID" in os.environ and "CLOUDFLARE_ACCOUNT_ID" not in os.environ:
+        os.environ["CLOUDFLARE_ACCOUNT_ID"] = os.environ["CF_ACCOUNT_ID"]
+    return env_file
+
 
 def build_release_flags(dry_run, quiet, allow_dirty, watch=False,
                         push_timeout=None, ci_timeout=None,
