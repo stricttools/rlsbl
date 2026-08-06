@@ -265,6 +265,18 @@ The generated publish router emits 1 shared gate job. Member gate jobs are strip
 
 Sibling projects' paths-filtered (skipped) CI checks are outside the filter and never block a release. CI check runs are named `<router job key> / <ci job name>` because the CI router invokes member CI as reusable workflows.
 
+#### The releasable run-everything hook
+
+In explicit releasable mode, the CI router's paths filter for **every** member of a releasable ends with one shared extra entry: the releasable's own `CHANGELOG.md` under `.rlsbl-monorepo/releasables/<name>/`. This is deliberate, and it is what makes a releasable release gateable at all.
+
+A release commit can touch nothing under a member's own directory. That is guaranteed on a **first** release, where the version write is a no-op, and possible on any release whose per-member writes all land elsewhere. Without the shared entry, that member's CI job concludes `skipped` on the exact commit its tag points at -- and the gate refuses a skipped check, correctly, because a skipped check proves nothing about the commit. There is no recovery from that state either: re-running CI on the commit skips the job again, for the same reason it skipped the first time. The release commit always regenerates and commits the releasable `CHANGELOG.md` (it gains the new version's heading), so anchoring every member's filter on that one path makes the gated commit verifiable for all members.
+
+The cost is real and accepted: **releasing a releasable runs the full CI job set of every member of that releasable**, including members whose own code did not change. CI minutes are the price of never tagging a commit the gate cannot read a verdict for. The gate is not relaxed to accept `skipped` -- that would let a release publish on a commit nothing actually verified.
+
+The same filter has a visible consequence for ordinary (non-release) pushes: a push whose diff touches only paths outside every member's filter -- a dev node project's own directory, say, or a root file no member watches -- leaves every member's CI job `skipped` on that commit. For a push this is correct: nothing a member ships changed. A **release** never lands in that state, because the release commit always touches the releasable `CHANGELOG.md`. If you need a member's CI to run on a commit that changed nothing of the member's, make the commit touch something that member's filter matches -- do not loosen the gate.
+
+Only the finalize artifact is in the filter, never the whole releasable directory: `rlsbl changelog add` writes the releasable's JSONL between releases, and those entries must not spend every member's CI minutes.
+
 ### Publish concurrency
 
 Publish workflows carry a per-ref concurrency group with `cancel-in-progress: false`: a dispatch retry at the same tag queues behind an in-flight run instead of racing it, and a publish run is never cancelled mid-flight.

@@ -319,6 +319,14 @@ The sync process:
 
 This ensures every project has its CI pipeline properly wired even when using different targets or custom workflow steps.
 
+### Router paths filters
+
+The generated router gates each project's inlined jobs on a `dorny/paths-filter` entry built from that project's `path` plus its `watch` patterns. A push whose diff matches none of a project's patterns leaves that project's CI job `skipped` on the pushed commit.
+
+In explicit releasable mode, one more pattern is appended to **every** member of a releasable: the releasable's own `CHANGELOG.md` under `.rlsbl-monorepo/releasables/<name>/`. It is a single path shared by all members, so any commit that touches it matches all of their filters at once. This is a deliberate run-everything hook. A release commit may touch nothing under a member's own directory -- guaranteed on a first release, where the version write is a no-op -- and the publish gate refuses to treat that member's `skipped` check as passing, with no re-runnable recovery. Since the release commit always regenerates and commits the releasable `CHANGELOG.md`, anchoring every member's filter on it makes the release commit verifiable for all members.
+
+Be aware of the cost: **releasing a releasable runs the CI jobs of every one of its members**, including members whose own code did not change. That is the accepted trade, not a bug -- see [Publish gating](release-workflow.md#the-releasable-run-everything-hook) in the release workflow docs for the full rationale, including why the gate is never relaxed to accept `skipped`, and what a push that touches only non-member paths (a dev node's directory, for instance) looks like.
+
 ## Workspace checks
 
 Fourteen checks run under `rlsbl check --tag workspace`, covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, buildability, and code liveness. All error-severity checks block releases when they fail:

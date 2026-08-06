@@ -105,10 +105,34 @@ def _releasable_finalize_artifact(project, releasables):
     is part of the project's own change surface: a release commit IS a change
     to the released project, so it must satisfy the router's paths filter.
 
-    Without it, a release push that touches nothing under the project's path
-    (inevitable on a FIRST release, where the version write is a no-op) skips
-    the project's CI job, and the publish gate -- which refuses to treat a
-    skipped check as passing -- deadlocks with no re-runnable recovery.
+    **This entry is a deliberate run-everything hook, not an accident.**
+
+    Mechanism: the finalize artifact is one path shared by every member of the
+    releasable, and it is appended to *each* member's filter. A commit that
+    touches it therefore matches all of their filters at once and triggers all
+    of their CI jobs. The release commit always touches it -- the version-bump
+    commit regenerates and commits the releasable ``CHANGELOG.md`` (it gains
+    the new version's heading) before the candidate push.
+
+    Why it exists: a release push can touch nothing under a member's own path.
+    That is inevitable on a FIRST release, where the version write is a no-op,
+    and it is possible on any release whose per-member writes all land outside
+    the member's directory. The member's CI job would then conclude ``skipped``
+    on the very commit its tag points at, and the publish gate deliberately
+    refuses to treat ``skipped`` as passing (:mod:`rlsbl.publish_gate`) -- a
+    skipped check proves nothing about the commit. The result is a deadlock
+    with no re-runnable recovery: re-running CI on that commit skips the job
+    again, for the same reason it skipped the first time. Anchoring every
+    member's filter on the one file a release always writes makes the gated
+    commit verifiable for all of them.
+
+    The cost, accepted knowingly: **any release of a releasable runs the full
+    CI job set of every one of its members**, including members whose own code
+    did not change, because the finalize artifact matches all of their filters.
+    That is the intended trade -- CI minutes in exchange for never tagging a
+    commit the gate cannot read a verdict for. Relaxing the gate to accept
+    ``skipped`` would be the cheaper fix and is rejected: it would let a
+    release publish on a commit nothing actually verified.
 
     Deliberately the finalize artifact only, NOT the whole releasable
     directory: ``rlsbl changelog add`` writes the JSONL between releases and
@@ -137,6 +161,12 @@ def router_filter_patterns(project, releasables=None):
     guarantee that the commit it tags rode in on a push whose diff matches
     every participating project's patterns, which is why this list is a
     published function rather than a local in :func:`_generate_router`.
+
+    In explicit releasable mode the list ends with the releasable's finalize
+    artifact (see :func:`_releasable_finalize_artifact`), a path shared by
+    every member of the releasable. Any commit touching it matches all of
+    their filters at once, so a release of the releasable runs every member's
+    CI jobs. That breadth is the point, not a leak in the filter.
     """
     clean_path = project['path'].rstrip('/')
     patterns = [f"{clean_path}/**"]
