@@ -221,6 +221,45 @@ class TestDeployBranchRestriction:
         captured = capsys.readouterr()
         assert "production" in captured.err
 
+    def test_deploy_dry_run_respects_branch_restriction(
+        self, mock_git_repo, monkeypatch, capsys,
+    ):
+        """A preview on a disallowed branch refuses, exactly as the run would.
+
+        The dry-run gate used to sit ABOVE the branch restriction, so a
+        preview on a branch the target forbids printed a full "here is what
+        would be deployed" plan and exited 0 -- describing a deploy that could
+        never happen. A preview must answer the same question the live run
+        answers, and the restriction is part of that answer.
+        """
+        targets = [_minimal_target(only_on=["production"])]
+
+        deploy_calls = []
+
+        def mock_deploy_target(target_config, current_branch):
+            deploy_calls.append(target_config["name"])
+            return DeployResult("prod", True, "Deploy completed")
+
+        monkeypatch.setattr(
+            "rlsbl.commands.deploy_cmd.deploy_target", mock_deploy_target,
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(
+                None, [], {"dry-run": True},
+                ctx=ProjectContext(
+                    project_root=Path("."), workspace_root=None,
+                    config={"deploy": targets},
+                ),
+            )
+
+        assert exc_info.value.code == 1
+        assert len(deploy_calls) == 0
+        captured = capsys.readouterr()
+        assert "production" in captured.err
+        # The plan is not printed: there is no deploy to preview.
+        assert "Deploy target:" not in captured.out
+
 
 class TestDeploySuccess:
 

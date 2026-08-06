@@ -54,12 +54,11 @@ def run_cmd(registry, args, flags, *, ctx):
     # 3. Get current branch
     branch = get_current_branch(cwd=str(ctx.project_root))
 
-    # 4. Dry run
-    if flags.get("dry-run"):
-        _print_dry_run(target_config, branch)
-        sys.exit(0)
-
-    # 5. Branch restriction (always enforced)
+    # 4. Branch restriction (always enforced, and enforced BEFORE the preview)
+    #    A preview answers the same question the live run answers. With the
+    #    dry-run gate above this check, `rlsbl deploy --dry-run` on a branch the
+    #    target forbids printed a full plan and exited 0 -- a confident
+    #    description of a deploy that could never run.
     only_on = target_config["only_on"]
     if branch not in only_on:
         print(
@@ -67,6 +66,11 @@ def run_cmd(registry, args, flags, *, ctx):
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # 5. Dry run
+    if flags.get("dry-run"):
+        _print_dry_run(target_config, branch)
+        sys.exit(0)
 
     # 6. Deploy
     result = deploy_target(target_config, branch)
