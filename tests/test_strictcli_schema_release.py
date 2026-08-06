@@ -40,32 +40,43 @@ class TestStrictcliSchemaDumpFunction:
         captured = capsys.readouterr()
         assert captured.err == ""
 
-    def test_dry_run_prints_what_would_happen(self, tmp_path, capsys):
-        """In dry-run mode, prints what would happen without running the command."""
+    def test_dry_run_records_the_dump_instead_of_describing_it(self, tmp_path):
+        """A preview routes the dump through ``effects.run``, which records it.
+
+        The hand-rolled ``Would run: ...`` line that used to stand in for the
+        dump under ``--dry-run`` restated the argv in a second place; the
+        would-do log now reports the argv that would really have run.
+        """
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "myapp"\nversion = "1.0.0"\n'
             'dependencies = ["strictcli"]\n'
             '\n[project.scripts]\nmyapp = "myapp:main"\n'
         )
-        messages = []
-        _run_strictcli_schema_dump(
-            {"dry-run": True}, lambda msg: messages.append(msg),
-            project_dir=str(tmp_path),
-        )
-        assert any("Would run: uv run myapp --dump-schema" in m for m in messages)
+        fake_effects = MagicMock()
+        with patch("rlsbl.commands.release.effects", fake_effects):
+            _run_strictcli_schema_dump(
+                {"dry-run": True}, lambda msg: None,
+                project_dir=str(tmp_path),
+            )
+        assert fake_effects.run.call_args[0][0] == [
+            "uv", "run", "myapp", "--dump-schema",
+        ]
 
     def test_dry_run_silent_when_not_strictcli(self, tmp_path):
-        """In dry-run mode with no strictcli, nothing is printed."""
+        """In dry-run mode with no strictcli, nothing runs and nothing prints."""
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "myapp"\nversion = "1.0.0"\n'
             'dependencies = ["click"]\n'
         )
         messages = []
-        _run_strictcli_schema_dump(
-            {"dry-run": True}, lambda msg: messages.append(msg),
-            project_dir=str(tmp_path),
-        )
+        fake_effects = MagicMock()
+        with patch("rlsbl.commands.release.effects", fake_effects):
+            _run_strictcli_schema_dump(
+                {"dry-run": True}, lambda msg: messages.append(msg),
+                project_dir=str(tmp_path),
+            )
         assert not messages
+        assert not fake_effects.run.called
 
     def test_command_failure_raises_error(self, tmp_path):
         """When the dump command fails, ReleaseValidationError is raised."""

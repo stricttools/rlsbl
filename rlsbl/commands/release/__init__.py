@@ -1129,10 +1129,22 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         log("Running pre-release hook...")
         run_release_hook("pre-release", pre_release_script, project_dir, hook_env, hook_timeout, config=config)
 
-    # Snapshot dirty files after all hooks
-    post_hook_output = run("git", ["status", "--porcelain"])
-    post_hook_dirty = parse_porcelain_paths(post_hook_output) if post_hook_output else set()
-    hook_generated = post_hook_dirty - pre_hook_dirty
+    # Snapshot dirty files after all hooks.
+    #
+    # Legitimately mode-aware, and the last such branch before the plan
+    # builder: the hooks above are ``effects.run`` children, so a preview
+    # RECORDED them instead of running them and nothing they would have
+    # generated exists. Asking git what the hooks produced would then be
+    # asking about a mutation that did not happen -- and, since a recorded
+    # mutation already stands between here and the last observe, the answer
+    # would be the framework's stale carrier, truncating the preview at a
+    # question whose honest answer is "nothing".
+    if effects.previewing():
+        hook_generated = set()
+    else:
+        post_hook_output = run("git", ["status", "--porcelain"])
+        post_hook_dirty = parse_porcelain_paths(post_hook_output) if post_hook_output else set()
+        hook_generated = post_hook_dirty - pre_hook_dirty
 
     # In explicit mode, commit message uses releasable name;
     # in implicit monorepo mode, uses the package name; standalone uses the tag.

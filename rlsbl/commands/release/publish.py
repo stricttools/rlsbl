@@ -38,10 +38,10 @@ def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
     if not os.path.exists(selfdoc_config):
         return True
 
-    if flags.get("dry-run"):
-        print(f"Would run: selfblog post generate --from-release --version {new_version}")
-        return True
-
+    # No dry-run branch: the generate call below is an ``effects.run`` and the
+    # temp changelog file it needs is an ``effects.temp_file`` -- a preview
+    # records both and prints the real argv, which the hand-rolled
+    # "Would run: ..." line here could only approximate.
     if not require_tool("selfblog", fatal=False):
         print(
             "Note: blog = true but selfblog is not installed. Skipping blog post generation."
@@ -102,8 +102,12 @@ def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
             f"selfblog post generate failed (exit code {e.returncode})."
         ) from e
     finally:
-        if tmp_changelog and os.path.exists(tmp_changelog):
-            effects.remove(tmp_changelog)
+        # ``missing_ok`` rather than an ``os.path.exists`` guard: a preview
+        # recorded the temp file instead of creating it, and the removal is
+        # owed to the log either way -- a recorded write with no matching
+        # recorded remove reads as a file the preview leaves behind.
+        if tmp_changelog:
+            effects.remove(tmp_changelog, missing_ok=True)
 
     return True
 

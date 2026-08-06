@@ -874,12 +874,11 @@ def _run_selfdoc_gen(flags, project_dir=None, version=None):
 
     version_args = _selfdoc_version_args(version)
 
-    if flags.get("dry-run"):
-        print(
-            "Would run: selfdoc gen --no-auto-commit " + " ".join(version_args)
-        )
-        return True
-
+    # No dry-run branch: the child below is ``effects.run``, so a preview
+    # records it and prints it in the would-do log. The hand-rolled
+    # "Would run: ..." line that used to sit here restated -- by hand, and
+    # only for this one call -- what the regime already reports for every
+    # call, and it drifted from the argv it claimed to describe.
     if not require_tool("selfdoc", fatal=False):
         print(
             "Note: selfdoc.json found but selfdoc is not installed. Skipping docs generation."
@@ -922,9 +921,7 @@ def _run_selfdoc_check(flags, project_dir=None, version=None):
     """
     from . import require_tool, effects as _effects, subprocess as _subprocess
 
-    if flags.get("dry-run"):
-        return True
-
+    # No dry-run branch: the child below is ``effects.run`` and records itself.
     check_dir = project_dir if project_dir else "."
     selfdoc_config = os.path.join(check_dir, "selfdoc.json")
     if not os.path.exists(selfdoc_config):
@@ -1208,13 +1205,8 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     except StrictcliDetectError as e:
         raise ReleaseValidationError(str(e)) from e
 
-    if flags.get("dry-run"):
-        if result:
-            entry_point, lang = result
-            cmd = _schema_dump_command(entry_point, lang)
-            log(f"Would run: {' '.join(cmd)}")
-        return
-
+    # No dry-run branch for the dump itself: it is an ``effects.run`` and
+    # records itself in the would-do log.
     if not result:
         return
 
@@ -1249,6 +1241,12 @@ def _patch_schema_version(project_dir, version):
     """
     schema_path = os.path.join(project_dir, ".strictcli", "schema.json")
     if not os.path.isfile(schema_path):
+        if effects.previewing():
+            # The dump above was RECORDED, not run, so a project whose schema
+            # file does not exist yet has nothing here to patch. Absence is
+            # then a statement about the preview, not about the project, and
+            # must not be reported as a failed dump.
+            return
         raise ReleaseValidationError(
             f"strictcli schema dump succeeded but {schema_path} does not exist"
         )

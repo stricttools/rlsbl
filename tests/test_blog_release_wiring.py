@@ -3,7 +3,7 @@
 import json
 import os
 import subprocess
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -274,12 +274,20 @@ class TestTempFileCleanup:
 class TestDryRun:
     """Test dry-run behavior."""
 
-    def test_dry_run_prints_what_would_run(self, tmp_path, capsys):
-        """Dry-run mode prints what would run without invoking selfblog."""
+    def test_dry_run_records_the_real_argv(self, tmp_path):
+        """A preview records the selfblog invocation instead of describing it.
+
+        The hand-rolled ``Would run: selfblog post generate ...`` line that
+        used to stand in here named only the version; the recorded call
+        carries the whole argv (bump type, description, body file, release
+        URL) and no subprocess is ever forked.
+        """
         selfdoc_json = tmp_path / "selfdoc.json"
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
-        with patch("subprocess.run") as mock_run:
+        fake_effects = MagicMock()
+        fake_effects.temp_file.return_value = str(tmp_path / "cl.md")
+        with patch("rlsbl.commands.release.publish.effects", fake_effects):
             result = _run_selfblog_post_generate(
                 {"dry-run": True},
                 project_dir=str(tmp_path),
@@ -292,10 +300,9 @@ class TestDryRun:
             )
 
         assert result is True
-        mock_run.assert_not_called()
-        captured = capsys.readouterr()
-        assert "selfblog post generate" in captured.out
-        assert "1.0.0" in captured.out
+        argv = fake_effects.run.call_args[0][0]
+        assert argv[:4] == ["selfblog", "post", "generate", "--from-release"]
+        assert "1.0.0" in argv
 
 
 class TestSubprocessFailure:

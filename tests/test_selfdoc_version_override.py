@@ -82,11 +82,19 @@ class TestOverrideReachesTheSubprocess:
             "selfdoc", "gen", "--no-auto-commit",
         ]
 
-    def test_dry_run_announces_the_override(self, tmp_path, capsys):
-        _selfdoc_project(tmp_path)
-        _run_selfdoc_gen({"dry-run": True}, project_dir=str(tmp_path),
-                         version="2.0.0")
-        assert "--version-override 2.0.0" in capsys.readouterr().out
+    def test_dry_run_records_the_same_argv(self, tmp_path):
+        """A preview records the real argv instead of describing it by hand.
+
+        This used to be a hand-rolled ``Would run: selfdoc gen ...`` print,
+        which restated the argv in a second place and could drift from it.
+        The call is an ``effects.run``, so a preview records it and the
+        framework's would-do log reports exactly what would have run --
+        including the version override.
+        """
+        argv = self._run(tmp_path, _run_selfdoc_gen, version="2.0.0")
+        assert argv == [
+            "selfdoc", "gen", "--no-auto-commit", "--version-override", "2.0.0",
+        ]
 
 
 class TestReleaseFlowThreadsTheNewVersion:
