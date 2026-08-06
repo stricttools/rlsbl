@@ -215,6 +215,15 @@ class TestScanDroppedWhereNoArtifactExists:
         """Dropping the scan must drop its install step too (no dead weight)."""
         assert "gitleaks" not in executable_lines(read_template(rel_path)).lower()
 
+    @pytest.mark.parametrize("rel_path", NO_SCAN_TEMPLATES)
+    def test_template_still_renders_as_valid_yaml(self, rel_path):
+        """Removing steps must not leave a dangling list item or bad indent."""
+        parsed = YAML(typ="safe").load(render_template(rel_path))
+        assert parsed["jobs"]
+        for job in parsed["jobs"].values():
+            for step in job.get("steps", []):
+                assert "gitleaks" not in (step.get("run") or "")
+
 
 class TestNpmPackScopedToScratchDir:
     """The pack destination must sit outside the checkout.
