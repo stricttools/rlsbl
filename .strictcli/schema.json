@@ -1188,7 +1188,7 @@
         },
         "status": {
           "name": "status",
-          "help": "Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.",
+          "help": "Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. Provides a quick overview of which projects have pending changes and are ready for their next release.",
           "effect": "read_only"
         },
         "check-names": {
@@ -2285,6 +2285,19 @@
       ]
     },
     "stricttest-floor": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
+    },
+    "dep-floors": {
       "tags": [
         "project",
         "preflight"
