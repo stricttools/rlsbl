@@ -19,8 +19,9 @@ The mode rule (declared, never inferred)
 A command handler binds the dispatch context here (``@effects.handler``), and
 from then on:
 
-* **Preview mode** (``--dry-run``; ``ctx.dry_run`` is true) -- *every*
-  operation below is minted on ``ctx.effects``.  Mutations are recorded, never
+* **Preview mode** (``--dry-run``; ``ctx.dry_run`` is true) -- every
+  operation below is minted on ``ctx.effects``, with three named exceptions
+  listed at the end of this docstring.  Mutations are recorded, never
   executed, and return strictcli's ``Unsettled`` carrier; a caller that
   forwards the carrier into a later effect keeps the preview going, and a
   caller that reads a field off it truncates the preview with the framework's
@@ -49,6 +50,26 @@ command dispatch; there is no handle to mint on there.
 ``tests/test_effects_binding.py`` asserts that every registered command
 handler carries ``@effects.handler``, so a bound path is never missed by
 accident.
+
+The three operations that execute in every mode
+-----------------------------------------------
+
+Each is declared by name, has a reason that is about the operation rather
+than about convenience, and touches nothing a preview reports on:
+
+* :func:`lock_makedirs` / :func:`lock_open` / :func:`lock_remove` /
+  :func:`lock_rmdir` -- the advisory lock is process infrastructure.  A
+  preview needs mutual exclusion as much as a live run, ``fcntl.flock``
+  needs a real descriptor, and the lock file is created and deleted inside
+  the same process's lifetime.
+* :func:`observe_scratch_files` -- operands of an allowlisted observe.  The
+  observe really runs under --dry-run, so recorded stand-ins would leave it
+  reading absent paths and reporting a failure that is about the preview
+  rather than about the project.
+* :func:`tcp_connect` -- a connect-and-close probe is a network read, and
+  reads execute in every mode here (see :func:`urlopen`).
+
+Everything else, including :func:`mkdtemp` and :func:`temp_file`, records.
 """
 
 import functools
