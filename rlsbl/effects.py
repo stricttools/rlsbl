@@ -535,3 +535,58 @@ def copytree(src, dst, *, dirs_exist_ok=False, ignore=None, symlinks=False):
             with open(os.path.join(dirpath, name), "rb") as f:
                 h.write(os.path.join(target_dir, name), f.read())
     return dst
+
+
+# ---------------------------------------------------------------------------
+# Process infrastructure -- executed in EVERY mode
+#
+# The advisory lock in :mod:`rlsbl.lock` is not a previewable effect: it is the
+# process-level mutual exclusion that keeps two concurrent rlsbl runs from
+# corrupting each other's state, and a preview needs it exactly as much as a
+# live run does -- two previews racing on the same project read the same
+# half-written files a live race would.  Mechanically it cannot be recorded
+# either: ``fcntl.flock`` needs a real file descriptor and ``release_lock``
+# reads ``.name`` off the handle, so routing the lock through the recording
+# seam crashed every preview that took it (``io.UnsupportedOperation:
+# fileno``).
+#
+# The lock file is scratch owned by the running process -- created on acquire,
+# deleted on release, never part of the project state a preview reports on --
+# so executing these in preview mode records nothing and leaves nothing
+# behind.  This is the only filesystem exception in the module, and it is
+# declared by name rather than inferred: nothing here ever tries the handle
+# first and falls back.
+# ---------------------------------------------------------------------------
+
+
+def lock_makedirs(path):
+    """Create the advisory lock's containing directory (real in every mode)."""
+    _direct.makedirs(path, exist_ok=True)
+
+
+def lock_open(path):
+    """Open the advisory lock file, returning a REAL file object in every mode.
+
+    The caller flocks the returned object's descriptor, so a recorded stand-in
+    would be useless: see the section comment above.
+    """
+    return _direct.open_write(path, "w")
+
+
+def lock_remove(path):
+    """Delete the advisory lock file (real in every mode).
+
+    ``FileNotFoundError`` propagates, which is the caller's "already gone"
+    signal.
+    """
+    _direct.remove(path)
+
+
+def lock_rmdir(path):
+    """Remove the advisory lock's directory when empty (real in every mode).
+
+    ``OSError`` propagates when the directory is not empty, which is the
+    caller's "somebody else's files live here" signal.
+    """
+    _direct.rmdir(path)
+

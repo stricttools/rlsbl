@@ -30,10 +30,13 @@ def acquire_lock(lock_dir=".rlsbl", *, project_root):
     if _lock_fd is not None:
         return
 
-    effects.makedirs(lock_dir, exist_ok=True)
+    # Real in every mode, preview included: flock needs a real descriptor, and
+    # two concurrent previews race on project state exactly like two live runs
+    # do.  See the "Process infrastructure" section of rlsbl/effects.py.
+    effects.lock_makedirs(lock_dir)
     lock_path = os.path.join(lock_dir, "lock")
 
-    _lock_fd = effects.open_write(lock_path, "w")
+    _lock_fd = effects.lock_open(lock_path)
 
     try:
         # Try non-blocking first to detect contention
@@ -56,15 +59,16 @@ def release_lock():
         _lock_fd.close()
         _lock_fd = None
         # Remove the lock file so it doesn't leave an untracked file
-        # that dirties the working tree for subsequent operations.
+        # that dirties the working tree for subsequent operations.  Recorded
+        # removals would leave the real file a preview really created behind.
         try:
-            effects.remove(lock_path)
+            effects.lock_remove(lock_path)
         except FileNotFoundError:
             pass
         # Remove the containing directory if empty (cleans up spurious
         # dirs created by the bug where lock_root pointed at the wrong path).
         try:
-            effects.rmdir(os.path.dirname(lock_path))
+            effects.lock_rmdir(os.path.dirname(lock_path))
         except OSError:
             pass
 
@@ -86,7 +90,9 @@ def is_stale(lock_path=None, *, project_root):
 
     fd = None
     try:
-        fd = effects.open_write(lock_path, "w")
+        # Real in every mode for the same reason acquire_lock's is: the probe
+        # IS the flock, and a recorded stand-in has no descriptor to take.
+        fd = effects.lock_open(lock_path)
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         # Lock acquired means no one holds it -- stale
         fcntl.flock(fd, fcntl.LOCK_UN)

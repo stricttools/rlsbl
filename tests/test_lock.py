@@ -166,3 +166,47 @@ def test_is_stale_with_stale_file(tmp_path, monkeypatch):
 # NOTE: testing is_stale() with a held lock requires a subprocess because
 # fcntl.flock is per-fd within the same process. The held-lock case is
 # tested implicitly by the cross-process lock tests above.
+
+
+class TestLockUnderPreviewDispatch:
+    """The advisory lock is process infrastructure, not a previewable effect.
+
+    ``fcntl.flock`` needs a real file descriptor and ``release_lock`` reads
+    ``.name`` off the handle.  Routing the lock file through the recording
+    seam handed both of those strictcli's in-memory stand-in, so every
+    ``--dry-run`` that took the lock died with ``io.UnsupportedOperation:
+    fileno`` before it could preview anything.  Two concurrent previews are
+    just as capable of corrupting each other's state as two live runs, so the
+    lock is taken for real in every mode.
+    """
+
+    def test_dry_run_dispatch_takes_the_lock_through_a_real_fd(
+        self, mock_git_repo, monkeypatch,
+    ):
+        """`scaffold --dry-run` flocks a real fd and cleans the lock file up."""
+        (mock_git_repo / "package.json").write_text(
+            '{"name": "lockpkg", "version": "0.1.0"}\n'
+        )
+
+        import rlsbl
+
+        flocked = []
+        real_flock = rlsbl.lock.fcntl.flock
+
+        def _spy(fd, operation):
+            # Both attributes raise on the recorded stand-in: fileno() with
+            # io.UnsupportedOperation, .name with AttributeError.
+            flocked.append((fd.fileno(), fd.name))
+            return real_flock(fd, operation)
+
+        monkeypatch.setattr(rlsbl.lock.fcntl, "flock", _spy)
+
+        result = rlsbl.app.test(["--dry-run", "scaffold"])
+
+        assert result.exit_code == 0, result.stderr
+        assert flocked, "the preview never reached the advisory lock"
+        assert all(
+            name.endswith(os.path.join(".rlsbl", "lock")) for _, name in flocked
+        ), flocked
+        # Released and cleaned up, so the preview leaves no untracked lock file.
+        assert not (mock_git_repo / ".rlsbl" / "lock").exists()
