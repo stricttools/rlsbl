@@ -205,6 +205,12 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle: these tests exercise the PREFLIGHT under
+            # --dry-run, and the release stops at the plan summary when there
+            # is nothing to record onto. Left as the MagicMock default this
+            # reads as "yes, previewing", and the release would walk into
+            # Phase A driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -257,6 +263,12 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle: these tests exercise the PREFLIGHT under
+            # --dry-run, and the release stops at the plan summary when there
+            # is nothing to record onto. Left as the MagicMock default this
+            # reads as "yes, previewing", and the release would walk into
+            # Phase A driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -308,6 +320,12 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle: these tests exercise the PREFLIGHT under
+            # --dry-run, and the release stops at the plan summary when there
+            # is nothing to record onto. Left as the MagicMock default this
+            # reads as "yes, previewing", and the release would walk into
+            # Phase A driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -357,6 +375,12 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle: these tests exercise the PREFLIGHT under
+            # --dry-run, and the release stops at the plan summary when there
+            # is nothing to record onto. Left as the MagicMock default this
+            # reads as "yes, previewing", and the release would walk into
+            # Phase A driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 

@@ -125,6 +125,26 @@ from .release_state import (
 )
 
 
+def _resolve_git_root(cwd):
+    """The git work-tree root for *cwd*, or None when git cannot answer.
+
+    Goes through ``effects.run`` directly rather than the release flow's
+    late-bound ``run``: this is bookkeeping the mutating phase is handed, and
+    it must never consume a mock side effect or shift a call sequence in tests
+    that stub the release's git calls (same rationale as ``head_sha``).
+    """
+    try:
+        result = effects.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, cwd=cwd,
+        )
+    except Exception:
+        return None
+    if effects.unsettled(result) or result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
 def _format_preflight_summary(results, *, label="Preflight"):
     """Format a one-line positive confirmation of the checks that passed.
 
@@ -548,6 +568,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # drift guard hard-errors on anything else. Best-effort resolution -- a
     # repo-less invocation simply has no pin and no drift to detect.
     _pin_sha = head_sha(cwd=str(project_root))
+    # The git work-tree root, resolved HERE rather than in the mutating phase.
+    # Both are observes, and a preview records the preflight's hooks and doc
+    # regeneration in between -- after which the framework answers every
+    # observe with a stale carrier. Asked from up here, before anything is
+    # recorded, the answer is real in both modes.
+    _git_root = _resolve_git_root(str(project_root))
     # Commits the release makes before its state file exists. These seed the
     # trail the drift guard compares against.
     _prior_release_commits = []
@@ -579,7 +605,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # always runs from the release branch).
     if flags.get("batch-mode", False):
         pre_existing_dirty = set()
-        branch = get_current_branch(cwd=str(project_root))
+        # The orchestrator resolved and validated the branch once, before the
+        # first member ran; re-reading it per member is both redundant and
+        # unanswerable under a preview (an observe after a recorded mutation).
+        branch = flags.get("release-branch") or get_current_branch(
+            cwd=str(project_root),
+        )
     else:
         validate_gh_cli()
         validate_gh_push_access(config)
@@ -840,8 +871,16 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         changelog_entry = extract_changelog_entry(changelog_path, new_version)
 
     # --- Run pre-release hooks and checks ---
-    pre_hook_output = run("git", ["status", "--porcelain"])
-    pre_hook_dirty = parse_porcelain_paths(pre_hook_output) if pre_hook_output else set()
+    # The pre-hook snapshot exists only to diff against the post-hook one, and
+    # a preview never takes that diff (the hooks are recorded, not run, so they
+    # generate nothing). In a batch preview this observe also comes after an
+    # earlier member's recorded effects, where the framework answers with a
+    # stale carrier rather than a fact.
+    if effects.previewing():
+        pre_hook_dirty = set()
+    else:
+        pre_hook_output = run("git", ["status", "--porcelain"])
+        pre_hook_dirty = parse_porcelain_paths(pre_hook_output) if pre_hook_output else set()
 
     # Build hook environment
     hook_env = build_hook_env(
@@ -1155,7 +1194,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     else:
         commit_msg = tag
 
-    # --- Dry run: print summary and return ---
+    # --- Dry run: the identity summary, then straight on into Phase A ---
+    # The summary answers "what release is this?"; Phase A then runs for real
+    # with every mutation RECORDED instead of performed, and returns at the
+    # Phase-A/Phase-B seam with the boundary line and Phase B's declared plan.
+    # It used to return here, which is why the deepest command in rlsbl shipped
+    # the weakest preview: an empty would-do body under a summary.
     if flags.get("dry-run", False):
         print_dry_run_summary(
             log, registry, monorepo_name, monorepo_project_path,
@@ -1165,7 +1209,20 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             member_package_paths=member_package_paths,
             releasable_config_dir=_rel_cfg_dir,
         )
-        return
+        if not effects.previewing():
+            # No effects handle is bound, so there is nothing for Phase A to
+            # record ONTO: every mutation in it would execute. That happens on
+            # the library path (a programmatic `run_cmd`, or a direct call from
+            # a test), which the effects module documents as executing
+            # directly. The preview stops at the summary there, and says so
+            # rather than quietly showing less than the CLI does.
+            log(
+                "(No effects handle is bound -- this is the library path, "
+                "where effects execute rather than record. Only the plan "
+                "summary above is previewable; run this through the rlsbl CLI "
+                "for the recorded Phase-A effect log.)"
+            )
+            return
 
     # --- Execute release ---
     lock_dir = ".rlsbl-monorepo" if monorepo_name else ".rlsbl"
@@ -1209,6 +1266,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             pre_existing_dirty=pre_existing_dirty,
             hook_generated=hook_generated,
             pin_sha=_pin_sha,
+            git_root=_git_root,
             prior_release_commits=_prior_release_commits,
             include=list(release_config.include),
             exclude=list(release_config.exclude),

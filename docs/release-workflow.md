@@ -435,15 +435,45 @@ rlsbl release run --no-allow-dirty --watch --approve-consequential
 
 ### Dry run preview
 
-Preview what a release would do without making any changes to the repository, registry, or GitHub. The dry-run flag runs the full validation pipeline (JSONL checks, version consistency, test suite) but stops before writing version files, committing, tagging, pushing, or creating GitHub Releases. Use this to verify that all checks pass and the bump type produces the expected version before executing a real release:
+`--dry-run` previews a release by *running* the first half of it with every mutation recorded instead of performed. It is not a description written by hand alongside the code — it is the release engine itself, driven through the effects chokepoint, so what it reports is what would happen.
+
+The preview splits at the same seam the release does:
+
+- **Phase A — recorded.** Version bump, ecosystem keywords, lockfile syncs, the build, the release commit, and the candidate push. Every one of these is an effect, so a preview records it and the would-do log at the end of the run lists the real argv and the real byte counts. Nothing reaches the disk or the remote.
+- **The boundary line.** `──────── everything below depends on CI's verdict ────────`.
+- **Phase B — declared.** The CI gate, changelog finalization, the tag, the GitHub Release, asset upload, publishing, deploys and post-release hooks. These are *declared*, not recorded: their operands (which commit gets tagged, which artifacts get uploaded) do not exist until CI has judged the candidate, so the preview names each step and what it would do rather than pretending to know.
 
 ```bash
 rlsbl release run --no-allow-dirty --no-watch --approve-consequential --dry-run
-#   [DRY RUN] Bump: patch (0.6.0 -> 0.6.1)
-#   [DRY RUN] Would write version 0.6.1 to pyproject.toml
-#   [DRY RUN] Would commit, push the candidate, gate on CI, tag v0.6.1, and push
-#   [DRY RUN] Would create GitHub Release v0.6.1
+#   --- Recorded: Phase A (version bump -> candidate push) ---
+#      1. VERSION_BUMPED       bump npm version in . -> 0.6.1
+#      2. VERSION_BUMPED       build npm in .
+#      3. COMMITTED            commit 2 file(s) as 'v0.6.1'  -> candidate_sha
+#      4. BRANCH_PUSHED        run git push --no-verify origin <candidate_sha>:refs/heads/main
+#
+#   ──────── everything below depends on CI's verdict ────────
+#
+#   --- Declared: Phase B (CI gate -> publish), NOT recorded ---
+#     CI_VERIFIED            wait for CI to go green on the candidate ...
+#     TAGGED                 create v0.6.1 on the CI-verified candidate
+#     ...
+#
+#   DRY RUN — no changes were made. Would do:
+#     1. write: package.json (44 bytes)
+#     ...
+#     9. run: git push --no-verify origin «step 8 output»
 ```
+
+`«step 8 output»` is the framework's own name for a value that does not exist: the commit the recorded commit step *would* have created. The push is rendered carrying it, which is exactly what the live push carries.
+
+Two things a preview deliberately cannot show:
+
+- **The secret scan.** It scans the artifacts the build produces, and the build was recorded rather than run, so there are no artifacts of this release to scan. The preview says so on the line where the scan would be.
+- **Idempotency skips.** "The version is already bumped", "the remote is already at the candidate" — a preview cannot ask git anything after its first recorded mutation (the framework answers with a stale carrier, deliberately), so it assumes the release does the full piece of work. A preview therefore shows the *maximal* plan.
+
+A preview cannot push, by construction rather than by a flag check: the push is an effect on the chokepoint, and no observe-allowlist prefix matches `git push` (`tests/test_release_phase_a_seam.py` pins both).
+
+Called programmatically rather than through the CLI, there is no effects handle to record onto, so `--dry-run` stops at the plan summary and says so.
 
 ### Recovering from a red CI gate
 

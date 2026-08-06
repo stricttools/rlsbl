@@ -721,7 +721,15 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
                           changelog_entry, monorepo_root=None,
                           member_package_paths=None,
                           releasable_config_dir=None):
-    """Print dry-run summary and return (caller should exit after this)."""
+    """Print the release's identity summary: which release this is.
+
+    The first of the preview's three parts. It answers "what release is this?"
+    -- registry, bump, tag, branch, changelog -- from values the release flow
+    has already resolved, before Phase A issues anything. The recorded Phase-A
+    log, the boundary line and the declared Phase-B table follow it (see
+    :func:`print_release_preview`), except on the library path, where there is
+    no effects handle to record onto and this summary is the whole preview.
+    """
     from . import TARGETS, load_workspace
     from .execute import collect_companion_tags
 
@@ -772,7 +780,90 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
             plain_tag = target.tag_format(new_version)
             log(f"Subtree:   {subtree_remote} (tag: {plain_tag})")
     log(f"Changelog:\n{changelog_entry or '(none)'}")
-    log("--- No changes made ---")
+
+
+# The one line a reader must not miss in a release preview. Above it: work the
+# release can describe exactly, because every operand was derived before
+# anything was issued. Below it: work whose very existence depends on a verdict
+# CI has not given yet.
+BOUNDARY_LINE = (
+    "──────── everything below depends on CI's verdict ────────"
+)
+
+
+def _phase_b_rows(state, *, registry):
+    """The declared Phase-B plan: one (step, what it does) row per release step.
+
+    Phase B stays imperative -- it waits on CI, then publishes -- so it has no
+    plan to issue. What it CAN do honestly is declare itself: name each step
+    and what that step would do to this particular release, with the operands
+    the builder already resolved (the version, the tag, the changes dir). No
+    row here is recorded, and the boundary line above says so.
+    """
+    version = state.new_version
+    tag = state.tag
+    branch = state.branch
+    changes = state.changes_dir or ".rlsbl/changes"
+    rows = [
+        ("CI_VERIFIED",
+         f"wait for CI to go green on the candidate pushed to origin/{branch}"),
+        ("CHANGELOG_FINALIZED",
+         f"rename {changes}/unreleased.jsonl to {version}.jsonl (read-only), "
+         f"write {version}.md, regenerate CHANGELOG.md, commit"),
+        ("RELEASE_FILE_FINALIZED",
+         f"archive the release file as releases/v{version}.toml, commit"),
+        ("TAGGED", f"create {tag} on the CI-verified candidate"),
+        ("PUSHED", f"push origin/{branch} and {tag}"),
+        ("GITHUB_RELEASE",
+         f"create the GitHub Release for {tag} from the {version} "
+         f"changelog section"),
+    ]
+    if state.monorepo_name and state.monorepo_project_path:
+        rows.append(("SUBTREE_PUBLISHED",
+                     "split and push the subtree mirror, if one is configured"))
+        rows.append(("MIRROR_RELEASED",
+                     "create the mirror repo's GitHub Release"))
+    rows += [
+        ("ASSETS_UPLOADED", f"build and upload release assets to {tag}"),
+        ("PIPELINES_PUBLISHED",
+         f"publish {registry} (and any other configured pipeline) for {version}"),
+        ("DEPLOYED", "run the configured deploy targets"),
+        ("POST_HOOKS_RUN", "run .rlsbl/hooks/post-release.sh"),
+    ]
+    return rows
+
+
+def print_release_preview(log, plan, state, *, registry, files_to_commit):
+    """Render the release preview: recorded Phase A, the boundary, declared Phase B.
+
+    The order is the point. Phase A's steps really were issued -- as recorded
+    effects, which the framework's would-do log lists verbatim at the end of the
+    run -- so they are reported first, as the plan that produced them. Then the
+    boundary line. Then Phase B, which is declared and not recorded, because
+    nothing below the line is knowable until CI has judged the candidate.
+    """
+    from .phase_a import render_plan_table
+
+    log("")
+    log("--- Recorded: Phase A (version bump -> candidate push) ---")
+    log("Every effect below was RECORDED, not performed; the would-do log at "
+        "the end of this run lists them verbatim.")
+    log(render_plan_table(plan))
+    log(f"Files in the release commit: {len(files_to_commit)}")
+    log("")
+    log(BOUNDARY_LINE)
+    log("")
+    log("--- Declared: Phase B (CI gate -> publish), NOT recorded ---")
+    for step, what in _phase_b_rows(state, registry=registry):
+        log(f"  {step:<22} {what}")
+    log("")
+    # The framework writes its own structured would-do log on the way out of
+    # every dispatch, so it lands after this block no matter what the handler
+    # prints. Say what it is, or a reader meets an effect log below a line that
+    # just told them everything below it waits on CI.
+    log("(The would-do log that follows is the framework's own record of the "
+        "Phase-A effects above. Nothing from Phase B appears in it.)")
+    log("")
 
 
 def print_resume_dry_run_summary(log, saved_state, *, verified_sha=None,

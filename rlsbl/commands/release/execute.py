@@ -5,6 +5,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import sys
 import time
 
@@ -20,6 +21,7 @@ from .release_state import (
     save_step_failure,
     clear_release_state,
 )
+from . import phase_a
 from ... import effects
 
 
@@ -485,6 +487,11 @@ def _git_read(args, *, cwd):
     result = effects.run(
         ["git"] + list(args), capture_output=True, text=True, cwd=cwd,
     )
+    if effects.unsettled(result):
+        # A preview past its first recorded mutation. The framework answers
+        # observes with a stale carrier, which is the same "git declined" case
+        # as any other: no evidence, and the caller falls through.
+        return None
     if result.returncode != 0:
         return None
     return result.stdout
@@ -817,12 +824,20 @@ def head_sha(cwd=None):
     calls. Same rationale as :func:`_track_release_commit`.
     """
     try:
-        return effects.run(
+        result = effects.run(
             ["git", "rev-parse", "HEAD"],
             capture_output=True, text=True, check=True, cwd=cwd,
-        ).stdout.strip() or None
+        )
     except Exception:
         return None
+    if effects.unsettled(result):
+        # A preview past its first recorded mutation: the framework answers
+        # observes with a stale carrier, and reading a field off one truncates
+        # the preview (deliberately -- the carrier derives from BaseException
+        # so no ``except Exception`` can swallow it). "Cannot be resolved" is
+        # the honest answer, and it is the one this function already promises.
+        return None
+    return result.stdout.strip() or None
 
 
 class ForeignCommitError(RlsblError):
@@ -882,6 +897,13 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
     except Exception:
         # An unresolvable pin cannot prove drift either way; the rollback
         # guard takes the same stance on an unusable range.
+        return
+    if effects.unsettled(result):
+        # A preview, past its first recorded mutation: the framework answers
+        # observes with a stale carrier rather than a fact. Same stance as an
+        # unresolvable range -- no evidence is not evidence of drift -- and
+        # there is nothing to protect anyway, since a preview creates no commit
+        # a ride-in could be confused with.
         return
 
     commits = [c.strip() for c in result.stdout.splitlines() if c.strip()]
@@ -992,11 +1014,36 @@ def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
     )
 
 
-def _bump_selfdoc_version(project_dir, new_version):
-    """Bump version in selfdoc.json if it exists. Returns list of modified file paths."""
+def _changelog_files_for_commit(project_dir, git_root, *, releasable_cfg_dir,
+                                monorepo_root):
+    """The generated CHANGELOG.md paths a release commits, git-root-relative.
+
+    One derivation, two callers: the Phase-A plan builder (for the release
+    commit) and the changelog-finalization step (for the finalize commit).
+    """
+    from ...changelog.home import get_changelog_home, get_workspace_changelog_path
+
+    files = []
+    canonical = get_changelog_home(project_dir, releasable_dir=releasable_cfg_dir)
+    if os.path.exists(canonical):
+        files.append(_rel_to_git_root(canonical, git_root))
+    if releasable_cfg_dir and monorepo_root:
+        root_changelog = get_workspace_changelog_path(str(monorepo_root))
+        if os.path.exists(root_changelog):
+            files.append(_rel_to_git_root(root_changelog, git_root))
+    return files
+
+
+def _bump_selfdoc_version_content(project_dir, new_version):
+    """The selfdoc.json content a version bump would produce, or None.
+
+    Pure: reads and derives, writes nothing.  The Phase-A plan builder calls
+    this so the write itself becomes a data-only plan step (a path and its
+    finished bytes) that the executor issues without re-deriving anything.
+    """
     config_path = os.path.join(project_dir, "selfdoc.json")
     if not os.path.exists(config_path):
-        return []
+        return None
 
     with open(config_path, "r", encoding="utf-8") as f:
         raw = f.read()
@@ -1014,11 +1061,48 @@ def _bump_selfdoc_version(project_dir, new_version):
             indent = len(line) - len(stripped)
             break
 
-    new_content = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
+    return json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
+
+
+def _bump_selfdoc_version(project_dir, new_version):
+    """Bump version in selfdoc.json if it exists. Returns list of modified file paths."""
+    new_content = _bump_selfdoc_version_content(project_dir, new_version)
+    if new_content is None:
+        return []
     # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
     # here before the chokepoint absorbed it (see the effects module).
-    effects.atomic_write_text(config_path, new_content, file_mode=0o600)
+    effects.atomic_write_text(
+        os.path.join(project_dir, "selfdoc.json"), new_content, file_mode=0o600,
+    )
     return ["selfdoc.json"]
+
+
+def _git_toplevel(cwd=None):
+    """The git work-tree root for *cwd*.
+
+    Asks git first (mockable through the release flow's ``run``, which is what
+    tests stub). When git cannot answer -- a preview past its first recorded
+    mutation replies with a stale carrier -- the answer is derived from the
+    filesystem instead, by walking up for a ``.git`` entry. That walk is pure:
+    no subprocess, no observe, and correct for worktrees too (whose ``.git`` is
+    a file rather than a directory).
+    """
+    from . import run
+
+    try:
+        out = run("git", ["rev-parse", "--show-toplevel"], cwd=cwd)
+        if not effects.unsettled(out) and out.strip():
+            return out.strip()
+    except Exception:
+        pass
+    current = os.path.realpath(cwd or ".")
+    while True:
+        if os.path.exists(os.path.join(current, ".git")):
+            return current
+        parent = os.path.dirname(current)
+        if parent == current:
+            return current
+        current = parent
 
 
 def _rel_to_git_root(path, git_root):
@@ -1101,6 +1185,70 @@ _LOCKFILE_SPECS = [
 ]
 
 _LOCKFILE_SYNC_TIMEOUT = 30
+
+
+def _target_lockfile_syncs(target_paths, log):
+    """Which lockfile syncs a release owes, and what each one runs.
+
+    Pure: every question that decides whether a sync is owed -- does the
+    lockfile exist, is its guard file present, is the tool on PATH, is the
+    lockfile gitignored -- is asked here, before the release records or
+    performs anything.  The old inline version asked the gitignore question
+    with a ``git check-ignore`` observe issued AFTER its own sync, which under
+    a preview is a question asked after a recorded mutation: the framework
+    answers with a stale carrier and the preview truncates on the reply.
+
+    Returns a list of dicts the plan carries verbatim::
+
+        {"cwd": ..., "cmd": [...], "lockfile": ..., "lockfile_path": ...,
+         "timeout": ...}
+    """
+    from . import effects as _effects
+
+    syncs = []
+    for _target_name, t_path in target_paths.items():
+        for lockfile, tool_name, sync_cmd, guard_file in _LOCKFILE_SPECS:
+            if guard_file and not os.path.exists(os.path.join(t_path, guard_file)):
+                continue
+            lockfile_path = os.path.join(t_path, lockfile)
+            if not os.path.exists(lockfile_path):
+                continue
+            if sync_cmd[0].startswith("./"):
+                wrapper_path = os.path.join(t_path, sync_cmd[0][2:])
+                if not os.path.exists(wrapper_path):
+                    log(f"Warning: {sync_cmd[0]} not found in {t_path}, skipping {lockfile} sync")
+                    continue
+            elif shutil.which(tool_name) is None:
+                log(f"Warning: {tool_name} not found on PATH, skipping {lockfile} sync")
+                continue
+            norm_path = os.path.normpath(lockfile_path)
+            ignored = False
+            try:
+                probe = _effects.run(
+                    ["git", "check-ignore", "-q", norm_path],
+                    cwd=t_path, capture_output=True,
+                )
+                # An unanswerable probe (a preview past its first recorded
+                # mutation) is not evidence that the lockfile is ignored, and
+                # treating it as such would silently drop the sync from the
+                # preview. Exit 0 means the file IS ignored.
+                ignored = (
+                    not _effects.unsettled(probe) and probe.returncode == 0
+                )
+            except Exception as e:
+                from ...utils import warn_exception
+                warn_exception("git check-ignore failed for lockfile", e)
+            if ignored:
+                log(f"Lockfile is gitignored, skipping: {lockfile}")
+                continue
+            syncs.append({
+                "cwd": t_path,
+                "cmd": list(sync_cmd),
+                "lockfile": lockfile,
+                "lockfile_path": norm_path,
+                "timeout": _LOCKFILE_SYNC_TIMEOUT,
+            })
+    return syncs
 
 
 def _sync_lockfiles(target_paths, files_to_commit, log):
@@ -1331,6 +1479,61 @@ def collect_companion_tags(member_package_paths, workspace_root, version,
     return result
 
 
+def _sync_member_package_versions_plan(
+    member_package_paths, monorepo_root, new_version, git_root,
+    exclude_path=None, releasable_config_dir=None,
+):
+    """Which member packages a releasable version bump has to write, and where.
+
+    Pure: resolves each member's config and targets, validates that a declared
+    target's manifest exists, and returns one entry per (member, target) pair::
+
+        {"package_path": ..., "target": ..., "path": ..., "files": [...]}
+
+    ``files`` are git-root-relative predictions from the target's declared
+    version file -- a lower bound the executor widens with whatever the
+    target's writer actually reports touching.
+    """
+    from . import TARGETS
+    from ...member_context import resolve_member_context
+
+    plan = []
+    for pkg_path in member_package_paths:
+        if exclude_path and pkg_path == exclude_path:
+            continue
+        abs_pkg = os.path.join(str(monorepo_root), pkg_path)
+        if not os.path.isdir(abs_pkg):
+            continue
+        member = resolve_member_context(
+            abs_pkg, releasable_config_dir=releasable_config_dir,
+        )
+        if member.publish_mode == "none":
+            continue
+        for entry in member.targets or ():
+            tgt = TARGETS.get(entry.name)
+            if not tgt:
+                continue
+            if not tgt.check_project_exists(entry.path):
+                from ...errors import ConfigError
+                raise ConfigError(
+                    f"member '{pkg_path}' declares target '{entry.name}' but "
+                    f"its manifest does not exist at {entry.path}. "
+                    f"Cannot sync version."
+                )
+            vfile = tgt.version_file(entry.path)
+            plan.append({
+                "package_path": pkg_path,
+                "target": entry.name,
+                "path": entry.path,
+                "files": (
+                    [_rel_to_git_root(
+                        os.path.join(entry.path, vfile), git_root,
+                    )] if vfile else []
+                ),
+            })
+    return plan
+
+
 def _sync_member_package_versions(
     member_package_paths, monorepo_root, new_version,
     files_to_commit, git_root, log, ctx,
@@ -1467,6 +1670,13 @@ class ReleaseState:
     # (including the pre-mutating selfdoc auto-commit). Everything in
     # pin_sha..HEAD must be in the release's own commit trail.
     pin_sha: str | None = None
+    # The git work-tree root, resolved by the entry point BEFORE the preflight
+    # hooks run. It has to come from up there: a preview records the hooks
+    # rather than running them, and after the first recorded mutation every
+    # observe -- including ``git rev-parse --show-toplevel`` -- answers with
+    # the framework's stale carrier. None means "resolve it here" (direct
+    # callers in tests).
+    git_root: str | None = None
     # Commits this release created BEFORE the state file existed (the selfdoc
     # auto-commit). They seed the state file's release_commits trail.
     prior_release_commits: list[str] = dataclasses.field(default_factory=list)
@@ -1502,22 +1712,55 @@ class ReleaseState:
         )
 
 
+def _refuse_phase_b_in_preview(flags):
+    """Structural backstop at the one door a preview must never open.
+
+    It used to guard the whole mutating phase, because a preview had no
+    business anywhere inside it: ``release resume --dry-run`` once walked
+    straight through and committed, tagged, pushed to the release branch,
+    created a GitHub Release and dispatched the publish workflows.
+
+    Phase A is now previewable BY CONSTRUCTION -- every mutation in it is an
+    effect, so a preview records it and nothing reaches the disk or the remote
+    (``tests/test_release_phase_a_seam.py`` pins that, including the fact that
+    no ``["git"]`` observe prefix exists that could let a push execute). What
+    stays un-previewable is Phase B, which waits on CI and then publishes. So
+    the backstop moved down to exactly that door: reaching it with ``--dry-run``
+    set means the seam return above was bypassed, which is a bug.
+    """
+    if (flags or {}).get("dry-run", False):
+        raise RlsblError(
+            "internal error: the CI gate and the publishing half of the "
+            "release were entered with --dry-run set. Every release entry "
+            "point must return at the Phase-A/Phase-B seam before this point "
+            "-- reaching here would tag, push and publish for real. This is a "
+            "bug in rlsbl; please report the command that produced it."
+        )
+
+
 def _run_release_mutating(state: ReleaseState):
     """Inner release logic that runs under the advisory lock (mutating phase)."""
-    # Structural backstop against the whole bug class, not one instance of it.
-    # Every entry point (fresh release, resume, batch member) is supposed to
-    # print its dry-run preview and return before reaching here. `release
-    # resume` did not, and `--dry-run` consequently committed, tagged, pushed
-    # to the release branch, created a GitHub Release and dispatched the
-    # publish workflows. Gating each caller relies on each caller remembering;
-    # refusing at the single door every mutation goes through does not.
-    if (state.flags or {}).get("dry-run", False):
+    # Preview mode reaches here on purpose: Phase A is issued through the plan
+    # executor, whose effects a preview RECORDS rather than performs, and the
+    # run returns at the Phase-A/Phase-B seam. The backstop that used to refuse
+    # this whole function now guards that seam instead
+    # (:func:`_refuse_phase_b_in_preview`).
+    _previewing = bool((state.flags or {}).get("dry-run", False))
+    # Late-bound through the package namespace, exactly like the ``run`` family
+    # below, so this backstop and the entry point's own check consult the SAME
+    # effects module -- including when a test patches it.
+    from . import effects as _effects_ns
+    if _previewing and not _effects_ns.previewing():
+        # --dry-run without an effects handle to record onto: every mutation
+        # below would EXECUTE. The entry points stop at the plan summary in
+        # that case (the library path), so reaching here means one of them
+        # did not -- and the difference between "recorded" and "performed" is
+        # the whole release.
         raise RlsblError(
             "internal error: the mutating release phase was entered with "
-            "--dry-run set. Every release entry point must return at its "
-            "dry-run preview before this point -- reaching here would commit, "
-            "tag, push and publish for real. This is a bug in rlsbl; please "
-            "report the command that produced it."
+            "--dry-run set but no effects handle bound, so its effects would "
+            "execute instead of being recorded. This is a bug in rlsbl; "
+            "please report the command that produced it."
         )
     # Unpack frequently-used state into locals for readability and to preserve
     # the existing closure/reference patterns (commit_msg, primary_path, and
@@ -1548,8 +1791,9 @@ def _run_release_mutating(state: ReleaseState):
     releasable_tag_format_str = state.releasable_tag_format
     commit_msg = state.commit_msg
     lock_dir = state.lock_dir
-    pre_existing_dirty = state.pre_existing_dirty
-    hook_generated = state.hook_generated
+    # ``pre_existing_dirty`` and ``hook_generated`` are read off ``state`` by
+    # the Phase-A plan builder, which owns everything they feed (the commit's
+    # file list and the concurrent-change guard's expected set).
     description = state.description
     context = state.context
     ctx = state.ctx
@@ -1565,7 +1809,6 @@ def _run_release_mutating(state: ReleaseState):
         commit_files,
         commit_files_if_changed,
         has_staged_or_modified,
-        DEFAULT_PUSH_TIMEOUT,
         get_push_timeout,
         get_hook_timeout,
         get_ci_timeout,
@@ -1586,8 +1829,6 @@ def _run_release_mutating(state: ReleaseState):
         read_deploy_config,
         deploy_target,
         ensure_github_topic,
-        ensure_npm_keyword,
-        ensure_pypi_keyword,
         changes_dir_exists,
         finalize_version,
         generate_version_file,
@@ -1634,15 +1875,30 @@ def _run_release_mutating(state: ReleaseState):
     # --allow-dirty pre-existing files, etc.). Only files that become dirty
     # AFTER this point — i.e. during the version bump — are candidates for
     # the "unexpected modified files" abort.
-    baseline_output = run("git", ["status", "--porcelain"])
-    baseline_dirty = parse_porcelain_paths(baseline_output) if baseline_output else set()
+    #
+    # A preview has no such snapshot to take: the stages above RECORDED their
+    # mutations instead of making them, so git would report the tree as it was
+    # before the release started -- which is exactly ``pre_existing_dirty``.
+    # (It would not even report that: an observe issued after a recorded
+    # mutation answers with the framework's stale carrier.) The guard that
+    # consumes the snapshot does not run in a preview either, because there is
+    # nothing written for it to judge.
+    if _previewing:
+        baseline_dirty = set(state.pre_existing_dirty or ())
+    else:
+        baseline_output = run("git", ["status", "--porcelain"])
+        baseline_dirty = parse_porcelain_paths(baseline_output) if baseline_output else set()
 
     if commit_msg is None:
         commit_msg = tag
 
     # git status --porcelain outputs paths relative to the repo root.
     # Compute the repo root so vpath can produce matching relative paths.
-    _git_root = run("git", ["rev-parse", "--show-toplevel"]).strip()
+    # The caller resolves it before the preflight hooks and hands it over,
+    # because by the time control reaches here a preview has already recorded
+    # a mutation or two -- and after the first of those, every observe (this
+    # one included) answers with the framework's stale carrier.
+    _git_root = state.git_root or _git_toplevel(project_dir)
 
     def vpath(filename):
         """Join filename with project_dir, return relative to git root."""
@@ -1687,7 +1943,14 @@ def _run_release_mutating(state: ReleaseState):
     # Capture HEAD before any version-bump writes so we can roll back on failure.
     # This must happen before write_version() so that git reset --hard reverts
     # the uncommitted version-bumped files if the release aborts.
-    pre_release_sha = run("git", ["rev-parse", "HEAD"])
+    #
+    # A preview has nothing to roll back -- it performs no write -- so it takes
+    # the release's own entry pin rather than issuing an observe that a
+    # recorded mutation has already made stale.
+    pre_release_sha = (
+        (state.pin_sha or "") if _previewing
+        else run("git", ["rev-parse", "HEAD"])
+    )
 
     # Write release state file at the start of the mutating phase.
     # This persists if the release fails mid-way, enabling future resume.
@@ -1934,374 +2197,41 @@ def _run_release_mutating(state: ReleaseState):
     # from the unexpected-files check) triggers rollback of version-bumped
     # files via git reset --hard.
     try:
-        # Write new version to version files (skip if version didn't change, e.g. first release)
-        # Build files_to_commit from the paths actually modified by write_version().
-        files_to_commit = []
-
-        # VERSION_BUMPED guard: skip if the primary target already has the new version
-        _version_already_bumped = False
-        if "VERSION_BUMPED" in _completed:
-            _version_already_bumped = True
-            log("Skipping version bump (already done)")
-        elif new_version != current_version:
-            try:
-                _on_disk_version = reg.read_version(primary_path)
-                if _on_disk_version == new_version:
-                    _version_already_bumped = True
-                    save_step(_state_path, "VERSION_BUMPED")
-                    _completed.add("VERSION_BUMPED")
-                    log("Skipping version bump (version already matches)")
-            except Exception:
-                pass  # read_version may fail if target has no manifest yet
-
-        if not _version_already_bumped and new_version != current_version:
-            # In explicit releasable mode, write the releasable version file first
-            if releasable_name and monorepo_root:
-                from ...workspace import write_releasable_version, get_releasable_version_path
-                write_releasable_version(str(monorepo_root), releasable_name, new_version)
-                ver_path = get_releasable_version_path(str(monorepo_root), releasable_name)
-                ver_rel = _rel_to_git_root(ver_path, _git_root)
-                files_to_commit.append(ver_rel)
-                log(f"Updated releasable version: {releasable_name} -> {new_version}")
-
-            if _rep_is_private:
-                log("Skipping representative manifest bump (publish-suppressed member)")
-            else:
-                modified = reg.write_version(primary_path, new_version, ctx=ctx)
-                for rel in modified:
-                    files_to_commit.append(target_vpath(primary_path, rel))
-                if modified:
-                    log(f"Updated version in {', '.join(target_vpath(primary_path, r) for r in modified)}")
-
-                # Sync version to other configured/detected targets (per-target paths)
-                for t_name, t_path in target_paths.items():
-                    if t_name == registry:
-                        continue
-                    other_reg = TARGETS.get(t_name)
-                    if other_reg and other_reg.check_project_exists(t_path):
-                        other_modified = other_reg.write_version(t_path, new_version, ctx=ctx)
-                        for rel in other_modified:
-                            files_to_commit.append(target_vpath(t_path, rel))
-                        if other_modified:
-                            log(f"Synced version to {', '.join(target_vpath(t_path, r) for r in other_modified)}")
-
-            # In explicit mode, sync version to published member packages
-            if releasable_name and member_package_paths and monorepo_root:
-                _sync_member_package_versions(
-                    member_package_paths, monorepo_root, new_version,
-                    files_to_commit, _git_root, log, ctx,
-                    # Skip the current project's path -- already handled above
-                    exclude_path=monorepo_project_path,
-                    releasable_config_dir=_releasable_cfg_dir,
-                )
-
-            # Bump selfdoc.json version inline (no DocsTarget dependency).
-            bumped_files = set(files_to_commit)
-            selfdoc_modified = _bump_selfdoc_version(project_dir, new_version)
-            for rel in selfdoc_modified:
-                fpath = vpath(rel)
-                if fpath not in bumped_files:
-                    files_to_commit.append(fpath)
-            if selfdoc_modified:
-                log(f"Synced version to {', '.join(vpath(r) for r in selfdoc_modified)}")
-
-            save_step(_state_path, "VERSION_BUMPED")
-            _completed.add("VERSION_BUMPED")
-
-        if "VERSION_BUMPED" not in _completed:
-            # Version unchanged (first release): nothing to bump. Mark the
-            # step so completeness is provable at the epilogue.
-            save_step(_state_path, "VERSION_BUMPED")
-            _completed.add("VERSION_BUMPED")
-
-        # Ecosystem tagging: add keyword to manifests if enabled. A private
-        # representative's manifests are never touched (same private-awareness
-        # as the version bump above).
-        if should_tag(flags, ctx.config) and not _rep_is_private:
-            npm_path = target_paths.get("npm", project_dir)
-            try:
-                if TARGETS["npm"].check_project_exists(npm_path):
-                    if ensure_npm_keyword(npm_path, quiet=quiet, project_root=project_root):
-                        pkg_path = target_vpath(npm_path, "package.json")
-                        if pkg_path not in files_to_commit:
-                            files_to_commit.append(pkg_path)
-            except Exception as e:
-                from ...utils import warn_exception
-                warn_exception("npm ecosystem tagging failed", e)
-            pypi_path = target_paths.get("pypi", project_dir)
-            try:
-                if TARGETS["pypi"].check_project_exists(pypi_path):
-                    if ensure_pypi_keyword(pypi_path, quiet=quiet, project_root=project_root):
-                        pyproject_path = target_vpath(pypi_path, "pyproject.toml")
-                        if pyproject_path not in files_to_commit:
-                            files_to_commit.append(pyproject_path)
-            except Exception as e:
-                from ...utils import warn_exception
-                warn_exception("pypi ecosystem tagging failed", e)
-
-        # Sync lockfiles after version bumps so they reflect the new version
-        _sync_lockfiles(target_paths, files_to_commit, log)
-        # In releasable mode, also sync lockfiles for publishing members
-        # whose manifests were version-bumped by _sync_member_package_versions.
-        if releasable_name and member_package_paths and monorepo_root:
-            from ...member_context import resolve_member_context as _rmc_lock
-            for _mp_path in member_package_paths:
-                _mp_abs = os.path.join(str(monorepo_root), _mp_path)
-                if not os.path.isdir(_mp_abs):
-                    continue
-                _mp_member = _rmc_lock(
-                    _mp_abs, releasable_config_dir=_releasable_cfg_dir,
-                )
-                if _mp_member.publish_mode == "none":
-                    continue
-                _mp_tpaths = _mp_member.target_paths
-                if _mp_tpaths:
-                    _sync_lockfiles(_mp_tpaths, files_to_commit, log)
-        if monorepo_root:
-            _sync_lockfiles({"workspace_root": str(monorepo_root)}, files_to_commit, log)
-            # Unconditionally include workspace-root lockfiles that exist.
-            # _sync_lockfiles only adds a lockfile when its mtime changes, but the
-            # lockfile may already be stale from the version bump (especially npm,
-            # see npm bug #5967). Including unconditionally ensures the release
-            # commit captures any pre-existing staleness.
-            for ws_lockfile_name, _, _, ws_guard in _LOCKFILE_SPECS:
-                if ws_guard and not os.path.exists(os.path.join(str(monorepo_root), ws_guard)):
-                    continue
-                ws_lockfile = os.path.join(str(monorepo_root), ws_lockfile_name)
-                if os.path.exists(ws_lockfile):
-                    norm = os.path.normpath(ws_lockfile)
-                    if norm not in files_to_commit:
-                        files_to_commit.append(norm)
-                        log(f"Workspace lockfile included: {ws_lockfile_name}")
-
-        # Update .rlsbl/version marker (the rlsbl TOOL version that generated
-        # the scaffolding) so it's included in the release commit. Only
-        # refresh it when the project was actually scaffolded (scaffold
-        # metadata present); never in releasable mode -- releasable member
-        # dirs are not scaffolded and nothing reads a member-level marker
-        # (the pre-push freshness check reads the repo root only).
-        rlsbl_version_marker = vpath(os.path.join(".rlsbl", "version"))
-        _scaffold_meta_present = any(
-            os.path.exists(os.path.join(project_dir, ".rlsbl", meta))
-            for meta in ("managed-files.json",)
-        )
-        if _releasable_cfg_dir is None and _scaffold_meta_present:
-            try:
-                from ... import __version__ as rlsbl_ver
-                with effects.open_write(rlsbl_version_marker, "w") as f:
-                    f.write(rlsbl_ver + "\n")
-                if rlsbl_version_marker not in files_to_commit:
-                    files_to_commit.append(rlsbl_version_marker)
-            except Exception as e:
-                from ...utils import warn_exception
-                warn_exception("writing .rlsbl/version marker failed", e)
-
-        # Include the generated CHANGELOG.md files in the commit (dev nodes
-        # have no CHANGELOG.md). The canonical location is resolved via
-        # rlsbl.changelog.home: releasable dir in releasable mode (plus the
-        # combined root CHANGELOG.md), project root otherwise.
-        from ...changelog.home import get_changelog_home, get_workspace_changelog_path
-        _changelog_commit_files = []
-        _canonical_changelog = get_changelog_home(
-            project_dir, releasable_dir=_releasable_cfg_dir,
-        )
-        if os.path.exists(_canonical_changelog):
-            _changelog_commit_files.append(
-                _rel_to_git_root(_canonical_changelog, _git_root)
-            )
-        if _releasable_cfg_dir and monorepo_root:
-            _root_changelog = get_workspace_changelog_path(str(monorepo_root))
-            if os.path.exists(_root_changelog):
-                _changelog_commit_files.append(
-                    _rel_to_git_root(_root_changelog, _git_root)
-                )
-        for _cl_file in _changelog_commit_files:
-            if _cl_file not in files_to_commit:
-                files_to_commit.append(_cl_file)
-
-        # Include hook-generated files (created or modified by pre-checks/pre-release hooks)
-        if hook_generated:
-            for hf in sorted(hook_generated):
-                if hf not in files_to_commit:
-                    files_to_commit.append(hf)
-                    log(f"Including hook-generated file: {hf}")
-
-        # Clear stale artifacts from dist/ BEFORE building so the secret scan
-        # below is scoped to exactly this release's output. Build tools append
-        # to dist/ without pruning older versions' artifacts; scanning those
-        # stale files could surface old secrets or slow the release.
-        from ...secret_scan import clean_stale_artifacts
-        clean_stale_artifacts(project_dir, log=log, target_paths=target_paths)
-
-        # Build step: primary target (e.g. pypi builds a wheel, maven runs
-        # gradle/mvn, pgdesign validates the schema).  Failures propagate to
-        # the outer rollback handler.
-        _build_config = ctx.config if ctx else None
-        target.build(primary_path, new_version, config=_build_config)
-
-        # Build step: secondary targets (multi-target projects).
-        if secondary_targets:
-            from ...targets import TARGETS as ALL_TARGETS
-            for sec_name in sorted(secondary_targets):
-                sec_target = ALL_TARGETS.get(sec_name)
-                if sec_target is None:
-                    continue
-                sec_path = secondary_targets[sec_name]
-                sec_target.build(sec_path, new_version, config=_build_config)
-
-        # Secret scan gate: scan built artifacts for leaked secrets before
-        # any push or publish. This is a hard, non-bypassable gate.
-        from ...secret_scan import scan_artifacts_for_secrets, SecretScanError
-        try:
-            scan_artifacts_for_secrets(project_dir, log=log, target_paths=target_paths)
-        except SecretScanError as e:
-            raise ReleaseAbortError(str(e))
-
-        # Re-check working tree: abort if files outside our expected set were modified
-        # (guards against concurrent processes dirtying the tree after our initial check)
-        dirty_output = run("git", ["status", "--porcelain"])
-        if dirty_output:
-            dirty_files = parse_porcelain_paths(dirty_output)
-            # Normalize all files_to_commit to git-relative paths.
-            # Some callers (e.g. _sync_lockfiles)
-            # add absolute paths via os.path.normpath(); git status
-            # --porcelain outputs repo-relative paths, so we must match.
-            expected_files = {
-                os.path.relpath(os.path.abspath(f), _git_root) if os.path.isabs(f) else f
-                for f in files_to_commit
-            }
-            expected_files.add(vpath(os.path.join(lock_dir, "lock")))
-            # rlsbl's own release-state files are never a concurrent-change
-            # signal: in-progress.json is written by this very function, and
-            # scrub-result.json is the scrub resume record that shares the
-            # directory (a scrub in another session -- or one interrupted
-            # moments ago -- leaves it there). ``validate_clean_tree``'s
-            # ``is_tool_owned_state_path`` exempts the same pair; this guard is
-            # the second gate on the same tree and must agree with it.
-            # Also add the parent directory with trailing slash since git
-            # status --porcelain may show newly-created directories as e.g.
-            # "?? .rlsbl/releases/" instead of listing individual files.
-            from .release_state import SCRUB_RESULT_FILENAME
-            _state_abs = os.path.abspath(_state_path)
-            _state_rel = os.path.relpath(_state_abs, _git_root)
-            expected_files.add(_state_rel)
-            _state_home = os.path.dirname(_state_abs)
-            expected_files.add(
-                os.path.relpath(
-                    os.path.join(_state_home, SCRUB_RESULT_FILENAME), _git_root,
-                )
-            )
-            _state_dir_rel = os.path.relpath(_state_home, _git_root)
-            expected_files.add(_state_dir_rel + "/")
-            # The .validated cache is written by changelog validation earlier in the
-            # release flow.  It may be tracked (dirty) or gitignored (invisible to
-            # git status).  Either way it is not a concurrent-change signal.
-            # Use the resolved changes_dir (covers both releasable and per-project).
-            _validated_changes_dir = state.changes_dir or get_changes_dir(project_dir)
-            validated_raw = os.path.normpath(
-                os.path.join(_validated_changes_dir, ".validated")
-            )
-            validated_file = os.path.relpath(validated_raw, _git_root) if os.path.isabs(validated_raw) else validated_raw
-            expected_files.add(validated_file)
-            # When --allow-dirty was used, files that were already dirty before the
-            # release started are not "unexpected" -- only genuinely new modifications
-            # (from e.g. concurrent processes) should trigger the abort.
-            if pre_existing_dirty:
-                expected_files |= pre_existing_dirty
-            # Subtract the baseline snapshot taken at the start of the mutating
-            # phase.  This covers files written by intermediate stages that ran
-            # BEFORE version-bump writes (generate_changelog, hooks, lint) which
-            # are not in files_to_commit or pre_existing_dirty.
-            unexpected = dirty_files - expected_files - baseline_dirty
-            if unexpected:
-                unexpected_list = ", ".join(sorted(unexpected))
-                raise ReleaseAbortError(
-                    f"Unexpected modified files detected (possible concurrent change): {unexpected_list}. Aborting release."
-                )
-
-        # COMMITTED guard: skip if HEAD commit message already matches
-        _commit_already_done = False
-        if "COMMITTED" in _completed:
-            _commit_already_done = True
-            log("Skipping commit (already done)")
-        else:
-            _head_msg = run("git", ["log", "-1", "--format=%s"]).strip()
-            if _head_msg == commit_msg:
-                _commit_already_done = True
-                save_step(_state_path, "COMMITTED")
-                _completed.add("COMMITTED")
-                log("Skipping commit (HEAD already matches)")
-
-        if not _commit_already_done:
-            # Commit if any of the files we track actually have changes.
-            # Don't use is_clean_tree() as a proxy — the advisory lock file (.rlsbl/lock)
-            # makes the tree appear dirty even when no release-relevant files changed.
-
-            needs_commit = new_version != current_version or has_staged_or_modified(files_to_commit, cwd=_git_root)
-            if files_to_commit and needs_commit:
-                commit_files(commit_msg, files_to_commit, cwd=_git_root)
-                _track_release_commit(_state_path)
-                log(f"Committed: {commit_msg}")
-            elif not needs_commit:
-                log("No changes to commit")
-            save_step(_state_path, "COMMITTED")
-            _completed.add("COMMITTED")
-
-        # SNAPSHOT_REGENERATED: regenerate the monorepo snapshot BEFORE the
-        # candidate push so the snapshot commit is part of the commit CI
-        # verifies -- and therefore of the tree the tag points at. This is a
-        # fatal pre-push mutating step: a failure rolls back like its
-        # neighbours rather than completing with a recorded failure marker.
-        if "SNAPSHOT_REGENERATED" in _completed:
-            log("Skipping snapshot regeneration (already done)")
-        elif "BRANCH_PUSHED" in _completed or "TAGGED" in _completed:
-            # Resume of a release whose candidate is already published (or an
-            # old-ordering state file whose tag was already pushed). The
-            # pre-push slot is forfeit -- a commit cannot be inserted before a
-            # commit that is already on the remote. The post-hoc fallback
-            # (after the release completes) regenerates the snapshot instead.
-            log("Snapshot pre-push slot forfeit (candidate already pushed); "
-                "will regenerate post-hoc")
-        elif monorepo_name:
-            from ...snapshot import generate_snapshot, write_snapshot
-            from ...workspace_graph import WorkspaceGraph
-
-            projects = load_workspace(monorepo_root)
-            graph = WorkspaceGraph(monorepo_root, projects)
-            snapshot = generate_snapshot(monorepo_root, projects, graph)
-            rel_path = write_snapshot(monorepo_root, snapshot)
-            did_commit = commit_files_if_changed(
-                "snapshot", [rel_path], skip_message="Snapshot unchanged.",
-                autogenerated=True, cwd=monorepo_root,
-            )
-            if did_commit:
-                _track_release_commit(_state_path)
-            log(f"Regenerated monorepo snapshot: {rel_path}")
-            save_step(_state_path, "SNAPSHOT_REGENERATED")
-            _completed.add("SNAPSHOT_REGENERATED")
-        else:
-            # Not a monorepo: nothing to regenerate; the step is trivially done.
-            save_step(_state_path, "SNAPSHOT_REGENERATED")
-            _completed.add("SNAPSHOT_REGENERATED")
-
-        # ---- Candidate push + CI gate (main-as-candidate ordering) ----
+        # ---- Phase A: version bump through candidate push ----
         #
-        # The version-bump commit is published to the release branch UNTAGGED
-        # and the repository's own CI judges it. Only a green verdict unlocks
-        # the irreversible half of the release (changelog finalization, tag,
-        # GitHub Release, registry publish). A red verdict leaves NO tag, NO
-        # GitHub Release and NO finalized changelog behind, so the version is
-        # not burnt and the fix lands forward at the same version.
-        push_timeout = get_push_timeout(ctx.config, override=flags.get("push-timeout"))
-        if push_timeout != DEFAULT_PUSH_TIMEOUT:
-            log(f"Push timeout: {push_timeout}s (from --push-timeout or the "
-                f"push_timeout config key)")
+        # Built first, then issued. :func:`~rlsbl.commands.release.phase_a.
+        # build_phase_a_plan` does every read this half of the release needs --
+        # the manifests, the working tree, the branch tip, the remote head, the
+        # state file -- and returns typed steps whose payloads are plain data;
+        # :func:`~rlsbl.commands.release.phase_a.execute_phase_a_plan` issues
+        # them and asks nothing. That is what lets a preview record Phase A end
+        # to end: with no observe left after the first recorded mutation, there
+        # is nothing for the framework's stale carrier to truncate.
+        #
+        # Rollback stays here, in the caller: a failing step raises into the
+        # handlers below (reset to the pre-release pin plus orphan cleanup).
+        # It is never a plan step, and a preview -- which executes nothing --
+        # needs none.
+        _phase_a_inputs = phase_a.BuildInputs(
+            state=state, ctx=ctx, log=log,
+            project_dir=project_dir, git_root=_git_root,
+            monorepo_root=monorepo_root,
+            releasable_cfg_dir=_releasable_cfg_dir,
+            rep_is_private=_rep_is_private,
+            registry=registry, primary_path=primary_path,
+            target_paths=target_paths, secondary_targets=secondary_targets,
+            state_path=_state_path, completed=_completed, pin_sha=_pin_sha,
+            baseline_dirty=baseline_dirty, commit_msg=commit_msg,
+            lock_dir=lock_dir,
+        )
 
         # The batch orchestrator runs ONE CI gate for the whole batch: every
         # member's candidate is pushed first (ci-defer), the batch tip is
         # verified once, and each member is then resumed with that verified
-        # SHA. Such a resume must not re-push or re-gate its own candidate.
+        # SHA. Such a resume must not re-push or re-gate its own candidate --
+        # so it skips Phase A entirely and adopts the recorded candidate.
         _batch_verified = flags.get("ci-verified-sha")
+        files_to_commit = []
         if "CI_VERIFIED" in _completed or (
             _batch_verified and "BRANCH_PUSHED" in _completed
         ):
@@ -2329,7 +2259,18 @@ def _run_release_mutating(state: ReleaseState):
                 save_step(_state_path, "CI_VERIFIED")
                 _completed.add("CI_VERIFIED")
         else:
-            if flags.get("ci-defer"):
+            _phase_a_plan = phase_a.build_phase_a_plan(_phase_a_inputs)
+            files_to_commit = _phase_a_plan.files_to_commit
+            # Recorded before the push is issued: a push that times out may
+            # still have landed, and the resumable-failure classifier below
+            # must not roll back over a candidate that reached the remote.
+            candidate_push_attempted = any(
+                s.kind == phase_a.PUSH_CANDIDATE for s in _phase_a_plan.steps
+            )
+            candidate_sha = phase_a.execute_phase_a_plan(
+                _phase_a_plan, _phase_a_inputs, preview=_previewing,
+            )
+            if _phase_a_plan.defers_push:
                 # Batch mode, pass 1: COMMIT ONLY -- the candidate stays local.
                 # The orchestrator publishes the whole batch in ONE push once
                 # every member has committed, and gates that single commit.
@@ -2345,59 +2286,33 @@ def _run_release_mutating(state: ReleaseState):
                 log("Deferring the candidate push and CI gate to the batch "
                     "orchestrator")
                 return
-
-            # A resume after a red CI re-pins the candidate on the CURRENT tip
-            # (the fix commit), so BRANCH_PUSHED is deliberately re-evaluated
-            # whenever CI_VERIFIED is missing.
-            candidate_sha = run("git", ["rev-parse", "HEAD"]).strip()
-            _cand_state = load_release_state(_state_path) or {}
-            _cand_state["candidate_sha"] = candidate_sha
-            save_release_state(_state_path, _cand_state)
-
-            _cand_needs_push = True
-            _remote_head = None
-            try:
-                _ls_out = run(
-                    "git", ["ls-remote", "origin", f"refs/heads/{branch}"]
-                ).strip()
-                _remote_head = _ls_out.split()[0] if _ls_out else None
-                if _remote_head and candidate_sha == _remote_head:
-                    _cand_needs_push = False
-                    log("Skipping candidate push (remote already at the candidate)")
-            except Exception:
-                pass  # Remote branch might not exist yet
-
-            _guard_foreign_commits(
-                _pin_sha, _state_path, cwd=_git_root, phase="candidate push",
-            )
-            # Pre-push: a candidate whose diff window matches none of this
-            # project's router filters can only end in a skipped CI job and a
-            # refused publish gate. Refuse it here, from the diff, rather than
-            # after the minutes-long wait that can only confirm it.
-            _guard_empty_candidate_window(
-                candidate_sha=candidate_sha,
-                remote_head=_remote_head,
-                needs_push=_cand_needs_push,
-                state_path=_state_path,
-                monorepo_root=monorepo_root,
-                monorepo_name=state.monorepo_name,
-                releasable_name=releasable_name,
-                version=new_version, tag=tag, branch=branch,
-                cwd=_git_root, log=log,
-            )
-            if _cand_needs_push:
-                candidate_push_attempted = True
-                push_if_needed(
-                    branch, config=ctx.config, cwd=project_dir, sha=candidate_sha,
-                )
             branch_pushed = True
-            log(
-                f"Pushed release candidate {candidate_sha[:12]} to "
-                f"origin/{branch} (untagged)"
-            )
-            save_step(_state_path, "BRANCH_PUSHED")
-            _completed.add("BRANCH_PUSHED")
 
+        # ---- The Phase-A / Phase-B seam ----
+        #
+        # Everything above is knowable now. Everything below waits on a verdict
+        # only CI can give, so a preview stops here: it renders what Phase B
+        # WOULD do as a declared plan, under a boundary line saying so, and
+        # returns without issuing any of it.
+        if _previewing:
+            from .validate import print_release_preview
+
+            print_release_preview(
+                log, _phase_a_plan, state,
+                registry=registry, files_to_commit=files_to_commit,
+            )
+            return
+        _refuse_phase_b_in_preview(flags)
+
+        # ---- Phase B: the CI gate ----
+        #
+        # The candidate is on the release branch, untagged, and the
+        # repository's own CI is judging it. Only a green verdict unlocks the
+        # irreversible half of the release (changelog finalization, tag, GitHub
+        # Release, registry publish). A red verdict leaves NO tag, NO GitHub
+        # Release and NO finalized changelog behind, so the version is not
+        # burnt and the fix lands forward at the same version.
+        if "CI_VERIFIED" not in _completed:
             if flags.get("ci-verified-sha"):
                 log(
                     "CI gate satisfied by the batch orchestrator "
@@ -2561,6 +2476,13 @@ def _run_release_mutating(state: ReleaseState):
             # Commit the finalized JSONL file and the new empty unreleased.jsonl
             jsonl_finalized = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.jsonl"), _git_root)
             jsonl_unreleased = _rel_to_git_root(os.path.join(changes_dir, "unreleased.jsonl"), _git_root)
+            # The generated CHANGELOG.md files, resolved the same way the
+            # Phase-A plan resolved them for the release commit.
+            _changelog_commit_files = _changelog_files_for_commit(
+                project_dir, _git_root,
+                releasable_cfg_dir=_releasable_cfg_dir,
+                monorepo_root=monorepo_root,
+            )
             finalize_files = [jsonl_finalized, jsonl_unreleased, *_changelog_commit_files]
             # Also commit the generated per-version .md file if it exists
             jsonl_md = _rel_to_git_root(os.path.join(changes_dir, f"{new_version}.md"), _git_root)

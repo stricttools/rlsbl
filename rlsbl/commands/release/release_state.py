@@ -283,7 +283,12 @@ def find_releasable_state_files(workspace_root) -> list[tuple[str, str]]:
 def save_release_state(state_path: str, state_dict: dict) -> None:
     """Atomically write the release state dict to disk (tmp + os.replace)."""
     parent = os.path.dirname(state_path)
-    effects.makedirs(parent, exist_ok=True)
+    # Only when it is actually missing. ``exist_ok=True`` made this a no-op in
+    # live mode but a recorded ``mkdir`` in a preview, on every one of the
+    # eight-plus step markers a release writes -- eight lines of would-do log
+    # for a directory that already exists.
+    if parent and not os.path.isdir(parent):
+        effects.makedirs(parent, exist_ok=True)
     # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
     # here before the chokepoint absorbed it (see the effects module).
     effects.atomic_write_text(
