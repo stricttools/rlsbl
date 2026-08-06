@@ -2681,6 +2681,9 @@ def _run_release_mutating(state: ReleaseState):
             # concurrent push, which would wrongly skip the push and leave the
             # branch behind the remote. This aligns with the tag_exists_on_remote
             # check just below, which is also a live ls-remote query.
+            push_timeout = get_push_timeout(
+                ctx.config, override=flags.get("push-timeout"),
+            )
             _local_head = run("git", ["rev-parse", "HEAD"]).strip()
             _branch_needs_push = True
             try:

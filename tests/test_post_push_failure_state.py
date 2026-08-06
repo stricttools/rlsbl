@@ -199,7 +199,7 @@ class TestLiveLsRemoteBranchSkip:
                 return f"{head}\t{args[2]}"
             return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
 
-        def fake_push_if_needed(branch, env=None, *, config, cwd):
+        def fake_push_if_needed(branch, env=None, *, config, cwd, sha=None):
             push_if_needed_called.append(branch)
 
         with (
@@ -217,8 +217,14 @@ class TestLiveLsRemoteBranchSkip:
         ):
             run_cmd(_rc(), {"quiet": False}, ctx=_ctx(mock_git_repo))
 
-        assert push_if_needed_called == [], \
-            "branch push must be skipped when the live remote is at local HEAD"
+        # Exactly one call: the CANDIDATE push, which Phase A owes because the
+        # release just made a commit the remote cannot already have. (Its own
+        # no-op skip lives inside push_if_needed, which this test replaces.)
+        # The FINAL branch push -- the one this test is about -- is the skip,
+        # decided by the live ls-remote comparison rather than the local
+        # origin/<branch> tracking ref.
+        assert push_if_needed_called == ["main"], \
+            "only the candidate push is owed; the final branch push must skip"
         assert "Skipping branch push (remote already at local HEAD)" \
             in capsys.readouterr().out
 

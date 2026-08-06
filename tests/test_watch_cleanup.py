@@ -158,16 +158,24 @@ class TestWatchCleanup:
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.watch.run_cmd", side_effect=fake_watch),
+            # A green watch is followed by the registry outcome probe. It is
+            # not what this test is about, and left live it makes the result
+            # depend on whether the sandbox has a network: reachable, the
+            # fixture package is genuinely absent from npm and the release
+            # exits nonzero; unreachable, the probe is inconclusive and it does
+            # not. Pinned to "nothing missing" so the assertion below is about
+            # the state file and nothing else.
+            patch(
+                "rlsbl.commands.release.execute._probe_publication",
+                return_value=([], ["npm"]),
+            ),
         ):
-            with pytest.raises(SystemExit) as exc_info:
-                run_cmd(
-                    _rc(),
-                    {"quiet": True, "watch": True},
-                    ctx=_make_ctx(tmp_project),
-                )
-
-            assert exc_info.value.code == 0, (
-                "watch sys.exit should propagate with code 0"
+            # A green watch returns normally: the watch's own SystemExit(0) is
+            # absorbed by the tail so the registry probe can run after it.
+            run_cmd(
+                _rc(),
+                {"quiet": True, "watch": True},
+                ctx=_make_ctx(tmp_project),
             )
 
         # The mock was called (watch was invoked)

@@ -212,7 +212,12 @@ class TestBatchReleaseRootSelfdocIntegration:
 
         mock_root_selfdoc.assert_called_once()
         call_args = mock_root_selfdoc.call_args
-        assert call_args[0][0] == flags  # flags
+        # The orchestrator adds the branch it resolved and validated once, so
+        # each member does not re-read it. Everything the caller passed is
+        # carried through unchanged.
+        forwarded = call_args[0][0]
+        assert {k: forwarded[k] for k in flags} == flags
+        assert forwarded["release-branch"] == "main"
         assert call_args[0][1] == str(tmp_path)  # workspace_root
 
 

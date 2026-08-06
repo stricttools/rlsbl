@@ -2,7 +2,7 @@
 
 import os
 import subprocess
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -327,20 +327,28 @@ class TestSchemaDumpBranching:
         assert len(captured_cmds) == 1
         assert captured_cmds[0] == ["uv", "run", "myapp", "--dump-schema"]
 
-    def test_dry_run_message_shows_go_command(self, tmp_path, monkeypatch):
-        """Dry-run log message shows 'go run' for Go projects."""
+    def test_dry_run_records_the_go_command(self, tmp_path, monkeypatch):
+        """A preview records `go run ... --dump-schema`, it does not describe it.
+
+        The hand-rolled ``Would run: ...`` line this used to assert on
+        restated the argv in a second place. The dump is an ``effects.run``,
+        so a preview records it and the framework's would-do log reports the
+        argv actually assembled.
+        """
         monkeypatch.setattr(
             "rlsbl.commands.release.validate.detect_strictcli",
             lambda d: ("./cmd/myapp/", "go"),
         )
 
-        messages = []
-        flags = {"dry-run": True}
-        _run_strictcli_schema_dump(flags, messages.append, project_dir=str(tmp_path))
+        fake_effects = MagicMock()
+        with patch("rlsbl.commands.release.effects", fake_effects):
+            _run_strictcli_schema_dump(
+                {"dry-run": True}, lambda m: None, project_dir=str(tmp_path),
+            )
 
-        assert len(messages) == 1
-        assert "go run ./cmd/myapp/ --dump-schema" in messages[0]
-        assert "uv" not in messages[0]
+        assert fake_effects.run.call_args[0][0] == [
+            "go", "run", "./cmd/myapp/", "--dump-schema",
+        ]
 
     def test_detection_failure_is_release_validation_error(self, tmp_path, monkeypatch):
         """A project that requires strictcli but whose entry point can't be

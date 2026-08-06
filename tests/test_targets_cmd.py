@@ -185,21 +185,22 @@ class TestMultiTargetRelease:
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        mock_run.side_effect = [
-            "",               # fetch
-            "0",              # rev-list
-            "",               # pre-hook snapshot
-            "",               # pre-selfdoc snapshot
-            "",               # post-selfdoc snapshot
-            "",               # post-hook snapshot
-            "",               # baseline snapshot
-            "/tmp/fake-repo", # show-toplevel
-            "pre123",         # rev-parse HEAD (pre_release_sha)
-            # Secondary build failure happens here.
-            # Rollback:
-            "",               # git tag -d (best-effort, may fail)
-            "",               # git reset --hard pre_release_sha
-        ]
+        # A responder rather than a fixed list: the release's git reads are an
+        # implementation detail (the Phase-A plan builder does its own), and a
+        # positional list makes an unrelated refactor look like a regression.
+        # What this test is about is the secondary build raising and the
+        # release rolling back.
+        def _git(cmd, args=None, **kwargs):
+            args = args or []
+            if "rev-list" in args:
+                return "0"
+            if "--show-toplevel" in args:
+                return "/tmp/fake-repo"
+            if args[:2] == ["rev-parse", "HEAD"]:
+                return "pre123"
+            return ""
+
+        mock_run.side_effect = _git
 
         from rlsbl.targets import TARGETS
         monkeypatch.setattr(TARGETS["spec"], "build", MagicMock(side_effect=RuntimeError("build failed")))

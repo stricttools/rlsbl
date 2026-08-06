@@ -436,40 +436,23 @@ class TestUnknownTarget:
 # dry_run flag
 # ---------------------------------------------------------------------------
 
-class TestDryRun:
-    """Tests for dry_run behavior."""
+class TestNoDryRunParameter:
+    """The runner has no dry-run switch of its own, deliberately.
 
-    def test_dry_run_skips_execution(self, tmp_project):
-        """When dry_run=True, no subprocess calls are made."""
-        _setup_npm_project(tmp_project, test_script="jest")
+    It is reached through the impure ``test-suite`` check, which the check
+    framework lists rather than runs under ``--dry-run``. The parameter this
+    function used to carry was never passed by any caller, and a second
+    hand-rolled skip was one more place for the two answers to disagree.
+    """
 
-        with patch("rlsbl.effects.run") as mock_run:
-            result = run_project_tests(
-                "npm", project_dir=str(tmp_project), dry_run=True
-            )
+    def test_the_signature_carries_no_dry_run(self):
+        import inspect
 
-            assert result is True
-            mock_run.assert_not_called()
+        assert "dry_run" not in inspect.signature(run_project_tests).parameters
 
-    def test_dry_run_skips_pypi(self, tmp_project):
-        """dry_run skips pypi tests too."""
-        with patch("rlsbl.effects.run") as mock_run:
-            result = run_project_tests(
-                "pypi", project_dir=str(tmp_project), dry_run=True
-            )
-
-            assert result is True
-            mock_run.assert_not_called()
-
-    def test_dry_run_skips_go(self, tmp_project):
-        """dry_run skips go tests too."""
-        with patch("rlsbl.effects.run") as mock_run:
-            result = run_project_tests(
-                "go", project_dir=str(tmp_project), dry_run=True
-            )
-
-            assert result is True
-            mock_run.assert_not_called()
+    def test_passing_one_is_a_hard_error(self, tmp_project):
+        with pytest.raises(TypeError):
+            run_project_tests("npm", project_dir=str(tmp_project), dry_run=True)
 
 
 # ---------------------------------------------------------------------------
