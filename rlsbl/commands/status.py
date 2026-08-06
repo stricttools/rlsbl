@@ -8,6 +8,7 @@ import sys
 from ..changelog import changes_dir_exists, get_changes_dir, read_unreleased, resolve_hashes
 from ..changelog.resolve import _get_last_version_tag, _unreleased_range
 from ..changelog.validate import filter_exempt_commits
+from ..ci_router import discover_project_ci_sources
 from ..git_util import filter_commits_for_project
 from ..targets import TARGETS, detect_targets
 from ..errors import GitError
@@ -172,8 +173,11 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
         except Exception as e:
             print(f"Warning: could not compute JSONL coverage: {e}", file=sys.stderr)
 
-    # CI workflows
-    ci = os.path.exists(os.path.join(root_str, ".github", "workflows", "ci.yml"))
+    # CI workflows. Route through the shared router discovery rather than
+    # probing a hardcoded ci.yml: scaffold names CI files per target
+    # (ci-go.yml, ci-pypi.yml, ...), and the hardcoded probe reported
+    # "CI: missing" on every such repo.
+    ci = [os.path.basename(p) for p in discover_project_ci_sources(root_str)]
     publish = os.path.exists(os.path.join(root_str, ".github", "workflows", "publish.yml")) or os.path.exists(
         os.path.join(root_str, ".github", "workflows", "workflow.yml")
     )
@@ -332,8 +336,9 @@ def run_cmd(registry, args, flags, ctx):
     # JSONL changelog coverage
     print(f"JSONL:     {data['jsonl_coverage']}")
 
-    # CI workflows
-    print(f"CI:        {'yes' if data['ci'] else 'missing'}")
+    # CI workflows (every discovered source, not a single hardcoded name)
+    ci_sources = data["ci"]
+    print(f"CI:        {', '.join(ci_sources) if ci_sources else 'missing'}")
     print(f"Publish:   {'yes' if data['publish'] else 'missing'}")
 
     # Commits-ahead warning: surfaces unreleased work that might otherwise
