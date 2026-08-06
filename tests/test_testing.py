@@ -1013,6 +1013,19 @@ class TestPythonSafePathShadowing:
             'raise RuntimeError("local html.py shadowed stdlib during plugin load")\n'
         )
         (proj / "test_trivial.py").write_text("def test_ok():\n    assert True\n")
+        # The inner pytest runs on rlsbl's own interpreter, so the stricttest
+        # plugin is installed there too -- and installing it IS adoption. A
+        # throwaway project that declares no safety stance aborts at configure
+        # time, which would mask what this scenario actually probes. Declare the
+        # most restrictive stance, exactly as a real consumer would.
+        (proj / "pytest.ini").write_text(
+            "[pytest]\n"
+            "stricttest_sockets = deny\n"
+            "stricttest_socket_allowlist =\n"
+            "stricttest_unix_socket_allowlist =\n"
+            "stricttest_loopback = deny\n"
+            "stricttest_sandbox_required = false\n"
+        )
 
         plugindir = tmp_path / "plugindir"
         plugindir.mkdir()

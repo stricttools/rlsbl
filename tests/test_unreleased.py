@@ -6,6 +6,7 @@ import subprocess
 
 import pytest
 
+from githarness import commit_file
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add
 from rlsbl.commands.unreleased import (
     _get_commits_since,
@@ -45,13 +46,10 @@ class TestGetCommitsSince:
 
     def test_returns_commits_since_tag(self, mock_git_repo):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        # Add a commit after the tag
-        (mock_git_repo / "new.txt").write_text("new")
-        subprocess.run(["git", "add", "new.txt"], cwd=str(mock_git_repo), check=True)
-        subprocess.run(
-            ["git", "commit", "-q", "-m", "feat: add new feature"],
-            cwd=str(mock_git_repo), check=True,
-        )
+        # Add a commit after the tag. It goes through githarness so the repo's
+        # own configured identity is what lands in the author field -- the test
+        # floor exports an ambient GIT_AUTHOR_NAME that otherwise outranks it.
+        commit_file(mock_git_repo, "new.txt", "new", "feat: add new feature")
         commits = _get_commits_since("v1.0.0")
         assert len(commits) == 1
         assert commits[0]["subject"] == "feat: add new feature"

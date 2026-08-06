@@ -167,6 +167,16 @@ class TestPushGuard:
         assert "BLOCKED" in str(exc.value)
         assert "non-local remote" in str(exc.value)
 
+    def test_push_to_a_direct_url_argument_is_blocked(self, tmp_path):
+        """No named remote at all: the URL is the push argument itself."""
+        repo = self._repo_with_remote(tmp_path, "https://example.com/x.git")
+        with pytest.raises(Failed) as exc:
+            subprocess.run(
+                ["git", "push", "https://github.com/smm-h/rlsbl.git", "main"],
+                cwd=str(repo), capture_output=True, text=True,
+            )
+        assert "BLOCKED" in str(exc.value)
+
     def test_push_to_scp_style_remote_is_blocked(self, tmp_path):
         repo = self._repo_with_remote(tmp_path, "git@github.com:smm-h/rlsbl.git")
         with pytest.raises(Failed):
