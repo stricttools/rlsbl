@@ -106,7 +106,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 
 | Check | Severity | Description |
 | --- | --- | --- |
-| `workspace-ci-router` | error | The monorepo CI router workflow exists and routes to all registered projects |
+| `workspace-ci-router` | error | The generated `ci-router.yml` exists at the repo root (it holds every project's inlined jobs; per-project coverage is `workspace-ci-synced`) |
 | `workspace-ci-synced` | error | Each in-scope project's CI jobs are inlined into the shared `ci-router.yml` |
 | `workspace-targets` | error | Each project's declared target matches its actual manifest files |
 | `workspace-unregistered` | error | No project directories with manifest files exist outside of `workspace.toml` |

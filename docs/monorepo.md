@@ -335,7 +335,7 @@ Fourteen checks run under `rlsbl check --tag workspace`, covering CI configurati
 
 | Check | Severity | Description |
 | ----- | -------- | ----------- |
-| `workspace-ci-router` | error | Validates the CI router workflow dispatches to all registered projects |
+| `workspace-ci-router` | error | Verifies the generated `ci-router.yml` exists at the repo root (it holds every project's inlined jobs; per-project coverage is `workspace-ci-synced`) |
 | `workspace-ci-synced` | error | Verifies each in-scope project's CI jobs are inlined into the shared `ci-router.yml` |
 | `workspace-targets` | error | Every project must have at least one detectable release target |
 | `workspace-unregistered` | error | Detects project directories with manifests that are not in workspace.toml |
