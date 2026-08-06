@@ -88,6 +88,22 @@ def list_main_packages(project_dir: str) -> list[GoPackage]:
     return [p for p in list_packages(project_dir) if p.name == "main"]
 
 
+def _pipeline_entries(config: dict) -> dict:
+    """The config's ``pipelines`` map, or {} when it declares none.
+
+    A ``pipelines`` value that is present but not a map is a config error, not
+    something to iterate: ``"pipelines": "none"`` is truthy, and ``.values()``
+    on it raised an AttributeError that named no config key. ``load_pipelines``
+    owns the diagnosis, so this defers to it rather than restating the message.
+    """
+    from .pipelines import load_pipelines
+
+    pipelines = config.get("pipelines")
+    if pipelines is not None and not isinstance(pipelines, dict):
+        load_pipelines(config)  # raises ConfigError with the actionable message
+    return pipelines or {}
+
+
 def go_pipeline_artifact(config: dict) -> str | None:
     """Return the ``artifact`` declared on the config's go-type pipeline.
 
@@ -97,7 +113,7 @@ def go_pipeline_artifact(config: dict) -> str | None:
     it decides the publish template AND what scaffold writes, so detection
     never overrides it.
     """
-    for entry in (config.get("pipelines") or {}).values():
+    for entry in _pipeline_entries(config).values():
         if isinstance(entry, dict) and entry.get("type") == "go":
             artifact = entry.get("artifact")
             return artifact if isinstance(artifact, str) and artifact else None
@@ -111,7 +127,7 @@ def go_pipeline_install_paths(config: dict) -> list[str] | None:
     Raises GoIntrospectError if the declaration is not a non-empty list
     of strings.
     """
-    for name, entry in (config.get("pipelines") or {}).items():
+    for name, entry in _pipeline_entries(config).items():
         if not isinstance(entry, dict) or entry.get("type") != "go":
             continue
         paths = entry.get("install_paths")

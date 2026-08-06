@@ -173,6 +173,14 @@ def validate_pipeline_config(config):
             "Add a pipelines section or run 'rlsbl scaffold'."
         )
 
+    # Shape first. Absent is diagnosed above; MALFORMED was diagnosed nowhere
+    # on this path, so a non-map `pipelines` used to sail through both
+    # validators (each of which returns early on a non-dict, deferring to this
+    # one) and blow up inside load_pipelines. Raises ConfigError, caught by the
+    # release run_cmd wrapper, before the mutating phase begins.
+    from ...config import validate_pipelines_config
+    validate_pipelines_config(config)
+
     # Enforce the explicit pipeline->target link (separate-but-linked shape):
     # every pipeline must declare a target name or null, and named refs must
     # resolve to a configured target. Raises ConfigError, caught by the

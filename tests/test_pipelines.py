@@ -742,3 +742,84 @@ class TestReleaseSurfaceTargetLinks:
             {"targets": ["pypi"], "pipelines": {"pypi": {"type": "pypi", "local": False, "target": "pypi"}}}
         )
         assert "pypi" in pipelines
+
+
+# ---------------------------------------------------------------------------
+# A malformed pipelines shape fails as a config error, never as a crash
+#
+# ``pipelines`` is a MAP of pipeline name -> pipeline. A scalar there (the
+# tempting `"pipelines": "none"` for "publish nowhere") is not a config form
+# rlsbl has: publishing nowhere is `"pipelines": {}`, and suppressing publish
+# entirely is `"publish_mode": "none"`. The shape validator has always said so
+# -- but the release flow never ran it, so a scalar sailed past the None check
+# and into load_pipelines, where `.items()` on a string killed the release with
+# an un-actionable AttributeError partway through the preflight.
+# ---------------------------------------------------------------------------
+
+
+class TestMalformedPipelinesShapeIsAConfigError:
+
+    SCALARS = ["none", "", 0, False, ["pypi"], 3]
+
+    @pytest.mark.parametrize("bad", SCALARS)
+    def test_the_loader_refuses_a_non_map(self, bad):
+        """load_pipelines is the chokepoint every caller goes through."""
+        from rlsbl.pipelines import load_pipelines
+
+        with pytest.raises(ConfigError, match="pipelines must be a dict"):
+            load_pipelines({"pipelines": bad})
+
+    @pytest.mark.parametrize("bad", ["none", 3, ["pypi"]])
+    def test_the_release_flow_refuses_a_non_map(self, bad):
+        """And the release flow reports it BEFORE it mutates anything."""
+        from rlsbl.commands.release.validate import validate_pipeline_config
+
+        with pytest.raises(ConfigError, match="pipelines must be a dict"):
+            validate_pipeline_config({"targets": ["pypi"], "pipelines": bad})
+
+    def test_the_error_names_the_two_real_ways_to_publish_nowhere(self):
+        """An error that only says "wrong" makes the reader guess."""
+        from rlsbl.pipelines import load_pipelines
+
+        with pytest.raises(ConfigError) as excinfo:
+            load_pipelines({"pipelines": "none"})
+        message = str(excinfo.value)
+        assert '"pipelines": {}' in message
+        assert '"publish_mode": "none"' in message
+
+    def test_an_empty_map_is_how_a_project_publishes_nowhere(self):
+        """The supported form still works, at both layers."""
+        from rlsbl.commands.release.validate import validate_pipeline_config
+        from rlsbl.pipelines import load_pipelines
+
+        assert load_pipelines({"pipelines": {}}) == {}
+        assert validate_pipeline_config(
+            {"targets": ["pypi"], "pipelines": {}}
+        ) == {}
+
+    def test_an_absent_key_still_tells_the_releaser_to_scaffold(self):
+        """Absent is a different diagnosis from malformed, and stays its own."""
+        from rlsbl.commands.release.validate import (
+            ReleaseValidationError, validate_pipeline_config,
+        )
+
+        with pytest.raises(ReleaseValidationError, match="no 'pipelines' key"):
+            validate_pipeline_config({"targets": ["pypi"]})
+
+    def test_the_go_introspection_helpers_refuse_a_non_map_too(self):
+        """The same shape, read through a different door.
+
+        go_introspect scans the pipelines map for the go entry with its own
+        ``(config.get("pipelines") or {})`` idiom -- and a truthy scalar is not
+        filtered by ``or {}``, so it hit ``.values()`` exactly the way
+        load_pipelines hit ``.items()``.
+        """
+        from rlsbl.go_introspect import (
+            go_pipeline_artifact, go_pipeline_install_paths,
+        )
+
+        for fn in (go_pipeline_artifact, go_pipeline_install_paths):
+            with pytest.raises(ConfigError, match="pipelines must be a dict"):
+                fn({"pipelines": "none"})
+            assert fn({}) is None
+            assert fn({"pipelines": {}}) is None

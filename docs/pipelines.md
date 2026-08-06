@@ -22,6 +22,17 @@ Pipelines are distinct from targets: targets determine which files get version-b
 
 A project with no pipelines configured simply does not publish anywhere — version bumps, tags, and GitHub Releases still happen via targets.
 
+### Publishing nowhere
+
+`pipelines` is always a **map** of pipeline name to pipeline config. There is no scalar form: `"pipelines": "none"` is a config error, not a way to opt out. Two shapes express "publish nowhere", and they mean different things:
+
+| Shape | Meaning |
+| --- | --- |
+| `"pipelines": {}` | The project releases (version bump, tag, GitHub Release) but publishes to no registry. |
+| `"publish_mode": "none"` | Publishing is suppressed entirely — no publish workflow is scaffolded at all. See [configuration](configuration.md). |
+
+Any other non-map value is rejected with a `ConfigError` naming both shapes, at config-check time and again in the release preflight — before the release mutates anything.
+
 ## Configuration
 
 Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each entry is keyed by a user-chosen name (any valid JSON string) and requires a `type` field (one of 9 built-in types), a `local` boolean field indicating whether publishing happens on the developer machine or in CI, and a `target` link naming the release target it publishes for (or `null` for a targetless publisher):

@@ -351,7 +351,10 @@ def validate_pipelines_config(config, project_root="."):
 
     if not isinstance(pipelines, dict):
         raise ConfigError(
-            f"pipelines must be a dict, got {type(pipelines).__name__}"
+            f"pipelines must be a dict, got {type(pipelines).__name__}. "
+            f"The 'pipelines' key maps a pipeline name to its config. To "
+            f'publish nowhere, use "pipelines": {{}}; to suppress publishing '
+            f'entirely, use "publish_mode": "none".'
         )
 
     for name, entry in pipelines.items():

@@ -38,8 +38,25 @@ def load_pipelines(config: dict) -> dict[str, "Pipeline"]:
 
     Returns a dict mapping pipeline names to pipeline instances.
     Returns an empty dict if no ``pipelines`` key exists in the config.
+
+    A ``pipelines`` value that is present but not a map is a hard
+    ``ConfigError`` here, at the chokepoint every caller goes through. It used
+    to be diagnosed only by ``validate_pipelines_config`` -- which the release
+    flow never called -- so a scalar reached this loop and died on
+    ``.items()``, mid-preflight, with an AttributeError naming no config key at
+    all.
     """
+    from ..errors import ConfigError
+
     pipelines_config = config.get("pipelines")
+    if pipelines_config is not None and not isinstance(pipelines_config, dict):
+        raise ConfigError(
+            f"pipelines must be a dict, got "
+            f"{type(pipelines_config).__name__}. The 'pipelines' key maps a "
+            f"pipeline name to its config. To publish nowhere, use "
+            f'"pipelines": {{}}; to suppress publishing entirely, use '
+            f'"publish_mode": "none".'
+        )
     if not pipelines_config:
         return {}
 
