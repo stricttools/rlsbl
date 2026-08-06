@@ -114,6 +114,8 @@ def _batch_release_flags(flags, **extra):
         "allow-dirty": flags.get("allow-dirty", False),
         "skip-lock": True,
         "batch-mode": True,
+        # The branch the orchestrator already resolved and validated.
+        "release-branch": flags.get("release-branch"),
     }
     for key in ("push-timeout", "ci-timeout", "check-timeout", "hook-timeout"):
         if flags.get(key) is not None:
@@ -602,7 +604,15 @@ def _cmd_batch_release(flags, project_root):
         validate_gh_cli()
         validate_gh_push_access()
         validate_clean_tree(flags)
-        validate_branch_and_remote(flags, cwd=workspace_root)
+        # Resolved ONCE, here, before anything the batch does is recorded or
+        # performed. The branch is fixed for the whole run, and each member's
+        # release would otherwise re-read it -- which under a preview happens
+        # after the previous member's effects were recorded, where the
+        # framework answers observes with a stale carrier.
+        flags = dict(flags)
+        flags["release-branch"] = str(
+            validate_branch_and_remote(flags, cwd=workspace_root)
+        )
     except ReleaseValidationError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -801,7 +811,15 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                 from ..release import run_cmd
 
                 release_flags = _batch_release_flags(
-                    flags, **({} if dry_run else {"ci-defer": True}),
+                    # ``ci-defer`` in EVERY mode: pass 1 is commit-only,
+                    # and a preview of pass 1 must be a preview of the
+                    # same thing. Without it a previewed member ran its
+                    # own candidate push, which the real pass 1 never
+                    # does -- the batch publishes one candidate for the
+                    # whole group. The batch preview is therefore the
+                    # members' Phase-A plans, concatenated, and nothing
+                    # else.
+                    flags, **{"ci-defer": True},
                 )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
                 _before = None if dry_run else head_sha(cwd=workspace_root)
@@ -1055,7 +1073,15 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                 from ..release import run_cmd
 
                 release_flags = _batch_release_flags(
-                    flags, **({} if dry_run else {"ci-defer": True}),
+                    # ``ci-defer`` in EVERY mode: pass 1 is commit-only,
+                    # and a preview of pass 1 must be a preview of the
+                    # same thing. Without it a previewed member ran its
+                    # own candidate push, which the real pass 1 never
+                    # does -- the batch publishes one candidate for the
+                    # whole group. The batch preview is therefore the
+                    # members' Phase-A plans, concatenated, and nothing
+                    # else.
+                    flags, **{"ci-defer": True},
                 )
                 pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
                 _before = None if dry_run else head_sha(cwd=workspace_root)
