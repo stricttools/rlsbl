@@ -269,6 +269,72 @@ def pytest_configure(config):
     _install_env_poisoning_floor()
 
 
+# ---------------------------------------------------------------------------
+# Repo-root litter guard: no test may leave a NEW entry directly under the
+# repository root.
+#
+# Forensics: a ``MagicMock/mkdtemp()/`` directory tree sat at the repo root for
+# weeks. A test mocked ``tempfile.mkdtemp``, production code interpolated the
+# resulting MagicMock into a path, and the relative string
+# ``MagicMock/mkdtemp()`` was then created against the process cwd. Nothing
+# failed -- git does not even report an empty directory in ``status`` -- so the
+# litter was only ever found by eye.
+#
+# This guard turns that whole class into a loud session failure: snapshot the
+# root's direct entries at session start, compare at session end, fail naming
+# the intruders. Only DIRECT children are compared, which is exactly where the
+# class lands (a relative path resolved against a cwd at or above the root),
+# and keeps the cost at two ``listdir`` calls per session.
+# ---------------------------------------------------------------------------
+
+# Tool artifacts that may legitimately materialize at the repo root during a
+# run (pytest's cache, coverage data, lint/type caches, strictcli's coverage
+# recorder). Everything else appearing mid-run is litter. Kept deliberately
+# tight -- build outputs and vendored trees are NOT allowlisted, because no
+# test has any business creating them either.
+_ROOT_LITTER_ALLOWED = frozenset({
+    "__pycache__",
+    ".coverage",
+    ".hypothesis",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".strictcli",
+})
+
+
+def _repo_root_entries():
+    """Names of the direct children of the repo root (empty set if unreadable)."""
+    try:
+        return set(os.listdir(_REPO_ROOT))
+    except OSError:
+        return set()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _guard_repo_root_litter():
+    """Fail the session if a test created a new entry at the repository root."""
+    before = _repo_root_entries()
+    yield
+    intruders = sorted(
+        name
+        for name in _repo_root_entries() - before
+        if name not in _ROOT_LITTER_ALLOWED and not name.startswith(".coverage.")
+    )
+    if intruders:
+        listing = "\n".join(f"  {_REPO_ROOT / name}" for name in intruders)
+        pytest.fail(
+            "Test run littered the repository root with new entries:\n"
+            f"{listing}\n\n"
+            "Something wrote a path relative to the process cwd instead of an "
+            "anchored temp location -- classically a mocked path helper (e.g. a "
+            "MagicMock returned by a patched tempfile.mkdtemp) interpolated into "
+            "a path string. Find the test, anchor the write to tmp_path, and "
+            "delete the litter with saferm.",
+            pytrace=False,
+        )
+
+
 @pytest.fixture(autouse=True)
 def _chdir_into_tmp(request, tmp_path, monkeypatch):
     """Autouse: never let a test run with the process cwd at the real repo.
