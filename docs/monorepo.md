@@ -307,15 +307,17 @@ Convergence never blindly overwrites the mirror. The remote tip must be **either
 
 ## Sync
 
-`rlsbl monorepo sync` copies per-project CI workflows to the shared `.github/workflows/` directory at the repository root, performing template variable resolution and trigger rewriting along the way. This is required because GitHub Actions only reads workflows from the repository root, not from individual project subdirectories.
+`rlsbl monorepo sync` folds every project's CI jobs into a single generated router at the repository root's shared `.github/workflows/` directory, performing template variable resolution along the way. This is required because GitHub Actions only reads workflows from the repository root, not from individual project subdirectories.
 
 The sync process:
 
 1. For each project in the workspace, reads its scaffolded CI workflow
-2. Rewrites the `on:` trigger to `workflow_call:` (making it callable from a router)
-3. Injects `working-directory` into job steps so they run in the correct subdirectory
-4. Generates a router workflow that dispatches to per-project workflows based on changed paths
-5. Commits the synced workflows
+2. Injects `working-directory` into job steps so they run in the correct subdirectory
+3. Inlines every project's jobs into one generated `ci-router.yml`, keyed by a per-file prefix and gated on a `detect` job's paths filter, and inlines publish jobs into `publish.yml` the same way
+4. Removes any stale per-project workflow copy left at the root by an older sync (via saferm)
+5. Commits the generated routers
+
+Jobs are inlined rather than invoked as reusable workflows: GitHub rejects a workflow file that references 20 or more of them, so `uses:`-based routing cannot scale past a certain workspace size. A guardrail refuses to emit a generated router containing any reusable call at all. Each inlined job gets an explicit `name: "{prefix} / {job}"`, so check-run names are identical to the ones the reusable-workflow era produced and the publish gate's regexes and any branch protection rules keep matching.
 
 This ensures every project has its CI pipeline properly wired even when using different targets or custom workflow steps.
 

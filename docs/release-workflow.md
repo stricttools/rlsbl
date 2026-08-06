@@ -263,7 +263,7 @@ Because the gate, all job conditions, and all version reads are ref-based, a dis
 
 The generated publish router emits 1 shared gate job. Member gate jobs are stripped during inlining and every inlined job is rewired to the shared gate. The gate resolves the releasing project from the tag ref prefix (the same prefix used in job `if:` conditions, which match `github.ref_name`) and waits only for that project's CI check runs.
 
-Sibling projects' paths-filtered (skipped) CI checks are outside the filter and never block a release. CI check runs are named `<router job key> / <ci job name>` because the CI router invokes member CI as reusable workflows.
+Sibling projects' paths-filtered (skipped) CI checks are outside the filter and never block a release. CI check runs are named `<router job key> / <ci job name>` because the CI router inlines each member's CI jobs and gives every inlined job that explicit `name:` -- the naming the reusable-workflow era produced, kept deliberately so these regexes and any branch protection rules keep matching.
 
 #### The releasable run-everything hook
 
