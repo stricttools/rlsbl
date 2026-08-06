@@ -1,7 +1,6 @@
 """Monorepo workspace management commands: init, add, remove, list, status, outdated, and check-names."""
 
 import os
-import re
 import sys
 import time
 
@@ -277,13 +276,12 @@ def _cmd_list(flags, project_root):
 
 
 def _latest_tag_for_glob(tag_glob):
-    """Return ``(latest_tag, latest_tag_version)`` for a git tag glob.
+    """Return the newest tag matching *tag_glob*, or None when there is none.
 
-    ``latest_tag`` is the newest matching tag (``"(none)"`` if none), and
-    ``latest_tag_version`` is the ``x.y.z`` extracted from it (or None).
+    The version parsed out of the tag is no longer needed: the status table
+    reports real JSONL coverage over the ``<tag>..HEAD`` range instead of
+    counting CHANGELOG bullets above the tag's heading.
     """
-    latest_tag = "(none)"
-    latest_tag_version = None
     try:
         result = effects.run(
             ["git", "tag", "-l", tag_glob, "--sort=-v:refname"],
@@ -291,41 +289,55 @@ def _latest_tag_for_glob(tag_glob):
         )
         first_line = result.stdout.strip().split("\n")[0].strip() if result.stdout.strip() else ""
         if first_line:
-            latest_tag = first_line
-            from ...tag_glob import TagMode, parse_version_tag
-            parsed = parse_version_tag(first_line, mode=TagMode.FINAL_ONLY)
-            if parsed:
-                latest_tag_version = parsed.version
+            return first_line
     except Exception:
         pass
-    return latest_tag, latest_tag_version
+    return None
 
 
-def _count_unreleased_from_changelog(changelog_path, latest_tag_version):
-    """Return an Unreleased-column string from a CHANGELOG.md.
+def _coverage_column(latest_tag, changes_dir, scope_projects):
+    """Return the Coverage-column string for one status row.
 
-    Counts bullet lines above the tagged version heading (or all bullets when
-    there is no tag). Returns ``"no changelog"`` when the file is missing.
+    Real JSONL coverage: the commits since *latest_tag*, scoped to the row's
+    project(s), minus the exempt ones, cross-referenced against the row's
+    ``unreleased.jsonl``. Rendered ``covered/tracked`` with a
+    ``(N exempted)`` suffix, matching ``rlsbl status``.
+
+    This column used to count CHANGELOG.md bullet lines above the last version
+    heading. CHANGELOG.md is regenerated from the JSONL at release time, so
+    that count described the *previous* release's prose, never whether the
+    current unreleased commits had entries -- and it read as "documented" when
+    no entry existed at all.
+
+    ``"no changelog"`` when the changes directory is missing.
     """
-    if not os.path.isfile(changelog_path):
+    if not os.path.isdir(changes_dir):
         return "no changelog"
-    with open(changelog_path, "r") as f:
-        changelog_text = f.read()
-    if latest_tag_version is None:
-        count = sum(1 for line in changelog_text.splitlines() if line.startswith("- "))
-    else:
-        tag_pattern = re.compile(r"^## " + re.escape(latest_tag_version) + r"(\s|$)", re.MULTILINE)
-        match = tag_pattern.search(changelog_text)
-        if match:
-            above = changelog_text[:match.start()]
-            count = sum(1 for line in above.splitlines() if line.startswith("- "))
-        else:
-            count = sum(1 for line in changelog_text.splitlines() if line.startswith("- "))
-    if count == 0:
-        return "0"
-    if count == 1:
-        return "1 entry"
-    return f"{count} entries"
+
+    from ...changelog.files import read_unreleased
+    from ...changelog.resolve import _git_log_hashes, resolve_hashes
+    from ...changelog.validate import filter_exempt_commits
+    from ...git_util import filter_commits_for_releasable
+
+    range_spec = f"{latest_tag}..HEAD" if latest_tag else "HEAD"
+    commits = _git_log_hashes(range_spec)
+    # Scope first, then exempt -- the order the authoritative coverage check
+    # uses, so an unrelated package's changelog churn is never counted here.
+    if scope_projects:
+        in_scope = filter_commits_for_releasable(set(commits), scope_projects)
+        commits = [c for c in commits if c in in_scope]
+    non_exempt, _stats = filter_exempt_commits(commits)
+    exempted = len(commits) - len(non_exempt)
+
+    all_hashes = []
+    for entry in read_unreleased(changes_dir):
+        all_hashes.extend(entry.commits)
+    resolved = resolve_hashes(all_hashes)
+    covered_shas = {full for full in resolved.values() if full is not None}
+
+    covered = sum(1 for c in non_exempt if c in covered_shas)
+    suffix = f" ({exempted} exempted)" if exempted else ""
+    return f"{covered}/{len(non_exempt)}{suffix}"
 
 
 def _cmd_status_explicit(root, projects):
@@ -337,36 +349,37 @@ def _cmd_status_explicit(root, projects):
     their releasable's tag_format instead of a per-member glob.
     """
     from ...workspace import (
-        get_releasable_dir,
+        get_releasable_changes_dir,
         load_releasables,
         members_of,
         read_releasable_version,
     )
-    from ...changelog.home import get_changelog_home
+    from ...changelog.files import get_changes_dir
     from ...tag_glob import resolve_monorepo_tag_glob
 
     releasables = load_releasables(root, projects)
-    rows = []  # (name, kind, version, tag, unreleased, members)
-    covered = set()
+    rows = []  # (name, kind, version, tag, coverage, members)
+    claimed = set()
 
     for rel in releasables:
         members = members_of(rel.name, projects)
         for m in members:
-            covered.add(m["name"])
+            claimed.add(m["name"])
         try:
             version = read_releasable_version(root, rel.name) or "?"
         except Exception:
             version = "?"
         tag_glob = resolve_monorepo_tag_glob(None, root, releasable=rel)
-        latest_tag, latest_tag_version = _latest_tag_for_glob(tag_glob)
-        changelog_path = os.path.join(get_releasable_dir(root, rel.name), "CHANGELOG.md")
-        unreleased = _count_unreleased_from_changelog(changelog_path, latest_tag_version)
+        latest_tag = _latest_tag_for_glob(tag_glob)
+        coverage = _coverage_column(
+            latest_tag, get_releasable_changes_dir(root, rel.name), members,
+        )
         member_names = ", ".join(m["name"] for m in members)
         members_col = f"{len(members)} ({member_names})" if members else "0"
-        rows.append((rel.name, "releasable", str(version), latest_tag, unreleased, members_col))
+        rows.append((rel.name, "releasable", str(version), latest_tag or "(none)", coverage, members_col))
 
     for proj in projects:
-        if proj["name"] in covered:
+        if proj["name"] in claimed:
             continue
         name = proj["name"]
         path = proj["path"]
@@ -379,12 +392,13 @@ def _cmd_status_explicit(root, projects):
             except Exception:
                 version = "?"
         tag_glob = resolve_monorepo_tag_glob(proj, root, releasable=None)
-        latest_tag, latest_tag_version = _latest_tag_for_glob(tag_glob)
-        changelog_path = get_changelog_home(os.path.join(root, path), releasable_dir=None)
-        unreleased = _count_unreleased_from_changelog(changelog_path, latest_tag_version)
-        rows.append((name, "project", str(version), latest_tag, unreleased, "-"))
+        latest_tag = _latest_tag_for_glob(tag_glob)
+        coverage = _coverage_column(
+            latest_tag, get_changes_dir(os.path.join(root, path)), [proj],
+        )
+        rows.append((name, "project", str(version), latest_tag or "(none)", coverage, "-"))
 
-    headers = ("Name", "Kind", "Version", "Tag", "Unreleased", "Members")
+    headers = ("Name", "Kind", "Version", "Tag", "Coverage", "Members")
     widths = [len(h) for h in headers]
     for row in rows:
         for i in range(len(headers)):
@@ -450,64 +464,29 @@ def _cmd_status(flags, project_root):
                 version = "?"
 
         # Find latest tag using target-aware glob
-        latest_tag = "(none)"
-        latest_tag_version = None
+        latest_tag = None
         try:
             if first_target_name and first_target_name in TARGETS:
                 tag_glob = TARGETS[first_target_name].monorepo_tag_glob(name, path=path)
             else:
                 tag_glob = f"{name}@v*"
-            result = effects.run(
-                ["git", "tag", "-l", tag_glob, "--sort=-v:refname"],
-                capture_output=True, text=True, check=True,
-            )
-            first_line = result.stdout.strip().split("\n")[0].strip() if result.stdout.strip() else ""
-            if first_line:
-                latest_tag = first_line
-                # Extract version from tag (handles v1.2.3, name@v1.2.3, path/v1.2.3).
-                from ...tag_glob import TagMode, parse_version_tag
-                parsed = parse_version_tag(first_line, mode=TagMode.FINAL_ONLY)
-                if parsed:
-                    latest_tag_version = parsed.version
+            latest_tag = _latest_tag_for_glob(tag_glob)
         except Exception:
             pass
 
-        # Count unreleased changelog entries. Route through the changelog
-        # home resolver: releasable members keep the canonical CHANGELOG.md
-        # at the releasable level, not the package root.
-        from ...changelog.home import get_changelog_home
-        _cl_releasable_dir = None
+        # Real JSONL coverage for this package. Releasable members read the
+        # releasable's changes dir, not the package's.
+        from ...changelog.files import get_changes_dir
+        _cl_changes_dir = None
         _cl_rel_name = releasable_map.get(name, "") if explicit else ""
         if _cl_rel_name:
-            from ...workspace import get_releasable_dir
-            _cl_releasable_dir = get_releasable_dir(root, _cl_rel_name)
-        changelog_path = get_changelog_home(
-            os.path.join(root, path), releasable_dir=_cl_releasable_dir,
+            from ...workspace import get_releasable_changes_dir
+            _cl_changes_dir = get_releasable_changes_dir(root, _cl_rel_name)
+        coverage_str = _coverage_column(
+            latest_tag,
+            _cl_changes_dir or get_changes_dir(os.path.join(root, path)),
+            [proj],
         )
-        if not os.path.isfile(changelog_path):
-            unreleased_str = "no changelog"
-        else:
-            with open(changelog_path, "r") as f:
-                changelog_text = f.read()
-            if latest_tag_version is None:
-                # No tag: count all bullet lines across all ## sections
-                count = sum(1 for line in changelog_text.splitlines() if line.startswith("- "))
-            else:
-                # Count bullet lines in ## sections above the tagged version
-                tag_pattern = re.compile(r"^## " + re.escape(latest_tag_version) + r"(\s|$)", re.MULTILINE)
-                match = tag_pattern.search(changelog_text)
-                if match:
-                    above = changelog_text[:match.start()]
-                    count = sum(1 for line in above.splitlines() if line.startswith("- "))
-                else:
-                    # Tagged version not found in changelog: count all bullets
-                    count = sum(1 for line in changelog_text.splitlines() if line.startswith("- "))
-            if count == 0:
-                unreleased_str = "0"
-            elif count == 1:
-                unreleased_str = "1 entry"
-            else:
-                unreleased_str = f"{count} entries"
 
         # Dependency counts
         deps_count = graph.dep_count(name)
@@ -532,7 +511,7 @@ def _cmd_status(flags, project_root):
         # Releasable membership (explicit mode only)
         releasable_str = releasable_map.get(name, "") if explicit else ""
 
-        rows.append((name, path, target_display, version, latest_tag, unreleased_str, library_str, dev_only_str, deps_str, rdeps_str, watch_str, remote_str, releasable_str))
+        rows.append((name, path, target_display, version, latest_tag or "(none)", coverage_str, library_str, dev_only_str, deps_str, rdeps_str, watch_str, remote_str, releasable_str))
 
     # Determine which dynamic columns to show
     any_library = any(row[6] != "" for row in rows)
@@ -544,7 +523,7 @@ def _cmd_status(flags, project_root):
     any_releasable = any(row[12] != "" for row in rows)
 
     # Calculate column widths
-    base_headers = ("Project", "Path", "Target", "Version", "Tag", "Unreleased")
+    base_headers = ("Project", "Path", "Target", "Version", "Tag", "Coverage")
     if any_releasable:
         base_headers = base_headers + ("Releasable",)
     if any_library:
