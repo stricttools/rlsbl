@@ -20,5 +20,6 @@ jobs:
       - uses: {{action "actions/setup-go"}}
         with:
           go-version: stable
-      - run: go install github.com/smm-h/pgdesign/cmd/pgdesign@latest
-      - run: pgdesign validate .
+      # @v0: a phantom v1.0.0 is permanently cached on the Go module proxy; @latest resolves it
+      - run: go install github.com/smm-h/pgdesign/cmd/pgdesign@v0
+      - run: pgdesign check --tag validation
