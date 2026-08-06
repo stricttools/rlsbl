@@ -1,4 +1,8 @@
-# stricttest: rlsbl dogfooding + remaining consumer floors
+# stricttest: rlsbl dogfooding
+
+Split out of `todo/stricttest-dogfooding-and-consumer-floors.md` (2026-08-06)
+when its item 1 landed. The consumer-side half stays active as
+`todo/stricttest-consumer-floors.md`. Original text below, unchanged.
 
 Successor to `todo/.done/test-floor-program.md` (split 2026-08-06). The master
 record's rlsbl-side DISTRIBUTION work shipped: the pytest plugin, the Go
@@ -19,15 +23,8 @@ replaced by the plugin dependency plus `[tool.pytest.ini_options]` config
 campaign's item 1.6, audited MISSING 2026-08-05, and it fell out of the fix
 campaign's plan during assembly (gap recorded and re-added there 2026-08-06).
 
-## 2. Consumer-side floor adoptions
-
-The remaining Python consumers without the floor adopt it at their fix-campaign
-Phase-6 visits (recipes and stances are pinned per repo in the campaign plan).
-This item exists here only so the split loses nothing; the per-repo work is not
-rlsbl's.
-
 ## Effort
 
 Item 1: medium — the extraction was designed for this replacement; the work is
 config mapping, deleting the duplicated layers, and proving the meta-guards
-still fire (deliberate probes). Item 2: rides the campaign's consumer wave.
+still fire (deliberate probes).
