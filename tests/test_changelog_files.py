@@ -145,6 +145,45 @@ class TestAppendEntry:
         assert all(not f.endswith(".tmp") for f in files)
 
 
+class TestAppendEntryUnderPreview:
+    """A preview appends nothing to disk -- not even scratch.
+
+    The append used to go via ``tempfile.mkstemp`` + a copy into the target,
+    which bought nothing (the copy was a plain append either way) and cost
+    purity: ``mkstemp`` creates its file unconditionally, so under --dry-run
+    the recorded cleanup never ran and every preview left a stray ``.tmp``
+    behind in ``.rlsbl/changes/``.
+    """
+
+    def test_preview_leaves_the_directory_untouched(self, tmp_path):
+        from test_effects import run_in_preview
+
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+        entry = ChangelogEntry(commits=["abc"], user_facing=False)
+
+        _, result = run_in_preview(lambda: append_entry(str(changes), entry))
+
+        assert result.exit_code == 0, result.stderr
+        assert (changes / "unreleased.jsonl").read_text() == ""
+        assert sorted(p.name for p in changes.iterdir()) == ["unreleased.jsonl"]
+
+    def test_preview_records_the_append(self, tmp_path):
+        """Purity is not silence: the write the append WOULD do is recorded."""
+        from test_effects import run_in_preview
+
+        changes = tmp_path / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "unreleased.jsonl").write_text("")
+        entry = ChangelogEntry(commits=["abc"], user_facing=False)
+
+        _, result = run_in_preview(lambda: append_entry(str(changes), entry))
+
+        assert "unreleased.jsonl" in result.stdout, result.stdout
+        assert "write" in result.stdout, result.stdout
+
+
 class TestFinalizeVersion:
     """Tests for finalize_version."""
 

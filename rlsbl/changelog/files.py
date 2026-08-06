@@ -9,7 +9,6 @@ import os
 import re
 import stat
 import sys
-import tempfile
 
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
 from ..errors import ChangelogError, ConfigError
@@ -298,27 +297,19 @@ def append_entry_to_version(changes_dir: str, version: str, entry: ChangelogEntr
 
 
 def _append_entry_to_file(target: str, entry: ChangelogEntry) -> None:
-    """Append one entry to any JSONL file atomically.
+    """Append one entry to any JSONL file, creating parents when missing.
 
-    Writes the serialized line to a temp file, then appends it to the target.
-    Creates parent directories if they don't exist.
+    One append of one line, through the effect seam.  It used to stage the
+    line in a ``tempfile.mkstemp`` file and then copy that into the target,
+    which bought nothing -- the copy was itself a plain append, so a crash
+    mid-write could truncate the target either way -- and cost purity:
+    ``mkstemp`` creates its file unconditionally, so under --dry-run the
+    recorded cleanup never ran and the preview left a stray ``.tmp`` in
+    ``.rlsbl/changes/``.
     """
     parent = os.path.dirname(target)
     effects.makedirs(parent, exist_ok=True)
-    line = serialize_entry(entry) + "\n"
-
-    # Write to a temp file in the same directory (same filesystem for rename)
-    fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=".tmp")
-    try:
-        os.write(fd, line.encode("utf-8"))
-        os.close(fd)
-        # Append the temp file content to the target
-        with effects.open_write(target, "a", encoding="utf-8") as f:
-            with open(tmp_path, "r", encoding="utf-8") as tmp_f:
-                f.write(tmp_f.read())
-    finally:
-        if os.path.exists(tmp_path):
-            effects.remove(tmp_path)
+    effects.append_text(target, serialize_entry(entry) + "\n")
 
 
 def _warn_stale_entries(src: str, tag_glob: str) -> None:

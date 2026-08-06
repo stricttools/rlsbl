@@ -7,14 +7,53 @@ which absorbed three different hand-rolled atomic-write shapes with three
 different resulting file modes.
 """
 
+import itertools
 import os
 import stat
 import subprocess
 from unittest.mock import patch
 
 import pytest
+import strictcli
 
 from rlsbl import effects
+
+
+_probe_seq = itertools.count(1)
+
+
+def run_in_preview(fn):
+    """Run *fn* inside a real ``--dry-run`` dispatch; return (value, result).
+
+    Preview mode needs a live strictcli effects handle, and only a real
+    dispatch mints one -- conftest's ``cli_ctx`` deliberately raises on
+    ``.effects`` so nobody fakes it.  Driving a seam through a whole rlsbl
+    command just to reach preview mode drags that command's preconditions
+    along, so this registers a throwaway one-command app instead: the handle
+    and the recording are the framework's real ones, and *fn* is the only
+    thing under test.
+
+    ``value`` is whatever *fn* returned; ``result`` is the strictcli test
+    result, whose ``stdout`` carries the rendered would-do log.
+    """
+    box = {}
+    app = strictcli.App(
+        name=f"previewprobe{next(_probe_seq)}",
+        version="0.0.0",
+        help="Throwaway app that mints a real effects handle for seam tests.",
+    )
+
+    @app.command(
+        name="probe",
+        help="Run the callable under test inside a real dry-run dispatch.",
+        effect="mutating",
+    )
+    @effects.handler
+    def _probe(ctx):
+        box["value"] = fn()
+
+    result = app.test(["--dry-run", "probe"])
+    return box.get("value"), result
 
 
 def _mode(path):
