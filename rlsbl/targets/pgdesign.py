@@ -97,18 +97,29 @@ class PgdesignTarget(BaseTarget):
         return "pgdesign.toml"
 
     def build(self, dir_path, version, *, config=None):
-        """Validate the pgdesign schema. Fails the release if errors exist."""
+        """Validate the pgdesign schema. Fails the release if errors exist.
+
+        pgdesign 0.12.0 removed the `validate` command in favour of the check
+        framework. `pgdesign check --tag validation` takes no positional path:
+        it resolves the project from the process working directory (its check
+        context root is the cwd, and config discovery only walks UP from
+        there). The schema directory the old positional argument carried is
+        therefore expressed as cwd -- which matters when pgdesign.toml lives in
+        a schema/ subdir, since discovery would never find it from dir_path.
+        """
         timeout = self._resolve_build_timeout(config)
         schema_dir = self._schema_dir(dir_path)
         result = effects.run(
-            ["pgdesign", "validate", schema_dir],
+            ["pgdesign", "check", "--tag", "validation"],
+            cwd=schema_dir,
             capture_output=True,
             text=True,
             timeout=timeout,
         )
         if result.returncode != 0:
             print(
-                f"pgdesign validate failed:\n{result.stderr or result.stdout}",
+                "pgdesign check --tag validation failed:\n"
+                f"{result.stderr or result.stdout}",
                 file=sys.stderr,
             )
             raise RuntimeError("pgdesign schema validation failed")

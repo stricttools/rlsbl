@@ -1,8 +1,10 @@
 """Tests for PgdesignTarget: pgdesign.toml handling, detection, version read/write."""
 
 import os
+import subprocess
 import tempfile
 
+import pytest
 import tomlkit
 
 from conftest import make_ctx
@@ -227,3 +229,107 @@ class TestPgdesignTargetSchemaDir:
             with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
                 f.write(MINIMAL_TOML)
             assert target._schema_dir(d) == schema_dir
+
+
+class TestPgdesignTargetBuild:
+    """build() shells out to pgdesign to validate the schema.
+
+    pgdesign 0.12.0 removed the `validate` command in favour of the check
+    framework (`pgdesign check --tag validation`). The check command takes no
+    positional path -- it resolves the project from the process working
+    directory (its CheckContext root is os.Getwd(), and config discovery only
+    walks UP from there) -- so the schema directory the old positional argument
+    carried has to be expressed as cwd instead.
+    """
+
+    def _capture(self, monkeypatch, returncode=0, stderr=""):
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append((argv, kwargs))
+            return subprocess.CompletedProcess(
+                argv, returncode, stdout="", stderr=stderr
+            )
+
+        monkeypatch.setattr("rlsbl.effects.run", fake_run)
+        return calls
+
+    def test_build_invokes_check_tag_validation(self, monkeypatch):
+        """The shipped argv must be the check-framework form, not `validate`."""
+        calls = self._capture(monkeypatch)
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            target.build(d, "1.2.3")
+        assert len(calls) == 1
+        argv, _ = calls[0]
+        assert argv == ["pgdesign", "check", "--tag", "validation"]
+
+    def test_build_passes_schema_dir_as_cwd_root(self, monkeypatch):
+        """A root-level pgdesign.toml means cwd is the project directory."""
+        calls = self._capture(monkeypatch)
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            target.build(d, "1.2.3")
+            assert calls[0][1]["cwd"] == d
+
+    def test_build_passes_schema_subdir_as_cwd(self, monkeypatch):
+        """A schema/ subdir must become cwd -- config discovery never walks down."""
+        calls = self._capture(monkeypatch)
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            schema_dir = os.path.join(d, "schema")
+            os.makedirs(schema_dir)
+            with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            target.build(d, "1.2.3")
+            assert calls[0][1]["cwd"] == schema_dir
+
+    def test_build_no_positional_path_argument(self, monkeypatch):
+        """`pgdesign check` accepts no positional path; passing one would abort."""
+        calls = self._capture(monkeypatch)
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            target.build(d, "1.2.3")
+            argv, _ = calls[0]
+            assert d not in argv
+            assert not any(a.startswith("/") for a in argv[1:])
+
+    def test_build_applies_configured_timeout(self, monkeypatch):
+        calls = self._capture(monkeypatch)
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            target.build(d, "1.2.3", config={"build_timeout": 17})
+            assert calls[0][1]["timeout"] == 17
+
+    def test_build_raises_on_nonzero(self, monkeypatch):
+        self._capture(monkeypatch, returncode=1, stderr="E101: bad column")
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            with pytest.raises(RuntimeError):
+                target.build(d, "1.2.3")
+
+    def test_build_failure_message_names_the_real_command(
+        self, monkeypatch, capsys
+    ):
+        """The diagnostic must name the command that actually ran."""
+        self._capture(monkeypatch, returncode=1, stderr="E101: bad column")
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            with pytest.raises(RuntimeError):
+                target.build(d, "1.2.3")
+        err = capsys.readouterr().err
+        assert "pgdesign check --tag validation" in err
+        assert "pgdesign validate" not in err
+        assert "E101: bad column" in err
