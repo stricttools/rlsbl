@@ -21,6 +21,7 @@ propagate unchanged, so call sites keep their existing ``except`` clauses.
 
 import os
 import shutil
+import socket
 import stat
 import subprocess
 import tempfile
@@ -97,6 +98,11 @@ def urlopen(url, *, timeout=None):
     if timeout is None:
         return urllib.request.urlopen(url)
     return urllib.request.urlopen(url, timeout=timeout)
+
+
+def tcp_connect(host, port, *, timeout=None):
+    """Open a TCP connection to *host*:*port* and return the socket."""
+    return socket.create_connection((host, port), timeout=timeout)
 
 
 # ---------------------------------------------------------------------------

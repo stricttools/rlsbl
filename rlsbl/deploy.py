@@ -2,7 +2,6 @@
 
 import os
 import re
-import socket
 import subprocess
 import sys
 import time
@@ -237,7 +236,7 @@ def _check_health_tcp(config, deploy_host):
 
     while time.monotonic() < deadline:
         try:
-            conn = socket.create_connection((host, port), timeout=5)
+            conn = effects.tcp_connect(host, port, timeout=5)
             conn.close()
             return True, f"TCP health check passed: {host}:{port}"
         except Exception as e:

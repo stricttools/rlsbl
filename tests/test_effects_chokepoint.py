@@ -8,9 +8,20 @@ It is AST-based rather than grep-based on purpose: ``except
 subprocess.CalledProcessError`` and the string ``os.replace`` in a docstring
 are not effects, and a grep cannot tell them apart from a call.
 
+The banned set covers five classes, each of which had real bypasses:
+subprocess, filesystem (including the descriptor-level ``os.open`` /
+``os.fdopen`` / ``os.write`` shape, which is a complete write that mentions
+no banned name), ``tempfile`` (whose entries are created in EVERY mode, so
+reaching for it directly makes a preview impure), the ``gh`` network seam,
+and raw network (``socket``, ``http.client``, ``requests``).
+
 Adding a bare ``subprocess.run`` to a production module fails this test.  The
 fix is to call the corresponding ``rlsbl.effects`` wrapper -- not to widen
-EXEMPT_FILES.
+EXEMPT_FILES.  The exemption list is exactly two files, both of them parts of
+the chokepoint itself; there is deliberately no per-site exemption mechanism,
+because a legitimate exception (the advisory lock's real fd, the TCP health
+probe) is expressible as a named seam in ``effects.py`` and reads better
+there than as an entry in an allowlist nobody revisits.
 """
 
 import ast
@@ -49,13 +60,36 @@ BANNED_ATTR_CALLS = {
     "os": {
         "replace", "rename", "remove", "unlink", "rmdir", "removedirs",
         "makedirs", "mkdir", "chmod", "symlink", "link", "truncate",
+        # The descriptor-level shapes: os.open + os.fdopen + os.write is a
+        # complete write that never touches ``open`` or a banned name above,
+        # which is how the exclusive-create release-file writes sat outside
+        # the chokepoint unnoticed.
+        "open", "fdopen", "write", "close", "renames", "chown", "mkfifo",
     },
     "shutil": {
         "copy", "copy2", "copyfile", "copytree", "copymode", "copystat",
         "move", "rmtree",
     },
+    # Temp files and dirs are filesystem writes like any other, and the ones
+    # that matter most: they are created in EVERY mode, so a call site that
+    # reaches for tempfile directly makes its own preview impure.  Route them
+    # through effects.mkdtemp / effects.temp_file (or, when the consumer is an
+    # allowlisted observe, effects.observe_scratch_files).
+    "tempfile": {
+        "mkstemp", "mkdtemp", "NamedTemporaryFile", "TemporaryDirectory",
+        "TemporaryFile", "SpooledTemporaryFile",
+    },
     "request": {"urlopen"},          # urllib.request.urlopen
     "urllib": {"urlopen"},           # urllib.urlopen alias forms
+    # Network below the urllib seam: a raw socket or a second HTTP client
+    # would reach a registry or a deploy host without appearing in the
+    # enumerable network surface.
+    "socket": {"create_connection", "create_server", "socket", "socketpair"},
+    "client": {"HTTPConnection", "HTTPSConnection"},   # http.client.*
+    "requests": {
+        "get", "post", "put", "delete", "patch", "head", "options",
+        "request", "Session",
+    },
 }
 
 # Bare names that are banned when imported directly (``from os import replace``).
@@ -283,6 +317,90 @@ def test_scanner_detects_a_planted_bypass(tmp_path):
     descriptions = [what for _, what in found]
     assert "subprocess.run(...)" in descriptions
     assert "open(..., 'w')" in descriptions
+
+
+def test_scanner_detects_a_planted_tempfile_bypass(tmp_path):
+    """Temp files and dirs are writes, and impure ones: they happen in every mode."""
+    planted = tmp_path / "planted_temp.py"
+    planted.write_text(
+        "import tempfile\n"
+        "from tempfile import mkdtemp\n"
+        "def go():\n"
+        "    a = tempfile.mkdtemp(prefix='x-')\n"
+        "    b = tempfile.mkstemp()\n"
+        "    c = tempfile.NamedTemporaryFile(delete=False)\n"
+        "    d = tempfile.TemporaryDirectory()\n"
+        "    e = mkdtemp()\n"
+        "    return a, b, c, d, e\n",
+        encoding="utf-8",
+    )
+    descriptions = [what for _, what in _violations(str(planted))]
+    # The bare ``mkdtemp()`` call is not matched by name (too many innocent
+    # locals would be), but it cannot exist without the import above it,
+    # which is -- exactly as for ``from shutil import rmtree``.
+    assert descriptions == [
+        "from tempfile import mkdtemp",
+        "tempfile.mkdtemp(...)",
+        "tempfile.mkstemp(...)",
+        "tempfile.NamedTemporaryFile(...)",
+        "tempfile.TemporaryDirectory(...)",
+    ], descriptions
+
+
+def test_scanner_detects_a_planted_descriptor_bypass(tmp_path):
+    """os.open + os.fdopen + os.write is a whole write with no banned ``open``."""
+    planted = tmp_path / "planted_fd.py"
+    planted.write_text(
+        "import os\n"
+        "def go(path):\n"
+        "    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)\n"
+        "    os.write(fd, b'x')\n"
+        "    os.close(fd)\n"
+        "    with os.fdopen(fd, 'w') as f:\n"
+        "        f.write('y')\n"
+        "    os.renames(path, path + '.bak')\n"
+        "    os.chown(path, 0, 0)\n"
+        "    os.mkfifo(path)\n",
+        encoding="utf-8",
+    )
+    # Sorted: ast.walk is breadth-first, so a call nested in a ``with`` body
+    # is not reported in source order.
+    descriptions = sorted(what for _, what in _violations(str(planted)))
+    assert descriptions == sorted([
+        "os.open(...)",
+        "os.write(...)",
+        "os.close(...)",
+        "os.fdopen(...)",
+        "os.renames(...)",
+        "os.chown(...)",
+        "os.mkfifo(...)",
+    ]), descriptions
+
+
+def test_scanner_detects_a_planted_network_bypass(tmp_path):
+    """A raw socket or a second HTTP client escapes the named network seam."""
+    planted = tmp_path / "planted_net.py"
+    planted.write_text(
+        "import http.client\n"
+        "import requests\n"
+        "import socket\n"
+        "def go():\n"
+        "    socket.create_connection(('h', 1))\n"
+        "    socket.socket()\n"
+        "    http.client.HTTPSConnection('h')\n"
+        "    requests.get('https://example.invalid')\n"
+        "    requests.post('https://example.invalid')\n"
+        "    socket.gethostname()\n",
+        encoding="utf-8",
+    )
+    descriptions = [what for _, what in _violations(str(planted))]
+    assert descriptions == [
+        "socket.create_connection(...)",
+        "socket.socket(...)",
+        "client.HTTPSConnection(...)",
+        "requests.get(...)",
+        "requests.post(...)",
+    ], descriptions
 
 
 def test_scanner_ignores_non_calls(tmp_path):

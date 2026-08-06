@@ -289,6 +289,21 @@ def urlopen(url, *, timeout=None):
     )
 
 
+def tcp_connect(host, port, *, timeout=None):
+    """Open a TCP connection to *host*:*port* and return the socket.
+
+    Connect-and-close is a network *read*: it leaves nothing behind on the
+    far side, so -- exactly like a ``GET`` -- it executes in every mode.  A
+    deploy health check that could not reach the host under a preview would
+    report a failure that says nothing about the deploy being previewed.
+
+    It still lives here rather than in the caller so the network surface stays
+    enumerable in one place: ``tests/test_effects_chokepoint.py`` bans
+    ``socket``, ``http.client`` and ``requests`` everywhere else.
+    """
+    return _direct.tcp_connect(host, port, timeout=timeout)
+
+
 # ---------------------------------------------------------------------------
 # Filesystem effects -- writes
 # ---------------------------------------------------------------------------
