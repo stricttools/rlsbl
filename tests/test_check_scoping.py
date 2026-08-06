@@ -406,12 +406,22 @@ def test_scaffold_gitignore_stale_warns_on_missing_gitignore(tmp_path):
 
 def test_scaffold_gitignore_stale_multiple_projects(tmp_path):
     """Check reports per-project details for multiple projects."""
-    # Project A: has correct gitignore (all rlsbl entries)
+    # Project A: has correct gitignore (all rlsbl entries).
+    # Derived from the shipped template rather than hardcoded, so adding an
+    # entry to gitignore.tpl does not silently turn this fixture stale.
+    from importlib.resources import files as pkg_files
+
+    template_text = (
+        pkg_files("rlsbl") / "templates" / "shared" / "gitignore.tpl"
+    ).read_text()
+    rlsbl_entries = [
+        line.strip()
+        for line in template_text.splitlines()
+        if ".rlsbl" in line and line.strip() and not line.strip().startswith("#")
+    ]
     proj_a = tmp_path / "proj_a"
     proj_a.mkdir()
-    (proj_a / ".gitignore").write_text(
-        ".rlsbl-notes-*.tmp\n.rlsbl/lock\n.rlsbl-monorepo/lock\n"
-    )
+    (proj_a / ".gitignore").write_text("\n".join(rlsbl_entries) + "\n")
 
     # Project B: missing entries
     proj_b = tmp_path / "proj_b"

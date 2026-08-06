@@ -272,6 +272,46 @@ def validate_gh_push_access(config=None):
     raise ReleaseValidationError(msg)
 
 
+def is_tool_owned_state_path(path) -> bool:
+    """True if *path* is one of rlsbl's own untracked release-state files.
+
+    rlsbl writes ``in-progress.json`` (release state) and
+    ``scrub-result.json`` (scrub resume state) into the releases dir and
+    leaves them there precisely when a release failed and must be resumed.
+    They are the tool's own scratch state, not the operator's work, so the
+    clean-tree gate must not treat them as uncommitted changes -- otherwise
+    rlsbl blocks its own ``release resume``.
+
+    The match is STRUCTURAL (path-shaped), never gitignore-derived: a stale
+    consumer ``.gitignore`` must not be able to defeat the exemption.
+
+    ``path`` is a repo-root-relative path as ``git status --porcelain``
+    reports it. The two canonical homes (see
+    :func:`rlsbl.release_file.get_releases_dir`) are:
+
+    - ``[<member>/].rlsbl/releases/<file>`` -- standalone projects and
+      implicit-monorepo packages
+    - ``.rlsbl-monorepo/releasables/<name>/releases/<file>`` -- releasables
+
+    ``unreleased.plan.json`` and the ``unreleased.toml`` family share those
+    directories and are DELIBERATELY committed; they are not exempt.
+    """
+    from .release_state import STATE_FILENAME, SCRUB_RESULT_FILENAME
+
+    parts = str(path).replace(os.sep, "/").split("/")
+    if len(parts) < 3 or parts[-1] not in (STATE_FILENAME, SCRUB_RESULT_FILENAME):
+        return False
+    if parts[-2] != "releases":
+        return False
+    if parts[-3] == ".rlsbl":
+        return True
+    return (
+        len(parts) >= 5
+        and parts[-4] == "releasables"
+        and parts[-5] == ".rlsbl-monorepo"
+    )
+
+
 def validate_clean_tree(flags):
     """Validate working tree is clean (or record pre-existing dirty files).
 
@@ -285,9 +325,37 @@ def validate_clean_tree(flags):
         dirty_output = run("git", ["status", "--porcelain"])
         if dirty_output:
             pre_existing_dirty = parse_porcelain_paths(dirty_output)
-    elif not is_clean_tree():
+        return pre_existing_dirty
+
+    if is_clean_tree():
+        return pre_existing_dirty
+
+    # Something is dirty. Classify it: rlsbl's own release-state files
+    # (in-progress.json, scrub-result.json) are the tool's scratch state and
+    # never block -- refusing over them is rlsbl blocking its own `release
+    # resume`, which is exactly when those files exist.
+    #
+    # ``--untracked-files=all`` is required: the default collapses a wholly
+    # untracked directory into a single ``?? .rlsbl/releases/`` entry, which
+    # cannot be classified per-file (and must NOT be exempted wholesale --
+    # unreleased.toml lives there and is deliberately committed).
+    try:
+        dirty_output = run("git", ["status", "--porcelain", "--untracked-files=all"])
+    except Exception:
+        # Fail closed: an unreadable status is never "clean enough".
         raise ReleaseValidationError(
             "working tree is not clean. Commit your changes first."
+        )
+
+    blocking = sorted(
+        path for path in parse_porcelain_paths(dirty_output or "")
+        if not is_tool_owned_state_path(path)
+    )
+    if blocking:
+        listed = "\n".join(f"  {path}" for path in blocking)
+        raise ReleaseValidationError(
+            "working tree is not clean. Commit your changes first.\n"
+            f"Uncommitted:\n{listed}"
         )
     return pre_existing_dirty
 
