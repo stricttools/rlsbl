@@ -78,6 +78,12 @@ BANNED_ATTR_CALLS = {
     "tempfile": {
         "mkstemp", "mkdtemp", "NamedTemporaryFile", "TemporaryDirectory",
         "TemporaryFile", "SpooledTemporaryFile",
+        # ``mktemp`` creates nothing itself, so the write it invites is the
+        # raw ``open(path, "w")`` on the next line -- which the scanner does
+        # catch.  It is banned by name anyway: the name is the request for
+        # that write, and naming it here points the fix at effects.temp_file
+        # instead of at whichever spelling of the open slipped past.
+        "mktemp",
     },
     "request": {"urlopen"},          # urllib.request.urlopen
     "urllib": {"urlopen"},           # urllib.urlopen alias forms
@@ -331,20 +337,31 @@ def test_scanner_detects_a_planted_tempfile_bypass(tmp_path):
         "    c = tempfile.NamedTemporaryFile(delete=False)\n"
         "    d = tempfile.TemporaryDirectory()\n"
         "    e = mkdtemp()\n"
-        "    return a, b, c, d, e\n",
+        "    f = tempfile.mktemp(suffix='.json')\n"
+        "    with open(f, 'w') as fh:\n"
+        "        fh.write('{}')\n"
+        "    return a, b, c, d, e, f\n",
         encoding="utf-8",
     )
-    descriptions = [what for _, what in _violations(str(planted))]
+    # Sorted: ast.walk is breadth-first, so the call inside the ``with`` header
+    # is not reported in source order.
+    descriptions = sorted(what for _, what in _violations(str(planted)))
     # The bare ``mkdtemp()`` call is not matched by name (too many innocent
     # locals would be), but it cannot exist without the import above it,
     # which is -- exactly as for ``from shutil import rmtree``.
-    assert descriptions == [
+    #
+    # ``mktemp`` names a path instead of creating one, so the write it invites
+    # is the ``open(f, 'w')`` below it -- flagged on its own.  Both are
+    # reported, and the mktemp line is the one that points at effects.temp_file.
+    assert descriptions == sorted([
         "from tempfile import mkdtemp",
         "tempfile.mkdtemp(...)",
         "tempfile.mkstemp(...)",
         "tempfile.NamedTemporaryFile(...)",
         "tempfile.TemporaryDirectory(...)",
-    ], descriptions
+        "tempfile.mktemp(...)",
+        "open(..., 'w')",
+    ]), descriptions
 
 
 def test_scanner_detects_a_planted_descriptor_bypass(tmp_path):
