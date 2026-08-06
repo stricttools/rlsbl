@@ -254,14 +254,18 @@ def _setup_batch_packages(ws, names, base_version="0.1.0", pretag=True):
     return batch_path
 
 
-def _simulate_release(ctx, released_sink=None):
+def _simulate_release_for(ws, name):
     """Reproduce a real release's observable effects from the resolved plan."""
-    name = os.path.basename(str(ctx.project_root))
-    ws = str(ctx.workspace_root)
-    plan = read_batch_plan(get_batch_plan_path(ws))
+    plan = read_batch_plan(get_batch_plan_path(str(ws)))
     item = plan.items[name]
-    _set_pyproject_version(os.path.join(ws, name), item.target_version)
+    _set_pyproject_version(os.path.join(str(ws), name), item.target_version)
     _git_tag(ws, item.tag)
+
+
+def _simulate_release(ctx, released_sink=None):
+    """``_simulate_release_for`` addressed by the member's ProjectContext."""
+    name = os.path.basename(str(ctx.project_root))
+    _simulate_release_for(str(ctx.workspace_root), name)
     if released_sink is not None:
         released_sink.append(name)
 
@@ -423,7 +427,12 @@ class TestBatchPlanIdempotency:
 
         with patch("rlsbl.commands.release.run_cmd", mock_run), \
              patch("rlsbl.commands.monorepo.batch_release.validate_gh_push_access"):
-            _run_batch(ws)
+            # Nothing can be released while beta is stranded, so the run has
+            # no completion to report: it exits nonzero rather than printing
+            # "Batch release complete" over an empty released list.
+            with pytest.raises(SystemExit) as exc:
+                _run_batch(ws)
+        assert exc.value.code == 1
 
         # The batch file must NOT have been archived (neither by the early pass
         # nor the loop tail) while beta is stranded.
@@ -522,3 +531,137 @@ class TestBatchPlanIdempotency:
         # If the plan had been regenerated on rerun, alpha's base would have
         # drifted to 0.1.1 and target to 0.1.2. It must not.
         assert plan_before.items["alpha"].target_version == "0.1.1"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.1(c): a batch release never reports success it cannot evidence.
+#
+# Two silent-zero holes lived here. A member whose release call exited 0
+# skipped the batch's own bookkeeping entirely -- neither `released` nor
+# `pending` learned about it -- and the batch moved on. And the completion
+# line printed unconditionally, so a run that released nothing still ended
+# with "Batch release complete: " and exit 0.
+# ---------------------------------------------------------------------------
+
+
+class TestBatchMemberSilentExitZero:
+
+    def test_member_exit_zero_without_state_is_a_hard_error(
+        self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
+    ):
+        """A member that exits 0 while leaving no in-progress state gives the
+        batch no evidence it released. That must abort, not be skipped."""
+        ws = mock_git_repo
+        _setup_batch_packages(ws, ["alpha"])
+
+        def mock_run(release_config, flags, **kwargs):
+            raise SystemExit(0)
+
+        with patch("rlsbl.commands.release.run_cmd", mock_run):
+            with pytest.raises(SystemExit) as exc:
+                _run_batch(ws)
+
+        assert exc.value.code == 1
+        out = capsys.readouterr()
+        assert "alpha" in out.err
+        assert "Batch release complete" not in out.out, (
+            "a batch that released nothing must not announce completion"
+        )
+
+    def test_member_exit_zero_with_state_is_treated_as_pending(
+        self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
+    ):
+        """A member that exits 0 but DID leave in-progress state is genuinely
+        mid-flight: pass 2 finishes it on the verified candidate."""
+        from rlsbl.commands.release.release_state import get_state_path
+
+        ws = mock_git_repo
+        _setup_batch_packages(ws, ["alpha"])
+
+        def mock_run(release_config, flags, **kwargs):
+            project_dir = str(kwargs["ctx"].project_root)
+            state_path = get_state_path(project_dir)
+            os.makedirs(os.path.dirname(state_path), exist_ok=True)
+            with open(state_path, "w", encoding="utf-8") as f:
+                f.write('{"new_version": "0.1.1", "tag": "alpha@v0.1.1"}\n')
+            raise SystemExit(0)
+
+        completed = []
+
+        def fake_resume(name, project_dir, workspace_root, state_path, flags,
+                        verified_sha, log):
+            completed.append(name)
+            _simulate_release_for(ws, name)
+            os.remove(state_path)  # a real resume clears its state on success
+
+        with (
+            patch("rlsbl.commands.release.run_cmd", mock_run),
+            patch("rlsbl.commands.monorepo.batch_release._publish_batch_candidate",
+                  return_value="deadbeef"),
+            patch("rlsbl.commands.monorepo.batch_release._batch_ci_gate",
+                  return_value="deadbeef"),
+            patch("rlsbl.commands.monorepo.batch_release._resume_batch_item",
+                  side_effect=fake_resume),
+        ):
+            _run_batch(ws)
+
+        assert completed == ["alpha"], (
+            "a member with in-progress state must reach pass 2, not be dropped"
+        )
+        assert "Batch release complete: alpha" in capsys.readouterr().out
+
+
+class TestBatchCompletionRequiresEvidence:
+
+    def test_batch_that_released_nothing_exits_nonzero(
+        self, mock_git_repo, capsys, bypass_upfront_validation,
+    ):
+        """Every item skipped as already-released and nothing released: the
+        run announced completion and exited 0.
+
+        Reproduced through the real divergence that reaches this state: the
+        repair pass's remote-tag probe blips (``item_is_released`` reads an
+        inconclusive ls-remote as not-released), so the batch falls through,
+        and by the time the loop re-probes, every item reads as released.
+        """
+        from rlsbl.utils import tag_exists_locally
+
+        ws = mock_git_repo
+        _setup_batch_packages(ws, ["alpha", "beta"])
+
+        plan = BatchPlan(
+            section_type="packages",
+            items={
+                "alpha": PlanItem("alpha", "0.1.0", "0.1.1", "alpha@v0.1.1", "pypi", "patch"),
+                "beta": PlanItem("beta", "0.1.0", "0.1.1", "beta@v0.1.1", "pypi", "patch"),
+            },
+        )
+        write_batch_plan(get_batch_plan_path(str(ws)), plan)
+        for n in ["alpha", "beta"]:
+            _set_pyproject_version(os.path.join(str(ws), n), "0.1.1")
+            _git_tag(ws, f"{n}@v0.1.1")
+
+        calls = {"n": 0}
+
+        def blip_once(tag, cwd=None):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise subprocess.CalledProcessError(returncode=128, cmd=["git", "ls-remote"])
+            return tag_exists_locally(tag, cwd=cwd)
+
+        def mock_run(release_config, flags, **kwargs):
+            raise AssertionError("nothing should be released here")
+
+        with (
+            patch("rlsbl.commands.monorepo.batch_release.commit_files"),
+            patch("rlsbl.commands.monorepo.batch_plan.tag_exists_on_remote",
+                  side_effect=blip_once),
+            patch("rlsbl.commands.release.run_cmd", mock_run),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _run_batch(ws)
+
+        assert exc.value.code == 1
+        out = capsys.readouterr()
+        assert "Batch release complete" not in out.out
+        assert "released nothing" in out.err

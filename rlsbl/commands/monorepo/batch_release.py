@@ -678,13 +678,21 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                                              workspace_root)
                         )
             except SystemExit as e:
-                if e.code != 0:
+                if e.code not in (0, None):
                     print(
                         f"\nError: release of releasable {rel_name} failed. "
                         f"Successfully released: {', '.join(released) if released else '(none)'}",
                         file=sys.stderr,
                     )
                     raise
+                from ...workspace_types import get_releasable_dir as _grd0
+                from ..release.release_state import get_state_path as _gsp0
+                _absorb_member_exit_zero(
+                    rel_name, project_dir,
+                    _gsp0(workspace_root,
+                          releasable_dir=_grd0(workspace_root, rel_name)),
+                    pending, dry_run=dry_run, kind="releasable",
+                )
 
             log("")
 
@@ -747,7 +755,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
             _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
 
     # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
-    log(f"Batch release complete: {', '.join(released)}")
+    _announce_batch_completion(released, log, kind="releasable")
 
     if not dry_run and last_sha:
         # Watch CI or print hint for the last release's commit
@@ -889,13 +897,18 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                                              workspace_root)
                         )
             except SystemExit as e:
-                if e.code != 0:
+                if e.code not in (0, None):
                     print(
                         f"\nError: release of {pkg_name} failed. "
                         f"Successfully released: {', '.join(released) if released else '(none)'}",
                         file=sys.stderr,
                     )
                     raise
+                from ..release.release_state import get_state_path as _gsp0
+                _absorb_member_exit_zero(
+                    pkg_name, project_dir, _gsp0(project_dir), pending,
+                    dry_run=dry_run, kind="package",
+                )
 
             log("")
 
@@ -958,7 +971,7 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
             _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
 
     # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
-    log(f"Batch release complete: {', '.join(released)}")
+    _announce_batch_completion(released, log, kind="package")
 
     if not dry_run and last_sha:
         # Watch CI or print hint for the last release's commit
@@ -968,6 +981,52 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
             watch_run_cmd(None, [last_sha], {})
         else:
             log(f"Watch CI: rlsbl watch {last_sha}")
+
+
+def _absorb_member_exit_zero(name, project_dir, state_path, pending, *,
+                             dry_run, kind):
+    """Interpret a ``SystemExit(0)`` escaping a member's release call.
+
+    A zero exit unwinds past the batch's own bookkeeping, so neither
+    ``released`` nor ``pending`` learns about the member. The only reading
+    under which that is safe is an in-progress state file: the member's
+    release really is mid-flight and pass 2 finishes it on the verified
+    candidate. With no state file the batch has NO evidence about what the
+    member did -- it may have released, may have done nothing -- and
+    continuing would either strand it or announce a completion nobody can
+    substantiate. That is a hard error.
+    """
+    if not dry_run and os.path.exists(state_path):
+        pending.append((name, project_dir, state_path))
+        return
+    print(
+        f"\nError: the release of {kind} {name} exited 0 without leaving "
+        f"in-progress release state, so the batch has no evidence of what it "
+        f"did.\nInspect {name} (`rlsbl status` in {project_dir}) and re-run "
+        f"`rlsbl monorepo release run` once its state is clear.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def _announce_batch_completion(released, log, *, kind):
+    """Print the completion line, or refuse when nothing was released.
+
+    An empty ``released`` list means the run produced no release at all --
+    every item was skipped as already-released, or a member vanished without
+    accounting for itself. Announcing "Batch release complete" there is the
+    same silent-success lie the exit-code family exists to kill.
+    """
+    if not released:
+        print(
+            f"\nError: the batch released nothing -- every {kind} was skipped "
+            f"or unaccounted for.\nIf they are all already released, the batch "
+            f"file and its plan are stale: archive them (or delete the plan "
+            f"sidecar and re-run) instead of re-running an empty batch.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    log(f"Batch release complete: {', '.join(released)}")
 
 
 def _plan_items_in_progress(plan, workspace_root, projects):
