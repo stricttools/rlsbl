@@ -73,6 +73,17 @@ def _fixture_plan():
                          "ref": phase_a.StepRef(phase_a.CANDIDATE_SHA)},
             ),
             phase_a.PlanStep(
+                kind=phase_a.GUARD_CANDIDATE_WINDOW,
+                release_step="BRANCH_PUSHED",
+                summary=("refuse a candidate whose diff window cannot trigger "
+                         "this project's CI"),
+                payload={"remote_head": "a" * 40, "branch": "main",
+                         "candidate": phase_a.StepRef(phase_a.CANDIDATE_SHA)},
+                capture=("window",
+                         ["git", "diff", "--name-only", "<base>..<candidate>"],
+                         "."),
+            ),
+            phase_a.PlanStep(
                 kind=phase_a.PUSH_CANDIDATE,
                 release_step="BRANCH_PUSHED",
                 summary="run git push --no-verify origin <candidate_sha>:refs/heads/main",
@@ -82,6 +93,7 @@ def _fixture_plan():
                                  phase_a.CANDIDATE_SHA,
                                  template=phase_a.SLOT + ":refs/heads/main",
                              )],
+                    "sha": phase_a.StepRef(phase_a.CANDIDATE_SHA),
                     "timeout": 300,
                 },
                 marks=("BRANCH_PUSHED",),
@@ -175,13 +187,37 @@ class TestPreviewBoundary:
 # ---------------------------------------------------------------------------
 
 
-# The ONLY function in the executor that may read. Everything the executor
-# needs beyond the plan arrives through it.
+# The ONLY function in the executor that may read the WORLD. Everything the
+# executor needs beyond the plan arrives through it.
 _EXECUTOR_READ_WHITELIST = {"_capture"}
 
 # Bare helper names that read the world. An executor method calling one of
 # these is asking a question the builder was supposed to have answered.
 _READ_CALLS = {"run", "run_gh", "head_sha", "_git_read", "_git_answer"}
+
+# Reads of the release-state LEDGER. These are invisible to the world-read scan
+# above (no subprocess, no git), so they are scanned separately -- an undeclared
+# read that nothing can see is worse than one that is merely tolerated.
+#
+# The ledger is the executor's OWN writing surface: it records how far this walk
+# has got, and reading it back is part of writing it. A builder-time snapshot
+# cannot substitute, because ``save_step`` mutates the file between the build
+# and every step that follows -- writing back a stale document would erase the
+# markers the walk itself had just recorded. Each site below is tolerated for
+# that reason and no other; anything new here has to earn its own line.
+_LEDGER_CALLS = {"load_release_state", "save_step", "_track_release_commit"}
+
+_TOLERATED_LEDGER_READS = {
+    # Records each marker as the walk reaches it. The walk is the only thing
+    # that knows how far it got.
+    "run": {"save_step"},
+    # The drift guard's trail: which commits this release created. A commit's
+    # SHA does not exist until the commit step has run.
+    "_settle": {"_track_release_commit"},
+    # Reads back the document the walk has been writing, so the candidate SHA
+    # joins the markers already recorded instead of replacing them.
+    "_do_record_candidate": {"load_release_state"},
+}
 
 # Binaries whose reads the framework really executes under --dry-run (they are
 # on the observe allowlist). An ``effects.run`` in the executor with one of
@@ -245,6 +281,53 @@ class TestExecutorReads:
             "build_phase_a_plan, or declare it as the step's capture."
         )
 
+    def test_every_ledger_read_is_named_and_justified(self):
+        """The release-state reads are enumerated, not silently exempt.
+
+        They do not touch git or the filesystem-as-world, so the scan above
+        cannot see them at all. Scanning them separately is what keeps the
+        "the executor asks nothing" claim honest: the reads that remain are
+        listed, each at a named site, each for a recorded reason.
+        """
+        offenders = []
+        for name, fn in _executor_methods():
+            allowed = _TOLERATED_LEDGER_READS.get(name, frozenset())
+            for node in ast.walk(fn):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                called = (
+                    func.id if isinstance(func, ast.Name)
+                    else func.attr if isinstance(func, ast.Attribute)
+                    else None
+                )
+                if called in _LEDGER_CALLS and called not in allowed:
+                    offenders.append(f"{name}() calls {called}()")
+        assert not offenders, (
+            "the Phase-A executor read the release-state ledger somewhere it "
+            f"is not accounted for: {offenders}. The ledger is the executor's "
+            "own writing surface, and reading it back is only legitimate where "
+            "the value being written did not exist at build time. Add the site "
+            "to _TOLERATED_LEDGER_READS with the reason, or move the read into "
+            "build_phase_a_plan."
+        )
+
+    def test_the_tolerated_ledger_reads_still_exist(self):
+        """The whitelist is a record of real sites, not accumulated cruft."""
+        methods = dict(_executor_methods())
+        for name, calls in _TOLERATED_LEDGER_READS.items():
+            assert name in methods, (
+                f"_TOLERATED_LEDGER_READS names {name}(), which the executor no "
+                "longer has -- drop the entry rather than leaving a standing "
+                "exemption for a method that does not exist"
+            )
+            source = ast.dump(methods[name])
+            for call in calls:
+                assert f"'{call}'" in source, (
+                    f"{name}() no longer calls {call}(): the exemption is dead "
+                    "and must be removed, not left to cover a future read"
+                )
+
     def test_the_capture_is_declared_per_step_not_improvised(self):
         """Every capture the executor runs was named by the builder."""
         for step in _fixture_plan().steps:
@@ -260,7 +343,7 @@ class TestExecutorReads:
 
 
 # ---------------------------------------------------------------------------
-# 3. Value threading: one producer, two consumers, one value
+# 3. Value threading: one producer, three consumers, one value
 # ---------------------------------------------------------------------------
 
 
@@ -276,14 +359,52 @@ class TestValueThreading:
         assert len(producers) == 1
         assert producers[0].kind in (phase_a.COMMIT, phase_a.SNAPSHOT)
 
-    def test_the_state_save_and_the_push_consume_it(self):
+    def test_the_declared_consumers_are_the_only_consumers(self):
+        """Four edges, not three.
+
+        The design was first written down as "one producer and two consumers"
+        -- the state-save and the push -- because those were the two steps
+        holding a StepRef. The candidate-window guard read candidate_sha too,
+        but it reached into the executor's value table instead of declaring it,
+        so ``consumers_of`` could not see it and the count read as three. The
+        guard now declares its consumption like the others, which makes four
+        the true number: the count only ever undercounted because one consumer
+        was threading the value off the plan's books.
+        """
         plan = _fixture_plan()
         consumers = plan.consumers_of(phase_a.CANDIDATE_SHA)
         assert [s.kind for s in consumers] == [
-            phase_a.RECORD_CANDIDATE, phase_a.PUSH_CANDIDATE,
+            phase_a.RECORD_CANDIDATE,
+            phase_a.GUARD_CANDIDATE_WINDOW,
+            phase_a.PUSH_CANDIDATE,
         ], (
-            "Phase A threads exactly three edges: the commit yields "
-            "candidate_sha, the state-save and the push consume it."
+            "Phase A threads exactly four edges: the commit yields "
+            "candidate_sha, and the state-save, the candidate-window guard and "
+            "the push consume it -- each declaring the consumption in its own "
+            "payload, so the plan is the whole truth about who reads the value."
+        )
+
+    def test_no_handler_threads_the_value_off_the_books(self):
+        """A handler reaching into ``_values`` bypasses ``consumers_of``.
+
+        ``_resolve`` is the declared path (it takes a StepRef out of the step's
+        own payload). ``self._values`` is the raw table behind it, and a handler
+        indexing it directly consumes the threaded value without the plan --
+        and therefore the preview -- ever saying so.
+        """
+        offenders = []
+        for name, fn in _executor_methods():
+            if name in {"__init__", "_resolve", "_settle", "run"}:
+                continue  # the threading machinery itself
+            for node in ast.walk(fn):
+                if not isinstance(node, ast.Attribute) or node.attr != "_values":
+                    continue
+                if isinstance(node.value, ast.Name) and node.value.id == "self":
+                    offenders.append(name)
+        assert not offenders, (
+            f"{sorted(set(offenders))} read the executor's value table "
+            "directly. Declare a StepRef in the step's payload and resolve it "
+            "with self._resolve, so PhaseAPlan.consumers_of reports the edge."
         )
 
     def test_a_step_ref_renders_its_template_in_the_plan_table(self):
@@ -295,6 +416,123 @@ class TestValueThreading:
     def test_the_plan_table_names_the_produced_value(self):
         table = phase_a.render_plan_table(_fixture_plan())
         assert "-> candidate_sha" in table
+
+
+# ---------------------------------------------------------------------------
+# 3b. The same threading, on a plan the REAL builder produced
+#
+# Everything above describes the seam through a hand-built plan, which pins the
+# shape but cannot notice the builder drifting away from it. These drive
+# build_phase_a_plan itself, over a stubbed-but-real project, so the
+# one-producer / declared-consumers invariant is pinned on what the release
+# actually issues.
+# ---------------------------------------------------------------------------
+
+
+class _BuiltState:
+    """The slice of ReleaseState build_phase_a_plan reads."""
+
+    current_version = "1.0.0"
+    new_version = "1.1.0"
+    tag = "v1.1.0"
+    branch = "main"
+    quiet = False
+    releasable_name = None
+    member_package_paths = None
+    monorepo_project_path = None
+    monorepo_name = None
+    changes_dir = None
+    hook_generated = ()
+    pre_existing_dirty = None
+    flags: dict = {}
+
+
+def _built_plan(tmp_path):
+    """A plan from the real builder, over a real (if minimal) npm project.
+
+    ``tmp_path`` is not a git repo, so every builder read answers None -- which
+    is the builder's declared "assume the work is owed" case, and therefore the
+    arrangement that produces the FULL plan rather than an idempotency-skipped
+    one.
+    """
+    import json
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"name": "p", "version": "1.0.0"}), encoding="utf-8",
+    )
+    (tmp_path / ".rlsbl").mkdir()
+    project_dir = str(tmp_path)
+    return phase_a.build_phase_a_plan(phase_a.BuildInputs(
+        state=_BuiltState(),
+        ctx=type("C", (), {"config": {}, "project_root": project_dir})(),
+        log=lambda _m: None,
+        project_dir=project_dir, git_root=project_dir,
+        monorepo_root=None, releasable_cfg_dir=None, rep_is_private=False,
+        registry="npm", primary_path=project_dir,
+        target_paths={"npm": project_dir}, secondary_targets={},
+        state_path=str(tmp_path / ".rlsbl" / "in-progress.json"),
+        completed=set(), pin_sha=None, baseline_dirty=set(),
+        commit_msg="v1.1.0", lock_dir=".rlsbl",
+    ))
+
+
+class TestTheBuilderProducesTheDeclaredSeam:
+
+    def test_the_builder_emits_exactly_one_producer(self, tmp_path):
+        plan = _built_plan(tmp_path)
+        assert plan.produced_names == [phase_a.CANDIDATE_SHA], (
+            "build_phase_a_plan produced "
+            f"{plan.produced_names}. Exactly one value crosses the seam, from "
+            "exactly one step -- _retarget_candidate exists to keep it that way "
+            "when the snapshot commit lands after the release commit."
+        )
+
+    def test_the_producer_is_the_last_commit_the_plan_makes(self, tmp_path):
+        plan = _built_plan(tmp_path)
+        producer = next(s for s in plan.steps if s.produces)
+        assert producer.kind in (phase_a.COMMIT, phase_a.SNAPSHOT)
+        assert producer.capture is not None, (
+            "the producing step must declare the observe that resolves it; "
+            "otherwise the executor has to invent the read"
+        )
+        assert producer.capture[0] == phase_a.CANDIDATE_SHA
+        assert producer.capture[1][:2] == ["git", "rev-parse"]
+
+    def test_every_consumer_the_builder_emits_declared_itself(self, tmp_path):
+        """The builder's consumers are the ones the design names, in order."""
+        plan = _built_plan(tmp_path)
+        consumers = [s.kind for s in plan.consumers_of(phase_a.CANDIDATE_SHA)]
+        assert consumers == [
+            phase_a.RECORD_CANDIDATE,
+            phase_a.GUARD_CANDIDATE_WINDOW,
+            phase_a.PUSH_CANDIDATE,
+        ], (
+            f"the real builder threads candidate_sha to {consumers}. Four edges "
+            "total: one producer, three declared consumers. A consumer the "
+            "builder emits without a StepRef is invisible to consumers_of -- "
+            "and to the preview."
+        )
+
+    def test_the_builder_threads_no_second_value(self, tmp_path):
+        """Only candidate_sha crosses the seam, on the real builder's output."""
+        plan = _built_plan(tmp_path)
+        names = set()
+        for step in plan.steps:
+            names |= phase_a._refs_in(step.payload)
+        assert names == {phase_a.CANDIDATE_SHA}, (
+            f"the plan references threaded values {sorted(names)}. A second "
+            "value crossing the seam needs its own producer, its own declared "
+            "capture, and its own line in the module docstring."
+        )
+
+    def test_the_built_plan_renders_its_thread_in_the_table(self, tmp_path):
+        table = phase_a.render_plan_table(_built_plan(tmp_path))
+        assert "-> candidate_sha" in table
+        assert "<candidate_sha>:refs/heads/main" in table, (
+            "the push row must show the refspec it would push, with the "
+            "unresolved thread named -- that is what makes the preview honest "
+            "about waiting on a commit that does not exist yet"
+        )
 
 
 # ---------------------------------------------------------------------------

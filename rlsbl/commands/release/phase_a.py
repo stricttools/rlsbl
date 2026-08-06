@@ -36,10 +36,16 @@ Value threading
 ---------------
 
 Exactly one value crosses the seam: ``candidate_sha``, the commit the release
-publishes as its candidate.  The commit step PRODUCES it; the state-save step
-and the push step CONSUME it, as :class:`StepRef` placeholders the builder
-plants in their payloads.  Three threads, one producer and two consumers, and
-the executor resolves them through :meth:`_Executor._resolve`.
+publishes as its candidate.  The commit step PRODUCES it; the state-save step,
+the candidate-window guard and the push step CONSUME it, as :class:`StepRef`
+placeholders the builder plants in their payloads.  Four threads, one producer
+and three consumers, and the executor resolves them through
+:meth:`_Executor._resolve`.
+
+Every consumer declares itself in its payload, so :meth:`PhaseAPlan.consumers_of`
+is the whole truth about who reads the value -- a handler that reached into
+``self._values`` directly would thread the value without appearing in the plan,
+and the plan is what the preview renders.
 
 A :class:`StepRef` is resolved from a per-step DECLARED result capture: an
 observe the builder names alongside the step (``["git", "rev-parse", "HEAD"]``
@@ -693,7 +699,11 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
         kind=GUARD_CANDIDATE_WINDOW,
         release_step="BRANCH_PUSHED",
         summary="refuse a candidate whose diff window cannot trigger this project's CI",
-        payload=dict(push_plan["window"]),
+        # The guard reads candidate_sha, so it declares it like every other
+        # consumer: reaching into the executor's value table directly would
+        # thread the value without ``consumers_of`` -- and therefore the plan --
+        # ever saying so.
+        payload=dict(push_plan["window"], candidate=StepRef(CANDIDATE_SHA)),
         capture=("window", ["git", "diff", "--name-only", "<base>..<candidate>"], git_root),
     ))
     if push_plan["needs_push"]:
@@ -704,7 +714,13 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
             kind=PUSH_CANDIDATE,
             release_step="BRANCH_PUSHED",
             summary="run " + " ".join(_render_operand(a) for a in argv),
-            payload={"argv": argv, "timeout": push_plan["timeout"]},
+            # Two references to the same thread: the refspec the push argv
+            # carries, and the bare SHA ``push_if_needed`` compares against the
+            # remote. Both are declared, so the plan names every edge.
+            payload={
+                "argv": argv, "sha": StepRef(CANDIDATE_SHA),
+                "timeout": push_plan["timeout"],
+            },
             marks=("BRANCH_PUSHED",),
         ))
     else:
@@ -926,15 +942,34 @@ class _Executor:
         # lower bound for (see :func:`_predicted_version_files`).
         self._written: list = []
 
-    # -- the executor's ONLY read ------------------------------------------
+    # -- the executor's reads, both of them --------------------------------
+    #
+    # The executor asks the WORLD nothing: the builder answered all of that
+    # before the first effect was issued. Two reads remain, and neither is a
+    # question about the world:
+    #
+    # 1. :meth:`_capture` -- a step's DECLARED result capture. A step's own
+    #    result cannot exist before the step runs, so the builder names the
+    #    observe rather than performing it.
+    # 2. The release-state LEDGER (``save_step`` in :meth:`run`,
+    #    ``_track_release_commit`` in :meth:`_settle`, ``load_release_state``
+    #    in :meth:`_do_record_candidate`). The ledger is the executor's own
+    #    writing surface -- it records how far this walk has got -- and reading
+    #    it back is part of writing it. A builder-time snapshot could not
+    #    substitute: ``save_step`` mutates the file between the build and every
+    #    step that follows, so a snapshot handed to the state-save step would
+    #    clobber the very markers the walk had just written.
+    #
+    # ``tests/test_release_phase_a_seam.py`` scans this class for both, and
+    # tolerates the ledger only at the sites named above.
 
     def _capture(self, step):
         """Run a step's DECLARED result-capture observe and return its output.
 
-        This is the executor's sole permitted read, and it exists because a
-        step's own result -- the SHA a commit creates, the porcelain a guard
-        judges -- cannot be known before the step runs. In preview mode nothing
-        is captured: the step issued a recorded effect, not a real one, so the
+        The executor's only read OF THE WORLD, and it exists because a step's
+        own result -- the SHA a commit creates, the porcelain a guard judges --
+        cannot be known before the step runs. In preview mode nothing is
+        captured: the step issued a recorded effect, not a real one, so the
         honest stand-in is the carrier that effect returned (see
         :meth:`_resolve`).
         """
@@ -1235,8 +1270,12 @@ class _Executor:
         from .execute import _guard_empty_candidate_window
 
         state = self._inp.state
+        # Resolved from the DECLARED StepRef, not read out of the value table:
+        # "" is what an unresolved thread renders as, and the guard's contract
+        # for "no candidate" is None.
+        candidate = self._resolve(step.payload["candidate"]) or None
         _guard_empty_candidate_window(
-            candidate_sha=self._values.get(CANDIDATE_SHA),
+            candidate_sha=candidate,
             remote_head=step.payload["remote_head"],
             needs_push=True,
             state_path=self._inp.state_path,
@@ -1245,7 +1284,7 @@ class _Executor:
             releasable_name=state.releasable_name,
             version=state.new_version, tag=state.tag,
             branch=step.payload["branch"],
-            cwd=self._inp.git_root, log=self._inp.log,
+            cwd=self._inp.git_root, log=self._log,
         )
         return None
 
@@ -1257,6 +1296,13 @@ class _Executor:
         that operand is the commit step's carrier, and the whole document is
         recorded as ``write: <state file> («step N output»)`` -- a write that
         names the value it is waiting on instead of inventing one.
+
+        The ``load_release_state`` below is a LEDGER read, not a question about
+        the world (see the note above :meth:`_capture`). It has to happen here
+        rather than in the builder: ``run`` calls ``save_step`` for every marker
+        as the walk goes, so the document on disk at this moment already carries
+        markers that did not exist when the plan was built -- and writing back a
+        build-time snapshot would erase them.
         """
         import json
 
@@ -1297,7 +1343,7 @@ class _Executor:
             push_if_needed(
                 self._inp.state.branch, config=self._inp.ctx.config,
                 cwd=self._inp.project_dir,
-                sha=self._values.get(CANDIDATE_SHA),
+                sha=self._resolve(step.payload["sha"]) or None,
             )
         self._log(
             f"Pushed the release candidate to origin/{self._inp.state.branch} "
