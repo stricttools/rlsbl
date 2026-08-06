@@ -348,13 +348,18 @@ class TestBatchPlanIdempotency:
         assert any(n.startswith("batch-") and n.endswith(".toml") for n in names)
         assert any(n.startswith("batch-") and n.endswith(".plan.json") for n in names)
 
-    def test_all_completed_out_of_band_archives_without_releasing(
+    def test_completed_plan_exits_nonzero_and_archives_only_the_sidecar(
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
     ):
-        """(b) Everything already released per an existing plan: the next batch
-        invocation archives both files and releases nothing."""
+        """(b) Everything already released per an existing plan.
+
+        This used to archive BOTH files and exit 0 -- a silent success for a
+        run that released nothing. The plan sidecar is stale and gets
+        archived (that is what unblocks the next run); the batch file is
+        never touched, and the run exits nonzero naming the stale plan.
+        """
         ws = mock_git_repo
-        _setup_batch_packages(ws, ["alpha", "beta"])
+        batch_path = _setup_batch_packages(ws, ["alpha", "beta"])
 
         # Construct the released end-state directly: manifests at target,
         # target tags created, and a matching plan persisted -- but the
@@ -377,15 +382,85 @@ class TestBatchPlanIdempotency:
             released.append(os.path.basename(str(kwargs["ctx"].project_root)))
 
         with patch("rlsbl.commands.release.run_cmd", mock_run):
+            with pytest.raises(SystemExit) as exc:
+                _run_batch(ws)
+
+        assert exc.value.code == 1
+        assert released == []  # nothing released
+        releases_dir = os.path.dirname(batch_path)
+        names = os.listdir(releases_dir)
+        assert "unreleased.toml" in names, (
+            "the batch file must never be consumed by the already-complete path"
+        )
+        assert not any(n.startswith("batch-") and n.endswith(".toml") for n in names)
+        assert "unreleased.plan.json" not in names, (
+            "the stale plan must be archived so a re-run can resolve a fresh one"
+        )
+        assert any(n.startswith("batch-") and n.endswith(".plan.json") for n in names)
+
+        err = capsys.readouterr().err
+        assert "unreleased.plan.json" in err
+        assert "unreleased.toml" in err
+
+    def test_completed_plan_does_not_consume_a_fresh_release_file(
+        self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
+    ):
+        """The operator wrote a fresh batch file for the NEXT release while a
+        completed plan sidecar was still on disk.
+
+        The plan is matched against the batch file by item set and bump
+        intent only, so the fresh file validates against the stale plan --
+        and the old already-complete path renamed it into the archive without
+        releasing anything. The file must survive byte-for-byte, and clearing
+        the stale plan must be enough for a re-run to release properly.
+        """
+        ws = mock_git_repo
+        batch_path = _setup_batch_packages(ws, ["alpha"])
+
+        plan = BatchPlan(
+            section_type="packages",
+            items={
+                "alpha": PlanItem("alpha", "0.1.0", "0.1.1", "alpha@v0.1.1", "pypi", "patch"),
+            },
+        )
+        write_batch_plan(get_batch_plan_path(str(ws)), plan)
+        _set_pyproject_version(os.path.join(str(ws), "alpha"), "0.1.1")
+        _git_tag(ws, "alpha@v0.1.1")
+
+        with open(batch_path, "r", encoding="utf-8") as f:
+            fresh_contents = f.read()
+
+        def refuse(release_config, flags, **kwargs):
+            raise AssertionError("nothing to release against a completed plan")
+
+        with patch("rlsbl.commands.release.run_cmd", refuse):
+            with pytest.raises(SystemExit) as exc:
+                _run_batch(ws)
+        assert exc.value.code == 1
+
+        with open(batch_path, "r", encoding="utf-8") as f:
+            assert f.read() == fresh_contents, (
+                "the operator's fresh batch file must be untouched"
+            )
+
+        # The remedy works: with the stale plan gone, a re-run resolves a
+        # fresh plan against the surviving batch file and releases for real.
+        capsys.readouterr()
+        released = []
+
+        def mock_run(release_config, flags, **kwargs):
+            _simulate_release(kwargs["ctx"], released_sink=released)
+
+        with patch("rlsbl.commands.release.run_cmd", mock_run):
             _run_batch(ws)
 
-        assert released == []  # nothing released
-        releases_dir = os.path.dirname(get_batch_release_file_path(str(ws)))
-        names = os.listdir(releases_dir)
-        assert "unreleased.toml" not in names
-        assert "unreleased.plan.json" not in names
-        assert any(n.startswith("batch-") and n.endswith(".toml") for n in names)
-        assert any(n.startswith("batch-") and n.endswith(".plan.json") for n in names)
+        assert released == ["alpha"]
+        plan_after = read_batch_plan(
+            os.path.join(os.path.dirname(batch_path), "unreleased.plan.json")
+        ) if os.path.exists(
+            os.path.join(os.path.dirname(batch_path), "unreleased.plan.json")
+        ) else None
+        assert plan_after is None, "the completed batch archives its own plan"
 
     def test_early_pass_does_not_archive_when_item_in_progress(
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
@@ -434,14 +509,21 @@ class TestBatchPlanIdempotency:
                 _run_batch(ws)
         assert exc.value.code == 1
 
-        # The batch file must NOT have been archived (neither by the early pass
-        # nor the loop tail) while beta is stranded.
+        # Neither file may be archived while beta is stranded: the batch file
+        # is the operator's, and the plan is what a resume still needs.
         releases_dir = os.path.dirname(get_batch_release_file_path(str(ws)))
         names = os.listdir(releases_dir)
         assert "unreleased.toml" in names, "must not archive a stranded batch"
+        assert "unreleased.plan.json" in names, (
+            "the plan a stranded item still needs must not be archived"
+        )
         assert not any(
             n.startswith("batch-") and n.endswith(".toml") for n in names
         ), "no archived batch file should exist"
+        assert not any(
+            n.startswith("batch-") and n.endswith(".plan.json") for n in names
+        ), "no archived plan file should exist"
+        assert "beta" in capsys.readouterr().err
 
     def test_happy_path_tail_archives_batch_and_plan(
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
