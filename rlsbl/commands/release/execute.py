@@ -161,6 +161,225 @@ def _ci_timeout_message(*, version, tag, branch, candidate_sha, detail):
     )
 
 
+# Wall-clock budget for the post-publish registry probe, as the delays BEFORE
+# each attempt. A registry can take a few seconds to serve a version its
+# publish API has already accepted, so a single immediate probe would report
+# false absences; ~50s total is enough for npm/PyPI/the Go proxy to settle
+# without turning the tail of a release into a wait. Module-level so tests can
+# collapse it.
+_PUBLICATION_PROBE_DELAYS = (0, 5, 15, 30)
+
+
+def _probe_publication(resolved_targets, version, ctx, *, log, delays=None):
+    """Probe every publishable target's registry for *version*.
+
+    Returns ``(missing, checked)``: the registry names still not serving the
+    version after the retry budget, and every name that was probeable at all.
+
+    Targets whose ``publish_mode`` is ``none`` are skipped (nothing was meant
+    to reach a registry), as are targets with no ``publication_probe``
+    capability -- an unprobeable target yields no evidence either way, and
+    inventing a verdict from its silence is the exact move this check exists
+    to replace.
+
+    ``delays`` defaults to :data:`_PUBLICATION_PROBE_DELAYS`, read at call time
+    rather than bound as a default argument so a test that monkeypatches the
+    module attribute actually collapses the budget for the wired-in call sites
+    too (which pass no ``delays`` of their own).
+    """
+    from ...evidence_gate import EvidenceKind, RegistryProbeSource
+    from ...targets import TARGETS
+
+    if delays is None:
+        delays = _PUBLICATION_PROBE_DELAYS
+
+    probeable = []
+    for rt in resolved_targets:
+        if rt.publish_mode == "none":
+            continue
+        impl = TARGETS.get(rt.name)
+        if impl is None:
+            continue
+        if "publication_probe" not in getattr(impl, "capabilities", frozenset()):
+            continue
+        probeable.append((impl, rt.path))
+    if not probeable:
+        return [], []
+
+    source = RegistryProbeSource()
+    checked = sorted({impl.name for impl, _ in probeable})
+    pending = list(probeable)
+    missing = []
+    for attempt, delay in enumerate(delays):
+        if delay:
+            time.sleep(delay)
+        still_pending = []
+        missing = []
+        for impl, path in pending:
+            evidence = source.gather([impl], path, version, ctx)
+            kind = evidence[0].kind if evidence else EvidenceKind.INCONCLUSIVE
+            if kind == EvidenceKind.PUBLISHED:
+                log(f"  {impl.name}: serving {version}")
+            elif kind == EvidenceKind.INCONCLUSIVE:
+                # The probe could not reach a verdict (no name, API error).
+                # Reported, never converted into a pass or a failure.
+                log(f"  {impl.name}: could not be probed ({evidence[0].message})")
+            else:
+                still_pending.append((impl, path))
+                missing.append(impl.name)
+        if not still_pending:
+            return [], checked
+        pending = still_pending
+        if attempt < len(delays) - 1:
+            log(
+                f"  waiting for {', '.join(missing)} to serve {version} "
+                f"(attempt {attempt + 1}/{len(delays)})"
+            )
+    return missing, checked
+
+
+def _verify_publication(resolved_targets, version, tag, ctx, *, log,
+                        delays=None):
+    """Assert every publishable target's registry is serving *version*.
+
+    A release verified its PROCESS -- CI green, tag pushed, publish workflow
+    dispatched -- and then announced success. It never verified its OUTCOME, so
+    a publish job that silently produced no artifact (a skipped matrix leg, a
+    gate that refused, an upload that 4xx'd into a retry that never happened)
+    ended as a green release with nothing on the registry. This is the outcome
+    check: after CI has concluded, ask each registry whether the version it was
+    supposed to publish is actually being served.
+
+    Exits nonzero naming every registry that is not.
+
+    **This runs on the ``--watch`` path only, deliberately.** The probe is
+    meaningful exactly once CI has concluded, because CI is what runs the
+    publish job. Under ``--no-watch`` the release returns while the publish
+    workflow is still queued or running, so probing there would report every
+    registry as missing the version and fail every release. That is an explicit
+    mode choice, not a degradation: ``--watch`` verifies the outcome,
+    ``--no-watch`` does not verify it and says so out loud
+    (:func:`_announce_unverified_publication`).
+    """
+    log("\nVerifying publication...")
+    missing, checked = _probe_publication(
+        resolved_targets, version, ctx, log=log, delays=delays,
+    )
+    if not checked:
+        log("  no probeable registry targets; nothing to verify")
+        return
+    if not missing:
+        log(f"Publication verified on: {', '.join(checked)}")
+        return
+    print(
+        f"\nError: {tag} is tagged and released, but "
+        f"{', '.join(missing)} {'is' if len(missing) == 1 else 'are'} not "
+        f"serving {version}.\n"
+        f"CI concluded and the publish workflow ran, so this is not a CI "
+        f"failure -- the artifact never reached the registry.\n"
+        f"  Probed: {', '.join(checked)}\n"
+        f"  Missing: {', '.join(missing)}\n"
+        f"\n"
+        f"The git tag and the GitHub Release exist, so nothing needs "
+        f"re-releasing at a new version. Inspect the publish workflow run for "
+        f"{tag}, fix the cause, and re-dispatch it with `rlsbl release "
+        f"retry`. If the version must not ship at all, `rlsbl release yank "
+        f"{version}`.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def _verify_publication_members(specs, *, log, delays=None):
+    """Batch form of :func:`_verify_publication`: one verdict per member.
+
+    *specs* is an iterable of ``(label, resolved_targets, version, tag, ctx)``
+    -- one entry per batch member, carrying that member's OWN resolved targets
+    and its OWN new version. A batch publishes many packages from one candidate
+    commit, and each lands on its own registry under its own version, so the
+    outcome question is per member; there is no batch-wide "did it publish".
+
+    Every member is probed before anything is decided, so one missing artifact
+    never hides another: a batch that half-published is reported whole. Exits
+    nonzero naming every (member, registry) pair still not serving its version.
+
+    Like :func:`_verify_publication`, this belongs on the ``--watch`` path
+    only -- see that function's docstring for why.
+    """
+    specs = list(specs)
+    if not specs:
+        return
+    log("\nVerifying publication...")
+    failures = []
+    verified = []
+    for label, resolved_targets, version, tag, ctx in specs:
+        missing, checked = _probe_publication(
+            resolved_targets, version, ctx,
+            log=lambda line, _l=label: log(f"  [{_l}] {line.strip()}"),
+            delays=delays,
+        )
+        if not checked:
+            log(f"  {label}: no probeable registry targets; nothing to verify")
+            continue
+        if missing:
+            failures.append((label, version, tag, missing, checked))
+        else:
+            verified.append(f"{label} {version} ({', '.join(checked)})")
+    if verified:
+        log("Publication verified: " + "; ".join(verified))
+    if not failures:
+        return
+    lines = [
+        "\nError: the batch is tagged and released, but "
+        f"{len(failures)} member(s) never reached their registries.",
+        "CI concluded and the publish workflow ran, so this is not a CI "
+        "failure -- the artifacts never reached the registries.",
+    ]
+    for label, version, tag, missing, checked in failures:
+        lines.append(
+            f"  {label} {version} ({tag}): missing on {', '.join(missing)} "
+            f"(probed {', '.join(checked)})"
+        )
+    lines.append(
+        "\nEvery tag and GitHub Release above exists, so nothing needs "
+        "re-releasing at a new version. Inspect each named member's publish "
+        "workflow run, fix the cause, and re-dispatch it with `rlsbl release "
+        "retry` from that member's directory. If a version must not ship at "
+        "all, `rlsbl release yank <version>` there."
+    )
+    print("\n".join(lines), file=sys.stderr)
+    sys.exit(1)
+
+
+def _announce_unverified_publication(sha, log):
+    """Say out loud that ``--no-watch`` left the publish outcome unverified.
+
+    The registry probe runs only after the CI wait (see
+    :func:`_verify_publication`), so a ``--no-watch`` release ends with the
+    publish workflow still in flight and nothing having asked the registry
+    whether the artifact arrived. That is a legitimate mode -- but it must not
+    look like the verified one, so the difference is stated rather than left to
+    the absence of a message.
+
+    Goes to stderr so ``--quiet`` cannot swallow it, and names the command that
+    resumes the verification the run skipped.
+    """
+    print(
+        f"\nNOTICE: publish outcome NOT verified (--no-watch).\n"
+        f"  The tag is pushed and the publish workflow will run in CI, but "
+        f"this run did not wait for it, so nothing here establishes that the "
+        f"artifact reached its registry. The post-publish registry probe runs "
+        f"on the --watch path only: without the CI wait it would probe a "
+        f"version the publish job has not attempted yet.\n"
+        f"  Verify with: rlsbl watch {sha}\n"
+        f"  That is CI's verdict. A green run means the publish job concluded; "
+        f"confirm the version is actually being served before treating this "
+        f"release as shipped.",
+        file=sys.stderr,
+    )
+    log(f"Watch CI: rlsbl watch {sha}")
+
+
 def _empty_candidate_window_message(*, version, tag, branch, candidate_sha,
                                     base_sha, patterns, changed, pushing):
     """Remediation for a candidate whose push cannot trigger this project's CI.
@@ -3237,6 +3456,21 @@ def _run_release_mutating(state: ReleaseState):
         if flags.get("watch"):
             log(f"Watching CI for {pushed_sha}...")
             from ..watch import run_cmd as watch_run_cmd
-            watch_run_cmd(None, [pushed_sha], {})
+            # watch_run_cmd exits with CI's verdict. Catch it so the outcome
+            # check below can run: a green CI means the publish workflow
+            # concluded, which is exactly when asking the registry is
+            # meaningful. A red one is answered already -- reporting missing
+            # artifacts on top of a failed publish adds nothing.
+            _watch_code = 0
+            try:
+                watch_run_cmd(None, [pushed_sha], {})
+            except SystemExit as _we:
+                _watch_code = _we.code or 0
+            if _watch_code:
+                sys.exit(_watch_code)
+            if not is_private:
+                _verify_publication(
+                    state.resolved_targets, new_version, tag, ctx, log=log,
+                )
         else:
-            log(f"Watch CI: rlsbl watch {pushed_sha}")
+            _announce_unverified_publication(pushed_sha, log)

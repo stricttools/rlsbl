@@ -262,18 +262,24 @@ class TestWatchInvokedAfterRelease:
         fake_sha = "abc123def456"
         mock_run.side_effect = _fake_run_dispatch(fake_sha)
 
+        order = []
         with patch("rlsbl.commands.release.acquire_lock"), \
              patch("rlsbl.commands.release.release_lock"), \
+             patch("rlsbl.commands.release.execute._verify_publication",
+                   side_effect=lambda *a, **k: order.append("verify")) as mock_verify, \
              patch("rlsbl.commands.watch.run_cmd") as mock_watch:
             # watch.run_cmd calls sys.exit, so prevent that
-            mock_watch.return_value = None
+            mock_watch.side_effect = lambda *a, **k: order.append("watch")
             run_cmd(
                 _rc(),
                 {"quiet": False, "watch": True},
-            
+
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )
             mock_watch.assert_called_once_with(None, [fake_sha], {})
+            # The registry outcome check runs on the --watch path, after CI.
+            mock_verify.assert_called_once()
+            assert order == ["watch", "verify"]
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
