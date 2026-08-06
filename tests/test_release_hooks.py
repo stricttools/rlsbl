@@ -247,7 +247,13 @@ class TestPostReleaseHookOutput:
         tmp_project,
         capsys,
     ):
-        """A failing post-release hook prints a warning but does not abort."""
+        """A failing post-release hook is not rolled back, but is not exit 0.
+
+        "Non-fatal" means the release is not rolled back and stays resumable;
+        it never meant the run reports success. A failed step at the epilogue
+        keeps the state file and exits nonzero so a script or CI step cannot
+        read a green exit code off a release that only half-finished.
+        """
         _setup_project(tmp_project, "post-release.sh", "#!/bin/bash\nexit 3\n")
 
         def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
@@ -289,11 +295,17 @@ class TestPostReleaseHookOutput:
 
             from rlsbl.commands.release import run_cmd
 
-            # Should NOT raise -- post-release hook failure is non-fatal
-            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            # Not rolled back, but reported: the run exits nonzero.
+            with pytest.raises(SystemExit) as exc:
+                run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
+            assert exc.value.code == 1
 
         captured = capsys.readouterr()
         assert "exited with code 3" in captured.err
+        assert "POST_HOOKS_RUN" in captured.err, (
+            "the failed step must be named so the operator knows what to resume"
+        )
+        assert "rlsbl release resume" in captured.err
 
 
 class TestWatchSHABeforePostHook:
