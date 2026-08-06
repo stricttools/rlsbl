@@ -57,25 +57,51 @@ STAGED_BIN="${STAGE_DIR}/safegit-${SAFEGIT_PIN}"
 SAFEGIT_SRC="${RLSBL_SAFEGIT_SRC:-$(dirname "${REPO_ROOT}")/safegit}"
 
 mkdir -p "${GO_DOWNLOAD_CACHE}"
-if ls "${GO_DOWNLOAD_CACHE}"/github.com/smm-h/safegit/@v/"${SAFEGIT_PIN}".info \
-      >/dev/null 2>&1; then
+
+# A module-cache entry is usable only when ALL THREE files an offline
+# `go install` needs are present and non-empty. An interrupted fetch leaves
+# the `.info` behind without the `.mod`/`.zip`, so gating on the `.info` alone
+# declared a cache hit for a module the sandbox's file:// GOPROXY cannot
+# serve -- and the fallback binary was deleted on the strength of that lie,
+# leaving the sandbox with neither route and silently skipping every
+# real-binary safegit test.
+MODULE_CACHE_V="${GO_DOWNLOAD_CACHE}/github.com/smm-h/safegit/@v"
+cache_entry_complete() {
+  local ext
+  for ext in info mod zip; do
+    [ -s "${MODULE_CACHE_V}/${SAFEGIT_PIN}.${ext}" ] || return 1
+  done
+  return 0
+}
+
+if cache_entry_complete; then
   echo "[prewarm] safegit ${SAFEGIT_PIN} already in the module cache" >&2
-  # The pin is published, so a locally-built stand-in for it is now a lie.
-  # Drop it; the fixture prefers the module anyway, but leaving a stale
-  # binary named after a released version invites confusion.
+else
+  echo "[prewarm] fetching safegit ${SAFEGIT_PIN} into the module cache (network)..." >&2
+fi
+
+# Prove the pin is installable BEFORE touching the staged fallback. The probe
+# installs into a throwaway GOBIN -- a cache hit when the entry above is
+# complete, a real fetch otherwise -- and only a materialized binary counts:
+# a corrupt zip, a checksum mismatch or a failed build all exit non-zero or
+# produce nothing, and any of those must leave the fallback in place.
+PROBE_GOBIN="$(mktemp -d)"
+trap 'rm -rf "${PROBE_GOBIN}" "${STAGED_BIN}.new"' EXIT
+if GOBIN="${PROBE_GOBIN}" go install "github.com/smm-h/safegit@${SAFEGIT_PIN}" \
+   && [ -x "${PROBE_GOBIN}/safegit" ]; then
+  # The pin is published and installable, so a locally-built stand-in for it
+  # is now a lie. Drop it; the fixture prefers the module anyway, but leaving
+  # a stale binary named after a released version invites confusion.
   rm -f "${STAGED_BIN}"
   exit 0
 fi
 
-echo "[prewarm] fetching safegit ${SAFEGIT_PIN} into the module cache (network)..." >&2
-if GOBIN="$(mktemp -d)" go install "github.com/smm-h/safegit@${SAFEGIT_PIN}"; then
-  exit 0
-fi
-
-# The pin is declared but not published (rlsbl raises SAFEGIT_MIN_VERSION
-# before safegit ships it). Build it from the local checkout with the pinned
-# version stamped in, so the sandbox exercises the real binary the floor
-# describes instead of skipping the whole real-binary suite.
+# The module route did not produce a binary -- usually because the pin is
+# declared but not published (rlsbl raises SAFEGIT_MIN_VERSION before safegit
+# ships it), otherwise because the cached module is unusable. Build it from
+# the local checkout with the pinned version stamped in, so the sandbox
+# exercises the real binary the floor describes instead of skipping the whole
+# real-binary suite.
 if [ -f "${SAFEGIT_SRC}/go.mod" ] && \
    grep -q '^module github.com/smm-h/safegit$' "${SAFEGIT_SRC}/go.mod"; then
   # ALWAYS rebuilt, never reused. An unpublished pin names a MOVING local
@@ -84,11 +110,18 @@ if [ -f "${SAFEGIT_SRC}/go.mod" ] && \
   # wrong tool. That is not hypothetical: a safegit CLI change (the confirm
   # protocol's flag rename) went undetected here for a day because the staged
   # build from the day before kept satisfying the same pin.
-  echo "[prewarm] safegit ${SAFEGIT_PIN} is not published; rebuilding it from" >&2
+  echo "[prewarm] safegit ${SAFEGIT_PIN} is not installable from the module" >&2
+  echo "          cache or proxy; rebuilding it from" >&2
   echo "          ${SAFEGIT_SRC} and staging it at ${STAGED_BIN}" >&2
   mkdir -p "${STAGE_DIR}"
-  ( cd "${SAFEGIT_SRC}" && go build -o "${STAGED_BIN}" \
+  # Build beside the staged binary, then rename over it. Building straight
+  # onto ${STAGED_BIN} destroys the previous fallback the moment the compiler
+  # opens the output file, so a failed build left the sandbox with a
+  # truncated binary and no stand-in at all.
+  BUILD_TMP="${STAGED_BIN}.new"
+  ( cd "${SAFEGIT_SRC}" && go build -o "${BUILD_TMP}" \
       -ldflags "-X main.version=${SAFEGIT_PIN}" . )
+  mv -f "${BUILD_TMP}" "${STAGED_BIN}"
   exit 0
 fi
 
@@ -97,8 +130,9 @@ fi
 # floor, which is louder and more precise than a pre-warm failure here.
 {
   echo "[prewarm] WARNING: safegit ${SAFEGIT_PIN} could not be obtained."
-  echo "  The module proxy does not have it (the floor is not published yet)"
-  echo "  and no local safegit checkout was found at ${SAFEGIT_SRC}."
+  echo "  The module route produced no binary (the floor is not published"
+  echo "  yet, or the cached module is unusable) and no local safegit"
+  echo "  checkout was found at ${SAFEGIT_SRC}."
   echo "  Real-binary safegit tests will SKIP. Set RLSBL_SAFEGIT_SRC to a"
   echo "  safegit checkout to build the pin locally."
 } >&2
