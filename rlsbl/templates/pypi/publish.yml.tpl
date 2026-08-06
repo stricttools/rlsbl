@@ -37,8 +37,16 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
       - run: uv build --out-dir dist
       - name: Scan artifacts for secrets
+        # gitleaks only auto-loads .gitleaks.toml from the directory it scans,
+        # and dist/ never holds the project's allowlist -- so the config is
+        # passed explicitly. Without it, the documented remedy for a false
+        # positive silently stops working in CI.
         run: |
-          gitleaks dir dist/
+          CONFIG_ARGS=""
+          if [ -f .gitleaks.toml ]; then
+            CONFIG_ARGS="--config ${PWD}/.gitleaks.toml"
+          fi
+          gitleaks dir dist/ ${CONFIG_ARGS}
       - uses: {{action "pypa/gh-action-pypi-publish"}}
         with:
           skip-existing: true

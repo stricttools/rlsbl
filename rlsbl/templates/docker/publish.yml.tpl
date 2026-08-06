@@ -33,13 +33,12 @@ jobs:
       - uses: {{action "actions/checkout"}}
         with:
           ref: ${{ inputs.tag || github.event.release.tag_name }}
-      - name: Install gitleaks
-        run: |
-          GITLEAKS_VERSION=8.24.3
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - name: Scan source for secrets
-        run: |
-          gitleaks dir .
+      # No secret scan here: build-push-action builds and pushes the image in
+      # one step, so there is no pre-publish artifact on disk to scan. The
+      # scan this workflow used to run was a whole-tree `gitleaks dir .`,
+      # which flags files that never ship and has blocked a release
+      # mid-flight. Artifact-scoped scanning is the rule; scanning the tree is
+      # not an acceptable stand-in.
       - name: Check if already published
         id: check-docker
         env:

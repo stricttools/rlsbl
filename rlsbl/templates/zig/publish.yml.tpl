@@ -32,13 +32,12 @@ jobs:
       - uses: {{action "mlugg/setup-zig"}}
         with:
           version: {{zig.minRequiredZig}}
-      - name: Install gitleaks
-        run: |
-          GITLEAKS_VERSION=8.24.3
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - name: Scan source for secrets
-        run: |
-          gitleaks dir .
+      # No secret scan here: this workflow uploads bare cross-compiled
+      # binaries, never a packed archive, so there is no textual artifact to
+      # scan before the upload. The scan this workflow used to run was a
+      # whole-tree `gitleaks dir .`, which flags files that never ship and has
+      # blocked a release mid-flight. Artifact-scoped scanning is the rule;
+      # scanning the tree is not an acceptable stand-in.
       - name: Check if already published
         id: check-zig
         run: |

@@ -39,14 +39,32 @@ jobs:
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - name: Scan source for secrets
-        run: |
-          gitleaks dir .
       - name: Install dependencies
         # Full install (devDependencies included): `pnpm publish` runs the
         # package's prepack script, which for a TypeScript package compiles
         # with the dev toolchain. A bare checkout has none of it.
         run: pnpm install --frozen-lockfile
+      - name: Pack the publishable artifact
+        # `pnpm pack` runs the same prepack build as `pnpm publish`, so the
+        # tarball scanned below carries exactly what would be published.
+        # It is packed outside the checkout: a scratch directory inside the
+        # repo would be swept into the published tarball by any package
+        # without a `files` field.
+        run: |
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          pnpm pack --pack-destination "$RUNNER_TEMP/artifacts"
+      - name: Scan artifacts for secrets
+        # Scoped to what actually ships. A whole-tree scan flags files that
+        # never reach a registry (fixtures, docs, sample configs, public
+        # identifiers) and has blocked a release mid-flight. gitleaks only
+        # auto-loads .gitleaks.toml from the directory it scans, so the
+        # project's allowlist is passed explicitly.
+        run: |
+          CONFIG_ARGS=""
+          if [ -f .gitleaks.toml ]; then
+            CONFIG_ARGS="--config ${PWD}/.gitleaks.toml"
+          fi
+          gitleaks dir "$RUNNER_TEMP/artifacts" ${CONFIG_ARGS}
       - name: Check if already published
         id: check-npm
         run: |

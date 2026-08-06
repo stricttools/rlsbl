@@ -38,9 +38,22 @@ jobs:
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - name: Scan source for secrets
+      - name: Build artifacts
+        # Assemble first so the jars exist to be scanned. `./gradlew publish`
+        # below reuses the up-to-date build outputs.
+        run: ./gradlew assemble
+      - name: Scan artifacts for secrets
+        # Scoped to the assembled jars. A whole-tree scan flags files that
+        # never ship (fixtures, docs, sample configs, public identifiers) and
+        # has blocked a release mid-flight. gitleaks only auto-loads
+        # .gitleaks.toml from the directory it scans, so the project's
+        # allowlist is passed explicitly.
         run: |
-          gitleaks dir .
+          CONFIG_ARGS=""
+          if [ -f .gitleaks.toml ]; then
+            CONFIG_ARGS="--config ${PWD}/.gitleaks.toml"
+          fi
+          gitleaks dir build/libs ${CONFIG_ARGS}
       # GitHub Packages allows re-publishing the same version (overwrites),
       # so this step is inherently idempotent -- no pre-check needed.
       - run: ./gradlew publish

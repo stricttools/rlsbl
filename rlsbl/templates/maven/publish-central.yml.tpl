@@ -37,9 +37,6 @@ jobs:
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - name: Scan source for secrets
-        run: |
-          gitleaks dir .
       - name: Check if already published
         id: check-maven-central
         env:
@@ -55,6 +52,24 @@ jobs:
               echo "Already published: ${GROUP_ID}:${ARTIFACT_ID}:${VERSION}"
             fi
           fi
+      - name: Build artifacts
+        # Assemble first so the jars exist to be scanned. The publish task
+        # below reuses the up-to-date build outputs.
+        if: steps.check-maven-central.outputs.skip != 'true'
+        run: ./gradlew assemble
+      - name: Scan artifacts for secrets
+        # Scoped to the assembled jars. A whole-tree scan flags files that
+        # never ship (fixtures, docs, sample configs, public identifiers) and
+        # has blocked a release mid-flight. gitleaks only auto-loads
+        # .gitleaks.toml from the directory it scans, so the project's
+        # allowlist is passed explicitly.
+        if: steps.check-maven-central.outputs.skip != 'true'
+        run: |
+          CONFIG_ARGS=""
+          if [ -f .gitleaks.toml ]; then
+            CONFIG_ARGS="--config ${PWD}/.gitleaks.toml"
+          fi
+          gitleaks dir build/libs ${CONFIG_ARGS}
       - run: ./gradlew publishAndReleaseToMavenCentral
         if: steps.check-maven-central.outputs.skip != 'true'
         env:

@@ -37,9 +37,6 @@ jobs:
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - name: Scan source for secrets
-        run: |
-          gitleaks dir .
       - name: Check if already published
         id: check-go
         run: |
@@ -82,6 +79,19 @@ jobs:
           # compare the stripped tag against a git tag that does not exist.
           GORELEASER_CURRENT_TAG: ${{ steps.bare-tag.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan artifacts for secrets
+        # Scoped to what goreleaser just built and is about to upload. A
+        # whole-tree scan flags files that never ship (fixtures, docs, sample
+        # configs, public identifiers) and has blocked a release mid-flight.
+        # gitleaks only auto-loads .gitleaks.toml from the directory it scans,
+        # so the project's allowlist is passed explicitly.
+        if: steps.check-go.outputs.skip != 'true'
+        run: |
+          CONFIG_ARGS=""
+          if [ -f .gitleaks.toml ]; then
+            CONFIG_ARGS="--config ${PWD}/.gitleaks.toml"
+          fi
+          gitleaks dir dist/ ${CONFIG_ARGS}
       - name: Upload release assets to the release tag
         if: steps.check-go.outputs.skip != 'true'
         run: |
