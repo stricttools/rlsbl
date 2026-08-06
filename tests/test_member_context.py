@@ -3,7 +3,7 @@
 Four code paths must resolve a releasable member's effective config and
 targets identically:
 
-- _sync_member_package_versions (release execute)
+- the Phase-A member version-sync pair (release execute + phase_a)
 - collect_companion_tags (release execute)
 - the go-companion-tags workspace check
 - resolve_target_paths (primary registry/path resolution)
@@ -21,11 +21,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from conftest import run_git
+from conftest import run_git, sync_member_versions
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.member_context import MemberContext, resolve_member_context
 from rlsbl.commands.release.execute import (
-    _sync_member_package_versions,
     collect_companion_tags,
     resolve_target_paths,
 )
@@ -261,7 +260,7 @@ class TestMemberSetAgreement:
 
         # 1. Version sync considers the member published (already worked)
         files_to_commit = []
-        _sync_member_package_versions(
+        sync_member_versions(
             ["packages/golib"], str(repo), "2.0.0",
             files_to_commit, str(repo), lambda m: None, ctx=None,
             releasable_config_dir=rel_dir,

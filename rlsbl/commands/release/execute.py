@@ -1064,19 +1064,6 @@ def _bump_selfdoc_version_content(project_dir, new_version):
     return json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
 
 
-def _bump_selfdoc_version(project_dir, new_version):
-    """Bump version in selfdoc.json if it exists. Returns list of modified file paths."""
-    new_content = _bump_selfdoc_version_content(project_dir, new_version)
-    if new_content is None:
-        return []
-    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
-    # here before the chokepoint absorbed it (see the effects module).
-    effects.atomic_write_text(
-        os.path.join(project_dir, "selfdoc.json"), new_content, file_mode=0o600,
-    )
-    return ["selfdoc.json"]
-
-
 def _git_toplevel(cwd=None):
     """The git work-tree root for *cwd*.
 
@@ -1420,8 +1407,9 @@ def collect_companion_tags(member_package_paths, workspace_root, version,
     - Only meaningful in explicit releasable mode (caller checks).
     - Skips companion creation if the primary tag already contains a
       ``/v`` pattern (Go-compatible), to avoid duplicate tags.
-    - Skips publish-suppressed packages (same logic as _sync_member_package_versions,
-      including releasable-level config inheritance).
+    - Skips publish-suppressed packages (same logic as
+      _sync_member_package_versions_plan, including releasable-level config
+      inheritance).
 
     Args:
         member_package_paths: workspace-relative paths for member packages.
@@ -1450,7 +1438,7 @@ def collect_companion_tags(member_package_paths, workspace_root, version,
             continue
 
         # A broken member config is a hard error, mirroring
-        # _sync_member_package_versions: version sync and companion-tag
+        # _sync_member_package_versions_plan: version sync and companion-tag
         # collection must agree on the member set, so this must never
         # silently skip a member the sync path would abort on. (The undo
         # flow wraps its collect_companion_tags call in its own try/except
@@ -1532,79 +1520,6 @@ def _sync_member_package_versions_plan(
                 ),
             })
     return plan
-
-
-def _sync_member_package_versions(
-    member_package_paths, monorepo_root, new_version,
-    files_to_commit, git_root, log, ctx,
-    exclude_path=None,
-    releasable_config_dir=None,
-):
-    """Sync version to published member packages in explicit releasable mode.
-
-    For each member package that publishes (publish_mode != "none", has a
-    detected target), writes the version to the manifest. Publish-suppressed
-    packages are left untouched.
-
-    Uses ``read_project_config`` with releasable inheritance so that
-    releasable-level ``publish_mode`` is respected by member packages
-    that don't set it themselves.
-
-    Args:
-        member_package_paths: list of workspace-relative paths for member packages.
-        monorepo_root: absolute path to the monorepo root.
-        new_version: version string to write.
-        files_to_commit: list to append modified file paths to.
-        git_root: absolute path to the git root.
-        log: logging callable.
-        ctx: ProjectContext.
-        exclude_path: optional workspace-relative path to skip (already handled).
-        releasable_config_dir: optional path to the releasable's state directory
-            for config inheritance.
-    """
-    from . import TARGETS
-    from ...member_context import resolve_member_context
-
-    for pkg_path in member_package_paths:
-        if exclude_path and pkg_path == exclude_path:
-            continue
-
-        abs_pkg = os.path.join(str(monorepo_root), pkg_path)
-        if not os.path.isdir(abs_pkg):
-            continue
-
-        # Resolve config through the inheritance-aware path
-        member = resolve_member_context(
-            abs_pkg, releasable_config_dir=releasable_config_dir,
-        )
-
-        # Skip publish-suppressed packages (publish_mode == "none")
-        if member.publish_mode == "none":
-            continue
-
-        # Detect targets and write version
-        entries = member.targets
-        if not entries:
-            continue
-
-        for entry in entries:
-            tgt = TARGETS.get(entry.name)
-            if not tgt:
-                continue
-            if not tgt.check_project_exists(entry.path):
-                from ...errors import ConfigError
-                raise ConfigError(
-                    f"member '{pkg_path}' declares target '{entry.name}' but "
-                    f"its manifest does not exist at {entry.path}. "
-                    f"Cannot sync version."
-                )
-            modified = tgt.write_version(entry.path, new_version, ctx=ctx)
-            for rel in modified:
-                fpath = _rel_to_git_root(os.path.join(entry.path, rel), git_root)
-                if fpath not in files_to_commit:
-                    files_to_commit.append(fpath)
-            if modified:
-                log(f"Synced version to member {pkg_path}: {', '.join(modified)}")
 
 
 def _target_paths_from_resolved(resolved_targets) -> dict:

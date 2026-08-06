@@ -16,7 +16,8 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from rlsbl.commands.release.execute import ReleaseState, _sync_member_package_versions
+from conftest import sync_member_versions
+from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import (
     _format_releasable_tag,
     _releasable_tag_glob,
@@ -400,7 +401,7 @@ class TestValidateChangelogStateReleasable:
 
 
 # ---------------------------------------------------------------------------
-# _sync_member_package_versions
+# The Phase-A member version sync (builder + executor)
 # ---------------------------------------------------------------------------
 
 
@@ -424,7 +425,7 @@ class TestSyncMemberPackageVersions:
             f.write('[project]\nname = "internal"\nversion = "0.1.0"\n')
 
         files = []
-        _sync_member_package_versions(
+        sync_member_versions(
             [pkg_path], ws_root, "1.0.0",
             files, ws_root, lambda msg: None, MagicMock(),
         )
@@ -438,7 +439,7 @@ class TestSyncMemberPackageVersions:
         os.makedirs(abs_pkg, exist_ok=True)
 
         files = []
-        _sync_member_package_versions(
+        sync_member_versions(
             [pkg_path], ws_root, "1.0.0",
             files, ws_root, lambda msg: None, MagicMock(),
             exclude_path=pkg_path,
@@ -463,7 +464,7 @@ class TestSyncMemberPackageVersions:
             f.write('[project]\nname = "api"\nversion = "0.1.0"\n')
 
         files = []
-        _sync_member_package_versions(
+        sync_member_versions(
             [pkg_path], ws_root, "1.0.0",
             files, ws_root, lambda msg: None, MagicMock(),
         )
@@ -491,7 +492,7 @@ class TestSyncMemberPackageVersions:
         with patch("rlsbl.targets.pypi.PypiTarget.write_version",
                    side_effect=VersionError("test error")):
             with pytest.raises(VersionError, match="test error"):
-                _sync_member_package_versions(
+                sync_member_versions(
                     [pkg_path], ws_root, "1.0.0",
                     files, ws_root, lambda msg: None, MagicMock(),
                 )
@@ -507,7 +508,7 @@ class TestSyncMemberPackageVersions:
         with patch("rlsbl.config.read_project_config",
                    side_effect=ConfigError("malformed JSON")):
             with pytest.raises(ConfigError, match="malformed JSON"):
-                _sync_member_package_versions(
+                sync_member_versions(
                     [pkg_path], ws_root, "1.0.0",
                     files, ws_root, lambda msg: None, MagicMock(),
                 )

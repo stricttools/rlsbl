@@ -948,37 +948,52 @@ class TestReleaseFlutterBuildTracking:
 
 
 class TestBumpSelfdocVersion:
-    """Covers lines 14-49 of execute.py: _bump_selfdoc_version."""
+    """The selfdoc.json bump: pure derivation, then a plan step that writes it."""
+
+    def _step(self, project_dir, content):
+        from rlsbl.commands.release import phase_a
+
+        return phase_a.PlanStep(
+            kind=phase_a.BUMP_SELFDOC,
+            release_step="VERSION_BUMPED",
+            summary="write selfdoc.json",
+            payload={
+                "path": os.path.join(project_dir, "selfdoc.json"),
+                "content": content,
+            },
+        )
 
     def test_no_selfdoc_json(self, tmp_path):
-        from rlsbl.commands.release.execute import _bump_selfdoc_version
+        from rlsbl.commands.release.execute import _bump_selfdoc_version_content
 
-        result = _bump_selfdoc_version(str(tmp_path), "1.0.0")
-        assert result == []
+        assert _bump_selfdoc_version_content(str(tmp_path), "1.0.0") is None
 
     def test_bumps_version_in_selfdoc(self, tmp_path):
-        from rlsbl.commands.release.execute import _bump_selfdoc_version
+        from conftest import issue_phase_a_steps
+        from rlsbl.commands.release.execute import _bump_selfdoc_version_content
 
         config = {
             "version": "0.1.0",
             "versions": [{"version": "0.1.0"}],
         }
         (tmp_path / "selfdoc.json").write_text(json.dumps(config, indent=2))
-        result = _bump_selfdoc_version(str(tmp_path), "0.2.0")
-        assert result == ["selfdoc.json"]
+        content = _bump_selfdoc_version_content(str(tmp_path), "0.2.0")
+        issue_phase_a_steps([self._step(str(tmp_path), content)])
         updated = json.loads((tmp_path / "selfdoc.json").read_text())
         assert updated["version"] == "0.2.0"
         assert updated["versions"][-1]["version"] == "0.2.0"
 
-    def test_write_failure_cleans_up(self, tmp_path):
-        from rlsbl.commands.release.execute import _bump_selfdoc_version
+    def test_write_failure_propagates(self, tmp_path):
+        from conftest import issue_phase_a_steps
+        from rlsbl.commands.release.execute import _bump_selfdoc_version_content
 
         config = {"version": "0.1.0"}
         (tmp_path / "selfdoc.json").write_text(json.dumps(config))
+        content = _bump_selfdoc_version_content(str(tmp_path), "0.2.0")
 
         with patch("os.fdopen", side_effect=OSError("disk full")):
             with pytest.raises(OSError):
-                _bump_selfdoc_version(str(tmp_path), "0.2.0")
+                issue_phase_a_steps([self._step(str(tmp_path), content)])
 
 
 class TestRelToGitRoot:

@@ -19,10 +19,8 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from rlsbl.commands.release.execute import (
-    ReleaseState,
-    _sync_member_package_versions,
-)
+from conftest import sync_member_versions
+from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import validate_pipeline_config
 from rlsbl.member_context import resolve_member_context
 from rlsbl.pipelines import load_pipelines
@@ -208,7 +206,12 @@ class TestWriteVersionExistenceGuard:
     """Missing manifest triggers hard error during version sync."""
 
     def test_missing_manifest_raises_config_error(self, tmp_path, monkeypatch):
-        """_sync_member_package_versions raises ConfigError for missing manifest."""
+        """The member version-sync builder raises ConfigError for a missing manifest.
+
+        The guard lives in the BUILDER, so a release aborts before it has
+        written anything -- and a preview reports the same error rather than
+        recording a write to a manifest that is not there.
+        """
         from rlsbl.errors import ConfigError
 
         monkeypatch.chdir(tmp_path)
@@ -223,7 +226,7 @@ class TestWriteVersionExistenceGuard:
         files = []
 
         with pytest.raises(ConfigError, match="manifest does not exist"):
-            _sync_member_package_versions(
+            sync_member_versions(
                 ["packages/core", "packages/web"],
                 str(tmp_path),
                 "0.2.0",
@@ -235,7 +238,7 @@ class TestWriteVersionExistenceGuard:
             )
 
     def test_present_manifest_succeeds(self, tmp_path, monkeypatch):
-        """_sync_member_package_versions succeeds when manifests exist."""
+        """The pair syncs every member's manifest when they all exist."""
         monkeypatch.chdir(tmp_path)
         _make_releasable_monorepo(tmp_path)
 
@@ -245,7 +248,7 @@ class TestWriteVersionExistenceGuard:
         files = []
 
         # Should not raise
-        _sync_member_package_versions(
+        sync_member_versions(
             ["packages/core", "packages/web"],
             str(tmp_path),
             "0.2.0",

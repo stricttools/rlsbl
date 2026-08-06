@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -500,6 +501,73 @@ def make_ctx(project_root, config=None):
         else:
             config = {}
     return ProjectContext(project_root=project_root, workspace_root=None, config=config)
+
+
+def issue_phase_a_steps(steps, *, ctx=None, git_root=".", log=None,
+                        preview=False):
+    """Issue Phase-A plan steps through the real executor and return its log.
+
+    The Phase-A writers are a builder/executor PAIR: a pure function derives
+    the operands (the member/version plan, the selfdoc.json bytes) and a typed
+    step carries them to a handler that issues the write. A test that wants the
+    write has to go through both halves, and this is the executor half --
+    ``execute_phase_a_plan`` with the slice of ``BuildInputs`` the write
+    handlers read.
+
+    Only steps with no ``marks`` and no ``capture`` are appropriate here: the
+    executor would otherwise touch the release-state file, which these
+    write-only steps never do.
+    """
+    from rlsbl.commands.release import phase_a
+
+    said = []
+    log = log or said.append
+    inp = types.SimpleNamespace(
+        log=log, ctx=ctx, git_root=str(git_root),
+        state_path=None, completed=set(),
+    )
+    plan = phase_a.PhaseAPlan(steps=list(steps), files_to_commit=[])
+    phase_a.execute_phase_a_plan(plan, inp, preview=preview)
+    return said
+
+
+def sync_member_versions(member_package_paths, monorepo_root, new_version,
+                         files_to_commit, git_root, log, ctx,
+                         exclude_path=None, releasable_config_dir=None):
+    """Derive and issue a releasable's member version sync: builder, then executor.
+
+    The Phase-A pair that replaced the old single-pass writer.
+    ``_sync_member_package_versions_plan`` resolves each member's config and
+    targets, hard-errors on a declared target whose manifest is missing, and
+    predicts the version files; the ``WRITE_MEMBER_VERSIONS`` plan step carries
+    those entries to the executor, which issues the writes.
+
+    ``files_to_commit`` is extended with the builder's predicted paths, which is
+    what the real builder does with the same entries.
+    """
+    from rlsbl.commands.release import phase_a
+    from rlsbl.commands.release.execute import _sync_member_package_versions_plan
+
+    entries = _sync_member_package_versions_plan(
+        member_package_paths, monorepo_root, new_version, git_root,
+        exclude_path=exclude_path,
+        releasable_config_dir=releasable_config_dir,
+    )
+    for entry in entries:
+        for fpath in entry["files"]:
+            if fpath not in files_to_commit:
+                files_to_commit.append(fpath)
+    if entries:
+        issue_phase_a_steps(
+            [phase_a.PlanStep(
+                kind=phase_a.WRITE_MEMBER_VERSIONS,
+                release_step="VERSION_BUMPED",
+                summary=f"sync {len(entries)} member package(s) -> {new_version}",
+                payload={"entries": entries, "version": new_version},
+            )],
+            ctx=ctx, git_root=git_root, log=log,
+        )
+    return entries
 
 
 def capture_all_checks():

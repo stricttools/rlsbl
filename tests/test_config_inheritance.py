@@ -299,12 +299,18 @@ class TestCreateContextReleasable:
 
 
 # ---------------------------------------------------------------------------
-# _sync_member_package_versions respects inherited private: false
+# The member version sync respects inherited publish_mode
 # ---------------------------------------------------------------------------
 
 
 class TestSyncMemberPackageVersionsInheritance:
-    """_sync_member_package_versions uses read_project_config with inheritance."""
+    """The member version-sync pair resolves config with releasable inheritance.
+
+    The builder (``_sync_member_package_versions_plan``) decides WHICH members
+    are in the sync and the executor writes them, so inheritance has to be
+    honoured in the builder -- and a member the builder leaves out gets no write
+    and no place in the release commit.
+    """
 
     def test_inherited_private_false_enables_sync(self, tmp_path):
         """A package with no private field inherits private: false from releasable
@@ -312,7 +318,7 @@ class TestSyncMemberPackageVersionsInheritance:
         from pathlib import Path
         from unittest.mock import MagicMock, patch
 
-        from rlsbl.commands.release.execute import _sync_member_package_versions
+        from conftest import sync_member_versions
         from rlsbl.context import ProjectContext
 
         monorepo_root = tmp_path
@@ -351,7 +357,7 @@ class TestSyncMemberPackageVersionsInheritance:
 
         with patch("rlsbl.targets.detect_targets", return_value=[mock_entry]), \
              patch("rlsbl.commands.release.TARGETS", {"pypi": mock_target}):
-            _sync_member_package_versions(
+            sync_member_versions(
                 member_package_paths=["pkg"],
                 monorepo_root=str(monorepo_root),
                 new_version="1.0.0",
@@ -372,7 +378,7 @@ class TestSyncMemberPackageVersionsInheritance:
         from pathlib import Path
         from unittest.mock import MagicMock, patch
 
-        from rlsbl.commands.release.execute import _sync_member_package_versions
+        from conftest import sync_member_versions
         from rlsbl.context import ProjectContext
 
         monorepo_root = tmp_path
@@ -396,7 +402,7 @@ class TestSyncMemberPackageVersionsInheritance:
         log_calls = []
 
         with patch("rlsbl.targets.detect_targets") as mock_detect:
-            _sync_member_package_versions(
+            sync_member_versions(
                 member_package_paths=["pkg"],
                 monorepo_root=str(monorepo_root),
                 new_version="1.0.0",

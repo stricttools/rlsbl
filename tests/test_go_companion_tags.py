@@ -178,7 +178,7 @@ class TestCollectCompanionTags:
 
     def test_corrupt_member_config_raises(self, tmp_path):
         """A member with a corrupt config.json must abort companion-tag
-        collection with a hard error, mirroring _sync_member_package_versions.
+        collection with a hard error, mirroring _sync_member_package_versions_plan.
         Silently skipping would let a release proceed without the member's
         Go proxy tag while version sync aborts on the very same config."""
         from rlsbl.errors import ConfigError
@@ -488,7 +488,7 @@ class TestGoCompanionTagsCheck:
         the member, not a silent skip.
 
         The release flow hard-errors on the same corrupt config
-        (_sync_member_package_versions propagates ConfigError); the check
+        (_sync_member_package_versions_plan propagates ConfigError); the check
         must not silently disagree about the member set.
         """
         from rlsbl.checks.workspace import register_workspace_checks

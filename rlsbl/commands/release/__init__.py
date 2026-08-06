@@ -94,7 +94,6 @@ from .hooks import (
     warn_if_hook_needs_migration,
 )
 from .execute import (
-    _bump_selfdoc_version,
     _rel_to_git_root,
     ForeignCommitError,
     head_sha,

@@ -1,8 +1,10 @@
 """Tests for selfdoc.json version bump and version-consistency check.
 
-Verifies that selfdoc.json is bumped during release via the inline
-_bump_selfdoc_version function, and that the version-consistency check
-detects drift in selfdoc.json regardless of target configuration.
+Verifies that selfdoc.json is bumped during release through the Phase-A
+builder/executor pair (``_bump_selfdoc_version_content`` derives the new bytes,
+the ``BUMP_SELFDOC`` plan step carries them to the write), and that the
+version-consistency check detects drift in selfdoc.json regardless of target
+configuration.
 """
 
 import json
@@ -13,8 +15,23 @@ from unittest.mock import MagicMock
 import pytest
 
 from rlsbl import app
-from conftest import make_ctx
+from conftest import issue_phase_a_steps, make_ctx
+from rlsbl.commands.release import phase_a
+from rlsbl.commands.release.execute import _bump_selfdoc_version_content
 from rlsbl.context import ProjectContext
+
+
+def _selfdoc_step(project_dir, content):
+    """The BUMP_SELFDOC plan step ``build_phase_a_plan`` plants for *content*."""
+    return phase_a.PlanStep(
+        kind=phase_a.BUMP_SELFDOC,
+        release_step="VERSION_BUMPED",
+        summary=f"write {os.path.join(project_dir, 'selfdoc.json')}",
+        payload={
+            "path": os.path.join(project_dir, "selfdoc.json"),
+            "content": content,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -95,14 +112,16 @@ class TestReleaseBumpSelfdocJson:
                 for rel in other_modified:
                     files_to_commit.append(os.path.normpath(os.path.join(t_path, rel)))
 
-        # Now apply the selfdoc.json bump (inline, no DocsTarget)
-        from rlsbl.commands.release import _bump_selfdoc_version
+        # Now apply the selfdoc.json bump, through the builder/executor pair the
+        # release itself uses: the pure derivation of the new bytes, then the
+        # typed plan step that carries them to the write.
         bumped_files = set(files_to_commit)
-        selfdoc_modified = _bump_selfdoc_version(version_dir, new_version)
-        for rel in selfdoc_modified:
-            fpath = os.path.normpath(os.path.join(version_dir, rel))
-            if fpath not in bumped_files:
-                files_to_commit.append(fpath)
+        selfdoc_content = _bump_selfdoc_version_content(version_dir, new_version)
+        assert selfdoc_content is not None
+        issue_phase_a_steps([_selfdoc_step(version_dir, selfdoc_content)])
+        fpath = os.path.normpath(os.path.join(version_dir, "selfdoc.json"))
+        if fpath not in bumped_files:
+            files_to_commit.append(fpath)
 
         # Verify selfdoc.json was bumped
         with open(os.path.join(version_dir, "selfdoc.json")) as f:
@@ -113,25 +132,42 @@ class TestReleaseBumpSelfdocJson:
         selfdoc_committed = any("selfdoc.json" in f for f in files_to_commit)
         assert selfdoc_committed, f"selfdoc.json not in files_to_commit: {files_to_commit}"
 
-    def test_bump_selfdoc_no_file_returns_empty(self, tmp_path):
-        """When selfdoc.json does not exist, _bump_selfdoc_version returns []."""
-        from rlsbl.commands.release import _bump_selfdoc_version
-        result = _bump_selfdoc_version(str(tmp_path), "1.0.0")
-        assert result == []
+    def test_bump_selfdoc_no_file_derives_nothing(self, tmp_path):
+        """No selfdoc.json means no content, and so no plan step at all.
+
+        The builder plants a BUMP_SELFDOC step only when the derivation returns
+        content, so ``None`` here is what keeps the step out of the plan.
+        """
+        assert _bump_selfdoc_version_content(str(tmp_path), "1.0.0") is None
 
     def test_bump_selfdoc_updates_versions_array(self, tmp_path):
-        """_bump_selfdoc_version also updates the last entry in the versions array."""
+        """The bump also updates the last entry in the versions array."""
         (tmp_path / "selfdoc.json").write_text(json.dumps({
             "version": "1.0.0",
             "versions": [{"version": "1.0.0", "indexed": True}],
         }, indent=2))
-        from rlsbl.commands.release import _bump_selfdoc_version
-        result = _bump_selfdoc_version(str(tmp_path), "1.1.0")
-        assert result == ["selfdoc.json"]
+        content = _bump_selfdoc_version_content(str(tmp_path), "1.1.0")
+        assert content is not None
+        issue_phase_a_steps([_selfdoc_step(str(tmp_path), content)])
         with open(tmp_path / "selfdoc.json") as f:
             data = json.load(f)
         assert data["version"] == "1.1.0"
         assert data["versions"][-1]["version"] == "1.1.0"
+
+    def test_the_builder_plants_the_selfdoc_step_with_finished_bytes(self, tmp_path):
+        """The step the executor issues carries content, not a re-derivation.
+
+        This is what makes the write recordable: a preview renders the path and
+        the bytes it WOULD write without reading selfdoc.json a second time.
+        """
+        (tmp_path / "selfdoc.json").write_text(
+            json.dumps({"version": "1.0.0"}, indent=2)
+        )
+        content = _bump_selfdoc_version_content(str(tmp_path), "2.0.0")
+        step = _selfdoc_step(str(tmp_path), content)
+        assert step.kind == phase_a.BUMP_SELFDOC
+        assert json.loads(step.payload["content"])["version"] == "2.0.0"
+        assert step.payload["path"].endswith("selfdoc.json")
 
 
 # ---------------------------------------------------------------------------
