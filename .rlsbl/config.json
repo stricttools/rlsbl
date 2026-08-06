@@ -40,9 +40,6 @@
     "prewarm": [
       "scripts/test-prewarm.sh"
     ],
-    "extra_env": {
-      "RLSBL_TEST_SANDBOX": "1"
-    },
     "ci_workflows": [
       ".github/workflows/ci-pypi.yml"
     ]

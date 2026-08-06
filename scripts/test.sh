@@ -77,8 +77,6 @@ ENV_ARGS=(
   --setenv LANG C.UTF-8
   --setenv STRICTTEST_SANDBOX 1
 
-  --setenv RLSBL_TEST_SANDBOX 1
-
 )
 
 # PATH inside the sandbox. Cache blocks prepend their toolchain directories so
