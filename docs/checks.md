@@ -38,14 +38,14 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 
 | Tag | Purpose | Check count |
 | --- | --- | --- |
-| `project` | Project-level metadata, config schema, version consistency | 20 |
+| `project` | Project-level metadata, config schema, version consistency | 21 |
 | `release` | Git tag and GitHub Release validation | 5 |
 | `changelog` | JSONL changelog validation and structure | 11 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 17 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 10 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
-Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (7 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
+Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (8 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`, `dep-floors`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
 
 ## Project checks
 
@@ -71,6 +71,7 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | `wrapper-producer` | error | Every launcher pipeline's `wraps` reference names a real binary-artifact pipeline, and the wrapped target's manifest still carries the shim-critical fields |
 | `strictspec-certificate-gate` | error | A configured strictspec diff certificate reports no violated (or unsupported-and-unadjudicated) claim. Skips when the project has no `strictspec_gate` section |
 | `stricttest-floor` | error | An adopted sandboxed test runner works: the `test_sandbox` runner script exists and is executable, the config family is complete, and every CI workflow the family names actually invokes the runner. Skips when the project has adopted neither the `test_sandbox` family nor the stricttest plugin |
+| `dep-floors` | error | Ecosystem-internal dependencies declare a `>=` floor at the version the lock resolves. Compares `pyproject.toml` against `uv.lock` and `package.json` against `package-lock.json`; Go is structurally satisfied (`require` lines are the minimums). Skips when the project has no `internal_dep_floors` config key |
 
 ## Release checks
 

@@ -103,6 +103,8 @@ EXPECTED_CHECKS = [
     "strictspec-certificate-gate",
     # stricttest floor adoption (sandboxed test runner)
     "stricttest-floor",
+    # ecosystem-internal dependency floors (declared >= vs locked version)
+    "dep-floors",
 ]
 
 # ``cli-test-coverage`` is a strictcli framework BUILT-IN check provider,

@@ -635,3 +635,20 @@ fast = true
 pure = true
 needs_network = false
 depends_on = ["config-schema"]
+
+# Ecosystem-internal dependency floors: a release that requires new framework
+# behavior must declare a ">=" floor at that version, or a consumer installing
+# the published artifact resolves an older framework and breaks. Compares the
+# declared constraint (pyproject.toml / package.json) against the locked
+# version (uv.lock / package-lock.json); Go is structurally satisfied (require
+# lines ARE the minimums). Feature-flagged by adoption -- skips visibly when
+# the repo has no "internal_dep_floors" config key. Pure (reads committed
+# TOML/JSON, no subprocess or network). In "preflight" so a lagging floor
+# blocks the release that would ship it.
+[checks.dep-floors]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["config-schema"]

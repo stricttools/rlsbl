@@ -30,6 +30,7 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | external_checks | array | Config-declared subprocess checks that run during `rlsbl check` and the release preflight. Each entry declares a `kind` (`structured` or `freeform`). See [external_checks](#external_checks) below. |
 | strictspec_gate | object | Opt-in [strictspec certificate deploy gate](#strictspec_gate). Consumes a `strictspec diff` certificate as a `format_version` gate. See below. |
 | test_sandbox | object | Opt-in [sandboxed test runner](#test_sandbox). Declaring it makes `rlsbl scaffold` emit an executable bubblewrap runner script and turns on the `stricttest-floor` check. See below. |
+| internal_dep_floors | array | Package names of ecosystem-internal dependencies whose declared `>=` floor must keep up with the locked version. Declaring the key turns on the [`dep-floors`](#internal_dep_floors) check. See below. |
 
 Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > user config (`~/.rlsbl/config.json`) > default (true).
 
@@ -89,6 +90,33 @@ Inside the sandbox the real repo is bound read-only, the suite runs in a writabl
 ```
 
 Run `<runner_path> --selftest` to prove the invariants (the real repo is read-only, the network is dead) without running the suite.
+
+### internal_dep_floors
+
+The `internal_dep_floors` array opts a project into the **dependency floor** convention: when a release ships work that requires new behavior from a sibling framework package, the manifest must carry a `>=` floor at that version. The development lock already resolves the new version, so the repo's own suite passes — but a consumer installing the published artifact resolves whatever the declared floor allows, and gets an older framework that lacks the behavior. Declaring the key turns on the `dep-floors` preflight check. Projects without the key are untouched — the check skips.
+
+The value is a list of package names to enforce. In a monorepo, every workspace sibling's package name is enforced too, without being listed — the workspace graph already knows which dependencies are ecosystem-internal.
+
+| Ecosystem | Declared floor | Locked version |
+| --- | --- | --- |
+| pypi | `pyproject.toml` `[project].dependencies` and `optional-dependencies` | `uv.lock` |
+| npm | `package.json` `dependencies`, `peerDependencies`, `optionalDependencies` | `package-lock.json` |
+| go | `go.mod` `require` | `go.mod` (same file) |
+
+Go is structurally satisfied and carries no comparison: a `require` line **is** the declared minimum, and the toolchain builds by minimal version selection, so the build can never sit ahead of the floor.
+
+The check errors when the lock resolves an enforced dependency and either:
+
+- the manifest declares it with no readable `>=` floor, or
+- the locked version's major.minor exceeds the declared floor's major.minor.
+
+Patch drift above the floor is fine — only a minor or major boundary is a behavior boundary. A name that appears only in the lock is transitive and is not this project's floor to declare. The error names the dependency, the locked version, and the exact constraint to write. Floors are not pins; upper bounds stay banned.
+
+```json
+{
+  "internal_dep_floors": ["strictcli", "stricttest", "selfdoc"]
+}
+```
 
 ### batch_limits
 

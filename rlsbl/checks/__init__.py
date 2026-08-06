@@ -54,6 +54,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "config-schema": None,
     "strictspec-certificate-gate": None,
     "stricttest-floor": None,
+    # dep-floors reads pyproject/uv.lock, package.json/package-lock.json, and
+    # go.mod -- the three ecosystems whose manifests state dependency floors.
+    "dep-floors": frozenset({"pypi", "npm", "go"}),
     "license-file": None,
     # --- release tag (universal) ---
     "local-tag": None,

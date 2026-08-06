@@ -640,6 +640,42 @@ def register_project_checks(app):
             f"{len(verdict.problems)} stricttest floor problem(s)"
         )
 
+    @app.error_check("dep-floors")
+    def check_dep_floors(ctx, reporter):
+        """Ecosystem-internal deps must declare a floor at the locked version.
+
+        A release that requires new framework behavior has to say so in its
+        manifest: the dev lock resolves the new version, but a consumer
+        installing the published artifact resolves whatever the declared
+        ``>=`` floor allows. A lock ahead of the floor across a minor or
+        major boundary is the shape that ships broken releases.
+
+        Skips visibly on repos that have not adopted the
+        ``internal_dep_floors`` config key.
+        """
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
+
+        from ..dep_floors import evaluate_dep_floors, workspace_package_names
+
+        verdict = evaluate_dep_floors(
+            ctx.config,
+            str(ctx.project_root),
+            workspace_names=workspace_package_names(ctx.workspace_root),
+        )
+        if not verdict.adopted:
+            return reporter.skipped(verdict.skip_reason)
+
+        if verdict.ok:
+            if verdict.notes:
+                return reporter.passed("; ".join(verdict.notes[:3]))
+            return reporter.passed("internal dep floors at the locked versions")
+
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(f"{len(verdict.problems)} lagging dep floor(s)")
+
     @app.error_check("requires-services")
     def check_requires_services(ctx, reporter):
         """CI service containers declared in config must be provisioned on disk.
