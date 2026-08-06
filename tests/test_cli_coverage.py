@@ -1154,6 +1154,58 @@ class TestMain:
         assert exc.value.code == 1
 
 
+class _RecordingStream:
+    """Minimal TextIOWrapper stand-in that records reconfigure() calls."""
+
+    def __init__(self):
+        self.line_buffering = False
+        self.calls = []
+
+    def reconfigure(self, **kwargs):
+        self.calls.append(kwargs)
+        if "line_buffering" in kwargs:
+            self.line_buffering = kwargs["line_buffering"]
+
+
+class TestMainLineBuffering:
+    """main() puts stdout and stderr in line-buffered mode, once, up front.
+
+    Redirected output (``rlsbl release run > release.log 2>&1``, a CI step, a
+    post-release pipeline) makes Python pick BLOCK buffering for stdout while
+    stderr stays unbuffered, so a release's progress lines surfaced in 8KB
+    gulps -- interleaved out of order with the stderr warnings they belong
+    next to, and lost entirely when the process was killed mid-block.
+    """
+
+    @patch("rlsbl.app.run")
+    def test_streams_are_reconfigured_line_buffered(self, _run, monkeypatch):
+        out, err = _RecordingStream(), _RecordingStream()
+        monkeypatch.setattr(sys, "stdout", out)
+        monkeypatch.setattr(sys, "stderr", err)
+        monkeypatch.setattr(sys, "argv", ["rlsbl", "status"])
+
+        rlsbl.main()
+
+        assert out.calls == [{"line_buffering": True}]
+        assert err.calls == [{"line_buffering": True}]
+
+    @patch("rlsbl.app.run")
+    def test_streams_without_reconfigure_are_tolerated(self, _run, monkeypatch):
+        """A replaced stream (pytest capture, a StringIO) has no reconfigure().
+
+        Buffering is a property of a real text stream; a substitute that has
+        no such knob simply has nothing to set, and main() must not die on it.
+        """
+        class _Plain:
+            pass
+
+        monkeypatch.setattr(sys, "stdout", _Plain())
+        monkeypatch.setattr(sys, "stderr", _Plain())
+        monkeypatch.setattr(sys, "argv", ["rlsbl", "status"])
+
+        rlsbl.main()  # must not raise
+
+
 # ============================================================================
 # cmd_scaffold paths
 # ============================================================================

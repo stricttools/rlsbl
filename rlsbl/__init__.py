@@ -2204,9 +2204,32 @@ def _extract_variadic_args():
 # Entry point
 # ---------------------------------------------------------------------------
 
+def _enable_line_buffering():
+    """Put stdout and stderr in line-buffered mode for the whole process.
+
+    Python block-buffers stdout as soon as it is not a TTY (a log file, a pipe,
+    a CI step) while stderr stays unbuffered. A release then emitted its
+    progress in 8KB gulps that landed AFTER the stderr warnings they belong
+    next to -- and a run killed mid-block lost its last lines entirely, which
+    is exactly the output an operator needs when a release dies. Line
+    buffering makes the redirected transcript match the terminal one.
+
+    Set once, here, so no individual command has to remember to flush.
+
+    A stream substituted by a test harness (pytest capture, a StringIO) has no
+    ``reconfigure`` -- there is no buffering knob on it to set, so there is
+    nothing to do rather than something to fail on.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(line_buffering=True)
+
+
 def main():
     """CLI entry point: extract variadic args and run the strictcli app."""
     global _variadic_args
+    _enable_line_buffering()
     # strictcli recognizes --dry-run/--approve-consequential/--quiet/--verbose
     # anywhere in argv, so `rlsbl release run --approve-consequential` reaches
     # the framework as written and needs no argv rewriting here.
