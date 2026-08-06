@@ -51,6 +51,10 @@ jobs:
       # Warms the uv cache (network) so the in-sandbox offline `uv sync` succeeds.
       - run: uv sync --locked
       - run: uv run python -c "import rlsbl"
+      # The pypi CI template dropped its own gitleaks install (the scan moved to
+      # the publish workflow's build artifacts). rlsbl still needs the binary
+      # HERE: its own suite shells out to gitleaks for the secret-scan tests, and
+      # /usr/local/bin rides into the bwrap sandbox on the read-only /usr bind.
       - name: Install gitleaks
         run: |
           GITLEAKS_VERSION=8.24.3
