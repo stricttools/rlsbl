@@ -1,5 +1,6 @@
 """Tests for batch release bugs: redundant validation, dirty tree sources, and release init warning."""
 
+import json
 import os
 import subprocess
 import sys
@@ -747,3 +748,132 @@ class TestBatchCompletionRequiresEvidence:
         out = capsys.readouterr()
         assert "Batch release complete" not in out.out
         assert "released nothing" in out.err
+
+
+# ---------------------------------------------------------------------------
+# Batch resume seeding: a member stranded by a PREVIOUS invocation
+# ---------------------------------------------------------------------------
+
+
+class TestBatchSeedsStrandedMembers:
+    """A batch that crashed between pass 1 and pass 2 leaves members holding
+    an in-progress.json: committed locally, never pushed, never gated, never
+    tagged. Re-running the batch used to hand each of them straight back to
+    ``release run``, which refuses point-blank ("a previous release is in
+    progress") -- so the batch died on the very state IT had created, and the
+    only way forward was to resume every member by hand, one at a time,
+    outside the batch. That defeats the whole reason the batch exists: ONE
+    push, ONE CI gate for the group.
+
+    Pass 1 now seeds ``pending`` from the plan's in-progress items and skips
+    their pass-1 release call, so they flow through the existing
+    candidate-push -> CI-gate -> resume sequence with everyone else.
+    """
+
+    def _stranded_plan(self, ws, names):
+        plan = BatchPlan(
+            section_type="packages",
+            items={
+                n: PlanItem(n, "0.1.0", "0.1.1", f"{n}@v0.1.1", "pypi", "patch")
+                for n in names
+            },
+        )
+        write_batch_plan(get_batch_plan_path(str(ws)), plan)
+        return plan
+
+    def _strand(self, ws, name, completed_steps):
+        from rlsbl.commands.release.release_state import get_state_path
+
+        state_path = get_state_path(os.path.join(str(ws), name))
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        with open(state_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "new_version": "0.1.1",
+                "tag": f"{name}@v0.1.1",
+                "branch": "main",
+                "registry": "pypi",
+                "completed_steps": completed_steps,
+                "release_commits": [],
+            }, f)
+        return state_path
+
+    def _patched_batch(self, ws, run_cmd_impl):
+        """Run the batch with the push/gate/resume trio recorded, not executed."""
+        calls = {"released": [], "resumed": []}
+
+        def fake_run_cmd(release_config, flags, **kwargs):
+            calls["released"].append(
+                os.path.basename(str(kwargs["ctx"].project_root))
+            )
+            run_cmd_impl(release_config, flags, **kwargs)
+
+        def fake_resume(name, project_dir, workspace_root, state_path, flags,
+                        verified_sha, log):
+            calls["resumed"].append((name, verified_sha))
+
+        with (
+            patch("rlsbl.commands.release.run_cmd", fake_run_cmd),
+            patch(
+                "rlsbl.commands.monorepo.batch_release._publish_batch_candidate",
+                return_value="cafebabe" * 5,
+            ),
+            patch(
+                "rlsbl.commands.monorepo.batch_release._batch_ci_gate",
+                side_effect=lambda ws_root, flags, log, sha, pending: sha,
+            ),
+            patch(
+                "rlsbl.commands.monorepo.batch_release._resume_batch_item",
+                fake_resume,
+            ),
+        ):
+            _run_batch(ws, quiet=False)
+        return calls
+
+    def test_stranded_member_is_resumed_inside_the_batch(
+        self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise,
+    ):
+        ws = mock_git_repo
+        _setup_batch_packages(ws, ["alpha", "beta"])
+        self._stranded_plan(ws, ["alpha", "beta"])
+        self._strand(ws, "alpha", ["VERSION_BUMPED", "COMMITTED"])
+
+        calls = self._patched_batch(ws, lambda rc, fl, **kw: _simulate_release(kw["ctx"]))
+
+        assert calls["released"] == ["beta"], (
+            "the stranded member must NOT be handed back to `release run`"
+        )
+        assert [name for name, _sha in calls["resumed"]] == ["alpha"]
+        assert calls["resumed"][0][1] == "cafebabe" * 5, (
+            "the stranded member finishes on the batch's verified candidate"
+        )
+        assert "alpha" in capsys.readouterr().out
+
+    def test_a_member_past_the_ci_gate_is_refused_by_name(
+        self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise,
+    ):
+        """A member sealed to a CI-verified commit must not be re-gated.
+
+        Past CI_VERIFIED the release is committed to the exact commit CI
+        judged; folding it into a NEW batch candidate would move the commit
+        its tag and its CI-SHA marker address. The batch refuses and names the
+        remedy instead of guessing.
+        """
+        ws = mock_git_repo
+        _setup_batch_packages(ws, ["alpha", "beta"])
+        self._stranded_plan(ws, ["alpha", "beta"])
+        self._strand(
+            ws, "alpha",
+            ["VERSION_BUMPED", "COMMITTED", "BRANCH_PUSHED", "CI_VERIFIED"],
+        )
+
+        def refuse(release_config, flags, **kwargs):
+            raise AssertionError("nothing may be released past a sealed member")
+
+        with patch("rlsbl.commands.release.run_cmd", refuse):
+            with pytest.raises(SystemExit) as exc:
+                _run_batch(ws)
+
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "alpha" in err
+        assert "rlsbl release resume" in err

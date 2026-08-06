@@ -616,7 +616,13 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
         inline_commits = []
         # Pass 1: COMMIT every member's release locally (``ci-defer``). The
         # push and the CI gate are deferred so ONE push publishes the whole
-        # batch and ONE wait covers it.
+        # batch and ONE wait covers it. Members an earlier invocation left
+        # mid-flight are seeded straight into pass 2: their commits are
+        # already on the branch, and this run's single push + gate covers
+        # them exactly as it covers the members it commits itself.
+        stranded = _seed_stranded_pending(
+            plan, workspace_root, projects, dry_run, "releasable",
+        )
         pending = []
         for rel_name in release_order:
             release_config = batch_config.packages[rel_name]
@@ -640,6 +646,15 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
             # Pick the first member as the representative for the release flow
             representative = member_projs[0]
             project_dir = os.path.join(workspace_root, representative["path"])
+
+            if rel_name in stranded:
+                log(
+                    f"--- Resuming releasable {rel_name}: an earlier run left "
+                    f"it mid-flight; it joins this batch's candidate ---"
+                )
+                pending.append((rel_name, project_dir, stranded[rel_name]))
+                log("")
+                continue
 
             log(f"--- Releasing releasable {rel_name} ({release_config.bump}) ---")
 
@@ -847,7 +862,13 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
         inline_commits = []
         # Pass 1: COMMIT every package's release locally (``ci-defer``). The
         # push and the CI gate are deferred so ONE push publishes the whole
-        # batch and ONE wait covers it.
+        # batch and ONE wait covers it. Members an earlier invocation left
+        # mid-flight are seeded straight into pass 2: their commits are
+        # already on the branch, and this run's single push + gate covers
+        # them exactly as it covers the members it commits itself.
+        stranded = _seed_stranded_pending(
+            plan, workspace_root, projects, dry_run, "package",
+        )
         pending = []
         for pkg_name in release_order:
             release_config = batch_config.packages[pkg_name]
@@ -865,6 +886,15 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                     )
                     log("")
                     continue
+
+            if pkg_name in stranded:
+                log(
+                    f"--- Resuming {pkg_name}: an earlier run left it "
+                    f"mid-flight; it joins this batch's candidate ---"
+                )
+                pending.append((pkg_name, project_dir, stranded[pkg_name]))
+                log("")
+                continue
 
             log(f"--- Releasing {pkg_name} ({release_config.bump}) ---")
 
@@ -1092,6 +1122,29 @@ def _announce_batch_completion(released, log, *, kind):
     log(f"Batch release complete: {', '.join(released)}")
 
 
+def _plan_item_state_paths(plan, workspace_root, projects):
+    """Yield ``(name, state_path)`` for every resolvable plan item.
+
+    One place decides where a plan item's release state lives, so the archive
+    gate, the completed-plan abort and the pass-1 resume seeding all address
+    the same file.
+    """
+    from ..release.release_state import get_state_path
+    from ...workspace_types import get_releasable_dir
+
+    project_by_name = {p["name"]: p for p in projects}
+    for name in plan.items:
+        if plan.section_type == "releasables":
+            rel_dir = get_releasable_dir(workspace_root, name)
+            yield name, get_state_path(workspace_root, releasable_dir=rel_dir)
+        else:
+            project = project_by_name.get(name)
+            if project is None:
+                continue
+            project_dir = os.path.join(workspace_root, project["path"])
+            yield name, get_state_path(project_dir)
+
+
 def _plan_items_in_progress(plan, workspace_root, projects):
     """Return the names of plan items with an on-disk in-progress.json.
 
@@ -1100,24 +1153,79 @@ def _plan_items_in_progress(plan, workspace_root, projects):
     clears its state file, so a lingering one is evidence of an unfinished
     release that the batch archive must not strand.
     """
-    from ..release.release_state import get_state_path
-    from ...workspace_types import get_releasable_dir
+    return [
+        name
+        for name, state_path in _plan_item_state_paths(
+            plan, workspace_root, projects,
+        )
+        if os.path.exists(state_path)
+    ]
 
-    project_by_name = {p["name"]: p for p in projects}
-    stranded = []
-    for name in plan.items:
-        if plan.section_type == "releasables":
-            rel_dir = get_releasable_dir(workspace_root, name)
-            state_path = get_state_path(workspace_root, releasable_dir=rel_dir)
+
+def _partition_stranded_items(plan, workspace_root, projects):
+    """Split the plan's in-progress items into batch-resumable and CI-sealed.
+
+    Returns ``(resumable, sealed)``: a name -> state_path mapping of items this
+    batch can finish itself, and a list of names it must refuse.
+
+    The split is the CI gate, for the same reason a single release's resume
+    splits there. Before ``CI_VERIFIED`` a member is just committed work on the
+    branch: folding it into the batch candidate is exactly right -- one push
+    publishes it with everyone else and one CI verdict covers them all. After
+    ``CI_VERIFIED`` the release is SEALED to the commit CI judged; the tag and
+    the CI-SHA marker address that commit, so re-gating it on a new batch
+    candidate would move the ground under a verdict that already exists.
+    """
+    from ..release.release_state import load_release_state
+
+    resumable = {}
+    sealed = []
+    for name, state_path in _plan_item_state_paths(plan, workspace_root, projects):
+        if not os.path.exists(state_path):
+            continue
+        state = load_release_state(state_path) or {}
+        if "CI_VERIFIED" in set(state.get("completed_steps") or []):
+            sealed.append(name)
         else:
-            project = project_by_name.get(name)
-            if project is None:
-                continue
-            project_dir = os.path.join(workspace_root, project["path"])
-            state_path = get_state_path(project_dir)
-        if os.path.exists(state_path):
-            stranded.append(name)
-    return stranded
+            resumable[name] = state_path
+    return resumable, sealed
+
+
+def _abort_on_sealed_items(sealed, kind):
+    """Refuse a batch that would have to re-gate a CI-verified member."""
+    print(
+        f"\nError: {', '.join(sealed)} {'is' if len(sealed) == 1 else 'are'} "
+        f"mid-release past the CI gate: the candidate {kind} "
+        f"{'was' if len(sealed) == 1 else 'were'} already verified and "
+        f"{'is' if len(sealed) == 1 else 'are'} sealed to that commit.\n"
+        f"This batch would publish a NEW candidate and gate that instead, "
+        f"moving the commit the tag and the publish gate address.\n"
+        f"Finish each one where it stands with `rlsbl release resume` (or roll "
+        f"it back with `rlsbl release undo`), then re-run "
+        f"`rlsbl monorepo release run`.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def _seed_stranded_pending(plan, workspace_root, projects, dry_run, kind):
+    """Resolve which plan items pass 1 must SKIP and hand straight to pass 2.
+
+    A batch that died between its pass-1 commits and its pass-2 completion
+    leaves every member holding an in-progress.json. Handing such a member
+    back to ``release run`` is a guaranteed refusal -- that command's whole
+    contract is that an in-progress release must be resumed, not restarted --
+    so the batch used to die on the state it had created itself, with no way
+    to finish the group as a group.
+
+    Returns a name -> state_path mapping. Never returns for a sealed member.
+    """
+    if plan is None or dry_run:
+        return {}
+    resumable, sealed = _partition_stranded_items(plan, workspace_root, projects)
+    if sealed:
+        _abort_on_sealed_items(sealed, kind)
+    return resumable
 
 
 def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
