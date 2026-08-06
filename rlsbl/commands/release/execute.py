@@ -1721,15 +1721,27 @@ def _run_release_mutating(state: ReleaseState):
                 for f in files_to_commit
             }
             expected_files.add(vpath(os.path.join(lock_dir, "lock")))
-            # The release state file (in-progress.json) is written by this
-            # function and should not trigger the unexpected-files guard.
+            # rlsbl's own release-state files are never a concurrent-change
+            # signal: in-progress.json is written by this very function, and
+            # scrub-result.json is the scrub resume record that shares the
+            # directory (a scrub in another session -- or one interrupted
+            # moments ago -- leaves it there). ``validate_clean_tree``'s
+            # ``is_tool_owned_state_path`` exempts the same pair; this guard is
+            # the second gate on the same tree and must agree with it.
             # Also add the parent directory with trailing slash since git
             # status --porcelain may show newly-created directories as e.g.
             # "?? .rlsbl/releases/" instead of listing individual files.
+            from .release_state import SCRUB_RESULT_FILENAME
             _state_abs = os.path.abspath(_state_path)
             _state_rel = os.path.relpath(_state_abs, _git_root)
             expected_files.add(_state_rel)
-            _state_dir_rel = os.path.relpath(os.path.dirname(_state_abs), _git_root)
+            _state_home = os.path.dirname(_state_abs)
+            expected_files.add(
+                os.path.relpath(
+                    os.path.join(_state_home, SCRUB_RESULT_FILENAME), _git_root,
+                )
+            )
+            _state_dir_rel = os.path.relpath(_state_home, _git_root)
             expected_files.add(_state_dir_rel + "/")
             # The .validated cache is written by changelog validation earlier in the
             # release flow.  It may be tracked (dirty) or gitignored (invisible to
