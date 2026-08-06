@@ -2026,6 +2026,12 @@ def _run_release_mutating(state: ReleaseState):
         # CHANGELOG.md already has the correct "## X.Y.Z" heading because the
         # earlier generate_changelog() call (above acquire_lock) was passed
         # version_override=new_version, so no regeneration is needed here.
+        # That holds for EVERY bump type: generate_changelog() emits the
+        # version_override section whenever an override is given, including
+        # when unreleased.jsonl is empty -- which is what an infra release is.
+        # (Before that invariant held, infra releases finalized a CHANGELOG.md
+        # with no section for their own version, since nothing regenerates it
+        # after this point.)
         #
         # In explicit releasable mode, the changes dir lives at the releasable
         # level, and the tag glob uses the releasable's tag format. The
