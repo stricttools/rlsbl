@@ -691,9 +691,11 @@ def copytree(src, dst, *, dirs_exist_ok=False, ignore=None, symlinks=False):
 # The lock file is scratch owned by the running process -- created on acquire,
 # deleted on release, never part of the project state a preview reports on --
 # so executing these in preview mode records nothing and leaves nothing
-# behind.  This is the only filesystem exception in the module, and it is
-# declared by name rather than inferred: nothing here ever tries the handle
-# first and falls back.
+# behind.  It is one of the two filesystem exceptions in the module -- the
+# other is :func:`observe_scratch_files`, whose files are operands of an
+# allowlisted observe (see the module docstring's list) -- and like it, this
+# one is declared by name rather than inferred: nothing here ever tries the
+# handle first and falls back.
 # ---------------------------------------------------------------------------
 
 
