@@ -177,25 +177,39 @@ class TestBatchSHACapture:
             r"_batch_ci_gate\(\s*workspace_root,\s*flags,\s*log\b", source,
         ), "the batch loop must run the shared CI gate"
 
-    def test_releasables_watch_block_present(self):
-        """_batch_release_releasables has a watch block after finalization."""
+    @pytest.mark.parametrize("func_name", [
+        "_batch_release_releasables", "_batch_release_packages",
+    ])
+    def test_both_loops_end_in_the_shared_watch_tail(self, func_name):
+        """Neither loop may grow its own watch block.
+
+        Both used to inline the watch/hint branch, which is how the two paths
+        drift: the registry outcome check belongs to both, so the tail is one
+        helper and each loop only delegates to it (with its own probe specs).
+        """
         import inspect
         from rlsbl.commands.monorepo import batch_release
 
-        source = inspect.getsource(batch_release._batch_release_releasables)
-        assert 'flags.get("watch")' in source
-        assert "watch_run_cmd" in source
-        assert "Watch CI: rlsbl watch" in source
+        source = inspect.getsource(getattr(batch_release, func_name))
+        assert "_watch_and_verify_batch(flags, last_sha, probe_specs, log)" in source
+        assert "watch_run_cmd(" not in source, (
+            "the watch call belongs to the shared tail, not to the loop"
+        )
 
-    def test_packages_watch_block_present(self):
-        """_batch_release_packages has a watch block after finalization."""
+    def test_the_shared_tail_watches_then_verifies_publication(self):
+        """The tail is CI verdict first, registry outcome second."""
         import inspect
         from rlsbl.commands.monorepo import batch_release
 
-        source = inspect.getsource(batch_release._batch_release_packages)
+        source = inspect.getsource(batch_release._watch_and_verify_batch)
         assert 'flags.get("watch")' in source
         assert "watch_run_cmd" in source
-        assert "Watch CI: rlsbl watch" in source
+        assert source.index("watch_run_cmd") < source.index(
+            "_verify_publication_members"
+        ), "the registry probe must run AFTER the CI wait, never before"
+        assert "_announce_unverified_publication" in source, (
+            "--no-watch must announce that the outcome is unverified"
+        )
 
     @pytest.mark.parametrize("func_name", [
         "_batch_release_releasables", "_batch_release_packages",

@@ -40,7 +40,13 @@ from .batch_plan import (
     validate_plan_against_config,
     write_batch_plan,
 )
-from ..release.execute import ForeignCommitError, head_sha
+from ..release.execute import (
+    ForeignCommitError,
+    ReleaseCIError,
+    _announce_unverified_publication,
+    _verify_publication_members,
+    head_sha,
+)
 from ..release.validate import (
     ReleaseValidationError,
     HookError,
@@ -153,6 +159,92 @@ def _batch_release_trail(pending, inline_commits):
     return trail
 
 
+def _watch_and_verify_batch(flags, last_sha, probe_specs, log):
+    """The batch's watch tail: CI verdict, then the registry outcome check.
+
+    Both batch loops (releasable and package mode) end here so the two paths
+    cannot drift. Under ``--watch`` the CI wait runs first -- a green run is
+    what makes the registry question meaningful, since CI is what runs the
+    publish jobs -- and every member is then probed for its own new version.
+    A red CI exits with CI's own code: reporting missing artifacts on top of a
+    failed publish adds nothing.
+
+    Under ``--no-watch`` NOTHING is probed, deliberately: the publish workflow
+    is still in flight, so a probe would report every member as missing and
+    fail every ``--no-watch`` batch. The run says so out loud instead (see
+    :func:`_announce_unverified_publication`).
+    """
+    if not flags.get("watch"):
+        _announce_unverified_publication(last_sha, log)
+        return
+    log(f"Watching CI for {last_sha}...")
+    from ..watch import run_cmd as watch_run_cmd
+    # watch_run_cmd exits with CI's verdict; catch it so the outcome check
+    # below can run on a green one.
+    watch_code = 0
+    try:
+        watch_run_cmd(None, [last_sha], {})
+    except SystemExit as e:
+        watch_code = e.code or 0
+    if watch_code:
+        sys.exit(watch_code)
+    _verify_publication_members(probe_specs, log=log)
+
+
+def _member_probe_spec(name, project_dir, workspace_root, state_path, log):
+    """One member's ``(label, resolved_targets, version, tag, ctx)`` probe spec.
+
+    Built from the member's release state BEFORE pass 2 runs, because a member
+    that finishes clears its state file -- by the time the batch reaches its
+    watch tail there is nothing left to read the version and targets out of.
+
+    Targets are resolved through :func:`resolve_member_context`, the same
+    single source of truth the release flow itself uses, so releasable-level
+    ``publish_mode`` / ``targets`` inheritance applies exactly as it did during
+    the release.
+
+    Returns ``None`` when no spec can be built: the state carries no version
+    (an item that never entered the mutating phase), or the member's config
+    cannot be resolved into targets. The second case is SAID OUT LOUD rather
+    than swallowed, and never converted into a verdict -- the same stance
+    :func:`~rlsbl.commands.release.execute._probe_publication` takes on an
+    inconclusive probe. Raising instead would turn a finished, tagged, released
+    batch into a crash over the bookkeeping for a check that has not run yet.
+    """
+    from pathlib import Path
+
+    from ...context import create_context
+    from ...errors import RlsblError
+    from ...member_context import resolve_member_context
+    from ...workspace import get_releasable_dir
+
+    saved = read_state_for_resume(state_path) or {}
+    version = saved.get("new_version")
+    if not version:
+        return None
+    rel_name = saved.get("releasable_name")
+    try:
+        rel_dir = (
+            get_releasable_dir(str(workspace_root), rel_name)
+            if rel_name else None
+        )
+        member = resolve_member_context(
+            project_dir, releasable_config_dir=rel_dir,
+            primary_name=saved.get("registry"),
+        )
+        resolved_targets = member.resolved_targets
+    except RlsblError as exc:
+        log(
+            f"  {name}: publication cannot be verified -- its release targets "
+            f"could not be resolved ({exc})"
+        )
+        return None
+    ctx = create_context(
+        Path(project_dir), workspace_root=Path(workspace_root),
+    )
+    return (name, resolved_targets, version, saved.get("tag"), ctx)
+
+
 def _publish_batch_candidate(workspace_root, pending, flags, log, *,
                              pin_sha=None, trail=()):
     """Guard the tip, then publish the whole batch as ONE candidate push.
@@ -175,6 +267,17 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
     say -- would otherwise ship under every tag in the batch. It is a hard
     error naming the SHAs; nothing is rolled back and nothing has been pushed.
 
+    The empty-candidate-window guard then runs ONCE PER MEMBER, not against the
+    union of the members' router filter patterns. The union would pass the
+    moment ONE member's paths were touched, which is precisely the
+    half-skipped batch this whole two-pass design exists to prevent: the batch
+    CI gate applies each member's OWN publish-gate filter, so a member the
+    window misses concludes ``skipped`` and blocks the entire batch after the
+    full CI wait. Per-member reuses :func:`_guard_empty_candidate_window`
+    verbatim -- the same call the single-release path makes, with that member's
+    own state file, monorepo name, releasable and version -- and refuses from
+    the diff, before the wait.
+
     Returns the published SHA: the commit the CI gate verifies and every
     member's tag lands on.
     """
@@ -182,7 +285,9 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
     # Late-bound through the release package namespace, exactly like the
     # per-member push site, so one mock.patch covers every push in a batch.
     from ..release import push_if_needed
-    from ..release.execute import guard_foreign_commits
+    from ..release.execute import (
+        _guard_empty_candidate_window, guard_foreign_commits,
+    )
     from ..release.release_state import (
         load_release_state, save_release_state, save_step,
     )
@@ -200,6 +305,34 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
         {"push_timeout": flags["push-timeout"]}
         if flags.get("push-timeout") else None
     )
+
+    remote_head = None
+    try:
+        ls_out = run(
+            "git", ["ls-remote", "origin", f"refs/heads/{branch}"],
+            cwd=workspace_root,
+        ).strip()
+        remote_head = ls_out.split()[0] if ls_out else None
+    except Exception:
+        pass  # Remote branch might not exist yet.
+    needs_push = not (remote_head and remote_head == sha)
+    for _name, _project_dir, _state_path in pending:
+        _st = load_release_state(_state_path) or {}
+        _guard_empty_candidate_window(
+            candidate_sha=sha,
+            remote_head=remote_head,
+            needs_push=needs_push,
+            state_path=_state_path,
+            monorepo_root=workspace_root,
+            monorepo_name=_st.get("monorepo_name"),
+            releasable_name=_st.get("releasable_name"),
+            version=_st.get("new_version"),
+            tag=_st.get("tag"),
+            branch=branch,
+            cwd=workspace_root,
+            log=log,
+        )
+
     push_if_needed(branch, config=push_config, cwd=workspace_root, sha=sha)
     log(
         f"Pushed the batch release candidate {sha[:12]} to origin/{branch} "
@@ -608,6 +741,9 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
 
     released = []
     last_sha = None
+    # Per-member probe specs for the watch tail's registry check, captured
+    # before each member's state file is cleared by its pass-2 completion.
+    probe_specs = []
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
         # Workspace-level pin, taken before the first candidate is built. Every
         # commit that appears in pin..HEAD must be one a member's own release
@@ -743,11 +879,25 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                     file=sys.stderr,
                 )
                 sys.exit(1)
+            except ReleaseCIError as e:
+                # The candidate's diff window cannot trigger some member's CI
+                # job (or CI did not go green on it). Nothing was tagged,
+                # released or finalized and no version is burnt: each member's
+                # state carries a CI_VERIFIED failure marker and the batch
+                # resumes once the window is widened.
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
             except ReleaseValidationError as e:
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
             for rel_name, project_dir, state_path in pending:
                 log(f"--- Completing releasable {rel_name} ---")
+                # Read before the resume: a member that completes clears its
+                # state file, and the watch tail's registry probe needs that
+                # member's version and resolved targets.
+                _spec = _member_probe_spec(
+                    rel_name, project_dir, workspace_root, state_path, log,
+                )
                 try:
                     _resume_batch_item(
                         rel_name, project_dir, workspace_root, state_path,
@@ -765,6 +915,8 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                         )
                         raise
                 released.append(rel_name)
+                if _spec is not None:
+                    probe_specs.append(_spec)
                 log("")
             last_sha = verified_sha
 
@@ -772,17 +924,12 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
         if not dry_run:
             _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
 
-    # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
+    # Log completion BEFORE the watch tail: the tail exits the process on a
+    # red CI or a missing artifact, and would skip the announcement.
     _announce_batch_completion(released, log, kind="releasable")
 
     if not dry_run and last_sha:
-        # Watch CI or print hint for the last release's commit
-        if flags.get("watch"):
-            log(f"Watching CI for {last_sha}...")
-            from ..watch import run_cmd as watch_run_cmd
-            watch_run_cmd(None, [last_sha], {})
-        else:
-            log(f"Watch CI: rlsbl watch {last_sha}")
+        _watch_and_verify_batch(flags, last_sha, probe_specs, log)
 
 
 def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
@@ -854,6 +1001,9 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
     # Release each package in order
     released = []
     last_sha = None
+    # Per-member probe specs for the watch tail's registry check, captured
+    # before each package's state file is cleared by its pass-2 completion.
+    probe_specs = []
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
         # Workspace-level pin, taken before the first candidate is built. Every
         # commit that appears in pin..HEAD must be one a member's own release
@@ -974,11 +1124,25 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                     file=sys.stderr,
                 )
                 sys.exit(1)
+            except ReleaseCIError as e:
+                # The candidate's diff window cannot trigger some member's CI
+                # job (or CI did not go green on it). Nothing was tagged,
+                # released or finalized and no version is burnt: each member's
+                # state carries a CI_VERIFIED failure marker and the batch
+                # resumes once the window is widened.
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
             except ReleaseValidationError as e:
                 print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
             for pkg_name, project_dir, state_path in pending:
                 log(f"--- Completing {pkg_name} ---")
+                # Read before the resume: a member that completes clears its
+                # state file, and the watch tail's registry probe needs that
+                # member's version and resolved targets.
+                _spec = _member_probe_spec(
+                    pkg_name, project_dir, workspace_root, state_path, log,
+                )
                 try:
                     _resume_batch_item(
                         pkg_name, project_dir, workspace_root, state_path,
@@ -996,6 +1160,8 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                         )
                         raise
                 released.append(pkg_name)
+                if _spec is not None:
+                    probe_specs.append(_spec)
                 log("")
             last_sha = verified_sha
 
@@ -1003,17 +1169,12 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
         if not dry_run:
             _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
 
-    # Log completion BEFORE watch, because watch_run_cmd() calls sys.exit().
+    # Log completion BEFORE the watch tail: the tail exits the process on a
+    # red CI or a missing artifact, and would skip the announcement.
     _announce_batch_completion(released, log, kind="package")
 
     if not dry_run and last_sha:
-        # Watch CI or print hint for the last release's commit
-        if flags.get("watch"):
-            log(f"Watching CI for {last_sha}...")
-            from ..watch import run_cmd as watch_run_cmd
-            watch_run_cmd(None, [last_sha], {})
-        else:
-            log(f"Watch CI: rlsbl watch {last_sha}")
+        _watch_and_verify_batch(flags, last_sha, probe_specs, log)
 
 
 def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root,
