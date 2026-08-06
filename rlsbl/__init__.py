@@ -1522,10 +1522,10 @@ def cmd_mono_sync(ctx, auto_commit):
     _cmd_sync({"auto-commit": auto_commit}, project_root=root)
 
 
-@mono.command(name="status", help="Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.", effect="read_only")
+@mono.command(name="status", help="Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. Provides a quick overview of which projects have pending changes and are ready for their next release.", effect="read_only")
 @effects.handler
 def cmd_mono_status(ctx):
-    """Show version, last tag, and unreleased commits for all workspace projects."""
+    """Show version, last tag, and changelog coverage for all workspace projects."""
     root = _require_project_root()
     from .commands.monorepo import _cmd_status
     _cmd_status({}, project_root=root)

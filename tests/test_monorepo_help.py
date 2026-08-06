@@ -30,7 +30,9 @@ class TestMonorepoNoArgs:
 class TestSubcommandHelp:
     def test_status_help(self):
         result = app.test(["monorepo", "status", "--help"])
-        assert "Show the current version, last release tag, and number of unreleased commits" in result.stdout
+        # The column is real JSONL coverage, not an unreleased-commit count.
+        assert "Show the current version, last release tag, and changelog coverage" in result.stdout
+        assert "number of unreleased commits" not in result.stdout
         assert "rlsbl monorepo status" in result.stdout
 
     def test_add_help(self):
