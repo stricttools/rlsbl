@@ -165,6 +165,33 @@ def _ci_timeout_message(*, version, tag, branch, candidate_sha, detail):
 _CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
 
 
+def _marker_reconcile_failure(tag, marker, what, exc):
+    """The message for a CI-SHA marker that could not be read or written."""
+    return (
+        f"could not {what} the CI-SHA marker on the existing '{tag}' GitHub "
+        f"Release ({exc}).\n"
+        f"  Intended marker: {marker}\n"
+        f"\n"
+        f"The marker is the publish gate's only precise statement of which "
+        f"commit CI proved green. Without it the gate falls back to "
+        f"$GITHUB_SHA -- whatever commit the workflow happens to observe -- so "
+        f"continuing would publish under a verdict nobody established. This is "
+        f"refused rather than warned about.\n"
+        f"\n"
+        f"The release state has been preserved: fix the cause (gh auth, "
+        f"network, release permissions) and run `rlsbl release resume` to "
+        f"re-attempt the reconcile and the steps after it."
+    )
+
+
+class CiShaMarkerError(RlsblError):
+    """Raised when the CI-SHA marker cannot be reconciled onto a Release.
+
+    Fail-closed by design: a release whose gate marker is unknown must not
+    proceed to the steps that act on the published Release.
+    """
+
+
 def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
     """Ensure an ALREADY-EXISTING GitHub Release carries the CI-SHA marker.
 
@@ -177,6 +204,14 @@ def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
 
     Idempotent: a body already carrying this exact marker is left untouched; a
     body carrying a DIFFERENT marker has it replaced, never duplicated.
+
+    A read or write failure raises :class:`CiShaMarkerError`. It used to print
+    a warning and return ``False`` -- a value the caller discarded -- so a
+    release whose gate marker was missing or stale completed and exited 0. The
+    caller turns the raise into a recorded step failure plus a nonzero,
+    resumable exit, and every step after this one is skipped: the gate reading
+    the marker is what decides whether the tag may publish at all, so acting
+    further on a Release whose marker is unknown is exactly the move to refuse.
     """
     # Late-bound through the package namespace, like the rest of this module,
     # so mock.patch("rlsbl.commands.release.run_gh") is honored at call time.
@@ -188,13 +223,9 @@ def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
             config=config,
         )
     except Exception as exc:
-        print(
-            f"Warning: could not read the '{tag}' release body to reconcile the "
-            f"CI-SHA marker ({exc}). The publish gate will fall back to "
-            f"$GITHUB_SHA.",
-            file=sys.stderr,
-        )
-        return False
+        raise CiShaMarkerError(
+            _marker_reconcile_failure(tag, marker, "read", exc)
+        ) from exc
 
     if marker in body:
         log(f"CI-SHA marker already present on {tag}")
@@ -208,13 +239,9 @@ def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
             f.write(new_body)
         run_gh(["release", "edit", tag, "--notes-file", tmp], config=config)
     except Exception as exc:
-        print(
-            f"Warning: could not write the CI-SHA marker onto the existing "
-            f"'{tag}' release ({exc}). The publish gate will fall back to "
-            f"$GITHUB_SHA.",
-            file=sys.stderr,
-        )
-        return False
+        raise CiShaMarkerError(
+            _marker_reconcile_failure(tag, marker, "write", exc)
+        ) from exc
     finally:
         if os.path.exists(tmp):
             effects.remove(tmp)
@@ -2509,9 +2536,14 @@ def _run_release_mutating(state: ReleaseState):
 
     try:
         if _gh_release_already_exists:
-            _reconcile_ci_sha_marker(
-                tag, _ci_marker, notes_file, config=ctx.config, log=log,
-            )
+            try:
+                _reconcile_ci_sha_marker(
+                    tag, _ci_marker, notes_file, config=ctx.config, log=log,
+                )
+            except CiShaMarkerError as e:
+                from ...errors import PostReleaseError
+                save_step_failure(_state_path, "GITHUB_RELEASE", str(e))
+                raise PostReleaseError(str(e)) from e
         else:
             # Retry gh release create with race-condition detection.
             # GitHub API can return an error even when the release was actually created,

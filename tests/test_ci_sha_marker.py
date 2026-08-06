@@ -6,8 +6,10 @@ release candidate (the commit the tag points at). The publish gate reads this
 marker to learn exactly which commit to gate on.
 """
 
+import os
 import subprocess
 
+import pytest
 from unittest.mock import patch
 
 from githarness import git
@@ -131,3 +133,76 @@ class TestCiShaMarkerWhenReleaseAlreadyExists:
             ),
         )
         assert edits == []
+
+
+class TestCiShaMarkerReconcileFailureIsFatal:
+    """A marker that cannot be read or written is a HARD failure.
+
+    The marker is the publish gate's only precise statement of which commit CI
+    proved green. Without it the gate falls back to ``$GITHUB_SHA`` -- whatever
+    commit the workflow happens to observe -- so a silent fallback publishes a
+    tag gated on a commit nobody verified. This used to be a stderr warning
+    whose return value the caller discarded, and the release exited 0.
+    """
+
+    def _run(self, tmp_project, gh):
+        core = _setup_releasable_workspace(tmp_project)
+        with pytest.raises(SystemExit) as exc:
+            _run_release(
+                core, tmp_project,
+                extra_patches=(
+                    patch("rlsbl.commands.release.run_gh", side_effect=gh),
+                ),
+            )
+        return exc.value.code
+
+    def test_unreadable_release_body_aborts(self, tmp_project):
+        def gh(args, **kwargs):
+            if args[:2] == ["release", "view"] and "--json" in args:
+                raise subprocess.CalledProcessError(1, "gh release view --json")
+            if args[:2] == ["release", "view"]:
+                return "existing release"
+            return ""
+
+        assert self._run(tmp_project, gh) == 1
+
+    def test_unwritable_marker_aborts(self, tmp_project):
+        def gh(args, **kwargs):
+            if args[:2] == ["release", "view"]:
+                if "--json" in args:
+                    return "Release notes\n"
+                return "existing release"
+            if args[:2] == ["release", "edit"]:
+                raise subprocess.CalledProcessError(1, "gh release edit")
+            return ""
+
+        assert self._run(tmp_project, gh) == 1
+
+    def test_state_is_preserved_for_resume(self, tmp_project):
+        """The release stays resumable: a resume re-attempts the reconcile."""
+        from rlsbl.commands.release.release_state import get_state_path
+        from rlsbl.workspace import get_releasable_dir
+
+        core = _setup_releasable_workspace(tmp_project)
+
+        def gh(args, **kwargs):
+            if args[:2] == ["release", "view"] and "--json" in args:
+                raise subprocess.CalledProcessError(1, "gh release view --json")
+            if args[:2] == ["release", "view"]:
+                return "existing release"
+            return ""
+
+        with pytest.raises(SystemExit):
+            _run_release(
+                core, tmp_project,
+                extra_patches=(
+                    patch("rlsbl.commands.release.run_gh", side_effect=gh),
+                ),
+            )
+
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        state_path = get_state_path(str(tmp_project), releasable_dir=rel_dir)
+        assert os.path.exists(state_path), (
+            "the in-progress state must survive so `rlsbl release resume` "
+            "can re-attempt the marker reconcile"
+        )
