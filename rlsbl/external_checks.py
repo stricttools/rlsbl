@@ -30,6 +30,7 @@ import tomllib
 
 from strictcli import error_check_spec
 
+from .errors import GitError
 from .utils import detect_uv_workspace_root, get_check_timeout, get_last_version_tag
 from . import effects
 
@@ -376,15 +377,30 @@ def _release_context_env(ctx):
 
     project_root = str(ctx.project_root)
     tag_glob = _resolve_tag_glob(ctx)
+    # ``RLSBL_LAST_TAG=""`` is a SIGNAL, not a fallback: it states that this
+    # project has never been released, and a check reading it takes the
+    # first-release branch. So only the genuine no-tag case may produce it --
+    # and that case does not raise, it returns None.
+    #
+    # This used to be a bare ``except Exception`` that turned ANY failure into
+    # the same empty string, so a repo whose history was merely unreachable
+    # (a shallow clone) looked brand-new to every external check. The one
+    # interpretable failure is that shallow clone, and rlsbl requires full
+    # history everywhere else too -- so it is named and hard-errored with the
+    # remedy. Anything else is a bug or a broken environment and propagates
+    # with its own traceback rather than being flattened into "no releases".
     try:
         last_tag = get_last_version_tag(tag_glob, cwd=project_root)
-    except Exception:
-        # A repo we cannot interrogate (shallow clone, not a git repo) still
-        # gets the project root; the tag pair is simply absent-as-empty.
-        last_tag = None
-        unreleased_range = "HEAD"
-    else:
-        unreleased_range = _unreleased_range(tag_glob, cwd=project_root)
+    except GitError as exc:
+        raise GitError(
+            f"cannot resolve the last release tag for {project_root} "
+            f"(glob {tag_glob!r}): {exc}\n"
+            f"External checks receive RLSBL_LAST_TAG / RLSBL_UNRELEASED_RANGE, "
+            f"and an empty tag means 'never released' -- reporting that for a "
+            f"clone whose history is merely truncated would silently widen "
+            f"every check's range. Run `git fetch --unshallow` first."
+        ) from exc
+    unreleased_range = _unreleased_range(tag_glob, cwd=project_root)
 
     env = dict(os.environ)
     env["RLSBL_PROJECT_ROOT"] = project_root

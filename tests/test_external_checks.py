@@ -1144,6 +1144,51 @@ class TestReleaseContextEnv:
         assert len(calls) == 1, calls
 
 
+class TestReleaseContextEnvFailureIsHard:
+    """A git failure the resolver cannot interpret must not become "no tag".
+
+    ``RLSBL_LAST_TAG=""`` is a load-bearing SIGNAL: it means "this project has
+    never been released", and a check reading it takes the first-release
+    branch. Producing it from a swallowed exception makes an interrogable
+    repo look brand-new -- so a coverage or diff check silently validates the
+    whole history instead of the unreleased range.
+    """
+
+    def _ctx(self, repo):
+        from pathlib import Path
+
+        from rlsbl.context import ProjectContext
+
+        return ProjectContext(
+            project_root=Path(str(repo)), workspace_root=None, config={},
+        )
+
+    def test_shallow_clone_is_a_hard_error(self, mock_git_repo, monkeypatch):
+        from rlsbl.errors import GitError
+
+        def shallow(tag_glob="v*", **kwargs):
+            raise GitError("Shallow clone detected")
+
+        monkeypatch.setattr(external_checks, "get_last_version_tag", shallow)
+        with pytest.raises(GitError) as exc:
+            external_checks._release_context_env(self._ctx(mock_git_repo))
+        assert "unshallow" in str(exc.value)
+
+    def test_an_unexpected_failure_propagates(self, mock_git_repo, monkeypatch):
+        def boom(tag_glob="v*", **kwargs):
+            raise RuntimeError("git went sideways")
+
+        monkeypatch.setattr(external_checks, "get_last_version_tag", boom)
+        with pytest.raises(RuntimeError, match="sideways"):
+            external_checks._release_context_env(self._ctx(mock_git_repo))
+
+    def test_a_genuinely_untagged_repo_still_reports_empty(self, mock_git_repo):
+        """The no-tag case does not raise -- it returns None -- and stays ""."""
+        env = external_checks._release_context_env(self._ctx(mock_git_repo))
+        assert env["RLSBL_LAST_TAG"] == ""
+        assert env["RLSBL_UNRELEASED_RANGE"] == "HEAD"
+
+
 class TestReleaseContextEnvWorkspace:
     """In a monorepo the tag glob is the project's own, not the bare `v*`."""
 
