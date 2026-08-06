@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 
 from .validate import HookError, ReleaseValidationError
 from ... import effects
@@ -54,12 +53,9 @@ def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
     # Write changelog entry to a temp file
     tmp_changelog = None
     try:
-        tmp_changelog = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", prefix="rlsbl-changelog-",
-            delete=False, encoding="utf-8",
+        tmp_changelog = effects.temp_file(
+            changelog_entry or "", suffix=".md", prefix="rlsbl-changelog-",
         )
-        tmp_changelog.write(changelog_entry or "")
-        tmp_changelog.close()
 
         # Assemble CLI args
         cmd = ["selfblog", "post", "generate", "--from-release"]
@@ -72,7 +68,7 @@ def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
             cmd.extend(["--description", release_config.description])
         if release_config.context:
             cmd.extend(["--context", release_config.context])
-        cmd.extend(["--changelog-file", tmp_changelog.name])
+        cmd.extend(["--changelog-file", tmp_changelog])
 
         # Body file (optional). ``releases_dir`` is the resolved releases
         # dir (releasable-level in explicit releasable mode).
@@ -106,8 +102,8 @@ def _run_selfblog_post_generate(flags, *, project_dir=None, release_config=None,
             f"selfblog post generate failed (exit code {e.returncode})."
         ) from e
     finally:
-        if tmp_changelog and os.path.exists(tmp_changelog.name):
-            effects.remove(tmp_changelog.name)
+        if tmp_changelog and os.path.exists(tmp_changelog):
+            effects.remove(tmp_changelog)
 
     return True
 

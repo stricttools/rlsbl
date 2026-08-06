@@ -12,6 +12,19 @@ import pytest
 from rlsbl.commands.claim_name import run_cmd
 
 
+def _temp_sandbox(monkeypatch, tmp_path):
+    """Point the temp-directory root at an empty per-test directory.
+
+    Anything a run creates through ``tempfile`` (directly or via the effect
+    seam's live path) lands here, so "created no real temp directory" is an
+    exact assertion instead of a guess about a shared /tmp.
+    """
+    sandbox = tmp_path / "temproot"
+    sandbox.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(sandbox))
+    return sandbox
+
+
 @pytest.fixture
 def real_tmpdir(tmp_path):
     """Provide a real temp directory and patch mkdtemp to return it.
@@ -19,7 +32,7 @@ def real_tmpdir(tmp_path):
     Also patches shutil.rmtree to prevent cleanup so tests can inspect
     written files after run_cmd returns.
     """
-    with patch("rlsbl.commands.claim_name.tempfile.mkdtemp", return_value=str(tmp_path)), \
+    with patch("rlsbl._effects_direct.mkdtemp", return_value=str(tmp_path)), \
          patch("rlsbl.effects.rmtree"):
         yield tmp_path
 
@@ -215,6 +228,13 @@ class TestClaimNamePreview:
     "dry run" claimed a name for real.  There is no branch to walk around any
     more -- the writes and the publish go through the effect chokepoint, and
     under --dry-run the framework records them instead of performing them.
+
+    A preview also creates NOTHING on disk: the staging directory the claim
+    is assembled in is a recorded stand-in, so ``tempfile.tempdir`` (pointed
+    at a per-test sandbox below) stays empty.  The command used to call
+    ``tempfile.mkdtemp`` directly, which creates its directory in every mode,
+    and the matching ``effects.rmtree`` was recorded rather than performed --
+    so every "dry run" left a real directory behind.
     """
 
     @patch("rlsbl.commands.check._check_single_name")
@@ -227,6 +247,7 @@ class TestClaimNamePreview:
         }
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("NPM_TOKEN", "tok123")
+        temp_sandbox = _temp_sandbox(monkeypatch, tmp_path)
         ran = []
         monkeypatch.setattr(
             "rlsbl._effects_direct.run",
@@ -246,6 +267,9 @@ class TestClaimNamePreview:
         assert ran == [], "a preview must not run a publish"
         assert "write: " in result.stdout and "package.json" in result.stdout
         assert "run: npm publish --access public" in result.stdout, result.stdout
+        assert list(temp_sandbox.iterdir()) == [], (
+            "a preview created a real staging directory"
+        )
 
     @patch("rlsbl.commands.check._check_single_name")
     def test_pypi_preview_never_renders_the_token(
@@ -258,6 +282,7 @@ class TestClaimNamePreview:
         }
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("PYPI_TOKEN", "s3cr3t-token-value")
+        temp_sandbox = _temp_sandbox(monkeypatch, tmp_path)
         monkeypatch.setattr(
             "rlsbl._effects_direct.run",
             lambda *a, **k: pytest.fail("a preview must not run a publish"),
@@ -276,6 +301,9 @@ class TestClaimNamePreview:
         assert "run: uv publish" in result.stdout, result.stdout
         assert "s3cr3t-token-value" not in result.stdout
         assert "s3cr3t-token-value" not in result.stderr
+        assert list(temp_sandbox.iterdir()) == [], (
+            "a preview created a real staging directory"
+        )
 
 
 class TestClaimNameConfirmation:

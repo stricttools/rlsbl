@@ -117,6 +117,18 @@ def open_write(path, mode="w", *, encoding=None, newline=None):
     return open(path, mode, encoding=encoding, newline=newline)
 
 
+def open_exclusive(path, *, file_mode=0o644, encoding="utf-8"):
+    """Create *path* and return it open for writing, failing if it exists.
+
+    ``O_CREAT | O_EXCL`` closes a TOCTOU: an ``exists()`` check far above the
+    write cannot be trusted, and this raises ``FileExistsError`` when a racer
+    won.  The mode is passed at creation rather than chmod'ed afterwards, so
+    the file is never briefly wider than intended.
+    """
+    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, file_mode)
+    return os.fdopen(fd, "w", encoding=encoding)
+
+
 def write_text(path, content, *, encoding="utf-8", newline=None):
     """Write *content* to *path*, truncating any existing file."""
     with open(path, "w", encoding=encoding, newline=newline) as f:
@@ -181,6 +193,33 @@ def atomic_write_text(
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
         raise
+
+
+# ---------------------------------------------------------------------------
+# Filesystem effects -- temporary files and directories
+# ---------------------------------------------------------------------------
+
+
+def temp_root():
+    """The directory temporary files are created in when no *dir* is given."""
+    return tempfile.gettempdir()
+
+
+def mkdtemp(*, prefix=None, suffix=None, dir=None):
+    """Create a temporary directory and return its path."""
+    return tempfile.mkdtemp(prefix=prefix, suffix=suffix, dir=dir)
+
+
+def temp_file(content, *, prefix=None, suffix=None, dir=None, encoding="utf-8"):
+    """Create a temporary file holding *content* and return its path.
+
+    The file is closed on return and is never deleted automatically -- the
+    caller owns it, exactly as ``NamedTemporaryFile(delete=False)`` did.
+    """
+    fd, path = tempfile.mkstemp(prefix=prefix, suffix=suffix, dir=dir)
+    with os.fdopen(fd, "w", encoding=encoding) as f:
+        f.write(content)
+    return path
 
 
 # ---------------------------------------------------------------------------

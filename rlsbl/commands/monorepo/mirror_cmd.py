@@ -29,7 +29,6 @@ commit -- a contract violation -- and is a hard error that touches nothing.
 import json
 import os
 import sys
-import tempfile
 from dataclasses import dataclass, field
 
 from ...git_util import validate_subtree_remote_ssh_host
@@ -297,7 +296,7 @@ def observe(remote, root, project_path):
         )
 
     # Populated: inspect the tip's shape in an isolated temp clone.
-    tmpdir = tempfile.mkdtemp(prefix="rlsbl-mirror-observe-")
+    tmpdir = effects.mkdtemp(prefix="rlsbl-mirror-observe-")
     try:
         clone_dir = os.path.join(tmpdir, "mirror")
         _clone_main(remote, clone_dir)
@@ -510,7 +509,7 @@ def _converge(plan, remote, root, project_path, sub_config_path):
         _push_bare_split(remote, split_sha, expected, root)
 
     # 2. Fresh clone at main (== split_sha now).
-    tmpdir = tempfile.mkdtemp(prefix="rlsbl-mirror-apply-")
+    tmpdir = effects.mkdtemp(prefix="rlsbl-mirror-apply-")
     try:
         clone_dir = os.path.join(tmpdir, "mirror")
         r = _git(["clone", "--quiet", "--single-branch", "--branch", "main",

@@ -3,7 +3,6 @@
 import ast
 import os
 import re
-import tempfile
 import tomllib
 
 import tomlkit
@@ -442,7 +441,7 @@ class PypiTarget(BaseTarget):
 
         rewritten_content = rewrite_pyproject_deps(original_content, rewrite_map)
 
-        tmp_dir = tempfile.mkdtemp(prefix="rlsbl-build-")
+        tmp_dir = effects.mkdtemp(prefix="rlsbl-build-")
         try:
             def _ignore(directory, contents):
                 # Only filter at the top level of the project

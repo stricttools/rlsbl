@@ -6,7 +6,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 
 from ..action_versions import format_action, UnknownActionError
 from ..ci_yaml import make_ci_workflow_transform
@@ -642,29 +641,19 @@ def _three_way_merge(ours_text, base_text, theirs_text):
     Writes three temp files in the project dir (not /tmp), runs
     `git merge-file -p ours base theirs`, and returns (merged_text, has_conflicts).
     Exit code: 0 = clean merge, positive = number of conflicts, negative = error.
+
+    The three files are ``observe_scratch_files``: ``git merge-file -p`` is an
+    allowlisted observe, so it really runs under --dry-run, and operands that
+    were only recorded would leave it reading absent paths -- turning every
+    previewed merge into a fabricated conflict.  They are created and deleted
+    inside the block in every mode, so a preview leaves nothing behind either.
     """
-    ours_tmp = theirs_tmp = base_tmp = None
-    try:
-        ours_tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".ours", dir=".", delete=False, encoding="utf-8",
-        )
-        ours_tmp.write(ours_text)
-        ours_tmp.close()
-
-        base_tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".base", dir=".", delete=False, encoding="utf-8",
-        )
-        base_tmp.write(base_text)
-        base_tmp.close()
-
-        theirs_tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".theirs", dir=".", delete=False, encoding="utf-8",
-        )
-        theirs_tmp.write(theirs_text)
-        theirs_tmp.close()
-
+    with effects.observe_scratch_files(
+        [(ours_text, ".ours"), (base_text, ".base"), (theirs_text, ".theirs")],
+        dir=".",
+    ) as (ours_tmp, base_tmp, theirs_tmp):
         result = effects.run(
-            ["git", "merge-file", "-p", ours_tmp.name, base_tmp.name, theirs_tmp.name],
+            ["git", "merge-file", "-p", ours_tmp, base_tmp, theirs_tmp],
             capture_output=True, text=True,
         )
         merged_text = result.stdout
@@ -674,13 +663,6 @@ def _three_way_merge(ours_text, base_text, theirs_text):
             # Treat errors as conflicts so the caller knows something went wrong
             has_conflicts = True
         return merged_text, has_conflicts
-    finally:
-        for tmp in (ours_tmp, base_tmp, theirs_tmp):
-            if tmp is not None:
-                try:
-                    effects.remove(tmp.name)
-                except OSError:
-                    pass
 
 
 def plan_mappings(template_dir, mappings, vars_dict, *, required_vars=None,

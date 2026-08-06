@@ -541,7 +541,7 @@ class TestClaimNameAdditionalCoverage:
         }
         mock_run.return_value = MagicMock(returncode=0)
 
-        with patch("rlsbl.commands.claim_name.tempfile.mkdtemp", return_value=str(tmp_path)), \
+        with patch("rlsbl._effects_direct.mkdtemp", return_value=str(tmp_path)), \
              patch("rlsbl.effects.rmtree"), \
              patch.dict(os.environ, {"NPM_TOKEN": "tok"}):
             claim_run_cmd("npm", ["pkg"], {"force-publish": True})

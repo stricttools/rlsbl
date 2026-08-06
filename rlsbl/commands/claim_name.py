@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 from .. import effects
 
 
@@ -74,7 +73,7 @@ def run_cmd(target, args, flags):
     # named for (a "dry run" that published for real) cannot recur by a branch
     # being forgotten.
 
-    tmpdir = tempfile.mkdtemp()
+    tmpdir = effects.mkdtemp()
     try:
         if target == "npm":
             _claim_npm(name, tmpdir)

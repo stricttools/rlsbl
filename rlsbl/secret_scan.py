@@ -9,7 +9,6 @@ import glob
 import os
 import sys
 import tarfile
-import tempfile
 import zipfile
 
 from .utils import require_tool
@@ -217,7 +216,7 @@ def scan_artifacts_for_secrets(project_dir, log=None, target_paths=None):
     all_findings = []
     for artifact_path in artifacts:
         artifact_name = os.path.basename(artifact_path)
-        tmp_dir = tempfile.mkdtemp(prefix="rlsbl-secret-scan-")
+        tmp_dir = effects.mkdtemp(prefix="rlsbl-secret-scan-")
         try:
             if not _unpack_artifact(artifact_path, tmp_dir):
                 continue

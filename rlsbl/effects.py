@@ -53,8 +53,10 @@ accident.
 
 import functools
 import io
+import itertools
 import os
 import subprocess
+from contextlib import contextmanager
 from contextvars import ContextVar
 
 import strictcli
@@ -64,6 +66,10 @@ from . import _effects_direct as _direct
 # The dispatch context of the command currently running, or None outside a
 # command dispatch (checks, library callers, direct unit-test calls).
 _CTX: ContextVar = ContextVar("rlsbl_effects_ctx", default=None)
+
+# Numbers the synthetic temp paths a preview hands back, so two staging
+# directories in one preview are told apart in the would-do log.
+_preview_temp_seq = itertools.count(1)
 
 
 def handler(fn):
@@ -343,6 +349,19 @@ def open_write(path, mode="w", *, encoding=None, newline=None, resource=None,
     return _RecordedWriter(h, _p(path), mode, resource, skip_if_current)
 
 
+def open_exclusive(path, *, file_mode=0o644, encoding="utf-8"):
+    """Create *path* open for writing, raising ``FileExistsError`` if it exists.
+
+    The exclusive create is what closes the TOCTOU between an ``exists()``
+    check and the write that follows it, so call sites branch on
+    ``FileExistsError`` rather than re-checking.
+    """
+    h = _handle()
+    if h is None:
+        return _direct.open_exclusive(path, file_mode=file_mode, encoding=encoding)
+    return _RecordedWriter(h, _p(path), "x")
+
+
 def write_text(path, content, *, encoding="utf-8", newline=None):
     """Write *content* to *path*, truncating any existing file."""
     h = _handle()
@@ -410,6 +429,89 @@ def atomic_write_text(
     h.write(_p(path), content, resource=resource, skip_if_current=skip_if_current)
     if file_mode is not None:
         h.chmod(_p(path), file_mode)
+
+
+# ---------------------------------------------------------------------------
+# Filesystem effects -- temporary files and directories
+# ---------------------------------------------------------------------------
+
+
+def _preview_temp_path(prefix, suffix, dir):
+    """A stable, obviously-synthetic path for a temp entry nobody creates.
+
+    Preview mode has to hand the caller a *path string* rather than the
+    ``Unsettled`` carrier: call sites join names onto it and pass it as a
+    subprocess ``cwd``, and a carrier would truncate the preview at the first
+    ``os.path.join`` instead of at the effect that actually matters.  The
+    counter keeps two staging directories in one preview distinguishable in
+    the would-do log.
+    """
+    parent = _p(dir) if dir is not None else _direct.temp_root()
+    name = f"{prefix or 'tmp'}preview{next(_preview_temp_seq)}{suffix or ''}"
+    return os.path.join(parent, name)
+
+
+def mkdtemp(*, prefix=None, suffix=None, dir=None):
+    """Create a temporary directory and return its path.
+
+    Live mode creates it.  Preview mode creates NOTHING: the directory is
+    recorded as a ``mkdir`` and the synthetic path comes back, so the writes
+    and runs the caller aims at it are recorded against it too and the
+    matching ``rmtree`` is recorded rather than performed.  Calling
+    ``tempfile.mkdtemp`` directly could not do that -- it creates its
+    directory in every mode, which is how ``claim-name --dry-run`` used to
+    leave a real staging directory behind on every preview.
+    """
+    h = _handle()
+    if h is None:
+        return _direct.mkdtemp(prefix=prefix, suffix=suffix, dir=dir)
+    path = _preview_temp_path(prefix, suffix, dir)
+    h.mkdir(path)
+    return path
+
+
+def temp_file(content="", *, prefix=None, suffix=None, dir=None, encoding="utf-8"):
+    """Create a temporary file holding *content* and return its path.
+
+    The caller owns the result and deletes it when done (``delete=False``
+    semantics).  Preview mode creates nothing and records the write.
+    """
+    h = _handle()
+    if h is None:
+        return _direct.temp_file(
+            content, prefix=prefix, suffix=suffix, dir=dir, encoding=encoding
+        )
+    path = _preview_temp_path(prefix, suffix, dir)
+    h.write(path, content)
+    return path
+
+
+@contextmanager
+def observe_scratch_files(items, *, dir=None):
+    """Materialize scratch files that exist ONLY as operands of an observe.
+
+    *items* is a sequence of ``(content, suffix)`` pairs; the paths are
+    yielded in the same order and deleted when the block exits.
+
+    Real in every mode, like the advisory lock and for the same reason: the
+    consumer is an allowlisted observe (``git merge-file -p``), which really
+    executes under --dry-run and would read nothing but absent paths from a
+    recorded stand-in -- reporting a merge conflict that does not exist.  A
+    preview may not fabricate its own inputs.  These files are scratch the
+    block owns end to end: created here, deleted here, never named in the
+    would-do log because nothing about them survives the call.
+    """
+    paths = []
+    try:
+        for content, suffix in items:
+            paths.append(_direct.temp_file(content, suffix=suffix, dir=dir))
+        yield paths
+    finally:
+        for path in paths:
+            try:
+                _direct.remove(path)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------------------

@@ -13,7 +13,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 
 from ...changelog.files import (
     get_changes_dir,
@@ -935,7 +934,7 @@ def cmd_absorb(
         }
 
     # --- 2. Temp-clone + history rewrite ---
-    tmp_root = tempfile.mkdtemp(prefix="rlsbl-absorb-")
+    tmp_root = effects.mkdtemp(prefix="rlsbl-absorb-")
     try:
         clone_path = os.path.join(tmp_root, "clone")
         _run_git(workspace_root, "clone", "--no-local", source_repo_path, clone_path)

@@ -299,11 +299,11 @@ def _scaffold_releasable_sections(workspace_root, projects, batch_path, filter_n
     # Atomic exclusive-create closes the TOCTOU (see _cmd_batch_release_init's
     # exists() check); on collision, re-run refuse-unless-pristine.
     try:
-        fd = os.open(batch_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        f = effects.open_exclusive(batch_path, file_mode=0o644)
     except FileExistsError:
         _handle_existing_batch(batch_path)
         return
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    with f:
         f.write(toml_text)
 
     commit_scaffold_file(
@@ -390,11 +390,11 @@ def _scaffold_package_sections(workspace_root, projects, batch_path, filter_name
     # Atomic exclusive-create closes the TOCTOU (see _cmd_batch_release_init's
     # exists() check); on collision, re-run refuse-unless-pristine.
     try:
-        fd = os.open(batch_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        f = effects.open_exclusive(batch_path, file_mode=0o644)
     except FileExistsError:
         _handle_existing_batch(batch_path)
         return
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    with f:
         f.write(toml_text)
 
     commit_scaffold_file(

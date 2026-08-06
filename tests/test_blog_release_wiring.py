@@ -3,7 +3,6 @@
 import json
 import os
 import subprocess
-import tempfile
 from unittest.mock import patch
 
 import pytest
@@ -192,12 +191,14 @@ class TestTempFileCleanup:
 
         temp_files_created = []
 
-        original_named_temp = tempfile.NamedTemporaryFile
+        from rlsbl import _effects_direct
 
-        def tracking_temp(*args, **kwargs):
-            t = original_named_temp(*args, **kwargs)
-            temp_files_created.append(t.name)
-            return t
+        original_temp_file = _effects_direct.temp_file
+
+        def tracking_temp(content, **kwargs):
+            path = original_temp_file(content, **kwargs)
+            temp_files_created.append(path)
+            return path
 
         def mock_subprocess_run(cmd, *args, **kwargs):
             # Verify temp file exists during subprocess call
@@ -210,7 +211,7 @@ class TestTempFileCleanup:
             patch("rlsbl.commands.release.require_tool", return_value=True),
             patch("subprocess.run", side_effect=mock_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
-            patch("tempfile.NamedTemporaryFile", side_effect=tracking_temp),
+            patch("rlsbl._effects_direct.temp_file", side_effect=tracking_temp),
         ):
             _run_selfblog_post_generate(
                 {},
@@ -233,12 +234,14 @@ class TestTempFileCleanup:
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
         temp_files_created = []
-        original_named_temp = tempfile.NamedTemporaryFile
+        from rlsbl import _effects_direct
 
-        def tracking_temp(*args, **kwargs):
-            t = original_named_temp(*args, **kwargs)
-            temp_files_created.append(t.name)
-            return t
+        original_temp_file = _effects_direct.temp_file
+
+        def tracking_temp(content, **kwargs):
+            path = original_temp_file(content, **kwargs)
+            temp_files_created.append(path)
+            return path
 
         def failing_subprocess_run(cmd, *args, **kwargs):
             if "selfblog" in cmd:
@@ -249,7 +252,7 @@ class TestTempFileCleanup:
             patch("rlsbl.commands.release.require_tool", return_value=True),
             patch("subprocess.run", side_effect=failing_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
-            patch("tempfile.NamedTemporaryFile", side_effect=tracking_temp),
+            patch("rlsbl._effects_direct.temp_file", side_effect=tracking_temp),
             pytest.raises(HookError),
         ):
             _run_selfblog_post_generate(

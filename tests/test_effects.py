@@ -35,12 +35,19 @@ def run_in_preview(fn):
 
     ``value`` is whatever *fn* returned; ``result`` is the strictcli test
     result, whose ``stdout`` carries the rendered would-do log.
+
+    The probe app carries rlsbl's own ``proc_observe_allowlist`` so a seam
+    whose consumer is an observe (``git merge-file -p``) behaves here exactly
+    as it does under a real ``rlsbl --dry-run``.
     """
+    import rlsbl
+
     box = {}
     app = strictcli.App(
         name=f"previewprobe{next(_probe_seq)}",
         version="0.0.0",
         help="Throwaway app that mints a real effects handle for seam tests.",
+        proc_observe_allowlist=list(rlsbl.app.proc_observe_allowlist),
     )
 
     @app.command(
@@ -272,3 +279,151 @@ class TestSimpleWrappers:
         with pytest.raises(FileExistsError):
             effects.makedirs(d)
         effects.makedirs(d, exist_ok=True)
+
+
+class TestTempSeams:
+    """``mkdtemp`` / ``temp_file``: real when live, recorded when previewing.
+
+    ``tempfile.mkdtemp`` and ``NamedTemporaryFile`` create their entry in
+    every mode, and the matching cleanup goes through the recording seam --
+    so a preview created a real directory and then recorded (never performed)
+    its removal.  That is the ``claim-name --dry-run`` tempdir leak.
+    """
+
+    def test_mkdtemp_live_creates_a_real_directory(self, tmp_path):
+        path = effects.mkdtemp(prefix="rlsbl-test-", dir=str(tmp_path))
+        assert os.path.isdir(path)
+        assert os.path.dirname(path) == str(tmp_path)
+
+    def test_mkdtemp_preview_creates_nothing(self, tmp_path):
+        path, result = run_in_preview(
+            lambda: effects.mkdtemp(prefix="rlsbl-test-", dir=str(tmp_path))
+        )
+        assert result.exit_code == 0, result.stderr
+        assert not os.path.exists(path)
+        assert list(tmp_path.iterdir()) == []
+        assert os.path.dirname(path) == str(tmp_path)
+        assert "rlsbl-test-" in result.stdout, result.stdout
+
+    def test_mkdtemp_preview_path_defaults_under_the_temp_root(self):
+        import tempfile as _tempfile
+
+        path, _ = run_in_preview(lambda: effects.mkdtemp(prefix="rlsbl-test-"))
+        assert os.path.dirname(path) == _tempfile.gettempdir()
+        assert not os.path.exists(path)
+
+    def test_temp_file_live_holds_the_content(self, tmp_path):
+        path = effects.temp_file("hello\n", suffix=".md", dir=str(tmp_path))
+        assert open(path, encoding="utf-8").read() == "hello\n"
+        assert path.endswith(".md")
+
+    def test_temp_file_preview_creates_nothing_and_records_the_write(self, tmp_path):
+        path, result = run_in_preview(
+            lambda: effects.temp_file("hello\n", suffix=".md", dir=str(tmp_path))
+        )
+        assert result.exit_code == 0, result.stderr
+        assert not os.path.exists(path)
+        assert list(tmp_path.iterdir()) == []
+        assert path.endswith(".md")
+        assert "write" in result.stdout, result.stdout
+
+    def test_preview_paths_are_distinct_per_call(self, tmp_path):
+        def _two():
+            return (
+                effects.mkdtemp(prefix="a-", dir=str(tmp_path)),
+                effects.mkdtemp(prefix="a-", dir=str(tmp_path)),
+            )
+
+        (first, second), _ = run_in_preview(_two)
+        assert first != second
+
+
+class TestObserveScratchFiles:
+    """Operands of an observe are real in EVERY mode, and always cleaned up."""
+
+    def test_paths_carry_the_content_and_vanish_after_the_block(self, tmp_path):
+        with effects.observe_scratch_files(
+            [("a\n", ".ours"), ("b\n", ".theirs")], dir=str(tmp_path)
+        ) as (ours, theirs):
+            assert open(ours, encoding="utf-8").read() == "a\n"
+            assert open(theirs, encoding="utf-8").read() == "b\n"
+            assert ours.endswith(".ours") and theirs.endswith(".theirs")
+        assert list(tmp_path.iterdir()) == []
+
+    def test_cleanup_survives_an_exception(self, tmp_path):
+        with pytest.raises(RuntimeError):
+            with effects.observe_scratch_files([("a\n", ".x")], dir=str(tmp_path)):
+                raise RuntimeError("boom")
+        assert list(tmp_path.iterdir()) == []
+
+    def test_preview_materializes_them_for_real_and_still_cleans_up(self, tmp_path):
+        """A preview may not fabricate the inputs an observe reads."""
+
+        def _probe():
+            with effects.observe_scratch_files(
+                [("a\n", ".x")], dir=str(tmp_path)
+            ) as (path,):
+                return path, open(path, encoding="utf-8").read()
+
+        (path, content), result = run_in_preview(_probe)
+        assert result.exit_code == 0, result.stderr
+        assert content == "a\n"
+        assert not os.path.exists(path)
+        assert list(tmp_path.iterdir()) == []
+
+    def test_a_previewed_three_way_merge_is_a_real_merge(self, tmp_path, monkeypatch):
+        """scaffold's merge preview reports git's verdict, not a fabrication.
+
+        ``git merge-file -p`` is an allowlisted observe: it executes under
+        --dry-run.  With recorded stand-ins for its three operands it would
+        read absent paths, exit non-zero and report a conflict for every
+        cleanly-mergeable file.
+        """
+        from rlsbl.commands.init_cmd import _three_way_merge
+
+        monkeypatch.chdir(tmp_path)
+        base = "".join(f"line{i}\n" for i in range(1, 9))
+        ours = base.replace("line2\n", "line2 ours\n")
+        theirs = base.replace("line7\n", "line7 theirs\n")
+
+        (merged, has_conflicts), result = run_in_preview(
+            lambda: _three_way_merge(ours, base, theirs)
+        )
+
+        assert result.exit_code == 0, result.stderr
+        assert has_conflicts is False
+        assert "line2 ours" in merged and "line7 theirs" in merged
+        assert "<<<<<<<" not in merged
+        # Same verdict as the live merge -- the preview is not a special case.
+        assert _three_way_merge(ours, base, theirs)[1] is False
+        assert list(tmp_path.iterdir()) == []
+
+
+class TestOpenExclusive:
+    """The exclusive create that closes the release-file TOCTOU."""
+
+    def test_creates_the_file_with_the_requested_mode(self, tmp_path):
+        target = str(tmp_path / "unreleased.toml")
+        with effects.open_exclusive(target) as f:
+            f.write("bump = \"patch\"\n")
+        assert open(target, encoding="utf-8").read() == 'bump = "patch"\n'
+        assert _mode(target) == 0o644
+
+    def test_raises_when_the_target_already_exists(self, tmp_path):
+        target = tmp_path / "unreleased.toml"
+        target.write_text("existing")
+        with pytest.raises(FileExistsError):
+            effects.open_exclusive(str(target))
+        assert target.read_text() == "existing"
+
+    def test_preview_records_the_write_and_creates_nothing(self, tmp_path):
+        target = str(tmp_path / "unreleased.toml")
+
+        def _probe():
+            with effects.open_exclusive(target) as f:
+                f.write("bump = \"patch\"\n")
+
+        _, result = run_in_preview(_probe)
+        assert result.exit_code == 0, result.stderr
+        assert not os.path.exists(target)
+        assert "unreleased.toml" in result.stdout, result.stdout

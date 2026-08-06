@@ -130,11 +130,11 @@ def run_cmd(project_root):
     # write when the file is truly absent; on collision we re-run the
     # refuse-unless-pristine check against whatever the racer wrote.
     try:
-        fd = os.open(release_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        f = effects.open_exclusive(release_path, file_mode=0o644)
     except FileExistsError:
         handle_existing()
         return
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    with f:
         tomlkit.dump(doc, f)
 
     # Anchor the git-repo check and the commit to the project directory, not
