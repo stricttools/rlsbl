@@ -184,15 +184,23 @@ class TestSelfdocCheck:
                 ["selfdoc", "check", "--no-auto-commit"], cwd=str(project_dir), check=True
             )
 
-    def test_selfdoc_check_dry_run_skips(self, tmp_project):
-        """When dry-run flag is set, selfdoc check is skipped."""
+    def test_selfdoc_check_dry_run_records_the_call(self, tmp_project):
+        """A preview records the check instead of hand-rolling a skip.
+
+        There is no dry-run branch left here: the call is an ``effects.run``,
+        so preview mode records it and the framework's would-do log reports the
+        argv. The branch that used to short-circuit meant the preview said
+        nothing at all about a step the release really takes.
+        """
         (tmp_project / "selfdoc.json").write_text("{}")
 
         with patch("rlsbl.effects.run") as mock_run:
             result = _run_selfdoc_check({"dry-run": True})
 
             assert result is True
-            mock_run.assert_not_called()
+            assert mock_run.call_args[0][0] == [
+                "selfdoc", "check", "--no-auto-commit",
+            ]
 
 
 # ---------------------------------------------------------------------------
@@ -276,17 +284,23 @@ class TestSelfdocGen:
                 ["selfdoc", "gen", "--no-auto-commit"], cwd=str(project_dir), check=True
             )
 
-    def test_selfdoc_gen_dry_run_logs(self, tmp_project, capsys):
-        """When dry-run flag is set, selfdoc gen is skipped with a log message."""
+    def test_selfdoc_gen_dry_run_records_the_call(self, tmp_project, capsys):
+        """A preview records the real argv instead of printing a copy of it.
+
+        The hand-rolled ``Would run: selfdoc gen --no-auto-commit`` line that
+        used to stand in here restated the argv in a second place, where it
+        could drift from the one actually assembled below it.
+        """
         (tmp_project / "selfdoc.json").write_text("{}")
 
         with patch("rlsbl.effects.run") as mock_run:
             result = _run_selfdoc_gen({"dry-run": True})
 
             assert result is True
-            mock_run.assert_not_called()
-            captured = capsys.readouterr()
-            assert "Would run: selfdoc gen --no-auto-commit" in captured.out
+            assert mock_run.call_args[0][0] == [
+                "selfdoc", "gen", "--no-auto-commit",
+            ]
+            assert "Would run:" not in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------

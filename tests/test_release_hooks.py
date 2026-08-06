@@ -207,12 +207,23 @@ class TestPreReleaseHookOutput:
             mock_run.side_effect = ["", "0", "", ""]
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle: the assertion below is about the PREFLIGHT
+            # (a hook that does not exist runs nothing), and the release stops
+            # at the plan summary when there is nothing to record onto.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
-            # dry-run: should complete without subprocess.run being called for hooks
+            # dry-run: completes without any hook being launched. Scoped to
+            # hook launches rather than "nothing ran at all": the release also
+            # resolves the git work-tree root through the chokepoint, which is
+            # a read and says nothing about hooks.
             run_cmd(_rc(), {"dry-run": True, "quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
-            mock_sp.run.assert_not_called()
+            hook_calls = [
+                c for c in mock_sp.run.call_args_list
+                if c.args and c.args[0] and c.args[0][0] == "bash"
+            ]
+            assert hook_calls == []
 
 
 class TestPostReleaseHookOutput:
@@ -524,6 +535,11 @@ class TestHookCwdStandalone:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle. These tests assert where the HOOK runs, which
+            # happens in the preflight; left as the MagicMock default this
+            # reads as "yes, previewing" and the release walks on into Phase A
+            # driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -572,6 +588,11 @@ class TestHookCwdStandalone:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle. These tests assert where the HOOK runs, which
+            # happens in the preflight; left as the MagicMock default this
+            # reads as "yes, previewing" and the release walks on into Phase A
+            # driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -641,6 +662,11 @@ class TestHookCwdStandalone:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle. These tests assert where the HOOK runs, which
+            # happens in the preflight; left as the MagicMock default this
+            # reads as "yes, previewing" and the release walks on into Phase A
+            # driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -710,6 +736,11 @@ class TestHookCwdMonorepo:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle. These tests assert where the HOOK runs, which
+            # happens in the preflight; left as the MagicMock default this
+            # reads as "yes, previewing" and the release walks on into Phase A
+            # driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -776,6 +807,11 @@ class TestHookCwdMonorepo:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle. These tests assert where the HOOK runs, which
+            # happens in the preflight; left as the MagicMock default this
+            # reads as "yes, previewing" and the release walks on into Phase A
+            # driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 
@@ -862,6 +898,11 @@ class TestHookCwdMonorepo:
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
+            # No preview handle. These tests assert where the HOOK runs, which
+            # happens in the preflight; left as the MagicMock default this
+            # reads as "yes, previewing" and the release walks on into Phase A
+            # driven by a mock that records nothing.
+            mock_sp.previewing.return_value = False
 
             from rlsbl.commands.release import run_cmd
 

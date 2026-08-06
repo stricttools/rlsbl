@@ -205,7 +205,9 @@ def _git_answer(argv, *, cwd):
         out = run("git", list(argv), cwd=cwd)
     except Exception:
         return None
-    if effects.unsettled(out):
+    if effects.unsettled(out) or not isinstance(out, str):
+        # Not a string is not an answer: the carrier a preview gets back, or
+        # anything a stubbed runner hands over that is not command output.
         return None
     return out
 
@@ -941,7 +943,7 @@ class _Executor:
             out = run(argv[0], list(argv[1:]), cwd=cwd)
         except Exception:
             return None
-        if effects.unsettled(out):
+        if effects.unsettled(out) or not isinstance(out, str):
             return None
         return out
 
@@ -994,10 +996,14 @@ class _Executor:
         captured = (self._capture(step) or "").strip()
         if step.produces:
             self._values[step.produces] = captured
-        if step.kind in (COMMIT, SNAPSHOT) and captured:
+        if step.kind in (COMMIT, SNAPSHOT):
+            # The drift guard's trail. ``_track_release_commit`` resolves HEAD
+            # itself, through the same direct ``effects.run`` the guard uses to
+            # read the range -- the two must name commits the same way or the
+            # release's own commit looks foreign to its own guard.
             from .execute import _track_release_commit
 
-            _track_release_commit(self._inp.state_path, captured)
+            _track_release_commit(self._inp.state_path)
 
     def _issue(self, step):
         """Issue one step's effect. Returns the carrier/result it produced."""
