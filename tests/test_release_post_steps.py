@@ -175,6 +175,71 @@ def _bump_and_tag(repo, version="1.0.1"):
     _git(repo, "tag", f"v{version}")
 
 
+def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
+                            version="1.0.1"):
+    """A monorepo whose only project declares a ``subtree_remote``, staged at
+    the point a resume re-enters the post-GitHub-Release phase.
+
+    Returns the project directory. The release is already tagged and its
+    state file records every mutating step, so the resume goes straight to
+    the subtree/mirror publishing block.
+    """
+    from rlsbl.workspace import save_workspace
+
+    proj_dir = repo / project_path
+    proj_dir.mkdir(parents=True)
+    (proj_dir / "package.json").write_text(
+        json.dumps({"name": name, "version": version}, indent=2) + "\n"
+    )
+    (proj_dir / ".rlsbl").mkdir()
+    (proj_dir / ".rlsbl" / "config.json").write_text(
+        json.dumps({"publish_mode": "none", "targets": ["npm"]}) + "\n"
+    )
+    save_workspace(str(repo), [{
+        "path": project_path,
+        "name": name,
+        "target": "npm",
+        "subtree_remote": "https://github.com/example/mylib.git",
+    }])
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", f"{name}@v{version}")
+    tag = f"{name}@v{version}"
+    _git(repo, "tag", tag)
+
+    state_path = get_state_path(str(proj_dir))
+    save_release_state(state_path, {
+        "new_version": version,
+        "tag": tag,
+        "branch": "main",
+        "pre_release_sha": _git_head(repo),
+        "candidate_sha": _git_head(repo),
+        "pin_sha": _git_head(repo),
+        "bump_type": "patch",
+        "registry": "npm",
+        "completed_steps": list(MUTATING_STEPS),
+        "failed_steps": {},
+        "companion_tags": [],
+        "monorepo_name": name,
+        "releasable_name": None,
+        "commit_msg": tag,
+        "description": "test release",
+        "context": "",
+        "include": ["npm"],
+        "exclude": [],
+        "preid": "",
+        "blog": False,
+    })
+    return str(proj_dir)
+
+
+def _make_subtree_ctx(repo, project_dir):
+    return ProjectContext(
+        project_root=Path(project_dir),
+        workspace_root=Path(str(repo)),
+        config={"publish_mode": "none", "pipelines": {}},
+    )
+
+
 class _RecordingPipeline:
     """Fake pipeline that records publish calls; optionally fails."""
 
@@ -399,12 +464,20 @@ class TestIncrementalPostReleaseResume:
 
 
 class TestNonFatalFailures:
+    """"Non-fatal" means the release is NOT rolled back and stays resumable.
 
-    def test_deploy_failure_recorded_and_named_in_summary(
+    It never meant "exit 0". A release that ends with a failed step reports
+    that failure through its exit code and keeps its state file, so
+    `rlsbl release resume` can re-attempt the step. The single decision
+    point is the completion epilogue: any failure marker => nonzero, state
+    preserved.
+    """
+
+    def test_deploy_failure_exits_nonzero_and_preserves_state(
         self, mock_git_repo, capsys,
     ):
-        """A deploy failure does not abort the release: the state is
-        cleared, but the summary loudly names the DEPLOYED step."""
+        """A deploy failure does not roll the release back, but it must not
+        be reported as success either: nonzero exit, state preserved."""
         from rlsbl.deploy import DeployResult
 
         _setup_npm_project(mock_git_repo)
@@ -424,25 +497,30 @@ class TestNonFatalFailures:
             patch("rlsbl.commands.release.deploy_target",
                   return_value=DeployResult("prod", False, "ssh timed out")),
         ):
-            # Must NOT raise: deploy failures are non-fatal
-            run_cmd(
-                _rc(),
-                {"quiet": True},
-                ctx=_make_ctx(mock_git_repo),
-            )
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(
+                    _rc(),
+                    {"quiet": True},
+                    ctx=_make_ctx(mock_git_repo),
+                )
 
-        # Release completed: state cleared
-        assert not os.path.exists(state_path)
+        assert exc_info.value.code == 1
+        assert os.path.exists(state_path), (
+            "a failed step must leave the state file behind so "
+            "`rlsbl release resume` stays reachable"
+        )
+        state = load_release_state(state_path)
+        assert "DEPLOYED" in state.get("failed_steps", {})
 
         captured = capsys.readouterr()
         assert "DEPLOYED" in captured.err
         assert "ssh timed out" in captured.err
 
-    def test_post_hook_failure_recorded_and_named_in_summary(
+    def test_post_hook_failure_exits_nonzero_and_preserves_state(
         self, mock_git_repo, capsys,
     ):
-        """A post-release hook failure is non-fatal but named in the
-        completion summary."""
+        """A post-release hook failure is not fatal to the published release,
+        but it is still a failed step: nonzero exit, state preserved."""
         _setup_npm_project(mock_git_repo)
         state_path = get_state_path(str(mock_git_repo))
 
@@ -466,13 +544,128 @@ class TestNonFatalFailures:
             patch("rlsbl.commands.release.hooks.run_release_hook",
                   side_effect=failing_post_hook),
         ):
-            run_cmd(
-                _rc(),
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd(
+                    _rc(),
+                    {"quiet": True},
+                    ctx=_make_ctx(mock_git_repo),
+                )
+
+        assert exc_info.value.code == 1
+        assert os.path.exists(state_path)
+        state = load_release_state(state_path)
+        assert "POST_HOOKS_RUN" in state.get("failed_steps", {})
+
+        captured = capsys.readouterr()
+        assert "POST_HOOKS_RUN" in captured.err
+        assert "hook exploded" in captured.err
+
+    def test_subtree_push_failure_exits_nonzero_and_preserves_state(
+        self, mock_git_repo, capsys,
+    ):
+        """A failed subtree push used to print a bare warning and let the
+        release exit 0. It is a tracked step now: nonzero exit, marker
+        recorded, state preserved."""
+        project_dir = _setup_subtree_monorepo(mock_git_repo)
+        state_path = get_state_path(project_dir)
+
+        def failing_subtree_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            if cmd == "git" and args and args[0] == "subtree":
+                raise RuntimeError("subtree split exploded")
+            return _fake_run_factory()(cmd, args=args, timeout=timeout,
+                                       env=env, cwd=cwd)
+
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run_gh_unscoped", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=failing_subtree_run),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                resume_cmd(
+                    load_release_state(state_path),
+                    {"quiet": True, "skip-lock": True},
+                    ctx=_make_subtree_ctx(mock_git_repo, project_dir),
+                )
+
+        assert exc_info.value.code == 1
+        assert os.path.exists(state_path)
+        state = load_release_state(state_path)
+        assert "SUBTREE_PUBLISHED" in state.get("failed_steps", {})
+        assert "subtree split exploded" in state["failed_steps"]["SUBTREE_PUBLISHED"]
+
+        err = capsys.readouterr().err
+        assert "SUBTREE_PUBLISHED" in err
+
+    def test_mirror_release_failure_exits_nonzero_and_preserves_state(
+        self, mock_git_repo, capsys,
+    ):
+        """Same for the mirror GitHub Release: a warning is not an outcome."""
+        project_dir = _setup_subtree_monorepo(mock_git_repo)
+        state_path = get_state_path(project_dir)
+
+        def failing_mirror(*args, **kwargs):
+            raise RuntimeError("mirror repo not found")
+
+        fake_run = _fake_run_factory()
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run_gh_unscoped",
+                  side_effect=failing_mirror),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                resume_cmd(
+                    load_release_state(state_path),
+                    {"quiet": True, "skip-lock": True},
+                    ctx=_make_subtree_ctx(mock_git_repo, project_dir),
+                )
+
+        assert exc_info.value.code == 1
+        assert os.path.exists(state_path)
+        state = load_release_state(state_path)
+        assert "MIRROR_RELEASED" in state.get("failed_steps", {})
+
+        err = capsys.readouterr().err
+        assert "MIRROR_RELEASED" in err
+
+    def test_resume_after_nonfatal_failure_completes_and_clears_state(
+        self, mock_git_repo,
+    ):
+        """The preserved state is genuinely resumable: a resume that
+        re-attempts the failed step successfully clears the failure marker,
+        completes the release, and removes the state file."""
+        from rlsbl.deploy import DeployResult
+
+        _setup_npm_project(mock_git_repo)
+        _bump_and_tag(mock_git_repo)
+
+        state_path = _make_in_progress_state(
+            mock_git_repo,
+            completed_steps=list(MUTATING_STEPS)
+            + ["ASSETS_UPLOADED", "PIPELINES_PUBLISHED"],
+            failed_steps={"DEPLOYED": "deploy to prod failed: ssh timed out"},
+        )
+
+        deploy_cfg = [{"name": "prod", "type": "ssh"}]
+        fake_run = _fake_run_factory()
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+            patch("rlsbl.commands.release.read_deploy_config",
+                  return_value=(deploy_cfg, [])),
+            patch("rlsbl.commands.release.deploy_target",
+                  return_value=DeployResult("prod", True, "deployed")),
+        ):
+            resume_cmd(
+                load_release_state(state_path),
                 {"quiet": True},
                 ctx=_make_ctx(mock_git_repo),
             )
 
-        assert not os.path.exists(state_path)
-        captured = capsys.readouterr()
-        assert "POST_HOOKS_RUN" in captured.err
-        assert "hook exploded" in captured.err
+        assert not os.path.exists(state_path), (
+            "a resume that clears every failure marker must complete the "
+            "release and remove the state file"
+        )

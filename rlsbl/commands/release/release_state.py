@@ -75,7 +75,16 @@ MUTATING_STEPS = (
 )
 
 # Ordered steps of the post-release phase (after the GitHub Release).
+#
+# SUBTREE_PUBLISHED / MIRROR_RELEASED only do work for a monorepo project
+# that declares a ``subtree_remote``; everywhere else they are marked
+# trivially done. They are tracked (rather than left as bare warnings)
+# because an unpublished mirror is a failed step like any other, and the
+# completion epilogue is the single place that turns failed steps into a
+# nonzero exit.
 POST_RELEASE_STEPS = (
+    "SUBTREE_PUBLISHED",
+    "MIRROR_RELEASED",
     "ASSETS_UPLOADED",
     "PIPELINES_PUBLISHED",
     "DEPLOYED",
@@ -100,8 +109,11 @@ RELEASE_STEPS = MUTATING_STEPS + POST_RELEASE_STEPS
 #     guards. A red CI_VERIFIED is the canonical case: fix forward on the
 #     release branch and resume at the SAME version.
 #
-# Deploy and post-release hooks remain non-fatal: their failures are recorded
-# and loudly reported, but the release completes and the state file is cleared.
+# Subtree/mirror, deploy and post-release hooks are NON-FATAL: the release is
+# never rolled back for them and the published artifacts stand. Non-fatal does
+# NOT mean "exit 0" -- their failure markers survive into the completion
+# epilogue, which reports them, keeps the state file, and exits nonzero so
+# `rlsbl release resume` can re-attempt exactly those steps.
 FATAL_STEPS = frozenset(MUTATING_STEPS) | {
     "ASSETS_UPLOADED",
     "PIPELINES_PUBLISHED",

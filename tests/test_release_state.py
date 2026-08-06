@@ -208,6 +208,8 @@ class TestCanonicalStepList:
 
     def test_post_release_steps_order(self):
         assert POST_RELEASE_STEPS == (
+            "SUBTREE_PUBLISHED",
+            "MIRROR_RELEASED",
             "ASSETS_UPLOADED",
             "PIPELINES_PUBLISHED",
             "DEPLOYED",
@@ -216,7 +218,7 @@ class TestCanonicalStepList:
 
     def test_release_steps_is_concatenation(self):
         assert RELEASE_STEPS == MUTATING_STEPS + POST_RELEASE_STEPS
-        assert len(RELEASE_STEPS) == 14
+        assert len(RELEASE_STEPS) == 16
         # No duplicates
         assert len(set(RELEASE_STEPS)) == len(RELEASE_STEPS)
 
@@ -229,9 +231,12 @@ class TestCanonicalStepList:
         assert "PIPELINES_PUBLISHED" in FATAL_STEPS
         # Snapshot regeneration is now a pre-tag mutating step -> fatal.
         assert "SNAPSHOT_REGENERATED" in FATAL_STEPS
-        # Deploy and post-hooks remain non-fatal
+        # Deploy, post-hooks and the subtree mirror remain non-fatal (the
+        # release is not rolled back; the epilogue still exits nonzero)
         assert "DEPLOYED" not in FATAL_STEPS
         assert "POST_HOOKS_RUN" not in FATAL_STEPS
+        assert "SUBTREE_PUBLISHED" not in FATAL_STEPS
+        assert "MIRROR_RELEASED" not in FATAL_STEPS
 
 
 class TestSaveStepValidation:

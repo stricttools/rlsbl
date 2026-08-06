@@ -2562,20 +2562,32 @@ def _run_release_mutating(state: ReleaseState):
                 validate_subtree_remote_ssh_host(subtree_remote, str(ctx.project_root))
                 plain_tag = target.tag_format(new_version)
                 log(f"Publishing subtree to {subtree_remote}...")
+                _subtree_pushed = False
                 try:
                     run("git", ["subtree", "split", f"--prefix={monorepo_project_path}", "-b", "_rlsbl-subtree-tmp"])
                     run("git", ["push", "--no-verify", subtree_remote, f"_rlsbl-subtree-tmp:refs/tags/{plain_tag}"])
                     run("git", ["push", "--no-verify", subtree_remote, "_rlsbl-subtree-tmp:refs/heads/main"])
                     log(f"Subtree published: {plain_tag} -> {subtree_remote}")
+                    _subtree_pushed = True
                 except Exception as e:
                     print(f"Warning: subtree push failed: {e}", file=sys.stderr)
+                    save_step_failure(
+                        _state_path, "SUBTREE_PUBLISHED",
+                        f"subtree push to {subtree_remote} failed: {e}",
+                    )
                 finally:
                     try:
                         run("git", ["branch", "-D", "_rlsbl-subtree-tmp"])
                     except Exception:
                         pass
+                if _subtree_pushed:
+                    save_step(_state_path, "SUBTREE_PUBLISHED")
+                    _completed.add("SUBTREE_PUBLISHED")
 
-                # Create GitHub Release on the mirror repo (non-fatal)
+                # Create GitHub Release on the mirror repo. Non-fatal in the
+                # sense that the primary release is already published and
+                # nothing is rolled back -- the failure marker still makes the
+                # run exit nonzero and stay resumable (see the epilogue).
                 try:
                     # Unscoped: --repo names the mirror explicitly, so this
                     # must NOT inherit the current project's GH_REPO.
@@ -2586,18 +2598,42 @@ def _run_release_mutating(state: ReleaseState):
                     log(f"Created mirror GitHub Release: {plain_tag} on {subtree_remote}")
                 except Exception as e:
                     print(f"Warning: mirror GitHub Release failed: {e}", file=sys.stderr)
+                    save_step_failure(
+                        _state_path, "MIRROR_RELEASED",
+                        f"mirror GitHub Release {plain_tag} on "
+                        f"{subtree_remote} failed: {e}",
+                    )
+                else:
+                    save_step(_state_path, "MIRROR_RELEASED")
+                    _completed.add("MIRROR_RELEASED")
     finally:
         # Clean up temp files after both main and mirror releases
         for tmp in (notes_file, writing_file):
             if os.path.exists(tmp):
                 effects.remove(tmp)
 
+    # Subtree/mirror mark-up: the two steps above only run for a monorepo
+    # project that declares a subtree_remote. Everywhere else they are
+    # trivially done, and the completeness check below demands a marker for
+    # every canonical step. An existing marker (success OR failure) is never
+    # overwritten -- a resume re-attempts the failed push above and clears its
+    # own marker on success.
+    _subtree_state = load_release_state(_state_path) or {}
+    _subtree_marked = (set(_subtree_state.get("completed_steps") or [])
+                       | set(_subtree_state.get("failed_steps") or {}))
+    for _mirror_step in ("SUBTREE_PUBLISHED", "MIRROR_RELEASED"):
+        if _mirror_step not in _subtree_marked:
+            save_step(_state_path, _mirror_step)
+            _completed.add(_mirror_step)
+
     # ---- Post-release phase ----
     # Every step below is tracked in the state file. Success markers gate
-    # resume-skip; failure markers feed the completion summary. Asset upload
-    # and pipeline publish failures are FATAL (state preserved, resumable);
-    # deploy / post-hooks / snapshot failures are non-fatal (recorded and
-    # loudly reported, then the release completes and state is cleared).
+    # resume-skip; failure markers feed the completion epilogue. Asset upload
+    # and pipeline publish failures are FATAL (they abort right here, state
+    # preserved, resumable); deploy / post-hooks / snapshot failures are
+    # non-fatal -- the release is not rolled back and the remaining steps
+    # still run -- but their markers make the epilogue exit nonzero and keep
+    # the state file, so no failed step is ever reported as success.
 
     # Upload release assets for pipelines with assets/custom_assets config.
     # In releasable mode, iterate each publishing member (publish_mode != "none") and
@@ -2882,16 +2918,30 @@ def _run_release_mutating(state: ReleaseState):
         from ...errors import PostReleaseError
         raise PostReleaseError(f"GitHub Release creation failed for {tag}")
 
-    # Completion summary: loudly name any non-fatal step failures.
+    # Single decision point for the whole non-fatal family (deploy, post
+    # hooks, subtree push, mirror release, post-hoc snapshot). "Non-fatal"
+    # means the release is not rolled back and stays resumable -- it never
+    # meant "exit 0". Any failure marker at this point is a step that ran and
+    # failed, so the run reports it through its exit code and KEEPS the state
+    # file: `rlsbl release resume` re-attempts the failed steps, and a resume
+    # that succeeds clears the markers (save_step drops them) and falls
+    # through to the success epilogue below.
     _final_state = load_release_state(_state_path) or {}
     _failed_final = get_failed_steps(_final_state)
     if _failed_final:
         print(
-            f"\nRelease {new_version} completed with non-fatal step failures:",
+            f"\nRelease {new_version} completed with failed steps:",
             file=sys.stderr,
         )
         for _step, _msg in _failed_final.items():
             print(f"  {_step}: {_msg}", file=sys.stderr)
+        from ...errors import PostReleaseError
+        raise PostReleaseError(
+            f"release {new_version} finished with {len(_failed_final)} failed "
+            f"step(s): {', '.join(sorted(_failed_final))}. The release state "
+            f"has been preserved; fix the cause and run "
+            f"`rlsbl release resume` to re-attempt them."
+        )
 
     # Provable completeness: every canonical step must carry a success or
     # failure marker before the state file is cleared. A missing marker
