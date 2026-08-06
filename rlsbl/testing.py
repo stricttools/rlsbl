@@ -166,7 +166,6 @@ def run_project_tests(
     workspace_root: str | None = None,
     skip_sync: bool = False,
     config: dict | None = None,
-    dry_run: bool = False,
 ) -> bool:
     """Run tests for the given project target type.
 
@@ -177,14 +176,16 @@ def run_project_tests(
             runs here instead of at project_dir.
         skip_sync: if True, skip the uv sync step (caller already synced).
         config: project config dict. Used to read uv_sync_verbose for pypi.
-        dry_run: if True, skip all subprocess execution and return True.
 
     Returns True if tests pass (or are skipped), False on failure.
     Does NOT call sys.exit -- that is the caller's responsibility.
-    """
-    if dry_run:
-        return True
 
+    No dry-run parameter: the test suite reaches this through the impure
+    ``test-suite`` check, which the check framework already lists rather than
+    runs under ``--dry-run``. The parameter this function used to carry was
+    never passed by any caller, and a second, hand-rolled skip would be a
+    second place for the two answers to disagree.
+    """
     print("Running tests...")
 
     timeout = get_check_timeout(config)
