@@ -426,6 +426,130 @@ class TestPreflightIsOutsideThePlan:
                 )
 
 
+# ---------------------------------------------------------------------------
+# 7. Narration is live-only: a preview never speaks in the past tense
+# ---------------------------------------------------------------------------
+
+
+class _NarrationInputs:
+    """The slice of BuildInputs the narrating step handlers read."""
+
+    def __init__(self, project_dir, *, log):
+        self.log = log
+        self.project_dir = str(project_dir)
+        self.git_root = str(project_dir)
+        self.state_path = str(Path(project_dir) / "in-progress.json")
+        self.completed = set()
+        self.monorepo_root = None
+        self.pin_sha = None
+        self.state = type("S", (), {"quiet": False, "branch": "main"})()
+        self.ctx = type("C", (), {
+            "project_root": str(project_dir), "config": {},
+        })()
+
+
+# Words a preview must never emit: they claim work that was RECORDED, not done.
+_PAST_TENSE_NARRATION = (
+    "Tagged ", "Cleared ", "removed ", "Committed", "Pushed ", "Updated ",
+    "Synced ", "Regenerated ",
+)
+
+
+def _narration_plan():
+    """The two steps whose helpers narrate through a channel of their own.
+
+    ``ensure_npm_keyword`` prints directly (its own ``quiet`` flag is the only
+    lever), and ``clean_stale_artifacts`` logs through a callable the handler
+    passes in. Both are past-tense, and both were reachable from a preview.
+    """
+    return phase_a.PhaseAPlan(
+        steps=[
+            phase_a.PlanStep(
+                kind=phase_a.ENSURE_KEYWORD,
+                release_step="VERSION_BUMPED",
+                summary="add the 'rlsbl' keyword to package.json",
+                payload={"kind": "npm", "path": ".",
+                         "manifest_path": "package.json"},
+            ),
+            phase_a.PlanStep(
+                kind=phase_a.CLEAN_ARTIFACTS,
+                release_step="VERSION_BUMPED",
+                summary="clear stale build artifacts from dist/",
+                payload={"project_dir": ".", "target_paths": {}},
+            ),
+        ],
+        files_to_commit=[],
+    )
+
+
+class TestPreviewNarrationIsLiveOnly:
+
+    def _run_preview(self, tmp_path, capsys):
+        """Issue the narrating steps in preview mode; return everything said."""
+        import json
+
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "p", "version": "1.0.0", "keywords": []}),
+            encoding="utf-8",
+        )
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "p-0.9.0.tar.gz").write_bytes(b"stale")
+
+        said = []
+        plan = _narration_plan()
+        for step in plan.steps:
+            step.payload["path" if step.kind == phase_a.ENSURE_KEYWORD
+                         else "project_dir"] = str(tmp_path)
+        phase_a.execute_phase_a_plan(
+            plan, _NarrationInputs(tmp_path, log=said.append), preview=True,
+        )
+        captured = capsys.readouterr()
+        return said + captured.out.splitlines() + captured.err.splitlines()
+
+    def test_a_preview_narrates_nothing_in_the_past_tense(self, tmp_path, capsys):
+        lines = self._run_preview(tmp_path, capsys)
+        offenders = [
+            line for line in lines
+            if any(word in line for word in _PAST_TENSE_NARRATION)
+        ]
+        assert not offenders, (
+            "the Phase-A executor narrated completed work during a PREVIEW: "
+            f"{offenders}. Per-step progress logging is live-only -- a preview "
+            "recorded these effects rather than performing them, and the plan "
+            "table it prints instead says the same things in the "
+            "past-conditional they belong in."
+        )
+
+    def test_the_same_steps_do_narrate_when_live(self, tmp_path, capsys):
+        """The silencing is preview-scoped, not a deletion of the narration."""
+        import json
+
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "p", "version": "1.0.0", "keywords": []}),
+            encoding="utf-8",
+        )
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "p-0.9.0.tar.gz").write_bytes(b"stale")
+
+        said = []
+        plan = _narration_plan()
+        for step in plan.steps:
+            step.payload["path" if step.kind == phase_a.ENSURE_KEYWORD
+                         else "project_dir"] = str(tmp_path)
+        phase_a.execute_phase_a_plan(
+            plan, _NarrationInputs(tmp_path, log=said.append), preview=False,
+        )
+        lines = said + capsys.readouterr().out.splitlines()
+        assert any("Tagged " in line for line in lines), (
+            "a LIVE run must still report the keyword it really added"
+        )
+        assert any("Cleared " in line for line in lines), (
+            "a LIVE run must still report the stale artifacts it really removed"
+        )
+
+
 @pytest.mark.parametrize("kind", sorted({
     v for k, v in vars(phase_a).items()
     if k.isupper() and isinstance(v, str) and not k.startswith("_")

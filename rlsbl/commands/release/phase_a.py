@@ -1085,7 +1085,11 @@ class _Executor:
         p = step.payload
         fn = ensure_npm_keyword if p["kind"] == "npm" else ensure_pypi_keyword
         try:
-            fn(p["path"], quiet=self._inp.state.quiet,
+            # The tagger narrates through ``print`` rather than a log callable,
+            # so ``quiet`` is the only lever there is -- and a preview must pull
+            # it: 'Tagged package.json with "rlsbl" keyword' is past tense about
+            # a write that was recorded, not made (see ``self._log``).
+            fn(p["path"], quiet=self._preview or self._inp.state.quiet,
                project_root=self._inp.ctx.project_root)
         except Exception as e:
             warn_exception(f"{p['kind']} ecosystem tagging failed", e)
@@ -1119,7 +1123,7 @@ class _Executor:
         from ...secret_scan import clean_stale_artifacts
 
         clean_stale_artifacts(
-            step.payload["project_dir"], log=self._inp.log,
+            step.payload["project_dir"], log=self._log,
             target_paths=step.payload["target_paths"],
         )
         return None
@@ -1150,7 +1154,7 @@ class _Executor:
             return None
         try:
             scan_artifacts_for_secrets(
-                step.payload["project_dir"], log=self._inp.log,
+                step.payload["project_dir"], log=self._log,
                 target_paths=step.payload["target_paths"],
             )
         except SecretScanError as e:
