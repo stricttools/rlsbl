@@ -721,15 +721,6 @@ class TestStatusNonReleasableProject:
         entry.name = "npm"
         entry.path = "."
 
-        patches = {
-            f"{MOD_STATUS}.find_workspace_root": "/fake/ws",
-            f"{MOD_STATUS}.load_workspace": [mock_proj],
-            f"{MOD_STATUS}.resolve_project": mock_proj,
-            f"{MOD_STATUS}.get_current_branch": "main",
-            f"{MOD_STATUS}.run": "v1.0.0",
-            f"{MOD_STATUS}.is_clean_tree": True,
-            f"{MOD_STATUS}.changes_dir_exists": False,
-        }
         with patch(f"{MOD_STATUS}.find_workspace_root", return_value="/fake/ws"), \
              patch(f"{MOD_STATUS}.load_workspace", return_value=[mock_proj]), \
              patch(f"{MOD_STATUS}.resolve_project", return_value=mock_proj), \
@@ -739,8 +730,7 @@ class TestStatusNonReleasableProject:
              patch(f"{MOD_STATUS}._get_last_version_tag", return_value=None), \
              patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
              patch(f"{MOD_STATUS}.run", return_value="v1.0.0"), \
-             patch(f"{MOD_STATUS}.is_clean_tree", return_value=True), \
-             patch(f"{MOD_STATUS}.changes_dir_exists", return_value=False):
+             patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
             run_cmd("npm", [], {"json": True}, ctx=_ctx())
         data = json.loads(capsys.readouterr().out)
         assert data["jsonl_coverage"] == "non-releasable -- no changelog"

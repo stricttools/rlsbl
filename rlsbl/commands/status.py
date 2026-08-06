@@ -5,11 +5,11 @@ import os
 import subprocess
 import sys
 
-from ..changelog import changes_dir_exists, get_changes_dir, read_unreleased, resolve_hashes
+from ..changelog import get_changes_dir, read_unreleased, resolve_hashes
 from ..changelog.resolve import _get_last_version_tag, _unreleased_range
 from ..changelog.validate import filter_exempt_commits
 from ..ci_router import discover_project_ci_sources
-from ..git_util import filter_commits_for_project
+from ..git_util import filter_commits_for_project, filter_commits_for_releasable
 from ..targets import TARGETS, detect_targets
 from ..errors import GitError
 from ..utils import (
@@ -43,7 +43,8 @@ def _compare_versions(local, remote):
     return "SAME"
 
 
-def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=None, flags=None):
+def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=None,
+                    flags=None, changes_dir=None, members=None):
     """Collect status data as a dict.
 
     When tag_glob is set (monorepo mode), it is forwarded to
@@ -51,7 +52,12 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
 
     When project is set (monorepo mode), unreleased commits are filtered
     to only those touching the project's files (by path prefix or watch
-    globs), so the count reflects actual project-specific changes.
+    globs), so the count reflects actual project-specific changes. When
+    members is set (a releasable's member projects), the scope is the whole
+    releasable -- a commit touching ANY member is the releasable's commit.
+
+    changes_dir overrides where the JSONL changelog lives; releasable members
+    keep theirs under the releasable, not the member package.
 
     When flags contains "registry": True, queries the package registry
     for the latest published version and computes drift.
@@ -112,6 +118,7 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     commits_ahead = None
     unreleased_commits = None
     all_unreleased = None
+    exempted_count = 0
     scoped_tag = _get_last_version_tag(tag_glob)
     try:
         range_spec = _unreleased_range(tag_glob=tag_glob)
@@ -125,17 +132,19 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
                 for line in result.stdout.strip().splitlines()
                 if line.strip()
             ]
-            non_exempt, exempt_stats = filter_exempt_commits(all_unreleased)
+            # Scope FIRST, then exempt -- the order the authoritative coverage
+            # check uses. Exempting first would count another project's
+            # changelog churn as this project's exempted commits.
+            in_scope = all_unreleased
+            if project and in_scope:
+                if members:
+                    keep = filter_commits_for_releasable(set(in_scope), members)
+                else:
+                    keep = filter_commits_for_project(set(in_scope), project)
+                in_scope = [c for c in in_scope if c in keep]
+            non_exempt, _exempt_stats = filter_exempt_commits(in_scope)
             unreleased_commits = non_exempt
-            # In monorepo mode, filter to commits touching this project's
-            # files so the count reflects actual project-specific changes.
-            if project and unreleased_commits:
-                filtered = filter_commits_for_project(
-                    set(unreleased_commits), project,
-                )
-                unreleased_commits = [
-                    c for c in unreleased_commits if c in filtered
-                ]
+            exempted_count = len(in_scope) - len(non_exempt)
             # Only set commits_ahead when there's a prior tag — without
             # a tag, "ahead of nothing" is meaningless and we don't warn.
             if scoped_tag is not None:
@@ -146,10 +155,10 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     # JSONL changelog coverage (non-releasable projects don't use changelogs)
     is_non_releasable = project is not None and not project.is_releasable
     jsonl_coverage = "non-releasable -- no changelog" if is_non_releasable else "not set up"
-    if not is_non_releasable and changes_dir_exists(target_path):
+    resolved_changes_dir = changes_dir or get_changes_dir(target_path)
+    if not is_non_releasable and os.path.isdir(resolved_changes_dir):
         try:
-            changes_dir = get_changes_dir(target_path)
-            entries = read_unreleased(changes_dir)
+            entries = read_unreleased(resolved_changes_dir)
             # Count covered commits
             all_hashes = []
             for entry in entries:
@@ -160,11 +169,10 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
             if unreleased_commits is not None and all_unreleased is not None:
                 total = len(unreleased_commits)
                 covered = sum(1 for c in unreleased_commits if c in covered_shas)
-                exempted = exempt_stats.autogenerated + exempt_stats.changelog_only
-                if exempted > 0:
+                if exempted_count > 0:
                     jsonl_coverage = (
                         f"{covered}/{total} commits covered"
-                        f" ({exempted} exempted)"
+                        f" ({exempted_count} exempted)"
                     )
                 else:
                     jsonl_coverage = f"{covered}/{total} commits covered"
@@ -234,6 +242,8 @@ def run_cmd(registry, args, flags, ctx):
     monorepo_count = None
     releasable_info = None  # (releasable_name, tag_format, version) in explicit mode
     releasable_config_dir = None
+    releasable_changes_dir = None
+    releasable_members = None
     try:
         ws_root = find_workspace_root(root_str)
         if ws_root is not None:
@@ -252,6 +262,11 @@ def run_cmd(registry, args, flags, ctx):
                         except Exception:
                             rel_ver = None
                         releasable_info = (rel.name, rel.tag_format, rel_ver)
+                        # A releasable member's JSONL lives under the
+                        # releasable, and its commit scope spans every member.
+                        from ..workspace import get_releasable_changes_dir, members_of
+                        releasable_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+                        releasable_members = members_of(rel.name, ws_projects)
             if monorepo_project:
                 from ..targets import resolve_releasable_config_dir
                 releasable_config_dir = resolve_releasable_config_dir(monorepo_project, ws_root)
@@ -277,6 +292,7 @@ def run_cmd(registry, args, flags, ctx):
     data = _collect_status(
         registry, primary_path, tag_glob=tag_glob,
         ctx=ctx, project=monorepo_project, flags=flags,
+        changes_dir=releasable_changes_dir, members=releasable_members,
     )
 
     if flags.get("json"):

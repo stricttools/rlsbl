@@ -1,11 +1,13 @@
 """Unreleased command that lists commits since the last tag and checks whether each one is covered by a corresponding changelog entry."""
 
 import json
+import os
 import subprocess
 import sys
 
-from ..changelog import changes_dir_exists, get_changes_dir, read_unreleased, resolve_hashes
-from ..git_util import filter_commits_for_project
+from ..changelog import get_changes_dir, read_unreleased, resolve_hashes
+from ..changelog.validate import filter_exempt_commits
+from ..git_util import filter_commits_for_project, filter_commits_for_releasable
 from ..targets import TARGETS, detect_targets
 from ..utils import get_last_version_tag
 from ..workspace import find_workspace_root, load_workspace, resolve_project
@@ -50,6 +52,65 @@ def _get_commits_since(tag):
     return commits
 
 
+def _resolve_scope(root_str):
+    """Resolve the monorepo/releasable context for the project at *root_str*.
+
+    Returns ``(project, tag_glob, changes_dir, members)``:
+
+    - ``project`` is the WorkspaceProject (None in standalone mode).
+    - ``tag_glob`` scopes the "last release tag" lookup.
+    - ``changes_dir`` is the releasable-aware JSONL directory. A releasable
+      member's entries live under ``.rlsbl-monorepo/releasables/<name>/``,
+      NOT under the member package -- resolving it per-package made every
+      releasable member report "JSONL changelog not set up".
+    - ``members`` are the releasable's member projects (empty otherwise), used
+      to scope commits to the whole releasable rather than one member.
+    """
+    project = None
+    tag_glob = None
+    changes_dir = get_changes_dir(root_str)
+    members = []
+    try:
+        ws_root = find_workspace_root(root_str)
+        if ws_root is None:
+            return project, tag_glob, changes_dir, members
+        project = resolve_project(ws_root, root_str)
+        if project is None:
+            return project, tag_glob, changes_dir, members
+
+        from ..workspace import (
+            get_releasable_changes_dir,
+            is_explicit_mode,
+            load_releasables,
+            members_of,
+            resolve_releasable_for_project,
+        )
+
+        rel = None
+        ws_projects = None
+        if is_explicit_mode(ws_root):
+            ws_projects = load_workspace(ws_root)
+            releasables = load_releasables(ws_root, ws_projects)
+            rel = resolve_releasable_for_project(project, releasables)
+
+        if rel is not None:
+            from ..commands.release.validate import _releasable_tag_glob
+            tag_glob = _releasable_tag_glob(rel.tag_format, rel.name)
+            changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+            members = members_of(rel.name, ws_projects)
+        else:
+            from ..targets import resolve_releasable_config_dir
+            rel_dir = resolve_releasable_config_dir(project, ws_root)
+            targets = detect_targets(root_str, releasable_config_dir=rel_dir)
+            if targets:
+                target = TARGETS[targets[0].name]
+                tag_glob = target.monorepo_tag_glob(
+                    project["name"], path=project["path"],
+                )
+    except Exception:
+        pass
+    return project, tag_glob, changes_dir, members
+
 
 def run_cmd(registry, args, flags, project_root):
     """List unreleased commits and their changelog coverage.
@@ -58,48 +119,29 @@ def run_cmd(registry, args, flags, project_root):
     """
     root_str = str(project_root)
 
-    # Detect monorepo context for scoped tags and directory filtering
-    monorepo_project = None
-    tag_glob = None
-    try:
-        ws_root = find_workspace_root(root_str)
-        if ws_root is not None:
-            monorepo_project = resolve_project(ws_root, root_str)
-            if monorepo_project:
-                # Check for explicit releasable mode
-                from ..workspace import is_explicit_mode, load_releasables, resolve_releasable_for_project
-                if is_explicit_mode(ws_root):
-                    ws_projects = load_workspace(ws_root)
-                    releasables = load_releasables(ws_root, ws_projects)
-                    rel = resolve_releasable_for_project(monorepo_project, releasables)
-                    if rel:
-                        from ..commands.release.validate import _releasable_tag_glob
-                        tag_glob = _releasable_tag_glob(rel.tag_format, rel.name)
-                if tag_glob is None:
-                    from ..targets import resolve_releasable_config_dir
-                    rel_dir = resolve_releasable_config_dir(monorepo_project, ws_root)
-                    targets = detect_targets(root_str, releasable_config_dir=rel_dir)
-                    if targets:
-                        target = TARGETS[targets[0].name]
-                        tag_glob = target.monorepo_tag_glob(
-                            monorepo_project["name"],
-                            path=monorepo_project["path"],
-                        )
-    except Exception:
-        pass
+    monorepo_project, tag_glob, changes_dir, members = _resolve_scope(root_str)
 
     tag = get_last_version_tag(tag_glob) if tag_glob else get_last_version_tag()
     commits = _get_commits_since(tag)
 
-    # In monorepo mode, filter to commits touching this project's files
+    # Scope to the project's (or the whole releasable's) files FIRST, then
+    # apply the exemption filter -- the same order the authoritative coverage
+    # check uses, so `unreleased`, `status`, and `rlsbl check --tag changelog`
+    # answer the same question the same way.
     if monorepo_project and commits:
         commit_shas = set(c["hash"] for c in commits)
-        filtered = filter_commits_for_project(commit_shas, monorepo_project)
-        commits = [c for c in commits if c["hash"] in filtered]
+        if members:
+            in_scope = filter_commits_for_releasable(commit_shas, members)
+        else:
+            in_scope = filter_commits_for_project(commit_shas, monorepo_project)
+        commits = [c for c in commits if c["hash"] in in_scope]
 
     if not commits:
         if flags.get("json"):
-            print(json.dumps({"tag": tag, "commits": [], "coverage": {"covered": 0, "total": 0}}))
+            print(json.dumps({
+                "tag": tag, "commits": [],
+                "coverage": {"covered": 0, "total": 0, "exempted": 0},
+            }))
         else:
             print("No unreleased commits.")
         sys.exit(0)
@@ -114,42 +156,59 @@ def run_cmd(registry, args, flags, project_root):
         sys.exit(0)
 
     # Cross-reference each commit against JSONL changelog
-    if not changes_dir_exists(root_str):
+    if not os.path.isdir(changes_dir):
         print(
-            "Error: JSONL changelog not set up. Run 'rlsbl scaffold' to create .rlsbl/changes/",
+            f"Error: JSONL changelog not set up ({changes_dir}). "
+            "Run 'rlsbl scaffold' to create it.",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    changes_dir = get_changes_dir(root_str)
     entries = read_unreleased(changes_dir)
     all_hashes = []
     for entry in entries:
         all_hashes.extend(entry.commits)
     resolved = resolve_hashes(all_hashes)
     covered_shas = {full for full in resolved.values() if full is not None}
+
+    # Autogenerated and changelog-only commits need no entry. Without this
+    # filter `unreleased` reported them as MISSING while `status` exempted
+    # them, so the two commands contradicted each other on the same repo.
+    non_exempt, _exempt_stats = filter_exempt_commits([c["hash"] for c in commits])
+    non_exempt_shas = set(non_exempt)
     for commit in commits:
+        commit["exempt"] = commit["hash"] not in non_exempt_shas
         commit["covered"] = commit["hash"] in covered_shas
 
-    covered_count = sum(1 for c in commits if c["covered"])
-    total = len(commits)
+    tracked = [c for c in commits if not c["exempt"]]
+    covered_count = sum(1 for c in tracked if c["covered"])
+    total = len(tracked)
+    exempted = len(commits) - total
 
     if flags.get("json"):
         output = {
             "tag": tag,
             "commits": commits,
-            "coverage": {"covered": covered_count, "total": total},
+            "coverage": {
+                "covered": covered_count, "total": total, "exempted": exempted,
+            },
         }
         print(json.dumps(output, indent=2))
     else:
         tag_display = tag or "(no tags)"
-        print(f"Unreleased commits since {tag_display} ({total} commits):\n")
+        print(f"Unreleased commits since {tag_display} ({len(commits)} commits):\n")
         for commit in commits:
             short_hash = commit["hash"][:7]
-            status = "[COVERED]" if commit["covered"] else "[MISSING]"
+            if commit["exempt"]:
+                status = "[EXEMPT]"
+            elif commit["covered"]:
+                status = "[COVERED]"
+            else:
+                status = "[MISSING]"
             subject = commit["subject"]
             print(f"  {short_hash}  {subject}  {status}")
 
-        print(f"\nCoverage: {covered_count}/{total} commits have changelog entries.")
+        suffix = f" ({exempted} exempted)" if exempted else ""
+        print(f"\nCoverage: {covered_count}/{total} commits covered{suffix}.")
 
     sys.exit(0)
