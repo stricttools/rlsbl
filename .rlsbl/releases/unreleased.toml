@@ -2,11 +2,65 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "A release that previews itself and verifies its own outcome: `release run --dry-run` now records the real mutating first half through the candidate push, and a live release probes every target's registry before it calls itself done."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+This release is the rlsbl half of an ecosystem-wide fix campaign, and it closes
+one theme: the release engine used to report success on the basis of what it
+DID, not what actually HAPPENED, and its preview used to describe a release
+rather than perform one with the writes withheld.
+
+Two flagship changes carry that theme.
+
+The `--dry-run` preview of `release run` was the weakest preview in the tool --
+a summary followed by an empty would-do body -- because the mutating phase
+interleaved reads and writes, and under the effects regime a read issued after
+a recorded write cannot be answered. That phase is now split on the CI seam:
+Phase A (version bump through candidate push) is a plan-builder plus an
+executor, where the builder reads and derives and the executor only issues
+effects, so a preview records every mutation for real and prints the actual
+argv and byte counts. Below an explicit boundary line, Phase B -- everything
+that depends on CI's verdict -- is DECLARED as a table rather than guessed at.
+A preview cannot push by construction rather than by a flag check.
+
+Outcome verification is the other half. After the CI wait, each publishable
+target's registry is probed on a bounded retry budget, and a version the
+registry is not serving is a hard error naming the registry and the remedy.
+This catches the green-but-empty publish -- a workflow that concluded
+successfully having uploaded nothing -- which a workflow-status check
+structurally cannot. Under `--no-watch` nothing is probed and the run says out
+loud that the outcome is unverified.
+
+Around those sit the defects the same campaign surfaced by hitting them live.
+The exit-code family: a release ending on a failed deploy, hook, subtree push
+or mirror release exited 0 with its state cleared; a batch could announce
+completion over an empty released list; a stale completed plan could swallow a
+freshly written batch file. The batch flow: stranded members are resumable
+inside the batch, the empty-candidate-window guard runs per member before the
+push instead of after a full CI wait, and the finalize commit the batch itself
+creates is now pushed rather than left behind. CI classification: an
+infrastructure-killed run is recognized ahead of the code-failure signatures it
+incidentally matches and its failed jobs are rerun once, because a resumed
+release pushes nothing and could never produce a fresh run.
+
+The rest are smaller and mostly mechanical: `dry_run_supported` declarations on
+the five commands that cannot honestly preview themselves (they now refuse at
+parse time and say so in `--help`), artifact-scoped secret scans in every
+publish template (a whole-tree scan blocked a release on a fixture and left a
+scarred version), the pgdesign `@latest` -> `@v0` and `pgdesign validate` ->
+`pgdesign check --tag validation` fixes in both the CI template and the release
+path, a new `dep-floors` check so a release requiring new framework behavior
+must declare the `>=` floor a consumer will actually resolve, the display trio
+(`unreleased`, `status`, `monorepo status` agreeing on real coverage), and the
+infra-release CHANGELOG assembly bug that silently omitted every infra
+version's heading.
+
+Internally, rlsbl now dogfoods the stricttest pytest plugin instead of carrying
+its own copy of the test-isolation floor, and its lock moves to the released
+strictcli that ships `dry_run_supported`.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
