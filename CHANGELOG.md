@@ -2,12 +2,75 @@
 
 # Changelog
 
-## Unreleased
+## 0.112.0
+
+A release that previews itself and verifies its own outcome: `release run --dry-run` now records the real mutating first half through the candidate push, and a live release probes every target's registry before it calls itself done.
+
+<details>
+<summary>Context</summary>
+
+This release is the rlsbl half of an ecosystem-wide fix campaign, and it closes
+one theme: the release engine used to report success on the basis of what it
+DID, not what actually HAPPENED, and its preview used to describe a release
+rather than perform one with the writes withheld.
+
+Two flagship changes carry that theme.
+
+The `--dry-run` preview of `release run` was the weakest preview in the tool --
+a summary followed by an empty would-do body -- because the mutating phase
+interleaved reads and writes, and under the effects regime a read issued after
+a recorded write cannot be answered. That phase is now split on the CI seam:
+Phase A (version bump through candidate push) is a plan-builder plus an
+executor, where the builder reads and derives and the executor only issues
+effects, so a preview records every mutation for real and prints the actual
+argv and byte counts. Below an explicit boundary line, Phase B -- everything
+that depends on CI's verdict -- is DECLARED as a table rather than guessed at.
+A preview cannot push by construction rather than by a flag check.
+
+Outcome verification is the other half. After the CI wait, each publishable
+target's registry is probed on a bounded retry budget, and a version the
+registry is not serving is a hard error naming the registry and the remedy.
+This catches the green-but-empty publish -- a workflow that concluded
+successfully having uploaded nothing -- which a workflow-status check
+structurally cannot. Under `--no-watch` nothing is probed and the run says out
+loud that the outcome is unverified.
+
+Around those sit the defects the same campaign surfaced by hitting them live.
+The exit-code family: a release ending on a failed deploy, hook, subtree push
+or mirror release exited 0 with its state cleared; a batch could announce
+completion over an empty released list; a stale completed plan could swallow a
+freshly written batch file. The batch flow: stranded members are resumable
+inside the batch, the empty-candidate-window guard runs per member before the
+push instead of after a full CI wait, and the finalize commit the batch itself
+creates is now pushed rather than left behind. CI classification: an
+infrastructure-killed run is recognized ahead of the code-failure signatures it
+incidentally matches and its failed jobs are rerun once, because a resumed
+release pushes nothing and could never produce a fresh run.
+
+The rest are smaller and mostly mechanical: `dry_run_supported` declarations on
+the five commands that cannot honestly preview themselves (they now refuse at
+parse time and say so in `--help`), artifact-scoped secret scans in every
+publish template (a whole-tree scan blocked a release on a fixture and left a
+scarred version), the pgdesign `@latest` -> `@v0` and `pgdesign validate` ->
+`pgdesign check --tag validation` fixes in both the CI template and the release
+path, a new `dep-floors` check so a release requiring new framework behavior
+must declare the `>=` floor a consumer will actually resolve, the display trio
+(`unreleased`, `status`, `monorepo status` agreeing on real coverage), and the
+infra-release CHANGELOG assembly bug that silently omitted every infra
+version's heading.
+
+Internally, rlsbl now dogfoods the stricttest pytest plugin instead of carrying
+its own copy of the test-isolation floor, and its lock moves to the released
+strictcli that ships `dry_run_supported`.
+
+</details>
 
 ### Features
 
 - **New `dep-floors` check.** A release that requires new behavior from a sibling framework package now has to declare a `>=` floor at that version, or the check blocks the release. Your dev lock resolves the new framework, so your suite passes -- but a consumer installing the published artifact resolves whatever the declared floor allows and gets an older framework without the behavior. The check compares `pyproject.toml` against `uv.lock` and `package.json` against `package-lock.json` (Go needs nothing: `require` lines are already the minimums), and names the dependency, the locked version, and the exact constraint to write. Opt in with the `internal_dep_floors` config key; monorepo siblings are enforced automatically.
 - **The releasable CI run-everything hook is documented.** The monorepo and release-workflow docs now explain why every member of a releasable carries the releasable's `CHANGELOG.md` in its CI paths filter: it makes a release commit verifiable for members whose own directory the release did not touch (a first release, where the version write is a no-op), at the cost of running every member's CI jobs on any release of that releasable. The publish gate's refusal to accept a `skipped` check is stated as deliberate.
+- **A release now verifies that the registry actually served the version.** Until now a release verified only its process -- CI green, tag pushed, publish workflow dispatched -- and then announced success. A publish job that concluded without producing an artifact (a skipped matrix leg, a gate that refused, an upload that 4xx'd into a retry that never happened) ended as a green release with nothing published, and nothing said so. After the CI wait, every publishable target's registry is now probed for the new version on a bounded retry budget, and a version still not being served is a hard error naming the registry and the remedy. In a batch, every member is probed for its own version and all failures are reported together. This runs on the `--watch` path only: under `--no-watch` the publish workflow is still in flight, so nothing is probed and the run says out loud that the outcome is unverified.
+- **`rlsbl release run --dry-run` now previews the release by running its first half with every mutation recorded.** It used to print a summary and an empty would-do body -- the deepest and most consequential command in rlsbl shipping its weakest preview. The mutating phase interleaved reads and writes, and under the effects regime a read issued after a recorded write cannot be answered, so no arrangement of those calls could survive its own preview. The version bump, keyword tagging, lockfile syncs, build, release commit and candidate push are now built as a plan and then issued: the preview records all of it, prints the real argv and byte counts, and reaches the candidate push -- which renders carrying `«step N output»`, the framework's name for the commit the recorded commit step would have created. Below that a boundary line reads `everything below depends on CI's verdict`, and Phase B (the CI gate, changelog finalization, the tag, the GitHub Release, publishing, deploys, post-release hooks) is declared as a table rather than guessed at. Exit 0, nothing written, nothing pushed -- and a preview cannot push by construction, not by a flag check. A batch preview is the members' plans in order.
 
 ### Fixes
 
@@ -24,6 +87,23 @@
 - **Releases of pgdesign-schema projects work again.** `rlsbl release run` invoked `pgdesign validate`, a command deleted in pgdesign 0.12.0, so the build step aborted with a misleading "pgdesign validate failed" message on every pgdesign-target release. It now runs `pgdesign check --tag validation` from the schema directory.
 - **`--dry-run` no longer crashes on the project lock.** Every preview that took rlsbl's advisory lock -- `monorepo release run --dry-run`, `scaffold --dry-run`, `release scrub --dry-run` -- died with `io.UnsupportedOperation: fileno` before it could preview anything, because the lock file was routed through the recording seam and `fcntl.flock` needs a real file descriptor. The lock is process infrastructure, not a previewable effect: it is now taken (and cleaned up) for real in both modes.
 - **A preview no longer creates real temporary files or directories.** `claim-name --dry-run` left a real staging directory behind on every run, and a previewed changelog append left a stray `.tmp` in `.rlsbl/changes/`: `tempfile` creates its entry in every mode while the matching cleanup was only recorded. Temp files and directories now go through the effect seam, so a preview records what it would create and creates nothing.
+- **`rlsbl monorepo status --help` no longer describes a column that does not exist.** The help text promised "the number of unreleased commits for every project" and "projects with zero unreleased commits are shown as up-to-date"; the column has been real JSONL changelog coverage for some time -- `covered/tracked` with an `(N exempted)` suffix, or `no changelog`. The help now says so.
+- **Monorepo CI router documentation corrected.** Both the release-workflow and monorepo pages still described the reusable-workflow era: that `monorepo sync` rewrites each CI workflow's trigger to `workflow_call:` and generates a router that dispatches to per-project workflows, and that the `<router job key> / <ci job name>` check-run naming follows from calling member CI as a reusable workflow. The router inlines every job instead (GitHub rejects a workflow referencing 20+ reusable workflows), writes no root copy, removes stale ones, and sets that check-run name explicitly so branch protection rules and the publish gate's regexes keep matching.
+- **A release candidate that cannot trigger its own CI is now refused in a second, not after a full CI wait.** The generated monorepo router gates each project's CI job on the paths a push touched, computed against that push's own before-SHA. When the window matched none of the releasing project's filters its job concluded `skipped`, the publish gate refused the skipped check, and the release deadlocked on a tag that could never publish -- discovered only after the whole CI cycle. The window is computable from the diff, so it is now checked before the push: an empty one is a hard error naming the project's filters, what the window actually changed, and how to widen it. Nothing is pushed, tagged or finalized, and the version number is not burnt.
+- **A batch release resumes its own stranded members instead of dying on them.** A batch that died between its pass-1 commits and its pass-2 completion left every member holding an `in-progress.json`. Re-running the batch handed each of those members back to `release run`, whose contract is that an in-progress release must be resumed rather than restarted -- so the batch refused on state it had created itself, with no way to finish the group as a group. Members left mid-flight are now seeded straight into pass 2 and covered by this run's single candidate push and CI gate.
+- **Every release entry point loads the shared env file, and a missing one is a hard error.** `release run`, `release resume`, `deploy` and `monorepo release run` did not all load it, so a deploy or post-release hook that needed a secret got a different environment depending on which command reached it. The load is now one shared helper on all four paths, and a configured env file that does not exist stops the release with the path instead of continuing into a hook that will fail obscurely.
+- **External checks are no longer told a shallow clone has never been released.** `RLSBL_LAST_TAG=""` is a signal meaning 'this project has no releases yet', and a check reading it takes its first-release branch. Any failure to resolve the last tag was flattened into that same empty string, so a clone with truncated history looked brand-new to every external check and silently widened each one's commit range. An unresolvable tag is now a hard error naming the remedy (`git fetch --unshallow`); only a genuinely untagged project produces the empty value.
+- **A CI-SHA marker that cannot be reconciled aborts the release instead of warning.** The marker is the publish gate's only precise statement of which commit CI proved green; without it the gate falls back to whatever commit the workflow happens to observe. A failure to read or write it onto an existing GitHub Release used to print a warning and continue, so the release proceeded to publish under a verdict nobody had established. It now aborts before tagging, preserving the state for `rlsbl release resume`.
+- **Release output redirected to a file or a CI log now appears in the right order and survives a killed run.** Python block-buffers stdout as soon as it is not a terminal, so a release emitted its progress in 8KB gulps that landed after the stderr warnings they belonged next to, and a run killed mid-block lost its final lines -- exactly the output an operator needs when a release dies. Both streams are now line-buffered for the whole CLI process.
+- **A release no longer aborts on its own `scrub-result.json`.** The unexpected-files guard exempted `in-progress.json` but not the scrub result written alongside it, so a release following a `release scrub` stopped on a file rlsbl had created itself.
+- **A batch release refuses a candidate push that cannot trigger every member's CI.** The per-member release path has checked its push window against the router's paths filter since the empty-window guard landed, but the batch orchestrator's own single candidate push went unguarded. The guard now runs once per member before that push -- per member, not against the union of the members' filters, because a union passes as soon as one member's paths are touched, which is precisely the half-skipped batch the two-pass design exists to prevent.
+- **`rlsbl deploy --dry-run` no longer previews a deploy the branch forbids.** The preview gate sat above the branch restriction, so running it on a branch outside the target's `only_on` list printed a full deploy plan and exited 0 -- a confident description of a deploy that could never run. The restriction is evaluated first now, so a preview refuses exactly where the live run refuses.
+- **`rlsbl release run --dry-run` no longer narrates work it only recorded.** The preview issues the first half of a real release with every mutation recorded rather than performed, but two steps spoke through channels the preview does not silence: the ecosystem-keyword tagger printed `Tagged package.json with "rlsbl" keyword` (it narrates through its own `quiet` flag, not the release log), and the stale-artifact cleaner reported the files it had cleared. Both claimed completed work in the past tense for writes that never happened. Both are silent under `--dry-run` now, and unchanged in a live run.
+- **`rlsbl release run --dry-run` no longer crashes when the candidate is already CI-verified.** Previewing a resume past the CI gate -- or a batch member the orchestrator had already gated -- skips Phase A entirely, then reached the Phase-A/Phase-B boundary with no plan to render and died with `UnboundLocalError`. The preview now states plainly that Phase A was already done, and renders the boundary and the declared Phase-B table as it does on every other path.
+- **A malformed `pipelines` value is a config error now, not a crash.** `pipelines` is a map of pipeline name to pipeline config; a scalar there -- `"pipelines": "none"` being the tempting one -- is truthy, so it slipped past every check on the release path and killed `rlsbl release run` mid-preflight with `AttributeError: 'str' object has no attribute 'items'`, naming no config key at all. Any non-map value is now refused with a `ConfigError` naming the two real shapes: `"pipelines": {}` to publish nowhere, `"publish_mode": "none"` to suppress publishing entirely. The identical crash reached through `go_introspect`'s pipeline scan is fixed with it.
+- **The five commands that refuse `--dry-run` now say so before they parse anything, and in `--help`.** `commit`, `release init`, `monorepo init`, `monorepo remove` and `monorepo release init` cannot honestly preview themselves, and used to refuse from inside the handler -- after argument validation, so `rlsbl monorepo remove --dry-run` answered with a missing-argument error instead of the refusal, and nothing in `--help` or the dumped schema said the command would refuse at all. The refusal is a framework declaration now: it fires at parse time, reads `--dry-run is not supported by command '<path>': <reason>`, and every one of the five renders a "Dry run:" section in its help. The reasons themselves are unchanged.
+- **A batch release no longer leaves its last commit unpushed.** `rlsbl monorepo release run` committed the archived batch release file after the final member's push and never published it, so every repository that completed a batch release stayed permanently one commit ahead of its remote and the next release's preflight met a diverged branch. The batch now pushes that commit as its own final step, refusing to carry any commit it did not create.
+- **A CI run killed by infrastructure no longer strands a release.** When a provider outage killed every job on runner acquisition or action download, rlsbl read the run as a deterministic code failure and refused to retry -- and a resumed release pushes nothing, so no fresh run could ever appear and the release became unrunnable. Such runs are now recognized as infrastructure failures ahead of the code-failure signatures they incidentally match, and rlsbl reruns their failed jobs once by itself. When it genuinely does not retry, the abort message now names the manual `gh run rerun <id> --failed` and `rlsbl release resume` remedy.
 
 ## 0.111.0
 
