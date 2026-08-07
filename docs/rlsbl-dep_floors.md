@@ -1,8 +1,7 @@
 ---
 title: rlsbl.dep_floors
-description: "Dependency floor enforcement for ecosystem-internal dependencies."
+description: "Compares the `>=` floor each ecosystem-internal dependency declares in the manifest against the major.minor the lockfile resolves, for pypi, npm and Go."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 73
 ---

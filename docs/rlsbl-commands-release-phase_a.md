@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.release.phase_a
-description: "Phase A of a release: a plan the builder derives, and an executor that issues it."
+description: "The Phase-A seam: a builder that hoists every read into one ordered, data-only plan, and an executor that issues each step's declared effect."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 54
 ---
