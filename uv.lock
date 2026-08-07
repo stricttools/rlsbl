@@ -240,8 +240,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ruamel-yaml" },
-    { name = "selfdoc-core", marker = "python_full_version >= '3.12' and extra == 'docs'" },
-    { name = "strictcli", specifier = ">=0.36.0" },
+    { name = "selfdoc-core", marker = "python_full_version >= '3.12' and extra == 'docs'", specifier = ">=0.1.1" },
+    { name = "strictcli", specifier = ">=0.37.0" },
     { name = "strictspec", specifier = ">=0.1.0" },
     { name = "tomlkit", specifier = ">=0.12" },
     { name = "tree-sitter", specifier = ">=0.24" },
@@ -306,14 +306,14 @@ wheels = [
 
 [[package]]
 name = "strictcli"
-version = "0.36.0"
+version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e3/b4/5ad0aa4f8912a87716e75614d85c8d8c27b6dcc6bdbf9b3de1303c22714a/strictcli-0.36.0.tar.gz", hash = "sha256:3ad801d2919ac1b0ecb68f04a1062e2cedd7d58d3ad6d4aa1ba0eca7e11d7d05", size = 260732, upload-time = "2026-08-04T20:49:45.559Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/8a/e0f5686eb0aebeff1e59236b7c58c307504202e3df5b05479550c1952c45/strictcli-0.37.0.tar.gz", hash = "sha256:82060ff8e74e58505396644233af0f2e36daa526dc6c8f5e5b4a3fb8d8f7ea98", size = 266525, upload-time = "2026-08-07T11:51:54.67Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/be/a924f2e95af0642a0c6358ec6b5b998b5adef5625814cb5024d1a564b677/strictcli-0.36.0-py3-none-any.whl", hash = "sha256:1aa2fa464fb7b1505485c79e3436942ca5c2dfe39958f8de7f2e3e7271baa98f", size = 101923, upload-time = "2026-08-04T20:49:43.962Z" },
+    { url = "https://files.pythonhosted.org/packages/61/b8/878fd7d5be276068365f89eaf5ca42d582db5a6fc93979beab5055768908/strictcli-0.37.0-py3-none-any.whl", hash = "sha256:5f73f6926c827e576e53fdc24f300509da7a634193694cc7f4a47f3ecfb348b1", size = 105406, upload-time = "2026-08-07T11:51:53.124Z" },
 ]
 
 [[package]]
