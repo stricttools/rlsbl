@@ -15,6 +15,7 @@ in topological order (original behavior).
 
 import os
 import stat
+import subprocess
 import sys
 import time
 
@@ -940,7 +941,10 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
 
         # Archive is state-driven: only fires when every plan item is released.
         if not dry_run:
-            _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
+            _archive_batch_if_complete(
+                batch_path, plan, workspace_root, projects, log,
+                flags=flags,
+            )
 
     # Log completion BEFORE the watch tail: the tail exits the process on a
     # red CI or a missing artifact, and would skip the announcement.
@@ -1193,7 +1197,10 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
 
         # Archive is state-driven: only fires when every plan item is released.
         if not dry_run:
-            _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log)
+            _archive_batch_if_complete(
+                batch_path, plan, workspace_root, projects, log,
+                flags=flags,
+            )
 
     # Log completion BEFORE the watch tail: the tail exits the process on a
     # red CI or a missing artifact, and would skip the announcement.
@@ -1415,7 +1422,8 @@ def _seed_stranded_pending(plan, workspace_root, projects, dry_run, kind):
     return resumable
 
 
-def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
+def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log,
+                               *, flags=None):
     """State-driven archive gate: finalize iff every plan item is released.
 
     This is the idempotent guard around :func:`_finalize_batch_file`, and it
@@ -1428,6 +1436,12 @@ def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
     Beyond the released-per-plan check, it refuses to archive when ANY plan
     item still has an in-progress.json on disk -- an unfinished/resumable
     release must never be silently archived away.
+
+    The finalize commit is then PUBLISHED (:func:`_push_finalized_batch_file`).
+    Owning the push here rather than inside the file helper keeps the helper a
+    pure rename-and-commit, and makes the push a visible step of the flow that
+    owns batch completion -- so a failure is reported as an unresolved step
+    with a remedy instead of as a failure of a release that already shipped.
     """
     if plan is None:
         return False
@@ -1443,8 +1457,98 @@ def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log):
             f"{', '.join(stranded)}. Resume or roll back those releases first."
         )
         return False
+    pin_sha = head_sha(cwd=workspace_root)
     _finalize_batch_file(batch_path, log)
+    try:
+        _push_finalized_batch_file(
+            workspace_root, flags or {}, log, pin_sha=pin_sha,
+        )
+    except (ForeignCommitError, GitError, subprocess.CalledProcessError) as e:
+        _announce_unpushed_finalize(e, workspace_root)
     return True
+
+
+def _announce_unpushed_finalize(exc, workspace_root):
+    """Report the finalize push as an unresolved step, with its remedy.
+
+    Everything the batch releases is already tagged, published and on the
+    remote by the time the archive gate runs, so a failure here is not a
+    failed release and must not be reported as one -- re-running or resuming
+    would find nothing to do. What it IS is the branch left one commit ahead
+    of its remote, which the next release's preflight will meet. So it is
+    stated out loud, on stderr (``--quiet`` cannot swallow it), naming the one
+    command that resolves it.
+    """
+    from ...utils import get_current_branch
+
+    try:
+        branch = get_current_branch(cwd=workspace_root)
+    except Exception:
+        branch = "<branch>"
+    print(
+        f"\nUNRESOLVED: the batch finalize commit was not pushed.\n"
+        f"{exc}\n"
+        f"Every member of the batch is tagged, released and on the remote --\n"
+        f"this is not a failed release and there is nothing to resume. What\n"
+        f"remains is the archive commit for the batch release file, which is\n"
+        f"committed locally but not published, leaving the branch one commit\n"
+        f"ahead of its remote.\n"
+        f"  Resolve with: git push origin {branch}\n"
+        f"  (if the message above names commits this release did not create,\n"
+        f"  move them off the branch or record them first)",
+        file=sys.stderr,
+    )
+
+
+def _push_finalized_batch_file(workspace_root, flags, log, *, pin_sha):
+    """Publish the batch's own finalize commit -- the batch's last push.
+
+    Every other commit a batch creates reaches the remote: pass 1's members
+    ride the single candidate push, and pass 2's per-member finalization is
+    pushed by each member's own release. The archive commit is created after
+    all of it, so without this step every repository that completed a batch
+    stayed one commit ahead of its remote forever, and the remote's history
+    was missing the document describing the release that just shipped.
+
+    Range-pinned like every other release push: the window ``pin_sha..HEAD``
+    must contain exactly the commit the finalize step created. A commit that
+    is not the batch's own (a concurrent session sharing the worktree) is
+    named and refused -- a release push never carries unreviewed work -- and
+    an empty window (the batch file was already archived, or the commit
+    failed) means there is nothing to publish.
+
+    ``push_if_needed`` is late-bound through the release package namespace,
+    exactly like the candidate push, so one mock covers every push in a batch.
+    """
+    from ...utils import get_current_branch
+    from ..release import push_if_needed
+    from ..release.execute import guard_foreign_commits
+
+    created = _commits_between(pin_sha, head_sha(cwd=workspace_root),
+                               workspace_root)
+    if not created:
+        return
+    # rev-list is newest-first, so the window's OLDEST commit is the one the
+    # finalize step created; anything above it rode in.
+    guard_foreign_commits(
+        pin_sha, [created[-1]], cwd=workspace_root,
+        phase="batch finalize push",
+    )
+    finalize_sha = created[0]
+    branch = get_current_branch(cwd=workspace_root)
+    # No single project's config owns a workspace-level push, so only the CLI
+    # override applies (the same stance the candidate push takes).
+    push_config = (
+        {"push_timeout": flags["push-timeout"]}
+        if flags.get("push-timeout") else None
+    )
+    push_if_needed(
+        branch, config=push_config, cwd=workspace_root, sha=finalize_sha,
+    )
+    log(
+        f"Pushed the batch finalize commit {finalize_sha[:12]} to "
+        f"origin/{branch}"
+    )
 
 
 def _finalize_batch_file(batch_path, log):
