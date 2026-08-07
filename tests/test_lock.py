@@ -2,8 +2,8 @@
 
 import fcntl
 import os
-import multiprocessing
-import time
+import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -103,24 +103,33 @@ def test_atexit_registered_on_acquire(tmp_path, monkeypatch):
             release_lock()
 
 
-def _child_acquire(lock_dir, result_queue):
-    """Helper for multiprocessing test: try non-blocking acquire in a child process."""
-    lock_path = os.path.join(lock_dir, ".rlsbl", "lock")
-    # Wait for lock file to exist
-    for _ in range(50):
-        if os.path.exists(lock_path):
-            break
-        time.sleep(0.01)
+# The child runs as a plain subprocess, not a ``multiprocessing.Process``.
+# ``fcntl.flock`` is per-open-file-description, so any separate process proves
+# the point -- but multiprocessing's default start method on Linux became
+# ``forkserver`` in Python 3.14, and a forkserver child is spawned over a unix
+# socket in a randomly named temp directory. The stricttest socket guard
+# refuses it, and the path is randomized, so it cannot be named in an exact
+# unix allowlist either. A subprocess needs no channel at all: the verdict
+# comes back on stdout.
+_CHILD_ACQUIRE = """
+import fcntl, os, sys, time
 
-    fd = open(lock_path, "w")
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        result_queue.put("acquired")
-        fcntl.flock(fd, fcntl.LOCK_UN)
-    except (OSError, BlockingIOError):
-        result_queue.put("blocked")
-    finally:
-        fd.close()
+lock_path = os.path.join(sys.argv[1], ".rlsbl", "lock")
+for _ in range(50):
+    if os.path.exists(lock_path):
+        break
+    time.sleep(0.01)
+
+fd = open(lock_path, "w")
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    print("acquired")
+    fcntl.flock(fd, fcntl.LOCK_UN)
+except (OSError, BlockingIOError):
+    print("blocked")
+finally:
+    fd.close()
+"""
 
 
 def test_cross_process_lock(tmp_path, monkeypatch):
@@ -129,16 +138,15 @@ def test_cross_process_lock(tmp_path, monkeypatch):
 
     acquire_lock(project_root=tmp_path)
     try:
-        result_queue = multiprocessing.Queue()
-        child = multiprocessing.Process(
-            target=_child_acquire,
-            args=(str(tmp_path), result_queue),
+        child = subprocess.run(
+            [sys.executable, "-c", _CHILD_ACQUIRE, str(tmp_path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
-        child.start()
-        child.join(timeout=5)
 
-        assert not result_queue.empty()
-        result = result_queue.get()
+        assert child.returncode == 0, f"Child failed: {child.stderr}"
+        result = child.stdout.strip()
         assert result == "blocked", f"Child should be blocked but got: {result}"
     finally:
         release_lock()

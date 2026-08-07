@@ -191,10 +191,19 @@ class TestSelfdocCheck:
         so preview mode records it and the framework's would-do log reports the
         argv. The branch that used to short-circuit meant the preview said
         nothing at all about a step the release really takes.
+
+        ``require_tool`` is patched for the same reason its live-run sibling
+        patches it: without selfdoc on PATH the runner short-circuits with a
+        "not installed" note and never reaches the call under test, so the
+        assertion would pass or fail on whether the machine running the suite
+        happens to have selfdoc installed. CI does not.
         """
         (tmp_project / "selfdoc.json").write_text("{}")
 
-        with patch("rlsbl.effects.run") as mock_run:
+        with (
+            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
             result = _run_selfdoc_check({"dry-run": True})
 
             assert result is True
@@ -290,10 +299,18 @@ class TestSelfdocGen:
         The hand-rolled ``Would run: selfdoc gen --no-auto-commit`` line that
         used to stand in here restated the argv in a second place, where it
         could drift from the one actually assembled below it.
+
+        ``require_tool`` is patched so the test does not depend on selfdoc
+        being installed on the machine running the suite: without it the runner
+        short-circuits with a "not installed" note and never reaches the call
+        under test.
         """
         (tmp_project / "selfdoc.json").write_text("{}")
 
-        with patch("rlsbl.effects.run") as mock_run:
+        with (
+            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
             result = _run_selfdoc_gen({"dry-run": True})
 
             assert result is True

@@ -281,13 +281,20 @@ class TestDryRun:
         used to stand in here named only the version; the recorded call
         carries the whole argv (bump type, description, body file, release
         URL) and no subprocess is ever forked.
+
+        ``require_tool`` is patched so the test does not depend on selfblog
+        being installed on the machine running the suite: without it the runner
+        prints a "not installed" note and returns before recording anything.
         """
         selfdoc_json = tmp_path / "selfdoc.json"
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
         fake_effects = MagicMock()
         fake_effects.temp_file.return_value = str(tmp_path / "cl.md")
-        with patch("rlsbl.commands.release.publish.effects", fake_effects):
+        with (
+            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfblog"),
+            patch("rlsbl.commands.release.publish.effects", fake_effects),
+        ):
             result = _run_selfblog_post_generate(
                 {"dry-run": True},
                 project_dir=str(tmp_path),
