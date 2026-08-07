@@ -1,5 +1,5 @@
 ---
-description: "Reference for the rlsbl release flow: the untagged candidate and its CI gate, bump types, the pre-release channel, pipeline order, hooks, and recovery."
+description: "Reference for the rlsbl release flow: the untagged candidate and its CI gate, bump types, the pre-release channel, publish gating, and the dry-run preview."
 ---
 
 # Release workflow
