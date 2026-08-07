@@ -544,7 +544,7 @@ class TestAutoRetry:
         # run_gh calls: original watch, log fetch, rerun, retry watch
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
+            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             "",  # retry watch (same id) succeeds
         ]
@@ -555,7 +555,7 @@ class TestAutoRetry:
         assert result["name"] == "CI"
         assert result["run_id"] == "100"  # in-place rerun keeps the run id
         err = capsys.readouterr().err
-        assert "CI failed, retrying once..." in err
+        assert "CI failed, retrying once" in err
         assert "retry passed" in err
 
     @patch("rlsbl.commands.watch.time")
@@ -566,7 +566,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
+            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             "",  # retry watch succeeds
         ]
@@ -583,7 +583,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
+            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             subprocess.CalledProcessError(1, "gh"),  # retry watch also fails
             "some retry failure output",  # gh run view --log-failed (retry tail)
@@ -605,7 +605,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
+            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             "",  # retry watch succeeds
         ]
@@ -614,7 +614,7 @@ class TestAutoRetry:
         assert result["passed"] is True
         assert result["run_id"] == "100"
         err = capsys.readouterr().err
-        assert "CI failed, retrying once..." in err
+        assert "CI failed, retrying once" in err
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
@@ -624,7 +624,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> unknown -> retry)
+            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             subprocess.CalledProcessError(1, "gh"),  # gh run rerun trigger fails
         ]
 
@@ -1142,9 +1142,17 @@ class TestClassifyFailure:
     def test_unknown_when_no_signature_matches(self):
         assert _classify_failure("some unremarkable log line") == "unknown"
 
-    def test_empty_log_is_unknown(self):
-        assert _classify_failure("") == "unknown"
-        assert _classify_failure(None) == "unknown"
+    def test_empty_log_is_infra(self):
+        """A failed run that produced no failing-step output never executed.
+
+        ``--log-failed`` returning nothing means no step got far enough to
+        write a line: the runner was never acquired, the actions never
+        resolved, or the run was cancelled while queued. Nothing about the
+        code was established, so the run is void rather than a verdict --
+        see tests/test_ci_infra_failure_rerun.py.
+        """
+        assert _classify_failure("") == "infra"
+        assert _classify_failure(None) == "infra"
 
     def test_deterministic_wins_over_transient(self):
         """A log with both a hard error and network chatter is deterministic."""
@@ -1234,7 +1242,7 @@ class TestRetryClassification:
         err = capsys.readouterr().err
         assert "failure log tail:" in err
         assert "i/o timeout" in err
-        assert "CI failed, retrying once..." in err
+        assert "CI failed, retrying once" in err
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
@@ -1254,7 +1262,7 @@ class TestRetryClassification:
         assert result["passed"] is True
         assert result["run_id"] == "100"
         err = capsys.readouterr().err
-        assert "CI failed, retrying once..." in err
+        assert "CI failed, retrying once" in err
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
@@ -1277,7 +1285,7 @@ class TestRetryClassification:
         err = capsys.readouterr().err
         assert "could not fetch failure logs" in err
         assert "retrying without classification" in err
-        assert "CI failed, retrying once..." in err
+        assert "CI failed, retrying once" in err
 
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")

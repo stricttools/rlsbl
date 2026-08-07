@@ -79,6 +79,28 @@ _LOG_TAIL_LINES = 100
 # 30s budget used for the retry dispatch below (external calls must be bounded).
 _LOG_FETCH_TIMEOUT = 30
 
+# Infrastructure: the run died BELOW the code under test -> rerun the failed
+# jobs once. A job that never acquired a runner, an action download that 5xx'd
+# in GitHub's own service layer, or a run cancelled before anything executed
+# establishes nothing about the commit, so treating it as a verdict strands the
+# release: a resumed release pushes nothing, so no fresh run can ever appear
+# and the stale one is the only verdict there will ever be.
+#
+# Checked BEFORE the deterministic set, and that order is the whole fix: the
+# log tail of a run that never executed still carries job names, echoed
+# commands and workflow text, which match deterministic signatures by accident.
+# A provider outage was read as a code failure exactly that way.
+_INFRA_SIGNATURES = tuple(
+    re.compile(p, re.IGNORECASE | re.MULTILINE) for p in (
+        # --- Runner never acquired: the job never started ---
+        r"was not acquired by\s+(a\s+|the\s+)?runner",
+        r"waiting for a runner to pick up this job.*(expired|timed out)",
+        # --- GitHub's own action-download service failed ---
+        r"failed to resolve action download info",
+        r"unable to (resolve|download) action",
+    )
+)
+
 # Deterministic: the failure will recur identically on retry -> never retry.
 # MULTILINE so ^-anchored patterns match at the start of any log line, not
 # just the start of the whole tail.
@@ -154,6 +176,11 @@ def _classify_failure(log_text):
     """Classify a CI failure log tail to decide whether a retry is worthwhile.
 
     Returns one of:
+      - "infra": the run died at the infrastructure layer, below the code
+        under test (no runner acquired, GitHub's action download service
+        failed, or nothing executed at all). Rerun its FAILED jobs once: the
+        run established nothing, and on a resumed release it is the only run
+        the candidate will ever have.
       - "deterministic": a signature indicating the failure recurs identically
         on retry (test failures, compile/build errors, config/validation errors,
         workflow syntax errors, missing-secret/auth denials). Never retry.
@@ -164,12 +191,24 @@ def _classify_failure(log_text):
         behavior for failures we don't yet recognize, rather than suppressing a
         retry that might have succeeded.
 
-    Deterministic signatures are checked before transient ones so a log that
-    contains both a hard error and incidental network chatter is treated as
-    deterministic (the hard error is the real cause).
+    Precedence is infra, then deterministic, then transient. Infra comes first
+    because a run that never executed still emits a log tail full of job names,
+    echoed commands and workflow text, which the deterministic signatures match
+    by accident -- that is precisely how a provider-wide outage was read as a
+    code failure and left a resumed release permanently unrunnable. Determin-
+    istic then outranks transient so a log holding both a hard error and
+    incidental network chatter follows the hard error, which is the real cause.
+
+    An EMPTY tail is infra, not unknown: ``--log-failed`` returning nothing for
+    a failed run means no step ever produced output, so the job died before
+    execution -- runner never acquired, actions never resolved, or the run was
+    cancelled while still queued.
     """
-    if not log_text:
-        return "unknown"
+    if not log_text or not log_text.strip():
+        return "infra"
+    for pat in _INFRA_SIGNATURES:
+        if pat.search(log_text):
+            return "infra"
     for pat in _DETERMINISTIC_SIGNATURES:
         if pat.search(log_text):
             return "deterministic"
@@ -193,14 +232,21 @@ def _fetch_failure_log(run_id, config=None):
     return "\n".join(lines[-_LOG_TAIL_LINES:])
 
 
-def _retry_workflow(workflow_name, repo_slug, label, failed_run_id):
+def _retry_workflow(workflow_name, repo_slug, label, failed_run_id,
+                    failed_only=False):
     """Re-run a failed workflow run in place once and watch the new attempt.
 
-    Uses `gh run rerun <failed_run_id>` -- a FULL rerun (not --failed) of the
-    SAME run id. GitHub re-executes the run as a new attempt on the failed
-    run's original commit, so (a) no duplicate check-run is created (a fresh
-    `gh workflow run` dispatch would poison the publish gate) and (b) the retry
-    runs on the failed commit rather than branch HEAD.
+    Uses `gh run rerun <failed_run_id>` on the SAME run id. GitHub re-executes
+    the run as a new attempt on the failed run's original commit, so (a) no
+    duplicate check-run is created (a fresh `gh workflow run` dispatch would
+    poison the publish gate) and (b) the retry runs on the failed commit rather
+    than branch HEAD.
+
+    ``failed_only`` adds ``--failed``, restarting only the jobs that failed.
+    That is the right shape for an infrastructure-killed run: the jobs that DID
+    acquire a runner and pass keep their result instead of being thrown back
+    into a queue that just proved unreliable. A transient flake keeps the full
+    rerun -- nothing there says which jobs the flake really touched.
 
     Because the run id is unchanged, there is no dispatched-run-identification
     dance: we simply watch failed_run_id for its new attempt's conclusion.
@@ -208,9 +254,14 @@ def _retry_workflow(workflow_name, repo_slug, label, failed_run_id):
     Returns a result dict with name, passed, and run_id.
     Returns None if the rerun could not be triggered.
     """
-    print(f"rlsbl: {label}: [{workflow_name}] CI failed, retrying once...", file=sys.stderr)
+    scope = " (failed jobs only)" if failed_only else ""
+    print(f"rlsbl: {label}: [{workflow_name}] CI failed, retrying once{scope}...",
+          file=sys.stderr)
+    argv = ["run", "rerun", str(failed_run_id)]
+    if failed_only:
+        argv.append("--failed")
     try:
-        run_gh(["run", "rerun", str(failed_run_id)], timeout=30)
+        run_gh(argv, timeout=30)
     except Exception as exc:
         print(f"rlsbl: {label}: [{workflow_name}] retry trigger failed: {exc}", file=sys.stderr)
         return None
@@ -304,12 +355,32 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None,
             print(f"rlsbl: {label}: [{workflow_name}] deterministic failure "
                   f"detected; not retrying (it would fail identically)",
                   file=sys.stderr)
+            # Name the manual remedy: this classification reads a log tail, and
+            # a run killed below the code under test can still look like a code
+            # failure. A resumed release re-uses whatever run already exists for
+            # its candidate -- it pushes nothing, so no fresh run can appear --
+            # and without this line the operator has no way to tell the tool
+            # that the verdict was void.
+            print(f"rlsbl: {label}: [{workflow_name}] if this run died at the "
+                  f"infrastructure layer rather than in the code (jobs never "
+                  f"acquired a runner, actions failed to resolve, the run was "
+                  f"cancelled while queued), rerun it by hand and pick the "
+                  f"release back up:\n"
+                  f"  gh run rerun {run_id} --failed\n"
+                  f"  rlsbl release resume",
+                  file=sys.stderr)
             return {"name": workflow_name, "passed": False, "run_id": run_id}
 
+        if classification == "infra":
+            print(f"rlsbl: {label}: [{workflow_name}] infrastructure failure "
+                  f"detected (the run died below the code under test and "
+                  f"established nothing); rerunning its failed jobs once",
+                  file=sys.stderr)
+
         # Auto-retry once before reporting failure (deduplicated by workflow name).
-        # Reached for transient and unknown classifications (unknown -> retry
-        # preserves the historical behavior for unrecognized failures). The
-        # retry is an in-place rerun of this run id, so it needs no branch.
+        # Reached for infra, transient and unknown classifications (unknown ->
+        # retry preserves the historical behavior for unrecognized failures).
+        # The retry is an in-place rerun of this run id, so it needs no branch.
         should_retry = True
         if retried_lock is not None and retried_workflows is not None:
             with retried_lock:
@@ -318,7 +389,10 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None,
                 else:
                     retried_workflows.add(workflow_name)
         if should_retry:
-            retry_result = _retry_workflow(workflow_name, repo_slug, label, run_id)
+            retry_result = _retry_workflow(
+                workflow_name, repo_slug, label, run_id,
+                failed_only=classification == "infra",
+            )
             if retry_result is not None:
                 return retry_result
         return {"name": workflow_name, "passed": False, "run_id": run_id}
