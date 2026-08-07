@@ -15,6 +15,8 @@ Developer utilities for locally working with rlsbl projects, including editable 
 
 Install the project locally for development by running each detected target's own install command. --global (default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go (go install), deno (deno install), and -- since they have no system-wide install concept -- zig (zig build install), swift (swift build), and hex (mix deps.get). --venv installs into the project's local environment instead and is supported by pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install where the target supports it (pypi, npm, deno). In monorepo mode, pair with --all, --include, or --exclude.
 
+**Effect:** mutating
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -30,6 +32,10 @@ Install the project locally for development by running each detected target's ow
 
 Overlay local editable checkouts of sibling projects onto this project's locked environment. Reads dev-sources.toml.local-only for overlay entries, runs uv sync --inexact excluding overlaid packages, then uv pip install -e per entry. Requires UV_NO_SYNC=1 in the environment to prevent bare uv run from reverting overlays.
 
+**Effect:** mutating
+
 ## dev status
 
 Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared.
+
+**Effect:** read_only

@@ -11,6 +11,8 @@ nav_order: 8
 
 Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

@@ -15,6 +15,10 @@ Manage monorepo workspaces with multiple independently-versioned projects. Initi
 
 Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.
 
+**Effect:** mutating
+
+**Dry run:** not supported — it bootstraps the workspace every other command reads, and there is no workspace to preview against until it exists
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -24,6 +28,8 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 ## monorepo add
 
 Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.
+
+**Effect:** mutating
 
 ### Flags
 
@@ -50,6 +56,10 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 
 Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.
 
+**Effect:** mutating
+
+**Dry run:** not supported — the whole edit is deleting the one workspace.toml entry you just named, and a preview of it would restate the path back to you
+
 ### Arguments
 
 | Name | Required | Description |
@@ -60,9 +70,13 @@ Unregister a project from the monorepo workspace.toml by its path. This removes 
 
 Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.
 
+**Effect:** read_only
+
 ## monorepo sync
 
 Inline every project's CI jobs into a single generated ci-router.yml (and publish jobs into publish.yml) in the shared .github/workflows directory at the repository root. Jobs are inlined rather than routed via reusable-workflow calls because GitHub rejects workflows that reference 20 or more reusable workflows. Stale per-project workflow copies at the root are removed via saferm.
+
+**Effect:** mutating
 
 ### Flags
 
@@ -72,11 +86,15 @@ Inline every project's CI jobs into a single generated ci-router.yml (and publis
 
 ## monorepo status
 
-Show the current version, last release tag, and number of unreleased commits for every project in the monorepo workspace. Provides a quick overview of which projects have pending changes and are ready for their next release. Projects with zero unreleased commits are shown as up-to-date.
+Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. Provides a quick overview of which projects have pending changes and are ready for their next release.
+
+**Effect:** read_only
 
 ## monorepo check-names
 
 Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.
+
+**Effect:** read_only
 
 ### Flags
 
@@ -91,17 +109,25 @@ Check package name availability on a target registry for all projects in the mon
 
 Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.
 
+**Effect:** read_only
+
 ## monorepo snapshot
 
 Regenerate the committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure, and commit it. Verifying without regenerating is a separate command, `rlsbl monorepo snapshot-check`. Under --dry-run the artifact is computed but neither written nor committed, and the preview names both steps.
+
+**Effect:** mutating
 
 ## monorepo snapshot-check
 
 Verify that .rlsbl-monorepo/snapshot.json matches the workspace it describes, without regenerating it. Exits 1 when the artifact is stale or missing. This is the read-only half of the former `monorepo snapshot --check` flag; `rlsbl monorepo snapshot` is the half that writes.
 
+**Effect:** read_only
+
 ## monorepo mirror
 
 Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Arguments
 
@@ -112,6 +138,8 @@ Reconcile a monorepo project's subtree mirror toward its desired state. The mirr
 ## monorepo graph
 
 Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.
+
+**Effect:** mutating
 
 ### Flags
 
@@ -127,6 +155,8 @@ Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text t
 
 Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.
 
+**Effect:** read_only
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -139,6 +169,8 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Arguments
 
 | Name | Required | Description |
@@ -149,6 +181,8 @@ Extract a package from the monorepo into a new standalone repository. Clones the
 ## monorepo absorb
 
 Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
@@ -169,6 +203,8 @@ Absorb an external repository as a package in the monorepo. Rewrites the source'
 
 Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Arguments
 
 | Name | Required | Description |
@@ -180,9 +216,13 @@ Extract all member packages of a releasable into a new repository. If the releas
 
 Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.
 
+**Effect:** mutating
+
 ## monorepo migrate-releasable
 
 Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).
+
+**Effect:** mutating
 
 ### Arguments
 
@@ -193,6 +233,8 @@ Migrate a releasable from per-package release state to the releasable model. Det
 ## monorepo rename-releasable
 
 Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.
+
+**Effect:** mutating
 
 ### Arguments
 

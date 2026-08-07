@@ -11,6 +11,8 @@ nav_order: 16
 
 List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

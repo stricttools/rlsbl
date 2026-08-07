@@ -11,6 +11,8 @@ nav_order: 3
 
 Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

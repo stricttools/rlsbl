@@ -11,9 +11,17 @@ nav_order: 4
 
 Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target package registry to publish the placeholder to (npm or pypi) |
 | `--force-publish` |  | bool |  |  | Publish even when the availability check reports the name as taken or returns an ambiguous status. Distinct from the framework's --approve-consequential, which only skips the confirmation prompt. |
+
+## Grants
+
+| Kind | Name | Reason |
+| --- | --- | --- |
+| proc_mutate | `publish` | claiming a name publishes a real package to a public registry, and neither npm nor PyPI lets you take it back |

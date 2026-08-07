@@ -11,6 +11,8 @@ nav_order: 2
 
 Run project checks registered via the check framework and report results
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

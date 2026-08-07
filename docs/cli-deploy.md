@@ -11,6 +11,8 @@ nav_order: 6
 
 Run the configured deployment pipeline for the project. Supports named deploy targets and dry-run preview of what would be deployed. Branch restrictions are always enforced.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

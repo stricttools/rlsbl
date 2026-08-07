@@ -10,3 +10,5 @@ nav_order: 11
 # rlsbl prs
 
 List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work.
+
+**Effect:** read_only

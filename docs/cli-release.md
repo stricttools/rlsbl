@@ -15,6 +15,8 @@ Release orchestration commands covering the full release lifecycle. Provides 10 
 
 Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, --approve-consequential to skip the confirmation prompt in non-interactive contexts, and --allow-dirty to skip the clean working tree check.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -33,6 +35,8 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 
 Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -47,9 +51,15 @@ Resume a previously failed release from where it left off. Reads the in-progress
 
 Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.
 
+**Effect:** mutating
+
+**Dry run:** not supported — the command scaffolds a file whose point is that you edit it before releasing; printing that file instead of writing it leaves nothing to edit
+
 ## release retry
 
 Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is auto-scaffolded with sensible defaults if missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered against the configured ref (defaults to the release tag).
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
@@ -61,6 +71,8 @@ Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the 
 
 Sync the GitHub Release notes for a given version with the corresponding CHANGELOG.md entry. Defaults to the current version if none is specified. Use --dry-run to preview changes without updating GitHub.
 
+**Effect:** mutating
+
 ### Arguments
 
 | Name | Required | Description |
@@ -70,6 +82,8 @@ Sync the GitHub Release notes for a given version with the corresponding CHANGEL
 ## release undo
 
 Revert a release. Without --version, reverts the latest release (deletes GitHub Release, removes git tag, reverts version bump commit). With --version, reverts a non-latest release if it is provably unpublished (probes registries for evidence, deletes GitHub Release + tag only, un-finalizes changelog).
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
@@ -81,6 +95,8 @@ Revert a release. Without --version, reverts the latest release (deletes GitHub 
 ## release deprecate
 
 Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
@@ -99,6 +115,8 @@ Mark a past release as deprecated. Sets the GitHub Release pre-release flag and 
 
 Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -116,6 +134,8 @@ Remove a published version from package registries. Probes each configured targe
 
 Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -132,6 +152,8 @@ Scrub sensitive content from git history and update release metadata to match th
 ## release reconcile
 
 Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 

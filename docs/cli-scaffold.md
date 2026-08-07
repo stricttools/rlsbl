@@ -11,6 +11,8 @@ nav_order: 13
 
 Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.
 
+**Effect:** mutating
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

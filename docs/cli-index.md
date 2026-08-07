@@ -37,3 +37,22 @@ Version: :-: var key="project.version"
 - [changelog](cli-changelog.html) -- Structured changelog management using JSONL entries with 3 entry types (feature, fix, breaking). Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
 - [monorepo](cli-monorepo.html) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 19 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, extract-releasable, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.
 - [dev](cli-dev.html) -- Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).
+
+## Framework flags
+
+These flags are owned by the strictcli framework, not by the app. No command may declare a flag with one of these names, and each is recognized anywhere on the command line.
+
+| Flag | Effect |
+| --- | --- |
+| `--dry-run` | Preview mode: no mutation runs. The framework prints a log of every effect the command would have performed. |
+| `--approve-consequential` | Skips the confirmation prompt a consequential command shows before it runs. |
+| `--quiet` | Hides informational output. Warnings, errors, structured data and the dry-run log are never suppressed. |
+| `--verbose` | Shows debug output. `--quiet` wins when both are passed. |
+
+## Infrastructure
+
+### Handshake variables
+
+| Env var | Description |
+| --- | --- |
+| `RLSBL_PUSH_STDIN` | Pre-push ref lines (`<local ref> <local sha> <remote ref> <remote sha>`) for `rlsbl check --tag prepush`, when the caller has already consumed git's hook stdin. |
