@@ -86,11 +86,19 @@ def test_no_handler_takes_a_reserved_parameter():
     assert not offenders, f"handlers taking reserved params: {offenders}"
 
 
-def test_reserved_flags_reach_the_context():
-    """The framework really delivers them, and rlsbl handlers really read them."""
+def test_reserved_flags_reach_the_framework():
+    """The framework really delivers them, and really acts on the declaration.
+
+    ``monorepo remove`` declares ``dry_run_supported=False``, so the refusal
+    comes from strictcli's parse-time check -- rlsbl no longer inspects
+    ``ctx.dry_run`` by hand anywhere.
+    """
     result = app.test(["--dry-run", "monorepo", "remove", "some/path"])
-    assert result.exit_code == 1
-    assert "does not support --dry-run" in result.stderr
+    assert result.exit_code != 0
+    assert (
+        "--dry-run is not supported by command 'monorepo.remove'"
+        in result.stderr
+    )
 
 
 def test_no_handler_swallows_kwargs():
@@ -125,13 +133,19 @@ class TestReservedFlagsAfterTheCommand:
 
     def test_flag_after_the_command_reaches_the_framework(self):
         result = app.test(["monorepo", "remove", "some/path", "--dry-run"])
-        assert result.exit_code == 1
-        assert "does not support --dry-run" in result.stderr
+        assert result.exit_code != 0
+        assert (
+            "--dry-run is not supported by command 'monorepo.remove'"
+            in result.stderr
+        )
 
     def test_flag_after_a_nested_subcommand_reaches_the_framework(self):
         result = app.test(["release", "init", "--dry-run"])
-        assert result.exit_code == 1
-        assert "does not support --dry-run" in result.stderr
+        assert result.exit_code != 0
+        assert (
+            "--dry-run is not supported by command 'release.init'"
+            in result.stderr
+        )
 
     def test_approve_consequential_after_the_command_is_not_unknown(self):
         """The exact shape the RLSBL protocol prescribes."""
@@ -173,3 +187,74 @@ class TestReservedFlagsAfterTheCommand:
         variadic = rlsbl._extract_variadic_args()
         assert variadic == ["--approve-consequential", "a.txt"]
         assert __import__("sys").argv == ["rlsbl", "commit", "-m", "x"]
+
+
+class TestDryRunUnsupportedIsDeclared:
+    """The five commands that cannot honestly preview say so at registration.
+
+    rlsbl used to inspect ``ctx.dry_run`` inside each handler and exit 1 with a
+    hand-rolled message. strictcli 0.37.0 accepts the same statement as a
+    command declaration (``dry_run_supported=False`` plus a mandatory reason),
+    and refuses at parse time -- before the handler runs, on every argv path,
+    and visibly in ``--help`` and the dumped schema. The declaration is the one
+    source of truth; the helper is gone.
+    """
+
+    # command path -> the dotted path strictcli names in its refusal.
+    DECLARED = {
+        ("commit",): "commit",
+        ("release", "init"): "release.init",
+        ("monorepo", "init"): "monorepo.init",
+        ("monorepo", "remove"): "monorepo.remove",
+        ("monorepo", "release", "init"): "monorepo.release.init",
+    }
+
+    def _command_for(self, path):
+        """Resolve a command path against the live registry."""
+        commands, groups = app._commands, app._groups
+        for part in path[:-1]:
+            group = groups[part]
+            commands, groups = group.commands, group._groups
+        return commands[path[-1]]
+
+    def test_every_site_carries_the_declaration_and_a_reason(self):
+        for path in self.DECLARED:
+            cmd = self._command_for(path)
+            assert cmd.dry_run_supported is False, f"{path} lost the declaration"
+            assert (cmd.dry_run_unsupported_reason or "").strip(), (
+                f"{path} declares no reason"
+            )
+
+    def test_every_site_refuses_with_the_framework_message(self):
+        for path, dotted in self.DECLARED.items():
+            argv = list(path) + ["--dry-run"]
+            result = app.test(argv)
+            assert result.exit_code != 0, f"{path} did not refuse --dry-run"
+            assert (
+                f"--dry-run is not supported by command '{dotted}'"
+                in result.stderr
+            ), f"{path} refused with the wrong message: {result.stderr!r}"
+
+    def test_the_reason_is_in_the_refusal(self):
+        """The reason travels with the refusal, as the hand-rolled one did."""
+        cmd = self._command_for(("commit",))
+        result = app.test(["commit", "--dry-run"])
+        assert cmd.dry_run_unsupported_reason in result.stderr
+
+    def test_help_beats_the_refusal(self):
+        """Asking what a command does is never answered with a refusal."""
+        result = app.test(["release", "init", "--dry-run", "--help"])
+        assert "--dry-run is not supported" not in result.stderr
+
+    def test_no_command_hand_rolls_a_dry_run_refusal(self):
+        """The helper that predated the declaration must not come back.
+
+        A handler reading ``ctx.dry_run`` to exit 1 would refuse AFTER
+        argument parsing and would stay invisible to ``--help`` and the schema
+        -- exactly what the declaration exists to prevent.
+        """
+        import rlsbl
+
+        assert not hasattr(rlsbl, "_refuse_dry_run")
+        source = inspect.getsource(rlsbl)
+        assert "_refuse_dry_run" not in source
