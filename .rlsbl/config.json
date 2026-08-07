@@ -28,6 +28,11 @@
     }
   },
   "changelog_format_version_enforced": true,
+  "internal_dep_floors": [
+    "strictcli",
+    "strictspec",
+    "selfdoc-core"
+  ],
   "test_sandbox": {
     "runner_path": "scripts/test.sh",
     "command": "uv sync --offline && uv run --offline pytest",
