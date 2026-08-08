@@ -106,11 +106,16 @@ class PgdesignTarget(BaseTarget):
         there). The schema directory the old positional argument carried is
         therefore expressed as cwd -- which matters when pgdesign.toml lives in
         a schema/ subdir, since discovery would never find it from dir_path.
+
+        `--ignore-warnings` is always passed: pgdesign's check framework exits
+        nonzero on warn-severity results, and warnings are advisory under its
+        own severity model. Only errors are release-blocking, so warnings must
+        never abort a release.
         """
         timeout = self._resolve_build_timeout(config)
         schema_dir = self._schema_dir(dir_path)
         result = effects.run(
-            ["pgdesign", "check", "--tag", "validation"],
+            ["pgdesign", "check", "--tag", "validation", "--ignore-warnings"],
             cwd=schema_dir,
             capture_output=True,
             text=True,

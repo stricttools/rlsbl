@@ -264,7 +264,27 @@ class TestPgdesignTargetBuild:
             target.build(d, "1.2.3")
         assert len(calls) == 1
         argv, _ = calls[0]
-        assert argv == ["pgdesign", "check", "--tag", "validation"]
+        assert argv == [
+            "pgdesign", "check", "--tag", "validation", "--ignore-warnings",
+        ]
+
+    def test_build_ignores_advisory_warnings(self, monkeypatch):
+        """Advisory warnings must never abort a release.
+
+        pgdesign's check framework exits nonzero on warn-severity results
+        unless `--ignore-warnings` is passed. Warnings are advisory by
+        pgdesign's own severity model; only errors are release-blocking, so
+        the release gate always passes the flag.
+        """
+        calls = self._capture(monkeypatch)
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            target.build(d, "1.2.3")
+        argv, _ = calls[0]
+        assert "--ignore-warnings" in argv
+        assert "--no-ignore-warnings" not in argv
 
     def test_build_passes_schema_dir_as_cwd_root(self, monkeypatch):
         """A root-level pgdesign.toml means cwd is the project directory."""
