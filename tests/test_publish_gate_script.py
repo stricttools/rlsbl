@@ -449,3 +449,84 @@ class TestMarkerShaResolution:
         assert sha == self.FALLBACK_SHA
         calls = (tmp_path / "bin" / "gh_calls.log").read_text()
         assert calls.count("release view") == 2
+
+
+@requires_jq
+class TestSkippedMatrixJobSupersededByItsLegs:
+    """The publish gate answers the skip-vs-legs question exactly as the
+    release gate does (:func:`rlsbl.ci_checks.latest_check_runs`).
+
+    GitHub does not expand a matrix for a job its ``if`` skipped: the job
+    collapses to one check run under the unsuffixed name, while the run that
+    executes it emits one per leg. The two never share a name, so a per-name
+    collapse alone leaves the skip standing on a commit whose jobs all ran --
+    the state a ``run_all`` router dispatch deliberately produces.
+    """
+
+    REGEX = "^(cli\\-ci) / "
+
+    def test_later_legs_drop_the_skipped_placeholder(self):
+        runs = _dedup_runs(
+            [
+                _cr("cli-ci / test", "completed", "skipped", 100,
+                    "2026-08-08T10:00:00Z", run_id="1"),
+                _cr("cli-ci / test (3.12)", "completed", "success", 200,
+                    "2026-08-08T10:05:00Z", run_id="2"),
+                _cr("cli-ci / test (3.13)", "completed", "success", 201,
+                    "2026-08-08T10:05:00Z", run_id="2"),
+            ],
+            regex=self.REGEX,
+        )
+        assert sorted(r["name"] for r in runs) == [
+            "cli-ci / test (3.12)", "cli-ci / test (3.13)",
+        ]
+        assert _not_success(runs) == []
+
+    def test_a_red_leg_still_fails_the_gate(self):
+        runs = _dedup_runs(
+            [
+                _cr("cli-ci / test", "completed", "skipped", 100,
+                    "2026-08-08T10:00:00Z", run_id="1"),
+                _cr("cli-ci / test (3.12)", "completed", "failure", 200,
+                    "2026-08-08T10:05:00Z", run_id="2"),
+            ],
+            regex=self.REGEX,
+        )
+        assert [r["conclusion"] for r in _not_success(runs)] == ["failure"]
+
+    def test_a_sibling_job_never_covers_a_skip(self):
+        runs = _dedup_runs(
+            [
+                _cr("cli-ci / test", "completed", "skipped", 100,
+                    "2026-08-08T10:00:00Z", run_id="1"),
+                _cr("cli-ci / lint", "completed", "success", 200,
+                    "2026-08-08T10:05:00Z", run_id="2"),
+            ],
+            regex=self.REGEX,
+        )
+        assert [r["conclusion"] for r in _not_success(runs)] == ["skipped"]
+
+    def test_an_earlier_leg_never_covers_a_later_skip(self):
+        runs = _dedup_runs(
+            [
+                _cr("cli-ci / test (3.12)", "completed", "success", 100,
+                    "2026-08-08T10:00:00Z", run_id="1"),
+                _cr("cli-ci / test", "completed", "skipped", 200,
+                    "2026-08-08T10:05:00Z", run_id="2"),
+            ],
+            regex=self.REGEX,
+        )
+        assert [r["conclusion"] for r in _not_success(runs)] == ["skipped"]
+
+    def test_a_prefix_sharing_job_never_covers_a_skip(self):
+        """``test-extra`` is a different job, not a leg of ``test``."""
+        runs = _dedup_runs(
+            [
+                _cr("cli-ci / test", "completed", "skipped", 100,
+                    "2026-08-08T10:00:00Z", run_id="1"),
+                _cr("cli-ci / test-extra", "completed", "success", 200,
+                    "2026-08-08T10:05:00Z", run_id="2"),
+            ],
+            regex=self.REGEX,
+        )
+        assert [r["conclusion"] for r in _not_success(runs)] == ["skipped"]

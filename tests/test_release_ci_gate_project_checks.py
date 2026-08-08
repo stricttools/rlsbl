@@ -459,7 +459,10 @@ class TestNotRunMessageIsItsOwnThing:
         # A red CI says "fix the failure". This is not that.
         assert "CI never ran for this project" in msg
         assert "NOT a CI failure" in msg
-        assert "paths filter that matched nothing matches nothing every time" in msg
+        assert "paths filter that matched nothing matches nothing every" in msg
+        # ... but re-running it with the filter SHORT-CIRCUITED is a different
+        # act, and the message must not read as a blanket ban on re-running.
+        assert "SHORT-CIRCUITED" in msg
         # The concrete remedy.
         assert "ci-router.yml" in msg
         assert "rlsbl release resume" in msg

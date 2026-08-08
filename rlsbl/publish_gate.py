@@ -208,13 +208,33 @@ while :; do
   # numeric id as tiebreak for retries within the same second) BEFORE the
   # pending / not-success logic runs. This way the newest run decides: still
   # running -> wait; genuinely red -> hard fail.
+  # Then one more collapse, for the one case a per-name grouping cannot see:
+  # GitHub does not expand a matrix for a job its `if` skipped, so the whole job
+  # becomes ONE check run under the unsuffixed name ("cli-ci / test"), while the
+  # run that actually executes it emits one per leg ("cli-ci / test (3.12)").
+  # They never share a name, so the skip would outlive the run that answered it
+  # -- exactly the state a `run_all` router dispatch leaves behind. A skipped
+  # check is dropped only when a STRICTLY LATER check for the SAME job (its
+  # matrix expansion, by name) exists; the legs are then judged on their own
+  # conclusions, so a red leg still fails. Nothing else covers a skip: not a
+  # sibling job, not a merely prefix-sharing name, and not an earlier run.
+  # Mirrors rlsbl.ci_checks.latest_check_runs -- the two gates answer the same
+  # question and must never diverge.
   runs="$(jq -s --arg re "$CI_CHECK_REGEX" --arg run_id "$GITHUB_RUN_ID" '
     [ .[].check_runs[]
       | select(.name | test($re))
       | select((.details_url // "") | contains("/actions/runs/" + $run_id + "/") | not)
       | {name, status, conclusion, id, started_at} ]
     | group_by(.name)
-    | map(sort_by(.started_at, .id) | last)' <<< "$resp")"
+    | map(sort_by(.started_at, .id) | last)
+    | . as $latest
+    | map(. as $c
+        | select(
+            $c.conclusion != "skipped"
+            or ([ $latest[]
+                  | select((.name | startswith($c.name + " ("))
+                           and ([.started_at, .id] > [$c.started_at, $c.id])) ]
+                | length) == 0))' <<< "$resp")"
   total="$(jq 'length' <<< "$runs")"
 
   if [ "$total" -eq 0 ]; then

@@ -123,8 +123,11 @@ def _ci_not_run_message(*, version, tag, branch, candidate_sha, detail):
         f"        and completes the SAME version ({version}) when this\n"
         f"        project's own CI goes green on it.\n"
         f"\n"
-        f"Do not re-run CI on the same commit expecting a different answer: a\n"
-        f"paths filter that matched nothing matches nothing every time."
+        f"Do not re-run CI on the same commit unchanged, expecting a different\n"
+        f"answer: a paths filter that matched nothing matches nothing every\n"
+        f"time. Re-running it with the filter SHORT-CIRCUITED is a different\n"
+        f"thing entirely, and it is the right move when the candidate's\n"
+        f"commits are honestly narrow -- see the remedy above.\n"
     )
 
 

@@ -228,16 +228,44 @@ def release_check_filters(*, config, registry, project_dir,
 # ---------------------------------------------------------------------------
 
 
+# A conclusion GitHub records for a job its ``if`` condition excluded. It is the
+# ABSENCE of a verdict, never a verdict -- which is why neither gate accepts it,
+# and also why :func:`latest_check_runs` may drop one that a later run answered.
+SKIPPED_CONCLUSION = "skipped"
+
+# The separator GitHub puts between a matrix job's name and its leg parameters:
+# ``cli-ci / test`` expands to ``cli-ci / test (3.12)``. Used to recognize a
+# skipped job's own legs, and nothing else -- ``cli-ci / test-extra`` is a
+# DIFFERENT job and can never cover ``cli-ci / test``.
+MATRIX_LEG_SUFFIX = " ("
+
+
 def latest_check_runs(check_runs, regex, *, exclude_run_id=None):
-    """Matching check runs, collapsed to the latest per name.
+    """Matching check runs, collapsed to the latest verdict per job.
 
     Mirrors the publish gate's jq pipeline: filter by name, drop this
     workflow's own runs, group by name and keep the newest
     (``started_at``, then numeric ``id``) so a retried run supersedes the
     stale one it replaced.
+
+    One thing a per-name collapse cannot see on its own: GitHub does not expand
+    a matrix for a job its ``if`` skipped. The whole job collapses to ONE check
+    run under the unsuffixed name (``cli-ci / test``), while the run that
+    actually executes it emits one per leg (``cli-ci / test (3.12)``). The two
+    never share a name, so the skip would outlive the run that answered it --
+    which is exactly the state a ``run_all`` dispatch exists to leave behind
+    (see :data:`RUN_ALL_REMEDY`): the push run skipped the job, the dispatched
+    run ran every leg of it.
+
+    So a ``skipped`` check run is dropped when a STRICTLY LATER check run for
+    the SAME job -- its matrix expansion, by name -- exists. The legs are then
+    judged on their own conclusions like any other check, so nothing is waived:
+    a red leg still fails the gate. Nothing else can cover a skip. Not a sibling
+    job, not a merely prefix-sharing name, and not an earlier run: if the skip
+    is the latest word about that job, it stands and the gate refuses.
     """
     pattern = re.compile(regex)
-    by_name: dict[str, dict] = {}
+    by_name: dict[str, tuple] = {}
     for run in check_runs:
         name = run.get("name") or ""
         if not pattern.search(name):
@@ -250,7 +278,17 @@ def latest_check_runs(check_runs, regex, *, exclude_run_id=None):
         current = by_name.get(name)
         if current is None or key >= current[0]:
             by_name[name] = (key, run)
-    return [by_name[name][1] for name in sorted(by_name)]
+
+    kept = []
+    for name in sorted(by_name):
+        key, run = by_name[name]
+        if run.get("conclusion") == SKIPPED_CONCLUSION and any(
+            other.startswith(name + MATRIX_LEG_SUFFIX) and by_name[other][0] > key
+            for other in by_name
+        ):
+            continue
+        kept.append(run)
+    return kept
 
 
 def failing_check_runs(runs):

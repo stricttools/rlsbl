@@ -223,3 +223,94 @@ class TestTheRemedyIsNamedWhereTheOperatorHitsIt:
             patterns=["core/**"], changed={"docs/x.md"}, pushing=True,
         )
         assert RUN_ALL_REMEDY in message
+
+
+class TestASkippedMatrixJobIsSupersededByItsLegs:
+    """A skipped matrix job has no legs; the run that runs it has nothing else.
+
+    GitHub does not expand a matrix for a job its ``if`` skipped: the whole job
+    collapses to ONE check run named without the matrix suffix (``cli-ci /
+    test``). The run that actually executes it emits one check run per leg
+    (``cli-ci / test (3.12)``). The two therefore never share a name, so the
+    plain collapse-to-latest-per-name cannot see that the later run answered the
+    exact question the skip left open -- and the skip would block a release
+    whose every job had in fact run and passed.
+
+    A ``skipped`` conclusion is the ABSENCE of a verdict, not a verdict. It is
+    dropped only when a strictly later check run for the SAME job (its matrix
+    expansion) exists, and those legs are then judged on their own conclusions.
+    Nothing else can cover a skip: not a sibling job, not an earlier run.
+    """
+
+    FILTER = CheckFilter("cli", r"^(cli\-ci) / ")
+
+    def _runs(self, *specs):
+        return [
+            _check_run(name, conclusion, run_id=rid,
+                       started_at=f"2026-08-08T10:{minute:02d}:00Z")
+            for name, conclusion, rid, minute in specs
+        ]
+
+    def test_later_legs_supersede_the_skipped_placeholder(self):
+        runs = self._runs(
+            ("cli-ci / test", "skipped", 1, 0),
+            ("cli-ci / test (3.12)", "success", 2, 1),
+            ("cli-ci / test (3.13)", "success", 3, 1),
+        )
+        verify_project_ci_ran(
+            "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+        )
+
+    def test_a_failing_leg_still_blocks(self):
+        runs = self._runs(
+            ("cli-ci / test", "skipped", 1, 0),
+            ("cli-ci / test (3.12)", "success", 2, 1),
+            ("cli-ci / test (3.13)", "failure", 3, 1),
+        )
+        with pytest.raises(ProjectCINotRunError) as exc:
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+            )
+        assert "failure" in str(exc.value)
+
+    def test_earlier_legs_do_not_supersede_a_later_skip(self):
+        """The skip is the latest word about that job; it stands."""
+        runs = self._runs(
+            ("cli-ci / test (3.12)", "success", 1, 0),
+            ("cli-ci / test", "skipped", 2, 1),
+        )
+        with pytest.raises(ProjectCINotRunError) as exc:
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+            )
+        assert "skipped" in str(exc.value)
+
+    def test_a_sibling_job_never_covers_a_skip(self):
+        """Only the same job's own legs may supersede it -- never another job."""
+        runs = self._runs(
+            ("cli-ci / test", "skipped", 1, 0),
+            ("cli-ci / lint", "success", 2, 1),
+        )
+        with pytest.raises(ProjectCINotRunError) as exc:
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+            )
+        assert "skipped" in str(exc.value)
+
+    def test_a_name_that_merely_shares_a_prefix_never_covers_a_skip(self):
+        """``test-extra`` is a different job from ``test``, not its leg."""
+        runs = self._runs(
+            ("cli-ci / test", "skipped", 1, 0),
+            ("cli-ci / test-extra", "success", 2, 1),
+        )
+        with pytest.raises(ProjectCINotRunError):
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+            )
+
+    def test_the_lone_skip_still_blocks(self):
+        runs = self._runs(("cli-ci / test", "skipped", 1, 0))
+        with pytest.raises(ProjectCINotRunError):
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+            )

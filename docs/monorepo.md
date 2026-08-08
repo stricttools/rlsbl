@@ -341,6 +341,8 @@ This is the sanctioned exit from a candidate whose push window is honestly narro
 
 Nothing is waived by the dispatch. The jobs execute for real, and a job that fails there still blocks the release. Both gates collapse matching check runs to the latest per name, so the dispatched run's conclusions supersede the earlier `skipped` ones on that commit -- and a red conclusion supersedes just as readily as a green one. The router's concurrency group includes the input, so a `run_all` dispatch never cancels an in-flight push run for the same commit (a cancelled run is a red verdict at the workflow-run level, before any per-check collapse happens).
 
+One wrinkle both gates handle explicitly: GitHub does not expand a matrix for a job its `if` skipped. The skipped job collapses to a single check run under the unsuffixed name (`cli-ci / test`), while the run that executes it emits one per leg (`cli-ci / test (3.12)`). They never share a name, so a plain per-name collapse would leave the skip standing. A `skipped` check is therefore dropped when a strictly later check run for the **same job** -- its matrix expansion, matched by name -- exists; the legs are then judged on their own conclusions. Nothing else can cover a skip: not a sibling job, not a merely prefix-sharing name (`test-extra` is a different job), and not an earlier run. If the skip is the latest word about that job, it stands and the gate refuses.
+
 Typical sequence when a release stops at a skipped member:
 
 ```bash
