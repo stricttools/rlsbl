@@ -164,7 +164,9 @@ class TestCIRouterScale:
         for proj in projects:
             name = proj["name"]
             job = parsed["jobs"][f"{name}-ci-test"]
-            assert job["if"] == f"needs.detect.outputs.{name} == 'true'"
+            assert job["if"] == (
+                f"(needs.detect.outputs.{name} == 'true' || inputs.run_all)"
+            )
 
     def test_with_watch_paths(self):
         """Router with watch paths uses multi-line filter format for all 30 projects."""

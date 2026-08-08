@@ -134,7 +134,9 @@ class TestInlineCISync:
         assert job["name"] == "tooling-ci / test"
         # Gated on the detect job
         assert list(job["needs"]) == ["detect"]
-        assert job["if"] == "needs.detect.outputs.tooling == 'true'"
+        assert job["if"] == (
+            "(needs.detect.outputs.tooling == 'true' || inputs.run_all)"
+        )
         # working-directory injected
         assert job["defaults"]["run"]["working-directory"] == "tooling"
         # No reusable workflow calls anywhere in the router

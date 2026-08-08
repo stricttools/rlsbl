@@ -151,7 +151,9 @@ class TestPerTargetCIFiles:
 
         doc = _router_doc(mock_git_repo)
         job = doc["jobs"]["tooling-ci-pypi-test-pypi"]
-        assert job["if"] == "needs.detect.outputs.tooling == 'true'"
+        assert job["if"] == (
+            "(needs.detect.outputs.tooling == 'true' || inputs.run_all)"
+        )
         assert list(job["needs"]) == ["detect"]
 
     def test_per_target_check_run_names(self, mock_git_repo, capsys):

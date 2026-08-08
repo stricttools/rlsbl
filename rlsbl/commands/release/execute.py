@@ -9,6 +9,7 @@ import shutil
 import sys
 import time
 
+from ...ci_checks import RUN_ALL_REMEDY
 from ...errors import RlsblError
 
 from .release_state import (
@@ -427,7 +428,9 @@ def _empty_candidate_window_message(*, version, tag, branch, candidate_sha,
         f"     release this project together with the commits that touch it.\n"
         f"  2. rlsbl release resume\n"
         f"     -- re-pushes the new tip as the candidate and completes the SAME\n"
-        f"        version ({version})."
+        f"        version ({version}).\n"
+        f"\n"
+        f"{RUN_ALL_REMEDY}"
     )
 
 

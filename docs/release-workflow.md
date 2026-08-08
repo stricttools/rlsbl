@@ -273,7 +273,17 @@ A release commit can touch nothing under a member's own directory. That is guara
 
 The cost is real and accepted: **releasing a releasable runs the full CI job set of every member of that releasable**, including members whose own code did not change. CI minutes are the price of never tagging a commit the gate cannot read a verdict for. The gate is not relaxed to accept `skipped` -- that would let a release publish on a commit nothing actually verified.
 
-The same filter has a visible consequence for ordinary (non-release) pushes: a push whose diff touches only paths outside every member's filter -- a dev node project's own directory, say, or a root file no member watches -- leaves every member's CI job `skipped` on that commit. For a push this is correct: nothing a member ships changed. A **release** never lands in that state, because the release commit always touches the releasable `CHANGELOG.md`. If you need a member's CI to run on a commit that changed nothing of the member's, make the commit touch something that member's filter matches -- do not loosen the gate.
+The same filter has a visible consequence for ordinary (non-release) pushes: a push whose diff touches only paths outside every member's filter -- a dev node project's own directory, say, or a root file no member watches -- leaves every member's CI job `skipped` on that commit. For a push this is correct: nothing a member ships changed. If you need a member's CI to run on a commit that changed nothing of the member's, make the commit touch something that member's filter matches -- do not loosen the gate.
+
+A release's **first** candidate never lands in that state, because the release commit always touches the releasable `CHANGELOG.md`. A **resumed** candidate can: when the first candidate's CI goes red and the fix-forward commits touch only the members they fix, the second candidate's push window covers only those members and every other member's job is skipped again. Widening that window would mean committing churn under paths that did not change. The sanctioned exit is to re-run the same commit with the router's paths filter short-circuited:
+
+```bash
+gh workflow run ci-router.yml --ref main -f run_all=true
+gh run watch <run-id>
+rlsbl release resume
+```
+
+Nothing is waived. Every member's real CI jobs execute on that exact commit, and a failure there still blocks the release; the gate simply reads the dispatched run's conclusions, because both gates collapse matching check runs to the latest per name. See [Running every job on one commit](monorepo.md#running-every-job-on-one-commit-run_all).
 
 Only the finalize artifact is in the filter, never the whole releasable directory: `rlsbl changelog add` writes the releasable's JSONL between releases, and those entries must not spend every member's CI minutes.
 

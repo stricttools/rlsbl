@@ -329,6 +329,26 @@ In explicit releasable mode, one more pattern is appended to **every** member of
 
 Be aware of the cost: **releasing a releasable runs the CI jobs of every one of its members**, including members whose own code did not change. That is the accepted trade, not a bug -- see [Publish gating](release-workflow.md#the-releasable-run-everything-hook) in the release workflow docs for the full rationale, including why the gate is never relaxed to accept `skipped`, and what a push that touches only non-member paths (a dev node's directory, for instance) looks like.
 
+### Running every job on one commit (`run_all`)
+
+The router declares a `workflow_dispatch` input, `run_all`. Dispatching with `run_all=true` short-circuits the paths filter: every inlined job's condition is `(needs.detect.outputs.<project> == 'true' || inputs.run_all)`, so all of them run on the dispatched commit.
+
+```bash
+gh workflow run ci-router.yml --ref main -f run_all=true
+```
+
+This is the sanctioned exit from a candidate whose push window is honestly narrow. A first release candidate rides the run-everything hook and runs every member's CI; if some of those jobs fail, the fix-forward commits that heal them touch only the members they fix. The *next* candidate's window therefore covers only those members, every other member's job concludes `skipped`, and the release gate refuses -- correctly, because a skipped check proves nothing about the commit. Widening the window would mean committing churn under paths that did not change, which lies in both the history and the changelog. Dispatching `run_all` re-runs the **same** commit with the filter short-circuited instead.
+
+Nothing is waived by the dispatch. The jobs execute for real, and a job that fails there still blocks the release. Both gates collapse matching check runs to the latest per name, so the dispatched run's conclusions supersede the earlier `skipped` ones on that commit -- and a red conclusion supersedes just as readily as a green one. The router's concurrency group includes the input, so a `run_all` dispatch never cancels an in-flight push run for the same commit (a cancelled run is a red verdict at the workflow-run level, before any per-check collapse happens).
+
+Typical sequence when a release stops at a skipped member:
+
+```bash
+gh workflow run ci-router.yml --ref main -f run_all=true
+gh run watch <run-id>
+rlsbl release resume
+```
+
 ## Workspace checks
 
 Fourteen checks run under `rlsbl check --tag workspace`, covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, buildability, and code liveness. All error-severity checks block releases when they fail:

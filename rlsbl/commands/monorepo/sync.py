@@ -177,6 +177,40 @@ def router_filter_patterns(project, releasables=None):
     return patterns
 
 
+# The router's ``workflow_dispatch`` input that short-circuits the paths
+# filter, and the expression every inlined job ORs into its ``if``.
+#
+# Why it exists: the filter answers "did THIS push touch this project?", and a
+# release candidate can honestly answer no for most members -- the fix-forward
+# commits that heal a red first candidate touch only the members they fix. Every
+# other member's job then concludes ``skipped``, which both the release CI gate
+# and the publish gate refuse (a skipped check proves nothing about the commit).
+# The sanctioned exits used to be "widen the window" or "release the members
+# together with the commits that touch them"; when neither applies, the operator
+# was left choosing between fabricating churn and abandoning the version.
+#
+# Dispatching the router at the candidate with ``run_all=true`` re-runs the SAME
+# commit with the filter short-circuited, so every member's job runs for real.
+# Nothing is relaxed: the jobs still have to pass, and the later run's check runs
+# supersede the skipped ones per name under the collapse-to-latest rule both
+# gates already apply (:func:`rlsbl.ci_checks.latest_check_runs`).
+#
+# ``inputs`` is empty outside ``workflow_dispatch``/``workflow_call``, so on a
+# push ``inputs.run_all`` is null -- falsy, and the filter decides alone.
+RUN_ALL_INPUT = "run_all"
+RUN_ALL_EXPR = f"inputs.{RUN_ALL_INPUT}"
+RUN_ALL_INPUT_SPEC = {
+    "description": (
+        "Run every project's CI jobs, ignoring the paths filter. Use this to "
+        "make a release candidate's members run their own CI on a commit whose "
+        "push window does not touch their paths."
+    ),
+    "type": "boolean",
+    "required": False,
+    "default": False,
+}
+
+
 def _generate_router(projects, releasables=None):
     """Generate ci-router.yml content with every project's CI jobs inlined.
 
@@ -194,6 +228,8 @@ def _generate_router(projects, releasables=None):
       identical to the reusable-workflow era (publish gate regexes and
       branch protection rules keep matching),
     - is gated on ``needs: detect`` + ``if: needs.detect.outputs.{project}``,
+      short-circuited by the ``run_all`` dispatch input (see
+      :data:`RUN_ALL_INPUT`),
     - keeps intra-workflow ``needs:`` (rewritten to the prefixed keys).
     """
     # Build the filters block as a multi-line string (dorny/paths-filter format)
@@ -229,7 +265,9 @@ def _generate_router(projects, releasables=None):
     jobs = {'detect': detect_job}
     for p in projects:
         name = p['name']
-        detect_cond = f"needs.detect.outputs.{name} == 'true'"
+        detect_cond = (
+            f"(needs.detect.outputs.{name} == 'true' || {RUN_ALL_EXPR})"
+        )
         for prefix, doc in p.get('_ci_docs', []):
             src_jobs = doc.get('jobs') or {}
             workflow_env = doc.get('env')
@@ -292,13 +330,25 @@ def _generate_router(projects, releasables=None):
         'on': {
             'push': {'branches': ['main']},
             'pull_request': None,
-            'workflow_dispatch': None,
+            'workflow_dispatch': {'inputs': {RUN_ALL_INPUT: dict(RUN_ALL_INPUT_SPEC)}},
         },
         # Per-SHA group: re-runs of the same commit dedupe, but a new commit
         # never cancels an earlier commit's in-flight run (release CI
         # conclusions stay intact during back-to-back batch pushes).
+        #
+        # The dispatch input is part of the key so a ``run_all`` dispatch does
+        # NOT cancel the push run for the same commit. It otherwise would: both
+        # runs share github.sha, and a cancelled push run is a red verdict at the
+        # workflow-run level (rlsbl.commands.watch.wait_for_ci_green), reached
+        # before the per-check collapse-to-latest can supersede anything. The
+        # two runs are complementary evidence about one commit; neither may kill
+        # the other. On a push ``inputs.run_all`` interpolates to the empty
+        # string, so push runs keep sharing one group exactly as before.
         'concurrency': {
-            'group': '${{ github.workflow_ref }}-${{ github.sha }}',
+            'group': (
+                '${{ github.workflow_ref }}-${{ github.sha }}'
+                '-${{ inputs.run_all }}'
+            ),
             'cancel-in-progress': True,
         },
         'jobs': jobs,

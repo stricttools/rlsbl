@@ -42,6 +42,14 @@ TEMPLATES_ROOT = os.path.join(
 
 EXPECTED_GROUP = "${{ github.workflow_ref }}-${{ github.sha }}"
 
+# The generated monorepo router keys one more dimension into the group: its
+# ``run_all`` dispatch input. A run-all dispatch and the push run it
+# complements are two runs on the SAME commit, and they must coexist -- a
+# cancelled push run is a red verdict at the workflow-run level, reached before
+# either gate's collapse-to-latest can supersede anything. On a push the input
+# interpolates to the empty string, so push runs keep sharing one group.
+ROUTER_EXPECTED_GROUP = EXPECTED_GROUP + "-${{ inputs.run_all }}"
+
 
 def _ci_templates():
     """Return sorted paths of all shipped CI templates."""
@@ -109,7 +117,7 @@ class TestRouterConcurrency:
         content = _generate_router(projects)
         doc = parse_ci_workflow(content)
         assert "concurrency" in doc
-        assert doc["concurrency"]["group"] == EXPECTED_GROUP
+        assert doc["concurrency"]["group"] == ROUTER_EXPECTED_GROUP
         assert doc["concurrency"]["cancel-in-progress"] is True
 
     def test_router_concurrency_before_jobs(self):
@@ -167,7 +175,7 @@ class TestInlineDropsWorkflowConcurrency:
         content = _generate_router(projects)
         router_doc = parse_ci_workflow(content)
         # Only the router's own per-SHA block exists
-        assert router_doc["concurrency"]["group"] == EXPECTED_GROUP
+        assert router_doc["concurrency"]["group"] == ROUTER_EXPECTED_GROUP
         # The inlined job did not gain a concurrency key
         assert "concurrency" not in router_doc["jobs"]["core-ci-test"]
 
@@ -255,6 +263,6 @@ class TestSyncInlineConcurrency:
         router_content = router.read_text()
         assert router_content.count("concurrency:") == 1
         doc = parse_ci_workflow(router_content)
-        assert doc["concurrency"]["group"] == EXPECTED_GROUP
+        assert doc["concurrency"]["group"] == ROUTER_EXPECTED_GROUP
         assert doc["concurrency"]["cancel-in-progress"] is True
         assert "concurrency" not in doc["jobs"]["mypylib-ci-test"]
