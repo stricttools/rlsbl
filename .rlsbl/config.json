@@ -20,11 +20,6 @@
       "type": "pypi",
       "local": false,
       "target": "pypi"
-    },
-    "docs-deploy": {
-      "type": "cloudflare-pages",
-      "local": true,
-      "target": null
     }
   },
   "changelog_format_version_enforced": true,

@@ -22,10 +22,6 @@
       "default": true
     }
   ],
-  "deploy": {
-    "provider": "cloudflare-pages",
-    "project": "rlsbl-docs"
-  },
   "gen": {
     "exclude": [
       "rlsbl.changelog",
