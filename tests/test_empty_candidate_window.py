@@ -266,3 +266,65 @@ class TestWindowThatDoesTriggerCiIsAllowed:
             version="1.0.1", tag="alpha@v1.0.1", branch="main",
             cwd=str(tmp_project), log=lambda m: None,
         )
+
+
+class TestCandidateAlreadyOnTheRemote:
+    """A resume that owes no push must not be judged as if it owed one.
+
+    When the remote branch is already AT the candidate, no push is about to
+    happen: the CI run the gate will read is the one an earlier push triggered,
+    and that push's own before-SHA is not knowable locally. The guard widens the
+    window to the release's own commit trail for exactly this case
+    (:func:`_widened_window_base`).
+
+    Handing the guard a hardcoded ``needs_push=True`` instead makes it diff the
+    candidate against itself -- an empty window every time -- so every such
+    resume was refused with "nothing changed", naming a push that was not about
+    to happen. That is the shape a ``run_all`` dispatch leaves behind: the
+    candidate is on the remote, its jobs have all run, and the operator resumes
+    without adding a commit.
+    """
+
+    def test_a_resume_with_no_push_owed_completes(self, tmp_project):
+        core = _setup_releasable_workspace(tmp_project)
+        state_path, _bump = _prepare_resumable_candidate(tmp_project, core)
+        head = _git_head(tmp_project)
+
+        # The remote is AT the local tip: nothing to push.
+        _run_resume(tmp_project, core, remote_head=head)
+
+        tags = subprocess.run(
+            ["git", "tag", "--list", "alpha@v1.0.1"],
+            cwd=str(tmp_project), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert tags == "alpha@v1.0.1", (
+            "the widened window contains the version bump; the release must "
+            "run to completion"
+        )
+        assert not os.path.exists(state_path)
+
+    def test_the_guard_still_refuses_when_even_the_widened_window_is_empty(
+        self, tmp_project, capsys
+    ):
+        """No relaxation: a trail that touches nothing of the project's is
+        still refused, push owed or not."""
+        from rlsbl.commands.release.execute import _guard_empty_candidate_window
+
+        _setup_releasable_workspace(tmp_project)
+        head = _git_head(tmp_project)
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        state_path = get_state_path(str(tmp_project), releasable_dir=rel_dir)
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        save_release_state(state_path, {"release_commits": []})
+
+        with pytest.raises(Exception) as exc:
+            _guard_empty_candidate_window(
+                candidate_sha=head, remote_head=head, needs_push=False,
+                state_path=state_path,
+                monorepo_root=str(tmp_project), monorepo_name="core",
+                releasable_name="alpha",
+                version="1.0.1", tag="alpha@v1.0.1", branch="main",
+                cwd=str(tmp_project), log=lambda m: None,
+            )
+        assert "cannot trigger this project's CI" in str(exc.value)
+        assert "already published this commit" in str(exc.value)

@@ -894,7 +894,19 @@ def _candidate_push_plan(inp, *, plan_commits):
         "refspec_template": SLOT + ":refs/heads/" + branch,
         "timeout": timeout,
         "local_head": local_head,
-        "window": {"remote_head": remote_head, "branch": branch},
+        # ``needs_push`` travels INTO the guard's payload: the guard reads a
+        # different window depending on whether a push is about to happen (the
+        # remote head is the before-SHA) or the candidate is already on the
+        # remote (no before-SHA is knowable, so the window widens to the
+        # release's own commit trail). Deriving it here and passing it is what
+        # keeps the plan the single statement of that answer -- hardcoding it at
+        # the executor made the already-pushed branch unreachable and diffed the
+        # candidate against itself.
+        "window": {
+            "remote_head": remote_head,
+            "branch": branch,
+            "needs_push": bool(needs_push),
+        },
     }
 
 
@@ -1277,7 +1289,7 @@ class _Executor:
         _guard_empty_candidate_window(
             candidate_sha=candidate,
             remote_head=step.payload["remote_head"],
-            needs_push=True,
+            needs_push=step.payload["needs_push"],
             state_path=self._inp.state_path,
             monorepo_root=self._inp.monorepo_root,
             monorepo_name=state.monorepo_name,
