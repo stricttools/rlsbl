@@ -64,9 +64,9 @@
     "schema_hash": "6bf61b345615538d2a83180e7b498ab5eea7397122e629c8925c2d84f3d867ce"
   },
   "en/cli-monorepo.md": {
-    "content": "79d92eea23a37699ddb4e5bc94f99db886f4f4bdc15618afa52a42ce6bf9e95b",
+    "content": "93270d48d6acffa1f895a699e7e4598e07df1c556a3dfd5688fecbc6c53c8ffd",
     "description": "6c995e7599a23e1a592541f673adb27062e6a87c22717bb562385d20428091c7",
-    "schema_hash": "be6d643ae28ce2ac1a4bc8d108cbf5b53930e208c7f03ae0205ff1130f3299d2"
+    "schema_hash": "978203210ae36713b746434e9e4faff83e27431f3f19a5a4893a2b78825007d0"
   },
   "en/cli-pre-push-check.md": {
     "content": "ba72de1e7600e82f09b4965780b6850faf4a7fac252a7aafa03d8479a66eea7e",
@@ -155,7 +155,7 @@
     "description": "a1f0cfcb22389d01c5dab80b9b6be0783a0b97223ffc56dd9c0d8d3be71646b3"
   },
   "en/monorepo.md": {
-    "content": "dd8ebb889c0f7b1a40839b0b011295efedf746ad1ea11d7dca7fb51e658dfd97",
+    "content": "09d4fdbb726172213d5c3774744ffd97ab32ed7995cbc2d90ec6ab4b47b9b33c",
     "description": "66929484cf36ef05b517c6c99147d274cce5b1453c588eef4fc0baeb1f08b65f",
     "source_docstring": "02b6fd46cd97711b77f82491b52bedc0ef190654867b753b5daebf51751f82e3"
   },
@@ -168,7 +168,7 @@
     "description": "fdbdb1a75f7573fd3e7297128b7341d57be1cc891b1b2ba362612f8316f7bd81"
   },
   "en/release-workflow.md": {
-    "content": "f888781b6dd3450274da321bf16df219ddd528ae77c609f0036da6b521404d18",
+    "content": "0c4d13914feaa88f7324b81bebfbf6fc32f172be8fc497d4df6f30221e5ca596",
     "description": "9e637e58bcf82d3c4121c5626f91ad983c63c16a805457188077c389984707e8",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
