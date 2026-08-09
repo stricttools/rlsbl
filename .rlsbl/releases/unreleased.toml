@@ -2,11 +2,35 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Release-path unblocks: the CI gates stop refusing commits whose jobs actually passed, the monorepo router gains a run_all dispatch that runs every member's CI on one commit, and advisory warnings no longer abort a release."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Every change here was reproduced against a real release that could not proceed.
+
+A matrix job GitHub *skipped* emits one unsuffixed check run, while the same job
+*run* emits one per leg -- so a re-run that executed every leg could never
+supersede the earlier skip, and both the CI wait and the publish gate refused a
+commit whose jobs had all passed. Supersession is now decided by a strictly
+later check run for the same job; a failing leg still blocks, and nothing else
+can cover a skip.
+
+The router's run_all dispatch input is the sanctioned way out of the adjacent
+trap: a resumed candidate that touches only some members leaves the rest
+filtered out by paths, and the previous remedy was to invent churn commits to
+widen the window. Nothing is waived -- the jobs still have to pass.
+
+The candidate-window guard was always told a push was about to happen, so a
+resume with nothing left to push compared the candidate against itself and
+refused, naming a push that was not happening. It now reads the window the plan
+actually derived.
+
+The pgdesign gate now matches pgdesign's own severity model, so a project with
+zero errors and some advisory warnings is releasable; and monorepo extract /
+extract-releasable are no longer consequential, since their history rewrite runs
+on a throwaway clone and touches nothing published or already pulled.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
