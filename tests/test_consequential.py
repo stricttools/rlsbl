@@ -39,13 +39,19 @@ CONSEQUENTIAL = {
     "release reconcile":          "force-pushes tags and recreates their Releases",
     "monorepo mirror":            "force-pushes the mirror remote",
     "monorepo absorb":            "rewrites another repo's history and merges it in",
-    "monorepo extract":           "filter-repo history rewrite into a new repo",
-    "monorepo extract-releasable": "filter-repo history rewrite into a new repo",
     "monorepo release run":       "release run, once per package, in one sweep",
 }
 
 # Everyday commands that must NEVER prompt. These are the ones the old
 # inferred rule caught, and catching them is what hollowed the guardrail out.
+#
+# `monorepo extract` and `monorepo extract-releasable` are here deliberately.
+# They read as dangerous -- a git filter-repo history rewrite -- but the
+# rewrite happens on a throwaway clone the command itself just made at
+# target_path. Nothing that anyone has ever pulled is rewritten, nothing is
+# pushed, no registry or public artifact is touched, and the source monorepo
+# loses only the extracted entries from workspace.toml. The bar is
+# unrecoverability, not how heavy the machinery sounds.
 MUST_NOT_PROMPT = [
     "commit", "scaffold", "check", "status", "targets", "deploy",
     "changelog add", "changelog generate", "changelog amend", "changelog edit",
@@ -53,6 +59,7 @@ MUST_NOT_PROMPT = [
     "monorepo init", "monorepo add", "monorepo sync", "monorepo snapshot",
     "monorepo cleanup", "monorepo migrate-releasable",
     "monorepo rename-releasable", "monorepo release init",
+    "monorepo extract", "monorepo extract-releasable",
     "dev install", "dev sync", "dev status",
 ]
 MUST_NOT_PROMPT = [c for c in MUST_NOT_PROMPT if c not in CONSEQUENTIAL]

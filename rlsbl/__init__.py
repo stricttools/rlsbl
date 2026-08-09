@@ -1679,7 +1679,12 @@ def cmd_mono_release_order(ctx):
     _cmd_release_order({}, project_root=root)
 
 
-@mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.", effect="mutating", consequential=True)  # filter-repo history rewrite into a new repo
+# NOT consequential: the filter-repo rewrite runs on a throwaway clone at
+# target_path, so nothing anyone has ever pulled is rewritten. Nothing is
+# pushed, no registry or public artifact is touched, and the only mutation to
+# the repo you are standing in is one removed workspace.toml entry. Everything
+# it does is local and trivially undone.
+@mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.", effect="mutating")
 @strictcli.arg(name="target_path", help="Filesystem path where the new standalone repository will be created")
 @strictcli.arg(name="package_name", help="Name of the package as defined in workspace.toml to extract into a standalone repo")
 @effects.handler
@@ -1746,7 +1751,10 @@ def cmd_mono_absorb(ctx, name, registry_name, releasable, source_repo, dest_path
             print(f"  Skipped {len(skipped)} non-version tag(s): {', '.join(skipped)}")
 
 
-@mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.", effect="mutating", consequential=True)  # filter-repo history rewrite into a new repo
+# NOT consequential, for the same reason as `monorepo extract`: the rewrite is
+# confined to a throwaway clone, nothing is pushed, and the source workspace
+# loses only the extracted members' workspace.toml entries.
+@mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.", effect="mutating")
 @strictcli.arg(name="target_path", help="Filesystem path where the new repository will be created")
 @strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract")
 @effects.handler
