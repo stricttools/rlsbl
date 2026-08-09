@@ -9,3 +9,4 @@
 {"format_version":1,"id":"18c9eff1ae8a6e96c0b121ddb5d64152898b69f80bca54db","commits":["11a269aa4d7f2c01459622e8da46bceb4820de0d"],"user_facing":false}
 {"format_version":1,"id":"18ca185322c267f9befb1c3a89bf4ae4967f3c4fd97273b5","commits":["e9a750f3471bc6eedf95736a69c6a30f72869ebf"],"user_facing":false}
 {"format_version":1,"id":"18ca1a6c91cf6086f0456a85df9a4ea799a4236fa01b78f7","commits":["ef40a07b2d7bdf59140a352be5cf61283f49005b"],"user_facing":true,"description":"`rlsbl monorepo extract` and `monorepo extract-releasable` no longer interrupt with a confirmation prompt. Their history rewrite runs on a throwaway clone, so nothing published or already-pulled is touched.","type":"fix"}
+{"format_version":1,"id":"18ca1a958f52f5a6ba98f4480124435ea2bf4e2ef4ae8224","commits":["072f5df84983fa7ba27be311a413b81998842619"],"user_facing":false}
