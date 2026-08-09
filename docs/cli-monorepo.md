@@ -169,7 +169,7 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.
 
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+**Effect:** mutating
 
 ### Arguments
 
@@ -203,7 +203,7 @@ Absorb an external repository as a package in the monorepo. Rewrites the source'
 
 Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.
 
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+**Effect:** mutating
 
 ### Arguments
 
