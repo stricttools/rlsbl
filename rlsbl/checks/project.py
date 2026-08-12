@@ -605,6 +605,16 @@ def register_project_checks(app):
         except ConfigError as e:
             errors.append(exception_text(e))
 
+        # Validate the optional path-capable tool-check blocks
+        from ..tool_checks import (
+            ToolCheckConfigError,
+            validate_tool_checks_config,
+        )
+        try:
+            validate_tool_checks_config(config)
+        except ToolCheckConfigError as e:
+            errors.append(exception_text(e))
+
         if errors:
             for err in errors:
                 reporter.error(err)

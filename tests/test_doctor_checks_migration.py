@@ -105,6 +105,13 @@ EXPECTED_CHECKS = [
     "stricttest-floor",
     # ecosystem-internal dependency floors (declared >= vs locked version)
     "dep-floors",
+    # Path-capable tool checks and their competing-scope guards
+    "lint",
+    "lint-scope-guard",
+    "format",
+    "format-scope-guard",
+    "type-check",
+    "type-check-scope-guard",
 ]
 
 # ``cli-test-coverage`` is a strictcli framework BUILT-IN check provider,

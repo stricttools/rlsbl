@@ -169,6 +169,29 @@ def register_quality_checks(app):
             f"ruff reported {count} violation(s) [{top}]; {fixable} fixable"
         )
 
+    # -- path-capable tool checks -------------------------------------------
+    #
+    # Registered from a table rather than six near-identical functions: the
+    # only thing that varies is the check name, and a copy of the body per
+    # tool is how the three of them drift apart.
+    def _register_tool_check(check_name):
+        from ..tool_checks import guard_name, run_scope_guard, run_tool_check
+
+        @app.error_check(check_name)
+        def _tool_check(ctx, reporter, _name=check_name):
+            """Run the project's declared paths through this tool."""
+            return run_tool_check(ctx, reporter, _name)
+
+        @app.error_check(guard_name(check_name))
+        def _tool_scope_guard(ctx, reporter, _name=check_name):
+            """The tool's own config must not carry competing scope."""
+            return run_scope_guard(ctx, reporter, _name)
+
+    from ..tool_checks import TOOL_CHECKS as _TOOL_CHECKS
+
+    for _tool_check_name in sorted(_TOOL_CHECKS):
+        _register_tool_check(_tool_check_name)
+
     @app.warn_check("dead-modules")
     def check_dead_modules(ctx, reporter):
         """Unreferenced Python modules, Go internal packages, npm or Dart source files."""

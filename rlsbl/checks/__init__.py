@@ -102,6 +102,14 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "scaffold-unreplaced-vars": None,
     # ruff-lint is Python-only: gated on a pypi target, mirroring dead-modules.
     "ruff-lint": frozenset({"pypi"}),
+    # Path-capable tool checks and their competing-scope guards: the tools
+    # (ruff, mypy) and the `uv run` invocation are Python-only.
+    "lint": frozenset({"pypi"}),
+    "lint-scope-guard": frozenset({"pypi"}),
+    "format": frozenset({"pypi"}),
+    "format-scope-guard": frozenset({"pypi"}),
+    "type-check": frozenset({"pypi"}),
+    "type-check-scope-guard": frozenset({"pypi"}),
     # --- phase 12 project checks ---
     "publish-mode-workflow": None,
     "npm-private-mismatch": frozenset({"npm"}),
