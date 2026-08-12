@@ -1,8 +1,7 @@
 ---
 title: rlsbl.tool_checks
-description: "How rlsbl invokes a checking tool, and the three built-ins that do it."
+description: "How rlsbl invokes a checking tool: the lint, format and type-check built-ins, their declared path lists, the uv-run argv composition, and the competing-scope guards."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 156
 ---

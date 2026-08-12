@@ -1,8 +1,7 @@
 ---
 title: rlsbl.observe_allowlist
-description: "The observe allowlist and the written standard every entry must satisfy."
+description: "The list of argv prefixes a preview may really execute, the written standard every entry satisfies -- no user-visible mutation -- and the category each one declares."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 102
 ---
