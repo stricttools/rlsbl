@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference: config.json pipelines, batch limits, the sandboxed test runner, internal dependency floors, external_checks, and workspace.toml."
+description: "Configuration reference: config.json pipelines, batch limits, the sandboxed test runner, internal dependency floors, freeform external_checks, the path-capable checks block, and workspace.toml."
 ---
 
 # Configuration reference

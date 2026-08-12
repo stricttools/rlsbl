@@ -131,7 +131,7 @@ class TestTheReclassificationIsDeclared:
         page = (
             Path(__file__).resolve().parent.parent / "docs" / "checks.md"
         ).read_text(encoding="utf-8")
-        assert "starts only allowlisted read-only programs" in page, (
+        assert "starts only read-only programs on the observe allowlist" in page, (
             "the docs page and the data file are the two statement sites and "
             "must not disagree"
         )

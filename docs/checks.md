@@ -1,5 +1,5 @@
 ---
-description: "Reference for rlsbl checks across 6 tags, covering check metadata, severity levels, target applicability, and workspace CI-router sync verification."
+description: "Reference for rlsbl checks across 6 tags: check metadata, severity, purity (which checks a preview runs), target applicability, and the path-capable lint, format and type-check built-ins."
 ---
 
 # Check system
@@ -42,10 +42,10 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `release` | Git tag and GitHub Release validation | 5 |
 | `changelog` | JSONL changelog validation and structure | 11 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 17 |
-| `quality` | Code quality, dependency analysis, scaffold hygiene | 10 |
+| `quality` | Code quality, dependency analysis, scaffold hygiene | 16 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
-Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (8 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`, `dep-floors`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
+Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (14 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`, `dep-floors`, and the six path-capable tool checks `lint`, `lint-scope-guard`, `format`, `format-scope-guard`, `type-check`, `type-check-scope-guard`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
 
 ## Project checks
 
@@ -134,6 +134,12 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `circular-deps` | warn | Detects circular import dependencies between modules |
 | `library-lint` | error | Runs lint rules for library projects (API surface, exports) |
 | `ruff-lint` | error | Project passes ruff lint checks (skipped when ruff is not installed) |
+| `lint` | error | Runs `ruff check` over the paths declared in the `checks.lint` config block; also tagged `preflight`. Skips when the config block is absent |
+| `lint-scope-guard` | error | ruff config carries no `include`/`extend-include` competing with `checks.lint.paths`; also tagged `preflight` |
+| `format` | error | Runs `ruff format --check` over the paths declared in the `checks.format` config block; also tagged `preflight`. Skips when the config block is absent |
+| `format-scope-guard` | error | ruff config carries no `include`/`extend-include` competing with `checks.format.paths`; also tagged `preflight` |
+| `type-check` | error | Runs `mypy` over the paths declared in the `checks.type-check` config block; also tagged `preflight`. Skips when the config block is absent |
+| `type-check-scope-guard` | error | mypy config carries no `files`/`packages`/`modules` competing with `checks.type-check.paths`; also tagged `preflight` |
 | `deps-runtime-test-only` | warn | Runtime dependencies that are only imported in test files |
 | `deps-dev-in-lib` | error | Dev dependencies used in library source (should be runtime deps) |
 | `scaffold-unreplaced-vars` | error | Leftover `{{...}}` template placeholders in workflow files |
@@ -191,7 +197,7 @@ Checks are declared in `rlsbl/data/checks.toml` with metadata that controls exec
 | `tags` | array of strings | Which tags include this check (empty = untagged, only runs with `--all` or `--name`) |
 | `severity` | `"error"` or `"warn"` | Whether failure blocks (`fail`) or advises (`warn`) |
 | `fast` | bool | Whether the check completes quickly (used for prioritization) |
-| `pure` | bool | Whether the check starts only allowlisted read-only programs (see [Purity](#purity) below) |
+| `pure` | bool | Whether the check starts only programs on the observe allowlist (see [Purity](#purity) below) |
 | `needs_network` | bool | Whether the check requires network access (e.g., GitHub API calls) |
 | `depends_on` | array of strings | Other checks that must pass first (skipped if dependency fails) |
 
@@ -199,13 +205,13 @@ Checks are implemented via the `@app.error_check("<name>")` and `@app.warn_check
 
 ### Purity
 
-**A pure check starts only allowlisted read-only programs.** The allowlist is `rlsbl/observe_allowlist.py`, whose written standard is *no user-visible mutation*: ref updates, index writes and credential emission are refused there, so any program that reaches the list changes nothing a user would notice. A check that starts no program at all is trivially pure.
+**A pure check starts only read-only programs on the observe allowlist.** The allowlist is `rlsbl/observe_allowlist.py`, whose written standard is *no user-visible mutation*: ref updates, index writes and credential emission are refused there, so any program that reaches the list changes nothing a user would notice. A check that starts no program at all is trivially pure.
 
 A check is impure when it starts a program that is not on that list. Every impure check today runs a tool that writes: `ruff` rewrites files, `uv sync` materializes an environment, the test suites and gradle build.
 
 Purity decides what a preview does. Under `rlsbl release run --dry-run` the preflight runs its pure checks for real and lists the impure ones as `would run: <name> (impure)` -- so a preview reports real findings from everything that can be run without changing anything, and is honest about the rest.
 
-This rule replaced an older one, "the check starts no program at all". That rule forced nine checks that spawn only read-only local git (the changelog validators, the two pre-push checks, `workspace-unregistered`, `go-companion-tags`) to be declared impure, and it quietly misdeclared two that do spawn: `local-tag` runs `git tag --list`, and `config-schema` can reach `go list` on its error path. All eleven are pure under the current rule, and are now declared so deliberately rather than by accident.
+This rule replaced an older one, "the check starts no program at all". That rule forced nine checks that spawn only read-only local git (the changelog validators, the two pre-push checks, `workspace-unregistered`, `go-companion-tags`) to be declared impure, and it quietly declared two checks pure that do spawn: `local-tag` runs `git tag --list`, and `config-schema` can reach `go list` on its error path. All eleven are pure under the current rule, and are now declared so deliberately rather than by accident.
 
 The declaration is verified, not trusted: `tests/test_check_purity.py` executes every pure-declared check under an effects observer and fails on any spawn whose argv matches no allowlist prefix.
 
