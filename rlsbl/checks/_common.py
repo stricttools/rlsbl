@@ -1,4 +1,4 @@
-"""Shared helpers for rlsbl check modules: version and tag resolution, changelog context loading, sibling project directory exclusion, and reporter text hygiene."""
+"""Shared helpers for rlsbl check modules: version and tag resolution, changelog context, sibling directory exclusion, and reporter text hygiene."""
 
 import os
 
