@@ -3922,6 +3922,21 @@
         },
         {
           "level": 3,
+          "text": "reportable_lines",
+          "anchor": "reportable_lines"
+        },
+        {
+          "level": 3,
+          "text": "summary_line",
+          "anchor": "summary_line"
+        },
+        {
+          "level": 3,
+          "text": "exception_text",
+          "anchor": "exception_text"
+        },
+        {
+          "level": 3,
           "text": "_resolve_version_and_tag",
           "anchor": "_resolve_version_and_tag"
         },
@@ -15263,5 +15278,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-12T03:39:22.976379+00:00"
+  "last_gen": "2026-08-12T12:21:07.914540+00:00"
 }

@@ -6,7 +6,7 @@
 
 # rlsbl
 
-> *[selfdoc: custom directive 'target-count' failed: No module named 'rlsbl']*
+Release orchestration and project scaffolding for npm, PyPI, Go, and [14 more release targets](https://rlsbl.smmh.dev/targets).
 
 ## Install
 
