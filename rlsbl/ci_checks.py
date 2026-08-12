@@ -314,6 +314,12 @@ def fetch_check_runs(sha, *, cwd=None, config=None):
     raw = run_gh(
         [
             "api",
+            # ``--method GET`` is not decoration: the observe allowlist pins
+            # ``gh api`` to the GET form, because the bare prefix would
+            # legalize POST.  Without it this read matches no prefix, so a
+            # preview RECORDS it and the gate reads a carrier where it
+            # expected JSON.
+            "--method", "GET",
             "--paginate",
             f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100",
         ],

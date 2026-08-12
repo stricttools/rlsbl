@@ -595,3 +595,29 @@ class TestFetchCheckRuns:
         assert "b" * 40 in seen["args"][-1]
         assert "check-runs" in seen["args"][-1]
         assert seen["cwd"] == os.sep
+
+    def test_the_request_matches_the_get_pinned_observe_prefix(self):
+        """Without --method GET the paginated read is not an observe.
+
+        The allowlist pins ``gh api`` to ``--method GET`` because the bare
+        prefix would legalize POST.  A read that omits the flag therefore
+        matches nothing, so under ``--dry-run`` it is recorded instead of
+        performed -- and the CI gate reads a carrier where it expected JSON.
+        """
+        from rlsbl import observe_allowlist as oa
+        from rlsbl.ci_checks import fetch_check_runs
+
+        seen = {}
+
+        def fake(args, **kwargs):
+            seen["argv"] = ["gh", *args]
+            return json.dumps({"check_runs": []})
+
+        with patch("rlsbl.utils.run_gh", side_effect=fake):
+            fetch_check_runs("c" * 40)
+
+        argv = seen["argv"]
+        assert any(
+            len(e.argv) <= len(argv) and tuple(argv[: len(e.argv)]) == e.argv
+            for e in oa.OBSERVE_ALLOWLIST
+        ), f"{' '.join(argv)} matches no observe prefix"
