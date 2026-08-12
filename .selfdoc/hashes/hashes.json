@@ -10,8 +10,8 @@
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
-    "content": "196eb44750abf2d72185a2781a30a392a8a92ccd0e04523f3a1417be65c0defe",
-    "description": "9f3eecf95855830d03400782dc9e47240c4c4c0e9142a073cfdbd00eeb5715da"
+    "content": "77d39f5295b5ecc4ae403dd038054d4d50e88768d4131984e1b14103eae451d8",
+    "description": "d6e72dc50c94d21304578f4762c5ec1a29654c973ac2dda56ba9df8b98293f96"
   },
   "en/ci-customization.md": {
     "content": "6ca3fe39c2f1a77fdfc2220fb8b8ff2d983c5a0fcc023414b10b669c063f9857",
@@ -123,8 +123,8 @@
     "schema_hash": "570d65dade4c365bea6e5abeb22fe63967f56806b7ea3c647117fa6f74e605ab"
   },
   "en/configuration.md": {
-    "content": "2bb80f879993f45b48dd70915e05476cea6c5b0873886aa413be8ab921ce2bdc",
-    "description": "3b94a81df8bbe80f2d52326340e26b0e7dd51240732c81c60a2b3063f11e94f4",
+    "content": "fb0e08f0ea7152bd7e2a9aa070e875d8279c451595f3ce720fa3d7dfc6c94714",
+    "description": "910424f6b3d050697fa15e4c9709a101584e96c92cd5a3ebd00e7b862ba26946",
     "source_docstring": "f63ecdc06d0960176c03f8e153c8f9ac925ae3dc16a8edba4ae41c09c5c57e8c"
   },
   "en/dep-validation.md": {
