@@ -335,7 +335,7 @@ def validate_clean_tree(flags):
 
     pre_existing_dirty = set()
     if flags.get("allow-dirty"):
-        dirty_output = run("git", ["status", "--porcelain"])
+        dirty_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
         if dirty_output:
             pre_existing_dirty = parse_porcelain_paths(dirty_output)
         return pre_existing_dirty
@@ -353,7 +353,7 @@ def validate_clean_tree(flags):
     # cannot be classified per-file (and must NOT be exempted wholesale --
     # unreleased.toml lives there and is deliberately committed).
     try:
-        dirty_output = run("git", ["status", "--porcelain", "--untracked-files=all"])
+        dirty_output = run("git", ["--no-optional-locks", "status", "--porcelain", "--untracked-files=all"])
     except Exception:
         # Fail closed: an unreadable status is never "clean enough".
         raise ReleaseValidationError(

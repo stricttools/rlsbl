@@ -4,8 +4,6 @@ import json
 import os
 import re
 import subprocess
-import urllib.request
-import urllib.error
 
 import tomlkit
 
@@ -73,20 +71,14 @@ def ensure_pypi_keyword(dir_path=".", quiet=False, *, project_root):
 
 
 def ensure_github_topic(quiet=False):
-    """Add "rlsbl" topic to the GitHub repository if not already present."""
-    # Try to get a GitHub token (env var first, then gh CLI)
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        try:
-            token = run_gh_unscoped(["auth", "token"])
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+    """Add "rlsbl" topic to the GitHub repository if not already present.
 
-    if not token:
-        if not quiet:
-            print("No GitHub token available. Run 'gh auth login' or set GITHUB_TOKEN.")
-        return False
-
+    Both API calls go through ``gh api``, which resolves the credential inside
+    its own process (``GH_TOKEN`` / ``GITHUB_TOKEN`` / the stored login, in
+    gh's own precedence).  rlsbl never asks for the raw token: putting a live
+    credential on a captured stdout pipe is what the observe standard forbids
+    (see :mod:`rlsbl.observe_allowlist`).
+    """
     # Detect repo name
     repo_name = None
     try:
@@ -108,19 +100,23 @@ def ensure_github_topic(quiet=False):
         return False
 
     owner, repo = repo_name.split("/", 1)
-    api_url = f"https://api.github.com/repos/{owner}/{repo}/topics"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "rlsbl-cli",
-    }
+    api_path = f"repos/{owner}/{repo}/topics"
 
-    # GET existing topics
+    # GET existing topics.  ``--method GET`` is what makes this match the
+    # GET-pinned observe prefix, so a preview really reads the current topics.
     try:
-        req = urllib.request.Request(api_url, headers=headers)
-        with effects.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
+        raw = run_gh_unscoped(
+            ["api", "--method", "GET", api_path], timeout=15,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
+        if not quiet:
+            print(f"Warning: failed to fetch GitHub topics: {e}")
+        return False
+    if effects.unsettled(raw):
+        return False
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
         if not quiet:
             print(f"Warning: failed to fetch GitHub topics: {e}")
         return False
@@ -129,15 +125,14 @@ def ensure_github_topic(quiet=False):
     if "rlsbl" in topics:
         return False
 
-    # PUT with merged topics list
+    # PUT with the merged topics list.  Not an observe: a preview records it.
     topics.append("rlsbl")
-    payload = json.dumps({"names": topics}).encode("utf-8")
+    argv = ["api", "--method", "PUT", api_path]
+    for name in topics:
+        argv += ["-f", f"names[]={name}"]
     try:
-        req = urllib.request.Request(api_url, data=payload, headers=headers, method="PUT")
-        req.add_header("Content-Type", "application/json")
-        with effects.urlopen(req, timeout=15) as resp:
-            resp.read()  # consume response
-    except (urllib.error.URLError, OSError) as e:
+        run_gh_unscoped(argv, timeout=15)
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
         if not quiet:
             print(f"Warning: failed to set GitHub topics: {e}")
         return False

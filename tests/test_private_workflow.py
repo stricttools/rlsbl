@@ -24,44 +24,54 @@ class TestIsPrivateRepo:
     """Tests for is_private_repo() utility function."""
 
     def test_private_repo_returns_true(self, monkeypatch):
-        """Mock GitHub API returning private=true, verify True returned."""
+        """gh reports private=true; verify True is returned."""
         monkeypatch.setattr(
             "rlsbl.utils.run",
             lambda cmd, args, **kw: {
                 ("git", ("remote", "get-url", "origin")): "git@github.com:owner/repo.git",
             }[(cmd, tuple(args))],
         )
-        # gh goes through the network seam, not the generic run helper.
-        monkeypatch.setattr("rlsbl.utils.run_gh_unscoped", lambda args, **kw: "fake-token")
-
-        fake_resp = MagicMock()
-        fake_resp.read.return_value = json.dumps({"private": True}).encode()
-        fake_resp.__enter__ = lambda s: s
-        fake_resp.__exit__ = lambda s, *a: None
-
-        monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=None: fake_resp)
+        monkeypatch.setattr(
+            "rlsbl.utils.run_gh_unscoped", lambda args, **kw: "true",
+        )
 
         assert is_private_repo() is True
 
     def test_public_repo_returns_false(self, monkeypatch):
-        """Mock GitHub API returning private=false, verify False returned."""
+        """gh reports private=false; verify False is returned."""
         monkeypatch.setattr(
             "rlsbl.utils.run",
             lambda cmd, args, **kw: {
                 ("git", ("remote", "get-url", "origin")): "https://github.com/owner/repo",
             }[(cmd, tuple(args))],
         )
-        # gh goes through the network seam, not the generic run helper.
-        monkeypatch.setattr("rlsbl.utils.run_gh_unscoped", lambda args, **kw: "fake-token")
-
-        fake_resp = MagicMock()
-        fake_resp.read.return_value = json.dumps({"private": False}).encode()
-        fake_resp.__enter__ = lambda s: s
-        fake_resp.__exit__ = lambda s, *a: None
-
-        monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=None: fake_resp)
+        monkeypatch.setattr(
+            "rlsbl.utils.run_gh_unscoped", lambda args, **kw: "false",
+        )
 
         assert is_private_repo() is False
+
+    def test_asks_gh_to_apply_the_credential_itself(self, monkeypatch):
+        """No raw token: the query is a GET-pinned `gh api` call.
+
+        Asking gh for the token and putting it in an Authorization header
+        would put a live credential on a captured stdout pipe, which the
+        observe standard (rlsbl/observe_allowlist.py) forbids.
+        """
+        seen = {}
+        monkeypatch.setattr(
+            "rlsbl.utils.run",
+            lambda cmd, args, **kw: "git@github.com:owner/repo.git",
+        )
+
+        def fake_gh(args, **kw):
+            seen["args"] = list(args)
+            return "false"
+
+        monkeypatch.setattr("rlsbl.utils.run_gh_unscoped", fake_gh)
+        is_private_repo()
+        assert seen["args"][:3] == ["api", "--method", "GET"]
+        assert "token" not in seen["args"]
 
     def test_failure_returns_none(self, monkeypatch):
         """When git/gh commands fail, verify None is returned."""

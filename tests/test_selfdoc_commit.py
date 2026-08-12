@@ -197,7 +197,7 @@ class TestSelfdocFilesCommitted:
         git_status_call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["status", "--porcelain"]:
+            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
                 git_status_call_count[0] += 1
                 n = git_status_call_count[0]
                 if n == 1:
@@ -247,7 +247,7 @@ class TestSelfdocFilesCommitted:
         git_status_call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["status", "--porcelain"]:
+            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
                 git_status_call_count[0] += 1
                 n = git_status_call_count[0]
                 if n <= 2:
@@ -358,7 +358,7 @@ class TestSelfdocIgnoresPreExistingDirty:
         git_status_call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["status", "--porcelain"]:
+            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
                 git_status_call_count[0] += 1
                 n = git_status_call_count[0]
                 if n <= 2:
@@ -409,7 +409,7 @@ class TestHookGeneratedExcludesSelfdocFiles:
         git_status_call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["status", "--porcelain"]:
+            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
                 git_status_call_count[0] += 1
                 n = git_status_call_count[0]
                 if n <= 2:
@@ -462,7 +462,7 @@ class TestSelfdocCommitTrailer:
         git_status_call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["status", "--porcelain"]:
+            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
                 git_status_call_count[0] += 1
                 # post_selfdoc (call 3) returns dirty file
                 if git_status_call_count[0] == 3:
@@ -543,7 +543,7 @@ class TestReleaseFailureAfterSelfdoc:
         git_status_call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["status", "--porcelain"]:
+            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
                 git_status_call_count[0] += 1
                 # post_selfdoc (call 3) returns dirty files
                 if git_status_call_count[0] == 3:

@@ -151,6 +151,12 @@ def fake_run_dispatch(*, head_sha="abc123def456", toplevel="/tmp/fake-repo",
         a = list(args or [])
         if cmd != "git" or not a:
             return ""
+        # ``--no-optional-locks`` is a GLOBAL git option, so it sits before the
+        # subcommand at every call site that reads the worktree or the index.
+        if a[0] == "--no-optional-locks":
+            a = a[1:]
+            if not a:
+                return ""
         if a[0] == "status":
             return after if seen_head["v"] else porcelain
         if a[0] == "rev-parse":

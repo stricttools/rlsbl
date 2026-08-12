@@ -118,7 +118,12 @@ WRITE_MODE_CHARS = ("w", "a", "x", "+")
 
 # The authorized spellings of a gh CLI invocation.  Everything else that puts
 # "gh" in argv position 0 is reaching GitHub outside the named network seam.
-GH_ENTRY_POINTS = {"gh", "gh_argv", "run_gh", "run_gh_unscoped"}
+GH_ENTRY_POINTS = {
+    "gh", "gh_argv", "run_gh", "run_gh_unscoped",
+    # Not an invocation at all: ``ObserveEntry(("gh", ...), ...)`` DECLARES an
+    # allowlist prefix in rlsbl/observe_allowlist.py. Nothing is executed.
+    "ObserveEntry",
+}
 
 
 def _production_files():

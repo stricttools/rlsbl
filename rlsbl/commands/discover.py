@@ -1,85 +1,46 @@
-"""Discover command that lists projects in the rlsbl ecosystem by querying GitHub for repositories tagged with the rlsbl topic."""
+"""Discover command that lists projects in the rlsbl ecosystem by querying GitHub for repositories tagged with the rlsbl topic.
 
-import json
-import os
+Every GitHub call here goes through ``gh api``, which resolves and applies
+the credential inside its own process.  rlsbl deliberately never asks gh for
+the raw token: a live credential on a captured stdout pipe is what the
+observe standard forbids (see :mod:`rlsbl.observe_allowlist`).
+"""
+
 import shutil
+import subprocess
 import sys
-import time
-import urllib.error
-import urllib.request
 from .. import effects
 
 
-SEARCH_URL = "https://api.github.com/search/repositories?q=topic:rlsbl&sort=updated&per_page=100"
+SEARCH_PATH = "search/repositories?q=topic:rlsbl&sort=updated&per_page=100"
 MAX_RESULTS = 1000
-MAX_PAGES = 20
+
+#: Per-repo fields the listing renders, extracted by gh's own jq so the
+#: paginated stream arrives as one TSV row per repository.
+_REPO_JQ = (
+    '.items[] | [.full_name, (.description // ""), .updated_at, .owner.login] '
+    '| @tsv'
+)
 
 
-def _get_github_token():
-    """Get a GitHub token from GITHUB_TOKEN env or `gh auth token`."""
-    token = os.environ.get("GITHUB_TOKEN")
-    if token:
-        return token
+def _gh_api(args, *, timeout):
+    """Read the GitHub API through ``gh api``; None when gh cannot answer.
+
+    ``--method GET`` is mandatory rather than incidental: it is what makes the
+    argv match the GET-pinned observe prefix, so these reads really execute
+    under ``--dry-run`` instead of being recorded.
+    """
     try:
         result = effects.gh(
-            ["auth", "token"],
-            capture_output=True, text=True, check=True, timeout=10,
+            ["api", "--method", "GET", *args],
+            capture_output=True, text=True, check=True, timeout=timeout,
         )
-        return result.stdout.strip() or None
-    except Exception:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
+            FileNotFoundError, OSError):
         return None
-
-
-def _make_request(url, token):
-    """Make a GET request to the GitHub API, return parsed JSON and response headers.
-
-    On a 403 with a Retry-After header, waits (capped at 10s) and retries once.
-    """
-    req = urllib.request.Request(url, method="GET")
-    req.add_header("Accept", "application/vnd.github+json")
-    req.add_header("User-Agent", "rlsbl-cli")
-    if token:
-        req.add_header("Authorization", f"token {token}")
-    try:
-        with effects.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            headers = dict(resp.headers)
-            return data, headers
-    except urllib.error.HTTPError as e:
-        if e.code != 403:
-            raise
-        retry_after = e.headers.get("Retry-After")
-        if retry_after is None:
-            raise
-        # Sleep for the indicated duration, capped at 10s, then retry once
-        wait = min(int(retry_after), 10)
-        time.sleep(wait)
-        # Build a fresh request for the retry
-        retry_req = urllib.request.Request(url, method="GET")
-        retry_req.add_header("Accept", "application/vnd.github+json")
-        retry_req.add_header("User-Agent", "rlsbl-cli")
-        if token:
-            retry_req.add_header("Authorization", f"token {token}")
-        with effects.urlopen(retry_req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            headers = dict(resp.headers)
-            return data, headers
-
-
-def _parse_next_link(headers):
-    """Extract the 'next' URL from the Link header, or None."""
-    link = headers.get("Link") or headers.get("link")
-    if not link:
+    if effects.unsettled(result):
         return None
-    for part in link.split(","):
-        if 'rel="next"' in part:
-            start = part.index("<") + 1
-            end = part.index(">")
-            url = part[start:end]
-            if not url.startswith("https://api.github.com/"):
-                return None
-            return url
-    return None
+    return result.stdout
 
 
 def _relative_time(iso_timestamp):
@@ -117,69 +78,60 @@ def _relative_time(iso_timestamp):
     return f"{years}y ago"
 
 
-def _get_authenticated_user(token):
-    """Get the authenticated user's login name."""
-    if not token:
+def _get_authenticated_user():
+    """The authenticated user's login name, or None when gh cannot say."""
+    raw = _gh_api(["user", "--jq", ".login"], timeout=10)
+    if raw is None:
         return None
-    try:
-        req = urllib.request.Request("https://api.github.com/user", method="GET")
-        req.add_header("Accept", "application/vnd.github+json")
-        req.add_header("User-Agent", "rlsbl-cli")
-        req.add_header("Authorization", f"token {token}")
-        with effects.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("login")
-    except Exception:
-        return None
+    return raw.strip() or None
 
 
-def _fetch_all_repos(token):
-    """Fetch all repos with the rlsbl topic, handling pagination."""
+def _fetch_all_repos():
+    """Every repo carrying the rlsbl topic, as ``(name, desc, updated, owner)``.
+
+    ``gh api --paginate`` walks the Link header itself, and the ``--jq``
+    projection turns each page into one TSV row per repository, so the
+    concatenated pages parse without a per-page JSON document boundary.
+    Returns None when gh could not answer at all.
+    """
+    raw = _gh_api(
+        ["--paginate", SEARCH_PATH, "--jq", _REPO_JQ], timeout=120,
+    )
+    if raw is None:
+        return None
     repos = []
-    url = SEARCH_URL
-    pages_fetched = 0
-
-    while url and len(repos) < MAX_RESULTS and pages_fetched < MAX_PAGES:
-        data, headers = _make_request(url, token)
-        items = data.get("items", [])
-        repos.extend(items)
-        pages_fetched += 1
-        url = _parse_next_link(headers)
-
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        fields = line.split("\t")
+        if len(fields) != 4:
+            continue
+        repos.append(tuple(fields))
+        if len(repos) >= MAX_RESULTS:
+            break
     return repos
 
 
 def run_cmd(registry, args, flags):
     """Discover command: list projects in the rlsbl ecosystem."""
-    token = _get_github_token()
     mine_only = flags.get("mine", False)
 
-    if mine_only and not token:
-        print("Error: --mine requires authentication (set GITHUB_TOKEN or install gh CLI).", file=sys.stderr)
-        sys.exit(1)
-
-    # Fetch repos
-    try:
-        repos = _fetch_all_repos(token)
-    except urllib.error.HTTPError as e:
-        print(f"Error: GitHub API returned {e.code}: {e.reason}", file=sys.stderr)
-        if e.code == 403:
-            print("Hint: run 'gh auth login' to increase API rate limits (60/hr unauthenticated → 5000/hr).", file=sys.stderr)
-        sys.exit(1)
-    except urllib.error.URLError as e:
-        print(f"Error: could not reach GitHub API: {e.reason}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+    repos = _fetch_all_repos()
+    if repos is None:
+        print(
+            "Error: could not query the GitHub API through gh. Run "
+            "'gh auth login' (or set GH_TOKEN) and try again.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Filter to --mine if requested
     if mine_only:
-        username = _get_authenticated_user(token)
+        username = _get_authenticated_user()
         if not username:
             print("Error: could not determine authenticated user.", file=sys.stderr)
             sys.exit(1)
-        repos = [r for r in repos if r.get("owner", {}).get("login") == username]
+        repos = [r for r in repos if r[3] == username]
 
     if not repos:
         if mine_only:
@@ -189,12 +141,10 @@ def run_cmd(registry, args, flags):
         return
 
     # Build table rows
-    rows = []
-    for repo in repos:
-        full_name = repo.get("full_name", "")
-        description = repo.get("description") or ""
-        updated = _relative_time(repo.get("updated_at", ""))
-        rows.append((full_name, description, updated))
+    rows = [
+        (full_name, description, _relative_time(updated_at))
+        for full_name, description, updated_at, _owner in repos
+    ]
 
     # Calculate column widths
     name_width = max(len(r[0]) for r in rows)

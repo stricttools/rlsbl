@@ -1,19 +1,29 @@
-"""Tests for rlsbl.commands.discover."""
+"""Tests for rlsbl.commands.discover.
 
-import json
-import urllib.error
+The command reaches GitHub exclusively through ``gh api``: gh resolves and
+applies the credential inside its own process, so no raw token ever transits
+an rlsbl pipe (see :mod:`rlsbl.observe_allowlist` for the standard that
+forbids it). These tests pin that shape -- the GET-pinned argv, gh's own
+pagination, and the TSV projection the listing parses.
+"""
+
+import subprocess
+from types import SimpleNamespace
 
 import pytest
 
-from conftest import FakeResponse
 from rlsbl.commands.discover import (
-    MAX_PAGES,
+    MAX_RESULTS,
+    SEARCH_PATH,
     _fetch_all_repos,
-    _make_request,
-    _parse_next_link,
+    _gh_api,
     _relative_time,
     run_cmd,
 )
+
+
+def _tsv(*rows):
+    return "".join("\t".join(row) + "\n" for row in rows)
 
 
 class TestRelativeTime:
@@ -25,133 +35,113 @@ class TestRelativeTime:
     def test_returns_days_ago_for_recent_timestamps(self):
         from datetime import datetime, timezone, timedelta
 
-        # 3 days ago
         ts = datetime.now(timezone.utc) - timedelta(days=3)
         iso = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
-        result = _relative_time(iso)
-        assert result == "3d ago"
+        assert _relative_time(iso) == "3d ago"
 
 
-class TestParseNextLink:
-    """Tests for _parse_next_link."""
+class TestNoTokenEverTransitsAPipe:
+    """The command must never ask gh to print the credential."""
 
-    def test_extracts_next_url_from_link_header(self):
-        headers = {
-            "Link": '<https://api.github.com/search/repositories?q=topic:rlsbl&page=2>; rel="next", '
-                    '<https://api.github.com/search/repositories?q=topic:rlsbl&page=5>; rel="last"'
-        }
-        result = _parse_next_link(headers)
-        assert result == "https://api.github.com/search/repositories?q=topic:rlsbl&page=2"
+    def test_no_call_site_asks_for_the_raw_token(self):
+        import inspect
 
-    def test_returns_none_when_no_next_link(self):
-        # Only a "last" link, no "next"
-        headers = {
-            "Link": '<https://api.github.com/search/repositories?q=topic:rlsbl&page=5>; rel="last"'
-        }
-        assert _parse_next_link(headers) is None
+        import rlsbl.commands.discover as discover
 
-    def test_returns_none_when_no_link_header(self):
-        assert _parse_next_link({}) is None
+        source = inspect.getsource(discover)
+        assert '"auth", "token"' not in source, (
+            "`gh auth token` puts a live credential on stdout; let gh apply "
+            "it itself instead"
+        )
+
+
+class TestGhApiShape:
+
+    def test_every_read_is_get_pinned(self, monkeypatch):
+        """--method GET is what makes the argv match the observe prefix."""
+        seen = {}
+
+        def fake_gh(args, **kwargs):
+            seen["args"] = list(args)
+            return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+        monkeypatch.setattr("rlsbl.commands.discover.effects.gh", fake_gh)
+        _gh_api([SEARCH_PATH], timeout=5)
+        assert seen["args"][:3] == ["api", "--method", "GET"]
+
+    def test_a_recorded_run_reads_as_no_answer(self, monkeypatch):
+        """Under a preview whose earlier steps recorded a mutation, gh's
+        answer is a carrier, not text -- the caller must not parse it."""
+        import strictcli
+
+        def fake_gh(args, **kwargs):
+            return strictcli.Unsettled("«stale»", None, "probe", True)
+
+        monkeypatch.setattr("rlsbl.commands.discover.effects.gh", fake_gh)
+        assert _gh_api(["user"], timeout=5) is None
+
+    def test_timeout_reads_as_no_answer(self, monkeypatch):
+        def fake_gh(args, **kwargs):
+            raise subprocess.TimeoutExpired(["gh"], 5)
+
+        monkeypatch.setattr("rlsbl.commands.discover.effects.gh", fake_gh)
+        assert _gh_api(["user"], timeout=5) is None
+
+
+class TestFetchAllRepos:
+
+    def test_delegates_pagination_to_gh(self, monkeypatch):
+        seen = {}
+
+        def fake(args, timeout):
+            seen["args"] = list(args)
+            return ""
+
+        monkeypatch.setattr("rlsbl.commands.discover._gh_api", fake)
+        _fetch_all_repos()
+        assert "--paginate" in seen["args"]
+        assert SEARCH_PATH in seen["args"]
+
+    def test_parses_the_tsv_projection(self, monkeypatch):
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api",
+            lambda args, timeout: _tsv(
+                ("a/one", "first", "2025-01-01T00:00:00Z", "a"),
+                ("b/two", "", "2025-01-02T00:00:00Z", "b"),
+            ),
+        )
+        assert _fetch_all_repos() == [
+            ("a/one", "first", "2025-01-01T00:00:00Z", "a"),
+            ("b/two", "", "2025-01-02T00:00:00Z", "b"),
+        ]
+
+    def test_stops_at_max_results(self, monkeypatch):
+        rows = _tsv(*[
+            (f"u/r{i}", "", "2025-01-01T00:00:00Z", "u")
+            for i in range(MAX_RESULTS + 10)
+        ])
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api", lambda args, timeout: rows,
+        )
+        assert len(_fetch_all_repos()) == MAX_RESULTS
 
 
 class TestRunCmd:
-    """Tests for the discover run_cmd function."""
 
-    def test_prints_no_repos_found_when_api_returns_empty(self, monkeypatch, capsys):
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        # Mock _get_github_token to return a fake token
+    def test_prints_no_repos_found_when_gh_returns_nothing(
+        self, monkeypatch, capsys,
+    ):
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: "fake-token"
+            "rlsbl.commands.discover._fetch_all_repos", lambda: [],
         )
-
-        def fake_urlopen(req, timeout=None):
-            return FakeResponse(
-                {"total_count": 0, "items": []},
-                headers={},
-            )
-
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
         run_cmd(None, [], {})
-        captured = capsys.readouterr()
-        assert "No rlsbl-tagged repositories found" in captured.out
+        assert "No rlsbl-tagged repositories found" in capsys.readouterr().out
 
-
-class TestFetchAllReposPageCap:
-    """Tests for pagination page-count cap in _fetch_all_repos."""
-
-    def test_stops_at_max_pages(self, monkeypatch):
-        """Verify pagination stops after MAX_PAGES even if more pages are available."""
-        call_count = 0
-
-        def fake_make_request(url, token):
-            nonlocal call_count
-            call_count += 1
-            # Return 1 item per page with a next link, simulating infinite pages
-            data = {
-                "total_count": 9999,
-                "items": [{"full_name": f"user/repo-{call_count}"}],
-            }
-            headers = {
-                "Link": '<https://api.github.com/search/repositories?q=topic:rlsbl&page=next>; rel="next"'
-            }
-            return data, headers
-
+    def test_exits_with_remedy_when_gh_cannot_answer(self, monkeypatch, capsys):
         monkeypatch.setattr(
-            "rlsbl.commands.discover._make_request", fake_make_request
+            "rlsbl.commands.discover._fetch_all_repos", lambda: None,
         )
-
-        repos = _fetch_all_repos("fake-token")
-
-        # Should have stopped at MAX_PAGES, not continued indefinitely
-        assert call_count == MAX_PAGES
-        assert len(repos) == MAX_PAGES
-
-
-class TestMakeRequestRateLimit:
-    """Tests for _make_request retry behavior on 403 rate-limit responses."""
-
-    def test_retries_on_403_with_retry_after_header(self, monkeypatch):
-        """On 403 with Retry-After: 1, it sleeps and retries successfully."""
-        call_count = 0
-
-        def fake_urlopen(req, timeout=None):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                # First call: 403 with Retry-After header
-                err = urllib.error.HTTPError(
-                    req.full_url, 403, "rate limited", {"Retry-After": "1"}, None
-                )
-                raise err
-            # Second call: success
-            return FakeResponse(
-                {"items": []},
-                headers={"X-Test": "ok"},
-            )
-
-        # Patch sleep to avoid actual waiting in tests
-        sleep_calls = []
-        monkeypatch.setattr("time.sleep", lambda s: sleep_calls.append(s))
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-        data, headers = _make_request("https://api.github.com/test", "fake-token")
-
-        assert call_count == 2
-        assert sleep_calls == [1]
-        assert data == {"items": []}
-
-    def test_raises_immediately_on_403_without_retry_after(self, monkeypatch):
-        """On 403 without Retry-After header, raises HTTPError immediately."""
-
-        def fake_urlopen(req, timeout=None):
-            err = urllib.error.HTTPError(
-                req.full_url, 403, "forbidden", {}, None
-            )
-            raise err
-
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-        with pytest.raises(urllib.error.HTTPError) as exc_info:
-            _make_request("https://api.github.com/test", "fake-token")
-
-        assert exc_info.value.code == 403
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, [], {})
+        assert exc_info.value.code == 1
+        assert "gh auth login" in capsys.readouterr().err

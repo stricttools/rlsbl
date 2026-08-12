@@ -200,7 +200,7 @@ def run_cleanup_command(workspace_root, *, dry_run=False):
     # residue (e.g. an uncommitted .rlsbl/version) vanishes without a
     # git-visible change and must not be passed to the commit tool.
     status = effects.run(
-        ["git", "status", "--porcelain", "--", *removed],
+        ["git", "--no-optional-locks", "status", "--porcelain", "--", *removed],
         capture_output=True, text=True, cwd=str(workspace_root),
     )
     tracked_changes = []

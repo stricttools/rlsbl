@@ -234,7 +234,7 @@ def get_push_changed_files(refs):
                 )
             else:
                 result = effects.run(
-                    ["git", "diff", "--name-only", f"{remote_sha}..{local_sha}"],
+                    ["git", "--no-optional-locks", "diff", "--name-only", f"{remote_sha}..{local_sha}"],
                     capture_output=True, text=True, timeout=30,
                 )
             if result.returncode == 0:

@@ -633,7 +633,7 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
             "expected": _expected_dirty_files(inp, files_to_commit),
             "baseline": set(inp.baseline_dirty or ()),
         },
-        capture=("dirty", ["git", "status", "--porcelain"], None),
+        capture=("dirty", ["git", "--no-optional-locks", "status", "--porcelain"], None),
         marks=("VERSION_BUMPED",),
     ))
 
@@ -704,7 +704,7 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
         # thread the value without ``consumers_of`` -- and therefore the plan --
         # ever saying so.
         payload=dict(push_plan["window"], candidate=StepRef(CANDIDATE_SHA)),
-        capture=("window", ["git", "diff", "--name-only", "<base>..<candidate>"], git_root),
+        capture=("window", ["git", "--no-optional-locks", "diff", "--name-only", "<base>..<candidate>"], git_root),
     ))
     if push_plan["needs_push"]:
         argv = list(push_plan["argv_prefix"]) + [
@@ -805,8 +805,8 @@ def _commit_is_needed(inp, files_to_commit, log):
         changed = False
         for path in files_to_commit:
             for argv in (
-                ["diff", "--name-only", "--", path],
-                ["status", "--porcelain", "--", path],
+                ["--no-optional-locks", "diff", "--name-only", "--", path],
+                ["--no-optional-locks", "status", "--porcelain", "--", path],
             ):
                 answer = _git_answer(argv, cwd=inp.git_root)
                 if answer is None or answer.strip():

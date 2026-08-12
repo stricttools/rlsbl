@@ -15,6 +15,7 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
@@ -27,9 +28,7 @@ from conftest import FakeResponse, run_git, git_head, make_commit
 # ============================================================================
 
 from rlsbl.commands.discover import (
-    _get_github_token,
-    _make_request,
-    _parse_next_link,
+    _gh_api,
     _relative_time,
     _get_authenticated_user,
     _fetch_all_repos,
@@ -37,86 +36,95 @@ from rlsbl.commands.discover import (
 )
 
 
-class TestGetGithubToken:
-    """Tests for _get_github_token."""
-
-    def test_returns_env_token_when_set(self, monkeypatch):
-        monkeypatch.setenv("GITHUB_TOKEN", "env-token-123")
-        assert _get_github_token() == "env-token-123"
-
-    def test_falls_back_to_gh_cli(self, monkeypatch):
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        mock_result = MagicMock()
-        mock_result.stdout = "gh-cli-token-456\n"
-        with patch("subprocess.run", return_value=mock_result):
-            assert _get_github_token() == "gh-cli-token-456"
-
-    def test_returns_none_when_gh_cli_returns_empty(self, monkeypatch):
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        mock_result = MagicMock()
-        mock_result.stdout = "\n"
-        with patch("subprocess.run", return_value=mock_result):
-            assert _get_github_token() is None
-
-    def test_returns_none_when_gh_cli_fails(self, monkeypatch):
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        with patch("subprocess.run", side_effect=FileNotFoundError("no gh")):
-            assert _get_github_token() is None
+def _tsv(*rows):
+    """Render repo rows the way gh's --jq @tsv projection would."""
+    return "".join("\t".join(row) + "\n" for row in rows)
 
 
-class TestMakeRequestNoToken:
-    """Tests for _make_request without a token."""
+class TestGhApi:
+    """_gh_api pins --method GET, which is what makes it an observe."""
 
-    def test_request_without_token(self, monkeypatch):
-        def fake_urlopen(req, timeout=None):
-            # Verify no Authorization header set
-            assert "Authorization" not in dict(req.headers)
-            return FakeResponse({"result": "ok"}, headers={"X-Test": "yes"})
+    def test_pins_method_get(self, monkeypatch):
+        seen = {}
 
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-        data, headers = _make_request("https://api.github.com/test", None)
-        assert data == {"result": "ok"}
+        def fake_gh(args, **kwargs):
+            seen["args"] = list(args)
+            return SimpleNamespace(stdout="out", stderr="", returncode=0)
 
+        monkeypatch.setattr("rlsbl.commands.discover.effects.gh", fake_gh)
+        assert _gh_api(["user"], timeout=1) == "out"
+        assert seen["args"][:4] == ["api", "--method", "GET", "user"]
 
-class TestMakeRequestRetryAfterCap:
-    """Test that Retry-After is capped at 10s."""
+    def test_returns_none_when_gh_fails(self, monkeypatch):
+        def fake_gh(args, **kwargs):
+            raise subprocess.CalledProcessError(1, ["gh"])
 
-    def test_retry_after_capped_at_10(self, monkeypatch):
-        call_count = 0
+        monkeypatch.setattr("rlsbl.commands.discover.effects.gh", fake_gh)
+        assert _gh_api(["user"], timeout=1) is None
 
-        def fake_urlopen(req, timeout=None):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                err = urllib.error.HTTPError(
-                    req.full_url, 403, "rate limited", {"Retry-After": "999"}, None
-                )
-                raise err
-            return FakeResponse({"items": []}, headers={})
+    def test_returns_none_when_gh_is_missing(self, monkeypatch):
+        def fake_gh(args, **kwargs):
+            raise FileNotFoundError("gh")
 
-        sleep_calls = []
-        monkeypatch.setattr("time.sleep", lambda s: sleep_calls.append(s))
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-        _make_request("https://api.github.com/test", "token")
-        assert sleep_calls == [10]  # capped at 10
+        monkeypatch.setattr("rlsbl.commands.discover.effects.gh", fake_gh)
+        assert _gh_api(["user"], timeout=1) is None
 
 
-class TestParseNextLinkSecurity:
-    """Test that _parse_next_link rejects non-GitHub URLs."""
+class TestFetchAllRepos:
+    """_fetch_all_repos parses gh's paginated TSV projection."""
 
-    def test_rejects_non_github_url(self):
-        headers = {
-            "Link": '<https://evil.example.com/repos?page=2>; rel="next"'
-        }
-        assert _parse_next_link(headers) is None
+    def test_parses_rows(self, monkeypatch):
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api",
+            lambda args, timeout: _tsv(
+                ("a/one", "first", "2025-01-01T00:00:00Z", "a"),
+                ("b/two", "", "2025-01-02T00:00:00Z", "b"),
+            ),
+        )
+        assert _fetch_all_repos() == [
+            ("a/one", "first", "2025-01-01T00:00:00Z", "a"),
+            ("b/two", "", "2025-01-02T00:00:00Z", "b"),
+        ]
 
-    def test_case_insensitive_link_header(self):
-        headers = {
-            "link": '<https://api.github.com/search/repos?page=2>; rel="next"'
-        }
-        result = _parse_next_link(headers)
-        assert result == "https://api.github.com/search/repos?page=2"
+    def test_asks_gh_to_paginate(self, monkeypatch):
+        seen = {}
+
+        def fake(args, timeout):
+            seen["args"] = list(args)
+            return ""
+
+        monkeypatch.setattr("rlsbl.commands.discover._gh_api", fake)
+        _fetch_all_repos()
+        assert "--paginate" in seen["args"]
+
+    def test_caps_at_max_results(self, monkeypatch):
+        from rlsbl.commands.discover import MAX_RESULTS
+
+        rows = _tsv(*[
+            (f"u/r{i}", "", "2025-01-01T00:00:00Z", "u")
+            for i in range(MAX_RESULTS + 25)
+        ])
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api", lambda args, timeout: rows,
+        )
+        assert len(_fetch_all_repos()) == MAX_RESULTS
+
+    def test_skips_malformed_rows(self, monkeypatch):
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api",
+            lambda args, timeout: "a/one\tdesc\n" + _tsv(
+                ("b/two", "", "2025-01-02T00:00:00Z", "b"),
+            ),
+        )
+        assert _fetch_all_repos() == [
+            ("b/two", "", "2025-01-02T00:00:00Z", "b"),
+        ]
+
+    def test_returns_none_when_gh_cannot_answer(self, monkeypatch):
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api", lambda args, timeout: None,
+        )
+        assert _fetch_all_repos() is None
 
 
 class TestRelativeTimeAllBuckets:
@@ -152,53 +160,38 @@ class TestGetAuthenticatedUser:
     """Tests for _get_authenticated_user."""
 
     def test_returns_login_on_success(self, monkeypatch):
-        def fake_urlopen(req, timeout=None):
-            return FakeResponse({"login": "testuser"})
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api", lambda args, timeout: "testuser\n",
+        )
+        assert _get_authenticated_user() == "testuser"
 
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-        assert _get_authenticated_user("fake-token") == "testuser"
+    def test_returns_none_when_gh_cannot_answer(self, monkeypatch):
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api", lambda args, timeout: None,
+        )
+        assert _get_authenticated_user() is None
 
-    def test_returns_none_without_token(self):
-        assert _get_authenticated_user(None) is None
-
-    def test_returns_none_on_api_error(self, monkeypatch):
-        def fake_urlopen(req, timeout=None):
-            raise urllib.error.HTTPError(
-                req.full_url, 401, "Unauthorized", {}, None
-            )
-
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-        assert _get_authenticated_user("bad-token") is None
+    def test_returns_none_on_empty_answer(self, monkeypatch):
+        monkeypatch.setattr(
+            "rlsbl.commands.discover._gh_api", lambda args, timeout: "\n",
+        )
+        assert _get_authenticated_user() is None
 
 
 class TestDiscoverRunCmdMineOnly:
     """Tests for discover run_cmd --mine flag."""
 
-    def test_mine_without_token_exits(self, monkeypatch, capsys):
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: None
-        )
-        with pytest.raises(SystemExit) as exc_info:
-            discover_run_cmd(None, [], {"mine": True})
-        assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "requires authentication" in captured.err
-
     def test_mine_filters_to_own_repos(self, monkeypatch, capsys):
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: "tok"
-        )
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._get_authenticated_user", lambda t: "me"
+            "rlsbl.commands.discover._get_authenticated_user", lambda: "me"
         )
         repos = [
-            {"full_name": "me/repo1", "description": "Mine", "updated_at": "2025-01-01T00:00:00Z", "owner": {"login": "me"}},
-            {"full_name": "other/repo2", "description": "Not mine", "updated_at": "2025-01-01T00:00:00Z", "owner": {"login": "other"}},
+            ("me/repo1", "Mine", "2025-01-01T00:00:00Z", "me"),
+            ("other/repo2", "Not mine", "2025-01-01T00:00:00Z", "other"),
         ]
         monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos", lambda t: repos
+            "rlsbl.commands.discover._fetch_all_repos", lambda: repos
         )
-        # Provide a terminal width to avoid layout issues
         monkeypatch.setattr("shutil.get_terminal_size", lambda: os.terminal_size((120, 40)))
 
         discover_run_cmd(None, [], {"mine": True})
@@ -208,13 +201,10 @@ class TestDiscoverRunCmdMineOnly:
 
     def test_mine_no_repos_found(self, monkeypatch, capsys):
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: "tok"
+            "rlsbl.commands.discover._get_authenticated_user", lambda: "me"
         )
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_authenticated_user", lambda t: "me"
-        )
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos", lambda t: []
+            "rlsbl.commands.discover._fetch_all_repos", lambda: []
         )
         discover_run_cmd(None, [], {"mine": True})
         captured = capsys.readouterr()
@@ -222,13 +212,11 @@ class TestDiscoverRunCmdMineOnly:
 
     def test_mine_auth_user_fails(self, monkeypatch, capsys):
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: "tok"
+            "rlsbl.commands.discover._get_authenticated_user", lambda: None
         )
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_authenticated_user", lambda t: None
-        )
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos", lambda t: [{"full_name": "a/b"}]
+            "rlsbl.commands.discover._fetch_all_repos",
+            lambda: [("a/b", "", "2025-01-01T00:00:00Z", "a")],
         )
         with pytest.raises(SystemExit) as exc_info:
             discover_run_cmd(None, [], {"mine": True})
@@ -240,83 +228,27 @@ class TestDiscoverRunCmdMineOnly:
 class TestDiscoverRunCmdErrors:
     """Tests for discover run_cmd error handling."""
 
-    def test_http_error_403(self, monkeypatch, capsys):
+    def test_exits_when_gh_cannot_answer(self, monkeypatch, capsys):
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: None
-        )
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos",
-            lambda t: (_ for _ in ()).throw(
-                urllib.error.HTTPError("url", 403, "Forbidden", {}, None)
-            ),
+            "rlsbl.commands.discover._fetch_all_repos", lambda: None
         )
         with pytest.raises(SystemExit) as exc_info:
             discover_run_cmd(None, [], {})
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
-        assert "403" in captured.err
         assert "gh auth login" in captured.err
-
-    def test_http_error_500(self, monkeypatch, capsys):
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: None
-        )
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos",
-            lambda t: (_ for _ in ()).throw(
-                urllib.error.HTTPError("url", 500, "Internal Server Error", {}, None)
-            ),
-        )
-        with pytest.raises(SystemExit) as exc_info:
-            discover_run_cmd(None, [], {})
-        assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "500" in captured.err
-
-    def test_url_error(self, monkeypatch, capsys):
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: None
-        )
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos",
-            lambda t: (_ for _ in ()).throw(
-                urllib.error.URLError("Connection refused")
-            ),
-        )
-        with pytest.raises(SystemExit) as exc_info:
-            discover_run_cmd(None, [], {})
-        assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "could not reach" in captured.err
-
-    def test_generic_error(self, monkeypatch, capsys):
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: None
-        )
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos",
-            lambda t: (_ for _ in ()).throw(RuntimeError("boom")),
-        )
-        with pytest.raises(SystemExit) as exc_info:
-            discover_run_cmd(None, [], {})
-        assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "boom" in captured.err
 
 
 class TestDiscoverRunCmdTableOutput:
     """Tests for the table rendering in discover run_cmd."""
 
     def test_renders_table_with_repos(self, monkeypatch, capsys):
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: "tok"
-        )
         repos = [
-            {"full_name": "user/project-a", "description": "A project", "updated_at": "2025-06-01T00:00:00Z"},
-            {"full_name": "user/project-b", "description": None, "updated_at": "2025-01-01T00:00:00Z"},
+            ("user/project-a", "A project", "2025-06-01T00:00:00Z", "user"),
+            ("user/project-b", "", "2025-01-01T00:00:00Z", "user"),
         ]
         monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos", lambda t: repos
+            "rlsbl.commands.discover._fetch_all_repos", lambda: repos
         )
         monkeypatch.setattr("shutil.get_terminal_size", lambda: os.terminal_size((120, 40)))
 
@@ -328,20 +260,16 @@ class TestDiscoverRunCmdTableOutput:
         assert "A project" in captured.out
 
     def test_truncates_long_descriptions(self, monkeypatch, capsys):
+        repos = [("user/repo", "x" * 300, "2025-06-01T00:00:00Z", "user")]
         monkeypatch.setattr(
-            "rlsbl.commands.discover._get_github_token", lambda: "tok"
+            "rlsbl.commands.discover._fetch_all_repos", lambda: repos
         )
-        repos = [
-            {"full_name": "user/repo", "description": "x" * 300, "updated_at": "2025-06-01T00:00:00Z"},
-        ]
-        monkeypatch.setattr(
-            "rlsbl.commands.discover._fetch_all_repos", lambda t: repos
-        )
-        # Narrow terminal to force truncation
-        monkeypatch.setattr("shutil.get_terminal_size", lambda: os.terminal_size((60, 40)))
+        monkeypatch.setattr("shutil.get_terminal_size", lambda: os.terminal_size((80, 24)))
 
         discover_run_cmd(None, [], {})
-        # Should not crash; description should be truncated
+        captured = capsys.readouterr()
+        assert "…" in captured.out
+        assert "x" * 300 not in captured.out
 
 
 # ============================================================================

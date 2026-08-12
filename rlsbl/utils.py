@@ -161,7 +161,7 @@ def is_virtual_uv_root(project_dir: str) -> bool:
 
 def is_clean_tree():
     """Returns True if the git working tree is clean (no uncommitted changes)."""
-    status = run("git", ["status", "--porcelain"])
+    status = run("git", ["--no-optional-locks", "status", "--porcelain"])
     return len(status) == 0
 
 
@@ -626,8 +626,8 @@ def has_staged_or_modified(paths: list[str], cwd: str | None = None) -> bool:
     """
     for p in paths:
         abs_p = os.path.join(cwd, p) if cwd and not os.path.isabs(p) else p
-        diff = run("git", ["diff", "--name-only", "--", p], cwd=cwd) if os.path.exists(abs_p) else ""
-        status = run("git", ["status", "--porcelain", "--", p], cwd=cwd)
+        diff = run("git", ["--no-optional-locks", "diff", "--name-only", "--", p], cwd=cwd) if os.path.exists(abs_p) else ""
+        status = run("git", ["--no-optional-locks", "status", "--porcelain", "--", p], cwd=cwd)
         if diff or status:
             return True
     return False
@@ -778,7 +778,7 @@ def commit_files_if_changed(
     Returns True if a commit was made, False if nothing changed.
     Raises on commit failure (never uses allow_failure=True).
     """
-    status = run("git", ["status", "--porcelain", "--", *files], cwd=cwd)
+    status = run("git", ["--no-optional-locks", "status", "--porcelain", "--", *files], cwd=cwd)
     if not status:
         print(skip_message)
         return False
@@ -911,6 +911,11 @@ def is_private_repo():
     """Detect if the current repo is private via GitHub API.
 
     Returns True if private, False if public, None if detection fails.
+
+    The query goes through ``gh api``, which resolves and applies the
+    credential inside its own process.  rlsbl deliberately never asks for the
+    token itself: a raw credential on a captured stdout pipe is exactly what
+    the observe standard forbids (see :mod:`rlsbl.observe_allowlist`).
     """
     try:
         remote = run("git", ["remote", "get-url", "origin"])
@@ -919,15 +924,13 @@ def is_private_repo():
             return None
         owner, repo = repo_name.split("/", 1)
 
-        token = run_gh_unscoped(["auth", "token"])
-        req = urllib.request.Request(
-            f"https://api.github.com/repos/{owner}/{repo}"
-        )
-        req.add_header("Authorization", f"Bearer {token.strip()}")
-        req.add_header("User-Agent", "rlsbl-cli")
-        with effects.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read())
-            return data.get("private", False)
+        answer = run_gh_unscoped([
+            "api", "--method", "GET", f"repos/{owner}/{repo}",
+            "--jq", ".private",
+        ], timeout=15)
+        if effects.unsettled(answer):
+            return None
+        return answer.strip().lower() == "true"
     except Exception:
         return None
 
@@ -1039,7 +1042,7 @@ def run_gh_unscoped(args: list, *, timeout: int = 120, cwd: str | None = None) -
     """Invoke ``gh`` WITHOUT injecting GH_REPO; return trimmed stdout.
 
     For the gh calls that must not be scoped to the current project: the
-    repo-independent ones (``--version``, ``auth status``, ``auth token``) and
+    repo-independent ones (``--version``, ``auth status``) and
     the ones that name their own ``--repo`` explicitly.  They deliberately skip
     :func:`run_gh`, but they still route through ``effects.gh``, so the gh
     family remains one enumerable surface.

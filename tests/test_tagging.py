@@ -135,50 +135,62 @@ class TestEnsurePypiKeyword:
 class TestEnsureGithubTopic:
     """Tests for ensure_github_topic."""
 
-    def test_returns_false_when_no_token_available(self, monkeypatch):
-        # No GITHUB_TOKEN env var
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        # Mock run() to raise FileNotFoundError (gh not installed)
-        monkeypatch.setattr("rlsbl.tagging.run", _raise_file_not_found)
+    def test_returns_false_when_repo_cannot_be_detected(self, monkeypatch):
+        # gh not installed and no parseable remote -> no repo to topic.
+        def _missing(*args, **kwargs):
+            raise FileNotFoundError("gh not found")
+
+        monkeypatch.setattr("rlsbl.tagging.run", _missing)
+        monkeypatch.setattr("rlsbl.tagging.run_gh", _missing)
         result = ensure_github_topic(quiet=True)
         assert result is False
 
     def test_adds_topic_via_api(self, monkeypatch):
-        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        # Mock run_gh() for repo detection (ensure_github_topic uses run_gh, not run)
         monkeypatch.setattr("rlsbl.tagging.run_gh", lambda args, **kw: "owner/repo")
 
-        # Track urlopen calls
         calls = []
 
-        def fake_urlopen(req, timeout=None):
-            calls.append(req)
-            if req.get_method() == "GET":
-                return FakeResponse({"names": ["existing-topic"]})
-            else:
-                # PUT request
-                return FakeResponse({"names": ["existing-topic", "rlsbl"]})
+        def fake_gh(args, **kw):
+            calls.append(list(args))
+            if args[2] == "GET":
+                return json.dumps({"names": ["existing-topic"]})
+            return ""
 
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        monkeypatch.setattr("rlsbl.tagging.run_gh_unscoped", fake_gh)
         result = ensure_github_topic(quiet=True)
         assert result is True
-        # Should have made a GET then a PUT
         assert len(calls) == 2
-        assert calls[0].get_method() == "GET"
-        assert calls[1].get_method() == "PUT"
-        # Verify PUT payload contains rlsbl
-        payload = json.loads(calls[1].data.decode())
-        assert "rlsbl" in payload["names"]
+        assert calls[0][:4] == [
+            "api", "--method", "GET", "repos/owner/repo/topics",
+        ]
+        assert calls[1][:4] == [
+            "api", "--method", "PUT", "repos/owner/repo/topics",
+        ]
+        # The PUT sends the merged list as repeated -f names[]= fields.
+        assert "names[]=rlsbl" in calls[1]
+        assert "names[]=existing-topic" in calls[1]
+
+    def test_no_raw_credential_is_ever_captured(self, monkeypatch):
+        """gh applies the credential itself; rlsbl never asks for the token."""
+        monkeypatch.setattr("rlsbl.tagging.run_gh", lambda args, **kw: "owner/repo")
+        seen = []
+
+        def fake_gh(args, **kw):
+            seen.append(list(args))
+            return json.dumps({"names": ["rlsbl"]})
+
+        monkeypatch.setattr("rlsbl.tagging.run_gh_unscoped", fake_gh)
+        ensure_github_topic(quiet=True)
+        assert seen and all(
+            argv[:2] != ["auth", "token"] for argv in seen
+        ), "a live credential must never transit an rlsbl pipe"
 
     def test_returns_false_if_topic_already_present(self, monkeypatch):
-        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
         monkeypatch.setattr("rlsbl.tagging.run_gh", lambda args, **kw: "owner/repo")
-
-        def fake_urlopen(req, timeout=None):
-            # GET returns topics that already include rlsbl
-            return FakeResponse({"names": ["rlsbl", "other"]})
-
-        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        monkeypatch.setattr(
+            "rlsbl.tagging.run_gh_unscoped",
+            lambda args, **kw: json.dumps({"names": ["rlsbl", "other"]}),
+        )
         result = ensure_github_topic(quiet=True)
         assert result is False
 

@@ -1092,7 +1092,7 @@ def _filter_dirty_files(paths: list[str], repo_root: str) -> list[str]:
     """
     try:
         result = effects.run(
-            ["git", "status", "--porcelain", "--", *paths],
+            ["git", "--no-optional-locks", "status", "--porcelain", "--", *paths],
             capture_output=True,
             text=True,
             check=True,
@@ -1117,7 +1117,7 @@ def _get_generated_files(project_path: str) -> list[str]:
     """
     try:
         result = effects.run(
-            ["git", "status", "--porcelain"],
+            ["git", "--no-optional-locks", "status", "--porcelain"],
             capture_output=True,
             text=True,
             check=True,

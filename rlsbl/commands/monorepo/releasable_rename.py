@@ -79,7 +79,7 @@ def validate_releasable_name(name):
 
 def _is_clean_tree(root):
     """Return True when the git working tree at ``root`` is clean."""
-    status = run("git", ["status", "--porcelain"], cwd=root)
+    status = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=root)
     return len(status.strip()) == 0
 
 

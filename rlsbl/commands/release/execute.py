@@ -505,7 +505,7 @@ def _git_read(args, *, cwd):
 
 def _diff_names(base_sha, head_sha_, *, cwd):
     """Repo-relative paths changed between two commits, or None if unknowable."""
-    out = _git_read(["diff", "--name-only", f"{base_sha}..{head_sha_}"], cwd=cwd)
+    out = _git_read(["--no-optional-locks", "diff", "--name-only", f"{base_sha}..{head_sha_}"], cwd=cwd)
     if out is None:
         return None
     return {line.strip() for line in out.splitlines() if line.strip()}
@@ -1807,7 +1807,7 @@ def _run_release_mutating(state: ReleaseState):
     if _previewing:
         baseline_dirty = set(state.pre_existing_dirty or ())
     else:
-        baseline_output = run("git", ["status", "--porcelain"])
+        baseline_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
         baseline_dirty = parse_porcelain_paths(baseline_output) if baseline_output else set()
 
     if commit_msg is None:
@@ -2087,7 +2087,7 @@ def _run_release_mutating(state: ReleaseState):
         defensively).
         """
         try:
-            residual = run("git", ["status", "--porcelain"]).strip()
+            residual = run("git", ["--no-optional-locks", "status", "--porcelain"]).strip()
         except Exception:
             return
         if not residual:
@@ -2421,7 +2421,7 @@ def _run_release_mutating(state: ReleaseState):
             # per-version .md files. Include any it actually modified so the
             # release leaves a clean working tree. Only files git reports as
             # changed are added (passing unchanged files to safegit may error).
-            md_status = run("git", ["status", "--porcelain", "--", changes_dir])
+            md_status = run("git", ["--no-optional-locks", "status", "--porcelain", "--", changes_dir])
             if md_status:
                 for md_path in sorted(parse_porcelain_paths(md_status)):
                     if md_path.endswith(".md") and md_path not in finalize_files:

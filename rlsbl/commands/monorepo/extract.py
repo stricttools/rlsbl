@@ -324,7 +324,7 @@ def _commit_extracted_state(repo):
     JSONL, migrated changelog files). No-op when the tree is already clean.
     """
     result = effects.run(
-        ["git", "status", "--porcelain"],
+        ["git", "--no-optional-locks", "status", "--porcelain"],
         cwd=str(repo), capture_output=True, text=True, check=True,
     )
     paths = []
@@ -1080,7 +1080,7 @@ def _commit_absorb_followup(workspace_root, name):
     # leading status columns must be preserved (a global strip would eat the
     # first line's leading space and corrupt its path).
     result = effects.run(
-        ["git", "status", "--porcelain"],
+        ["git", "--no-optional-locks", "status", "--porcelain"],
         cwd=str(workspace_root), capture_output=True, text=True, check=True,
     )
     paths = []

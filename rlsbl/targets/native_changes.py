@@ -29,7 +29,7 @@ def detect_native_changes(project_dir: str, since_ref: str) -> list[str]:
     """
     try:
         result = effects.run(
-            ["git", "diff", "--name-only", f"{since_ref}..HEAD", "--", project_dir],
+            ["git", "--no-optional-locks", "diff", "--name-only", f"{since_ref}..HEAD", "--", project_dir],
             capture_output=True,
             text=True,
             cwd=project_dir,

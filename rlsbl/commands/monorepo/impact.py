@@ -34,7 +34,7 @@ def _get_changed_files_from_git(since_ref, root):
     """Run git diff --name-only {since_ref}..HEAD and return file paths."""
     try:
         result = effects.run(
-            ["git", "diff", "--name-only", f"{since_ref}..HEAD"],
+            ["git", "--no-optional-locks", "diff", "--name-only", f"{since_ref}..HEAD"],
             cwd=root,
             capture_output=True,
             text=True,

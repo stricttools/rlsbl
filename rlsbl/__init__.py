@@ -7,6 +7,7 @@ from pathlib import Path
 
 import strictcli
 
+from . import observe_allowlist as _observe_allowlist
 from .context import create_context
 from .errors import ReleaseFileError
 
@@ -163,74 +164,13 @@ app = strictcli.App(
     # any of them here is now a registration-time hard error, and `yes` stays
     # banned so nobody restates --approve-consequential in the old spelling.
     #
-    # Every argv prefix below is a READ: under --dry-run these still execute
-    # and return real values, which is what lets the release engine's
-    # read-then-branch code walk a preview end to end.  Prefixes are matched
-    # element-wise by string equality and nothing here is a single token -- a
-    # one-token prefix would exempt an entire binary (`git push` included) and
-    # strictcli's observe-allowlist-breadth check warns about exactly that.
-    proc_observe_allowlist=[
-        # -- git reads --------------------------------------------------
-        ["git", "rev-parse"],
-        ["git", "rev-list"],
-        ["git", "status"],
-        ["git", "log"],
-        ["git", "show"],
-        ["git", "describe"],
-        # fetch touches only remote-tracking refs -- no working tree, no local
-        # branch, nothing a user would call a change -- and a preview that
-        # could not learn the remote's state would be guessing.
-        ["git", "fetch"],
-        ["git", "diff"],
-        ["git", "diff-tree"],
-        ["git", "diff-index"],
-        ["git", "ls-files"],
-        ["git", "ls-remote"],
-        ["git", "ls-tree"],
-        ["git", "cat-file"],
-        ["git", "merge-base"],
-        ["git", "check-ignore"],
-        ["git", "for-each-ref"],
-        ["git", "symbolic-ref"],
-        ["git", "name-rev"],
-        ["git", "shortlog"],
-        ["git", "var"],
-        ["git", "config", "--get"],
-        ["git", "config", "--get-all"],
-        ["git", "config", "--list"],
-        ["git", "remote", "get-url"],
-        ["git", "remote", "-v"],
-        ["git", "branch", "--show-current"],
-        ["git", "branch", "--contains"],
-        ["git", "branch", "-a"],
-        ["git", "branch", "--list"],
-        ["git", "tag", "-l"],
-        ["git", "tag", "--list"],
-        ["git", "tag", "--points-at"],
-        ["git", "stash", "list"],
-        ["git", "merge-file", "-p"],
-        ["git", "--version"],
-        # -- gh reads (never `gh api` wholesale: it POSTs too) -----------
-        ["gh", "api", "--method", "GET"],
-        ["gh", "auth", "status"],
-        ["gh", "auth", "token"],
-        ["gh", "release", "view"],
-        ["gh", "release", "list"],
-        ["gh", "repo", "view"],
-        ["gh", "run", "list"],
-        ["gh", "run", "view"],
-        ["gh", "pr", "list"],
-        ["gh", "workflow", "list"],
-        ["gh", "--version"],
-        # -- registry and toolchain reads -------------------------------
-        ["npm", "view"],
-        ["go", "list"],
-        ["uv", "--version"],
-        ["ruff", "--version"],
-        ["safegit", "--version"],
-        ["saferm", "--version"],
-        ["selfdoc", "--version"],
-    ],
+    # Every argv prefix is a READ: under --dry-run these still execute and
+    # return real values, which is what lets the release engine's
+    # read-then-branch code walk a preview end to end.  The list, the written
+    # standard every entry must satisfy ("no user-visible mutation"), and each
+    # entry's declared category live in :mod:`rlsbl.observe_allowlist`;
+    # ``tests/test_observe_allowlist.py`` asserts the list against it.
+    proc_observe_allowlist=_observe_allowlist.prefixes(),
     # A cross-tool protocol signal, read live at call time: the pre-push check
     # reads the pushed refs git feeds its hook on stdin, and a caller that has
     # already consumed that stdin hands the content over here instead.

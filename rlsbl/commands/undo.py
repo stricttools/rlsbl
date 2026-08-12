@@ -565,7 +565,7 @@ def _restore_changelog(plan, uc, results):
         )
         unfinalize_version(changes_dir, plan.version)
         regenerate_changelog()
-        status = run("git", ["status", "--porcelain", "--", *add_paths]).strip()
+        status = run("git", ["--no-optional-locks", "status", "--porcelain", "--", *add_paths]).strip()
         if status:
             run("git", ["add", *add_paths])
             run("git", ["commit", "-m", f"chore: restore changelog after undo of {plan.tag}"])

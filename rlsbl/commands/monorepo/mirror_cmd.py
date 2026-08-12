@@ -235,7 +235,7 @@ def _first_parent_chain(clone_dir, tip):
 
 def _changed_paths(clone_dir, base, tip):
     """Paths changed between ``base`` and ``tip`` (name-only)."""
-    out = _git_ok(["diff", "--name-only", base, tip], cwd=clone_dir)
+    out = _git_ok(["--no-optional-locks", "diff", "--name-only", base, tip], cwd=clone_dir)
     return [p for p in out.splitlines() if p.strip()]
 
 
@@ -525,7 +525,7 @@ def _converge(plan, remote, root, project_path, sub_config_path):
         _run_scaffold(clone_dir, sub_config_path)
 
         _git_ok(["add", "-A"], cwd=clone_dir)
-        status = _git_ok(["status", "--porcelain"], cwd=clone_dir)
+        status = _git_ok(["--no-optional-locks", "status", "--porcelain"], cwd=clone_dir)
         if not status:
             print(f"Mirror converged (scaffold produced no changes): {remote}")
             return

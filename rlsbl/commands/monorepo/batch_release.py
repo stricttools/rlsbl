@@ -83,7 +83,7 @@ def _run_root_selfdoc(flags, workspace_root, log):
     # ``git status``/commit here once walked up from a TMPDIR-inside-repo
     # fixture into the real repo and committed junk (the Jul junk-commit
     # incidents); the explicit cwd makes the target repo unambiguous.
-    pre_output = run("git", ["status", "--porcelain"], cwd=workspace_root)
+    pre_output = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=workspace_root)
     pre_dirty = parse_porcelain_paths(pre_output) if pre_output else set()
 
     _run_selfdoc_gen(flags, project_dir=workspace_root)
@@ -93,7 +93,7 @@ def _run_root_selfdoc(flags, workspace_root, log):
         return
 
     # Commit any files selfdoc generated (diff against pre-selfdoc snapshot)
-    post_output = run("git", ["status", "--porcelain"], cwd=workspace_root)
+    post_output = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=workspace_root)
     post_dirty = parse_porcelain_paths(post_output) if post_output else set()
     selfdoc_generated = post_dirty - pre_dirty
     if selfdoc_generated:

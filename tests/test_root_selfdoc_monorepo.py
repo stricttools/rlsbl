@@ -60,7 +60,7 @@ class TestRunRootSelfdoc:
         call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["status", "--porcelain"]:
+            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
                 call_count[0] += 1
                 if call_count[0] == 1:
                     return ""  # pre-selfdoc: clean
