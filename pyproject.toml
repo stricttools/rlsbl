@@ -8,7 +8,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 keywords = ["release", "npm", "pypi", "go", "goreleaser", "publish", "cli", "scaffold", "rlsbl"]
 dependencies = [
-    "ruamel-yaml",
+    "ruamel-yaml>=0.19.1",
     "strictcli>=0.37.0",
     "strictspec>=0.1.0",
     "tomlkit>=0.12",
