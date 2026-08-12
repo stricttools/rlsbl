@@ -27,7 +27,8 @@ Project-level configuration file created by `rlsbl config init` or `rlsbl scaffo
 | ci_timeout | int | Timeout in seconds for the release CI gate — the in-process wait for CI to conclude on the pushed release candidate. Default: 3600. Run discovery is spent inside this budget and capped at half of it, so the completion wait always keeps at least half. Overridable per-invocation with `--ci-timeout`. |
 | build_timeout | int or object | Timeout in seconds for target build steps. An int applies to every target; an object is keyed by target name with an optional `default` entry. Falls back to each target's shipped default (120s for most, 300s for maven, 60s for pgdesign). |
 | test | object | Per-target test-selection filters. See [test](#test) below. |
-| external_checks | array | Config-declared subprocess checks that run during `rlsbl check` and the release preflight. Each entry declares a `kind` (`structured` or `freeform`). See [external_checks](#external_checks) below. |
+| external_checks | array | Config-declared freeform subprocess checks that run during `rlsbl check` and the release preflight. See [external_checks](#external_checks) below. |
+| checks | map | Per-check settings for the path-capable built-in tool checks (`lint`, `format`, `type-check`). See [checks](#checks) below. |
 | strictspec_gate | object | Opt-in [strictspec certificate deploy gate](#strictspec_gate). Consumes a `strictspec diff` certificate as a `format_version` gate. See below. |
 | test_sandbox | object | Opt-in [sandboxed test runner](#test_sandbox). Declaring it makes `rlsbl scaffold` emit an executable bubblewrap runner script and turns on the `stricttest-floor` check. See below. |
 | internal_dep_floors | array | Package names of ecosystem-internal dependencies whose declared `>=` floor must keep up with the locked version. Declaring the key turns on the [`dep-floors`](#internal_dep_floors) check. See below. |
@@ -177,21 +178,23 @@ This is a **selection filter, not a gate bypass**. It narrows the set of tests t
 
 The `external_checks` array declares project-specific subprocess checks. Each check is selected by tag during `rlsbl check --tag <tag>` and during the release preflight; a non-zero exit is a hard failure with no bypass.
 
-Every entry **must** declare a `kind`. The marker is mandatory on purpose: a check whose scope rlsbl cannot see (an opaque shell command) must be a deliberate, visible declaration rather than an accident. Missing `kind`, an unknown `kind`, or any unrecognized key on an entry is a hard error.
+Every entry **must** declare `kind = "freeform"`. The marker is mandatory on purpose: a check whose scope rlsbl cannot see (an opaque shell command) must be a deliberate, visible declaration rather than an accident. Missing `kind`, an unknown `kind`, or any unrecognized key on an entry is a hard error.
 
-Common keys on both kinds:
+`kind = "structured"` is **retired**. It named a known tool plus a path list and had rlsbl compose the argv; that shape is now the built-in [checks](#checks) block. A config that still declares it is a hard error naming the built-in that replaced it.
+
+Keys:
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
 | `name` | string | Yes | Check name. Lowercase letters, digits, hyphens only (`[a-z][a-z0-9-]*`); glob metacharacters are rejected so a name can never pattern-match a built-in check. |
 | `tag` | string | Yes | The check tag under which this check is selected (e.g. `preflight`). |
-| `kind` | string | Yes | `"structured"` or `"freeform"`. |
+| `kind` | string | Yes | `"freeform"` -- the only kind. |
 | `depends_on` | array | No | Names of checks that must run before this one. |
 | `cwd` | string | No | Working directory (absolute, or relative to the project root). |
 
 #### kind = "freeform"
 
-A freeform check runs an opaque `command` string through a shell. rlsbl does not understand its scope — the command is executed verbatim. Use this for anything that is not one of the built-in structured tools (npm scripts, Go tests, custom gate scripts, `uvx` tools, etc.).
+A freeform check runs an opaque `command` string through a shell. rlsbl does not understand its scope — the command is executed verbatim. Use this for anything the built-in tool checks do not cover (npm scripts, Go tests, custom validation scripts, `uvx` tools, etc.).
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -210,56 +213,9 @@ A freeform check runs an opaque `command` string through a shell. rlsbl does not
 }
 ```
 
-#### kind = "structured"
-
-A structured check names a known `tool` and an explicit `paths` list. rlsbl composes the argv itself and runs it **without a shell**, so paths are passed as discrete arguments (no word-splitting, no glob surprises). Because rlsbl controls the invocation, it can additionally guard the tool's config against scope that would silently override or narrow `paths` (see below).
-
-| Key | Type | Required | Description |
-| --- | --- | --- | --- |
-| `tool` | string | Yes | One of `mypy`, `ruff-check`, `ruff-format`. Any other value is a hard error whose message points you to a freeform entry. |
-| `paths` | array | Yes | Non-empty list of files/directories to check. This is the single source of truth for the tool's scope. |
-
-The adapters compose these argv (with `uv run` degrading to the right dependency group / extra so a tool declared outside the default `dev` group still resolves):
-
-| tool | composed argv |
-| --- | --- |
-| `mypy` | `uv run mypy <paths...>` |
-| `ruff-check` | `uv run ruff check <paths...>` |
-| `ruff-format` | `uv run ruff format --check <paths...>` |
-
-```json
-{
-  "external_checks": [
-    {
-      "name": "mypy-strict",
-      "kind": "structured",
-      "tool": "mypy",
-      "paths": ["mypackage", "tests"],
-      "tag": "preflight"
-    },
-    {
-      "name": "ruff-check",
-      "kind": "structured",
-      "tool": "ruff-check",
-      "paths": ["mypackage", "tests", "scripts", "docs"],
-      "tag": "preflight"
-    }
-  ]
-}
-```
-
-Structured checks require only `uv` on `PATH` (the tools themselves live in the project venv, invoked via `uv run`) — this is validated eagerly at registration.
-
-#### Competing-scope guards
-
-For every structured entry, rlsbl emits an additional pure, fast check named `<name>-scope-guard`. It hard-errors when the tool's own config file carries scope that competes with the entry's `paths`, because such config silently changes what actually gets checked:
-
-- **mypy guard.** mypy's `files` / `packages` / `modules` config keys are silently **overridden** by CLI paths — a scope declared there is dead but misleading. The guard reads `pyproject.toml` `[tool.mypy]`, `mypy.ini`, `.mypy.ini`, and `setup.cfg` `[mypy]`; any of those keys present is an error. Scope must live only in the structured entry's `paths`.
-- **ruff guard** (both `ruff-check` and `ruff-format`)**.** ruff's `include` / `extend-include` config keys silently **narrow** the directories passed explicitly on the CLI (confirmed on ruff 0.15.20). The guard reads `pyproject.toml` `[tool.ruff]`, `ruff.toml`, and `.ruff.toml`; `include` or `extend-include` present is an error. `exclude` / `extend-exclude` / `force-exclude` are **exempt** — those are bypassed by explicit paths (loud over-inclusion, not silent under-scoping).
-
 #### Release-context environment
 
-Both kinds run with rlsbl's release context merged into their environment on top of the ambient one. rlsbl already knows the answers — a check must never re-derive them with its own `git describe`, which gets monorepo tag prefixes wrong.
+External checks and the built-in tool checks alike run with rlsbl's release context merged into their environment on top of the ambient one. rlsbl already knows the answers — a check must never re-derive them with its own `git describe`, which gets monorepo tag prefixes wrong.
 
 | Variable | Value | Availability |
 | --- | --- | --- |
@@ -267,7 +223,7 @@ Both kinds run with rlsbl's release context merged into their environment on top
 | `RLSBL_LAST_TAG` | The project's last release tag, resolved through the same per-project tag glob the changelog layer uses (`v*` standalone, `<name>@v*` or the releasable's `tag_format` in a monorepo). **The empty string when no tag exists**, so "no baseline yet" is distinguishable from "not injected". | Always |
 | `RLSBL_UNRELEASED_RANGE` | `<last_tag>..HEAD`, or `HEAD` on a first release. | Always |
 
-The three are resolved **once per check run** and shared by every external check in it, so N checks never mean N `git describe` calls.
+The three are resolved **once per check run** and shared by every check in it, so N checks never mean N `git describe` calls.
 
 Availability matrix — plain `rlsbl check` vs the release preflight:
 
@@ -286,7 +242,45 @@ with the first-release case handled by testing `[ -z "$RLSBL_LAST_TAG" ]`.
 
 #### Timeout
 
-Both kinds resolve their subprocess timeout per run from the configured check budget — `--check-timeout` if passed, else the `check_timeout` key in `.rlsbl/config.json`, else the shipped default (900s). This is the same precedence every built-in check uses. The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
+Every config-driven check resolves its subprocess timeout per run from the configured check budget — `--check-timeout` if passed, else the `check_timeout` key in `.rlsbl/config.json`, else the shipped default (900s). This is the same precedence every built-in check uses. The budget is a declared limit, not a bypass: the check still hard-fails on a real hang.
+
+### checks
+
+The `checks` map configures the three **path-capable built-in checks**: `lint`, `format` and `type-check`. Each runs one Python tool over a project-declared path list, invoked through the project's own environment. A check with no entry here skips.
+
+```json
+{
+  "checks": {
+    "lint":       {"paths": ["mypackage", "tests", "scripts", "docs"]},
+    "format":     {"paths": ["mypackage", "tests", "scripts", "docs"]},
+    "type-check": {"paths": ["mypackage", "tests", "docs"]}
+  }
+}
+```
+
+| Key | Type | Required | Description |
+| --- | --- | --- | --- |
+| `paths` | array | Yes | Non-empty list of files/directories. This is the single source of truth for the tool's scope. |
+| `cwd` | string | No | Working directory (absolute, or relative to the project root). |
+
+The composed argv, with no shell (paths are discrete arguments -- no word-splitting, no glob surprises). `uv run` degrades to the right dependency group or extra, so a tool declared outside the default `dev` group still resolves:
+
+| check | tool | composed argv |
+| --- | --- | --- |
+| `lint` | ruff | `uv run ruff check <paths...>` |
+| `format` | ruff | `uv run ruff format --check <paths...>` |
+| `type-check` | mypy | `uv run mypy <paths...>` |
+
+All three are Python-only (they require a `pypi` target) and carry the `quality` and `preflight` tags.
+
+#### Competing-scope guards
+
+Each of the three is paired with a pure, fast check named `<check>-scope-guard`. It hard-errors when the tool's own config file carries scope that competes with the declared `paths`, because such config silently changes what actually gets checked:
+
+- **mypy guard** (`type-check-scope-guard`)**.** mypy's `files` / `packages` / `modules` config keys are silently **overridden** by CLI paths — a scope declared there is dead but misleading. The guard reads `pyproject.toml` `[tool.mypy]`, `mypy.ini`, `.mypy.ini`, and `setup.cfg` `[mypy]`; any of those keys present is an error.
+- **ruff guards** (`lint-scope-guard`, `format-scope-guard`)**.** ruff's `include` / `extend-include` config keys silently **narrow** the directories passed explicitly on the CLI (confirmed on ruff 0.15.20). The guard reads `pyproject.toml` `[tool.ruff]`, `ruff.toml`, and `.ruff.toml`; `include` or `extend-include` present is an error. `exclude` / `extend-exclude` / `force-exclude` are **exempt** — those are bypassed by explicit paths (loud over-inclusion, not silent under-scoping).
+
+Because the guards are pure, they execute under `rlsbl release run --dry-run` while the tool checks themselves are listed.
 
 ### Pipeline config
 

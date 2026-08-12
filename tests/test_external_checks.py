@@ -9,16 +9,10 @@ import pytest
 
 from strictcli import ErrorReporter
 
-from rlsbl import external_checks
+from rlsbl import external_checks, tool_checks
 from rlsbl.external_checks import (
     ExternalCheckError,
-    _compose_structured_argv,
-    _guard_name,
     _make_external_check_fn,
-    _make_scope_guard_fn,
-    _make_structured_check_fn,
-    _mypy_scope_conflicts,
-    _ruff_scope_conflicts,
     make_external_check_provider,
     validate_external_checks,
 )
@@ -37,7 +31,7 @@ def _freeform(**overrides):
 
 
 def _structured(**overrides):
-    """A minimal valid structured entry."""
+    """The RETIRED structured entry shape, for the migration-error tests."""
     entry = {
         "name": "mypy-strict",
         "kind": "structured",
@@ -47,6 +41,64 @@ def _structured(**overrides):
     }
     entry.update(overrides)
     return entry
+
+
+class TestStructuredKindIsRetired:
+    """`kind = "structured"` is a hard error that names its replacement.
+
+    The path-list tool invocation moved into three built-in checks
+    (``lint`` / ``format`` / ``type-check``) configured under the top-level
+    ``checks`` key.  A config that still declares the old shape must not be
+    silently ignored, and must not merely say "invalid kind" -- it must say
+    where the setting went.
+    """
+
+    def test_structured_entry_is_rejected(self):
+        with pytest.raises(ExternalCheckError, match='kind "structured" was'):
+            validate_external_checks({"external_checks": [_structured()]})
+
+    @pytest.mark.parametrize("tool,replacement", [
+        ("mypy", "type-check"),
+        ("ruff-check", "lint"),
+        ("ruff-format", "format"),
+    ])
+    def test_the_error_names_the_replacing_check(self, tool, replacement):
+        with pytest.raises(ExternalCheckError) as exc:
+            validate_external_checks({
+                "external_checks": [_structured(tool=tool)]
+            })
+        assert replacement in str(exc.value)
+        assert '"checks"' in str(exc.value)
+
+    def test_the_error_carries_the_declared_paths_into_the_example(self):
+        with pytest.raises(ExternalCheckError) as exc:
+            validate_external_checks({
+                "external_checks": [_structured(paths=["pkg", "docs"])]
+            })
+        assert '"pkg", "docs"' in str(exc.value)
+
+    def test_an_unknown_tool_still_reaches_the_migration_error(self):
+        """The retirement is decided by `kind`, not by whether the tool
+        happened to be one rlsbl knew."""
+        with pytest.raises(ExternalCheckError, match='kind "structured" was'):
+            validate_external_checks({
+                "external_checks": [_structured(tool="pylint")]
+            })
+
+    def test_any_other_kind_points_at_the_same_place(self):
+        with pytest.raises(ExternalCheckError) as exc:
+            validate_external_checks({
+                "external_checks": [_freeform(kind="weird")]
+            })
+        assert "only kind is 'freeform'" in str(exc.value)
+        assert "type-check" in str(exc.value)
+
+    def test_the_provider_surfaces_it_as_a_hard_error(self):
+        provider = make_external_check_provider(
+            lambda: {"external_checks": [_structured()]}
+        )
+        with pytest.raises(ValueError, match="external checks config error"):
+            provider()
 
 
 # ---------------------------------------------------------------------------
@@ -146,18 +198,7 @@ class TestValidateExternalChecks:
                 "external_checks": [_freeform(bogus="x")]
             })
 
-    def test_command_on_structured_is_unknown_key(self):
-        """'command' is not allowed on structured entries -> unknown key."""
-        with pytest.raises(ExternalCheckError, match="unknown key"):
-            validate_external_checks({
-                "external_checks": [_structured(command="echo ok")]
-            })
 
-    def test_tool_on_freeform_is_unknown_key(self):
-        with pytest.raises(ExternalCheckError, match="unknown key"):
-            validate_external_checks({
-                "external_checks": [_freeform(tool="mypy")]
-            })
 
     def test_missing_command_binary_raises(self, monkeypatch):
         monkeypatch.setattr(shutil, "which", lambda name: None)
@@ -209,233 +250,6 @@ class TestValidateExternalChecks:
         })
         assert len(result) == 1
 
-
-# ---------------------------------------------------------------------------
-# Validation: structured
-# ---------------------------------------------------------------------------
-
-
-class TestValidateStructured:
-    def test_valid_structured_passes(self):
-        result = validate_external_checks({
-            "external_checks": [_structured()]
-        })
-        assert len(result) == 1
-        assert result[0]["tool"] == "mypy"
-
-    @pytest.mark.parametrize("tool", ["mypy", "ruff-check", "ruff-format"])
-    def test_all_valid_tools(self, tool):
-        result = validate_external_checks({
-            "external_checks": [_structured(name=f"t-{tool}".replace("_", "-"), tool=tool)]
-        })
-        assert result[0]["tool"] == tool
-
-    def test_unknown_tool_raises(self):
-        with pytest.raises(ExternalCheckError, match="unknown tool 'pylint'"):
-            validate_external_checks({
-                "external_checks": [_structured(tool="pylint")]
-            })
-
-    def test_unknown_tool_message_mentions_freeform(self):
-        with pytest.raises(ExternalCheckError, match="freeform"):
-            validate_external_checks({
-                "external_checks": [_structured(tool="pylint")]
-            })
-
-    def test_missing_tool_raises(self):
-        entry = _structured()
-        del entry["tool"]
-        with pytest.raises(ExternalCheckError, match="require a non-empty 'tool'"):
-            validate_external_checks({"external_checks": [entry]})
-
-    def test_missing_paths_raises(self):
-        entry = _structured()
-        del entry["paths"]
-        with pytest.raises(ExternalCheckError, match="require a non-empty 'paths'"):
-            validate_external_checks({"external_checks": [entry]})
-
-    def test_empty_paths_raises(self):
-        with pytest.raises(ExternalCheckError, match="require a non-empty 'paths'"):
-            validate_external_checks({
-                "external_checks": [_structured(paths=[])]
-            })
-
-    def test_paths_bad_element_raises(self):
-        with pytest.raises(ExternalCheckError, match=r"paths\[1\] must be"):
-            validate_external_checks({
-                "external_checks": [_structured(paths=["ok", ""])]
-            })
-
-    def test_missing_uv_raises(self, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda name: None)
-        with pytest.raises(ExternalCheckError, match="'uv' not found on PATH"):
-            validate_external_checks({
-                "external_checks": [_structured()]
-            })
-
-
-# ---------------------------------------------------------------------------
-# Structured argv composition (byte-for-byte canonical invocations)
-# ---------------------------------------------------------------------------
-
-
-def _write_pyproject(dir_path, body):
-    (dir_path / "pyproject.toml").write_text(body)
-
-
-class TestComposeStructuredArgv:
-    def test_mypy_default_dev_group(self, tmp_path):
-        _write_pyproject(tmp_path, (
-            "[dependency-groups]\ndev = [\"mypy>=2.3.0\", \"ruff>=0.15.20\"]\n"
-        ))
-        argv = _compose_structured_argv("mypy", ["claudewheel", "tests"], str(tmp_path))
-        assert argv == ["uv", "run", "mypy", "claudewheel", "tests"]
-
-    def test_ruff_check_default_dev_group(self, tmp_path):
-        _write_pyproject(tmp_path, (
-            "[dependency-groups]\ndev = [\"ruff>=0.15.20\"]\n"
-        ))
-        argv = _compose_structured_argv(
-            "ruff-check", ["claudewheel", "tests", "scripts", "docs"], str(tmp_path)
-        )
-        assert argv == ["uv", "run", "ruff", "check", "claudewheel", "tests", "scripts", "docs"]
-
-    def test_ruff_format_default_dev_group(self, tmp_path):
-        _write_pyproject(tmp_path, (
-            "[dependency-groups]\ndev = [\"ruff>=0.15.20\"]\n"
-        ))
-        argv = _compose_structured_argv(
-            "ruff-format", ["claudewheel", "tests", "scripts", "docs"], str(tmp_path)
-        )
-        assert argv == [
-            "uv", "run", "ruff", "format", "--check",
-            "claudewheel", "tests", "scripts", "docs",
-        ]
-
-    def test_no_pyproject_degrades_to_plain(self, tmp_path):
-        argv = _compose_structured_argv("mypy", ["src"], str(tmp_path))
-        assert argv == ["uv", "run", "mypy", "src"]
-
-    def test_non_default_group_adds_group_flag(self, tmp_path):
-        _write_pyproject(tmp_path, (
-            "[dependency-groups]\nlint = [\"ruff>=0.15.20\"]\n"
-        ))
-        argv = _compose_structured_argv("ruff-check", ["src"], str(tmp_path))
-        assert argv == ["uv", "run", "--group", "lint", "ruff", "check", "src"]
-
-    def test_optional_dependency_adds_extra_flag(self, tmp_path):
-        _write_pyproject(tmp_path, (
-            "[project.optional-dependencies]\ntyping = [\"mypy>=2.3.0\"]\n"
-        ))
-        argv = _compose_structured_argv("mypy", ["src"], str(tmp_path))
-        assert argv == ["uv", "run", "--extra", "typing", "mypy", "src"]
-
-
-# ---------------------------------------------------------------------------
-# Competing-scope guards
-# ---------------------------------------------------------------------------
-
-
-class TestMypyScopeConflicts:
-    def test_clean_pyproject_passes(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.mypy]\nstrict = true\n")
-        assert _mypy_scope_conflicts(str(tmp_path)) == []
-
-    def test_pyproject_files_key_conflicts(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.mypy]\nfiles = \"src\"\n")
-        conflicts = _mypy_scope_conflicts(str(tmp_path))
-        assert ("pyproject.toml [tool.mypy]", "files") in conflicts
-
-    @pytest.mark.parametrize("key", ["files", "packages", "modules"])
-    def test_all_scope_keys_conflict(self, tmp_path, key):
-        _write_pyproject(tmp_path, f"[tool.mypy]\n{key} = \"src\"\n")
-        conflicts = _mypy_scope_conflicts(str(tmp_path))
-        assert any(k == key for _, k in conflicts)
-
-    def test_mypy_ini_files_conflicts(self, tmp_path):
-        (tmp_path / "mypy.ini").write_text("[mypy]\nfiles = src\n")
-        conflicts = _mypy_scope_conflicts(str(tmp_path))
-        assert ("mypy.ini [mypy]", "files") in conflicts
-
-    def test_setup_cfg_mypy_conflicts(self, tmp_path):
-        (tmp_path / "setup.cfg").write_text("[mypy]\nfiles = src\n")
-        conflicts = _mypy_scope_conflicts(str(tmp_path))
-        assert ("setup.cfg [mypy]", "files") in conflicts
-
-    def test_no_config_passes(self, tmp_path):
-        assert _mypy_scope_conflicts(str(tmp_path)) == []
-
-
-class TestRuffScopeConflicts:
-    def test_clean_pyproject_passes(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.ruff.lint]\nselect = [\"E\"]\n")
-        assert _ruff_scope_conflicts(str(tmp_path)) == []
-
-    def test_include_conflicts(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.ruff]\ninclude = [\"src/**\"]\n")
-        conflicts = _ruff_scope_conflicts(str(tmp_path))
-        assert ("pyproject.toml [tool.ruff]", "include") in conflicts
-
-    def test_extend_include_conflicts(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.ruff]\nextend-include = [\"*.pyi\"]\n")
-        conflicts = _ruff_scope_conflicts(str(tmp_path))
-        assert ("pyproject.toml [tool.ruff]", "extend-include") in conflicts
-
-    def test_exclude_is_exempt(self, tmp_path):
-        _write_pyproject(tmp_path, (
-            "[tool.ruff]\nexclude = [\"build\"]\nextend-exclude = [\"x\"]\n"
-            "force-exclude = true\n"
-        ))
-        assert _ruff_scope_conflicts(str(tmp_path)) == []
-
-    def test_ruff_toml_include_conflicts(self, tmp_path):
-        (tmp_path / "ruff.toml").write_text("include = [\"src/**\"]\n")
-        conflicts = _ruff_scope_conflicts(str(tmp_path))
-        assert ("ruff.toml", "include") in conflicts
-
-
-class TestScopeGuardFn:
-    def test_mypy_guard_passes_clean(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.mypy]\nstrict = true\n")
-        fn = _make_scope_guard_fn("mypy", None, "mypy-strict")
-
-        class FakeCtx:
-            project_root = tmp_path
-
-        result = fn(FakeCtx(), ErrorReporter())
-        assert result.status == "pass"
-
-    def test_mypy_guard_fails_on_files(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.mypy]\nfiles = \"src\"\n")
-        fn = _make_scope_guard_fn("mypy", None, "mypy-strict")
-
-        class FakeCtx:
-            project_root = tmp_path
-
-        result = fn(FakeCtx(), ErrorReporter())
-        assert result.status == "fail"
-        assert "OVERRIDE" in result.message
-
-    def test_ruff_guard_fails_on_include(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.ruff]\ninclude = [\"src/**\"]\n")
-        fn = _make_scope_guard_fn("ruff-check", None, "ruff-check")
-
-        class FakeCtx:
-            project_root = tmp_path
-
-        result = fn(FakeCtx(), ErrorReporter())
-        assert result.status == "fail"
-        assert "NARROWS" in result.message
-
-    def test_ruff_guard_passes_clean(self, tmp_path):
-        _write_pyproject(tmp_path, "[tool.ruff.lint]\nselect = [\"E\"]\n")
-        fn = _make_scope_guard_fn("ruff-format", None, "ruff-format")
-
-        class FakeCtx:
-            project_root = tmp_path
-
-        result = fn(FakeCtx(), ErrorReporter())
-        assert result.status == "pass"
 
 
 # ---------------------------------------------------------------------------
@@ -558,27 +372,6 @@ class TestBlankLineSeparatedOutput:
         assert "lib.py:3:1: E501 line too long" in texts
         assert "" not in texts
 
-    def test_structured_blank_line_output_is_reported(self, tmp_path, monkeypatch):
-        """The structured arm shares the same reporting path."""
-        def fake_run(*args, **kwargs):
-            class R:
-                returncode = 1
-                stdout = "app.py:1:1: F401 unused import\n\nFound 1 error.\n"
-                stderr = ""
-            return R()
-
-        monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
-        fn = _make_structured_check_fn("ruff-check", ["app"], None, "ruff-lint")
-
-        class FakeCtx:
-            project_root = tmp_path
-            config = {}
-
-        result = fn(FakeCtx(), ErrorReporter())
-        assert result.status == "fail"
-        texts = [p.text for p in result.problems]
-        assert "app.py:1:1: F401 unused import" in texts
-        assert "" not in texts
 
     def test_whitespace_only_output_still_attributes(self, tmp_path, monkeypatch):
         """Output that is nothing but blank lines still names the check."""
@@ -654,24 +447,6 @@ class TestTimeoutRouting:
         fn(FakeCtx(), ErrorReporter())
         assert captured["timeout"] == DEFAULT_CHECK_TIMEOUT
 
-    def test_structured_honors_the_config_key(self, tmp_path, monkeypatch):
-        captured = {}
-        _capture_timeout(monkeypatch, captured)
-        _write_pyproject(tmp_path, "[dependency-groups]\ndev = [\"mypy>=2.3.0\"]\n")
-        fn = _make_structured_check_fn("mypy", ["src"], None, "c")
-
-        class FakeCtx:
-            project_root = tmp_path
-            config = {"check_timeout": 1800}
-
-        fn(FakeCtx(), ErrorReporter())
-        assert captured["timeout"] == 1800
-        assert captured["argv"] == ["uv", "run", "mypy", "src"]
-        # A structured check composes an argv list; the shell is not involved.
-        # ``effects.run`` names every parameter explicitly now (it must, to
-        # decide what the effects handle can express), so the recorded value is
-        # an explicit False rather than an absent key.
-        assert captured.get("shell") is False
 
 
 class TestCheckTimeoutFlagReachesExternalChecks:
@@ -718,32 +493,6 @@ class TestCheckTimeoutFlagReachesExternalChecks:
         self._run_spec("my-check", specs, ReleaseCtx())
         assert captured["timeout"] == 13
 
-    def test_structured_external_check_honors_the_flag(self, tmp_path, monkeypatch):
-        from rlsbl.commands.release.shared import (
-            apply_timeout_overrides,
-            build_release_flags,
-        )
-
-        captured = {}
-        _capture_timeout(monkeypatch, captured)
-        _write_pyproject(tmp_path, "[dependency-groups]\ndev = [\"mypy>=2.3.0\"]\n")
-
-        on_disk = {"external_checks": [_structured()]}
-        monkeypatch.setattr(shutil, "which", lambda b: f"/usr/bin/{b}")
-        specs = make_external_check_provider(lambda: dict(on_disk))()
-
-        live = dict(on_disk)
-        apply_timeout_overrides(
-            live,
-            build_release_flags(False, False, False, check_timeout=21),
-        )
-
-        class ReleaseCtx:
-            project_root = tmp_path
-            config = live
-
-        self._run_spec("mypy-strict", specs, ReleaseCtx())
-        assert captured["timeout"] == 21
 
 
 # ---------------------------------------------------------------------------
@@ -769,19 +518,6 @@ class TestMakeExternalCheckProvider:
         assert specs[0].severity == "error"
         assert specs[0].pure is False
 
-    def test_structured_provider_emits_tool_and_guard(self, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/" + name)
-        config = {"external_checks": [_structured(name="mypy-strict")]}
-        provider = make_external_check_provider(lambda: config)
-        specs = provider()
-        names = {s.name for s in specs}
-        assert names == {"mypy-strict", "mypy-strict-scope-guard"}
-        guard = next(s for s in specs if s.name == _guard_name("mypy-strict"))
-        assert guard.pure is True
-        assert guard.fast is True
-        assert guard.depends_on == []
-        tool = next(s for s in specs if s.name == "mypy-strict")
-        assert tool.pure is False
 
     def test_provider_empty_config(self):
         provider = make_external_check_provider(lambda: {})
@@ -948,7 +684,9 @@ class TestRunExternalPreflightChecks:
                 project_root=Path(str(mock_git_repo)),
                 workspace_root=None, config=config,
             )
-            results, exit_code = run_external_preflight_checks(rlsbl.app, ctx, config)
+            results, _listed, exit_code = run_external_preflight_checks(
+                rlsbl.app, ctx, config,
+            )
             assert exit_code == 0
             assert ext_marker.exists()
             assert not builtin_marker.exists()
@@ -959,41 +697,6 @@ class TestRunExternalPreflightChecks:
             rlsbl.app.reset_check_provider_cache()
             rlsbl.app._check_defs.pop("fake-builtin-preflight", None)
 
-    def test_structured_guard_runs_in_preflight(self, mock_git_repo, monkeypatch):
-        """A structured entry's scope guard runs in the customized-hook path."""
-        import rlsbl
-        from rlsbl.external_checks import run_external_preflight_checks
-        from rlsbl.context import ProjectContext
-        from pathlib import Path
-
-        monkeypatch.chdir(mock_git_repo)
-        rlsbl_dir = mock_git_repo / ".rlsbl"
-        rlsbl_dir.mkdir(exist_ok=True)
-        # mypy config carries competing scope -> guard must fail.
-        (mock_git_repo / "pyproject.toml").write_text(
-            "[tool.mypy]\nfiles = \"src\"\n"
-        )
-        config = {
-            "publish_mode": "ci",
-            "targets": ["plain"],
-            "external_checks": [_structured(name="mypy-strict", paths=["src"])],
-        }
-        (rlsbl_dir / "config.json").write_text(json.dumps(config))
-        rlsbl.app.reset_check_provider_cache()
-
-        try:
-            ctx = ProjectContext(
-                project_root=Path(str(mock_git_repo)),
-                workspace_root=None, config=config,
-            )
-            results, exit_code = run_external_preflight_checks(rlsbl.app, ctx, config)
-            names = [r.name for r in results]
-            assert "mypy-strict-scope-guard" in names
-            guard = next(r for r in results if r.name == "mypy-strict-scope-guard")
-            assert guard.status == "fail"
-            assert exit_code != 0
-        finally:
-            rlsbl.app.reset_check_provider_cache()
 
     def test_failing_external_check_returns_nonzero(self, mock_git_repo, monkeypatch):
         import rlsbl
@@ -1016,13 +719,122 @@ class TestRunExternalPreflightChecks:
                 project_root=Path(str(mock_git_repo)),
                 workspace_root=None, config=config,
             )
-            results, exit_code = run_external_preflight_checks(rlsbl.app, ctx, config)
+            results, _listed, exit_code = run_external_preflight_checks(
+                rlsbl.app, ctx, config,
+            )
             assert exit_code != 0
             assert any(
                 r.name == "ext-fail-check" and r.status == "fail" for r in results
             )
         finally:
             rlsbl.app.reset_check_provider_cache()
+
+
+class TestBothRehearsalBranchesPartitionTheSameWay:
+    """The customized-hook branch previews like the other one, or not at all.
+
+    Before this, a preview whose pre-release hook was customized LISTED every
+    external check straight from the config and executed nothing -- so the
+    checks that could safely have run under --dry-run (a structured entry's
+    competing-scope guard is pure) were silently skipped in exactly the repos
+    that had opted into owning their own testing.  Both branches now go
+    through one call with the same purity partition.
+    """
+
+    def test_pure_only_is_forwarded_to_the_check_runner(self, mock_git_repo,
+                                                        monkeypatch):
+        import rlsbl
+        from rlsbl.external_checks import run_external_preflight_checks
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        monkeypatch.chdir(mock_git_repo)
+        config = {
+            "publish_mode": "ci",
+            "external_checks": [_freeform(name="ext-partition", command="true")],
+        }
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
+        rlsbl.app.reset_check_provider_cache()
+
+        seen = []
+        real = rlsbl.app.run_checks
+
+        def spy(ctx, **kwargs):
+            seen.append(kwargs.get("pure_only"))
+            return real(ctx, **kwargs)
+
+        monkeypatch.setattr(rlsbl.app, "run_checks", spy)
+        try:
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None, config=config,
+            )
+            run_external_preflight_checks(
+                rlsbl.app, ctx, config, pure_only=True,
+            )
+        finally:
+            rlsbl.app.reset_check_provider_cache()
+
+        assert seen and all(v is True for v in seen), (
+            "the rehearsal's purity partition must reach the check runner, or "
+            "a preview executes impure external checks for real"
+        )
+
+    def test_impure_external_check_is_listed_not_executed_under_pure_only(
+        self, mock_git_repo, monkeypatch, tmp_path,
+    ):
+        import rlsbl
+        from rlsbl.external_checks import run_external_preflight_checks
+        from rlsbl.context import ProjectContext
+        from pathlib import Path
+
+        monkeypatch.chdir(mock_git_repo)
+        marker = tmp_path / "ext-ran-in-preview"
+        config = {
+            "publish_mode": "ci",
+            "external_checks": [_freeform(
+                name="ext-preview", command=f"touch {marker}",
+            )],
+        }
+        rlsbl_dir = mock_git_repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps(config))
+        rlsbl.app.reset_check_provider_cache()
+
+        try:
+            ctx = ProjectContext(
+                project_root=Path(str(mock_git_repo)),
+                workspace_root=None, config=config,
+            )
+            results, listed, exit_code = run_external_preflight_checks(
+                rlsbl.app, ctx, config, pure_only=True,
+            )
+        finally:
+            rlsbl.app.reset_check_provider_cache()
+
+        assert "ext-preview" in listed
+        assert not any(r.name == "ext-preview" for r in results)
+        assert not marker.exists(), "a preview executed an impure external check"
+        assert exit_code == 0
+
+    def test_neither_branch_lists_from_raw_config(self):
+        """The listing must come from the check runner's partition.
+
+        Reading ``validate_external_checks`` and printing every entry is how
+        the customized-hook branch used to preview: it named entries the
+        runner would have SCOPED OUT, and it never executed the pure ones.
+        """
+        import inspect
+
+        from rlsbl.commands import release as release_mod
+
+        source = inspect.getsource(release_mod)
+        assert "for entry in validate_external_checks(" not in source, (
+            "the rehearsal is listing straight from config again instead of "
+            "from the runner's purity partition"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1081,45 +893,6 @@ class TestPartitionWiring:
         finally:
             rlsbl.app.reset_check_provider_cache()
 
-    def test_structured_guard_is_pure_and_runs_under_pure_only(
-        self, mock_git_repo, monkeypatch,
-    ):
-        """The scope guard is pure: it executes under pure_only while the
-        structured tool check is listed impure."""
-        import rlsbl
-        from rlsbl.context import ProjectContext
-        from pathlib import Path
-
-        monkeypatch.chdir(mock_git_repo)
-        rlsbl_dir = mock_git_repo / ".rlsbl"
-        rlsbl_dir.mkdir(exist_ok=True)
-        config = {
-            "publish_mode": "ci",
-            "targets": ["plain"],
-            "external_checks": [_structured(name="mypy-strict", paths=["src"])],
-        }
-        (rlsbl_dir / "config.json").write_text(json.dumps(config))
-        rlsbl.app.reset_check_provider_cache()
-
-        try:
-            ctx = ProjectContext(
-                project_root=Path(str(mock_git_repo)),
-                workspace_root=None, config=config,
-            )
-            results, impure_listed, exit_code = rlsbl.app.run_checks(
-                ctx, tag_expr="preflight", pure_only=True,
-            )
-            # Tool check is impure -> listed, not run.
-            assert "mypy-strict" in impure_listed
-            # Guard is pure -> runs and appears in results (passes: no
-            # competing config in the mock repo).
-            guard_results = [
-                r for r in results if r.name == "mypy-strict-scope-guard"
-            ]
-            assert len(guard_results) == 1
-            assert guard_results[0].status == "pass"
-        finally:
-            rlsbl.app.reset_check_provider_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -1174,34 +947,6 @@ class TestReleaseContextEnv:
         assert "tag=[v1.2.3]" in result.message
         assert "range=v1.2.3..HEAD" in result.message
 
-    def test_structured_check_gets_the_same_env(self, mock_git_repo, monkeypatch):
-        """The structured (shell-free) path injects the identical env."""
-        from rlsbl.context import ProjectContext
-        from pathlib import Path
-
-        self._tag(mock_git_repo, "v0.9.0")
-        captured = {}
-
-        def fake_run(argv, **kwargs):
-            captured["env"] = kwargs.get("env")
-            return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
-
-        # Rebind the NAME in external_checks only -- patching the shared
-        # effect chokepoint would also swallow the git calls the env resolver
-        # itself makes.
-        monkeypatch.setattr(
-            external_checks, "effects", SimpleNamespace(run=fake_run),
-        )
-        ctx = ProjectContext(
-            project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
-        )
-        fn = _make_structured_check_fn("mypy", ["src"], None, "mypy-strict")
-        fn(ctx, ErrorReporter())
-
-        env = captured["env"]
-        assert env["RLSBL_PROJECT_ROOT"] == str(mock_git_repo)
-        assert env["RLSBL_LAST_TAG"] == "v0.9.0"
-        assert env["RLSBL_UNRELEASED_RANGE"] == "v0.9.0..HEAD"
 
     def test_cwd_override_still_learns_the_project_root(self, mock_git_repo):
         """An entry with a cwd override has no other way to find the root."""
@@ -1226,13 +971,13 @@ class TestReleaseContextEnv:
 
         self._tag(mock_git_repo, "v2.0.0")
         calls = []
-        real = external_checks.get_last_version_tag
+        real = tool_checks.get_last_version_tag
 
         def counting(tag_glob="v*", **kwargs):
             calls.append(tag_glob)
             return real(tag_glob, **kwargs)
 
-        monkeypatch.setattr(external_checks, "get_last_version_tag", counting)
+        monkeypatch.setattr(tool_checks, "get_last_version_tag", counting)
         ctx = ProjectContext(
             project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
         )
@@ -1268,22 +1013,22 @@ class TestReleaseContextEnvFailureIsHard:
         def shallow(tag_glob="v*", **kwargs):
             raise GitError("Shallow clone detected")
 
-        monkeypatch.setattr(external_checks, "get_last_version_tag", shallow)
+        monkeypatch.setattr(tool_checks, "get_last_version_tag", shallow)
         with pytest.raises(GitError) as exc:
-            external_checks._release_context_env(self._ctx(mock_git_repo))
+            tool_checks.release_context_env(self._ctx(mock_git_repo))
         assert "unshallow" in str(exc.value)
 
     def test_an_unexpected_failure_propagates(self, mock_git_repo, monkeypatch):
         def boom(tag_glob="v*", **kwargs):
             raise RuntimeError("git went sideways")
 
-        monkeypatch.setattr(external_checks, "get_last_version_tag", boom)
+        monkeypatch.setattr(tool_checks, "get_last_version_tag", boom)
         with pytest.raises(RuntimeError, match="sideways"):
-            external_checks._release_context_env(self._ctx(mock_git_repo))
+            tool_checks.release_context_env(self._ctx(mock_git_repo))
 
     def test_a_genuinely_untagged_repo_still_reports_empty(self, mock_git_repo):
         """The no-tag case does not raise -- it returns None -- and stays ""."""
-        env = external_checks._release_context_env(self._ctx(mock_git_repo))
+        env = tool_checks.release_context_env(self._ctx(mock_git_repo))
         assert env["RLSBL_LAST_TAG"] == ""
         assert env["RLSBL_UNRELEASED_RANGE"] == "HEAD"
 

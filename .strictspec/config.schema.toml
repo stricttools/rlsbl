@@ -48,9 +48,17 @@ type = "Pipeline"
 [types.Config.fields.external_checks]
 type = "array"
 required = false
-description = "Config-declared subprocess checks (a discriminated union per entry)."
+description = "Config-declared freeform subprocess checks."
 [types.Config.fields.external_checks.item]
 type = "ExternalCheck"
+
+[types.Config.fields.checks]
+type = "map"
+required = false
+key_pattern = "^(lint|format|type-check)$"
+description = "Path-capable built-in tool checks: a declared path list per check, invoked through the project's own environment."
+[types.Config.fields.checks.value]
+type = "ToolCheck"
 
 # external_check names unique across the list.
 [[types.Config.constraints]]
@@ -200,49 +208,28 @@ resolves_into = "targets"
 resolves_by = "node-kind-union-key"
 description = "target names a configured release target."
 
-# ExternalCheck -- discriminated union on kind.
-[types.ExternalCheck]
-type = "discriminated-union"
-discriminator = "kind"
-description = "kind=\"structured\" (rlsbl-composed tool+paths) or kind=\"freeform\" (opaque shell command)."
-[types.ExternalCheck.arms.structured]
-type = "StructuredCheck"
-[types.ExternalCheck.arms.freeform]
-type = "FreeformCheck"
-
-[types.StructuredCheck]
+# ToolCheck -- one path-capable built-in check's settings.
+[types.ToolCheck]
 type = "record"
-[types.StructuredCheck.fields.kind]
-type = "literal"
-value = "structured"
-required = true
-[types.StructuredCheck.fields.name]
-type = "string"
-required = true
-non_empty = true
-regex = "^[a-z][a-z0-9-]*$"
-[types.StructuredCheck.fields.tag]
-type = "string"
-required = true
-non_empty = true
-[types.StructuredCheck.fields.tool]
-type = "enum"
-required = true
-values = ["mypy", "ruff-check", "ruff-format"]
-[types.StructuredCheck.fields.paths]
+description = "Scope is DECLARED, never inferred: both tools read scope from their own config in ways that silently disagree with an explicit CLI path list."
+[types.ToolCheck.fields.paths]
 type = "array"
 required = true
 min_len = 1
-[types.StructuredCheck.fields.paths.item]
+[types.ToolCheck.fields.paths.item]
 type = "string"
-[types.StructuredCheck.fields.depends_on]
-type = "array"
-required = false
-[types.StructuredCheck.fields.depends_on.item]
-type = "string"
-[types.StructuredCheck.fields.cwd]
+[types.ToolCheck.fields.cwd]
 type = "string"
 required = false
+
+# ExternalCheck -- one kind, still discriminated so a retired kind is a
+# diagnostic on the discriminator rather than a pile of unknown-key errors.
+[types.ExternalCheck]
+type = "discriminated-union"
+discriminator = "kind"
+description = "kind=\"freeform\" (an opaque shell command) is the only kind. kind=\"structured\" was retired: configure lint / format / type-check under the top-level \"checks\" key instead."
+[types.ExternalCheck.arms.freeform]
+type = "FreeformCheck"
 
 [types.FreeformCheck]
 type = "record"

@@ -147,14 +147,17 @@ class TestReferencesAndUniqueness:
 
 
 class TestExternalCheckDiscriminatedUnion:
-    def test_structured_requires_tool_and_paths(self):
+    def test_structured_kind_is_retired(self):
+        """The union has one arm now; the retired kind is a diagnostic on the
+        discriminator, not a pile of unknown-key errors."""
         codes = _v({
             "format_version": 1, "publish_mode": "ci",
             "external_checks": [
-                {"kind": "structured", "name": "lint", "tag": "preflight"},
+                {"kind": "structured", "name": "lint", "tag": "preflight",
+                 "tool": "mypy", "paths": ["src"]},
             ],
         })
-        assert codes  # missing tool + paths -> diagnostics
+        assert codes
 
     def test_freeform_rejects_unknown_key(self):
         codes = _v({
@@ -191,3 +194,45 @@ class TestNotWiredBoundary:
         src = inspect.getsource(config_mod)
         assert "config_validator" not in src
         assert "strictspec_gen" not in src
+
+
+class TestToolCheckBlock:
+    """The `checks` block: the path-capable built-ins' only configuration."""
+
+    def test_valid_block(self):
+        assert _v({
+            "format_version": 1, "publish_mode": "ci",
+            "checks": {
+                "lint": {"paths": ["pkg", "tests"]},
+                "format": {"paths": ["pkg"]},
+                "type-check": {"paths": ["pkg"], "cwd": "sub"},
+            },
+        }) == []
+
+    def test_paths_are_required(self):
+        codes = _v({
+            "format_version": 1, "publish_mode": "ci",
+            "checks": {"lint": {}},
+        })
+        assert codes
+
+    def test_empty_paths_rejected(self):
+        codes = _v({
+            "format_version": 1, "publish_mode": "ci",
+            "checks": {"lint": {"paths": []}},
+        })
+        assert codes
+
+    def test_unknown_check_name_rejected(self):
+        codes = _v({
+            "format_version": 1, "publish_mode": "ci",
+            "checks": {"typecheck": {"paths": ["a"]}},
+        })
+        assert codes
+
+    def test_unknown_entry_key_rejected(self):
+        codes = _v({
+            "format_version": 1, "publish_mode": "ci",
+            "checks": {"lint": {"paths": ["a"], "tool": "ruff"}},
+        })
+        assert "STRICTSPEC_KEY_UNKNOWN" in codes

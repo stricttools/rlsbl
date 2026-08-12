@@ -1025,29 +1025,31 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     releasables=[releasable_obj] if releasable_obj else [],
                 )
                 if hook_is_customized:
-                    if _pf_dry:
-                        # In dry-run with customized hook, list external checks
-                        from ...external_checks import validate_external_checks
-                        for entry in validate_external_checks(ctx.config):
-                            log(f"would run: {entry['name']} (impure)")
-                    else:
-                        # Run ONLY the config-declared external checks; the hook
-                        # owns built-in tests/lint.
-                        results, exit_code = run_external_preflight_checks(
+                    # Run ONLY the config-declared external checks; the hook
+                    # owns built-in tests/lint.  Under --dry-run the SAME call
+                    # partitions exactly as the other branch does: pure checks
+                    # execute, impure ones are listed.
+                    results, _impure_listed, exit_code = (
+                        run_external_preflight_checks(
                             _rlsbl_app, member_ctx, ctx.config,
+                            pure_only=_pf_dry,
                         )
-                        if exit_code != 0:
-                            for r in results:
-                                if r.status == "fail":
-                                    all_failed.append(
-                                        f"{pkg_name}: {r.name}: {r.message}"
-                                    )
-                        else:
-                            _member_summary = _format_preflight_summary(
-                                results, label=f"Preflight ({pkg_name})"
-                            )
-                            if _member_summary:
-                                log(_member_summary)
+                    )
+                    if _pf_dry:
+                        for _impure_name in _impure_listed:
+                            log(f"would run: {_impure_name} (impure)")
+                    if exit_code != 0:
+                        for r in results:
+                            if r.status == "fail":
+                                all_failed.append(
+                                    f"{pkg_name}: {r.name}: {r.message}"
+                                )
+                    else:
+                        _member_summary = _format_preflight_summary(
+                            results, label=f"Preflight ({pkg_name})"
+                        )
+                        if _member_summary:
+                            log(_member_summary)
                 else:
                     # One run covering built-in + external preflight checks.
                     results, _impure_listed, exit_code = _rlsbl_app.run_checks(
@@ -1114,30 +1116,30 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             )
             if hook_is_customized:
                 # Run ONLY the config-declared external checks; the hook owns
-                # built-in tests/lint.
+                # built-in tests/lint.  Under --dry-run the SAME call
+                # partitions exactly as the other branch does: pure checks
+                # execute, impure ones are listed.
                 log("Skipping built-in checks (pre-release hook handles testing/linting; running config-declared external checks)")
+                results, _impure_listed, exit_code = run_external_preflight_checks(
+                    _rlsbl_app, standalone_ctx, config, pure_only=_pf_dry,
+                )
                 if _pf_dry:
-                    from ...external_checks import validate_external_checks
-                    for entry in validate_external_checks(config):
-                        log(f"would run: {entry['name']} (impure)")
-                else:
-                    results, exit_code = run_external_preflight_checks(
-                        _rlsbl_app, standalone_ctx, config,
+                    for _impure_name in _impure_listed:
+                        log(f"would run: {_impure_name} (impure)")
+                if exit_code != 0:
+                    failed = [
+                        f"{r.name}: {r.message}"
+                        for r in results
+                        if r.status == "fail"
+                    ]
+                    for msg in failed:
+                        print(f"  FAIL  {msg}", file=sys.stderr)
+                    raise HookError(
+                        f"Preflight checks failed ({len(failed)} failure(s))"
                     )
-                    if exit_code != 0:
-                        failed = [
-                            f"{r.name}: {r.message}"
-                            for r in results
-                            if r.status == "fail"
-                        ]
-                        for msg in failed:
-                            print(f"  FAIL  {msg}", file=sys.stderr)
-                        raise HookError(
-                            f"Preflight checks failed ({len(failed)} failure(s))"
-                        )
-                    _pf_summary = _format_preflight_summary(results)
-                    if _pf_summary:
-                        log(_pf_summary)
+                _pf_summary = _format_preflight_summary(results)
+                if _pf_summary:
+                    log(_pf_summary)
             else:
                 # One run covering built-in + external preflight checks.
                 results, _impure_listed, exit_code = _rlsbl_app.run_checks(
