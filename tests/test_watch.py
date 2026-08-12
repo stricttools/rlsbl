@@ -1443,3 +1443,87 @@ class TestCIDiscoveryBudget:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+class TestRetryReachesTheEffectsRegime:
+    """`rlsbl watch` re-dispatches CI, so its declaration must permit that.
+
+    The auto-retry issues `gh run rerun <id>`, which is a real mutation of CI
+    state on GitHub.  While the command was declared ``read_only``, the
+    effects handle refused that argv at call time and `_retry_workflow`'s
+    broad `except Exception` swallowed the refusal into "retry trigger
+    failed" -- so a watch over a failed run silently gave up instead of
+    re-dispatching, and the would-do log never named the rerun either.
+    """
+
+    @staticmethod
+    def _preview(effect, fn):
+        """Run *fn* inside a real --dry-run dispatch of the given effect class."""
+        import strictcli
+
+        import rlsbl
+        from rlsbl import effects
+
+        box = {}
+        app = strictcli.App(
+            name="watchretryprobe",
+            version="0.0.0",
+            help="Throwaway app that mints a real effects handle.",
+            proc_observe_allowlist=list(rlsbl.app.proc_observe_allowlist),
+        )
+
+        @app.command(
+            name="probe",
+            help="Run the callable under test inside a real dry-run dispatch.",
+            effect=effect,
+        )
+        @effects.handler
+        def _probe(ctx):
+            box["value"] = fn()
+
+        result = app.test(["--dry-run", "probe"])
+        return box.get("value"), result
+
+    def test_watch_declares_an_effect_that_permits_re_dispatch(self):
+        import rlsbl
+
+        assert rlsbl.app._commands["watch"].effect == "mutating", (
+            "a command whose auto-retry calls `gh run rerun` changes CI state; "
+            "declaring it read_only makes the effects handle refuse the rerun "
+            "at call time"
+        )
+
+    def test_a_preview_records_the_rerun_instead_of_swallowing_it(self):
+        from rlsbl.commands.watch import _retry_workflow
+
+        import rlsbl
+
+        _value, result = self._preview(
+            rlsbl.app._commands["watch"].effect,
+            lambda: _retry_workflow("CI", "user/repo", "test-label", "4242"),
+        )
+
+        assert "retry trigger failed" not in result.stderr, (
+            "the rerun was refused at call time and `_retry_workflow`'s broad "
+            "`except Exception` swallowed it into a trigger-failure notice -- "
+            f"stderr was:\n{result.stderr}"
+        )
+        assert "gh run rerun 4242" in result.stdout, (
+            "a preview must NAME the re-dispatch it would perform; "
+            f"got:\n{result.stdout}"
+        )
+
+    def test_the_blocking_watch_call_is_an_observe(self):
+        """`gh run watch` polls; it must really run, even under a preview.
+
+        If it were recorded instead, `run_gh` would hand back a carrier, no
+        exception would be raised, and `_watch_single_run` would print
+        "[workflow] passed" for a run it never looked at.
+        """
+        from rlsbl import observe_allowlist as oa
+
+        argv = ["gh", "run", "watch", "4242", "--exit-status"]
+        assert any(
+            len(e.argv) <= len(argv) and tuple(argv[: len(e.argv)]) == e.argv
+            for e in oa.OBSERVE_ALLOWLIST
+        ), "gh run watch matches no observe prefix"

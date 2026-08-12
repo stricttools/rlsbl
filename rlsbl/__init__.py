@@ -1048,7 +1048,14 @@ def cmd_discover(ctx, mine):
 # watch
 # ---------------------------------------------------------------------------
 
-@app.command(name="watch", help="Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.", effect="read_only")
+# `mutating`, not `read_only`: watching a FAILED run auto-retries it with
+# `gh run rerun`, which re-dispatches CI -- a real change to state on GitHub.
+# While this was declared read_only the effects handle refused that argv at
+# call time and the retry path swallowed the refusal, so a watch over a failed
+# run silently gave up instead of re-dispatching. Not `consequential`: a rerun
+# of a run that already failed is cheap and reversible, and the command is
+# invoked constantly for monitoring.
+@app.command(name="watch", help="Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.", effect="mutating")
 @strictcli.flag(name="target", type=str, help="Registry whose CI workflow to watch (auto-detected if omitted)", default="")
 @strictcli.flag(name="run-id", type=str, help="GitHub Actions workflow run ID to poll directly instead of searching by SHA", repeatable=True, unique=True)
 @strictcli.arg(name="sha", help="Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted)", required=False)

@@ -172,6 +172,12 @@ OBSERVE_ALLOWLIST = (
     ObserveEntry(("gh", "repo", "view"), "network-read", "reads repository metadata"),
     ObserveEntry(("gh", "run", "list"), "network-read", "lists workflow runs"),
     ObserveEntry(("gh", "run", "view"), "network-read", "reads one workflow run"),
+    ObserveEntry(
+        ("gh", "run", "watch"), "network-read",
+        "blocks polling one workflow run until it concludes; nothing on the "
+        "far side changes, and a preview that RECORDED it would hand the "
+        "caller a carrier and report a pass it never observed",
+    ),
     ObserveEntry(("gh", "pr", "list"), "network-read", "lists pull requests"),
     ObserveEntry(("gh", "workflow", "list"), "network-read", "lists workflows"),
     ObserveEntry(("gh", "--version"), "self-report", "prints gh's version"),
