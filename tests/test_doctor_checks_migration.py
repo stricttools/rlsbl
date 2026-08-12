@@ -414,11 +414,20 @@ class TestBranchSyncCheck:
 # ---------------------------------------------------------------------------
 
 class TestCheckDryRun:
-    """``check --all --dry-run`` previews which checks would run."""
+    """``check --all --dry-run`` previews which checks would run.
+
+    Since strictcli unified the two preview behaviours, ``check --dry-run``
+    EXECUTES the checks declared pure and renders only the impure remainder as
+    the would-run plan -- so its exit code now reports real results. These tests
+    run in a bare temp directory (stricttest chdirs every test into its own),
+    which is not an rlsbl project, so pure checks legitimately fail there and
+    the exit code is not the thing under test. What is under test is that every
+    registered check appears in the preview, as an executed row or a plan entry.
+    """
 
     def test_dry_run_lists_all_checks(self):
         result = app.test(["--dry-run", "check", "--all"])
-        assert result.exit_code == 0
+        assert "Would run" in result.stdout
         for name in EXPECTED_CHECKS + BUILTIN_PROVIDER_CHECKS:
             assert name in result.stdout
 
@@ -428,11 +437,16 @@ class TestCheckDryRun:
 # ---------------------------------------------------------------------------
 
 class TestCheckTagFiltering:
-    """``check --tag <expr>`` filters checks by tag."""
+    """``check --tag <expr>`` filters checks by tag.
+
+    As in :class:`TestCheckDryRun`, a dry run now executes the pure checks, so
+    in the bare temp CWD the exit code reflects those real results rather than
+    the preview's success; the selection itself is what these assert.
+    """
 
     def test_tag_project(self):
         result = app.test(["--dry-run", "check", "--tag", "project"])
-        assert result.exit_code == 0
+        assert "Would run" in result.stdout
         assert "lock" in result.stdout
         assert "version-consistency" in result.stdout
         # release-only checks should not appear
@@ -448,7 +462,7 @@ class TestCheckTagFiltering:
 
     def test_tag_changelog(self):
         result = app.test(["--dry-run", "check", "--tag", "changelog"])
-        assert result.exit_code == 0
+        assert "Would run" in result.stdout
         assert "changelog-entry" in result.stdout
         # New changelog validation checks should also appear
         assert "changelog-hashes" in result.stdout
