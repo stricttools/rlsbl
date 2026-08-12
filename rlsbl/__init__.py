@@ -1858,7 +1858,7 @@ def cmd_mono_migrate_releasable(ctx, releasable_name):
             print(f"  Cleaned up: {len(cleanup)} per-package directories")
 
 
-@mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the releasable's state directory, drops the stale changelog validation cache, re-runs monorepo sync to regenerate publish gate prefixes, and commits everything as one commit. When the tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: a crash between the commit and the tag push is healed by re-running.", effect="mutating")
+@mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: re-running heals a crash between the commit and the tag push.", effect="mutating")
 @strictcli.arg(name="new_name", help="New name for the releasable group in workspace.toml and state directories")
 @strictcli.arg(name="old_name", help="Current name of the releasable group in workspace.toml")
 @effects.handler
@@ -1917,7 +1917,7 @@ def cmd_mono_rename_releasable(ctx, old_name, new_name):
 dev = app.group("dev", help="Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).")
 
 
-@dev.command(name="install", help="Install the project locally for development by running each detected target's own install command. --global (default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go (go install), deno (deno install), and -- since they have no system-wide install concept -- zig (zig build install), swift (swift build), and hex (mix deps.get). --venv installs into the project's local environment instead and is supported by pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install where the target supports it (pypi, npm, deno). In monorepo mode, pair with --all, --include, or --exclude.", effect="mutating")
+@dev.command(name="install", help="Install the project locally for development by running each detected target's own install command. --global (the default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.", effect="mutating")
 @strictcli.flag(name="all", type=bool, default=False, help="In monorepo mode, install every project in the workspace")
 @strictcli.flag(name="include", type=str, help="In monorepo mode, comma-separated project names to include", default="")
 @strictcli.flag(name="exclude", type=str, help="In monorepo mode, comma-separated project names to exclude", default="")
