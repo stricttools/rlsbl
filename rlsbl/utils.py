@@ -586,9 +586,14 @@ def check_gh_installed():
 
 
 def check_gh_auth():
-    """Check that the gh CLI is authenticated."""
+    """Check that the gh CLI is authenticated for github.com.
+
+    The host is named explicitly: github.com is the only forge rlsbl talks to,
+    and the observe allowlist pins this exact argv so the bare ``gh auth
+    status`` prefix cannot also admit ``--show-token``.
+    """
     try:
-        run_gh_unscoped(["auth", "status"])
+        run_gh_unscoped(["auth", "status", "--hostname", "github.com"])
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False

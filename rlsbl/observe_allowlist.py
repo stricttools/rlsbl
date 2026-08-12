@@ -47,6 +47,13 @@ Consequences of the standard, entry by entry
   commands refresh the index and take ``index.lock``.
 * ``npm view`` and ``go list`` stay.  Both are registry/module reads whose
   only write is to the tool's own cache.
+* ``gh auth status`` is pinned to ``["gh", "auth", "status", "--hostname",
+  "github.com"]``, and its one caller (``utils.check_gh_auth``) issues exactly
+  that argv.  The two-token prefix it used to carry also matched ``gh auth
+  status --show-token`` and its short form ``-t``, both of which print the live
+  credential to stdout -- credential emission, admitted by a prefix that was
+  written for the token-free form.  github.com is the only host rlsbl talks to,
+  so naming it costs the check nothing.
 * ``gh auth token`` is **gone**.  It printed a live credential to stdout, so
   it was never observe-safe under any reading of the standard.  Its three
   former callers now let ``gh`` resolve and use the credential internally
@@ -164,8 +171,11 @@ OBSERVE_ALLOWLIST = (
         "GET-pinned API read; the bare `gh api` prefix would legalize POST",
     ),
     ObserveEntry(
-        ("gh", "auth", "status"), "self-report",
-        "reports whether a credential is present and valid; prints no token",
+        ("gh", "auth", "status", "--hostname", "github.com"), "self-report",
+        "reports whether a credential for github.com is present and valid; "
+        "pinned to the one argv rlsbl issues because the bare `gh auth status` "
+        "prefix also admitted `--show-token` and `-t`, which print the live "
+        "credential to stdout",
     ),
     ObserveEntry(("gh", "release", "view"), "network-read", "reads one Release"),
     ObserveEntry(("gh", "release", "list"), "network-read", "lists Releases"),

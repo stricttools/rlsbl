@@ -161,6 +161,11 @@ INDEX_WRITES = [
 CREDENTIAL_EMISSION = [
     ["gh", "auth", "token"],
     ["gh", "auth", "token", "--hostname", "github.com"],
+    # `gh auth status` prints no token -- until it is asked for one. Both
+    # spellings put the live credential on stdout, so neither may ride the
+    # status entry's prefix.
+    ["gh", "auth", "status", "--show-token"],
+    ["gh", "auth", "status", "-t"],
     ["git", "credential", "fill"],
 ]
 
@@ -233,6 +238,7 @@ class TestTheReadsStillMatch:
         ["git", "merge-file", "-p", "a", "b", "c"],
         ["git", "tag", "--list", "v*"],
         ["gh", "api", "--method", "GET", "repos/x/y"],
+        ["gh", "auth", "status", "--hostname", "github.com"],
         ["gh", "run", "view", "1", "--log-failed"],
         ["npm", "view", "pkg", "version"],
         ["go", "list", "-m", "all"],
@@ -269,6 +275,29 @@ class TestCallSitesPassTheFlag:
             "refresh the index and take index.lock, and the allowlist no "
             f"longer admits the bare form, so they would be RECORDED rather "
             f"than observed under --dry-run: {offenders}"
+        )
+
+
+    def test_the_auth_check_issues_the_pinned_argv(self):
+        """``check_gh_auth`` must produce the argv the allowlist pins.
+
+        A call site that drops ``--hostname github.com`` matches no prefix, so
+        under ``--dry-run`` the auth probe is RECORDED instead of observed:
+        ``run_gh_unscoped`` hands back the carrier, nothing raises, and
+        ``check_gh_auth`` reports success for a probe that never ran.
+        """
+        import inspect
+
+        from rlsbl import utils
+
+        src = inspect.getsource(utils.check_gh_auth)
+        pinned = [
+            e for e in oa.OBSERVE_ALLOWLIST if e.argv[:3] == ("gh", "auth", "status")
+        ]
+        assert len(pinned) == 1, pinned
+        args = ", ".join(f'"{tok}"' for tok in pinned[0].argv[1:])
+        assert f"[{args}]" in src, (
+            f"check_gh_auth does not issue the pinned argv [{args}]:\n{src}"
         )
 
 
