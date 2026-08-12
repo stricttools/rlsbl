@@ -45,8 +45,12 @@ Consequences of the standard, entry by entry
 * ``git status`` / ``git diff`` / ``git diff-index`` carry
   ``--no-optional-locks``, both here and at every call site.  Without it those
   commands refresh the index and take ``index.lock``.
-* ``npm view`` and ``go list`` stay.  Both are registry/module reads whose
-  only write is to the tool's own cache.
+* ``npm view`` stays: a registry read whose only write is to npm's own cache.
+* ``go list`` is split into the two forms rlsbl actually issues -- ``go list
+  -m ...`` (the module-proxy notification) and ``go list -e -f ...`` (package
+  enumeration).  The bare two-token prefix also admitted ``go list -mod=mod
+  ...``, which updates ``go.mod`` and ``go.sum`` in place: a manifest write a
+  user would notice, reached through an entry written for a read.
 * ``gh auth status`` is pinned to ``["gh", "auth", "status", "--hostname",
   "github.com"]``, and its one caller (``utils.check_gh_auth``) issues exactly
   that argv.  The two-token prefix it used to carry also matched ``gh auth
@@ -197,8 +201,14 @@ OBSERVE_ALLOWLIST = (
         "registry metadata read; its only write is npm's own cache",
     ),
     ObserveEntry(
-        ("go", "list"), "network-read",
-        "module metadata read; its only write is the module cache",
+        ("go", "list", "-m"), "network-read",
+        "module metadata read (the proxy notification in pipelines/go.py); its "
+        "only write is the module cache",
+    ),
+    ObserveEntry(
+        ("go", "list", "-e", "-f"), "local-read",
+        "package enumeration in go_introspect.py; -e keeps it off the network "
+        "and the format string only shapes stdout",
     ),
     ObserveEntry(("uv", "--version"), "self-report", "prints uv's version"),
     ObserveEntry(("ruff", "--version"), "self-report", "prints ruff's version"),

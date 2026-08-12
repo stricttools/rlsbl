@@ -181,6 +181,10 @@ REMOTE_MUTATIONS = [
     ["npm", "publish"],
     ["npm", "install"],
     ["go", "get", "example.com/m"],
+    # -mod=mod turns a read into a manifest write: go updates go.mod and
+    # go.sum in place. rlsbl issues `go list -m ...` and `go list -e -f ...`
+    # only, so the entries are pinned to those and this cannot match.
+    ["go", "list", "-mod=mod", "all"],
     ["uv", "publish"],
     ["uv", "sync"],
     ["ruff", "check", "--fix", "."],
@@ -242,6 +246,7 @@ class TestTheReadsStillMatch:
         ["gh", "run", "view", "1", "--log-failed"],
         ["npm", "view", "pkg", "version"],
         ["go", "list", "-m", "all"],
+        ["go", "list", "-e", "-f", "{{.Name}}", "./..."],
     ], ids=" ".join)
     def test_read_argv_is_observable(self, argv):
         assert _matches(argv), f"{' '.join(argv)} is a read but matches nothing"
