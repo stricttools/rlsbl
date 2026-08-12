@@ -1,4 +1,4 @@
-"""Shared helpers for rlsbl check modules: version and tag resolution, changelog context loading, and sibling project directory exclusion."""
+"""Shared helpers for rlsbl check modules: version and tag resolution, changelog context loading, sibling project directory exclusion, and reporter text hygiene."""
 
 import os
 
@@ -6,6 +6,55 @@ from ..check_context import WorkspaceCheckContext
 
 # Universal project indicator: every scaffolded rlsbl project has this file.
 RLSBL_CONFIG = os.path.join(".rlsbl", "config.json")
+
+# Fallback text for a reporter call whose intended text turned out to be empty.
+# The reporter rejects empty problem/outcome text with a ValueError that
+# propagates out of the whole check run, so no rlsbl check may ever hand it one.
+_NO_TEXT = "(no message)"
+
+
+def reportable_lines(text, *, limit=None):
+    """Return the non-blank lines of *text*, right-stripped, optionally capped.
+
+    Tool output is not safe to feed to a reporter line by line: linters like
+    ruff separate findings with blank lines, and an empty problem text is a
+    hard error that aborts the entire check run with no attribution to the
+    check that produced it.  Blank lines carry no finding, so they are dropped
+    before the reporter ever sees them.  *limit* caps the number of lines
+    returned (applied after filtering, so a cap of 20 yields 20 real findings).
+    """
+    lines = [line.rstrip() for line in (text or "").splitlines() if line.strip()]
+    if limit is not None:
+        return lines[:limit]
+    return lines
+
+
+def summary_line(text, *, limit=200, fallback=_NO_TEXT):
+    """Return the first non-blank line of *text*, truncated to *limit* chars.
+
+    Used for the one-line outcome message that accompanies a set of problems.
+    Never returns an empty string: text that is empty or entirely blank yields
+    *fallback*, because the reporter rejects an empty outcome message.
+    """
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped[:limit]
+    return fallback
+
+
+def exception_text(exc, *, fallback=None):
+    """Return a non-empty description of *exc* suitable for a reporter call.
+
+    An exception raised with no message (or a whitespace-only one) stringifies
+    to ``""``, which the reporter rejects.  Falling back to the exception's
+    class name keeps the failure attributable to the check that hit it instead
+    of aborting the run with an internal error.
+    """
+    text = str(exc).strip()
+    if text:
+        return text
+    return fallback or f"{type(exc).__name__} {_NO_TEXT}"
 
 
 def _resolve_version_and_tag(ctx):

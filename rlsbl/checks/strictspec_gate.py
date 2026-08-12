@@ -6,6 +6,7 @@ gate. Feature-flagged by config presence: skips cleanly when the project has no
 """
 
 from ..errors import ConfigError
+from ._common import exception_text, summary_line
 
 
 def register_strictspec_gate_checks(app):
@@ -24,8 +25,12 @@ def register_strictspec_gate_checks(app):
         try:
             verdict = evaluate_certificate_gate(config, str(ctx.project_root))
         except ConfigError as e:
-            reporter.error(str(e))
-            return reporter.found(str(e).splitlines()[0])
+            # A message-less exception stringifies to "", which the reporter
+            # rejects -- twice over here, since the outcome also indexes the
+            # first line of it.
+            text = exception_text(e)
+            reporter.error(text)
+            return reporter.found(summary_line(text))
 
         if verdict.ok:
             if verdict.notes:

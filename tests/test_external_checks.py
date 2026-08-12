@@ -504,6 +504,105 @@ class TestMakeExternalCheckFn:
 
 
 # ---------------------------------------------------------------------------
+# Blank lines in tool output
+#
+# Real linters (ruff, mypy with a summary block, pytest) separate findings with
+# blank lines.  Every line used to be handed to reporter.error() verbatim, and
+# the reporter rejects an empty problem text -- so a failing linter aborted the
+# whole check run with an internal ValueError and no attribution instead of
+# showing its findings.  Blank lines are filtered before the reporter sees them.
+# ---------------------------------------------------------------------------
+
+
+class TestBlankLineSeparatedOutput:
+    """A tool whose findings are separated by blank lines is reported, not raised."""
+
+    #: stdout of a fake linter: two findings separated by a blank line, plus a
+    #: trailing blank line before the summary -- the shape ruff actually emits.
+    FAKE_LINTER = (
+        "bash -c '"
+        "printf \"app.py:1:1: F401 unused import\\n\\n"
+        "app.py:9:5: F841 unused variable\\n\\n"
+        "Found 2 errors.\\n\"; exit 1'"
+    )
+
+    FAKE_LINTER_STDERR = (
+        "bash -c '"
+        "printf \"lib.py:3:1: E501 line too long\\n\\nFound 1 error.\\n\" >&2; exit 1'"
+    )
+
+    def test_freeform_blank_line_stdout_is_reported(self, tmp_path):
+        fn = _make_external_check_fn(self.FAKE_LINTER, None, "fake-lint")
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        result = fn(FakeCtx(), ErrorReporter())
+        assert result.status == "fail"
+        texts = [p.text for p in result.problems]
+        assert "app.py:1:1: F401 unused import" in texts
+        assert "app.py:9:5: F841 unused variable" in texts
+        assert "Found 2 errors." in texts
+        assert "" not in texts
+        assert "fake-lint" in result.message
+
+    def test_freeform_blank_line_stderr_is_reported(self, tmp_path):
+        fn = _make_external_check_fn(self.FAKE_LINTER_STDERR, None, "fake-lint-err")
+
+        class FakeCtx:
+            project_root = tmp_path
+
+        result = fn(FakeCtx(), ErrorReporter())
+        assert result.status == "fail"
+        texts = [p.text for p in result.problems]
+        assert "lib.py:3:1: E501 line too long" in texts
+        assert "" not in texts
+
+    def test_structured_blank_line_output_is_reported(self, tmp_path, monkeypatch):
+        """The structured arm shares the same reporting path."""
+        def fake_run(*args, **kwargs):
+            class R:
+                returncode = 1
+                stdout = "app.py:1:1: F401 unused import\n\nFound 1 error.\n"
+                stderr = ""
+            return R()
+
+        monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
+        fn = _make_structured_check_fn("ruff-check", ["app"], None, "ruff-lint")
+
+        class FakeCtx:
+            project_root = tmp_path
+            config = {}
+
+        result = fn(FakeCtx(), ErrorReporter())
+        assert result.status == "fail"
+        texts = [p.text for p in result.problems]
+        assert "app.py:1:1: F401 unused import" in texts
+        assert "" not in texts
+
+    def test_whitespace_only_output_still_attributes(self, tmp_path, monkeypatch):
+        """Output that is nothing but blank lines still names the check."""
+        def fake_run(*args, **kwargs):
+            class R:
+                returncode = 3
+                stdout = "\n \n\n"
+                stderr = ""
+            return R()
+
+        monkeypatch.setattr(external_checks.subprocess, "run", fake_run)
+        fn = _make_external_check_fn("whatever", None, "blank-check")
+
+        class FakeCtx:
+            project_root = tmp_path
+            config = {}
+
+        result = fn(FakeCtx(), ErrorReporter())
+        assert result.status == "fail"
+        assert "blank-check" in result.message
+        assert all(p.text.strip() for p in result.problems)
+
+
+# ---------------------------------------------------------------------------
 # Timeout routing
 #
 # The budget is resolved per RUN from the live check context's config, never

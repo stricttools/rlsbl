@@ -30,6 +30,7 @@ import tomllib
 
 from strictcli import error_check_spec
 
+from .checks._common import reportable_lines, summary_line
 from .errors import GitError
 from .utils import detect_uv_workspace_root, get_check_timeout, get_last_version_tag
 from . import effects
@@ -423,26 +424,32 @@ def _resolve_cwd(ctx, cwd):
 
 
 def _report_subprocess_result(reporter, result, name):
-    """Turn a completed subprocess into a pass/fail check result."""
+    """Turn a completed subprocess into a pass/fail check result.
+
+    Every line handed to the reporter goes through ``reportable_lines``: the
+    reporter rejects empty problem text with an exception that propagates out
+    of the whole check run, and real linters separate their findings with blank
+    lines, so unfiltered output turned a lint failure into an unattributed
+    internal error.
+    """
     if result.returncode == 0:
         stdout = (result.stdout or "").strip()
-        msg = stdout[:200] if stdout else "passed"
+        msg = summary_line(stdout, fallback="passed") if stdout else "passed"
         return reporter.passed(msg)
 
-    stderr = (result.stderr or "").strip()
-    stdout = (result.stdout or "").strip()
-    output = stderr or stdout or f"exit code {result.returncode}"
-    if stdout:
-        for line in stdout.splitlines()[:20]:
-            reporter.error(line)
-    if stderr:
-        for line in stderr.splitlines()[:20]:
-            reporter.error(line)
-    if not stdout and not stderr:
-        reporter.error(f"exit code {result.returncode}")
+    exit_text = f"exit code {result.returncode}"
+    stdout_lines = reportable_lines(result.stdout, limit=20)
+    stderr_lines = reportable_lines(result.stderr, limit=20)
+    for line in stdout_lines:
+        reporter.error(line)
+    for line in stderr_lines:
+        reporter.error(line)
+    if not stdout_lines and not stderr_lines:
+        reporter.error(exit_text)
+    first = (stderr_lines or stdout_lines or [exit_text])[0]
     return reporter.found(
         f"external check '{name}' failed (exit {result.returncode}): "
-        + output.splitlines()[0][:200]
+        + first[:200]
     )
 
 

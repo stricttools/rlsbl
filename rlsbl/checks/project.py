@@ -12,6 +12,7 @@ import os
 import tomllib
 
 from ..errors import ConfigError
+from ._common import exception_text
 
 
 def _launcher_target_subdir_from_config(config, launcher_entry):
@@ -567,42 +568,42 @@ def register_project_checks(app):
         try:
             _validate_config_schema(config, project_dir=str(ctx.project_root))
         except ConfigError as e:
-            errors.append(str(e))
+            errors.append(exception_text(e))
 
         # Validate pipelines config if present
         from ..config import validate_pipelines_config
         try:
             validate_pipelines_config(config)
         except ConfigError as e:
-            errors.append(str(e))
+            errors.append(exception_text(e))
 
         # Validate pipeline target links (separate-but-linked config shape)
         from ..config import validate_pipeline_target_links
         try:
             validate_pipeline_target_links(config)
         except ConfigError as e:
-            errors.append(str(e))
+            errors.append(exception_text(e))
 
         # Validate the optional per-target test config block if present
         from ..config import validate_test_config
         try:
             validate_test_config(config)
         except ConfigError as e:
-            errors.append(str(e))
+            errors.append(exception_text(e))
 
         # Validate the optional CI service-container config (services/test_env)
         from ..config import validate_services_config
         try:
             validate_services_config(config)
         except ConfigError as e:
-            errors.append(str(e))
+            errors.append(exception_text(e))
 
         # Validate the optional sandboxed-test-runner config family
         from ..test_sandbox import validate_test_sandbox_config
         try:
             validate_test_sandbox_config(config)
         except ConfigError as e:
-            errors.append(str(e))
+            errors.append(exception_text(e))
 
         if errors:
             for err in errors:
@@ -820,8 +821,9 @@ def register_project_checks(app):
         try:
             mode = get_publish_mode(ctx.config)
         except ConfigError as e:
-            reporter.error(str(e))
-            return reporter.found(str(e))
+            text = exception_text(e)
+            reporter.error(text)
+            return reporter.found(text)
         if mode != "none":
             return reporter.passed('publish_mode is not "none"')
 
@@ -871,8 +873,9 @@ def register_project_checks(app):
         try:
             mode = get_publish_mode(ctx.config)
         except ConfigError as e:
-            reporter.error(str(e))
-            return reporter.found(str(e))
+            text = exception_text(e)
+            reporter.error(text)
+            return reporter.found(text)
 
         if npm_private is True and mode != "none":
             msg = (
@@ -934,8 +937,9 @@ def register_project_checks(app):
         try:
             pkg_root = detect_python_package_root(root_str)
         except VersionError as e:
-            reporter.error(str(e))
-            return reporter.found(str(e))
+            text = exception_text(e)
+            reporter.error(text)
+            return reporter.found(text)
 
         if pkg_root is None:
             return reporter.passed("cannot determine package root")
@@ -1084,8 +1088,9 @@ def register_project_checks(app):
         try:
             sentinel = load_sentinel(root)
         except MalformedSentinelError as e:
-            reporter.error(str(e))
-            return reporter.found(str(e))
+            text = exception_text(e)
+            reporter.error(text)
+            return reporter.found(text)
         if sentinel is None:
             return reporter.skipped("no dev overlays declared (no sentinel)")
         if not sentinel:
