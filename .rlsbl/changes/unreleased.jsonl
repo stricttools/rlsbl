@@ -3,3 +3,4 @@
 {"format_version":1,"id":"18caf1f55d5aca066728676068f74290aa10299dc7386922","commits":["bf95c9736bc2a3cf799a2907e68d34e3e0271c85"],"user_facing":false}
 {"format_version":1,"id":"18caf1f56715a4e85b184d194f8449aab40a4463c3f212f7","commits":["185e595607d724818e346768005cedc93d7bacf8"],"user_facing":true,"description":"Shorter, more readable help for `rlsbl dev install` and `rlsbl monorepo rename-releasable`.","type":"feature"}
 {"format_version":1,"id":"18caf2d8d6313d9080c7dc9c421c418db638774c1d0fb109","commits":["a3aaa5ab1df48ec5becfaaa397dc732517e560b0"],"user_facing":false}
+{"format_version":1,"id":"18cb0cbb428ea48dafd60a1b43ff4a64b3cb3751a539bca0","commits":["284a56d683c8550387c3fde15d4c59385fb23206"],"user_facing":false}
