@@ -1,11 +1,31 @@
 app = "rlsbl"
 
-# Purity standard for the `pure` flag below:
-# pure = the check spawns no subprocess and touches no network; read-only
-# subprocesses still count as impure (unverifiable). "Sometimes shells out"
-# means impure -- purity is verifiable by grepping the check impl (and every
-# helper it calls) for subprocess/run() usage, never by trusting that a
-# subprocess is "harmless".
+# Purity standard for the `pure` flag below.
+#
+# pure   = the check starts ONLY allowlisted read-only programs. The allowlist
+#          is rlsbl/observe_allowlist.py, and its written standard is "no
+#          user-visible mutation": ref updates, index writes and credential
+#          emission are refused there, so anything that reaches the list
+#          changes nothing a user would notice. A check that spawns no program
+#          at all is trivially pure.
+# impure  = the check starts a program that is NOT on that list. Every impure
+#          check today runs a tool that writes -- ruff rewrites files, `uv
+#          sync` materializes an environment, the test suites and gradle build.
+#          "Sometimes shells out to a writing tool" means impure.
+#
+# This replaced "the check spawns no subprocess at all". That older rule forced
+# nine checks that spawn only read-only local git to be declared impure, and it
+# quietly misdeclared two that DO spawn: `local-tag` runs `git tag --list`, and
+# `config-schema` can reach `go list` on its error path. Under the rule above
+# both are legitimately pure, and are declared so deliberately rather than by
+# accident. The full record is in rlsbl/observe_allowlist.py.
+#
+# Verifiable rather than asserted: tests/test_check_purity.py executes every
+# pure-declared check under an effects observer and fails on any spawn whose
+# argv matches no allowlist prefix.
+#
+# `needs_network` is orthogonal and unchanged: it says whether the check needs
+# the network to answer at all, never whether it may mutate.
 
 [checks.lock]
 tags = ["project"]
@@ -128,7 +148,7 @@ scope = "workspace:library"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = []
 
@@ -136,7 +156,7 @@ depends_on = []
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = ["changelog-hashes"]
 
@@ -144,7 +164,7 @@ depends_on = ["changelog-hashes"]
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = ["changelog-hashes"]
 
@@ -152,7 +172,7 @@ depends_on = ["changelog-hashes"]
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = []
 
@@ -184,7 +204,7 @@ depends_on = []
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = []
 
@@ -242,7 +262,7 @@ scope = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = []
 scope = "workspace"
@@ -400,6 +420,65 @@ needs_network = false
 depends_on = []
 
 # ---------------------------------------------------------------------------
+# Path-capable tool checks (rlsbl/tool_checks.py)
+#
+# Each runs a Python tool over a project-declared path list through the
+# project's own environment (`uv run ...`), and each is paired with a pure
+# competing-scope guard that hard-errors when the tool's own config file
+# carries scope that would silently override or narrow those paths. The tool
+# checks are impure (the tools write); the guards are pure config reads, so a
+# preview runs them.
+# ---------------------------------------------------------------------------
+
+[checks.lint]
+tags = ["quality", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+
+[checks.lint-scope-guard]
+tags = ["quality", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.format]
+tags = ["quality", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+
+[checks.format-scope-guard]
+tags = ["quality", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.type-check]
+tags = ["quality", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+
+[checks.type-check-scope-guard]
+tags = ["quality", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+# ---------------------------------------------------------------------------
 # Phase 12 project checks
 # ---------------------------------------------------------------------------
 
@@ -490,7 +569,7 @@ depends_on = []
 tags = ["prepush"]
 severity = "error"
 fast = false
-pure = false
+pure = true
 needs_network = false
 depends_on = []
 
@@ -498,7 +577,7 @@ depends_on = []
 tags = ["prepush"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = []
 
@@ -565,7 +644,7 @@ scope = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
-pure = false
+pure = true
 needs_network = false
 depends_on = []
 scope = "workspace"

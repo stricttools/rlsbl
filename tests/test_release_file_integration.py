@@ -17,6 +17,7 @@ import pytest
 from rlsbl.commands.release import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
+from githarness import write_covered_unreleased
 from conftest import cli_ctx
 
 
@@ -34,7 +35,10 @@ def _setup_npm_project(tmp_path):
     )
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
-    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
+    # The changelog validators are pure, so a --dry-run release EXECUTES
+    # them: a placeholder hash would abort the preview on changelog-hashes
+    # before the behaviour under test is reached.
+    write_covered_unreleased(tmp_path, changes_dir=changes_dir)
     # Config to declare targets so detect_targets returns consistent results
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
@@ -55,7 +59,10 @@ def _setup_multi_target_project(tmp_path, targets):
     )
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
-    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
+    # The changelog validators are pure, so a --dry-run release EXECUTES
+    # them: a placeholder hash would abort the preview on changelog-hashes
+    # before the behaviour under test is reached.
+    write_covered_unreleased(tmp_path, changes_dir=changes_dir)
     config_dir = tmp_path / ".rlsbl"
     config_dir.mkdir(exist_ok=True)
     config = {"targets": targets, "publish_mode": "ci"}

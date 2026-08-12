@@ -191,11 +191,25 @@ Checks are declared in `rlsbl/data/checks.toml` with metadata that controls exec
 | `tags` | array of strings | Which tags include this check (empty = untagged, only runs with `--all` or `--name`) |
 | `severity` | `"error"` or `"warn"` | Whether failure blocks (`fail`) or advises (`warn`) |
 | `fast` | bool | Whether the check completes quickly (used for prioritization) |
-| `pure` | bool | Whether the check has no side effects and reads only local state |
+| `pure` | bool | Whether the check starts only allowlisted read-only programs (see [Purity](#purity) below) |
 | `needs_network` | bool | Whether the check requires network access (e.g., GitHub API calls) |
 | `depends_on` | array of strings | Other checks that must pass first (skipped if dependency fails) |
 
-Checks are implemented via the `@app.check()` decorator in the `rlsbl/checks/` package (one module per tag, e.g. `project.py`, `release.py`, `workspace.py`), which registers the function with strictcli's check system. The decorator name must match the key in `checks.toml`.
+Checks are implemented via the `@app.error_check("<name>")` and `@app.warn_check("<name>")` decorators in the `rlsbl/checks/` package (one module per tag, e.g. `project.py`, `release.py`, `workspace.py`), which register the function with strictcli's check system. The name passed to the decorator must match the key in `checks.toml`, and the decorator chosen must match that entry's `severity`.
+
+### Purity
+
+**A pure check starts only allowlisted read-only programs.** The allowlist is `rlsbl/observe_allowlist.py`, whose written standard is *no user-visible mutation*: ref updates, index writes and credential emission are refused there, so any program that reaches the list changes nothing a user would notice. A check that starts no program at all is trivially pure.
+
+A check is impure when it starts a program that is not on that list. Every impure check today runs a tool that writes: `ruff` rewrites files, `uv sync` materializes an environment, the test suites and gradle build.
+
+Purity decides what a preview does. Under `rlsbl release run --dry-run` the preflight runs its pure checks for real and lists the impure ones as `would run: <name> (impure)` -- so a preview reports real findings from everything that can be run without changing anything, and is honest about the rest.
+
+This rule replaced an older one, "the check starts no program at all". That rule forced nine checks that spawn only read-only local git (the changelog validators, the two pre-push checks, `workspace-unregistered`, `go-companion-tags`) to be declared impure, and it quietly misdeclared two that do spawn: `local-tag` runs `git tag --list`, and `config-schema` can reach `go list` on its error path. All eleven are pure under the current rule, and are now declared so deliberately rather than by accident.
+
+The declaration is verified, not trusted: `tests/test_check_purity.py` executes every pure-declared check under an effects observer and fails on any spawn whose argv matches no allowlist prefix.
+
+`needs_network` is orthogonal: it says whether a check needs the network to answer at all, never whether it may mutate. A pure check may be a network read.
 
 ## Examples
 

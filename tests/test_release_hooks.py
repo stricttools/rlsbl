@@ -14,6 +14,8 @@ from rlsbl.release_file import ReleaseConfig
 from rlsbl.utils import get_hook_timeout
 from rlsbl.utils import run as real_run
 
+from githarness import write_covered_unreleased
+
 
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
@@ -40,7 +42,10 @@ def _setup_project(tmp_path, hook_name, hook_body):
     # JSONL changelog
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
-    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
+    # The changelog validators are pure, so a --dry-run release EXECUTES
+    # them: a placeholder hash would abort the preview on changelog-hashes
+    # before the behaviour under test is reached.
+    write_covered_unreleased(tmp_path, changes_dir=changes_dir)
     # Config with required private key and targets
     (tmp_path / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
@@ -183,7 +188,10 @@ class TestPreReleaseHookOutput:
         )
         changes_dir = tmp_project / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True, exist_ok=True)
-        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
+        # The changelog validators are pure, so a --dry-run release EXECUTES
+        # them: a placeholder hash would abort the preview on changelog-hashes
+        # before the behaviour under test is reached.
+        write_covered_unreleased(tmp_project, changes_dir=changes_dir)
         (tmp_project / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
         )

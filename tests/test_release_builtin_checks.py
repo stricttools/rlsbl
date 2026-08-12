@@ -13,6 +13,8 @@ from rlsbl.commands.release import (
     _format_preflight_summary,
 )
 from rlsbl.context import ProjectContext
+
+from githarness import write_covered_unreleased
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -355,12 +357,11 @@ class TestTwoHookModel:
     ):
         """pre-checks.sh runs before preflight checks (pure checks execute in dry-run)."""
         _setup_npm_project(tmp_project, test_script="jest")
-        # Add a user-facing entry so changelog-user-facing passes under dry-run
-        import json as _json
+        # A user-facing entry whose commit really resolves: the changelog
+        # validators are pure, so a --dry-run release EXECUTES them and a
+        # placeholder hash would abort the preview before the hook runs.
         changes_dir = tmp_project / ".rlsbl" / "changes"
-        (changes_dir / "unreleased.jsonl").write_text(
-            _json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
-        )
+        write_covered_unreleased(tmp_project, changes_dir=changes_dir)
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
         marker = tmp_project / "pre-checks-ran"
@@ -406,12 +407,11 @@ class TestTwoHookModel:
     ):
         """pre-release.sh runs after preflight checks (pure checks execute in dry-run)."""
         _setup_npm_project(tmp_project, test_script=None)
-        # Add a user-facing entry so changelog-user-facing passes under dry-run
-        import json as _json
+        # A user-facing entry whose commit really resolves: the changelog
+        # validators are pure, so a --dry-run release EXECUTES them and a
+        # placeholder hash would abort the preview before the hook runs.
         changes_dir = tmp_project / ".rlsbl" / "changes"
-        (changes_dir / "unreleased.jsonl").write_text(
-            _json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
-        )
+        write_covered_unreleased(tmp_project, changes_dir=changes_dir)
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
         pre_release_marker = tmp_project / "pre-release-ran"

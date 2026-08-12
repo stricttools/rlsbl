@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from conftest import make_ctx
+from githarness import write_covered_unreleased
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ConfigError
 
@@ -664,10 +665,14 @@ class TestRelease:
         # Create CHANGELOG.md with entry for the bumped version
         with open("CHANGELOG.md", "w") as f:
             f.write("# Changelog\n\n## 1.0.1\n\nPatch release with bugfixes and improvements.\n")
-        # Create .rlsbl/changes/ with a valid unreleased entry
+        # Create .rlsbl/changes/ with a valid unreleased entry. The changelog
+        # validators are pure, so a --dry-run release EXECUTES them: a
+        # placeholder hash would abort the preview on changelog-hashes before
+        # the behaviour under test is reached.
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
-        with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
-            f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+        write_covered_unreleased(
+            tmp_path, description="Bugfix", entry_type="fix",
+        )
         # Config with required private key
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"publish_mode": "ci", "targets": ["npm"]}, f)

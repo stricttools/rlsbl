@@ -20,7 +20,7 @@ import rlsbl.lock
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 
-from githarness import fake_run_dispatch
+from githarness import fake_run_dispatch, write_covered_unreleased
 
 
 def _rc(bump="patch", include=None, exclude=None):
@@ -55,8 +55,10 @@ class TestPrivateConfigRequired:
         with open("CHANGELOG.md", "w") as f:
             f.write("# Changelog\n\n## 1.0.1\n\nPatch release.\n")
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
-        with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
-            f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+        # The changelog validators are pure, so a --dry-run release EXECUTES
+        # them: a placeholder hash would abort the preview on changelog-hashes
+        # before the behaviour under test is reached.
+        write_covered_unreleased(tmp_path, description="Bugfix", entry_type="fix")
 
     def test_release_aborts_when_private_key_missing(self, capsys):
         """Release exits with error when ``private`` is absent from config."""
@@ -161,8 +163,10 @@ class TestPrivatePublishGuardrail:
         with open("CHANGELOG.md", "w") as f:
             f.write("# Changelog\n\n## 1.0.1\n\nPatch release.\n")
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
-        with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
-            f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+        # The changelog validators are pure, so a --dry-run release EXECUTES
+        # them: a placeholder hash would abort the preview on changelog-hashes
+        # before the behaviour under test is reached.
+        write_covered_unreleased(tmp_path, description="Bugfix", entry_type="fix")
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.release_lock")

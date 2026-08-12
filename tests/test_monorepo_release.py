@@ -14,6 +14,8 @@ from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 from rlsbl.targets.base import BaseTarget
 
+from githarness import write_covered_unreleased
+
 
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
@@ -82,6 +84,12 @@ class TestMonorepoRelease:
         subprocess.run(
             ["git", "commit", "-q", "-m", "add monorepo structure"],
             cwd=str(repo_root), check=True,
+        )
+        # The changelog validators are pure, so a --dry-run release EXECUTES
+        # them: a placeholder hash would abort the preview on changelog-hashes
+        # before the behaviour under test is reached.
+        write_covered_unreleased(
+            repo_root, changes_dir=changes_dir, scope_path=project_path,
         )
 
         return proj_dir
@@ -277,6 +285,7 @@ class TestMonorepoRelease:
             ["git", "commit", "-q", "-m", "add standalone project"],
             cwd=str(mock_git_repo), check=True,
         )
+        write_covered_unreleased(mock_git_repo, changes_dir=changes_dir)
 
         mock_run.side_effect = ["", "0", "", ""]
 
@@ -315,6 +324,11 @@ class TestMonorepoRelease:
         subprocess.run(
             ["git", "commit", "-q", "-m", "add root package.json"],
             cwd=str(mock_git_repo), check=True,
+        )
+        write_covered_unreleased(
+            mock_git_repo,
+            changes_dir=proj_dir / ".rlsbl" / "changes",
+            scope_path="libs/core",
         )
 
         monkeypatch.chdir(str(proj_dir))
@@ -406,6 +420,9 @@ class TestSubtreePublish:
         subprocess.run(
             ["git", "commit", "-q", "-m", "add monorepo structure"],
             cwd=str(repo_root), check=True,
+        )
+        write_covered_unreleased(
+            repo_root, changes_dir=changes_dir, scope_path=project_path,
         )
         return proj_dir
 

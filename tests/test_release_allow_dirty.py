@@ -12,7 +12,7 @@ from rlsbl.context import ProjectContext
 
 from rlsbl.release_file import ReleaseConfig
 
-from githarness import fake_run_dispatch
+from githarness import fake_run_dispatch, write_covered_unreleased
 
 
 def _rc(bump="patch", include=None, exclude=None):
@@ -40,8 +40,10 @@ class TestReleaseAllowDirty:
             f.write("# Changelog\n\n## 1.0.1\n\nPatch release with bugfixes and improvements.\n")
         # Create .rlsbl/changes/ for JSONL changelog
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
-        with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
-            f.write('{"commits":["abc1234"],"user_facing":true,"description":"Bugfix","type":"fix"}\n')
+        # The changelog validators are pure, so a --dry-run release EXECUTES
+        # them: a placeholder hash would abort the preview on changelog-hashes
+        # before the behaviour under test is reached.
+        write_covered_unreleased(tmp_path, description="Bugfix", entry_type="fix")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"publish_mode": "ci", "targets": ["npm"]}, f)
 

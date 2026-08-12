@@ -12,6 +12,7 @@ from rlsbl.commands.release import (
 )
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
+from githarness import write_covered_unreleased
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +38,10 @@ def _setup_project(tmp_path, hook_body=None):
     )
     changes_dir = tmp_path / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True, exist_ok=True)
-    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
+    # The changelog validators are pure, so a --dry-run release EXECUTES
+    # them: a placeholder hash would abort the preview on changelog-hashes
+    # before the behaviour under test is reached.
+    write_covered_unreleased(tmp_path, changes_dir=changes_dir)
     (tmp_path / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n"
     )

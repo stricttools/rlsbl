@@ -23,6 +23,7 @@ given revision).
 
 import os
 import subprocess
+from pathlib import Path
 
 # The stricttest floor exports a throwaway commit identity in the ENVIRONMENT as
 # well as in the throwaway global git config, so a git invocation that ignores
@@ -87,6 +88,85 @@ def commit_file(repo, relpath, content, message):
     git(repo, "add", relpath)
     git(repo, "commit", "-q", "-m", message)
     return git(repo, "rev-parse", "HEAD")
+
+
+def write_covered_unreleased(root, *, description="test", entry_type="feature",
+                             changes_dir=None, scope_path=None):
+    """Write an ``unreleased.jsonl`` whose commit hash really resolves.
+
+    The changelog validators are PURE, so ``release run --dry-run`` executes
+    them for real.  A fixture carrying an unresolvable placeholder hash
+    (``abc1234``) therefore aborts the preview on ``changelog-hashes`` before
+    it ever reaches the behaviour under test -- which is the correct product
+    behaviour and the wrong fixture.
+
+    Initializes a throwaway git repo at *root* when there is not one already,
+    commits whatever the fixture has written so far, and covers that commit.
+    Returns the covered hash.
+
+    *changes_dir* overrides where the file lands (monorepo sub-projects and
+    releasables keep their changes elsewhere); it defaults to
+    ``<root>/.rlsbl/changes``.
+    """
+    import json as _json
+    import os as _os
+
+    root = Path(root)
+    if not (root / ".git").is_dir():
+        init_repo(root)
+    # Everything the fixture has written so far becomes one covered commit.
+    # Paths are enumerated and passed explicitly -- never `git add -A`.
+    staged = []
+    for dirpath, dirnames, filenames in _os.walk(root):
+        dirnames[:] = [d for d in dirnames if d != ".git"]
+        for name in filenames:
+            staged.append(
+                _os.path.relpath(_os.path.join(dirpath, name), str(root))
+            )
+    if not staged:
+        (root / ".fixture-seed").write_text("seed\n")
+        staged = [".fixture-seed"]
+    git(root, "add", "--", *staged)
+    if git(root, "status", "--porcelain", check=False):
+        git(root, "commit", "-q", "-m", "fixture")
+    sha = git(root, "rev-parse", "HEAD")
+
+    # Cover EVERY commit in the unreleased range, not just HEAD: coverage is
+    # per commit, so a fixture with two commits and one entry fails
+    # changelog-coverage instead of reaching the behaviour under test.
+    #
+    # ``scope_path`` narrows the range the way a monorepo sub-project's
+    # coverage is narrowed: an entry naming a commit that never touched the
+    # sub-project is out of range rather than helpful.
+    last_tag = git(root, "describe", "--tags", "--abbrev=0", "--match",
+                   "v*", check=False)
+    rev_range = f"{last_tag}..HEAD" if last_tag else "HEAD"
+    args = ["rev-list", rev_range]
+    if scope_path is not None:
+        args += ["--", str(scope_path)]
+    commits = [line for line in git(root, *args).splitlines() if line]
+    if sha not in commits:
+        commits.insert(0, sha)
+
+    target = Path(changes_dir) if changes_dir else root / ".rlsbl" / "changes"
+    _os.makedirs(target, exist_ok=True)
+    lines = [
+        _json.dumps({
+            "format_version": 1,
+            "commits": [sha],
+            "user_facing": True,
+            "description": description,
+            "type": entry_type,
+        })
+    ]
+    lines += [
+        _json.dumps({
+            "format_version": 1, "commits": [c], "user_facing": False,
+        })
+        for c in commits if c != sha
+    ]
+    (target / "unreleased.jsonl").write_text("\n".join(lines) + "\n")
+    return sha
 
 
 def add_remote(repo, remote_dir, *, name="origin", branch="main", push=True):
