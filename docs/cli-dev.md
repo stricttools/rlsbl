@@ -13,7 +13,7 @@ Developer utilities for locally working with rlsbl projects, including editable 
 
 ## dev install
 
-Install the project locally for development by running each detected target's own install command. --global (the default) is supported by pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.
+Install the project locally for development by running each detected target's own install command. --global (the default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.
 
 **Effect:** mutating
 
