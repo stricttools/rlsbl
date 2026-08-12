@@ -1513,6 +1513,42 @@ class TestRetryReachesTheEffectsRegime:
             f"got:\n{result.stdout}"
         )
 
+    def test_the_real_watch_command_previews_the_rerun(self, monkeypatch):
+        """The same seam, reached through `rlsbl watch`'s own registration.
+
+        `_preview` above mints a throwaway app; this one dispatches the real
+        command, so the effect declared on `cmd_watch`, its `@effects.handler`
+        binding and the allowlist the real app was built with are all the ones
+        under test.  Nothing below the command is mocked: `run_gh` is the real
+        one, so `gh run rerun` reaches the real effects handle and is recorded
+        by it.  Only the run-discovery around the retry is replaced -- polling
+        GitHub for a failed run is not what this test is about.
+        """
+        import rlsbl
+        from rlsbl.commands import watch as watch_mod
+
+        def stub_run_cmd(registry, args, flags):
+            # The real retry, with the real run_gh underneath it.
+            watch_mod._retry_workflow("CI", "user/repo", "0123456789ab", "4242")
+
+        monkeypatch.setattr(watch_mod, "run_cmd", stub_run_cmd)
+        result = rlsbl.app.test(["--dry-run", "watch", "0" * 40])
+
+        assert "gh run rerun 4242" in result.stdout, (
+            "a preview of `rlsbl watch` must NAME the re-dispatch it would "
+            f"perform; stdout was:\n{result.stdout}"
+        )
+        assert "CI failed, retrying once" in result.stderr, (
+            "the retry path was never entered, so this test proves nothing "
+            f"about it; stderr was:\n{result.stderr}"
+        )
+        assert "retry trigger failed" not in result.stderr, (
+            "the effects handle refused `gh run rerun` at call time and "
+            "`_retry_workflow`'s broad `except Exception` swallowed the "
+            f"refusal into a trigger-failure notice; stderr was:\n"
+            f"{result.stderr}"
+        )
+
     def test_the_blocking_watch_call_is_an_observe(self):
         """`gh run watch` polls; it must really run, even under a preview.
 
