@@ -238,7 +238,6 @@ class TestTheReadsStillMatch:
         ["git", "--no-optional-locks", "status", "--porcelain"],
         ["git", "--no-optional-locks", "diff", "--name-only"],
         ["git", "--no-optional-locks", "diff-index", "--quiet", "HEAD"],
-        ["git", "fetch", "origin", "--quiet"],
         ["git", "merge-file", "-p", "a", "b", "c"],
         ["git", "tag", "--list", "v*"],
         ["gh", "api", "--method", "GET", "repos/x/y"],
@@ -250,6 +249,53 @@ class TestTheReadsStillMatch:
     ], ids=" ".join)
     def test_read_argv_is_observable(self, argv):
         assert _matches(argv), f"{' '.join(argv)} is a read but matches nothing"
+
+
+class TestTheFetchIsRetainedByExplicitRuling:
+    """`git fetch` is on the list against the ref-update ban, on purpose.
+
+    The standard bans ref updates and names FETCH_HEAD and the remote-tracking
+    refs among them, and the pinned `git fetch origin --quiet` writes exactly
+    those.  It stays by an explicit ruling: those refs are cache-like git
+    plumbing no user workflow reads as state, unlike refs/heads or the index.
+    The pin is the ruling's boundary -- the short mutating forms must not
+    match.  This group exists so the exception reads as an exception rather
+    than sitting unremarked among the ordinary reads.
+    """
+
+    PINNED_FETCH = ["git", "fetch", "origin", "--quiet"]
+
+    def test_the_pinned_fetch_is_observable(self):
+        assert _matches(self.PINNED_FETCH), (
+            "the release flow's one fetch must stay observable, or a preview "
+            "of the release stops before it can read the remote"
+        )
+
+    def test_the_ruling_is_written_down_where_the_entry_is(self):
+        """A retained exception with no recorded reason is indistinguishable
+        from an oversight -- which is how it read before this test existed."""
+        entry = next(
+            e for e in oa.OBSERVE_ALLOWLIST if list(e.argv) == self.PINNED_FETCH
+        )
+        assert "ruling" in entry.why, (
+            f"the fetch entry must say it is an exception and why: {entry.why!r}"
+        )
+        doc = oa.__doc__ or ""
+        assert "ruling" in doc and "cache-like" in doc, (
+            "the module docstring must reconcile the retained fetch with the "
+            "ref-update ban it stands against"
+        )
+
+    @pytest.mark.parametrize("argv", [
+        ["git", "fetch", "--prune"],
+        ["git", "fetch", "--all"],
+        ["git", "fetch", "origin", "--tags"],
+    ], ids=" ".join)
+    def test_the_ruling_does_not_extend_past_the_pin(self, argv):
+        assert not _matches(argv), (
+            f"{' '.join(argv)} matches: the ruling covers the pinned argv "
+            f"only, and these forms move refs a user reads"
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -26,6 +26,9 @@ Not legal under the standard:
 
 * **Ref updates** -- writing any ref, including remote-tracking refs and
   ``FETCH_HEAD``.  A preview that moves refs has changed the repository.
+  One entry is retained against this ban by an explicit ruling rather than by
+  the ban's own reading: the pinned ``git fetch origin --quiet``, reconciled
+  below.
 * **Index writes** -- anything that takes ``index.lock``.  In a worktree
   shared by several sessions the lock is a real hazard, not a formality:
   a preview must not be able to make a concurrent commit fail.
@@ -42,6 +45,21 @@ Consequences of the standard, entry by entry
   which is a ref update; the narrow prefix keeps the one call site the release
   flow needs while refusing ``--prune`` and ``--tags``, which the old prefix
   silently legalized.
+
+  **Why it is retained even though the ban names ref updates.**  This is a
+  ruling, recorded here so nobody has to re-derive it: ``FETCH_HEAD`` and
+  origin's remote-tracking refs are git-internal plumbing that no user workflow
+  reads as state.  They are cache-like -- deleting them costs a re-fetch and
+  nothing else -- which is the same reasoning the standard already applies to a
+  package manager's download cache.  ``refs/heads`` and the index are not:
+  those are what a user's work sits on, and writing either from a preview is
+  refused with no exception.  The pin is what keeps the ruling narrow: the
+  two-token prefix admitted the short mutating forms (``git fetch --prune``,
+  ``git fetch --tags``, ``git fetch --all``), and those do reach refs a user
+  reads.  Prefix matching cannot refuse a flag APPENDED to the pinned argv
+  (``git fetch origin --quiet --prune`` still matches) -- rlsbl's own call
+  sites are the only producer of these argvs, so what the pin buys is that a
+  future call site cannot reach a mutating fetch by writing a shorter one.
 * ``git status`` / ``git diff`` / ``git diff-index`` carry
   ``--no-optional-locks``, both here and at every call site.  Without it those
   commands refresh the index and take ``index.lock``.
@@ -127,9 +145,12 @@ OBSERVE_ALLOWLIST = (
     ObserveEntry(("git", "describe"), "local-read", "names a commit from tags"),
     ObserveEntry(
         ("git", "fetch", "origin", "--quiet"), "network-read",
-        "the one fetch the release flow needs; pinned to this exact argv "
-        "because fetching rewrites FETCH_HEAD and remote-tracking refs, so "
-        "the broader forms (--prune, --tags) must not match",
+        "the one fetch the release flow needs; retained by explicit ruling "
+        "against the ref-update ban because FETCH_HEAD and origin's "
+        "remote-tracking refs are cache-like git plumbing no user workflow "
+        "reads as state, unlike refs/heads or the index; pinned to this exact "
+        "argv so the short mutating forms (--prune, --tags, --all) cannot "
+        "match",
     ),
     ObserveEntry(
         ("git", "--no-optional-locks", "diff"), "local-read",
