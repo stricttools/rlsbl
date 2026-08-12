@@ -1,14 +1,12 @@
 """Shared utilities: subprocess runner, git helpers, version bumping, changelog extraction, commit tooling, and GitHub API queries."""
 
 import glob
-import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tomllib
-import urllib.request
 from dataclasses import dataclass
 from enum import Enum
 
