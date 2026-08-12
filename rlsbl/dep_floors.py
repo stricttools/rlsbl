@@ -15,7 +15,7 @@ What is compared, per ecosystem:
 
 | target | declared floor                                                | locked version       |
 | ------ | ------------------------------------------------------------- | -------------------- |
-| pypi   | ``pyproject.toml`` ``[project]`` dependencies + optional-dependencies | ``uv.lock``    |
+| pypi   | ``pyproject.toml``: ``[project].dependencies``, ``[project].optional-dependencies``, and PEP 735 ``[dependency-groups]`` | ``uv.lock`` |
 | npm    | ``package.json`` dependencies / peerDependencies / optionalDependencies | ``package-lock.json`` |
 | go     | ``go.mod`` ``require``                                        | ``go.mod`` (same file) |
 
@@ -233,7 +233,18 @@ def _split_requirement(text):
 
 
 def pypi_declared(project_root):
-    """Declared runtime + extra requirements from ``pyproject.toml``.
+    """Declared requirements from ``pyproject.toml``, wherever they live.
+
+    Three buckets, in the order a floor should be reported from:
+
+    1. ``[project].dependencies`` -- runtime, what a consumer resolves.
+    2. ``[project].optional-dependencies.<extra>`` -- reachable by extra.
+    3. ``[dependency-groups].<group>`` -- PEP 735, dev-only.
+
+    The third bucket is not optional to read. An internal dependency declared
+    ONLY in a dependency group used to be dropped entirely, so the check
+    returned no verdict for it however far behind its floor was -- and a
+    test-infrastructure dependency is exactly the shape that lives there.
 
     Returns ``{normalized_name: (section_label, kind, constraint)}``, or
     None when there is no readable ``pyproject.toml``.
@@ -247,6 +258,8 @@ def pypi_declared(project_root):
         buckets.append(
             (f"[project].optional-dependencies.{extra}", entries or [])
         )
+    for group, entries in (data.get("dependency-groups") or {}).items():
+        buckets.append((f"[dependency-groups].{group}", entries or []))
 
     declared = {}
     for label, entries in buckets:
@@ -255,8 +268,9 @@ def pypi_declared(project_root):
             if split is None:
                 continue
             name, kind, constraint = split
-            # First declaration wins: runtime deps are read before extras,
-            # and a runtime floor is the one consumers actually resolve.
+            # First declaration wins, and the bucket order above is the
+            # precedence: a runtime floor is the one consumers actually
+            # resolve, then an extra, then a dev-only group.
             declared.setdefault(name, (label, kind, constraint))
     return declared
 

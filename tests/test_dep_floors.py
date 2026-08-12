@@ -32,7 +32,7 @@ from conftest import make_ctx
 # ---------------------------------------------------------------------------
 
 
-def _pyproject(root, deps, *, optional=None, name="consumer"):
+def _pyproject(root, deps, *, optional=None, groups=None, name="consumer"):
     lines = [
         "[project]",
         f'name = "{name}"',
@@ -47,6 +47,12 @@ def _pyproject(root, deps, *, optional=None, name="consumer"):
         for extra, entries in optional.items():
             rendered = ", ".join(f'"{e}"' for e in entries)
             lines.append(f"{extra} = [{rendered}]")
+    if groups:
+        lines.append("")
+        lines.append("[dependency-groups]")
+        for group, entries in groups.items():
+            rendered = ", ".join(f'"{e}"' for e in entries)
+            lines.append(f"{group} = [{rendered}]")
     (root / "pyproject.toml").write_text("\n".join(lines) + "\n")
 
 
@@ -205,6 +211,39 @@ class TestPypi:
         result = _run(tmp_path, _config())
         assert result.status == "fail"
         assert "optional-dependencies" in _text(result)
+
+    def test_pep_735_dependency_group_is_covered(self, tmp_path):
+        """A dev-group internal dep still needs a floor.
+
+        The reader used to look only at ``[project].dependencies`` and
+        ``[project].optional-dependencies``, so an internal dependency
+        declared in a PEP 735 ``[dependency-groups]`` table was silently
+        DROPPED -- no verdict at all, however far behind its floor was.
+        A test-infrastructure dependency is exactly where that shape lives.
+        """
+        _pyproject(tmp_path, [], groups={"dev": ["stricttest"]})
+        _uv_lock(tmp_path, {"stricttest": "0.4.0"})
+        result = _run(tmp_path, _config(names=("stricttest",)))
+        assert result.status == "fail"
+        text = _text(result)
+        assert "[dependency-groups].dev" in text
+        assert "stricttest>=0.4.0" in text
+
+    def test_dependency_group_floor_at_locked_version_passes(self, tmp_path):
+        _pyproject(tmp_path, [], groups={"dev": ["stricttest>=0.4.0"]})
+        _uv_lock(tmp_path, {"stricttest": "0.4.0"})
+        result = _run(tmp_path, _config(names=("stricttest",)))
+        assert result.status == "pass"
+
+    def test_runtime_declaration_wins_over_a_dependency_group(self, tmp_path):
+        """A consumer resolves the RUNTIME floor; that is the one to report."""
+        _pyproject(
+            tmp_path, ["strictcli>=0.35.0"], groups={"dev": ["strictcli"]},
+        )
+        _uv_lock(tmp_path, {"strictcli": "0.36.0"})
+        result = _run(tmp_path, _config())
+        assert result.status == "fail"
+        assert "[project].dependencies" in _text(result)
 
     def test_transitive_dep_not_declared_is_ignored(self, tmp_path):
         """A name only in the lock is transitive -- not this project's floor."""
