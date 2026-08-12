@@ -219,6 +219,115 @@ if [ "${1:-}" = "--sweep-only" ]; then
   exit 0
 fi
 
+# --- local dev overlays (`rlsbl dev sync`) -----------------------------------
+# When a sibling checkout has been overlaid onto this project's environment
+# (`rlsbl dev sync`, driven by dev-sources.toml.local-only), the sandbox must
+# run the suite against THAT source. Otherwise the sandboxed suite keeps testing
+# the released registry wheel while the bare venv tests the local tree, and the
+# two runs quietly disagree about what is being verified.
+#
+# The mode is decided by BOTH local-only files -- the declaration, and the
+# sentinel `rlsbl dev status` reports on. Neither present: registry mode (CI,
+# and every machine without overlays), and the rest of this block is inert.
+# Both present and agreeing: overlay mode. Disagreeing: a hard error, never a
+# silent fall back to registry wheels. The mode is printed on every run.
+#
+# Each overlaid checkout is bound READ-ONLY -- exactly what the sandbox already
+# does with the repo itself -- so no isolation property is weakened: still no
+# network, still a throwaway writable work copy, still nothing writable outside
+# it, and the editable install is built offline from the cloned uv cache.
+OVERLAY_SPEC=""
+if [ -f "${REPO_ROOT}/dev-sources.toml.local-only" ] \
+   || [ -f "${REPO_ROOT}/dev-overlays-state.toml.local-only" ]; then
+  OVERLAY_SPEC="$(python3 - "${REPO_ROOT}" <<'PYOVERLAY'
+import os, sys, tomllib
+
+root = sys.argv[1]
+DECL, SENT = "dev-sources.toml.local-only", "dev-overlays-state.toml.local-only"
+FIX = ("Run `rlsbl dev sync` (with UV_NO_SYNC=1 exported) to bring the two into "
+       "agreement, or delete both files to run against registry wheels.")
+
+def fail(message):
+    print(f"[sandbox] dev overlays: {message}\n  {FIX}", file=sys.stderr)
+    raise SystemExit(1)
+
+def load(name):
+    path = os.path.join(root, name)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "rb") as handle:
+            data = tomllib.load(handle)
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        fail(f"{name} could not be read: {exc}")
+    entries = data.get("overlay") or []
+    if not isinstance(entries, list):
+        fail(f"{name}: 'overlay' must be an array of tables.")
+    out = {}
+    for i, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            fail(f"{name}: [[overlay]] entry #{i} is not a table.")
+        package, path_value = entry.get("package"), entry.get("path")
+        if not package or not path_value:
+            fail(f"{name}: [[overlay]] entry #{i} lacks 'package' or 'path'.")
+        if not os.path.isabs(path_value):
+            path_value = os.path.join(root, path_value)
+        out[package] = os.path.realpath(path_value)
+    return out
+
+declared, synced = load(DECL), load(SENT)
+if declared is None and synced is None:
+    raise SystemExit(0)
+if declared is None:
+    fail(f"{SENT} records overlays but {DECL} is gone, so what the venv holds "
+         "no longer matches any declaration.")
+if synced is None:
+    fail(f"{DECL} declares overlays but {SENT} does not exist: they were "
+         "declared but never installed.")
+if set(declared) != set(synced):
+    fail(f"{DECL} declares {sorted(declared)} but {SENT} records {sorted(synced)}.")
+for package in sorted(declared):
+    if declared[package] != synced[package]:
+        fail(f"overlay '{package}': declared at {declared[package]} but synced "
+             f"from {synced[package]}.")
+    if not os.path.isdir(declared[package]):
+        fail(f"overlay '{package}': checkout {declared[package]} does not exist.")
+    print(f"{package}\t{declared[package]}")
+PYOVERLAY
+  )" || { echo "[sandbox] FATAL: dev overlays are inconsistent (see above)." >&2; exit 1; }
+fi
+
+OVERLAY_SYNC_ARGS=""
+OVERLAY_INSTALL=""
+OVERLAY_RUN_ARGS=""
+OVERLAY_SUMMARY="registry wheels from the lockfile (no dev overlays)"
+if [ -n "${OVERLAY_SPEC}" ]; then
+  OVERLAY_SYNC_ARGS="--inexact"
+  OVERLAY_SUMMARY=""
+  while IFS=$'\t' read -r ov_pkg ov_path; do
+    [ -n "${ov_pkg}" ] || continue
+    BIND_ARGS+=(--ro-bind "${ov_path}" "${ov_path}")
+    OVERLAY_SYNC_ARGS="${OVERLAY_SYNC_ARGS} --no-install-package ${ov_pkg}"
+    OVERLAY_INSTALL="${OVERLAY_INSTALL}${OVERLAY_INSTALL:+ && }uv pip install --offline -e ${ov_path}"
+    OVERLAY_SUMMARY="${OVERLAY_SUMMARY}${OVERLAY_SUMMARY:+, }${ov_pkg} <- ${ov_path} (editable, read-only bind)"
+  done <<<"${OVERLAY_SPEC}"
+  # `uv run` auto-syncs by default, which would reinstall the locked wheel over
+  # the editable install between the overlay step and the test command. This is
+  # the same hazard UV_NO_SYNC=1 covers outside the sandbox -- but the env var
+  # is NOT usable here: it would be inherited by the test process and by every
+  # `uv run` a fixture spawns, so a fixture project's own suite would run
+  # against a venv uv was told not to create. The flag scopes it to one command.
+  OVERLAY_RUN_ARGS="--no-sync"
+fi
+# Consumed by the configured inner command (test_sandbox.command). All three are
+# empty in registry mode, where the command is then byte-for-byte the
+# pure-registry one it has always been.
+ENV_ARGS+=(
+  --setenv SANDBOX_UV_SYNC_ARGS "${OVERLAY_SYNC_ARGS}"
+  --setenv SANDBOX_OVERLAY_INSTALL "${OVERLAY_INSTALL}"
+  --setenv SANDBOX_UV_RUN_ARGS "${OVERLAY_RUN_ARGS}"
+)
+
 # --- pre-warm (OUTSIDE the sandbox, network allowed) -------------------------
 # Config-declared commands (test_sandbox.prewarm), run from the project root
 # before the sandbox is entered, so an offline in-sandbox build hits a warm
@@ -310,8 +419,30 @@ fi
 ENV_ARGS+=(--setenv PATH "${SANDBOX_PATH}")
 
 # --- inner command: the configured test command, or the sandbox selftest ---
-SANDBOX_COMMAND='uv sync --offline && uv run --offline pytest'
+SANDBOX_COMMAND='uv sync --offline $SANDBOX_UV_SYNC_ARGS && eval "$SANDBOX_OVERLAY_INSTALL" && uv run $SANDBOX_UV_RUN_ARGS --offline pytest'
 SANDBOX_DEFAULT_ARGS='-q -n auto'
+
+# An active overlay is only honoured if the configured command consumes the
+# three variables the block above sets. A command that ignores them would bind
+# the checkout read-only, print "overlay", and then run the suite against the
+# locked registry wheel anyway -- a preview that lies. Refuse instead.
+if [ -n "${OVERLAY_SPEC}" ]; then
+  for ov_var in SANDBOX_UV_SYNC_ARGS SANDBOX_OVERLAY_INSTALL SANDBOX_UV_RUN_ARGS; do
+    case "${SANDBOX_COMMAND}" in
+      *"\$${ov_var}"*) ;;
+      *)
+        {
+          echo "[sandbox] FATAL: dev overlays are active, but test_sandbox.command"
+          echo "  does not reference \$${ov_var}, so the overlay would be bound and"
+          echo "  then ignored. Set the command in .rlsbl/config.json to:"
+          echo "    uv sync --offline \$SANDBOX_UV_SYNC_ARGS && eval \"\$SANDBOX_OVERLAY_INSTALL\" && uv run \$SANDBOX_UV_RUN_ARGS --offline <test command>"
+          echo "  and re-run \`rlsbl scaffold\`."
+        } >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
 
 if [ "${1:-}" = "--selftest" ]; then
   INNER='
@@ -346,6 +477,8 @@ else
 fi
 
 echo "[sandbox] bwrap: real repo RO, writable copy=${WORK}, no network, TMPDIR=tmpfs, caches=${SANDBOX_CACHES:-none}" >&2
+
+echo "[sandbox] dependency source: ${OVERLAY_SUMMARY}" >&2
 
 # --- preflight: the two known sandbox-SETUP failures (distinct from test
 # failures) surface as a non-zero bwrap exit at startup, before the inner

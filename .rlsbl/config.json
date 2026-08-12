@@ -30,7 +30,7 @@
   ],
   "test_sandbox": {
     "runner_path": "scripts/test.sh",
-    "command": "uv sync --offline && uv run --offline pytest",
+    "command": "uv sync --offline $SANDBOX_UV_SYNC_ARGS && eval \"$SANDBOX_OVERLAY_INSTALL\" && uv run $SANDBOX_UV_RUN_ARGS --offline pytest",
     "default_args": "-q -n auto",
     "caches": [
       "uv",

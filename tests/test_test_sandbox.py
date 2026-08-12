@@ -287,6 +287,115 @@ class TestScaffoldEmission:
         assert runner.stat().st_mode & stat.S_IXUSR
 
 
+class TestDevOverlayBlock:
+    """The runner honours `rlsbl dev sync` overlays, for uv repos only.
+
+    Without this, a repo whose environment carries an editable sibling checkout
+    runs its bare suite against that checkout and its sandboxed suite against
+    the locked registry wheel -- two runs verifying different code.
+    """
+
+    def _render(self, config):
+        rendered, unreplaced = process_template(
+            TEMPLATE_PATH.read_text(), template_vars(config)
+        )
+        assert unreplaced == []
+        return rendered
+
+    def test_uv_repo_carries_the_block(self):
+        content = self._render(_section(caches=["uv", "go"]))
+        assert "dev-sources.toml.local-only" in content
+        assert "dev-overlays-state.toml.local-only" in content
+        assert "--setenv SANDBOX_UV_SYNC_ARGS" in content
+        assert "--setenv SANDBOX_OVERLAY_INSTALL" in content
+        assert "--setenv SANDBOX_UV_RUN_ARGS" in content
+        assert "uv pip install --offline -e" in content
+        assert 'echo "[sandbox] dependency source:' in content
+
+    def test_non_uv_repo_has_no_block(self):
+        content = self._render(_section(caches=["go"]))
+        assert "dev-sources.toml.local-only" not in content
+        assert "SANDBOX_UV_SYNC_ARGS" not in content
+        assert "dependency source:" not in content
+
+    def test_block_refuses_a_command_that_ignores_the_variables(self):
+        """An overlay bound but not installed would be a preview that lies."""
+        content = self._render(_section(caches=["uv"]))
+        assert "does not reference" in content
+        assert (
+            "for ov_var in SANDBOX_UV_SYNC_ARGS SANDBOX_OVERLAY_INSTALL "
+            "SANDBOX_UV_RUN_ARGS" in content
+        )
+
+    # -- the embedded resolver, run as the runner runs it --------------------
+
+    def _resolver(self):
+        """The python program the runner embeds, lifted from the template."""
+        content = TEMPLATE_PATH.read_text()
+        start = content.index("<<'PYOVERLAY'\n") + len("<<'PYOVERLAY'\n")
+        end = content.index("\nPYOVERLAY", start)
+        return content[start:end]
+
+    def _run_resolver(self, root):
+        return subprocess.run(
+            ["python3", "-c", self._resolver(), str(root)],
+            capture_output=True,
+            text=True,
+        )
+
+    @staticmethod
+    def _write(path, package, checkout):
+        path.write_text(
+            f'[[overlay]]\npackage = "{package}"\npath = "{checkout}"\n'
+        )
+
+    def test_no_files_is_registry_mode(self, tmp_path):
+        result = self._run_resolver(tmp_path)
+        assert result.returncode == 0
+        assert result.stdout == ""
+
+    def test_agreeing_files_emit_the_overlay(self, tmp_path):
+        checkout = tmp_path / "sibling"
+        checkout.mkdir()
+        self._write(tmp_path / "dev-sources.toml.local-only", "sib", checkout)
+        self._write(
+            tmp_path / "dev-overlays-state.toml.local-only", "sib", checkout
+        )
+        result = self._run_resolver(tmp_path)
+        assert result.returncode == 0
+        assert result.stdout.strip() == f"sib\t{os.path.realpath(checkout)}"
+
+    def test_declared_but_never_synced_is_a_hard_error(self, tmp_path):
+        checkout = tmp_path / "sibling"
+        checkout.mkdir()
+        self._write(tmp_path / "dev-sources.toml.local-only", "sib", checkout)
+        result = self._run_resolver(tmp_path)
+        assert result.returncode == 1
+        assert "never installed" in result.stderr
+        assert "rlsbl dev sync" in result.stderr
+
+    def test_disagreeing_paths_are_a_hard_error(self, tmp_path):
+        first = tmp_path / "sibling"
+        second = tmp_path / "elsewhere"
+        first.mkdir()
+        second.mkdir()
+        self._write(tmp_path / "dev-sources.toml.local-only", "sib", first)
+        self._write(
+            tmp_path / "dev-overlays-state.toml.local-only", "sib", second
+        )
+        result = self._run_resolver(tmp_path)
+        assert result.returncode == 1
+        assert "but synced from" in result.stderr
+
+    def test_missing_checkout_is_a_hard_error(self, tmp_path):
+        gone = tmp_path / "gone"
+        self._write(tmp_path / "dev-sources.toml.local-only", "sib", gone)
+        self._write(tmp_path / "dev-overlays-state.toml.local-only", "sib", gone)
+        result = self._run_resolver(tmp_path)
+        assert result.returncode == 1
+        assert "does not exist" in result.stderr
+
+
 def test_rlsbl_own_runner_is_a_template_instance():
     """rlsbl dogfoods the shared template: its runner IS the rendered template.
 
