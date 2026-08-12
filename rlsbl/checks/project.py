@@ -570,10 +570,13 @@ def register_project_checks(app):
         except ConfigError as e:
             errors.append(exception_text(e))
 
-        # Validate pipelines config if present
+        # Validate pipelines config if present.  project_root is explicit:
+        # the go-pipeline error path shells out to `go list` to suggest an
+        # `artifact` value, and the default ("." -- the process CWD) probed
+        # whatever module the caller happened to be standing in.
         from ..config import validate_pipelines_config
         try:
-            validate_pipelines_config(config)
+            validate_pipelines_config(config, project_root=str(ctx.project_root))
         except ConfigError as e:
             errors.append(exception_text(e))
 

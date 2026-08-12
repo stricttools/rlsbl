@@ -177,3 +177,49 @@ class TestConfigSchemaCheckSurfacesPipelineTargetLinks:
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "pass"
+
+
+class TestConfigSchemaProbesTheProjectRoot:
+    """The check's error path must probe ctx.project_root, not the CWD.
+
+    ``validate_pipelines_config`` auto-detects a suggested ``artifact`` value
+    for a go pipeline that declares none, and the detection shells out to
+    ``go list``.  The check used to call it with the default ``project_root=
+    "."``, so in a monorepo (or from any directory that is not the project
+    root) the suggestion described whatever module the process happened to be
+    standing in -- or none at all.
+    """
+
+    def test_go_artifact_detection_runs_in_the_project_root(
+        self, tmp_project, monkeypatch, tmp_path,
+    ):
+        import os
+
+        seen = []
+
+        def fake_detect(project_root="."):
+            seen.append(str(project_root))
+            return "library"
+
+        monkeypatch.setattr("rlsbl.config._detect_go_artifact_kind", fake_detect)
+
+        elsewhere = tmp_path / "somewhere-else"
+        elsewhere.mkdir(exist_ok=True)
+        monkeypatch.chdir(elsewhere)
+
+        ctx = ProjectContext(
+            project_root=tmp_project,
+            workspace_root=None,
+            config={
+                "publish_mode": "ci",
+                "targets": ["go"],
+                "pipelines": {"go": {"type": "go", "local": False, "target": "go"}},
+            },
+        )
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "fail"
+        assert seen == [str(tmp_project)], (
+            f"the go-artifact probe ran in {seen!r}; it must probe "
+            f"{str(tmp_project)!r} regardless of the process CWD "
+            f"(cwd was {os.getcwd()!r})"
+        )
