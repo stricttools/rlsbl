@@ -187,7 +187,7 @@ Manage multi-package workspaces with `rlsbl monorepo`:
 
 - `monorepo init` / `monorepo add` / `monorepo remove` -- workspace management
 - `monorepo sync` -- synchronize CI workflows
-- `monorepo graph` -- export dependency graph (JSON, DOT, text)
+- `monorepo graph` -- export dependency graph (DOT, text, or `--json` payload)
 - `monorepo snapshot` -- committed JSON artifact of workspace state
 - `monorepo impact` -- change analysis across the dependency graph
 - `monorepo release run` -- batch release in topological order
