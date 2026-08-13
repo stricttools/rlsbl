@@ -41,13 +41,22 @@ from .. import effects
 # Minimum safegit release the scrub flow is built against: the flow depends on
 # --remap-shas-in (in-history changelog hash remapping), the persisted rewrite
 # journal (.git/safegit/rewrite-maps.jsonl), and the
-# cleanup_ok/cleanup_errors/pre_rewrite_remotes JSON fields (all >= 0.22.0),
-# and on >= 0.25.0 for two coupled behaviour changes: destructive rewrites in
+# cleanup_ok/cleanup_errors/pre_rewrite_remotes fields (all >= 0.22.0), and on
+# >= 0.25.0 for two coupled behaviour changes: destructive rewrites in
 # rlsbl-managed repos no longer require an orchestration handshake, and --json
 # no longer answers the destructive confirmation, so the invocation below
-# passes the confirmation-skip flag explicitly. The integration test harness
-# builds exactly this version.
-SAFEGIT_MIN_VERSION = (0, 25, 0)
+# passes the confirmation-skip flag explicitly.
+#
+# 0.27.0 is where safegit's --json became the FRAMEWORK's machine mode: stdout
+# carries exactly one document, the strictcli envelope, and safegit's own data
+# is its `payload` member. That is a different document shape, so this flow
+# reads envelopes only -- an older safegit's bare JSON is refused by name
+# rather than half-parsed. There is no dual support: safegit is pre-stable, the
+# two releases ship together, and a scrub is rare enough that requiring the
+# matching pair is the honest cost.
+#
+# The integration test harness builds exactly this version.
+SAFEGIT_MIN_VERSION = (0, 27, 0)
 
 
 def _save_step(path, data, step_name):
@@ -127,34 +136,49 @@ def _remap_glob_args(remap_globs):
     return args
 
 
-# The header strictcli's dry mode prints before its would-do log (contract
-# 3.2). It goes to STDOUT and is never suppressed -- not by --quiet and not by
-# a command's own --json -- so safegit's `--json --dry-run` stdout is one JSON
-# document followed by this log.
-_DRY_RUN_LOG_HEADER = "DRY RUN"
+def _safegit_floor_str():
+    return ".".join(str(p) for p in SAFEGIT_MIN_VERSION)
 
 
-def _parse_safegit_json(output):
-    """Parse safegit's --json stdout, tolerating the dry-run would-do log.
+def _parse_safegit_envelope(output):
+    """Parse safegit's --json stdout as the framework's machine-mode envelope.
 
-    Under --dry-run the framework appends its would-do log to STDOUT after the
-    command's own JSON, so `json.loads` on the whole stream fails with "Extra
-    data". Read exactly one JSON document and require that whatever follows is
-    only that log: genuine garbage after the JSON is still a hard error, not
-    something silently swallowed.
+    In machine mode stdout carries exactly ONE document (strictcli effects
+    contract 19.1): the envelope, whose `payload` member is safegit's own data
+    and whose `preview` member carries the recorded effects of a dry run. The
+    whole stream is therefore parsed with a plain `json.loads` -- there is no
+    trailing would-do log to tolerate any more, and no partial decode that
+    could silently swallow a second document.
+
+    Anything that is not an envelope is refused by name: the pre-0.27.0 shape
+    was safegit's own bare JSON object, and reading it as a payload would
+    produce a scrub state file missing every key this flow needs.
     """
-    decoder = json.JSONDecoder()
+    text = output.strip()
+    if not text:
+        raise ValueError(
+            "safegit --json produced no output at all; the scrub flow needs "
+            f"safegit >= {_safegit_floor_str()}, whose machine mode always "
+            "emits an envelope"
+        )
     try:
-        data, end = decoder.raw_decode(output.lstrip())
+        envelope = json.loads(text)
     except ValueError as exc:
         raise ValueError(f"safegit --json output is not JSON: {exc}") from exc
-    trailer = output.lstrip()[end:].strip()
-    if trailer and not trailer.startswith(_DRY_RUN_LOG_HEADER):
+    if not isinstance(envelope, dict) or "interface_version" not in envelope:
         raise ValueError(
-            "safegit --json output carries unexpected trailing content: "
-            f"{trailer[:200]!r}"
+            "safegit --json output is not a strictcli envelope (no "
+            f"interface_version). The scrub flow needs safegit >= "
+            f"{_safegit_floor_str()}; an older safegit prints its own JSON "
+            "object instead, which this flow no longer reads."
         )
-    return data
+    if envelope["interface_version"] != 1:
+        raise ValueError(
+            "safegit's envelope declares interface_version "
+            f"{envelope['interface_version']!r}, which this rlsbl does not "
+            "know how to read (expected 1)"
+        )
+    return envelope
 
 
 def _build_safegit_args(flags, mode, remap_globs):
@@ -259,23 +283,28 @@ def _get_archive_path(scrub_result_path, new_head):
 
 
 def _print_dry_run_summary(mode, data):
-    """Print a per-mode dry-run preview from safegit's REAL dry-run JSON.
+    """Print a per-mode dry-run preview from safegit's preview payload.
 
-    Dry-run schemas differ per mode and have NO rewrites/tags keys:
-    - match: ScrubMatchDryRunResult (total_matches, estimated_commits, ...)
-    - file:  ScrubFileDryRunResult (commit_count, mode, file)
+    safegit has one result type per command now; the preview-only members are
+    present exactly when they were measured, so a dry run's payload carries
+    the match counts and none of the rewrite counts.
+
+    `objects_matched` is the count of distinct objects the pattern matched --
+    NOT `objects_scanned`, which counts what the scan walked. safegit reported
+    only the latter under a name that read like the former until 0.27.0.
     """
     if mode == "match":
         total = data.get("total_matches", 0)
         blobs = data.get("blob_matches", 0)
         msgs = data.get("commit_matches", 0)
         tag_m = data.get("tag_matches", 0)
+        matched = data.get("objects_matched", 0)
         scanned = data.get("objects_scanned", 0)
         est = data.get("estimated_commits", 0)
         print(
             f"Dry run (match): {total} matches ({blobs} blob, {msgs} "
-            f"commit-message, {tag_m} tag) across {scanned} objects; "
-            f"~{est} commits would be rewritten."
+            f"commit-message, {tag_m} tag) across {matched} matching objects "
+            f"of {scanned} scanned; ~{est} commits would be rewritten."
         )
     elif mode == "file":
         action = "replaced" if data.get("mode") == "replace" else "removed"
@@ -783,9 +812,13 @@ def run_cmd(flags, *, ctx):
             )
             return
 
-        # safegit emits NO JSON (empty stdout) when there is nothing to
-        # rewrite, in both execute and some scoped paths.
-        if not output.strip():
+        envelope = _parse_safegit_envelope(output)
+        scrub_data = envelope.get("payload")
+
+        # A run that supplied no payload is a run that found nothing to
+        # rewrite: safegit returns before it reports figures. The envelope is
+        # always there now, so the absence is in the payload, not in stdout.
+        if scrub_data is None:
             print("No matches found, nothing to do.")
             # Even a no-op scrub validates the changelog hashes (and can
             # repair prior damage from the rewrite journal) -- but never on
@@ -795,8 +828,6 @@ def run_cmd(flags, *, ctx):
                     project_root, ctx.workspace_root, workspace_projects,
                 )
             return
-
-        scrub_data = _parse_safegit_json(output)
 
         if flags.get("dry-run"):
             _print_dry_run_summary(mode, scrub_data)

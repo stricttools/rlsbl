@@ -499,7 +499,11 @@ class TestJournalRecoveryE2E:
             cwd=str(repo),
             capture_output=True, text=True, check=True,
         )
-        data = json.loads(result.stdout)
+        # safegit speaks the framework's machine mode: stdout is one envelope
+        # and safegit's own data is its payload.
+        envelope = json.loads(result.stdout)
+        assert envelope["interface_version"] == 1
+        data = envelope["payload"]
         assert data["rewrites"], "direct scrub must have rewritten commits"
 
         # The worktree JSONL still references the OLD (now pruned) commit.

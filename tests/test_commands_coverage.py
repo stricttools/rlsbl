@@ -1094,6 +1094,27 @@ MOD_RECONCILE = "rlsbl.commands.release_reconcile"
 SAFEGIT_OK = "safegit " + ".".join(str(p) for p in SAFEGIT_MIN_VERSION)
 
 
+def _safegit_envelope(payload, *, dry_run=False, command="scrub.match"):
+    """Wrap *payload* in the machine-mode envelope safegit's --json emits.
+
+    From safegit 0.27.0 stdout carries exactly one document (strictcli effects
+    contract 19.2) and safegit's own data is its ``payload`` member.
+    """
+    return json.dumps({
+        "interface_version": 1,
+        "app": "safegit",
+        "app_version": ".".join(str(p) for p in SAFEGIT_MIN_VERSION),
+        "command": command,
+        "exit_code": 0,
+        "payload": payload,
+        "dry_run": dry_run,
+        "preview": [],
+        "preview_error": None,
+        "diagnostics": [],
+    })
+
+
+
 class TestScrubSafegitVersionTooOld:
     """The scrub flow refuses a safegit older than SAFEGIT_MIN_VERSION.
 
@@ -1193,7 +1214,7 @@ class TestScrubFileMode:
 
     def test_file_mode(self, tmp_path):
         # Real ScrubFileDryRunResult schema (no rewrites/tags keys)
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "version": 1, "dry_run": True, "file": "secrets.txt",
             "mode": "remove", "from": "abc123", "commit_count": 2,
             "old_head": "def456",
@@ -1214,7 +1235,7 @@ class TestScrubFromCommit:
     """Covers line 106: --from-commit flag."""
 
     def test_from_commit_flag(self, tmp_path):
-        safegit_result = json.dumps({"rewrites": {"a": "b"}, "tags": []})
+        safegit_result = _safegit_envelope({"rewrites": {"a": "b"}, "tags": []})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "from-commit": "abc123def", "dry-run": True}
         mock_run = _scrub_simple(tmp_path, [SAFEGIT_OK, safegit_result], flags)
         scrub_call = mock_run.call_args_list[1]
@@ -1242,7 +1263,7 @@ class TestScrubHasNoPromptOfItsOwn:
     """
 
     def test_declined_stdin_does_not_abort(self, tmp_path):
-        safegit_result = json.dumps({"rewrites": {"a": "b"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"a": "b"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         with patch("builtins.input", return_value="n") as mock_input:
             with pytest.raises(SystemExit):
@@ -1257,7 +1278,7 @@ class TestScrubBranchPushFails:
         # Sequence: version, ls-remote(snapshot), scrub, commit(archive),
         # rev-parse(branch target), push(fail), ls-remote(idempotence check
         # exhausts the list -> treated as unconfirmed -> hard error).
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         with pytest.raises(SystemExit) as exc_info:
             _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", Exception("push failed")], flags)
@@ -1269,7 +1290,7 @@ class TestScrubCommitFails:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (tmp_path / "CHANGELOG.md").write_text("# Changelog\n")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Sequence: version, ls-remote, scrub, commit(fail). A failed commit
         # must ABORT (never push metadata-less history) and keep
@@ -1285,7 +1306,7 @@ class TestScrubTagPushFails:
     def test_tag_push_failure_is_hard_error(self, tmp_path, capsys):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse,
         # branch_push, tag_push(fail), ls-remote(exhausts -> hard error)
@@ -1300,7 +1321,7 @@ class TestScrubNoGhForReleases:
     def test_skips_release_when_no_gh(self, tmp_path):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push
         mock_run = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags)
@@ -1311,7 +1332,7 @@ class TestScrubReleaseDeleteFails:
     def test_gh_release_delete_fail(self, tmp_path, capsys):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete(fail) (run_gh)
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
@@ -1324,7 +1345,7 @@ class TestScrubVersionExtractFails:
     def test_bad_tag_name(self, tmp_path, capsys):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/not-a-version"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/not-a-version"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete (run_gh)
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
@@ -1337,7 +1358,7 @@ class TestScrubGhReleaseCreateFails:
     def test_gh_create_failure_warns(self, tmp_path, capsys):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="notes")}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete, gh_create(fail) (run_gh)
@@ -1352,7 +1373,7 @@ class TestScrubFallbackNotes:
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (tmp_path / "CHANGELOG.md").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value=None)}
         # Calls: version, ls-remote, scrub, commit, rev-parse, branch_push, tag_push (run); gh_view, gh_delete, gh_create (run_gh)
@@ -1368,7 +1389,7 @@ class TestScrubNoReleaseForTag:
     def test_no_release_for_tag(self, tmp_path):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view(fail) (run_gh)
         mock_run, mock_run_gh = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
@@ -1382,7 +1403,7 @@ class TestScrubNoRefname:
     def test_empty_refname_skipped(self, tmp_path):
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-        safegit_result = json.dumps({"rewrites": {"old": "new"}, "tags": [{"refname": ""}, {"refname": "refs/tags/"}], "new_head": "abc"})
+        safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": ""}, {"refname": "refs/tags/"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         # Empty refnames -> no tag pushes, no gh release checks.
         # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push
@@ -1410,7 +1431,7 @@ class TestScrubMonorepoFallbackScan:
         workspace_projects = [WorkspaceProject({"name": "alpha", "path": "pkg/alpha"})]
         # A monorepo tag whose project prefix ("beta@") is not in the tag prefix
         # index (only "alpha@" is) -- reaches the scan-all-projects fallback.
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old": "new"},
             "tags": [{"refname": "refs/tags/beta@v1.0.0"}],
             "new_head": "abc",

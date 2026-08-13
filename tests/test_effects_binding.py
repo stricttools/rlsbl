@@ -153,7 +153,7 @@ class TestScrubPreviewRecordsTheChild:
 
         src = inspect.getsource(release_scrub.run_cmd)
         idx_guard = src.index("effects.unsettled(output)")
-        idx_parse = src.index("_parse_safegit_json(output)")
+        idx_parse = src.index("_parse_safegit_envelope(output)")
         assert idx_guard < idx_parse, (
             "the recorded-run guard must come before the JSON parse, or a "
             "preview crashes on output that was never produced"

@@ -385,7 +385,7 @@ Error recovery: if the command fails partway, `scrub-result.json` preserves the 
 
 A direct `safegit scrub` in an rlsbl-managed repository is not blocked, but it leaves rlsbl's release metadata behind: the JSONL changelogs keep pre-rewrite hashes, the tags still point at pruned commits, and the GitHub Releases go stale. `rlsbl release scrub` does the rewrite and that repair in one pass; after an out-of-band rewrite, `rlsbl release reconcile` repairs the metadata from safegit's rewrite journal.
 
-Requires safegit 0.25.0+, for `--remap-shas-in`, the persisted rewrite journal, and the cleanup_ok/pre_rewrite_remotes JSON fields (0.22.0), and for destructive rewrites that no longer take `--json` as consent, so rlsbl passes `--approve-consequential` explicitly (0.25.0); safegit declares all three scrub modes `consequential`.
+Requires **safegit 0.27.0+**. The earlier floors still apply — `--remap-shas-in`, the persisted rewrite journal, and the `cleanup_ok`/`pre_rewrite_remotes` fields (0.22.0), and destructive rewrites no longer taking `--json` as consent, so rlsbl passes `--approve-consequential` explicitly (0.25.0); safegit declares all three scrub modes `consequential`. From 0.27.0 safegit's `--json` is the strictcli framework's machine mode: stdout carries exactly one document, the envelope, and safegit's own data is its `payload` member. rlsbl reads that shape only — an older safegit's bare JSON object is refused by name, naming the version to install. There is no dual support and no fallback parse.
 
 ## Examples
 

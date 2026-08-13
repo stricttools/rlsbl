@@ -27,6 +27,29 @@ SAFEGIT_FLOOR = ".".join(str(p) for p in SAFEGIT_MIN_VERSION)
 SAFEGIT_OK = f"safegit {SAFEGIT_FLOOR}"
 
 
+def _safegit_envelope(payload, *, dry_run=False, command="scrub.match", preview=None):
+    """Wrap *payload* in the machine-mode envelope safegit's --json emits.
+
+    safegit speaks the framework's machine mode from 0.27.0: stdout carries
+    exactly one document (strictcli effects contract 19.2) and safegit's own
+    data is its ``payload`` member. Tests mock safegit's stdout, so they mock
+    the envelope.
+    """
+    return json.dumps({
+        "interface_version": 1,
+        "app": "safegit",
+        "app_version": SAFEGIT_FLOOR,
+        "command": command,
+        "exit_code": 0,
+        "payload": payload,
+        "dry_run": dry_run,
+        "preview": preview if preview is not None else [],
+        "preview_error": None,
+        "diagnostics": [],
+    })
+
+
+
 def _ctx(project_root, config=None, workspace_root=None):
     """Create a minimal ProjectContext for scrub tests."""
     if isinstance(project_root, str):
@@ -109,7 +132,7 @@ class TestFileModeRealSafegitContract:
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
     def test_file_mode_builds_positional_args(self, mock_run, _req_tool, tmp_path):
-        file_dry_run = json.dumps({
+        file_dry_run = _safegit_envelope({
             "version": 1, "dry_run": True, "file": "secrets.env",
             "mode": "remove", "from": "abc123", "commit_count": 3,
             "old_head": "def456",
@@ -172,7 +195,7 @@ class TestRecipeMode:
         recipe.write_text('[[operations]]\npattern = "secret"\nreplace = "X"\n')
 
         # Real ScrubRunDryRunResult schema (safegit scrub_run.go)
-        dry_json = json.dumps({
+        dry_json = _safegit_envelope({
             "version": 1,
             "dry_run": True,
             "operation_count": 2,
@@ -277,7 +300,7 @@ class TestSafegitMinVersion:
     @patch(f"{MOD}.run")
     def test_accepts_dirty_build_suffix(self, mock_run, _req_tool, tmp_path):
         """Version strings like '0.21.1+dirty' must parse, not crash."""
-        dry_json = json.dumps({
+        dry_json = _safegit_envelope({
             "version": 1, "dry_run": True, "pattern": "x",
             "total_matches": 0, "estimated_commits": 0,
         })
@@ -304,7 +327,7 @@ class TestRemapGlobsPassedToSafegit:
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
     def test_match_mode_standalone_glob(self, mock_run, _req_tool, tmp_path):
-        dry_json = json.dumps({
+        dry_json = _safegit_envelope({
             "version": 1, "dry_run": True, "pattern": "x",
             "total_matches": 0, "estimated_commits": 0,
         })
@@ -320,7 +343,7 @@ class TestRemapGlobsPassedToSafegit:
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
     def test_file_mode_glob_and_positional_last(self, mock_run, _req_tool, tmp_path):
-        dry_json = json.dumps({
+        dry_json = _safegit_envelope({
             "version": 1, "dry_run": True, "file": "secrets.env",
             "mode": "remove", "from": "abc", "commit_count": 1,
         })
@@ -340,7 +363,7 @@ class TestRemapGlobsPassedToSafegit:
     def test_recipe_mode_glob(self, mock_run, _req_tool, tmp_path):
         recipe = tmp_path / "recipe.toml"
         recipe.write_text('[[operations]]\npattern = "x"\nreplace = "y"\n')
-        dry_json = json.dumps({
+        dry_json = _safegit_envelope({
             "version": 1, "dry_run": True, "operation_count": 1,
             "estimated_commits": 0,
         })
@@ -354,16 +377,21 @@ class TestRemapGlobsPassedToSafegit:
         assert self._remap_pairs(args) == [".rlsbl/changes/*.jsonl"]
 
 
-class TestEmptyOutputMeansNoMatches:
-    """safegit scrub execute emits NO JSON when there is nothing to rewrite."""
+class TestNullPayloadMeansNoMatches:
+    """safegit reports nothing to rewrite as an envelope with a null payload.
+
+    Machine mode always emits the envelope, so the absence lives in the
+    payload rather than in an empty stdout (which now means safegit never got
+    as far as writing its one document).
+    """
 
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
-    def test_empty_execute_output(self, mock_run, _req_tool, tmp_path, capsys):
+    def test_null_payload_execute_output(self, mock_run, _req_tool, tmp_path, capsys):
         mock_run.side_effect = [
             SAFEGIT_OK,  # safegit --version
             "",                # git ls-remote origin (pre-scrub snapshot)
-            "",                # safegit scrub match: no matches -> empty stdout
+            _safegit_envelope(None),  # safegit scrub match: nothing to rewrite
         ]
         flags = {
             "pattern": "nonexistent", "replace": "XXX",
@@ -397,7 +425,7 @@ class TestDryRunShowsPreviewNoMutations:
         original_content = unreleased.read_text()
 
         # Real ScrubMatchDryRunResult schema (safegit scrub_match.go)
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "version": 1,
             "dry_run": True,
             "pattern": "secret",
@@ -450,7 +478,7 @@ class TestDryRunShowsPreviewNoMutations:
     @patch(f"{MOD}.run")
     def test_dry_run_file(self, mock_run, _req_tool, tmp_path, capsys):
         # Real ScrubFileDryRunResult schema (safegit scrub.go)
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "version": 1,
             "dry_run": True,
             "file": "secrets.env",
@@ -526,7 +554,7 @@ class TestFullScrubFlow:
         (tmp_path / "CHANGELOG.md").write_text("# Changelog\n")
 
         # safegit scrub result with rewrites
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old_hash_1": "new_hash_1", "old_hash_2": "new_hash_2"},
             "tags": [{"refname": "refs/tags/v1.0.0"}],
             "old_head": "cafebabe5678",
@@ -827,7 +855,7 @@ class TestReleasableDirsRemapped:
             WorkspaceProject({"name": "alpha", "path": "packages/alpha"}),
         ]
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old_hash_1": "new_hash_1", "old_hash_2": "new_hash_2"},
             "tags": [],
             "old_head": "old_hash_1",
@@ -890,7 +918,7 @@ class TestPushMechanics:
     NEW_TAG = "dddd111122223333444455556666777788889999"
 
     def _run(self, tmp_path, mock_run):
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {self.OLD_HEAD: self.NEW_HEAD},
             "tags": [{
                 "refname": "refs/tags/v1.0.0",
@@ -997,7 +1025,7 @@ class TestPushMechanics:
         force-pushed by the TAG step -- the old guard used removeprefix
         without checking the prefix exists, so 'refs/heads/x' passed."""
         rogue = "refs/heads/feature-x"
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {self.OLD_HEAD: self.NEW_HEAD},
             "tags": [
                 {
@@ -1140,7 +1168,7 @@ class TestScrubArchiveCommitted:
             ChangelogEntry(commits=["old_hash_1"], user_facing=False),
         ])
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old_hash_1": "new_hash_1"},
             "tags": [],
             "old_head": "cafebabe567812345678",
@@ -1217,7 +1245,7 @@ class TestPostRemapValidationGate:
             ChangelogEntry(commits=[bogus], user_facing=False),
         ])
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old_hash_1": "new_hash_1"},
             "tags": [],
             "old_head": "old_hash_1",
@@ -1271,7 +1299,7 @@ class TestPostRemapValidationGate:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text("")
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old": "new"}, "tags": [],
             "old_head": "old", "new_head": "new",
         })
@@ -1344,7 +1372,7 @@ class TestJournalRecovery:
                 "\n".join(lines) + "\n"
             )
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {OLD_SHA: NEW_SHA}, "tags": [],
             "old_head": OLD_SHA, "new_head": NEW_SHA,
         })
@@ -1568,7 +1596,7 @@ class TestJournalRecovery:
             "\n".join(lines) + "\n"
         )
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {key_a: "3" * 40, key_b: "4" * 40}, "tags": [],
             "old_head": key_a, "new_head": "3" * 40,
         })
@@ -1712,7 +1740,7 @@ class TestPreRewriteRemotesCrossCheck:
         }
 
     def _run(self, tmp_path, mock_run, tracking_sha):
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {self.OLD_HEAD: self.NEW_HEAD}, "tags": [],
             "old_head": self.OLD_HEAD, "new_head": self.NEW_HEAD,
             "pre_rewrite_remotes": {
@@ -1817,7 +1845,7 @@ class TestCleanupOkGate:
         }
 
     def _safegit_result(self):
-        return json.dumps({
+        return _safegit_envelope({
             "rewrites": {self.OLD: self.NEW}, "tags": [],
             "old_head": self.OLD, "new_head": self.NEW,
             "cleanup_ok": False,
@@ -1939,7 +1967,7 @@ class TestCleanupOkGate:
 
         head = "e" * 40
         other = "d" * 40
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             # All-identity map: nothing to prune, ever.
             "rewrites": {head: head, other: other},
             "tags": [{
@@ -1989,7 +2017,7 @@ class TestChangelogRegenerateUnchanged:
         }
 
     def _run_effect(self):
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"1" * 40: "2" * 40}, "tags": [],
             "old_head": "1" * 40, "new_head": "2" * 40,
         })
@@ -2102,7 +2130,7 @@ class TestNoMatchesExitsCleanly:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text("")
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {},
             "tags": [],
         })
@@ -2151,10 +2179,11 @@ class TestNoMatchValidatesHashes:
             "entire-history": True,
         }
 
-    def _setup(self, tmp_path, journal_groups, *, empty_stdout=False):
+    def _setup(self, tmp_path, journal_groups, *, null_payload=False):
         """Project with one dangling-hash entry, a rewrite journal, and a
-        safegit scrub that finds NOTHING to rewrite (either empty stdout or
-        a JSON result with empty rewrites)."""
+        safegit scrub that finds NOTHING to rewrite (either a null payload --
+        safegit returned before reporting figures -- or a payload with empty
+        rewrites)."""
         changes_dir = tmp_path / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
         unreleased = changes_dir / "unreleased.jsonl"
@@ -2170,8 +2199,8 @@ class TestNoMatchValidatesHashes:
                 "\n".join(lines) + "\n"
             )
 
-        no_match_result = "" if empty_stdout else json.dumps(
-            {"rewrites": {}, "tags": []}
+        no_match_result = _safegit_envelope(
+            None if null_payload else {"rewrites": {}, "tags": []}
         )
 
         def run_effect(cmd, args=None, **kw):
@@ -2290,7 +2319,7 @@ class TestNoMatchValidatesHashes:
     @patch(f"{MOD}.acquire_lock")
     @patch(f"{MOD}.require_tool")
     @patch(f"{MOD}.run")
-    def test_empty_stdout_path_also_validates_and_repairs(
+    def test_null_payload_path_also_validates_and_repairs(
         self, mock_run, _req_tool, _acquire_lock, _release_lock,
         tmp_path, capsys,
     ):
@@ -2299,7 +2328,7 @@ class TestNoMatchValidatesHashes:
         journal repair."""
         unreleased, run_effect = self._setup(
             tmp_path, [_journal_records("id-1", {OLD_SHA: NEW_SHA})],
-            empty_stdout=True,
+            null_payload=True,
         )
         mock_run.side_effect = run_effect
 
@@ -2383,7 +2412,7 @@ class TestMonorepoTagCorrectProject:
                 return "- Beta fix"
             return None
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old1": "new1"},
             "tags": [
                 {"refname": "refs/tags/alpha@v1.0.0"},
@@ -2496,7 +2525,7 @@ class TestStandaloneTagNoPrefix:
                 return "- Root level change"
             return None
 
-        safegit_result = json.dumps({
+        safegit_result = _safegit_envelope({
             "rewrites": {"old1": "new1"},
             "tags": [{"refname": "refs/tags/v1.0.0"}],
             "new_head": "abc123",
@@ -2546,40 +2575,63 @@ class TestStandaloneTagNoPrefix:
         assert "v1.0.0" in gh_create_calls[0][0][0]
 
 
-class TestSafegitJsonParsing:
-    """safegit's `--json --dry-run` stdout is JSON followed by a would-do log.
+class TestSafegitEnvelopeParsing:
+    """safegit's `--json` stdout is the framework's envelope, whole.
 
-    strictcli's dry mode prints its would-do log to STDOUT and never suppresses
-    it (contract 3.2/3.4), so a `--json` command's machine output and the
-    framework's human log share one stream. Plain ``json.loads`` on that stream
-    raises "Extra data" and `rlsbl release scrub --dry-run` died on it.
+    Machine mode carries exactly ONE document on stdout (strictcli effects
+    contract 19.1), so the stream parses with a plain ``json.loads`` and
+    safegit's own data is the envelope's ``payload``. The pre-0.27.0 shape --
+    safegit's own bare JSON object, followed under --dry-run by the framework's
+    would-do log -- is refused by name rather than half-read.
     """
 
-    def test_json_followed_by_the_would_do_log_parses(self):
-        from rlsbl.commands.release_scrub import _parse_safegit_json
+    def test_envelope_parses_whole(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
         stdout = (
-            '{\n  "version": 1,\n  "dry_run": true,\n  "file_matches": 1\n}\n'
-            "DRY RUN — no changes were made. Would do:\n"
-            "  1. run: git filter-repo\n"
+            '{"interface_version": 1, "app": "safegit", "command": '
+            '"scrub.file", "exit_code": 0, "payload": {"version": 1, '
+            '"dry_run": true, "commit_count": 3}, "dry_run": true, '
+            '"preview": [{"seq": 1, "verb": "run"}], "preview_error": null, '
+            '"diagnostics": []}\n'
         )
-        assert _parse_safegit_json(stdout) == {
-            "version": 1, "dry_run": True, "file_matches": 1,
+        envelope = _parse_safegit_envelope(stdout)
+        assert envelope["payload"] == {
+            "version": 1, "dry_run": True, "commit_count": 3,
         }
+        assert envelope["preview"] == [{"seq": 1, "verb": "run"}]
 
-    def test_plain_json_parses(self):
-        from rlsbl.commands.release_scrub import _parse_safegit_json
+    def test_bare_pre_envelope_json_is_refused_by_name(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
-        assert _parse_safegit_json('{"version": 1}\n') == {"version": 1}
+        with pytest.raises(ValueError, match="0.27.0"):
+            _parse_safegit_envelope('{"version": 1, "dry_run": true}\n')
 
-    def test_unexpected_trailing_content_is_a_hard_error(self):
-        from rlsbl.commands.release_scrub import _parse_safegit_json
+    def test_trailing_would_do_log_is_a_hard_error(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
-        with pytest.raises(ValueError, match="unexpected trailing content"):
-            _parse_safegit_json('{"version": 1}\n{"version": 2}\n')
+        stdout = (
+            '{"interface_version": 1, "payload": null}\n'
+            "DRY RUN \u2014 no changes were made. Would do:\n"
+            "  1. run: git update-ref\n"
+        )
+        with pytest.raises(ValueError, match="not JSON"):
+            _parse_safegit_envelope(stdout)
+
+    def test_empty_output_names_the_required_safegit(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_envelope
+
+        with pytest.raises(ValueError, match="0.27.0"):
+            _parse_safegit_envelope("   \n")
+
+    def test_unknown_interface_version_is_a_hard_error(self):
+        from rlsbl.commands.release_scrub import _parse_safegit_envelope
+
+        with pytest.raises(ValueError, match="interface_version"):
+            _parse_safegit_envelope('{"interface_version": 2, "payload": {}}\n')
 
     def test_non_json_is_a_hard_error(self):
-        from rlsbl.commands.release_scrub import _parse_safegit_json
+        from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
         with pytest.raises(ValueError, match="not JSON"):
-            _parse_safegit_json("not json at all\n")
+            _parse_safegit_envelope("not json at all\n")
