@@ -21,5 +21,4 @@ Run project checks registered via the check framework and report results
 | `--tag` |  | str |  |  | Tag DSL expression to select checks (e.g. 'changelog & !quality') |
 | `--name` |  | str |  |  | Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*') |
 | `--list` |  | bool |  |  | List all registered checks with their tags and exit without running |
-| `--json` |  | bool |  |  | Output check results as machine-readable JSON instead of human text |
 | `--ignore-warnings` |  | bool |  |  | Treat warn-severity results as passing so they do not cause nonzero exit |

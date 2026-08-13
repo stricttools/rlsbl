@@ -11,7 +11,7 @@ nav_order: 17
 
 Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.
 
-**Effect:** read_only
+**Effect:** mutating
 
 ## Flags
 

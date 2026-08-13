@@ -19,4 +19,3 @@ Query npm, PyPI, or other registries to check whether one or more package names 
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Registry to query for name availability (npm, pypi, go, or github); repeatable |
 | `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |
-| `--json` |  | bool |  |  | Output results as machine-readable JSON: one object for a single name+target, a JSON array for multiple names and/or targets |

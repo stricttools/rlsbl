@@ -137,7 +137,7 @@ Reconcile a monorepo project's subtree mirror toward its desired state. The mirr
 
 ## monorepo graph
 
-Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.
+Export the monorepo dependency graph as DOT (Graphviz) or an indented text tree; the framework-owned --json yields the same graph as a structured document. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write the rendering to a file instead of stdout.
 
 **Effect:** mutating
 
@@ -145,7 +145,7 @@ Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text t
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--format` |  | str | json |  | Serialization format for the dependency graph: json, dot (Graphviz), or text |
+| `--format` |  | str | text |  | Rendering for the dependency graph: dot (Graphviz) or text |
 | `--output` |  | str |  |  | File path to write the graph output to instead of printing to stdout |
 | `--root` |  | str |  |  | Filter to show only transitive dependencies reachable from this package |
 | `--reverse` |  | str |  |  | Filter to show only transitive reverse dependencies of this package |
@@ -153,7 +153,7 @@ Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text t
 
 ## monorepo impact
 
-Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.
+Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates as a human report, or as a structured document under the framework-owned --json. Supports package names, file paths, and --since for git-based change detection.
 
 **Effect:** read_only
 
@@ -161,7 +161,6 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--format` |  | str | text |  | Output serialization format for the impact report: json or text (default: text) |
 | `--depth` |  | int |  |  | Maximum number of dependency hops to traverse when computing transitive impact |
 | `--since` |  | str |  |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
 
