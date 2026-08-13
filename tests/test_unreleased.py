@@ -74,9 +74,7 @@ class TestRunCmd:
 
     def test_no_unreleased_commits(self, mock_git_repo, capsys):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=".")
-        assert exc_info.value.code == 0
+        run_cmd(None, [], {}, project_root=".")
         captured = capsys.readouterr()
         assert "No unreleased commits." in captured.out
 
@@ -97,11 +95,7 @@ class TestRunCmd:
 
     def test_json_output_no_commits(self, mock_git_repo, capsys):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {"json": True}, project_root=".")
-        assert exc_info.value.code == 0
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = run_cmd(None, [], {"json": True}, project_root=".")
         assert data["tag"] == "v1.0.0"
         assert data["commits"] == []
         assert data["coverage"] == {"covered": 0, "total": 0, "exempted": 0}
@@ -176,10 +170,7 @@ class TestUnreleasedMonorepo:
 
         monkeypatch.chdir(str(mock_git_repo / "alpha"))
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
-        assert exc_info.value.code == 0
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
         # Should use scoped tag
         assert data["tag"] == "alpha@v1.0.0"
 
@@ -209,19 +200,13 @@ class TestUnreleasedMonorepo:
         # Check alpha: should see only 1 commit
         monkeypatch.chdir(str(mock_git_repo / "alpha"))
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
-        assert exc_info.value.code == 0
-        alpha_data = json.loads(capsys.readouterr().out)
+        alpha_data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
         assert alpha_data["coverage"]["total"] == 1
 
         # Check beta: should see only 2 commits
         monkeypatch.chdir(str(mock_git_repo / "beta"))
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "beta"))
-        assert exc_info.value.code == 0
-        beta_data = json.loads(capsys.readouterr().out)
+        beta_data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "beta"))
         assert beta_data["coverage"]["total"] == 2
 
     def test_monorepo_no_commits_for_project(self, mock_git_repo, monkeypatch, capsys):
@@ -242,9 +227,7 @@ class TestUnreleasedMonorepo:
         # Check alpha: should see no unreleased commits
         monkeypatch.chdir(str(mock_git_repo / "alpha"))
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {}, project_root=str(mock_git_repo / "alpha"))
-        assert exc_info.value.code == 0
+        run_cmd("npm", [], {}, project_root=str(mock_git_repo / "alpha"))
         out = capsys.readouterr().out
         assert "No unreleased commits." in out
 
@@ -264,10 +247,7 @@ class TestUnreleasedMonorepo:
         _commit_file(mock_git_repo, "src/main.js", message="add main")
 
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=".")
-        assert exc_info.value.code == 0
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, project_root=".")
         assert data["tag"] == "v1.0.0"
         assert data["coverage"]["total"] == 1
 
@@ -327,10 +307,7 @@ class TestUnreleasedExemptions:
         self._repo_with_exempt_commits(mock_git_repo)
 
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=".")
-        assert exc_info.value.code == 0
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, project_root=".")
         assert data["coverage"]["total"] == 1
         assert data["coverage"]["exempted"] == 2
         assert data["coverage"]["covered"] == 0
@@ -339,9 +316,7 @@ class TestUnreleasedExemptions:
         self._repo_with_exempt_commits(mock_git_repo)
 
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {}, project_root=".")
-        assert exc_info.value.code == 0
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
         assert "0/1 commits covered (2 exempted)" in out
 
@@ -349,9 +324,7 @@ class TestUnreleasedExemptions:
         self._repo_with_exempt_commits(mock_git_repo)
 
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {}, project_root=".")
-        assert exc_info.value.code == 0
+        run_cmd("npm", [], {}, project_root=".")
         out = capsys.readouterr().out
         assert "[EXEMPT]" in out
         exempt_lines = [ln for ln in out.splitlines() if "[EXEMPT]" in ln]
@@ -367,10 +340,7 @@ class TestUnreleasedExemptions:
         path.write_text(json.dumps(entry) + "\n")
 
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=".")
-        assert exc_info.value.code == 0
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, project_root=".")
         assert data["coverage"] == {"covered": 1, "total": 1, "exempted": 2}
 
 
@@ -425,10 +395,8 @@ class TestUnreleasedReleasableMember:
 
         monkeypatch.chdir(str(mock_git_repo / "pkg-a"))
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "pkg-a"))
-        assert exc_info.value.code == 0, "must not error with 'JSONL not set up'"
-        data = json.loads(capsys.readouterr().out)
+        # Must not error with "JSONL changelog not set up".
+        data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "pkg-a"))
         assert data["tag"] == "alpha@v1.0.0"
         assert data["coverage"]["total"] == 1
         assert data["coverage"]["covered"] == 0
@@ -448,8 +416,5 @@ class TestUnreleasedReleasableMember:
 
         monkeypatch.chdir(str(mock_git_repo / "pkg-a"))
         capsys.readouterr()
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "pkg-a"))
-        assert exc_info.value.code == 0
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "pkg-a"))
         assert data["coverage"] == {"covered": 1, "total": 1, "exempted": 0}

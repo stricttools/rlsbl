@@ -615,7 +615,43 @@ def cmd_release_retry(ctx, watch):
 # status
 # ---------------------------------------------------------------------------
 
-@app.command(name="status", help="Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.", effect="read_only")
+# Every key `_collect_status` builds is always present; the nullable ones are
+# what an unavailable git repo, an untagged project or a skipped registry query
+# leave behind. `drift` is only set when --registry was passed.
+_STATUS_PAYLOAD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "version": {"type": ["string", "null"]},
+        "target": {"type": "string"},
+        "branch": {"type": ["string", "null"]},
+        "tag": {"type": ["string", "null"]},
+        "clean": {"type": ["boolean", "null"]},
+        "changelog": {"type": ["boolean", "null"]},
+        "jsonl_coverage": {"type": "string"},
+        "commits_ahead": {"type": ["integer", "null"]},
+        "commits_ahead_tag": {"type": ["string", "null"]},
+        "ci": {"type": "array", "items": {"type": "string"}},
+        "publish": {"type": "boolean"},
+        "registry_version": {"type": ["string", "null"]},
+        "drift": {
+            "type": ["string", "null"],
+            "enum": [
+                "AHEAD", "BEHIND", "SAME", "ERROR",
+                "PRIVATE", "UNPUBLISHED", None,
+            ],
+        },
+    },
+    "required": [
+        "name", "version", "target", "branch", "tag", "clean", "changelog",
+        "jsonl_coverage", "commits_ahead", "commits_ahead_tag", "ci",
+        "publish", "registry_version", "drift",
+    ],
+    "additionalProperties": False,
+}
+
+
+@app.command(name="status", help="Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.", effect="read_only", payload_schema=_STATUS_PAYLOAD_SCHEMA)
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
 @strictcli.flag(name="registry", type=bool, default=False, help="Query the package registry for the latest published version")
 @effects.handler
@@ -633,11 +669,13 @@ def cmd_status(ctx, target, registry):
     )
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
-    ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)
+    # The project context is a different object from the dispatch context, so
+    # it gets its own name: `ctx` stays the strictcli one the payload goes to.
+    project_ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)
     target_name = _resolve_target(target or None)
     flags = {"json": json, "registry": registry}
     from .commands.status import run_cmd
-    run_cmd(target_name, [], flags, ctx=ctx)
+    ctx.payload(run_cmd(target_name, [], flags, ctx=project_ctx))
 
 
 # ---------------------------------------------------------------------------
@@ -739,7 +777,56 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
 # check
 # ---------------------------------------------------------------------------
 
-@app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.", effect="read_only")
+# One availability result, as `_result_to_json` builds it. `note`, `error` and
+# `github_count` appear only when the underlying check set them.
+_CHECK_NAME_RESULT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "target": {"type": "string"},
+        "status": {"type": "string"},
+        "reason": {"type": ["string", "null"]},
+        "structured_conflicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "rule": {"type": "string"},
+                },
+                "required": ["name", "rule"],
+                "additionalProperties": False,
+            },
+        },
+        "rule_sentences": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+        },
+        "exit_code": {"type": "integer"},
+        "note": {"type": "string"},
+        "error": {"type": "string"},
+        "github_count": {"type": "integer"},
+    },
+    "required": [
+        "name", "target", "status", "reason",
+        "structured_conflicts", "rule_sentences", "exit_code",
+    ],
+    "additionalProperties": False,
+}
+
+# The payload is one result object for a single name+target, and an array of
+# them for any other combination -- so the declaration carries both forms: the
+# object keywords describe the single-result shape, `items` the array's.
+_CHECK_NAME_PAYLOAD_SCHEMA = {
+    "type": ["object", "array"],
+    "properties": _CHECK_NAME_RESULT_SCHEMA["properties"],
+    "required": _CHECK_NAME_RESULT_SCHEMA["required"],
+    "additionalProperties": False,
+    "items": _CHECK_NAME_RESULT_SCHEMA,
+}
+
+
+@app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.", effect="read_only", payload_schema=_CHECK_NAME_PAYLOAD_SCHEMA)
 @strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, go, or github); repeatable", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
 @effects.handler
@@ -779,11 +866,9 @@ def cmd_check_name(ctx, target, delay):
         exit_code, payload = run_cmd(tgt, names, flags)
         max_exit = max(max_exit, exit_code)
         payloads.extend(payload)
-    if json:
-        import json as _json
-        # One object for a single name+target; a JSON array otherwise.
-        out = payloads[0] if len(payloads) == 1 else payloads
-        print(_json.dumps(out, indent=2))
+    # One object for a single name+target; a JSON array otherwise. The call is
+    # mode-independent -- the framework emits it only in machine mode.
+    ctx.payload(payloads[0] if len(payloads) == 1 else payloads)
     sys.exit(max_exit)
 
 
@@ -1106,7 +1191,52 @@ def cmd_prs(ctx):
 # unreleased
 # ---------------------------------------------------------------------------
 
-@app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.", effect="read_only")
+# Three shapes, one declaration: the normal report carries the commit list and
+# its coverage counts; the empty report carries the same with an empty list;
+# a non-releasable project carries the commit COUNT instead of the list, plus
+# the two flags that say why it has no changelog. `tag` is null before the
+# project's first release tag.
+_UNRELEASED_PAYLOAD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "tag": {"type": ["string", "null"]},
+        "commits": {
+            "type": ["array", "integer"],
+            "items": {
+                "type": "object",
+                "properties": {
+                    "hash": {"type": "string"},
+                    "subject": {"type": "string"},
+                    "author": {"type": "string"},
+                    "date": {"type": "string"},
+                    "exempt": {"type": "boolean"},
+                    "covered": {"type": "boolean"},
+                },
+                "required": [
+                    "hash", "subject", "author", "date", "exempt", "covered",
+                ],
+                "additionalProperties": False,
+            },
+        },
+        "coverage": {
+            "type": "object",
+            "properties": {
+                "covered": {"type": "integer"},
+                "total": {"type": "integer"},
+                "exempted": {"type": "integer"},
+            },
+            "required": ["covered", "total", "exempted"],
+            "additionalProperties": False,
+        },
+        "non_releasable": {"type": "boolean"},
+        "dev_only": {"type": "boolean"},
+    },
+    "required": ["tag", "commits"],
+    "additionalProperties": False,
+}
+
+
+@app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.", effect="read_only", payload_schema=_UNRELEASED_PAYLOAD_SCHEMA)
 @effects.handler
 def cmd_unreleased(ctx):
     """List unreleased commits and their changelog coverage status."""
@@ -1122,7 +1252,7 @@ def cmd_unreleased(ctx):
     )
     flags = {"json": json}
     from .commands.unreleased import run_cmd
-    run_cmd(None, [], flags, project_root=root)
+    ctx.payload(run_cmd(None, [], flags, project_root=root))
 
 
 # ---------------------------------------------------------------------------

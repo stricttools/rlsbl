@@ -688,10 +688,9 @@ class TestStatusBranchException:
              patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
              patch(f"{MOD_STATUS}.run", side_effect=Exception("no tag")), \
              patch(f"{MOD_STATUS}.is_clean_tree", side_effect=Exception("no tree")):
-            run_cmd("npm", [], {"json": True}, ctx=_ctx(root=tmp_path))
+            data = run_cmd("npm", [], {"json": True}, ctx=_ctx(root=tmp_path))
 
         captured = capsys.readouterr()
-        data = json.loads(captured.out)
         assert data["branch"] is None
         assert data["tag"] is None
         assert data["clean"] is None
@@ -731,8 +730,7 @@ class TestStatusNonReleasableProject:
              patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
              patch(f"{MOD_STATUS}.run", return_value="v1.0.0"), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
-            run_cmd("npm", [], {"json": True}, ctx=_ctx())
-        data = json.loads(capsys.readouterr().out)
+            data = run_cmd("npm", [], {"json": True}, ctx=_ctx())
         assert data["jsonl_coverage"] == "non-releasable -- no changelog"
 
 
@@ -789,10 +787,7 @@ class TestUnreleasedNonReleasable:
              patch("rlsbl.commands.unreleased.resolve_project", return_value=mock_proj), \
              patch("rlsbl.commands.unreleased.get_last_version_tag", return_value="v1.0.0"), \
              patch("rlsbl.commands.unreleased._get_commits_since", return_value=commits):
-            with pytest.raises(SystemExit) as exc:
-                run_cmd("npm", [], {"json": True}, project_root="/ws/devnode")
-        assert exc.value.code == 0
-        data = json.loads(capsys.readouterr().out)
+            data = run_cmd("npm", [], {"json": True}, project_root="/ws/devnode")
         assert data["non_releasable"] is True
         assert data["dev_only"] is True
 
@@ -809,9 +804,7 @@ class TestUnreleasedNonReleasable:
              patch("rlsbl.commands.unreleased.resolve_project", return_value=mock_proj), \
              patch("rlsbl.commands.unreleased.get_last_version_tag", return_value="v1.0.0"), \
              patch("rlsbl.commands.unreleased._get_commits_since", return_value=commits):
-            with pytest.raises(SystemExit) as exc:
-                run_cmd("npm", [], {}, project_root="/ws/devnode")
-        assert exc.value.code == 0
+            run_cmd("npm", [], {}, project_root="/ws/devnode")
         assert "non-releasable" in capsys.readouterr().out
 
 

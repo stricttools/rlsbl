@@ -61,10 +61,7 @@ class TestStatusRegistryAhead:
             mock_query.return_value = {"status": "found", "version": "1.1.0"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
-            out = capsys.readouterr().out
-
-        data = json.loads(out)
+            data = run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
         assert data["registry_version"] == "1.1.0"
         assert data["drift"] == "AHEAD"
 
@@ -116,10 +113,7 @@ class TestStatusRegistryUnpublished:
             mock_query.return_value = {"status": "not_found"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
-            out = capsys.readouterr().out
-
-        data = json.loads(out)
+            data = run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
         assert data["registry_version"] is None
         assert data["drift"] == "UNPUBLISHED"
 
@@ -152,10 +146,7 @@ class TestStatusRegistryPrivate:
         ctx = make_ctx(".", config={"publish_mode": "none"})
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"registry": True, "json": True}, ctx=ctx)
-        out = capsys.readouterr().out
-
-        data = json.loads(out)
+        data = run_cmd("npm", [], {"registry": True, "json": True}, ctx=ctx)
         assert data["registry_version"] is None
         assert data["drift"] == "PRIVATE"
 
@@ -187,10 +178,7 @@ class TestStatusRegistryError:
             mock_query.return_value = {"status": "error", "message": "HTTP 500"}
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
-            run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
-            out = capsys.readouterr().out
-
-        data = json.loads(out)
+            data = run_cmd("npm", [], {"registry": True, "json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
         assert data["registry_version"] is None
         assert data["drift"] == "ERROR"
 
@@ -219,9 +207,6 @@ class TestStatusRegistryFlagNotSet:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
-        out = capsys.readouterr().out
-
-        data = json.loads(out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx(".", config={"publish_mode": "ci"}))
         assert data["registry_version"] is None
         assert data["drift"] is None

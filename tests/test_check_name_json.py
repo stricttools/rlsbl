@@ -8,7 +8,9 @@ Two concerns:
 
 2. ``--json`` structured output: single name+target yields one JSON object;
    multiple names and/or targets yield a JSON array.  Each object carries the
-   unified ``structured_conflicts`` field with stable rule tokens.
+   unified ``structured_conflicts`` field with stable rule tokens.  In machine
+   mode stdout is strictcli's envelope (effects contract §19.2) and that
+   structure is its ``payload`` member.
 """
 
 import json as _json
@@ -31,6 +33,11 @@ from rlsbl.commands.check import (
 def _avail(name, registry):
     return {"name": name, "registry": registry, "status": "available",
             "variants": [], "reason": None}
+
+
+def _envelope_payload(stdout):
+    """The one envelope document machine mode writes, unwrapped to its payload."""
+    return _json.loads(stdout)["payload"]
 
 
 class TestCheckNameMultiTargetRunsAllTargets:
@@ -139,7 +146,7 @@ class TestCheckNameJsonOutput:
 
         result = rlsbl.app.test(["check-name", "--target", "npm", "--json"])
         assert result.exit_code == 0
-        data = _json.loads(result.stdout)
+        data = _envelope_payload(result.stdout)
         assert isinstance(data, dict)
         assert data["name"] == "mypkg"
         assert data["target"] == "npm"
@@ -156,7 +163,7 @@ class TestCheckNameJsonOutput:
         mock_check.side_effect = lambda name, registry, delay_ms=200: _avail(name, registry)
 
         result = rlsbl.app.test(["check-name", "--target", "npm", "--json"])
-        data = _json.loads(result.stdout)
+        data = _envelope_payload(result.stdout)
         assert isinstance(data, list)
         assert [o["name"] for o in data] == ["a", "b"]
 
@@ -169,7 +176,7 @@ class TestCheckNameJsonOutput:
         result = rlsbl.app.test(
             ["check-name", "--target", "npm", "--target", "pypi", "--json"]
         )
-        data = _json.loads(result.stdout)
+        data = _envelope_payload(result.stdout)
         assert isinstance(data, list)
         assert {o["target"] for o in data} == {"npm", "pypi"}
 
@@ -183,7 +190,7 @@ class TestCheckNameJsonOutput:
         }
         result = rlsbl.app.test(["check-name", "--target", "npm", "--json"])
         assert result.exit_code == 1
-        data = _json.loads(result.stdout)
+        data = _envelope_payload(result.stdout)
         assert data["status"] == "taken"
         assert data["exit_code"] == 1
 
@@ -203,6 +210,6 @@ class TestCheckNameJsonOutput:
             ],
         }
         result = rlsbl.app.test(["check-name", "--target", "npm", "--json"])
-        data = _json.loads(result.stdout)
+        data = _envelope_payload(result.stdout)
         names = [c["name"] for c in data["structured_conflicts"]]
         assert names == sorted(names)

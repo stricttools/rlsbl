@@ -1,6 +1,5 @@
 """Status command that displays a project summary including current version, branch, last tag, and changelog coverage for unreleased work."""
 
-import json as _json
 import os
 import subprocess
 import sys
@@ -231,7 +230,10 @@ def run_cmd(registry, args, flags, ctx):
     """Status command handler.
 
     Shows a quick 'where am I' summary: package info, git state, changelog, CI.
-    With --json, outputs machine-readable JSON instead.
+    Returns the collected status dict -- the caller (the CLI handler) hands it
+    to the framework as the command's machine payload.  Human output is printed
+    here unless ``flags["json"]`` is set, in which case machine mode owns
+    stdout and nothing human may reach it.
     """
     project_root = ctx.project_root
     root_str = str(project_root)
@@ -296,8 +298,7 @@ def run_cmd(registry, args, flags, ctx):
     )
 
     if flags.get("json"):
-        print(_json.dumps(data, indent=2))
-        return
+        return data
 
     print(f"Package:   {data['name']}")
 
@@ -391,3 +392,5 @@ def run_cmd(registry, args, flags, ctx):
             )
             print(f"Mono tag:  {mono_tag}")
         print(f"Part of monorepo ({monorepo_count} project{'s' if monorepo_count != 1 else ''}). Run 'rlsbl monorepo status' for all.")
+
+    return data

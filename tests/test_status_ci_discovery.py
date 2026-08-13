@@ -92,14 +92,12 @@ class TestStatusCiDiscovery:
         _write_workflow(mock_git_repo, "ci-npm.yml")
 
         capsys.readouterr()
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         assert data["ci"] == ["ci-go.yml", "ci-npm.yml"]
 
     def test_json_reports_empty_list_when_missing(self, mock_git_repo, capsys):
         _make_npm_project(mock_git_repo)
 
         capsys.readouterr()
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         assert data["ci"] == []

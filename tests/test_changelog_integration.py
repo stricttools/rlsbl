@@ -253,9 +253,7 @@ class TestUnreleasedWithJsonl:
 
         from rlsbl.commands.unreleased import run_cmd
 
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=mock_git_repo)
-        assert exc_info.value.code == 0
+        run_cmd(None, [], {}, project_root=mock_git_repo)
         captured = capsys.readouterr()
         assert "[COVERED]" in captured.out
 
@@ -274,9 +272,7 @@ class TestUnreleasedWithJsonl:
 
         from rlsbl.commands.unreleased import run_cmd
 
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {}, project_root=mock_git_repo)
-        assert exc_info.value.code == 0
+        run_cmd(None, [], {}, project_root=mock_git_repo)
         captured = capsys.readouterr()
         assert "[COVERED]" in captured.out
         assert "[MISSING]" in captured.out
@@ -295,11 +291,7 @@ class TestUnreleasedWithJsonl:
 
         from rlsbl.commands.unreleased import run_cmd
 
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(None, [], {"json": True}, project_root=mock_git_repo)
-        assert exc_info.value.code == 0
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = run_cmd(None, [], {"json": True}, project_root=mock_git_repo)
         assert data["coverage"]["covered"] == 1
         assert data["coverage"]["total"] == 1
 
@@ -374,9 +366,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import run_cmd
 
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx(mock_git_repo))
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx(mock_git_repo))
         assert "jsonl_coverage" in data
 
     def test_display_output_shows_jsonl_line(self, mock_git_repo, capsys):

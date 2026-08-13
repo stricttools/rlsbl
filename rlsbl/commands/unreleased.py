@@ -1,6 +1,5 @@
 """Unreleased command that lists commits since the last tag and checks whether each one is covered by a corresponding changelog entry."""
 
-import json
 import os
 import subprocess
 import sys
@@ -115,7 +114,10 @@ def _resolve_scope(root_str):
 def run_cmd(registry, args, flags, project_root):
     """List unreleased commits and their changelog coverage.
 
-    Usage: rlsbl unreleased [--json]
+    Returns the machine payload -- the caller (the CLI handler) hands it to the
+    framework, which emits it only in machine mode.  Human output is printed
+    here unless ``flags["json"]`` is set, in which case machine mode owns
+    stdout and nothing human may reach it.
     """
     root_str = str(project_root)
 
@@ -137,23 +139,22 @@ def run_cmd(registry, args, flags, project_root):
         commits = [c for c in commits if c["hash"] in in_scope]
 
     if not commits:
-        if flags.get("json"):
-            print(json.dumps({
-                "tag": tag, "commits": [],
-                "coverage": {"covered": 0, "total": 0, "exempted": 0},
-            }))
-        else:
+        if not flags.get("json"):
             print("No unreleased commits.")
-        sys.exit(0)
+        return {
+            "tag": tag, "commits": [],
+            "coverage": {"covered": 0, "total": 0, "exempted": 0},
+        }
 
     # Non-releasable projects don't use changelogs
     is_non_releasable = monorepo_project is not None and not monorepo_project.is_releasable
     if is_non_releasable:
-        if flags.get("json"):
-            print(json.dumps({"tag": tag, "commits": len(commits), "non_releasable": True, "dev_only": monorepo_project.dev_only}))
-        else:
+        if not flags.get("json"):
             print(f"non-releasable -- no changelog ({len(commits)} unreleased commits)")
-        sys.exit(0)
+        return {
+            "tag": tag, "commits": len(commits),
+            "non_releasable": True, "dev_only": monorepo_project.dev_only,
+        }
 
     # Cross-reference each commit against JSONL changelog
     if not os.path.isdir(changes_dir):
@@ -185,16 +186,7 @@ def run_cmd(registry, args, flags, project_root):
     total = len(tracked)
     exempted = len(commits) - total
 
-    if flags.get("json"):
-        output = {
-            "tag": tag,
-            "commits": commits,
-            "coverage": {
-                "covered": covered_count, "total": total, "exempted": exempted,
-            },
-        }
-        print(json.dumps(output, indent=2))
-    else:
+    if not flags.get("json"):
         tag_display = tag or "(no tags)"
         print(f"Unreleased commits since {tag_display} ({len(commits)} commits):\n")
         for commit in commits:
@@ -211,4 +203,10 @@ def run_cmd(registry, args, flags, project_root):
         suffix = f" ({exempted} exempted)" if exempted else ""
         print(f"\nCoverage: {covered_count}/{total} commits covered{suffix}.")
 
-    sys.exit(0)
+    return {
+        "tag": tag,
+        "commits": commits,
+        "coverage": {
+            "covered": covered_count, "total": total, "exempted": exempted,
+        },
+    }

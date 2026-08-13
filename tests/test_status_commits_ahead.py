@@ -175,9 +175,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
-        out = capsys.readouterr().out
-        data = json.loads(out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
 
         assert data["commits_ahead"] == 2
         assert data["commits_ahead_tag"] == "v1.0.0"
@@ -190,9 +188,7 @@ class TestStatusCommitsAheadStandalone:
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
-        out = capsys.readouterr().out
-        data = json.loads(out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
 
         assert data["commits_ahead"] is None
         assert data["commits_ahead_tag"] is None
@@ -331,14 +327,12 @@ class TestStatusCommitsAheadMonorepo:
 
         capsys.readouterr()
         monkeypatch.chdir(str(alpha))
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         assert data["commits_ahead"] == 1
 
         capsys.readouterr()
         monkeypatch.chdir(str(beta))
-        run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
-        data = json.loads(capsys.readouterr().out)
+        data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
         assert data["commits_ahead"] == 2
 
     def test_monorepo_warns_only_for_projects_with_unreleased_commits(self, mock_git_repo, monkeypatch, capsys):

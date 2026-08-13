@@ -134,6 +134,16 @@ class _CliCtx:
         self.quiet = quiet
         self.verbose = verbose
         self.json = json
+        self.payload_value = None
+
+    def payload(self, value):
+        """Capture the machine payload the handler supplies (contract §19.4).
+
+        The real framework validates it against the command's declared schema
+        and emits it only in machine mode; a direct handler call just records
+        it so the test can assert on it.
+        """
+        self.payload_value = value
 
     @property
     def effects(self):
