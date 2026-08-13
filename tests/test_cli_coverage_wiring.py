@@ -325,6 +325,9 @@ class TestStandaloneWiring:
         result, m = _dispatch(
             ["unreleased", "--json"],
             "rlsbl.commands.unreleased.run_cmd",
+            # The handler hands this straight to ctx.payload, which validates
+            # it against the command's declared schema.
+            ret={"tag": None, "commits": []},
         )
         assert result.exit_code == 0, result.stderr
         assert m.call_args[0][2] == {"json": True}
@@ -429,6 +432,7 @@ class TestMonorepoDirectWiring:
         result, m = _dispatch(
             ["monorepo", "graph", "--format", "dot", "--root", "pkgA", "--depth", "2"],
             "rlsbl.commands.monorepo._cmd_graph",
+            ret={"packages": {}, "edges": []},
         )
         assert result.exit_code == 0, result.stderr
         flags = _flags(m)
@@ -454,6 +458,11 @@ class TestMonorepoDirectWiring:
             ["monorepo", "impact", "--since", "HEAD~2", "--depth", "3"],
             "rlsbl.commands.monorepo._cmd_impact",
             variadic=["pkgA"],
+            ret={
+                "input": "pkgA", "direct_dependents": [],
+                "transitive_dependents": [], "test_scope": [],
+                "release_candidates": [],
+            },
         )
         assert result.exit_code == 0, result.stderr
         args, flags = m.call_args[0][0], m.call_args[0][1]

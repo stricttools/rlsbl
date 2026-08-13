@@ -1173,8 +1173,8 @@ class TestResolveReleaseTargets:
         assert "nonexistent" not in result
 
 
-class TestStatusJson:
-    """Tests for rlsbl.commands.status --json flag."""
+class TestStatusPayload:
+    """Tests for the machine payload rlsbl.commands.status returns."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path, monkeypatch):
@@ -1193,15 +1193,15 @@ class TestStatusJson:
         os.system("git add package.json CHANGELOG.md")
         os.system("git commit -q -m initial")
 
-    def test_status_json_output(self):
-        """With --json, status should output valid JSON with expected keys."""
+    def test_status_payload(self):
+        """The machine payload carries every status key and nothing else."""
         from rlsbl.commands.status import run_cmd
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
-            run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
+            data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
 
-        output = mock_out.getvalue()
-        data = json.loads(output)
+        # Machine mode owns stdout: the human summary must not be printed.
+        assert mock_out.getvalue() == ""
         expected_keys = {"name", "version", "target", "branch", "tag",
                          "clean", "changelog", "jsonl_coverage",
                          "commits_ahead", "commits_ahead_tag",

@@ -167,8 +167,8 @@ class TestSnapshotMultiTarget:
 class TestGraphMultiTarget:
     """Verify graph output includes all targets for multi-target projects."""
 
-    def test_graph_json_contains_both_targets(self, mock_git_repo, capsys):
-        """JSON graph output should list all targets for a multi-target project."""
+    def test_graph_payload_contains_both_targets(self, mock_git_repo, capsys):
+        """The graph payload should list all targets for a multi-target project."""
         _make_multi_target_project(mock_git_repo, "dual", version="1.0.0")
         _make_single_target_project(mock_git_repo, "single", target="npm", version="2.0.0")
 
@@ -178,9 +178,7 @@ class TestGraphMultiTarget:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         dual = data["packages"]["dual"]
         assert "targets" in dual, "graph should use 'targets' (plural) key"
@@ -198,9 +196,7 @@ class TestGraphMultiTarget:
         projects = [{"path": "dual", "name": "dual"}]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         assert data["packages"]["dual"]["version"] == "3.1.0"
 

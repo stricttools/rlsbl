@@ -798,7 +798,7 @@ class TestCmdMonoImpact:
     @patch("rlsbl.commands.monorepo._cmd_impact")
     def test_delegates(self, mock_impact, _):
         rlsbl._variadic_args = ["packages/core"]
-        rlsbl.cmd_mono_impact(cli_ctx(), format="json", depth=2, since="HEAD~3")
+        rlsbl.cmd_mono_impact(cli_ctx(), depth=2, since="HEAD~3")
         mock_impact.assert_called_once()
         flags = mock_impact.call_args[0][1]
         assert flags["since"] == "HEAD~3"
@@ -1059,7 +1059,7 @@ class TestExtractVariadicArgs:
     def test_monorepo_impact(self, monkeypatch):
         monkeypatch.setattr(
             sys, "argv",
-            ["rlsbl", "monorepo", "impact", "packages/core", "--format", "json"],
+            ["rlsbl", "monorepo", "impact", "packages/core", "--since", "HEAD~2"],
         )
         result = rlsbl._extract_variadic_args()
         assert result == ["packages/core"]
@@ -1101,7 +1101,7 @@ class TestExtractVariadicArgs:
     def test_monorepo_impact_with_flag_equals(self, monkeypatch):
         monkeypatch.setattr(
             sys, "argv",
-            ["rlsbl", "monorepo", "impact", "packages/core", "--format=json", "--depth=2"],
+            ["rlsbl", "monorepo", "impact", "packages/core", "--since=HEAD~2", "--depth=2"],
         )
         result = rlsbl._extract_variadic_args()
         assert result == ["packages/core"]

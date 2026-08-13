@@ -81,8 +81,17 @@ class TestMainRootDiscovery:
         monkeypatch.chdir(subdir)
         original_cwd = os.getcwd()
 
-        # Mock the status command's run_cmd to avoid actual execution
+        # Mock the status command's run_cmd to avoid actual execution. Its
+        # return value is the machine payload, which the framework validates
+        # against the command's declared schema, so it must be a real one.
         with patch("rlsbl.commands.status.run_cmd") as mock_run:
+            mock_run.return_value = {
+                "name": "test", "version": "1.0.0", "target": "npm",
+                "branch": None, "tag": None, "clean": None, "changelog": None,
+                "jsonl_coverage": "not set up", "commits_ahead": None,
+                "commits_ahead_tag": None, "ci": [], "publish": False,
+                "registry_version": None, "drift": None,
+            }
             with patch("rlsbl.detect_registries", return_value=["npm"]):
                 from rlsbl import app
                 app.test(["status"])
