@@ -617,11 +617,13 @@ def cmd_release_retry(ctx, watch):
 
 @app.command(name="status", help="Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.", effect="read_only")
 @strictcli.flag(name="target", type=str, help="Target a specific registry (auto-detected if omitted)", default="")
-@strictcli.flag(name="json", type=bool, default=False, help="Output version, branch, tag, and coverage as machine-readable JSON")
 @strictcli.flag(name="registry", type=bool, default=False, help="Query the package registry for the latest published version")
 @effects.handler
-def cmd_status(ctx, target, json, registry):
+def cmd_status(ctx, target, registry):
     """Display project version, branch, last tag, and changelog coverage."""
+    # --json is framework-owned: strictcli reserves the name at every level and
+    # delivers the value on the Context.
+    json = ctx.json
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl status` must run inside a sub-project, not at "
@@ -740,10 +742,12 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
 @app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.", effect="read_only")
 @strictcli.flag(name="target", type=str, help="Registry to query for name availability (npm, pypi, go, or github); repeatable", repeatable=True, unique=True)
 @strictcli.flag(name="delay", type=str, help="Milliseconds to wait between consecutive registry API queries (default: 200)", default="200")
-@strictcli.flag(name="json", type=bool, default=False, help="Output results as machine-readable JSON: one object for a single name+target, a JSON array for multiple names and/or targets")
 @effects.handler
-def cmd_check_name(ctx, target, delay, json):
+def cmd_check_name(ctx, target, delay):
     """Query package registries to check name availability."""
+    # --json is framework-owned: strictcli reserves the name at every level and
+    # delivers the value on the Context.
+    json = ctx.json
     # --target is required for check-name; with repeatable=True, target is a list
     targets = target if target else []
     if not targets:
@@ -1103,10 +1107,12 @@ def cmd_prs(ctx):
 # ---------------------------------------------------------------------------
 
 @app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.", effect="read_only")
-@strictcli.flag(name="json", type=bool, default=False, help="Output the unreleased commit list and coverage status as machine-readable JSON")
 @effects.handler
-def cmd_unreleased(ctx, json):
+def cmd_unreleased(ctx):
     """List unreleased commits and their changelog coverage status."""
+    # --json is framework-owned: strictcli reserves the name at every level and
+    # delivers the value on the Context.
+    json = ctx.json
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl unreleased` must run inside a sub-project, not "

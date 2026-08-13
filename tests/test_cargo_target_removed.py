@@ -75,7 +75,7 @@ class TestCliSurface:
             sys, "argv", ["rlsbl", "check-name", "serde", "--target", "crates"]
         )
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(cli_ctx(), target=["crates"], delay=0, json=False)
+            rlsbl.cmd_check_name(cli_ctx(json=False), target=["crates"], delay=0)
         assert exc.value.code == 1
         err = capsys.readouterr().err
         assert "crates" in err

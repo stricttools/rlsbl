@@ -242,7 +242,7 @@ class TestCmdStatus:
     @patch("rlsbl._resolve_target", return_value="npm")
     @patch("rlsbl.commands.status.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_status(cli_ctx(), target="npm", json=True, registry=False)
+        rlsbl.cmd_status(cli_ctx(json=True), target="npm", registry=False)
         mock_run.assert_called_once()
         assert mock_run.call_args[0][2] == {"json": True, "registry": False}
 
@@ -257,12 +257,12 @@ class TestCmdCheckName:
 
     def test_exits_when_no_target(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(cli_ctx(), target=[], delay="200", json=False)
+            rlsbl.cmd_check_name(cli_ctx(json=False), target=[], delay="200")
         assert exc.value.code == 1
 
     def test_exits_on_invalid_targets(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(cli_ctx(), target=["bogus"], delay="200", json=False)
+            rlsbl.cmd_check_name(cli_ctx(json=False), target=["bogus"], delay="200")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.check.run_cmd")
@@ -270,7 +270,7 @@ class TestCmdCheckName:
         rlsbl._variadic_args = ["my-package"]
         mock_run.return_value = (0, [])
         with pytest.raises(SystemExit):
-            rlsbl.cmd_check_name(cli_ctx(), target=["npm", "pypi"], delay="500", json=False)
+            rlsbl.cmd_check_name(cli_ctx(json=False), target=["npm", "pypi"], delay="500")
         assert mock_run.call_count == 2
         assert mock_run.call_args_list[0][0][0] == "npm"
         assert mock_run.call_args_list[1][0][0] == "pypi"
@@ -572,7 +572,7 @@ class TestCmdUnreleased:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.unreleased.run_cmd")
     def test_delegates(self, mock_run, _):
-        rlsbl.cmd_unreleased(cli_ctx(), json=True)
+        rlsbl.cmd_unreleased(cli_ctx(json=True))
         mock_run.assert_called_once()
         assert mock_run.call_args[0][2] == {"json": True}
 
