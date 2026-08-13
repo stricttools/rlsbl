@@ -44,13 +44,14 @@ def _site_packages(root):
     return root / ".venv" / "lib" / "python3.13" / "site-packages"
 
 
-def _make_dist_info(root, name, version, *, editable=None, url_path=None):
-    """Create a ``<name>-<version>.dist-info`` under the project's fake venv.
+def _make_dist_info_in(site, name, version, *, editable=None, url_path=None, pth=False):
+    """Create a ``<name>-<version>.dist-info`` inside *site* (a site-packages dir).
 
     editable=None -> no direct_url.json (registry wheel, overlay wiped).
     editable=True/False with url_path -> a direct_url.json pointing at url_path.
+    pth=True -> also drop the ``_editable_impl_<name>.pth`` import hook that a
+    modern editable install writes INSTEAD OF a package directory.
     """
-    site = _site_packages(root)
     di = site / f"{name.replace('-', '_')}-{version}.dist-info"
     di.mkdir(parents=True)
     (di / "METADATA").write_text(
@@ -59,7 +60,39 @@ def _make_dist_info(root, name, version, *, editable=None, url_path=None):
     if editable is not None:
         du = {"url": f"file://{url_path}", "dir_info": {"editable": editable}}
         (di / "direct_url.json").write_text(json.dumps(du))
+    if pth:
+        (site / f"_editable_impl_{name.replace('-', '_')}.pth").write_text(
+            f"import _editable_impl_{name.replace('-', '_')}\n"
+        )
     return di
+
+
+def _make_dist_info(root, name, version, *, editable=None, url_path=None, pth=False):
+    """Create a ``<name>-<version>.dist-info`` under the project's own fake venv."""
+    return _make_dist_info_in(
+        _site_packages(root), name, version, editable=editable, url_path=url_path, pth=pth
+    )
+
+
+def _make_uv_workspace(root, member="pkg"):
+    """Build a uv workspace: a root pyproject declaring *member*, the member
+    directory, and the workspace-root .venv site-packages.
+
+    uv gives a workspace exactly ONE environment, at the workspace root -- a
+    member directory has no .venv of its own. Returns (member_dir, site_packages).
+    """
+    (root / "pyproject.toml").write_text(
+        "[project]\nname = 'ws'\nversion = '0.0.0'\n\n"
+        f"[tool.uv.workspace]\nmembers = ['{member}']\n"
+    )
+    member_dir = root / member
+    member_dir.mkdir()
+    (member_dir / "pyproject.toml").write_text(
+        f"[project]\nname = '{member}'\nversion = '0.1.0'\n"
+    )
+    site = _site_packages(root)
+    site.mkdir(parents=True)
+    return member_dir, site
 
 
 def _write_sentinel_entries(root, entries):
@@ -168,6 +201,111 @@ def test_inspect_matches_normalized_name(tmp_project):
     _make_dist_info(tmp_project, "My_Pkg", "1.0", editable=True, url_path="/x")
     installed = inspect_installed(str(tmp_project), "my-pkg")
     assert installed["found"] is True
+
+
+def test_inspect_editable_without_package_directory(tmp_project):
+    """An editable install writes a dist-info and a .pth import hook -- NOT a
+    package directory in site-packages. Detection must read the dist-info's
+    direct_url.json, never look for a directory that will not be there."""
+    checkout = tmp_project / "depa-src"
+    _make_dist_info(
+        tmp_project, "depa", "0.3.1", editable=True, url_path=str(checkout), pth=True
+    )
+    site = _site_packages(tmp_project)
+    assert not (site / "depa").exists()  # no package directory, by construction
+    assert (site / "_editable_impl_depa.pth").is_file()
+
+    installed = inspect_installed(str(tmp_project), "depa")
+    assert installed["found"] is True
+    assert installed["editable"] is True
+
+    entry = {"package": "depa", "path": str(checkout), "version": "0.3.1"}
+    state, _ = classify_overlay(entry, installed)
+    assert state == OVERLAY_HEALTHY
+
+
+# ---------------------------------------------------------------------------
+# Environment resolution: uv gives a workspace ONE venv, at the workspace root
+# ---------------------------------------------------------------------------
+
+
+def test_inspect_finds_workspace_root_environment(tmp_project):
+    """A uv workspace member has no .venv of its own: its dependencies are
+    installed in the workspace root's environment. Looking only under the
+    member directory reports a perfectly healthy overlay as MISSING."""
+    member, site = _make_uv_workspace(tmp_project)
+    checkout = tmp_project / "depa-src"
+    _make_dist_info_in(
+        site, "depa", "0.3.1", editable=True, url_path=str(checkout), pth=True
+    )
+    assert not (member / ".venv").exists()
+
+    installed = inspect_installed(str(member), "depa")
+    assert installed["found"] is True
+    assert installed["editable"] is True
+    assert os.path.realpath(installed["path"]) == os.path.realpath(str(checkout))
+    assert installed["version"] == "0.3.1"
+
+
+def test_workspace_member_registry_wheel_is_wiped(tmp_project):
+    """The workspace-root environment holding a registry wheel is a WIPED
+    overlay, not a MISSING one."""
+    member, site = _make_uv_workspace(tmp_project)
+    _make_dist_info_in(site, "depa", "0.3.1")  # no direct_url.json
+    entry = {"package": "depa", "path": str(tmp_project / "depa-src"), "version": "0.3.1"}
+    state, _ = classify_overlay(entry, inspect_installed(str(member), "depa"))
+    assert state == OVERLAY_WIPED
+
+
+def test_workspace_member_wrong_path_is_drift(tmp_project):
+    """An editable install pointing somewhere other than the declared checkout
+    is drift, detected in the workspace-root environment too."""
+    member, site = _make_uv_workspace(tmp_project)
+    _make_dist_info_in(site, "depa", "0.3.1", editable=True, url_path="/somewhere/else")
+    entry = {"package": "depa", "path": str(tmp_project / "depa-src"), "version": "0.3.1"}
+    state, _ = classify_overlay(entry, inspect_installed(str(member), "depa"))
+    assert state == OVERLAY_WIPED
+
+
+def test_non_member_keeps_its_own_environment(tmp_project):
+    """A project that is NOT a member of the surrounding workspace uses its own
+    .venv -- the workspace root's environment must not be consulted for it."""
+    _, site = _make_uv_workspace(tmp_project)
+    outsider = tmp_project / "outsider"
+    outsider.mkdir()
+    _make_dist_info_in(site, "depa", "0.3.1", editable=True, url_path="/x")
+    assert inspect_installed(str(outsider), "depa")["found"] is False
+
+
+def test_uv_project_environment_override_is_honored(tmp_project, monkeypatch):
+    """UV_PROJECT_ENVIRONMENT relocates the project environment; the detector
+    must look where uv actually installs, not at a .venv that is not used."""
+    site = tmp_project / "custom-env" / "lib" / "python3.13" / "site-packages"
+    site.mkdir(parents=True)
+    checkout = tmp_project / "depa-src"
+    _make_dist_info_in(site, "depa", "0.3.1", editable=True, url_path=str(checkout))
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", "custom-env")
+
+    installed = inspect_installed(str(tmp_project), "depa")
+    assert installed["found"] is True
+    assert installed["editable"] is True
+
+
+def test_status_workspace_member_editable_reports_intact(tmp_project, capsys):
+    """End to end: `rlsbl dev status` inside a workspace member whose overlay is
+    installed in the workspace-root environment exits 0 and reports it intact."""
+    member, site = _make_uv_workspace(tmp_project)
+    checkout = tmp_project / "depa-src"
+    _make_dist_info_in(
+        site, "depa", "0.3.1", editable=True, url_path=str(checkout), pth=True
+    )
+    _write_sentinel_entries(
+        member, [{"package": "depa", "path": str(checkout), "version": "0.3.1"}]
+    )
+    rc = run_status(str(member))
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert "[ok]" in out
 
 
 def test_classify_healthy(tmp_project):

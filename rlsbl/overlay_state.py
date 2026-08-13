@@ -17,7 +17,10 @@ import json
 import os
 import re
 import tomllib
+from importlib.metadata import Distribution, DistributionFinder, MetadataPathFinder
 from urllib.parse import unquote, urlparse
+
+from .utils import detect_uv_workspace_root
 
 
 class MalformedSentinelError(Exception):
@@ -98,61 +101,62 @@ def load_sentinel(project_root):
     return result
 
 
-def _venv_site_packages(project_root):
-    """Return existing ``site-packages`` directories under the project's
-    ``.venv`` (one per Python minor version present)."""
-    pattern = os.path.join(
-        str(project_root), ".venv", "lib", "python*", "site-packages"
+def project_environment(project_root):
+    """Return the directory of the environment uv manages for *project_root*.
+
+    uv gives a project exactly ONE environment, and it is not always a ``.venv``
+    beside the project's own pyproject.toml:
+
+    - A **uv workspace member** shares the environment at the WORKSPACE ROOT
+      (``uv sync`` and ``uv pip install`` from inside the member both target
+      it), and has no ``.venv`` of its own. Looking only under the member
+      directory reported a perfectly healthy overlay as missing.
+    - ``UV_PROJECT_ENVIRONMENT`` relocates it entirely; a relative value is
+      resolved against the workspace root. Read here for the same reason: it
+      is uv's own selection of the directory this function has to describe,
+      not rlsbl configuration.
+    """
+    root = os.path.abspath(str(project_root))
+    base = detect_uv_workspace_root(root) or root
+    override = os.environ.get("UV_PROJECT_ENVIRONMENT")
+    if override:
+        return override if os.path.isabs(override) else os.path.join(base, override)
+    return os.path.join(base, ".venv")
+
+
+def _site_packages_dirs(env_dir):
+    """Return the existing ``site-packages`` directories inside an environment
+    (one per Python minor version present)."""
+    patterns = (
+        os.path.join(env_dir, "lib", "python*", "site-packages"),
+        os.path.join(env_dir, "Lib", "site-packages"),  # Windows layout
     )
-    return [d for d in glob.glob(pattern) if os.path.isdir(d)]
+    found = []
+    for pattern in patterns:
+        found.extend(d for d in glob.glob(pattern) if os.path.isdir(d))
+    return found
 
 
-def _read_dist_info_metadata(dist_info):
-    """Return ``(name, version)`` from a ``*.dist-info`` directory's METADATA
-    file, falling back to the directory-name split when METADATA is absent.
-    Either element may be None if unreadable."""
-    meta_path = os.path.join(dist_info, "METADATA")
-    if os.path.isfile(meta_path):
-        name = version = None
-        try:
-            with open(meta_path, "r", encoding="utf-8", errors="replace") as f:
-                for line in f:
-                    if not line.strip():
-                        break  # blank line ends the RFC822 header block
-                    if name is None and line.startswith("Name:"):
-                        name = line[len("Name:"):].strip()
-                    elif version is None and line.startswith("Version:"):
-                        version = line[len("Version:"):].strip()
-                    if name and version:
-                        break
-        except OSError:
-            return None, None
-        return name, version
+def _read_direct_url(dist):
+    """Return ``(editable, path)`` from an installed distribution's
+    ``direct_url.json`` (PEP 610).
 
-    base = os.path.basename(dist_info)
-    if base.endswith(".dist-info"):
-        stem = base[: -len(".dist-info")]
-        name, _, version = stem.rpartition("-")
-        if name:
-            return name, version
-    return None, None
-
-
-def _read_direct_url(dist_info):
-    """Return ``(editable, path)`` from a dist-info's ``direct_url.json``.
-
-    A registry wheel has no ``direct_url.json`` -> ``(False, None)``. A uv
+    A registry wheel has no ``direct_url.json`` -> ``(False, None)``. An
     editable install writes ``dir_info.editable = true`` and a ``file://`` url
     pointing at the checkout -> ``(True, "/abs/checkout")``. A non-editable
     local install -> ``(False, "/abs/path")``.
+
+    This record is the only honest evidence of editability. An editable install
+    does NOT put a package directory in site-packages -- it writes a ``.pth``
+    import hook whose name and content vary by build backend -- so nothing in
+    the file layout may be used to decide this.
     """
-    du_path = os.path.join(dist_info, "direct_url.json")
-    if not os.path.isfile(du_path):
+    raw = dist.read_text("direct_url.json")
+    if not raw:
         return False, None
     try:
-        with open(du_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
+        data = json.loads(raw)
+    except json.JSONDecodeError:
         return False, None
     editable = bool((data.get("dir_info") or {}).get("editable"))
     url = data.get("url")
@@ -163,29 +167,55 @@ def _read_direct_url(dist_info):
 
 
 def inspect_installed(project_root, package):
-    """Inspect the project's ``.venv`` for how *package* is installed.
+    """Inspect the project's environment for how *package* is installed.
 
-    Returns ``{"found", "editable", "path", "version"}``:
-    - ``found=False``: no dist-info for *package* in the venv (missing).
-    - ``editable=True`` with ``path``: uv editable install; ``path`` is the
-      ``file://`` checkout it points at.
+    Returns ``{"found", "editable", "path", "version", "environment"}``:
+    - ``found=False``: the environment holds no distribution named *package*.
+    - ``editable=True`` with ``path``: an editable install; ``path`` is the
+      ``file://`` checkout its ``direct_url.json`` points at.
     - ``editable=False``: a registry wheel or non-editable install -- i.e. the
       overlay was wiped.
+    - ``environment``: the environment directory that was inspected, so a
+      not-found answer can say where it looked.
+
+    Distributions are read through ``importlib.metadata`` pointed at the
+    environment's ``site-packages``, so dist-info naming, metadata parsing and
+    the PEP 610 record all follow the packaging standard rather than a
+    hand-rolled guess at the on-disk layout.
     """
     target = _normalize(package)
-    for site in _venv_site_packages(project_root):
-        for dist_info in glob.glob(os.path.join(site, "*.dist-info")):
-            meta_name, meta_version = _read_dist_info_metadata(dist_info)
-            if meta_name is None or _normalize(meta_name) != target:
-                continue
-            editable, path = _read_direct_url(dist_info)
-            return {
-                "found": True,
-                "editable": editable,
-                "path": path,
-                "version": meta_version,
-            }
-    return {"found": False, "editable": False, "path": None, "version": None}
+    env_dir = project_environment(project_root)
+    sites = _site_packages_dirs(env_dir)
+    # The environment is foreign, mutable state (a `uv sync` between two calls
+    # in one process changes it), so never answer from importlib's path cache.
+    MetadataPathFinder.invalidate_caches()
+    context = DistributionFinder.Context(path=sites)
+    for dist in Distribution.discover(context=context):
+        try:
+            name = dist.metadata["Name"]
+        except Exception:
+            name = None
+        if not name or _normalize(name) != target:
+            continue
+        editable, path = _read_direct_url(dist)
+        try:
+            version = dist.version
+        except Exception:
+            version = None
+        return {
+            "found": True,
+            "editable": editable,
+            "path": path,
+            "version": version,
+            "environment": env_dir,
+        }
+    return {
+        "found": False,
+        "editable": False,
+        "path": None,
+        "version": None,
+        "environment": env_dir,
+    }
 
 
 def classify_overlay(entry, installed):
@@ -199,10 +229,13 @@ def classify_overlay(entry, installed):
     declared_path = entry["path"]
 
     if not installed["found"]:
+        env = installed.get("environment")
+        where = f" ({env})" if env else ""
         return (
             OVERLAY_MISSING,
             f"{package}: declared as an editable overlay of {declared_path} "
-            "but not installed in the venv at all -- run `rlsbl dev sync`",
+            f"but not installed in the project environment{where} at all "
+            "-- run `rlsbl dev sync`",
         )
     if not installed["editable"]:
         actual_version = installed["version"] or "unknown version"

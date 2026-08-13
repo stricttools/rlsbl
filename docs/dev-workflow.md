@@ -1,5 +1,5 @@
 ---
-description: "Local development workflow: editable installs across 7 targets, sibling overlays via dev sync, CI watching with classified retry, and pre-push enforcement."
+description: "Local development workflow: editable installs across 7 targets, sibling overlays via dev sync, overlay drift detection, CI watching with classified retry, and pre-push enforcement."
 ---
 
 # Development workflow
@@ -91,6 +91,17 @@ Every problem is a hard error, never a silent no-op: missing file (the error sho
 4. Prints exactly what was overlaid: package, version (from the checkout's `pyproject.toml`), and resolved path.
 
 `VIRTUAL_ENV` is stripped from both subprocess invocations so `uv sync` and `uv pip` deterministically target the same project environment (a leaked active venv would otherwise split the two steps across environments). The command is idempotent. In a monorepo, run it from within a sub-project; invoking it at the workspace root is a hard error.
+
+### How an overlay is detected (`rlsbl dev status`, `dev-overlay-drift`)
+
+`rlsbl dev status` and the `dev-overlay-drift` check compare the sentinel against the environment uv actually manages for the project. Whether an install is editable is read from the installed distribution's PEP 610 `direct_url.json` (`dir_info.editable`, plus the `file://` checkout the URL names), through `importlib.metadata`. Nothing in the file layout is consulted: an editable install writes a dist-info and a `.pth` import hook whose name and content vary by build backend, and never creates a package directory in `site-packages`, so a directory-shaped test would report a healthy overlay as missing.
+
+The environment is resolved the way uv resolves it, not as "a `.venv` beside the project":
+
+- A **uv workspace member** has no environment of its own -- `uv sync` and `uv pip install` from inside the member both target the workspace root's `.venv`, and that is where the detector looks.
+- `UV_PROJECT_ENVIRONMENT` relocates it; a relative value is resolved against the workspace root, exactly as uv does.
+
+A package the environment does not hold at all reports as missing and names the environment directory that was inspected.
 
 ### The UV_NO_SYNC=1 gate
 
