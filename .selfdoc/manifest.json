@@ -5785,11 +5785,6 @@
         },
         {
           "level": 3,
-          "text": "`_render_json`",
-          "anchor": "_render_json"
-        },
-        {
-          "level": 3,
           "text": "`_render_dot`",
           "anchor": "_render_dot"
         },
@@ -5859,11 +5854,6 @@
           "level": 3,
           "text": "`_render_text`",
           "anchor": "_render_text"
-        },
-        {
-          "level": 3,
-          "text": "`_render_json`",
-          "anchor": "_render_json"
         },
         {
           "level": 3,
@@ -15194,6 +15184,11 @@
         },
         {
           "level": 2,
+          "text": "Machine output",
+          "anchor": "machine-output"
+        },
+        {
+          "level": 2,
           "text": "`rlsbl commit`",
           "anchor": "rlsbl-commit"
         },
@@ -15332,5 +15327,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-12T14:21:56.201944+00:00"
+  "last_gen": "2026-08-13T03:08:27.265398+00:00"
 }
