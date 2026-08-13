@@ -105,9 +105,12 @@ class TestNonInteractiveStdin:
         result = self._run(["release", "yank", "1.0.0"], tmp_path)
         assert result.returncode == 1
         assert (
-            "error: stdin is not interactive; pass --approve-consequential to confirm"
-            in result.stderr
+            "error: stdin is not interactive; a consequential command must be "
+            "confirmed at a terminal" in result.stderr
         ), result.stderr
+        # The refusal names what is required, never the token that lifts it
+        # (strictcli contract §12.6, amended at the protocol round).
+        assert "--approve-consequential" not in result.stderr, result.stderr
 
     def test_approve_consequential_gets_past_the_prompt(self, tmp_path):
         result = self._run(
