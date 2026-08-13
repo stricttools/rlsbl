@@ -7400,8 +7400,8 @@
         },
         {
           "level": 3,
-          "text": "`_parse_safegit_json`",
-          "anchor": "_parse_safegit_json"
+          "text": "`_parse_safegit_envelope`",
+          "anchor": "_parse_safegit_envelope"
         },
         {
           "level": 3,
@@ -15322,5 +15322,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-13T03:10:12.389251+00:00"
+  "last_gen": "2026-08-13T05:31:51.192209+00:00"
 }
