@@ -527,12 +527,81 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
             result = app._check_defs["test-suite-workspace"].impl(ctx)
 
         assert result.status == "pass"
-        # Upfront uv sync runs at workspace root
-        mock_sync.assert_called_once_with(str(repo), check_timeout=DEFAULT_CHECK_TIMEOUT)
+        # Upfront uv sync runs at workspace root, carrying the (empty, in
+        # registry mode) set of dev overlays it must not reinstall over.
+        mock_sync.assert_called_once_with(
+            str(repo), check_timeout=DEFAULT_CHECK_TIMEOUT, overlays=[]
+        )
         # Per-project test runs with skip_sync=True
         mock_tests.assert_called_once_with(
             "pypi", project_dir=str(pkg), workspace_root=str(repo), skip_sync=True,
         )
+
+    def test_member_overlay_is_excluded_from_the_workspace_sync(
+        self, tmp_path, monkeypatch
+    ):
+        """A member's active dev overlay must reach the workspace-root sync as
+        an exclusion. The members share one environment, so a bare sync here
+        reinstalls the locked registry wheel over the editable checkout."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+
+        run_git(repo, "init", "-q", "-b", "main")
+        run_git(repo, "config", "user.email", "test@test.local")
+        run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        run_git(repo, "add", "README.md")
+        run_git(repo, "commit", "-q", "-m", "initial")
+        run_git(repo, "tag", "v0.0.0")
+
+        pkg = repo / "packages" / "alpha"
+        pkg.mkdir(parents=True)
+        (pkg / "pyproject.toml").write_text(
+            '[project]\nname = "alpha"\nversion = "0.1.0"\n'
+        )
+        checkout = tmp_path / "depa-src"
+        checkout.mkdir()
+        (pkg / "dev-sources.toml.local-only").write_text(
+            f'[[overlay]]\npackage = "depa"\npath = "{checkout}"\n'
+        )
+        (pkg / "dev-overlays-state.toml.local-only").write_text(
+            f'[[overlay]]\npackage = "depa"\npath = "{checkout}"\nversion = "0.3.1"\n'
+        )
+
+        make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
+
+        run_git(repo, "add", ".")
+        run_git(repo, "commit", "-q", "-m", "scaffold workspace")
+        base_sha = git_head(repo)
+
+        (pkg / "src.py").write_text("x = 1\n")
+        run_git(repo, "add", "packages/alpha/src.py")
+        run_git(repo, "commit", "-q", "-m", "feat: alpha feature")
+        head_sha = git_head(repo)
+
+        from rlsbl.workspace import load_workspace
+
+        ctx = WorkspaceCheckContext(
+            project_root=Path(str(repo)),
+            workspace_root=Path(str(repo)),
+            config={},
+            projects=load_workspace(str(repo)),
+            graph=None,
+        )
+        ctx.push_stdin = f"refs/heads/main {head_sha} refs/heads/main {base_sha}"
+
+        with (
+            patch("rlsbl.testing.run_project_tests", return_value=True),
+            patch("rlsbl.testing.sync_workspace", return_value=True) as mock_sync,
+        ):
+            result = app._check_defs["test-suite-workspace"].impl(ctx)
+
+        assert result.status == "pass"
+        assert mock_sync.call_args.kwargs["overlays"] == [
+            {"package": "depa", "path": str(checkout)}
+        ]
 
 
 class TestWorkspaceTestSuiteSkipsDevNodes:

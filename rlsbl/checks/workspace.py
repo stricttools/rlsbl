@@ -680,7 +680,8 @@ def register_workspace_checks(app):
         from ..prepush_utils import _parse_stdin_refs
         from ..git_util import affected_projects as _affected, get_push_changed_files
         from ..targets import detect_targets, resolve_releasable_config_dir
-        from ..testing import run_project_tests, sync_workspace
+        from ..overlay_state import MalformedSentinelError, OverlayModeConflictError
+        from ..testing import collect_active_overlays, run_project_tests, sync_workspace
 
         stdin_lines = ctx.push_stdin.strip().splitlines()
         refs = _parse_stdin_refs(stdin_lines)
@@ -719,7 +720,20 @@ def register_workspace_checks(app):
 
         if has_pypi:
             timeout = get_check_timeout(ctx.config)
-            if not sync_workspace(str(ctx.workspace_root), check_timeout=timeout):
+            # The members share one environment, so the sync must exclude every
+            # member's overlaid packages: a bare sync here reinstalls the locked
+            # registry wheels over them without a word.
+            try:
+                overlays = collect_active_overlays(
+                    [d for _proj, d, target in project_targets if target == "pypi"]
+                )
+            except (OverlayModeConflictError, MalformedSentinelError) as e:
+                text = str(e)
+                reporter.error(text)
+                return reporter.found(text)
+            if not sync_workspace(
+                str(ctx.workspace_root), check_timeout=timeout, overlays=overlays
+            ):
                 reporter.error("uv sync --all-packages failed at workspace root")
                 return reporter.found("uv sync --all-packages failed at workspace root")
 

@@ -9,10 +9,12 @@ from unittest.mock import patch
 import pytest
 
 from rlsbl.errors import ConfigError
+from rlsbl.overlay_state import OverlayModeConflictError
 from rlsbl.testing import (
     CHECK_TIMEOUT_HINT,
     _probe_pytest_location,
     _resolve_pytest_invocation,
+    collect_active_overlays,
     run_project_tests,
     sync_workspace,
 )
@@ -290,6 +292,233 @@ class TestPypiMarkers:
             result = run_project_tests("pypi", project_dir=str(tmp_project), config={})
             assert result is True
             assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
+
+
+# ---------------------------------------------------------------------------
+# Dev overlays: the test-suite runner must not wipe them
+# ---------------------------------------------------------------------------
+
+def _declare_overlay(root, package="depa", *, sentinel_path=None, declare=True, sentinel=True):
+    """Put a project into overlay mode: a declaration, a matching sentinel, and
+    the checkout they both name. Returns the checkout path."""
+    checkout = root / f"{package}-src"
+    checkout.mkdir(parents=True, exist_ok=True)
+    if declare:
+        (root / "dev-sources.toml.local-only").write_text(
+            f'[[overlay]]\npackage = "{package}"\npath = "{checkout}"\n'
+        )
+    if sentinel:
+        (root / "dev-overlays-state.toml.local-only").write_text(
+            f'[[overlay]]\npackage = "{package}"\n'
+            f'path = "{sentinel_path or checkout}"\nversion = "0.3.1"\n'
+        )
+    return checkout
+
+
+class TestDevOverlayPreservation:
+    """A declared-and-installed overlay must survive the test-suite check.
+
+    `rlsbl dev sync` overlays sibling checkouts by syncing with `--inexact
+    --no-install-package <pkg>`; the sandboxed runner does exactly the same and
+    then runs the suite with `uv run --no-sync`. The non-sandboxed runner must
+    match that, or it silently reinstalls the locked registry wheel over the
+    overlay -- destroying the state the `dev-overlay-drift` check then fails on.
+    """
+
+    def _pyproject(self, root):
+        (root / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ndev = ['pytest>=8.0']\n"
+        )
+
+    def test_workspace_sync_excludes_overlaid_package(self, tmp_project):
+        """Workspace member: the sync keeps the overlay and the suite runs with
+        --no-sync so `uv run` cannot re-sync it away."""
+        ws_root = tmp_project / "ws"
+        ws_root.mkdir()
+        (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
+        pkg = ws_root / "pkg"
+        pkg.mkdir()
+        _declare_overlay(pkg)
+
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests(
+                "pypi", project_dir=str(pkg), workspace_root=str(ws_root)
+            )
+
+        assert result is True
+        assert mock_run.call_count == 2
+        assert mock_run.call_args_list[0][0][0] == [
+            "uv", "sync", "--all-packages", "--quiet",
+            "--inexact", "--no-install-package", "depa",
+        ]
+        assert mock_run.call_args_list[1][0][0] == [
+            "uv", "run", "--no-sync", "python", "-P", "-m", "pytest",
+        ]
+
+    def test_standalone_syncs_inexact_then_runs_without_sync(self, tmp_project):
+        """Standalone: `uv run` would auto-sync (exact) and wipe the overlay, so
+        the environment is synced explicitly with the overlay excluded first."""
+        self._pyproject(tmp_project)
+        _declare_overlay(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is True
+        assert mock_run.call_count == 2
+        assert mock_run.call_args_list[0][0][0] == [
+            "uv", "sync", "--inexact", "--quiet", "--no-install-package", "depa",
+        ]
+        assert mock_run.call_args_list[0].kwargs.get("cwd") == str(tmp_project)
+        assert mock_run.call_args_list[1][0][0] == [
+            "uv", "run", "--no-sync", "python", "-P", "-m", "pytest",
+        ]
+
+    def test_standalone_named_group_carries_selector_into_sync(self, tmp_project):
+        """The explicit sync installs the same groups the suite runs with."""
+        (tmp_project / "pyproject.toml").write_text(
+            "[project]\nname = 'test'\nversion = '0.1.0'\n\n"
+            "[dependency-groups]\ntesting = ['pytest>=8.0']\n"
+        )
+        _declare_overlay(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is True
+        assert mock_run.call_args_list[0][0][0] == [
+            "uv", "sync", "--inexact", "--quiet", "--group", "testing",
+            "--no-install-package", "depa",
+        ]
+        assert mock_run.call_args_list[1][0][0] == [
+            "uv", "run", "--no-sync", "--group", "testing",
+            "python", "-P", "-m", "pytest",
+        ]
+
+    def test_standalone_sync_failure_returns_false(self, tmp_project):
+        """A failed overlay-preserving sync fails the check; pytest never runs."""
+        self._pyproject(tmp_project)
+        _declare_overlay(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is False
+        assert mock_run.call_count == 1
+
+    def test_no_overlay_files_is_byte_identical(self, tmp_project):
+        """Registry mode (no local-only files) runs exactly today's commands."""
+        self._pyproject(tmp_project)
+
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is True
+        assert mock_run.call_count == 1
+        assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
+
+    def test_declared_but_never_synced_is_a_hard_error(self, tmp_project, capsys):
+        """A declaration with no sentinel is neither mode: hard error, and no
+        subprocess runs at all -- never a silent sync that wipes the checkout."""
+        self._pyproject(tmp_project)
+        _declare_overlay(tmp_project, sentinel=False)
+
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is False
+        mock_run.assert_not_called()
+        err = capsys.readouterr().err
+        assert "dev-sources.toml.local-only" in err
+        assert "dev-overlays-state.toml.local-only" in err
+
+    def test_declaration_and_sentinel_path_disagreement_is_a_hard_error(
+        self, tmp_project, capsys
+    ):
+        """Declared at one path, synced from another: hard error, nothing runs."""
+        self._pyproject(tmp_project)
+        other = tmp_project / "elsewhere"
+        other.mkdir()
+        _declare_overlay(tmp_project, sentinel_path=other)
+
+        with (
+            patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
+            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.effects.run") as mock_run,
+        ):
+            result = run_project_tests("pypi", project_dir=str(tmp_project))
+
+        assert result is False
+        mock_run.assert_not_called()
+        assert "depa" in capsys.readouterr().err
+
+    def test_collect_unions_overlays_across_projects(self, tmp_project):
+        """A workspace sync must exclude every member's overlaid packages."""
+        a, b = tmp_project / "a", tmp_project / "b"
+        a.mkdir()
+        b.mkdir()
+        ca = _declare_overlay(a, "depa")
+        cb = _declare_overlay(b, "depb")
+        assert collect_active_overlays([str(a), str(b)]) == [
+            {"package": "depa", "path": str(ca)},
+            {"package": "depb", "path": str(cb)},
+        ]
+
+    def test_collect_same_package_two_checkouts_is_a_hard_error(self, tmp_project):
+        """One shared environment cannot hold two checkouts of one package."""
+        a, b = tmp_project / "a", tmp_project / "b"
+        a.mkdir()
+        b.mkdir()
+        _declare_overlay(a, "depa")
+        _declare_overlay(b, "depa")
+        with pytest.raises(OverlayModeConflictError, match="depa"):
+            collect_active_overlays([str(a), str(b)])
+
+    def test_collect_registry_mode_is_empty(self, tmp_project):
+        assert collect_active_overlays([str(tmp_project)]) == []
+
+    def test_go_target_ignores_overlays(self, tmp_project):
+        """Overlay mode is a Python-environment concept: the go runner is
+        untouched by the files being present."""
+        _declare_overlay(tmp_project)
+        with patch("rlsbl.effects.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = run_project_tests("go", project_dir=str(tmp_project))
+
+        assert result is True
+        assert mock_run.call_args[0][0] == [
+            "go", "test", "./...", "-race", "-short", "-count=1"
+        ]
 
 
 # ---------------------------------------------------------------------------

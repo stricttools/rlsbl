@@ -11,6 +11,11 @@ import sys
 import tomllib
 
 from .errors import ConfigError
+from .overlay_state import (
+    MalformedSentinelError,
+    OverlayModeConflictError,
+    active_overlays,
+)
 from .utils import detect_uv_workspace_root, get_check_timeout, require_tool
 from . import effects
 
@@ -33,10 +38,71 @@ CHECK_TIMEOUT_HINT = (
 # Requires Python 3.11+, which is the floor for all rlsbl-managed projects.
 
 
+def _overlay_exclusions(overlays: list[dict] | None) -> list[str]:
+    """Return the ``--no-install-package <pkg>`` arguments that keep declared
+    dev overlays out of a sync, or ``[]`` in registry mode.
+
+    Paired with ``--inexact`` (which stops the sync removing packages uv did
+    not install), this is the same pair ``rlsbl dev sync`` and the sandboxed
+    test runner use. Without it an exact sync reinstalls the locked registry
+    wheel over the editable checkout, with no output saying so.
+    """
+    args: list[str] = []
+    for overlay in overlays or []:
+        args += ["--no-install-package", overlay["package"]]
+    return args
+
+
+def collect_active_overlays(project_dirs) -> list[dict]:
+    """Union the active dev overlays declared by *project_dirs*.
+
+    A workspace's members share one environment, so a sync at the workspace
+    root must exclude every member's overlaid packages, not just one project's.
+    Raises :class:`OverlayModeConflictError` when two projects overlay the same
+    package from different checkouts -- one shared environment cannot hold both,
+    and picking either silently would wipe the other.
+    """
+    merged: dict[str, str] = {}
+    for project_dir in project_dirs:
+        for overlay in active_overlays(project_dir) or []:
+            package, path = overlay["package"], overlay["path"]
+            existing = merged.get(package)
+            if existing is not None and existing != path:
+                raise OverlayModeConflictError(
+                    f"Error: workspace projects overlay '{package}' from two "
+                    f"different checkouts ({existing} and {path}); one shared "
+                    "environment cannot hold both. Reconcile the "
+                    "dev-sources.toml.local-only files and re-run "
+                    "`rlsbl dev sync`."
+                )
+            merged[package] = path
+    return [{"package": p, "path": merged[p]} for p in sorted(merged)]
+
+
+def _sync_selector_args(run_cmd: list[str]) -> list[str]:
+    """Extract the ``--group``/``--extra`` selectors from a resolved ``uv run``
+    invocation, so an explicit ``uv sync`` installs exactly what the suite runs
+    with. Reading them back off the command keeps one source for the choice."""
+    selectors: list[str] = []
+    for i, token in enumerate(run_cmd):
+        if token in ("--group", "--extra") and i + 1 < len(run_cmd):
+            selectors += [token, run_cmd[i + 1]]
+    return selectors
+
+
 def sync_workspace(
-    workspace_root: str, *, verbose: bool = False, check_timeout: int = 120
+    workspace_root: str,
+    *,
+    verbose: bool = False,
+    check_timeout: int = 120,
+    overlays: list[dict] | None = None,
 ) -> bool:
     """Run uv sync --all-packages at the workspace root.
+
+    In overlay mode (*overlays* non-empty) the sync additionally carries
+    ``--inexact`` and one ``--no-install-package`` per overlaid package, so a
+    workspace whose environment holds editable sibling checkouts is synced
+    without wiping them.
 
     Returns True on success, False on failure.
     """
@@ -53,6 +119,9 @@ def sync_workspace(
     sync_cmd = ["uv", "sync", "--all-packages"]
     if not verbose:
         sync_cmd.append("--quiet")
+    if overlays:
+        sync_cmd.append("--inexact")
+        sync_cmd += _overlay_exclusions(overlays)
     try:
         result = effects.run(sync_cmd, cwd=workspace_root, timeout=check_timeout)
     except subprocess.TimeoutExpired:
@@ -223,28 +292,74 @@ def _run_pypi_tests(
     ``uv run python -P -m pytest``. For standalone projects: skips sync
     (``uv run`` handles it), uses ``_resolve_pytest_invocation`` to build the
     correct command. Falls back to ``python -P -m pytest`` when uv is not installed.
+
+    When the project declares dev overlays and the sentinel agrees, every uv
+    invocation here is overlay-preserving: the sync excludes the overlaid
+    packages and ``uv run`` is given ``--no-sync``. Otherwise this runner would
+    reinstall the locked registry wheels over the editable checkouts -- testing
+    released code while destroying the state ``dev-overlay-drift`` then fails
+    on. A declaration and a sentinel that disagree are a hard error, since
+    neither mode is then true.
     """
     uv_verbose = config.get("uv_sync_verbose", False)
     effective_dir = project_dir or "."
     marker_args = _pytest_marker_args(config)
+
+    try:
+        overlays = active_overlays(effective_dir)
+    except (OverlayModeConflictError, MalformedSentinelError) as e:
+        print(str(e), file=sys.stderr)
+        return False
 
     if require_tool("uv", fatal=False):
         is_workspace_member = (
             workspace_root is not None
             and detect_uv_workspace_root(effective_dir) is not None
         )
+        # `uv run` auto-syncs (exactly) before running, which would undo the
+        # overlay-preserving sync between the two commands. The flag scopes the
+        # suppression to this one invocation; UV_NO_SYNC=1 in the environment
+        # would be inherited by the test process and by every `uv run` a
+        # fixture spawns -- the same reason the sandboxed runner uses the flag.
+        run_args = ["--no-sync"] if overlays else []
 
         if is_workspace_member:
             # Workspace member: sync at workspace root, run uv run python -P -m pytest
             if not skip_sync:
                 if not sync_workspace(
-                    workspace_root, verbose=uv_verbose, check_timeout=check_timeout
+                    workspace_root,
+                    verbose=uv_verbose,
+                    check_timeout=check_timeout,
+                    overlays=overlays,
                 ):
                     return False
-            cmd = ["uv", "run", "python", "-P", "-m", "pytest"]
+            cmd = ["uv", "run"] + run_args + ["python", "-P", "-m", "pytest"]
         else:
             # Standalone: uv run handles sync; resolve the right invocation
             cmd = _resolve_pytest_invocation(effective_dir, workspace_root)
+            if overlays:
+                # Standalone normally leans on `uv run`'s auto-sync, which is
+                # exact and would wipe the overlays. Sync explicitly instead,
+                # with the same groups/extras the suite runs with.
+                sync_cmd = ["uv", "sync", "--inexact"]
+                if not uv_verbose:
+                    sync_cmd.append("--quiet")
+                sync_cmd += _sync_selector_args(cmd) + _overlay_exclusions(overlays)
+                try:
+                    sync_result = effects.run(
+                        sync_cmd, cwd=project_dir, timeout=check_timeout
+                    )
+                except subprocess.TimeoutExpired:
+                    print(f"Error: command timed out after {check_timeout}s: {sync_cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
+                    return False
+                if sync_result.returncode != 0:
+                    print(
+                        "Error: overlay-preserving uv sync failed "
+                        f"(exit {sync_result.returncode}); tests were not run.",
+                        file=sys.stderr,
+                    )
+                    return False
+                cmd = cmd[:2] + run_args + cmd[2:]
 
         cmd = cmd + marker_args
         try:

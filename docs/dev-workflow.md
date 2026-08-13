@@ -1,5 +1,5 @@
 ---
-description: "Local development workflow: editable installs across 7 targets, sibling overlays via dev sync, overlay drift detection, CI watching with classified retry, and pre-push enforcement."
+description: "Local development workflow: editable installs across 7 targets, sibling overlays via dev sync, overlay drift detection and mode, CI watching with retry, and pre-push enforcement."
 ---
 
 # Development workflow
@@ -102,6 +102,12 @@ The environment is resolved the way uv resolves it, not as "a `.venv` beside the
 - `UV_PROJECT_ENVIRONMENT` relocates it; a relative value is resolved against the workspace root, exactly as uv does.
 
 A package the environment does not hold at all reports as missing and names the environment directory that was inspected.
+
+### Overlay mode is what other commands read
+
+The declaration and the sentinel together say which mode the environment is in: neither file present is registry mode (CI, and every machine with no overlays), both present and agreeing is overlay mode, and any disagreement -- a declaration that was never synced, a sentinel with no declaration, different package sets, or a package synced from a path other than the one declared -- is a hard error naming both files. Never a silent choice of one mode: picking registry mode would wipe the overlays, and picking overlay mode would test against a checkout nobody declared.
+
+Every command that syncs an environment reads this. In overlay mode the built-in `test-suite` and `test-suite-workspace` checks (which the release preflight and the pre-push hook run) sync with `--inexact --no-install-package <pkg>` per overlay, and run the suite with `uv run --no-sync` -- the same shape as `rlsbl dev sync` and the sandboxed test runner. A bare `uv sync` in that position would reinstall the locked registry wheels over the checkouts, so the suite would silently test released code and the `dev-overlay-drift` check would then fail on the wipe the check itself caused. In a workspace, the members share one environment, so the sync at the workspace root excludes every member's overlaid packages; two members overlaying one package from different checkouts is a hard error.
 
 ### The UV_NO_SYNC=1 gate
 

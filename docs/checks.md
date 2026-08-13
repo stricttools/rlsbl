@@ -1,5 +1,5 @@
 ---
-description: "Reference for rlsbl checks across 6 tags: check metadata, severity, purity (which checks a preview runs), target applicability, and the path-capable lint, format and type-check built-ins."
+description: "Reference for rlsbl checks across 6 tags: metadata, severity, purity (which checks a preview runs), target applicability, overlay-preserving test runs, and the path-capable built-ins."
 ---
 
 # Check system
@@ -158,6 +158,8 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `test-suite-workspace` | error | Runs tests for affected workspace projects (monorepo only) |
 
 `scaffold-conflicts` (see project checks) is also tagged `prepush`. Dependencies: `test-suite` and `test-suite-workspace` both depend on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`.
+
+Both test-suite checks are overlay-preserving: when the project runs on `rlsbl dev sync` overlays, their `uv sync` excludes every overlaid package and the suite runs with `uv run --no-sync`. See [the dev workflow](dev-workflow.md) for why a bare sync would otherwise wipe the overlays it is about to test.
 
 ## Untagged checks
 

@@ -40,6 +40,11 @@ class MalformedSentinelError(Exception):
 # file (verified against rlsbl's .gitignore and the shared scaffold template).
 SENTINEL_FILENAME = "dev-overlays-state.toml.local-only"
 
+# The user-authored declaration `rlsbl dev sync` reads. Paired with the sentinel
+# above, it is what tells any other command whether this project currently runs
+# on local checkouts or on registry wheels.
+OVERRIDES_FILENAME = "dev-sources.toml.local-only"
+
 # Overlay health states shared by the drift check and `dev status`.
 OVERLAY_HEALTHY = "healthy"
 OVERLAY_WIPED = "wiped"
@@ -99,6 +104,122 @@ def load_sentinel(project_root):
             }
         )
     return result
+
+
+class OverlayModeConflictError(Exception):
+    """Raised when the overlay declaration and the sentinel disagree.
+
+    The two local-only files decide, together, which mode a project's
+    environment is in: neither present is registry mode, both present and
+    agreeing is overlay mode. Any disagreement means neither answer is true,
+    and a command that had to pick one would either wipe the overlays or test
+    against a checkout nobody declared. It is a hard error instead.
+    """
+
+
+_OVERLAY_CONFLICT_FIX = (
+    "Run `rlsbl dev sync` (with UV_NO_SYNC=1 exported) to bring the two into "
+    "agreement, or delete both files to run against registry wheels."
+)
+
+
+def _load_overlay_pairs(project_root, filename):
+    """Read ``package -> absolute checkout path`` from one of the two overlay
+    files, or None when the file does not exist.
+
+    Deliberately lighter than ``dev_sync._load_overlays``: this is the read
+    side, which only needs to know which packages are overlaid and from where.
+    ``dev_sync`` keeps the full write-side validation (pyproject name match and
+    the rest), since it is the only writer.
+    """
+    path = os.path.join(str(project_root), filename)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except (tomllib.TOMLDecodeError, OSError) as e:
+        raise OverlayModeConflictError(
+            f"Error: {filename} exists but could not be read: {e}. "
+            f"{_OVERLAY_CONFLICT_FIX}"
+        )
+    entries = data.get("overlay") or []
+    if not isinstance(entries, list):
+        raise OverlayModeConflictError(
+            f"Error: 'overlay' in {filename} must be an array of tables. "
+            f"{_OVERLAY_CONFLICT_FIX}"
+        )
+    pairs = {}
+    for i, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            raise OverlayModeConflictError(
+                f"Error: {filename}: [[overlay]] entry #{i} is not a table. "
+                f"{_OVERLAY_CONFLICT_FIX}"
+            )
+        package, value = entry.get("package"), entry.get("path")
+        if not package or not value:
+            raise OverlayModeConflictError(
+                f"Error: {filename}: [[overlay]] entry #{i} lacks 'package' or "
+                f"'path'. {_OVERLAY_CONFLICT_FIX}"
+            )
+        if not os.path.isabs(value):
+            value = os.path.join(str(project_root), value)
+        pairs[package] = os.path.realpath(value)
+    return pairs
+
+
+def active_overlays(project_root):
+    """Return the overlays this project's environment is currently running on.
+
+    Returns a list of ``{"package", "path"}`` dicts in overlay mode, or None in
+    registry mode (neither local-only file present -- CI, and every machine
+    with no overlays). Raises :class:`OverlayModeConflictError` when the
+    declaration and the sentinel disagree, or when a declared checkout is gone.
+
+    The mode is decided by BOTH files, exactly as the sandboxed test runner
+    decides it, so every entry point reads one answer. A command that syncs an
+    environment must consult this before running a bare ``uv sync``: an exact
+    sync reinstalls the locked registry wheel over an editable overlay without
+    a word, and the project would then be tested against released code while
+    its own drift check reports the wipe.
+    """
+    declared = _load_overlay_pairs(project_root, OVERRIDES_FILENAME)
+    synced = _load_overlay_pairs(project_root, SENTINEL_FILENAME)
+
+    if not declared and not synced:
+        return None
+    if not declared:
+        raise OverlayModeConflictError(
+            f"Error: {SENTINEL_FILENAME} records overlays "
+            f"({sorted(synced)}) but {OVERRIDES_FILENAME} declares none, so "
+            f"what the environment holds matches no declaration. "
+            f"{_OVERLAY_CONFLICT_FIX}"
+        )
+    if not synced:
+        raise OverlayModeConflictError(
+            f"Error: {OVERRIDES_FILENAME} declares overlays "
+            f"({sorted(declared)}) but {SENTINEL_FILENAME} does not: they were "
+            f"declared but never installed. {_OVERLAY_CONFLICT_FIX}"
+        )
+    if set(declared) != set(synced):
+        raise OverlayModeConflictError(
+            f"Error: {OVERRIDES_FILENAME} declares {sorted(declared)} but "
+            f"{SENTINEL_FILENAME} records {sorted(synced)}. "
+            f"{_OVERLAY_CONFLICT_FIX}"
+        )
+    for package in sorted(declared):
+        if declared[package] != synced[package]:
+            raise OverlayModeConflictError(
+                f"Error: overlay '{package}' is declared at "
+                f"{declared[package]} but was synced from {synced[package]}. "
+                f"{_OVERLAY_CONFLICT_FIX}"
+            )
+        if not os.path.isdir(declared[package]):
+            raise OverlayModeConflictError(
+                f"Error: overlay '{package}': the checkout "
+                f"{declared[package]} does not exist. {_OVERLAY_CONFLICT_FIX}"
+            )
+    return [{"package": p, "path": declared[p]} for p in sorted(declared)]
 
 
 def project_environment(project_root):

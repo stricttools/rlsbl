@@ -24,6 +24,7 @@ from ..overlay_state import (
     OVERLAY_HEALTHY,
     OVERLAY_MISSING,
     OVERLAY_WIPED,
+    OVERRIDES_FILENAME,
     SENTINEL_FILENAME,
     _normalize,
     classify_overlay,
@@ -32,8 +33,6 @@ from ..overlay_state import (
 )
 from ..utils import require_tool
 from .. import effects
-
-OVERRIDES_FILENAME = "dev-sources.toml.local-only"
 
 _FILE_FORMAT_HOWTO = """\
 Create {filename} at the project root (gitignored fleet-wide via the
