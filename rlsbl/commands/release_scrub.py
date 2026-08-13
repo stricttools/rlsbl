@@ -812,7 +812,14 @@ def run_cmd(flags, *, ctx):
             )
             return
 
-        envelope = _parse_safegit_envelope(output)
+        # The refusals _parse_safegit_envelope raises are written for a human
+        # (they name the safegit version this flow needs), so they are printed
+        # as an error rather than allowed to surface as a traceback.
+        try:
+            envelope = _parse_safegit_envelope(output)
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
         scrub_data = envelope.get("payload")
 
         # A run that supplied no payload is a run that found nothing to

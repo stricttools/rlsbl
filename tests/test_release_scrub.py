@@ -2635,3 +2635,58 @@ class TestSafegitEnvelopeParsing:
 
         with pytest.raises(ValueError, match="not JSON"):
             _parse_safegit_envelope("not json at all\n")
+
+
+class TestNonEnvelopeStdoutReachesTheOperator:
+    """The refusals above are written for a human, so they must reach one.
+
+    An exit-0 safegit whose stdout is not an envelope is a real possibility --
+    an older safegit on PATH prints its own bare JSON object -- and the parse
+    happens at the call site, where an uncaught ValueError would surface as a
+    traceback and hide the message that names the required safegit. The call
+    site delivers it as a clean error and exits 1, the shape every other
+    failure in this flow has.
+    """
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_bare_pre_envelope_json_is_a_clean_error(
+        self, mock_run, _req_tool, tmp_path, capsys,
+    ):
+        mock_run.side_effect = [
+            SAFEGIT_OK,                             # safegit --version
+            "",                                     # git ls-remote origin
+            '{"version": 1, "dry_run": true}\n',    # safegit scrub: not an envelope
+        ]
+        flags = {
+            "pattern": "secret", "replace": "XXX",
+            "reason": "test", "entire-history": True,
+        }
+        with pytest.raises(SystemExit) as exc:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "Error:" in err
+        assert "not a strictcli envelope" in err
+        assert SAFEGIT_FLOOR in err
+
+    @patch(f"{MOD}.require_tool")
+    @patch(f"{MOD}.run")
+    def test_non_json_stdout_is_a_clean_error(
+        self, mock_run, _req_tool, tmp_path, capsys,
+    ):
+        mock_run.side_effect = [
+            SAFEGIT_OK,                # safegit --version
+            "",                        # git ls-remote origin
+            "not json at all\n",       # safegit scrub: not a document at all
+        ]
+        flags = {
+            "pattern": "secret", "replace": "XXX",
+            "reason": "test", "entire-history": True,
+        }
+        with pytest.raises(SystemExit) as exc:
+            run_cmd(flags, ctx=_ctx(str(tmp_path)))
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "Error:" in err
+        assert "not JSON" in err
