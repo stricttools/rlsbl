@@ -133,17 +133,17 @@ Dependencies have a `scope` attribute with 4 possible values: `runtime`, `dev`, 
 
 ### Viewing the graph
 
-The graph can be exported in 3 formats: JSON for programmatic consumption, DOT for rendering with Graphviz, and indented text tree for quick terminal inspection. Each format supports the same filtering options, including scoping to a single root package and its transitive dependencies, reverse dependency queries showing what depends on a given package, and depth limiting to control how many levels of the graph are traversed:
+The graph has two renderings selected by `--format` -- DOT for Graphviz and an indented text tree for terminal inspection -- plus the machine form under the framework-owned `--json`, which puts the structured graph in the envelope's `payload` (see [Machine output](utilities.md#machine-output)). Every form supports the same filtering options, including scoping to a single root package and its transitive dependencies, reverse dependency queries showing what depends on a given package, and depth limiting to control how many levels of the graph are traversed:
 
 ```bash
-# JSON format (default)
+# Text tree, indented (default)
 rlsbl monorepo graph
 
 # DOT format for Graphviz
 rlsbl monorepo graph --format dot --output graph.dot
 
-# Text tree (indented)
-rlsbl monorepo graph --format text
+# Structured graph in the envelope's payload
+rlsbl monorepo graph --json
 
 # Filter to a single package's transitive dependencies
 rlsbl monorepo graph --root mylib
@@ -193,7 +193,7 @@ The command reports a structured breakdown of the blast radius across 5 output s
 | Test scope | Packages that should be tested (input + all dependents) |
 | Release candidates | Packages that may need a new release |
 
-Supports `--depth N` to limit BFS traversal depth (default: unlimited, traverses the full transitive closure).
+Supports `--depth N` to limit BFS traversal depth (default: unlimited, traverses the full transitive closure). The same breakdown is available as a structured document under the framework-owned `--json`, in the envelope's `payload` (see [Machine output](utilities.md#machine-output)).
 
 ## Batch release
 
