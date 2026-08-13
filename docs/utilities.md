@@ -1,5 +1,5 @@
 ---
-description: "Utility commands for project status, unreleased-commit coverage, target detection, ecosystem discovery, open pull requests, and machine-generated commits."
+description: "Utility commands for project status, unreleased-commit coverage, target detection, ecosystem discovery, pull requests, and the --json envelope."
 ---
 
 # Utility commands
