@@ -178,7 +178,9 @@ class TestCheckDeclarations:
         """``rlsbl check --list --json`` outputs valid JSON with all checks."""
         result = app.test(["check", "--list", "--json"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        # Machine mode's stdout is strictcli's envelope (effects contract
+        # §19.2); the check command's listing is its `payload` member.
+        data = json.loads(result.stdout)["payload"]
         names = [item["name"] for item in data]
         assert sorted(names) == sorted(EXPECTED_CHECKS + BUILTIN_PROVIDER_CHECKS)
 
