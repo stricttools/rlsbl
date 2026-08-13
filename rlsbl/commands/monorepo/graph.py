@@ -1,6 +1,5 @@
-"""Monorepo dependency graph export command: JSON, DOT, and text tree formats."""
+"""Monorepo dependency graph export command: DOT and text tree renderings, plus the structured graph the command emits as its machine payload."""
 
-import json
 import os
 import sys
 
@@ -104,12 +103,6 @@ def _filter_packages(graph, packages, edges, root_pkg=None, reverse_pkg=None, de
     return filtered_packages, filtered_edges
 
 
-def _render_json(packages, edges):
-    """Render the graph as JSON."""
-    data = {"packages": packages, "edges": edges}
-    return json.dumps(data, indent=2)
-
-
 def _render_dot(packages, edges):
     """Render the graph as Graphviz DOT with scope-styled edges and fact-styled nodes."""
     _EDGE_STYLES = {
@@ -176,7 +169,14 @@ def _render_text_subtree(name, packages, lines, indent, visited):
 
 
 def _cmd_graph(flags, project_root):
-    """Export the monorepo dependency graph."""
+    """Export the monorepo dependency graph.
+
+    Returns the graph as ``{"packages": ..., "edges": ...}`` -- the caller (the
+    CLI handler) hands it to the framework as the command's machine payload --
+    or None when there is no workspace content to describe.  The rendered DOT
+    or text form is printed (or written to ``--output``) here, except in
+    machine mode, where the envelope owns stdout.
+    """
     start = str(project_root)
     root = find_workspace_root(start)
     if root is None:
@@ -186,7 +186,7 @@ def _cmd_graph(flags, project_root):
     projects = load_workspace(root)
     if not projects:
         print("No projects in workspace.")
-        return
+        return None
 
     graph = WorkspaceGraph(root, projects)
 
@@ -202,15 +202,13 @@ def _cmd_graph(flags, project_root):
         root_pkg=root_pkg, reverse_pkg=reverse_pkg, depth=depth,
     )
 
-    fmt = flags.get("format", "json")
-    if fmt == "json":
-        output = _render_json(packages, edges)
-    elif fmt == "dot":
+    fmt = flags.get("format", "text")
+    if fmt == "dot":
         output = _render_dot(packages, edges)
     elif fmt == "text":
         output = _render_text(packages, edges)
     else:
-        print(f"Error: unknown format '{fmt}'. Use json, dot, or text.", file=sys.stderr)
+        print(f"Error: unknown format '{fmt}'. Use dot or text.", file=sys.stderr)
         sys.exit(1)
 
     output_file = flags.get("output") or None
@@ -218,6 +216,13 @@ def _cmd_graph(flags, project_root):
         with effects.open_write(output_file, "w", encoding="utf-8") as f:
             f.write(output)
             f.write("\n")
-        print(f"Wrote graph to {output_file}")
-    else:
-        print(output)
+
+    # In machine mode the envelope is stdout's only document, so neither the
+    # rendered graph nor the wrote-it confirmation may be printed.
+    if not flags.get("json"):
+        if output_file:
+            print(f"Wrote graph to {output_file}")
+        else:
+            print(output)
+
+    return {"packages": packages, "edges": edges}

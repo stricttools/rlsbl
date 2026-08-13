@@ -1660,16 +1660,64 @@ def cmd_mono_mirror(ctx, project):
     _cmd_mirror({"project": project, "dry-run": dry_run}, project_root=root)
 
 
-@mono.command(name="graph", help="Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.", effect="mutating")
-@strictcli.flag(name="format", type=str, help="Serialization format for the dependency graph: json, dot (Graphviz), or text", default="json")
+# The graph as the workspace scan produced it: one entry per package, keyed by
+# package name, plus one edge per dependency. The DOT and text renderings are
+# built from exactly this data.
+_MONO_GRAPH_PAYLOAD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "packages": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "deps": {"type": "array", "items": {"type": "string"}},
+                    "rdeps": {"type": "array", "items": {"type": "string"}},
+                    "targets": {"type": "array", "items": {"type": "string"}},
+                    "version": {"type": ["string", "null"]},
+                    "dev_only": {"type": "boolean"},
+                    "library": {"type": "boolean"},
+                    "has_runtime_dependents": {"type": "boolean"},
+                    "is_leaf": {"type": "boolean"},
+                },
+                "required": [
+                    "deps", "rdeps", "targets", "version", "dev_only",
+                    "library", "has_runtime_dependents", "is_leaf",
+                ],
+                "additionalProperties": False,
+            },
+        },
+        "edges": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "from": {"type": "string"},
+                    "to": {"type": "string"},
+                    "type": {"type": "string"},
+                    "constraint": {"type": "string"},
+                    "scope": {"type": "string"},
+                },
+                "required": ["from", "to", "type", "constraint", "scope"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["packages", "edges"],
+    "additionalProperties": False,
+}
+
+
+@mono.command(name="graph", help="Export the monorepo dependency graph as DOT (Graphviz) or an indented text tree; the framework-owned --json yields the same graph as a structured document. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write the rendering to a file instead of stdout.", effect="mutating", payload_schema=_MONO_GRAPH_PAYLOAD_SCHEMA)
+@strictcli.flag(name="format", type=str, help="Rendering for the dependency graph: dot (Graphviz) or text", default="text")
 @strictcli.flag(name="output", type=str, help="File path to write the graph output to instead of printing to stdout", default="")
 @strictcli.flag(name="root", type=str, help="Filter to show only transitive dependencies reachable from this package", default="")
 @strictcli.flag(name="reverse", type=str, help="Filter to show only transitive reverse dependencies of this package", default="")
 @strictcli.flag(name="depth", type=int, help="Maximum number of dependency hops to traverse from the root or reverse node")
 @effects.handler
 def cmd_mono_graph(ctx, format, output, root, reverse, depth=None):
-    """Export the monorepo dependency graph in JSON, DOT, or text format."""
-    flags = {"format": format}
+    """Export the monorepo dependency graph as DOT or a text tree."""
+    flags = {"format": format, "json": ctx.json}
     if output:
         flags["output"] = output
     if root:
@@ -1680,25 +1728,47 @@ def cmd_mono_graph(ctx, format, output, root, reverse, depth=None):
         flags["depth"] = depth
     root = _require_project_root()
     from .commands.monorepo import _cmd_graph
-    _cmd_graph(flags, project_root=root)
+    graph_data = _cmd_graph(flags, project_root=root)
+    if graph_data is not None:
+        ctx.payload(graph_data)
 
 
-@mono.command(name="impact", help="Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.", effect="read_only")
-@strictcli.flag(name="format", type=str, help="Output serialization format for the impact report: json or text (default: text)", default="text")
+# The impact report, exactly as `_compute_impact` builds it. `input` is the
+# comma-joined set of packages the analysis started from.
+_MONO_IMPACT_PAYLOAD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "input": {"type": "string"},
+        "direct_dependents": {"type": "array", "items": {"type": "string"}},
+        "transitive_dependents": {"type": "array", "items": {"type": "string"}},
+        "test_scope": {"type": "array", "items": {"type": "string"}},
+        "release_candidates": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "input", "direct_dependents", "transitive_dependents",
+        "test_scope", "release_candidates",
+    ],
+    "additionalProperties": False,
+}
+
+
+@mono.command(name="impact", help="Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates as a human report, or as a structured document under the framework-owned --json. Supports package names, file paths, and --since for git-based change detection.", effect="read_only", payload_schema=_MONO_IMPACT_PAYLOAD_SCHEMA)
 @strictcli.flag(name="depth", type=int, help="Maximum number of dependency hops to traverse when computing transitive impact")
 @strictcli.flag(name="since", type=str, help="Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0)", default="")
 @effects.handler
-def cmd_mono_impact(ctx, format, depth=None, since=""):
+def cmd_mono_impact(ctx, depth=None, since=""):
     """Analyze the impact of changes on the monorepo dependency graph."""
     args = _variadic_args
-    flags = {"format": format}
+    flags = {"json": ctx.json}
     if depth is not None:
         flags["depth"] = depth
     if since:
         flags["since"] = since
     root = _require_project_root()
     from .commands.monorepo import _cmd_impact
-    _cmd_impact(args, flags, project_root=root)
+    impact_data = _cmd_impact(args, flags, project_root=root)
+    if impact_data is not None:
+        ctx.payload(impact_data)
 
 
 mono_release = mono.group("release", help="Release commands for monorepo workspaces. Provides 3 subcommands: run (batch release), init (scaffold release file), and order (topological release order).")
@@ -2264,7 +2334,7 @@ def _extract_variadic_args():
         positionals = []
         new_argv = [sys.argv[0], "monorepo", "impact"]
         i = 2  # index into argv (after 'monorepo impact')
-        value_flags = {"format", "since", "depth"}
+        value_flags = {"since", "depth"}
         while i < len(argv):
             tok = argv[i]
             if tok.startswith("--"):

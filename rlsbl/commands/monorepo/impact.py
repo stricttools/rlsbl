@@ -1,6 +1,5 @@
 """Monorepo impact analysis command: show affected packages from a change."""
 
-import json
 import os
 import subprocess
 import sys
@@ -128,13 +127,14 @@ def _render_text(impact_data):
     return "\n".join(lines)
 
 
-def _render_json(impact_data):
-    """Format impact data as JSON."""
-    return json.dumps(impact_data, indent=2)
-
-
 def _cmd_impact(args, flags, project_root):
-    """Analyze the impact of changes on the monorepo dependency graph."""
+    """Analyze the impact of changes on the monorepo dependency graph.
+
+    Returns the impact report -- the caller (the CLI handler) hands it to the
+    framework as the command's machine payload -- or None when there is
+    nothing to report.  The human rendering is printed here, except in machine
+    mode, where the envelope owns stdout.
+    """
     start = str(project_root)
     root = find_workspace_root(start)
     if root is None:
@@ -147,12 +147,11 @@ def _cmd_impact(args, flags, project_root):
     projects = load_workspace(root)
     if not projects:
         print("No projects in workspace.")
-        return
+        return None
 
     graph = WorkspaceGraph(root, projects)
 
     since_ref = flags.get("since") or None
-    fmt = flags.get("format", "text")
     depth_raw = flags.get("depth")
     depth = int(depth_raw) if depth_raw is not None else None
 
@@ -194,17 +193,13 @@ def _cmd_impact(args, flags, project_root):
 
     if not package_names:
         print("No affected packages found.")
-        return
+        return None
 
     impact_data = _compute_impact(package_names, graph, depth)
 
-    if fmt == "json":
-        print(_render_json(impact_data))
-    elif fmt == "text":
+    # In machine mode the envelope is stdout's only document, so the human
+    # rendering is not printed.
+    if not flags.get("json"):
         print(_render_text(impact_data))
-    else:
-        print(
-            f"Error: unknown format '{fmt}'. Use json or text.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+
+    return impact_data

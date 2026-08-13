@@ -435,6 +435,7 @@ class TestMonorepoDirectWiring:
         assert flags["format"] == "dot"
         assert flags["root"] == "pkgA"
         assert flags["depth"] == 2
+        assert flags["json"] is False
 
     def test_check_names(self):
         result, m = _dispatch(
@@ -450,16 +451,26 @@ class TestMonorepoDirectWiring:
 
     def test_impact(self):
         result, m = _dispatch(
-            ["monorepo", "impact", "--format", "json", "--since", "HEAD~2", "--depth", "3"],
+            ["monorepo", "impact", "--since", "HEAD~2", "--depth", "3"],
             "rlsbl.commands.monorepo._cmd_impact",
             variadic=["pkgA"],
         )
         assert result.exit_code == 0, result.stderr
         args, flags = m.call_args[0][0], m.call_args[0][1]
         assert args == ["pkgA"]
-        assert flags["format"] == "json"
         assert flags["since"] == "HEAD~2"
         assert flags["depth"] == 3
+        assert flags["json"] is False
+
+    def test_impact_has_no_local_format_flag(self):
+        """--format died with the json arm: the envelope is the machine form."""
+        result, _m = _dispatch(
+            ["monorepo", "impact", "--format", "json"],
+            "rlsbl.commands.monorepo._cmd_impact",
+            variadic=["pkgA"],
+        )
+        assert result.exit_code == 1
+        assert "unknown flag '--format'" in result.stderr
 
     def test_release_init(self):
         result, m = _dispatch(

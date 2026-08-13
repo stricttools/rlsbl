@@ -27,11 +27,11 @@ def _init_workspace(base_path, projects):
     save_workspace(str(base_path), projects)
 
 
-class TestGraphJSON:
-    """Test JSON output format."""
+class TestGraphPayload:
+    """Test the structured graph the command emits as its machine payload."""
 
     def test_three_package_graph(self, mock_git_repo, capsys):
-        """JSON output with 3 packages has correct structure."""
+        """The payload for 3 packages has the expected structure."""
         _make_npm_project(mock_git_repo, "models", version="1.2.0", deps={"schema": "^1.0.0"})
         _make_npm_project(mock_git_repo, "schema", version="1.0.0")
         _make_npm_project(mock_git_repo, "app", version="2.0.0", deps={"models": "^1.0.0"})
@@ -43,9 +43,7 @@ class TestGraphJSON:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         assert "packages" in data
         assert "edges" in data
@@ -89,9 +87,7 @@ class TestGraphJSON:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         assert set(data["packages"].keys()) == {"alpha", "beta"}
         assert data["edges"] == []
@@ -223,9 +219,7 @@ class TestGraphRootFilter:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "root": "A"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True, "root": "A"}, project_root=".")
 
         assert set(data["packages"].keys()) == {"A", "B", "C"}
         assert "D" not in data["packages"]
@@ -238,7 +232,7 @@ class TestGraphRootFilter:
         _init_workspace(mock_git_repo, projects)
 
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_graph({"format": "json", "root": "nonexistent"}, project_root=".")
+            _cmd_graph({"json": True, "root": "nonexistent"}, project_root=".")
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "nonexistent" in captured.err
@@ -262,9 +256,7 @@ class TestGraphReverseFilter:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "reverse": "C"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True, "reverse": "C"}, project_root=".")
 
         assert set(data["packages"].keys()) == {"A", "B", "C"}
         assert "D" not in data["packages"]
@@ -286,9 +278,7 @@ class TestGraphDepthLimit:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "root": "A", "depth": 1}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True, "root": "A", "depth": 1}, project_root=".")
 
         # depth=1 from A: only direct dep B (not transitive C)
         assert set(data["packages"].keys()) == {"A", "B"}
@@ -307,9 +297,7 @@ class TestGraphDepthLimit:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json", "reverse": "C", "depth": 1}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True, "reverse": "C", "depth": 1}, project_root=".")
 
         # depth=1 reverse from C: only direct rdep B (not transitive A)
         assert set(data["packages"].keys()) == {"B", "C"}
@@ -330,12 +318,15 @@ class TestGraphOutputFile:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        output_path = os.path.join(str(mock_git_repo), "graph.json")
-        _cmd_graph({"format": "json", "output": output_path}, project_root=".")
+        output_path = os.path.join(str(mock_git_repo), "graph.txt")
+        data = _cmd_graph({"format": "text", "output": output_path}, project_root=".")
 
         assert os.path.isfile(output_path)
         with open(output_path) as f:
-            data = json.loads(f.read())
+            content = f.read()
+        assert "X" in content
+        assert "Y" in content
+        # The payload is produced regardless of which rendering was written.
         assert set(data["packages"].keys()) == {"X", "Y"}
 
         captured = capsys.readouterr()
@@ -370,14 +361,14 @@ class TestGraphEdgeCases:
         _cmd_init({}, project_root=".")
         capsys.readouterr()
 
-        _cmd_graph({"format": "json"}, project_root=".")
+        assert _cmd_graph({"json": True}, project_root=".") is None
         captured = capsys.readouterr()
         assert "No projects in workspace." in captured.out
 
     def test_no_workspace(self, mock_git_repo):
         """No workspace should error and exit 1."""
         with pytest.raises(SystemExit):
-            _cmd_graph({"format": "json"}, project_root=".")
+            _cmd_graph({"json": True}, project_root=".")
 
 
 def _make_npm_project_full(base_path, subdir, version="0.1.0", deps=None,
@@ -400,7 +391,7 @@ class TestRawFacts:
     """Test raw facts (dev_node, library, has_runtime_dependents, is_leaf) in graph output."""
 
     def test_json_includes_raw_facts(self, mock_git_repo, capsys):
-        """JSON output includes dev_node, library, has_runtime_dependents, is_leaf."""
+        """The payload includes dev_node, library, has_runtime_dependents, is_leaf."""
         _make_npm_project(mock_git_repo, "core", deps={"utils": "^1.0.0"})
         _make_npm_project(mock_git_repo, "utils")
 
@@ -410,9 +401,7 @@ class TestRawFacts:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         for name in ("core", "utils"):
             pkg = data["packages"][name]
@@ -432,9 +421,7 @@ class TestRawFacts:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         # app has no dependents -> is_leaf
         assert data["packages"]["app"]["is_leaf"] is True
@@ -452,9 +439,7 @@ class TestRawFacts:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         # lib is depended on by app via runtime scope
         assert data["packages"]["lib"]["has_runtime_dependents"] is True
@@ -472,9 +457,7 @@ class TestRawFacts:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         # testlib is depended on by app via dev scope only
         assert data["packages"]["testlib"]["has_runtime_dependents"] is False
@@ -491,9 +474,7 @@ class TestRawFacts:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         # core is depended on by app via explicit scope
         assert data["packages"]["core"]["has_runtime_dependents"] is True
@@ -509,9 +490,7 @@ class TestRawFacts:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         assert data["packages"]["devtool"]["dev_only"] is True
         assert data["packages"]["main"]["dev_only"] is False
@@ -527,9 +506,7 @@ class TestRawFacts:
         ]
         _init_workspace(mock_git_repo, projects)
 
-        _cmd_graph({"format": "json"}, project_root=".")
-        captured = capsys.readouterr()
-        data = json.loads(captured.out)
+        data = _cmd_graph({"json": True}, project_root=".")
 
         assert data["packages"]["shared-lib"]["library"] is True
         assert data["packages"]["app"]["library"] is False
