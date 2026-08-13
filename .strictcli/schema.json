@@ -61,6 +61,7 @@
     ],
     [
       "git",
+      "--no-optional-locks",
       "status"
     ],
     [
@@ -77,10 +78,13 @@
     ],
     [
       "git",
-      "fetch"
+      "fetch",
+      "origin",
+      "--quiet"
     ],
     [
       "git",
+      "--no-optional-locks",
       "diff"
     ],
     [
@@ -89,6 +93,7 @@
     ],
     [
       "git",
+      "--no-optional-locks",
       "diff-index"
     ],
     [
@@ -218,12 +223,9 @@
     [
       "gh",
       "auth",
-      "status"
-    ],
-    [
-      "gh",
-      "auth",
-      "token"
+      "status",
+      "--hostname",
+      "github.com"
     ],
     [
       "gh",
@@ -252,6 +254,11 @@
     ],
     [
       "gh",
+      "run",
+      "watch"
+    ],
+    [
+      "gh",
       "pr",
       "list"
     ],
@@ -270,7 +277,14 @@
     ],
     [
       "go",
-      "list"
+      "list",
+      "-m"
+    ],
+    [
+      "go",
+      "list",
+      "-e",
+      "-f"
     ],
     [
       "uv",
@@ -298,6 +312,12 @@
       "name": "check",
       "help": "Run project checks registered via the check framework and report results",
       "effect": "read_only",
+      "payload_schema": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
       "flags": [
         {
           "name": "all",
@@ -326,13 +346,6 @@
           "negatable": true
         },
         {
-          "name": "json",
-          "type": "bool",
-          "help": "Output check results as machine-readable JSON instead of human text",
-          "default": false,
-          "negatable": true
-        },
-        {
           "name": "ignore-warnings",
           "type": "bool",
           "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
@@ -348,19 +361,115 @@
       "name": "status",
       "help": "Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.",
       "effect": "read_only",
+      "payload_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "type": "string"
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clean": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "changelog": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "jsonl_coverage": {
+            "type": "string"
+          },
+          "commits_ahead": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "commits_ahead_tag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ci": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "publish": {
+            "type": "boolean"
+          },
+          "registry_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "drift": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "AHEAD",
+              "BEHIND",
+              "SAME",
+              "ERROR",
+              "PRIVATE",
+              "UNPUBLISHED",
+              null
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "target",
+          "branch",
+          "tag",
+          "clean",
+          "changelog",
+          "jsonl_coverage",
+          "commits_ahead",
+          "commits_ahead_tag",
+          "ci",
+          "publish",
+          "registry_version",
+          "drift"
+        ],
+        "additionalProperties": false
+      },
       "flags": [
         {
           "name": "target",
           "type": "str",
           "help": "Target a specific registry (auto-detected if omitted)",
           "default": ""
-        },
-        {
-          "name": "json",
-          "type": "bool",
-          "help": "Output version, branch, tag, and coverage as machine-readable JSON",
-          "default": false,
-          "negatable": true
         },
         {
           "name": "registry",
@@ -415,6 +524,143 @@
       "name": "check-name",
       "help": "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
       "effect": "read_only",
+      "payload_schema": {
+        "type": [
+          "object",
+          "array"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "structured_conflicts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "rule": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "rule"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rule_sentences": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "github_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "target",
+          "status",
+          "reason",
+          "structured_conflicts",
+          "rule_sentences",
+          "exit_code"
+        ],
+        "additionalProperties": false,
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "structured_conflicts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "rule": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "rule"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "rule_sentences": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "exit_code": {
+              "type": "integer"
+            },
+            "note": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "github_count": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "name",
+            "target",
+            "status",
+            "reason",
+            "structured_conflicts",
+            "rule_sentences",
+            "exit_code"
+          ],
+          "additionalProperties": false
+        }
+      },
       "flags": [
         {
           "name": "target",
@@ -429,13 +675,6 @@
           "type": "str",
           "help": "Milliseconds to wait between consecutive registry API queries (default: 200)",
           "default": "200"
-        },
-        {
-          "name": "json",
-          "type": "bool",
-          "help": "Output results as machine-readable JSON: one object for a single name+target, a JSON array for multiple names and/or targets",
-          "default": false,
-          "negatable": true
         }
       ]
     },
@@ -484,7 +723,7 @@
     "watch": {
       "name": "watch",
       "help": "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.",
-      "effect": "read_only",
+      "effect": "mutating",
       "flags": [
         {
           "name": "target",
@@ -523,15 +762,86 @@
       "name": "unreleased",
       "help": "List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.",
       "effect": "read_only",
-      "flags": [
-        {
-          "name": "json",
-          "type": "bool",
-          "help": "Output the unreleased commit list and coverage status as machine-readable JSON",
-          "default": false,
-          "negatable": true
-        }
-      ]
+      "payload_schema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commits": {
+            "type": [
+              "array",
+              "integer"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "hash": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "exempt": {
+                  "type": "boolean"
+                },
+                "covered": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "hash",
+                "subject",
+                "author",
+                "date",
+                "exempt",
+                "covered"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "covered": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "exempted": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "covered",
+              "total",
+              "exempted"
+            ],
+            "additionalProperties": false
+          },
+          "non_releasable": {
+            "type": "boolean"
+          },
+          "dev_only": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tag",
+          "commits"
+        ],
+        "additionalProperties": false
+      }
     },
     "targets": {
       "name": "targets",
@@ -1258,14 +1568,110 @@
         },
         "graph": {
           "name": "graph",
-          "help": "Export the monorepo dependency graph in JSON, DOT (Graphviz), or indented text tree format. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write to a file instead of stdout.",
+          "help": "Export the monorepo dependency graph as DOT (Graphviz) or an indented text tree; the framework-owned --json yields the same graph as a structured document. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write the rendering to a file instead of stdout.",
           "effect": "mutating",
+          "payload_schema": {
+            "type": "object",
+            "properties": {
+              "packages": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "deps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "rdeps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "dev_only": {
+                      "type": "boolean"
+                    },
+                    "library": {
+                      "type": "boolean"
+                    },
+                    "has_runtime_dependents": {
+                      "type": "boolean"
+                    },
+                    "is_leaf": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deps",
+                    "rdeps",
+                    "targets",
+                    "version",
+                    "dev_only",
+                    "library",
+                    "has_runtime_dependents",
+                    "is_leaf"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "constraint": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to",
+                    "type",
+                    "constraint",
+                    "scope"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "packages",
+              "edges"
+            ],
+            "additionalProperties": false
+          },
           "flags": [
             {
               "name": "format",
               "type": "str",
-              "help": "Serialization format for the dependency graph: json, dot (Graphviz), or text",
-              "default": "json"
+              "help": "Rendering for the dependency graph: dot (Graphviz) or text",
+              "default": "text"
             },
             {
               "name": "output",
@@ -1294,15 +1700,49 @@
         },
         "impact": {
           "name": "impact",
-          "help": "Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates. Supports package names, file paths, and --since for git-based change detection.",
+          "help": "Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates as a human report, or as a structured document under the framework-owned --json. Supports package names, file paths, and --since for git-based change detection.",
           "effect": "read_only",
-          "flags": [
-            {
-              "name": "format",
-              "type": "str",
-              "help": "Output serialization format for the impact report: json or text (default: text)",
-              "default": "text"
+          "payload_schema": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "string"
+              },
+              "direct_dependents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "transitive_dependents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "test_scope": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "release_candidates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             },
+            "required": [
+              "input",
+              "direct_dependents",
+              "transitive_dependents",
+              "test_scope",
+              "release_candidates"
+            ],
+            "additionalProperties": false
+          },
+          "flags": [
             {
               "name": "depth",
               "type": "int",
@@ -1709,7 +2149,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": []
     },
@@ -1720,7 +2160,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": [
         "changelog-hashes"
@@ -1733,7 +2173,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": [
         "changelog-hashes"
@@ -1746,7 +2186,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": []
     },
@@ -1790,7 +2230,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": []
     },
@@ -1856,7 +2296,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace"
@@ -2035,6 +2475,72 @@
       "needs_network": false,
       "depends_on": []
     },
+    "lint": {
+      "tags": [
+        "quality",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "lint-scope-guard": {
+      "tags": [
+        "quality",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "format": {
+      "tags": [
+        "quality",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "format-scope-guard": {
+      "tags": [
+        "quality",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "type-check": {
+      "tags": [
+        "quality",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "type-check-scope-guard": {
+      "tags": [
+        "quality",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
     "publish-mode-workflow": {
       "tags": [
         "project"
@@ -2136,7 +2642,7 @@
       ],
       "severity": "error",
       "fast": false,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": []
     },
@@ -2146,7 +2652,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": []
     },
@@ -2228,7 +2734,7 @@
       ],
       "severity": "error",
       "fast": true,
-      "pure": false,
+      "pure": true,
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace"
