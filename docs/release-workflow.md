@@ -1,5 +1,5 @@
 ---
-description: "Reference for the rlsbl release flow: the untagged candidate and its CI gate, bump types, the pre-release channel, publish gating, and the dry-run preview."
+description: "Reference for the rlsbl release flow: the untagged candidate and its CI check, bump types, the pre-release channel, publish gating, the scrub flow's safegit requirement, and the dry-run preview."
 ---
 
 # Release workflow
