@@ -13,7 +13,7 @@ Developer utilities for locally working with rlsbl projects, including editable 
 
 ## dev install
 
-Install the project locally for development by running each detected target's own install command. --global (the default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.
+Install the project locally for development by running each detected target's own install command. --target is required and names the install mode. --target global is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --target venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.
 
 **Effect:** mutating
 
@@ -25,8 +25,7 @@ Install the project locally for development by running each detected target's ow
 | `--include` |  | str |  |  | In monorepo mode, comma-separated project names to include |
 | `--exclude` |  | str |  |  | In monorepo mode, comma-separated project names to exclude |
 | `--uninstall` |  | bool |  |  | Reverse a previous dev install (where supported by the target) |
-| `--global` |  | bool |  |  | Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv. |
-| `--venv` |  | bool |  |  | Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global. |
+| `--target` |  | str |  |  | Install mode: 'global' installs as a global tool/symlink, 'venv' installs into the project's local environment only (e.g. uv sync, npm install). Required -- there is no default mode. |
 
 ## dev sync
 
