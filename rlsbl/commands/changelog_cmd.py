@@ -809,9 +809,10 @@ def cmd_edit(flags, project_root):
 
     # Apply edits
     if user_facing_value is False:
+        # Flip the flag only. description/type stay on the line: they are
+        # unused while the entry is non-user-facing (generation filters on
+        # user_facing), and they survive a later flip back.
         entry.user_facing = False
-        entry.description = None
-        entry.type = None
     elif user_facing_value is True:
         entry.user_facing = True
         # If the entry doesn't already have description/type, require them

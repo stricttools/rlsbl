@@ -147,7 +147,13 @@ class TestCmdEdit:
         assert entries[0].type == "feature"
 
     def test_edit_to_non_user_facing(self, rlsbl_repo):
-        """Edit a user-facing entry to non-user-facing."""
+        """Edit a user-facing entry to non-user-facing.
+
+        Flipping user_facing to false must ONLY flip the flag: the stored
+        description and type stay on the line (unused while non-user-facing,
+        and generation filters on user_facing alone). Wiping them destroyed
+        text the operator never asked to lose.
+        """
         sha = _make_commit(rlsbl_repo)
         _add_unreleased_entry(rlsbl_repo, sha, description="Visible feature", entry_type="feature")
 
@@ -164,8 +170,36 @@ class TestCmdEdit:
         entries = parse_jsonl(os.path.join(changes_dir, "unreleased.jsonl"))
         assert len(entries) == 1
         assert entries[0].user_facing is False
-        assert entries[0].description is None
-        assert entries[0].type is None
+        assert entries[0].description == "Visible feature"
+        assert entries[0].type == "feature"
+
+    def test_edit_non_user_facing_round_trip_keeps_fields(self, rlsbl_repo):
+        """Flipping to non-user-facing and back restores the original text.
+
+        Because the flip preserves description and type, flipping back needs
+        no --description/--type restatement: the stored fields are still there.
+        """
+        sha = _make_commit(rlsbl_repo)
+        _add_unreleased_entry(rlsbl_repo, sha, description="Visible feature", entry_type="feature")
+
+        off = {
+            "commits": sha,
+            "type": "",
+            "description": "",
+            "user-facing": False,
+            "auto-commit": False,
+        }
+        cmd_edit(off, project_root=rlsbl_repo)
+
+        on = dict(off, **{"user-facing": True})
+        cmd_edit(on, project_root=rlsbl_repo)
+
+        changes_dir = get_changes_dir(str(rlsbl_repo))
+        entries = parse_jsonl(os.path.join(changes_dir, "unreleased.jsonl"))
+        assert len(entries) == 1
+        assert entries[0].user_facing is True
+        assert entries[0].description == "Visible feature"
+        assert entries[0].type == "feature"
 
     def test_edit_to_user_facing(self, rlsbl_repo):
         """Edit a non-user-facing entry to user-facing with description and type."""
