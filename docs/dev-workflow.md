@@ -24,16 +24,16 @@ Seven of rlsbl's release targets implement an editable install command; every ot
 
 ### Modes
 
-| Flag | Behavior |
+| `--target` value | Behavior |
 | --- | --- |
-| `--global` (default) | System-wide install via the target's global command |
-| `--venv` | Project-local environment install (supported by pypi, npm, deno, and hex) |
+| `global` | System-wide install via the target's global command |
+| `venv` | Project-local environment install (supported by pypi, npm, deno, and hex) |
 
-When neither `--global` nor `--venv` is passed, `--global` is the default. The two flags are mutually exclusive.
+`--target` is required and has no default: `rlsbl dev install` without it is a parse-time error naming the flag. The mode is always stated, never assumed.
 
 ### Uninstall
 
-`rlsbl dev install --uninstall` reverses a previous install by invoking each target's native removal command. The uninstall mechanism is stateless -- rlsbl does not track which packages were installed, so it relies entirely on the ecosystem's own uninstall tooling to determine what to remove:
+`rlsbl dev install --target global --uninstall` reverses a previous install by invoking each target's native removal command. The uninstall mechanism is stateless -- rlsbl does not track which packages were installed, so it relies entirely on the ecosystem's own uninstall tooling to determine what to remove:
 
 | Target | Uninstall command | Notes |
 | --- | --- | --- |
@@ -177,7 +177,7 @@ The old `rlsbl pre-push-check` command was removed. It is now a stub that prints
 cd ~/Projects/mylib
 
 # Install the project locally for development (editable install)
-rlsbl dev install
+rlsbl dev install --target global
 #   Installing mylib via: uv tool install -e .
 #   Installed mylib 0.5.2
 
@@ -226,16 +226,16 @@ rlsbl dev status
 cd ~/Projects/my-monorepo
 
 # Install all workspace projects
-rlsbl dev install --all
+rlsbl dev install --target global --all
 #   Installing mylib via: uv tool install -e packages/mylib
 #   Installing cli via: npm link (packages/cli)
 #   Skipping tests (dev_node)
 
 # Or install specific projects
-rlsbl dev install --include mylib,cli
+rlsbl dev install --target global --include mylib,cli
 
 # Uninstall when done
-rlsbl dev install --uninstall --all
+rlsbl dev install --target global --uninstall --all
 ```
 
 ### Watching CI after a push

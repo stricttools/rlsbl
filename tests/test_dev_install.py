@@ -7,7 +7,6 @@ import subprocess
 import pytest
 
 from rlsbl.commands.dev import run_install
-from conftest import cli_ctx
 
 
 def _make_pypi(dir_path, name="mypkg"):
@@ -150,7 +149,7 @@ def stub_go_introspect(monkeypatch):
 
 def test_pypi_install_runs_uv_tool_install(tmp_project, fake_run, all_tools_present):
     _make_pypi(str(tmp_project))
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["uv", "tool", "install", "-e", "."]
@@ -159,7 +158,7 @@ def test_pypi_install_runs_uv_tool_install(tmp_project, fake_run, all_tools_pres
 
 def test_npm_install_runs_npm_link(tmp_project, fake_run, all_tools_present):
     _make_npm(str(tmp_project))
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["npm", "link"]
@@ -167,7 +166,7 @@ def test_npm_install_runs_npm_link(tmp_project, fake_run, all_tools_present):
 
 def test_go_install_runs_go_install(tmp_project, fake_run, all_tools_present):
     _make_go(str(tmp_project))
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     # Declared install_paths drive the install (never a blanket ./...)
@@ -176,14 +175,14 @@ def test_go_install_runs_go_install(tmp_project, fake_run, all_tools_present):
 
 def test_pypi_uninstall_uses_project_name(tmp_project, fake_run, all_tools_present):
     _make_pypi(str(tmp_project), name="rlsbl-test-pkg")
-    rc = run_install({"uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
     assert rc == 0
     assert fake_run.calls[0]["cmd"] == ["uv", "tool", "uninstall", "rlsbl-test-pkg"]
 
 
 def test_go_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsys):
     _make_go(str(tmp_project))
-    rc = run_install({"uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
     # Nothing actually ran -- go cannot be cleanly uninstalled.
     assert rc == 0
     assert fake_run.calls == []
@@ -192,7 +191,7 @@ def test_go_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsy
 
 
 def test_no_targets_returns_error(tmp_project, fake_run, all_tools_present, capsys):
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 1
     captured = capsys.readouterr()
     assert "no targets detected" in captured.err
@@ -203,7 +202,7 @@ def test_unsupported_target_skipped(tmp_project, fake_run, all_tools_present, ca
     os.makedirs(str(tmp_project / ".rlsbl"))
     with open(str(tmp_project / ".rlsbl" / "config.json"), "w") as f:
         json.dump({"targets": ["plain"]}, f)
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     # No supported targets -> nothing ran, no error.
     assert rc == 0
     assert fake_run.calls == []
@@ -238,7 +237,7 @@ def test_skip_reason_from_target_is_shown(
     monkeypatch.setattr(
         "rlsbl.targets.go.list_main_packages", lambda project_dir: []
     )
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
@@ -253,7 +252,7 @@ def test_missing_tool_is_skipped(tmp_project, fake_run, monkeypatch, capsys):
         "rlsbl.commands.dev.require_tool",
         lambda name, purpose=None, fatal=True: None,
     )
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
@@ -265,7 +264,7 @@ def test_install_failure_returns_nonzero(tmp_project, monkeypatch, all_tools_pre
     _make_pypi(str(tmp_project))
     cap = _Capture(returncode=2)
     monkeypatch.setattr("rlsbl.effects.run", cap)
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 1
     assert len(cap.calls) == 1
 
@@ -311,7 +310,7 @@ def test_path_scoped_targets_run_in_their_own_dirs(
     directory, not the project root: npm link needs npm/package.json, uv needs
     pypi/pyproject.toml."""
     _make_multi_target(tmp_project)
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     cwds = {c["cmd"][0]: os.path.normpath(c["kwargs"]["cwd"]) for c in fake_run.calls}
     assert cwds["go"] == "."
@@ -325,7 +324,7 @@ def test_path_scoped_uninstall_reads_manifest_from_target_dir(
     """Uninstall must resolve the package name from the target entry's own
     manifest (pypi/pyproject.toml), not fall back to the root dir basename."""
     _make_multi_target(tmp_project)
-    rc = run_install({"uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
     assert rc == 0
     cmds = [c["cmd"] for c in fake_run.calls]
     assert ["uv", "tool", "uninstall", "multi-pypi"] in cmds
@@ -355,7 +354,7 @@ def _make_monorepo(root):
 
 def test_monorepo_without_flags_errors(tmp_project, fake_run, all_tools_present, capsys):
     _make_monorepo(tmp_project)
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 1
     captured = capsys.readouterr()
     assert "monorepo mode" in captured.err
@@ -367,7 +366,7 @@ def test_monorepo_all_iterates_all_projects(
     tmp_project, fake_run, all_tools_present, capsys
 ):
     _make_monorepo(tmp_project)
-    rc = run_install({"all": True}, project_root=".")
+    rc = run_install({"target": "global", "all": True}, project_root=".")
     assert rc == 0
     # One install per project: uv, npm, go.
     tools = [c["cmd"][0] for c in fake_run.calls]
@@ -380,7 +379,7 @@ def test_monorepo_all_iterates_all_projects(
 
 def test_monorepo_include_filters(tmp_project, fake_run, all_tools_present, capsys):
     _make_monorepo(tmp_project)
-    rc = run_install({"include": "pyproj,nodeproj"}, project_root=".")
+    rc = run_install({"target": "global", "include": "pyproj,nodeproj"}, project_root=".")
     assert rc == 0
     tools = [c["cmd"][0] for c in fake_run.calls]
     assert sorted(tools) == ["npm", "uv"]
@@ -390,7 +389,7 @@ def test_monorepo_include_filters(tmp_project, fake_run, all_tools_present, caps
 
 def test_monorepo_exclude_filters(tmp_project, fake_run, all_tools_present, capsys):
     _make_monorepo(tmp_project)
-    rc = run_install({"exclude": "goproj"}, project_root=".")
+    rc = run_install({"target": "global", "exclude": "goproj"}, project_root=".")
     assert rc == 0
     tools = [c["cmd"][0] for c in fake_run.calls]
     assert sorted(tools) == ["npm", "uv"]
@@ -402,7 +401,7 @@ def test_monorepo_empty_filter_errors(
     tmp_project, fake_run, all_tools_present, capsys
 ):
     _make_monorepo(tmp_project)
-    rc = run_install({"include": "nonexistent"}, project_root=".")
+    rc = run_install({"target": "global", "include": "nonexistent"}, project_root=".")
     assert rc == 1
     captured = capsys.readouterr()
     assert "No projects matched" in captured.err
@@ -421,7 +420,7 @@ def test_monorepo_uninstall_all(tmp_project, fake_run, all_tools_present, capsys
     go   -> skipped (uninstall_args_template is None)
     """
     _make_monorepo(tmp_project)
-    rc = run_install({"all": True, "uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "all": True, "uninstall": True}, project_root=".")
     assert rc == 0
 
     cmds = [c["cmd"] for c in fake_run.calls]
@@ -444,7 +443,7 @@ def test_monorepo_uninstall_all(tmp_project, fake_run, all_tools_present, capsys
 def test_monorepo_uninstall_include(tmp_project, fake_run, all_tools_present, capsys):
     """--include pyproj,nodeproj --uninstall only uninstalls those two."""
     _make_monorepo(tmp_project)
-    rc = run_install({"include": "pyproj,nodeproj", "uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "include": "pyproj,nodeproj", "uninstall": True}, project_root=".")
     assert rc == 0
 
     cmds = [c["cmd"] for c in fake_run.calls]
@@ -463,7 +462,7 @@ def test_monorepo_uninstall_include(tmp_project, fake_run, all_tools_present, ca
 def test_monorepo_uninstall_exclude(tmp_project, fake_run, all_tools_present, capsys):
     """--exclude goproj --uninstall uninstalls pyproj and nodeproj, skipping goproj."""
     _make_monorepo(tmp_project)
-    rc = run_install({"exclude": "goproj", "uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "exclude": "goproj", "uninstall": True}, project_root=".")
     assert rc == 0
 
     cmds = [c["cmd"] for c in fake_run.calls]
@@ -480,13 +479,13 @@ def test_monorepo_uninstall_exclude(tmp_project, fake_run, all_tools_present, ca
 
 
 # ---------------------------------------------------------------------------
-# --venv mode
+# --target venv mode
 # ---------------------------------------------------------------------------
 
 
 def test_pypi_venv_runs_uv_sync(tmp_project, fake_run, all_tools_present):
     _make_pypi(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
+    rc = run_install({"target": "venv"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["uv", "sync", "--all-packages"]
@@ -494,7 +493,7 @@ def test_pypi_venv_runs_uv_sync(tmp_project, fake_run, all_tools_present):
 
 def test_npm_venv_runs_npm_install(tmp_project, fake_run, all_tools_present):
     _make_npm(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
+    rc = run_install({"target": "venv"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["npm", "install"]
@@ -504,13 +503,13 @@ def test_go_venv_skipped_with_clear_message(
     tmp_project, fake_run, all_tools_present, capsys
 ):
     _make_go(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
+    rc = run_install({"target": "venv"}, project_root=".")
     # Go has no venv concept -> no command runs, clear skip message shown.
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
     assert "Skipping go" in captured.out
-    assert "--venv not supported" in captured.out
+    assert "--target venv not supported" in captured.out
 
 
 # ---------------------------------------------------------------------------
@@ -520,16 +519,16 @@ def test_go_venv_skipped_with_clear_message(
 
 def test_hex_global_runs_mix_deps_get(tmp_project, fake_run, all_tools_present):
     _make_hex(str(tmp_project))
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["mix", "deps.get"]
 
 
 def test_hex_venv_also_runs_mix_deps_get(tmp_project, fake_run, all_tools_present):
-    """Hex has no global/local distinction; --venv returns the same spec."""
+    """Hex has no global/local distinction; --target venv returns the same spec."""
     _make_hex(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
+    rc = run_install({"target": "venv"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["mix", "deps.get"]
@@ -537,7 +536,7 @@ def test_hex_venv_also_runs_mix_deps_get(tmp_project, fake_run, all_tools_presen
 
 def test_hex_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsys):
     _make_hex(str(tmp_project))
-    rc = run_install({"uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
@@ -551,7 +550,7 @@ def test_hex_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, caps
 
 def test_deno_global_runs_deno_install(tmp_project, fake_run, all_tools_present):
     _make_deno(str(tmp_project))
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["deno", "install"]
@@ -559,7 +558,7 @@ def test_deno_global_runs_deno_install(tmp_project, fake_run, all_tools_present)
 
 def test_deno_venv_runs_deno_cache(tmp_project, fake_run, all_tools_present):
     _make_deno(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
+    rc = run_install({"target": "venv"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["deno", "cache", "."]
@@ -569,7 +568,7 @@ def test_deno_uninstall_uses_project_name(
     tmp_project, fake_run, all_tools_present
 ):
     _make_deno(str(tmp_project), name="mydeno")
-    rc = run_install({"uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
     assert rc == 0
     assert fake_run.calls[0]["cmd"] == ["deno", "uninstall", "mydeno"]
 
@@ -581,7 +580,7 @@ def test_deno_uninstall_uses_project_name(
 
 def test_zig_global_runs_zig_build_install(tmp_project, fake_run, all_tools_present):
     _make_zig(str(tmp_project))
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["zig", "build", "install"]
@@ -591,17 +590,17 @@ def test_zig_venv_skipped_with_clear_message(
     tmp_project, fake_run, all_tools_present, capsys
 ):
     _make_zig(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
+    rc = run_install({"target": "venv"}, project_root=".")
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
     assert "Skipping zig" in captured.out
-    assert "--venv not supported" in captured.out
+    assert "--target venv not supported" in captured.out
 
 
 def test_zig_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsys):
     _make_zig(str(tmp_project))
-    rc = run_install({"uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
@@ -615,7 +614,7 @@ def test_zig_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, caps
 
 def test_swift_global_runs_swift_build(tmp_project, fake_run, all_tools_present):
     _make_swift(str(tmp_project))
-    rc = run_install({}, project_root=".")
+    rc = run_install({"target": "global"}, project_root=".")
     assert rc == 0
     assert len(fake_run.calls) == 1
     assert fake_run.calls[0]["cmd"] == ["swift", "build"]
@@ -625,17 +624,17 @@ def test_swift_venv_skipped_with_clear_message(
     tmp_project, fake_run, all_tools_present, capsys
 ):
     _make_swift(str(tmp_project))
-    rc = run_install({"venv": True}, project_root=".")
+    rc = run_install({"target": "venv"}, project_root=".")
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
     assert "Skipping swift" in captured.out
-    assert "--venv not supported" in captured.out
+    assert "--target venv not supported" in captured.out
 
 
 def test_swift_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsys):
     _make_swift(str(tmp_project))
-    rc = run_install({"uninstall": True}, project_root=".")
+    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
@@ -643,25 +642,97 @@ def test_swift_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, ca
 
 
 # ---------------------------------------------------------------------------
-# CLI: --global / --venv mutual exclusion
+# CLI: --target is one required choice, not two optional bools
 # ---------------------------------------------------------------------------
 
 
-def test_cli_global_and_venv_are_mutually_exclusive():
-    """`rlsbl dev install --global --venv` must exit non-zero with a clear error.
+def _dev_install_flag_names():
+    from rlsbl import app
 
-    We exercise the strictcli-wired handler directly to verify the guard
-    rather than spawning a subprocess.
-    """
-    import pytest as _pytest
+    return {f.name for f in app._groups["dev"].commands["install"].flags}
 
-    from rlsbl import cmd_dev_install
 
-    with _pytest.raises(SystemExit) as excinfo:
-        # We expect the handler to bail before touching the filesystem, so
-        # passing no project setup is fine.
-        cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, global_=True, venv=True)
-    assert excinfo.value.code == 2
+def test_cli_install_mode_is_a_single_target_flag():
+    """The install mode is one --target choice; the old bools are gone."""
+    names = _dev_install_flag_names()
+    assert "target" in names
+    assert "global" not in names
+    assert "venv" not in names
+
+
+def test_cli_target_declares_exactly_the_two_modes():
+    from rlsbl import app
+
+    flag = next(
+        f for f in app._groups["dev"].commands["install"].flags if f.name == "target"
+    )
+    assert flag.choices == ["global", "venv"]
+    # No default: the caller must state the mode explicitly.
+    assert flag.default is None
+
+
+def test_cli_target_is_required(tmp_path, monkeypatch):
+    """Omitting --target must fail at parse time rather than assuming global."""
+    from rlsbl import app
+
+    _make_pypi(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+
+    result = app.test(["dev", "install"])
+    assert result.exit_code != 0
+    assert "--target" in result.stderr
+    assert "required" in result.stderr
+
+
+def test_cli_target_rejects_an_unknown_mode(tmp_path, monkeypatch):
+    from rlsbl import app
+
+    _make_pypi(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+
+    result = app.test(["dev", "install", "--target", "system"])
+    assert result.exit_code != 0
+    assert "target" in result.stderr
+
+
+def _make_cli_pypi_project(root):
+    """A pypi project with .rlsbl/ so the CLI resolves it as a project root."""
+    _make_pypi(str(root))
+    rlsbl_dir = os.path.join(str(root), ".rlsbl")
+    os.makedirs(rlsbl_dir, exist_ok=True)
+    with open(os.path.join(rlsbl_dir, "config.json"), "w", encoding="utf-8") as f:
+        json.dump({"targets": ["pypi"], "publish_mode": "ci"}, f)
+
+
+def test_cli_target_venv_selects_the_venv_command(tmp_path, monkeypatch, fake_run, all_tools_present):
+    """--target venv reaches the venv spec end to end through the CLI."""
+    from rlsbl import app
+
+    _make_cli_pypi_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = app.test(["dev", "install", "--target", "venv"])
+    assert result.exit_code == 0
+    assert [c["cmd"] for c in fake_run.calls] == [["uv", "sync", "--all-packages"]]
+
+
+def test_cli_target_global_selects_the_global_command(tmp_path, monkeypatch, fake_run, all_tools_present):
+    from rlsbl import app
+
+    _make_cli_pypi_project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = app.test(["dev", "install", "--target", "global"])
+    assert result.exit_code == 0
+    assert [c["cmd"] for c in fake_run.calls] == [["uv", "tool", "install", "-e", "."]]
+
+
+def test_run_install_requires_an_explicit_mode(tmp_project, fake_run, all_tools_present):
+    """The internal entry point has no implicit mode either."""
+    _make_pypi(str(tmp_project))
+    with pytest.raises(ValueError) as excinfo:
+        run_install({}, project_root=".")
+    assert "target" in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------------
@@ -682,7 +753,7 @@ def test_cli_workspace_root_gives_cd_guidance(tmp_path, monkeypatch):
     (tmp_path / "py").mkdir()
     monkeypatch.chdir(tmp_path)
 
-    result = app.test(["dev", "install"])
+    result = app.test(["dev", "install", "--target", "global"])
     assert result.exit_code == 1
     assert "sub-project" in result.stderr
     assert "monorepo add" not in result.stderr
@@ -716,7 +787,7 @@ def test_dev_install_help_matches_the_real_supported_sets():
 
     The help used to claim a flat "installs system-wide across N supported
     targets" list, which was wrong twice over: three of those targets have no
-    system-wide install at all, and the --venv/--uninstall sets are smaller
+    system-wide install at all, and the venv/uninstall sets are smaller
     still. Derive the sets from the target registry so the text cannot drift.
     """
     from rlsbl import app
@@ -725,15 +796,15 @@ def test_dev_install_help_matches_the_real_supported_sets():
     supports_global, supports_venv, supports_uninstall = _install_modes()
 
     assert f"{len(supports_global)} targets" in help_text
-    global_part, venv_part = help_text.split("--venv installs", 1)
+    global_part, venv_part = help_text.split("--target venv installs", 1)
     for name in supports_global:
-        assert name in global_part, f"{name} supports --global but is unlisted"
+        assert name in global_part, f"{name} supports --target global but is unlisted"
 
     venv_sentence = venv_part.split("--uninstall", 1)[0]
     for name in supports_venv:
-        assert name in venv_sentence, f"{name} supports --venv but is unlisted"
+        assert name in venv_sentence, f"{name} supports --target venv but is unlisted"
     for name in supports_global - supports_venv:
-        assert name not in venv_sentence, f"{name} does not support --venv"
+        assert name not in venv_sentence, f"{name} does not support --target venv"
 
     uninstall_sentence = venv_part.split("--uninstall", 1)[1]
     for name in supports_uninstall:

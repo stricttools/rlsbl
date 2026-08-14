@@ -963,25 +963,26 @@ class TestCmdMonoExtractReleasable:
 
 
 class TestCmdDevInstall:
-    def test_global_and_venv_mutual_exclusion(self):
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, global_=True, venv=True)
-        assert exc.value.code == 2
-
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.dev.run_install", return_value=0)
     def test_delegates_global_mode(self, mock_run, _):
-        rlsbl.cmd_dev_install(cli_ctx(), all=False, include="core", exclude="", uninstall=False, global_=False, venv=False)
+        rlsbl.cmd_dev_install(cli_ctx(), all=False, include="core", exclude="", uninstall=False, target="global")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][0]
-        assert flags["global"] is True
-        assert flags["venv"] is False
+        assert flags["target"] == "global"
+
+    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
+    @patch("rlsbl.commands.dev.run_install", return_value=0)
+    def test_delegates_venv_mode(self, mock_run, _):
+        rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, target="venv")
+        flags = mock_run.call_args[0][0]
+        assert flags["target"] == "venv"
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.dev.run_install", return_value=1)
     def test_exits_on_nonzero_return(self, mock_run, _):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, global_=False, venv=True)
+            rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, target="venv")
         assert exc.value.code == 1
 
 

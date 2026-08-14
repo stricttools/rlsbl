@@ -2070,22 +2070,15 @@ def cmd_mono_rename_releasable(ctx, old_name, new_name):
 dev = app.group("dev", help="Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).")
 
 
-@dev.command(name="install", help="Install the project locally for development by running each detected target's own install command. --global (the default) is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.", effect="mutating")
+@dev.command(name="install", help="Install the project locally for development by running each detected target's own install command. --target is required and names the install mode. --target global is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --target venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.", effect="mutating")
 @strictcli.flag(name="all", type=bool, default=False, help="In monorepo mode, install every project in the workspace")
 @strictcli.flag(name="include", type=str, help="In monorepo mode, comma-separated project names to include", default="")
 @strictcli.flag(name="exclude", type=str, help="In monorepo mode, comma-separated project names to exclude", default="")
 @strictcli.flag(name="uninstall", type=bool, default=False, help="Reverse a previous dev install (where supported by the target)")
-@strictcli.flag(name="global", type=bool, help="Install as a global tool/symlink. This is the default behavior when neither --global nor --venv is passed. Mutually exclusive with --venv.", default=False)
-@strictcli.flag(name="venv", type=bool, help="Install into the project's local environment only (e.g. uv sync, npm install). Mutually exclusive with --global.", default=False)
+@strictcli.flag(name="target", type=str, choices=["global", "venv"], help="Install mode: 'global' installs as a global tool/symlink, 'venv' installs into the project's local environment only (e.g. uv sync, npm install). Required -- there is no default mode.")
 @effects.handler
-def cmd_dev_install(ctx, all, include, exclude, uninstall, global_, venv):
+def cmd_dev_install(ctx, all, include, exclude, uninstall, target):
     """Install the project locally using the detected target's editable install."""
-    if global_ and venv:
-        print(
-            "Error: --global and --venv are mutually exclusive.",
-            file=sys.stderr,
-        )
-        sys.exit(2)
     root = _require_sub_project_root(
         workspace_root_guidance=(
             "Error: `rlsbl dev install` must run inside a sub-project, not "
@@ -2094,17 +2087,12 @@ def cmd_dev_install(ctx, all, include, exclude, uninstall, global_, venv):
             "select which workspace projects to install."
         )
     )
-    # Both flags default to False (not True) so strictcli's mutex check doesn't
-    # always fire when neither is passed. The user-visible default (no flags ->
-    # global mode) is preserved by deriving install_global from --venv only.
-    install_global = not venv
     flags = {
         "all": all,
         "include": include or None,
         "exclude": exclude or None,
         "uninstall": uninstall,
-        "global": install_global,
-        "venv": venv,
+        "target": target,
     }
     from .commands.dev import run_install
     rc = run_install(flags, project_root=root)

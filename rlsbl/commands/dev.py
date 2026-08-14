@@ -33,7 +33,14 @@ def _install_single(project_dir, flags):
         return 1
 
     uninstall = bool(flags.get("uninstall"))
-    venv = bool(flags.get("venv"))
+    # The install mode is stated, never assumed: `--target global|venv` is a
+    # required CLI flag, so a missing key here is a caller bug, not a default.
+    mode = flags.get("target")
+    if mode not in ("global", "venv"):
+        raise ValueError(
+            "dev install: flags['target'] must be 'global' or 'venv', "
+            f"got {mode!r}"
+        )
     success = True
     any_handled = False
 
@@ -50,12 +57,12 @@ def _install_single(project_dir, flags):
             if target is not None
             else {"global": None, "venv": None}
         )
-        spec = modes.get("venv" if venv else "global")
+        spec = modes.get(mode)
         if spec is None:
             reason = modes.get("reason")
-            if venv and modes.get("global") is not None:
+            if mode == "venv" and modes.get("global") is not None:
                 # Global install exists for this target but venv mode does not.
-                print(f"Skipping {name}: --venv not supported for this target")
+                print(f"Skipping {name}: --target venv not supported for this target")
             elif reason:
                 # The target explained why there is nothing to install
                 # (e.g. "Go library: nothing to install").
