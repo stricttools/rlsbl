@@ -1967,6 +1967,16 @@
         },
         {
           "level": 3,
+          "text": "How an overlay is detected (`rlsbl dev status`, `dev-overlay-drift`)",
+          "anchor": "how-an-overlay-is-detected-rlsbl-dev-status-dev-overlay-drift"
+        },
+        {
+          "level": 3,
+          "text": "Overlay mode is what other commands read",
+          "anchor": "overlay-mode-is-what-other-commands-read"
+        },
+        {
+          "level": 3,
           "text": "The UV_NO_SYNC=1 gate",
           "anchor": "the-uv_no_sync1-gate"
         },
@@ -9997,13 +10007,28 @@
         },
         {
           "level": 3,
-          "text": "`_venv_site_packages`",
-          "anchor": "_venv_site_packages"
+          "text": "`OverlayModeConflictError`",
+          "anchor": "overlaymodeconflicterror"
         },
         {
           "level": 3,
-          "text": "`_read_dist_info_metadata`",
-          "anchor": "_read_dist_info_metadata"
+          "text": "`_load_overlay_pairs`",
+          "anchor": "_load_overlay_pairs"
+        },
+        {
+          "level": 3,
+          "text": "`active_overlays`",
+          "anchor": "active_overlays"
+        },
+        {
+          "level": 3,
+          "text": "`project_environment`",
+          "anchor": "project_environment"
+        },
+        {
+          "level": 3,
+          "text": "`_site_packages_dirs`",
+          "anchor": "_site_packages_dirs"
         },
         {
           "level": 3,
@@ -13426,6 +13451,21 @@
         },
         {
           "level": 3,
+          "text": "`_overlay_exclusions`",
+          "anchor": "_overlay_exclusions"
+        },
+        {
+          "level": 3,
+          "text": "`collect_active_overlays`",
+          "anchor": "collect_active_overlays"
+        },
+        {
+          "level": 3,
+          "text": "`_sync_selector_args`",
+          "anchor": "_sync_selector_args"
+        },
+        {
+          "level": 3,
           "text": "`sync_workspace`",
           "anchor": "sync_workspace"
         },
@@ -15322,5 +15362,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-13T05:31:51.192209+00:00"
+  "last_gen": "2026-08-14T04:03:53.520646+00:00",
+  "theme": "minimal"
 }
