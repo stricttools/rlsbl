@@ -444,6 +444,6 @@ class GoTarget(BaseTarget):
                 "uninstall_args_template": None,
             },
             # Go has no per-project venv concept; modules are managed globally
-            # in GOPATH/pkg/mod. Nothing meaningful to do for --venv.
+            # in GOPATH/pkg/mod. Nothing meaningful to do for --target venv.
             "venv": None,
         }
