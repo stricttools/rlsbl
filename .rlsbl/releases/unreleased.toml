@@ -2,11 +2,34 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "The check system gains an observe-ability purity model backed by a written read-only-command standard, plus path-capable lint, format and type-check built-ins that replace the structured external-check adapter. Machine output on status, unreleased, check-name and monorepo graph/impact moves to strictcli's envelope, the scrub flow now requires safegit 0.27.0, and the test-suite and dev-status checks stop wiping and misreporting dev-sync overlays."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+The framework dependency moves onto released strictcli 0.40.0: the machine-mode
+API this release is built on (ctx.json, ctx.payload, payload_schema and the
+envelope) ships there, so the floor is raised to >=0.40.0 and the local
+development overlay onto the strictcli checkout is retired. rlsbl now resolves
+strictcli from PyPI like any consumer does.
+
+The machine-output change is BREAKING for anything parsing rlsbl's --json.
+`rlsbl status --json`, `rlsbl unreleased --json`, `rlsbl check-name --json`,
+`rlsbl monorepo graph --json` and `rlsbl monorepo impact --json` no longer print
+their own bare JSON document. Each now emits exactly one envelope whose
+`payload` member carries what the command used to print at the top level, so a
+consumer reads `.payload` where it previously read the document root. The same
+move is why `rlsbl release scrub` requires safegit 0.27.0 or newer: it reads
+safegit's `--json` through the envelope only, and older safegit does not emit
+one.
+
+The check-system work behind the headline is a redefinition rather than a new
+feature bolted on. Purity now means "starts only allowlisted read-only
+programs", which is a property the check itself can be audited against, so the
+changelog validators, the two pre-push checks, `workspace-unregistered` and
+`go-companion-tags` execute during `--dry-run` instead of reporting themselves
+as would-run and checking nothing.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
