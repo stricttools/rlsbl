@@ -19,17 +19,17 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--push-timeout` |  | str |  |  | Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
-| `--ci-timeout` |  | str |  |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default. |
-| `--check-timeout` |  | str |  |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default. |
-| `--hook-timeout` |  | str |  |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
-| `--watch` |  | str |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
-| `--allow-dirty` |  | str |  |  | Skip the clean working tree check and allow releasing with uncommitted changes |
-| `--bump` |  | str |  |  | Bump type: patch, minor, major, infra, prerelease. Skips the release file. |
-| `--description` |  | str |  |  | Short release description summarizing the changes (required with --bump) |
-| `--preid` |  | str |  |  | Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump. |
+| `--push-timeout` |  | int | optional |  | Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
+| `--ci-timeout` |  | int | optional |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default. |
+| `--check-timeout` |  | int | optional |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default. |
+| `--hook-timeout` |  | int | optional |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
+| `--watch`, `--no-watch` |  | bool | required |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
+| `--allow-dirty`, `--no-allow-dirty` |  | bool | required |  | Skip the clean working tree check and allow releasing with uncommitted changes |
+| `--bump` |  | str | optional |  | Bump type: patch, minor, major, infra, prerelease. Skips the release file. |
+| `--description` |  | str | optional |  | Short release description summarizing the changes (required with --bump) |
+| `--preid` |  | str | optional |  | Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump. |
 
 ## release resume
 
@@ -39,13 +39,13 @@ Resume a previously failed release from where it left off. Reads the in-progress
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--push-timeout` |  | str |  |  | Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
-| `--ci-timeout` |  | str |  |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default. |
-| `--check-timeout` |  | str |  |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default. |
-| `--hook-timeout` |  | str |  |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
-| `--watch` |  | str |  |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
+| `--push-timeout` |  | int | optional |  | Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
+| `--ci-timeout` |  | int | optional |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default. |
+| `--check-timeout` |  | int | optional |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default. |
+| `--hook-timeout` |  | int | optional |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
+| `--watch`, `--no-watch` |  | bool | required |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 
 ## release init
 
@@ -63,9 +63,9 @@ Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the 
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--watch` |  | str |  |  | After retry, automatically watch CI runs to completion (--no-watch to skip) |
+| `--watch`, `--no-watch` |  | bool | required |  | After retry, automatically watch CI runs to completion (--no-watch to skip) |
 
 ## release edit
 
@@ -75,9 +75,9 @@ Sync the GitHub Release notes for a given version with the corresponding CHANGEL
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `version` | yes | Version whose GitHub Release notes to sync (defaults to current version) |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `version` | str | optional | Version whose GitHub Release notes to sync (defaults to current version) |
 
 ## release undo
 
@@ -87,10 +87,10 @@ Revert a release. Without --version, reverts the latest release (deletes GitHub 
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Target a specific registry for version detection (auto-detected if omitted) |
-| `--version` |  | str |  |  | Version to undo (for non-latest releases that are provably unpublished) |
+| `--target` |  | str | optional |  | Target a specific registry for version detection (auto-detected if omitted) |
+| `--version` |  | str | optional |  | Version to undo (for non-latest releases that are provably unpublished) |
 
 ## release deprecate
 
@@ -100,16 +100,16 @@ Mark a past release as deprecated. Sets the GitHub Release pre-release flag and 
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--reason` |  | str |  |  | Human-readable explanation of why this version is being deprecated |
-| `--use` |  | str |  |  | Suggest this version as a replacement in the deprecation notice |
+| `--reason` |  | str | optional |  | Human-readable explanation of why this version is being deprecated |
+| `--use` |  | str | optional |  | Suggest this version as a replacement in the deprecation notice |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `version` | yes | Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1) |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `version` | str | required | Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1) |
 
 ## release yank
 
@@ -119,16 +119,16 @@ Remove a published version from package registries. Probes each configured targe
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--reason` |  | str |  |  | Human-readable explanation of why this version is being yanked |
-| `--use` |  | str |  |  | Suggest this version as a replacement in the yank notice |
+| `--reason` |  | str | optional |  | Human-readable explanation of why this version is being yanked |
+| `--use` |  | str | optional |  | Suggest this version as a replacement in the yank notice |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `version` | yes | Semver string of the release to yank, with or without v prefix (e.g. 0.9.1) |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `version` | str | required | Semver string of the release to yank, with or without v prefix (e.g. 0.9.1) |
 
 ## release scrub
 
@@ -138,11 +138,18 @@ Scrub sensitive content from git history and update release metadata to match th
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--mode` |  | str |  |  | Which scrub mode to run: match a regex, rewrite one file, or execute a recipe TOML. Exactly one must be elected, and the elected one decides which further flags exist. |
-| `--commit-range` |  | str |  |  | Which commits the rewrite covers: everything descended from one commit, or the entire history from the initial commit onward. Exactly one must be elected. |
-| `--reason` |  | str |  |  | Why this content is being scrubbed. Recorded in the rewrite commit message and in the scrub archive, so it is the audit trail for an irreversible history rewrite. |
+| `mode` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--pattern`, `--file`, `--recipe`. Which scrub mode to run: match a regex, rewrite one file, or execute a recipe TOML. Exactly one must be elected, and the elected one decides which further flags exist. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--pattern` |  | str | required |  | Elects `mode` = `pattern`. Match mode: rewrite every occurrence of a regex throughout history Its value: regex pattern to match against file contents |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--replace` |  | str | optional |  | Only with `--pattern`. literal text to substitute for each match (mutually exclusive with --mangle) |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--mangle` |  | bool | optional |  | Only with `--pattern`. replace matched content with random ASCII of the same length (mutually exclusive with --replace) |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--file` |  | str | required |  | Elects `mode` = `file`. File mode: rewrite one file throughout history Its value: path of the file to rewrite throughout history; it is replaced with its current on-disk content, or removed if absent (requires --from-commit) |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--recipe` |  | str | required |  | Elects `mode` = `recipe`. Recipe mode: execute a scrub recipe TOML via safegit scrub run Its value: path to a scrub recipe TOML file; per-operation pattern/replace/mangle live inside the recipe |
+| `commit-range` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--from-commit`, `--entire-history`. Which commits the rewrite covers: everything descended from one commit, or the entire history from the initial commit onward. Exactly one must be elected. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--from-commit` |  | str | required |  | Elects `commit-range` = `from-commit`. Rewrite from one commit onward Its value: SHA of the earliest commit to rewrite (all descendants are also rewritten) |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--entire-history` |  |  | required |  | Elects `commit-range` = `entire-history`. Rewrite every commit in the repository from the initial commit onward (match and recipe modes only; file mode requires --from-commit) |
+| `--reason` |  | str | required |  | Why this content is being scrubbed. Recorded in the rewrite commit message and in the scrub archive, so it is the audit trail for an irreversible history rewrite. |
 
 ## release reconcile
 
@@ -152,6 +159,6 @@ Reconcile release metadata with a rewritten history: re-push the tags a rewrite 
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--push-timeout` |  | str |  |  | Timeout in seconds for each tag push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
+| `--push-timeout` |  | int | optional |  | Timeout in seconds for each tag push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |

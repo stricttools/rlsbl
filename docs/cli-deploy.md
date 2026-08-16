@@ -15,12 +15,12 @@ Run the configured deployment pipeline for the project. Supports named deploy ta
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry whose deploy pipeline to run (auto-detected if omitted) |
+| `--target` |  | str | optional |  | Registry whose deploy pipeline to run (auto-detected if omitted) |
 
 ## Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `target_name` | yes | Named deploy target from the project's deploy configuration to execute |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `target_name` | str | optional | Named deploy target from the project's deploy configuration to execute |

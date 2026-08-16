@@ -15,10 +15,10 @@ Run project checks registered via the check framework and report results
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--all` |  | str |  |  | Run every registered check regardless of tag or name filters |
-| `--tag` |  | str |  |  | Tag DSL expression to select checks (e.g. 'changelog & !quality') |
-| `--name` |  | str |  |  | Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*') |
-| `--list` |  | str |  |  | List all registered checks with their tags and exit without running |
-| `--ignore-warnings` |  | str |  |  | Treat warn-severity results as passing so they do not cause nonzero exit |
+| `--all`, `--no-all` |  | bool | default: `false` |  | Run every registered check regardless of tag or name filters |
+| `--tag` |  | str | default: `` |  | Tag DSL expression to select checks (e.g. 'changelog & !quality') |
+| `--name` |  | str | default: `` |  | Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*') |
+| `--list`, `--no-list` |  | bool | default: `false` |  | List all registered checks with their tags and exit without running |
+| `--ignore-warnings`, `--no-ignore-warnings` |  | bool | default: `false` |  | Treat warn-severity results as passing so they do not cause nonzero exit |

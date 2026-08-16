@@ -549,6 +549,11 @@
           "anchor": "flags-3"
         },
         {
+          "level": 3,
+          "text": "Constraints",
+          "anchor": "constraints"
+        },
+        {
           "level": 2,
           "text": "changelog remap",
           "anchor": "changelog-remap"
@@ -557,6 +562,11 @@
           "level": 3,
           "text": "Flags",
           "anchor": "flags-4"
+        },
+        {
+          "level": 3,
+          "text": "Constraints",
+          "anchor": "constraints-1"
         }
       ]
     },
@@ -15484,6 +15494,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-16T10:40:14.633248+00:00",
+  "last_gen": "2026-08-16T12:28:19.821546+00:00",
   "theme": "minimal"
 }

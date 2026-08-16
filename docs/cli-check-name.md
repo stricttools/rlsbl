@@ -15,7 +15,7 @@ Query npm, PyPI, or other registries to check whether one or more package names 
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry to query for name availability; repeatable |
-| `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries |
+| `--target` |  | list[str] (unique) | required |  | Registry to query for name availability; repeatable Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go module proxy), `github` (GitHub repository names). |
+| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries |

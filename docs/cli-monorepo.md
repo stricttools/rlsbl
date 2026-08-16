@@ -21,9 +21,9 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | str |  |  | Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed) |
 
 ## monorepo add
 
@@ -33,24 +33,24 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--name` |  | str |  |  | Display name for the project in workspace.toml (defaults to directory name) |
-| `--target` |  | str |  |  | Registry this project publishes to (e.g. npm, pypi, go) |
-| `--watch` |  | str |  |  | Comma-separated glob patterns for change detection in CI workflows |
-| `--subtree-remote` |  | str |  |  | Git remote URL for split-publishing this project as a standalone repo |
-| `--depends-on` |  | str |  |  | Comma-separated names of workspace projects this project depends on |
-| `--library` |  | str |  |  | Mark as a shared library consumed by other workspace projects (true/false) |
-| `--dev-only` |  | str |  |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
-| `--releasable` |  | str |  |  | Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning) |
-| `--registry-name` |  | str |  |  | Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix) |
-| `--auto-commit` |  | str |  |  | Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed) |
+| `--name` |  | str | optional |  | Display name for the project in workspace.toml (defaults to directory name) |
+| `--target` |  | str | optional |  | Registry this project publishes to (e.g. npm, pypi, go) |
+| `--watch` |  | str | optional |  | Comma-separated glob patterns for change detection in CI workflows |
+| `--subtree-remote` |  | str | optional |  | Git remote URL for split-publishing this project as a standalone repo |
+| `--depends-on` |  | str | optional |  | Comma-separated names of workspace projects this project depends on |
+| `--library` |  | str | optional |  | Mark as a shared library consumed by other workspace projects (true/false) |
+| `--dev-only` |  | str | optional |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
+| `--releasable` |  | str | optional |  | Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning) |
+| `--registry-name` |  | str | optional |  | Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed) |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Relative path from the repo root to the project directory to register |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | str | required | Relative path from the repo root to the project directory to register |
 
 ## monorepo remove
 
@@ -62,9 +62,9 @@ Unregister a project from the monorepo workspace.toml by its path. This removes 
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Relative path from the repo root of the project to unregister from workspace.toml |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | str | required | Relative path from the repo root of the project to unregister from workspace.toml |
 
 ## monorepo list
 
@@ -80,9 +80,9 @@ Inline every project's CI jobs into a single generated ci-router.yml (and publis
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | str |  |  | Auto-commit merged workflow files in .github/workflows/ (the handler commits when neither form is passed) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit merged workflow files in .github/workflows/ (the handler commits when neither form is passed) |
 
 ## monorepo status
 
@@ -98,12 +98,12 @@ Check package name availability on a target registry for all projects in the mon
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry to query for name availability across all workspace projects |
-| `--prefix` |  | str |  |  | String to prepend to each project name before checking availability |
-| `--suffix` |  | str |  |  | String to append to each project name before checking availability |
-| `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries |
+| `--target` |  | str | required |  | Registry to query for name availability across all workspace projects Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go module proxy), `github` (GitHub repository names). |
+| `--prefix` |  | str | optional |  | String to prepend to each project name before checking availability |
+| `--suffix` |  | str | optional |  | String to append to each project name before checking availability |
+| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries |
 
 ## monorepo outdated
 
@@ -131,9 +131,9 @@ Reconcile a monorepo project's subtree mirror toward its desired state. The mirr
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `project` | yes | Name of the workspace project to split and push as a standalone mirror repo |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `project` | str | required | Name of the workspace project to split and push as a standalone mirror repo |
 
 ## monorepo graph
 
@@ -143,13 +143,13 @@ Export the monorepo dependency graph as DOT (Graphviz) or an indented text tree;
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--format` |  | str |  |  | Rendering for the dependency graph (the handler renders text when omitted) |
-| `--output` |  | str |  |  | File path to write the graph output to instead of printing to stdout |
-| `--root` |  | str |  |  | Filter to show only transitive dependencies reachable from this package |
-| `--reverse` |  | str |  |  | Filter to show only transitive reverse dependencies of this package |
-| `--depth` |  | str |  |  | Maximum number of dependency hops to traverse from the root or reverse node |
+| `--format` |  | str | optional |  | Rendering for the dependency graph (the handler renders text when omitted) Values: `text` (an indented text tree), `dot` (a Graphviz DOT document). |
+| `--output` |  | str | optional |  | File path to write the graph output to instead of printing to stdout |
+| `--root` |  | str | optional |  | Filter to show only transitive dependencies reachable from this package |
+| `--reverse` |  | str | optional |  | Filter to show only transitive reverse dependencies of this package |
+| `--depth` |  | int | optional |  | Maximum number of dependency hops to traverse from the root or reverse node |
 
 ## monorepo impact
 
@@ -159,10 +159,10 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--depth` |  | str |  |  | Maximum number of dependency hops to traverse when computing transitive impact |
-| `--since` |  | str |  |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
+| `--depth` |  | int | optional |  | Maximum number of dependency hops to traverse when computing transitive impact |
+| `--since` |  | str | optional |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
 
 ## monorepo extract
 
@@ -172,10 +172,10 @@ Extract a package from the monorepo into a new standalone repository. Clones the
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `package_name` | yes | Name of the package as defined in workspace.toml to extract into a standalone repo |
-| `target_path` | yes | Filesystem path where the new standalone repository will be created |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `package_name` | str | required | Name of the package as defined in workspace.toml to extract into a standalone repo |
+| `target_path` | str | required | Filesystem path where the new standalone repository will be created |
 
 ## monorepo absorb
 
@@ -185,18 +185,18 @@ Absorb an external repository as a package in the monorepo. Rewrites the source'
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--name` |  | str |  |  | Workspace project name for the absorbed package (the basename of the destination path when omitted) |
-| `--registry-name` |  | str |  |  | Package registry identity recorded in workspace.toml (used verbatim for name checks) |
-| `--releasable` |  | str |  |  | Releasable group to assign the absorbed package to |
+| `--name` |  | str | optional |  | Workspace project name for the absorbed package (the basename of the destination path when omitted) |
+| `--registry-name` |  | str | optional |  | Package registry identity recorded in workspace.toml (used verbatim for name checks) |
+| `--releasable` |  | str | optional |  | Releasable group to assign the absorbed package to |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `source_repo` | yes | Filesystem path to the external git repository to absorb |
-| `dest_path` | yes | Destination directory (and workspace path) the source repo's history is rewritten under |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `source_repo` | str | required | Filesystem path to the external git repository to absorb |
+| `dest_path` | str | required | Destination directory (and workspace path) the source repo's history is rewritten under |
 
 ## monorepo extract-releasable
 
@@ -206,10 +206,10 @@ Extract all member packages of a releasable into a new repository. If the releas
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `releasable_name` | yes | Name of the releasable group in workspace.toml to extract |
-| `target_path` | yes | Filesystem path where the new repository will be created |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `releasable_name` | str | required | Name of the releasable group in workspace.toml to extract |
+| `target_path` | str | required | Filesystem path where the new repository will be created |
 
 ## monorepo cleanup
 
@@ -225,9 +225,9 @@ Migrate a releasable from per-package release state to the releasable model. Det
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `releasable_name` | yes | Name of the releasable group in workspace.toml to migrate |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `releasable_name` | str | required | Name of the releasable group in workspace.toml to migrate |
 
 ## monorepo rename-releasable
 
@@ -237,7 +237,7 @@ Rename a releasable group. Rewrites the [[releasables]] name and every member's 
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `old_name` | yes | Current name of the releasable group in workspace.toml |
-| `new_name` | yes | New name for the releasable group in workspace.toml and state directories |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `old_name` | str | required | Current name of the releasable group in workspace.toml |
+| `new_name` | str | required | New name for the releasable group in workspace.toml and state directories |

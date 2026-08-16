@@ -19,14 +19,14 @@ Append a structured changelog entry to the project's unreleased.jsonl file. Each
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--commits` |  | str |  |  | Comma-separated list of commit hashes to associate with this changelog entry |
-| `--description` |  | str |  |  | Human-readable description of the change, shown in the generated CHANGELOG.md (required unless --no-user-facing) |
-| `--type` |  | str |  |  | Classification of the change (required unless --no-user-facing) |
-| `--user-facing` |  | str |  |  | Mark this entry as user-facing, included in generated CHANGELOG.md output (the handler treats an absent flag as user-facing) |
-| `--auto-commit` |  | str |  |  | Auto-commit unreleased.jsonl after appending the entry (the handler commits when neither form is passed) |
-| `--allow-batch` |  | str |  |  | Auto-create an exclusion if this entry exceeds the commit batch limit |
+| `--commits` |  | str | required |  | Comma-separated list of commit hashes to associate with this changelog entry |
+| `--description` |  | str | optional |  | Human-readable description of the change, shown in the generated CHANGELOG.md (required unless --no-user-facing) |
+| `--type` |  | str | optional |  | Classification of the change (required unless --no-user-facing) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
+| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Mark this entry as user-facing, included in generated CHANGELOG.md output (the handler treats an absent flag as user-facing) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit unreleased.jsonl after appending the entry (the handler commits when neither form is passed) |
+| `--allow-batch`, `--no-allow-batch` |  | bool | optional |  | Auto-create an exclusion if this entry exceeds the commit batch limit |
 
 ## changelog generate
 
@@ -36,9 +36,9 @@ Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | str |  |  | Auto-commit generated CHANGELOG.md and per-version .md files (the handler commits when neither form is passed) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit generated CHANGELOG.md and per-version .md files (the handler commits when neither form is passed) |
 
 ## changelog amend
 
@@ -48,15 +48,15 @@ Append a changelog entry to a released version's JSONL file. Temporarily unlocks
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--version` |  | str |  |  | Semver of the already-released version whose JSONL to amend (e.g. 0.39.0) |
-| `--commits` |  | str |  |  | Comma-separated commit hashes to associate with the amended changelog entry |
-| `--id` |  | str |  |  | Entry ID (ULID) to select the target entry for amendment |
-| `--description` |  | str |  |  | Human-readable description for the amended entry in CHANGELOG.md |
-| `--type` |  | str |  |  | Classification for the amended entry (required unless --no-user-facing) |
-| `--user-facing` |  | str |  |  | Mark the amended entry as user-facing, included in CHANGELOG.md output (the handler treats an absent flag as user-facing) |
-| `--validate-hashes` |  | str |  |  | Validate commit hashes via git rev-parse before appending (the handler validates when neither form is passed) |
+| `--version` |  | str | required |  | Semver of the already-released version whose JSONL to amend (e.g. 0.39.0) |
+| `--commits` |  | str | required |  | Comma-separated commit hashes to associate with the amended changelog entry |
+| `--id` |  | str | optional |  | Entry ID (ULID) to select the target entry for amendment |
+| `--description` |  | str | optional |  | Human-readable description for the amended entry in CHANGELOG.md |
+| `--type` |  | str | optional |  | Classification for the amended entry (required unless --no-user-facing) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
+| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Mark the amended entry as user-facing, included in CHANGELOG.md output (the handler treats an absent flag as user-facing) |
+| `--validate-hashes`, `--no-validate-hashes` |  | bool | optional |  | Validate commit hashes via git rev-parse before appending (the handler validates when neither form is passed) |
 
 ## changelog edit
 
@@ -64,16 +64,31 @@ Modify an existing changelog entry in unreleased or released JSONL files. Finds 
 
 **Effect:** mutating
 
+**Updates:** `changelog-entry` (write mode: sparse)
+
+- Identified by: `--commits`, `--id`
+- Writes: `--description`, `--type`, `--user-facing` -- at least one of them is required.
+- A property that is not supplied is left unchanged.
+- Clearable: `--unset-description`, `--unset-type`.
+
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--commits` |  | str |  |  | Comma-separated commit hashes identifying the target entry |
-| `--id` |  | str |  |  | Entry ID (ULID) identifying the target entry to edit in the JSONL file |
-| `--type` |  | str |  |  | New type value; also disambiguates a commit covered by several entries |
-| `--description` |  | str |  |  | Replacement description text for the matched changelog entry |
-| `--user-facing` |  | str |  |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |
-| `--auto-commit` |  | str |  |  | Automatically commit the edited JSONL changelog file to git after modification (the handler commits when neither form is passed) |
+| `--commits` |  | str | optional |  | Comma-separated commit hashes identifying the target entry |
+| `--id` |  | str | optional |  | Entry ID (ULID) identifying the target entry to edit in the JSONL file |
+| `--type`, `--unset-type` |  | str | optional |  | New type value; also disambiguates a commit covered by several entries Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). `--unset-type` clears it. |
+| `--description`, `--unset-description` |  | str | optional |  | Replacement description text for the matched changelog entry `--unset-description` clears it. |
+| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Automatically commit the edited JSONL changelog file to git after modification (the handler commits when neither form is passed) |
+
+### Constraints
+
+The framework enforces these before the command runs.
+
+| Rule | What it requires |
+| --- | --- |
+| `entry-selection` | At least one of `--commits` (when supplied), `--id` (when supplied). |
 
 ## changelog remap
 
@@ -83,8 +98,16 @@ Remap stale commit hashes in JSONL changelog files using a mapping of old SHAs t
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--map-file` |  | str |  |  | Path to a file of 'old_sha new_sha' lines (same format as git's post-rewrite hook) |
-| `--from-journal` |  | str |  |  | Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) |
-| `--stdin` |  | str |  |  | Read the old/new SHA map from stdin (for piping from git's post-rewrite hook) |
+| `--map-file` |  | str | optional |  | Path to a file of 'old_sha new_sha' lines (same format as git's post-rewrite hook) |
+| `--from-journal`, `--no-from-journal` |  | bool | optional |  | Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) |
+| `--stdin`, `--no-stdin` |  | bool | optional |  | Read the old/new SHA map from stdin (for piping from git's post-rewrite hook) |
+
+### Constraints
+
+The framework enforces these before the command runs.
+
+| Rule | What it requires |
+| --- | --- |
+| `map-source` | At least one of `--map-file` (when non-empty), `--from-journal` (when true), `--stdin` (when true). |

@@ -19,13 +19,13 @@ Install the project locally for development by running each detected target's ow
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--all` |  | str |  |  | In monorepo mode, install every project in the workspace |
-| `--include` |  | str |  |  | In monorepo mode, comma-separated project names to include |
-| `--exclude` |  | str |  |  | In monorepo mode, comma-separated project names to exclude |
-| `--uninstall` |  | str |  |  | Reverse a previous dev install (where supported by the target) |
-| `--target` |  | str |  |  | Install mode. Required -- there is no default mode. |
+| `--all`, `--no-all` |  | bool | optional |  | In monorepo mode, install every project in the workspace |
+| `--include` |  | str | optional |  | In monorepo mode, comma-separated project names to include |
+| `--exclude` |  | str | optional |  | In monorepo mode, comma-separated project names to exclude |
+| `--uninstall`, `--no-uninstall` |  | bool | optional |  | Reverse a previous dev install (where supported by the target) |
+| `--target` |  | str | required |  | Install mode. Required -- there is no default mode. Values: `global` (install as a global tool or symlink (uv tool install -e, npm link, go install, ...)), `venv` (install into the project's own local environment only (uv sync, npm install, ...)). |
 
 ## dev sync
 

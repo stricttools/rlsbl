@@ -15,13 +15,13 @@ Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass o
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry whose CI workflow to watch (auto-detected if omitted) |
-| `--run-id` |  | str |  |  | GitHub Actions workflow run ID to poll directly instead of searching by SHA |
+| `--target` |  | str | optional |  | Registry whose CI workflow to watch (auto-detected if omitted) |
+| `--run-id` |  | list[str] (unique) | optional |  | GitHub Actions workflow run ID to poll directly instead of searching by SHA |
 
 ## Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `sha` | yes | Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted) |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `sha` | str | optional | Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted) |

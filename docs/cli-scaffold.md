@@ -15,10 +15,10 @@ Generate or update CI/CD workflows, git hooks, changelog, and license files. Saf
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one. |
-| `--publish-mode` |  | str |  |  | Publish mode. Required for private repos; when omitted, public repos are scaffolded as "ci". |
-| `--auto-commit` |  | str |  |  | Auto-commit scaffolded files after writing them to disk (the handler commits when neither --auto-commit nor --no-auto-commit is passed) |
-| `--skip-shared` |  | str |  |  | Skip processing of shared workflow templates across targets |
-| `--auto-tag` |  | str |  |  | Add or update the rlsbl GitHub topic tag on this invocation (the handler tags when neither --auto-tag nor --no-auto-tag is passed) |
+| `--target` |  | str | optional |  | Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one. |
+| `--publish-mode` |  | str | optional |  | Publish mode. Required for private repos; when omitted, public repos are scaffolded as "ci". Values: `ci` (publish via the scaffolded CI pipelines), `none` (suppress publishing to public registries). |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit scaffolded files after writing them to disk (the handler commits when neither --auto-commit nor --no-auto-commit is passed) |
+| `--skip-shared`, `--no-skip-shared` |  | bool | optional |  | Skip processing of shared workflow templates across targets |
+| `--auto-tag`, `--no-auto-tag` |  | bool | optional |  | Add or update the rlsbl GitHub topic tag on this invocation (the handler tags when neither --auto-tag nor --no-auto-tag is passed) |

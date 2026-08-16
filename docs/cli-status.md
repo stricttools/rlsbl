@@ -15,7 +15,7 @@ Display the current project version, branch, last release tag, unreleased commit
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
-| `--registry` |  | str |  |  | Query the package registry for the latest published version |
+| `--target` |  | str | optional |  | Target a specific registry (auto-detected if omitted) |
+| `--registry`, `--no-registry` |  | bool | default: `false` |  | Query the package registry for the latest published version |

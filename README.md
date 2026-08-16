@@ -6,7 +6,7 @@
 
 # rlsbl
 
-> *[selfdoc: custom directive 'target-count' failed: flag() got an unexpected keyword argument 'presence']*
+Release orchestration and project scaffolding for npm, PyPI, Go, and [14 more release targets](https://rlsbl.smmh.dev/targets).
 
 ## Install
 
