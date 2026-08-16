@@ -815,6 +815,12 @@
     "description": "aa60d2e66dbcec90a251351db5dba664d53c6fa5a1aac14b6f2eebc0a8caddb1",
     "source_docstring": "d519713ee301d905931cf1e26ecdacf2738c2eb2f82e1231baa0c20a641f97b8"
   },
+  "en/rlsbl-saferm.md": {
+    "content": "698f8a99eaeb70dce4b5f7d333197c19db65190b834a51e1503825dc06d9f304",
+    "description": "90634eea7536c24e87158aabbe43ddaf397e7e93d84e63e7cc498963535b3f0b",
+    "seed_hash": "90634eea7536c24e87158aabbe43ddaf397e7e93d84e63e7cc498963535b3f0b",
+    "source_docstring": "8cfbc66235aa762ddf4af723b7de728ca782004a91e7218547994cd74657f423"
+  },
   "en/rlsbl-secret_scan.md": {
     "content": "2ac911ea04c0ec87dfcf4efbdb5b6ac2a5aa10b2d31398b2c8bafd77b4629b41",
     "description": "a30a382988178f6abd1a5cb8e718bd51f824d3b34287b803a662da6334db9154",
