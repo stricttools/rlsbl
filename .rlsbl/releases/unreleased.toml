@@ -2,9 +2,9 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Release-flow fixes (the empty-candidate-window guard now pushes and dispatches run_all itself on stranded resumes; dev-node editable-sibling locks refresh at bump time), the changelog-edit field-wipe fix, and dev install's required --target choice."
 # Optional context explaining why these changes were made
 context = ""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
