@@ -1,5 +1,5 @@
 {
-  "version": "0.115.0",
+  "version": "0.115.1",
   "base_url": "https://rlsbl.smmh.dev",
   "search_engine": "pagefind",
   "author": {
@@ -19,7 +19,7 @@
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.115.0"
+      "version": "0.115.1"
     }
   ],
   "locales": [

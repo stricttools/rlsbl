@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.115.1
+
+The publish/CI gates never let a skipped check outrank a real verdict of the same name, and every saferm invocation states its mandatory error mode.
+
+### Fixes
+
+- **A skipped CI check no longer hides the run-all conclusion that replaced it.** When a release dispatches the CI router with `run_all=true`, the commit carries two check runs per job: the push run's paths-filtered `skipped` and the dispatched run's real conclusion. GitHub often stamps the skip last, and both gates picked it by recency -- so the release refused a candidate whose every job had run and passed. A skip now loses to any completed non-skipped conclusion of the same name, in either check suite and in any order. A job that is only ever skipped still blocks the release, and a failure in the dispatched run still blocks it.
+- **Every `saferm` deletion rlsbl performs now succeeds.** saferm's `--on-error` flag is mandatory and has no default, so every `saferm delete` rlsbl ran exited 1 without deleting anything: `release retry` left its `retry.toml` behind and dirtied the working tree for the next release, and `monorepo sync`, `monorepo cleanup`, `rename-releasable` and `scaffold`'s orphan sweep all silently failed their removals. All call sites now declare `--on-error abort`.
+
 ## 0.115.0
 
 Release-flow fixes (the empty-candidate-window guard now pushes and dispatches run_all itself on stranded resumes; dev-node editable-sibling locks refresh at bump time), the changelog-edit field-wipe fix, and dev install's required --target choice.
