@@ -1,8 +1,7 @@
 ---
 title: rlsbl.saferm
-description: "The one place rlsbl builds a ``saferm delete`` argv."
+description: "The single constructor for every saferm delete rlsbl runs, so the required --on-error flag can never be omitted and a deletion silently skipped."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 125
 ---
