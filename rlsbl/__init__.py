@@ -1076,14 +1076,16 @@ class ScrubEntireHistory:
     help="Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.",
 )
 @strictcli.choice_flag(
-    "mode", help="Which scrub mode to run", presence="required",
+    "mode", help="Which scrub mode to run: match a regex, rewrite one file, or execute a recipe TOML. Exactly one must be elected, and the elected one decides which further flags exist.",
+    presence="required",
     elect_by="member-flags", choices=[ScrubPattern, ScrubFile, ScrubRecipe],
 )
 @strictcli.choice_flag(
-    "commit-range", help="Which commits the rewrite covers", presence="required",
+    "commit-range", help="Which commits the rewrite covers: everything descended from one commit, or the entire history from the initial commit onward. Exactly one must be elected.",
+    presence="required",
     elect_by="member-flags", choices=[ScrubFromCommit, ScrubEntireHistory],
 )
-@strictcli.flag(name="reason", type=str, presence="required", help="Reason for scrubbing (used in the commit message)")
+@strictcli.flag(name="reason", type=str, presence="required", help="Why this content is being scrubbed. Recorded in the rewrite commit message and in the scrub archive, so it is the audit trail for an irreversible history rewrite.")
 @effects.handler
 def cmd_release_scrub(
     ctx,

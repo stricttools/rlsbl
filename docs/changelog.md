@@ -242,6 +242,14 @@ Use `--no-resolve` to skip hash validation for old or amended commits that may n
 
 `rlsbl changelog edit` modifies an existing entry in any JSONL file (unreleased or released) by looking it up via commit hash. Instead of appending a new entry like `add` or `amend`, it performs a partial field update on the matched entry and rewrites the file atomically. This is the correct tool when an entry already exists but has the wrong type, description, or user-facing status.
 
+The command declares itself as an update: the resource is `changelog-entry`, the write mode is sparse, `--commits` and `--id` are the two ways to identify the instance, and `--description`, `--type` and `--user-facing` are the properties. Three rules follow from that declaration rather than from anything the command checks itself:
+
+- **A property you do not supply is untouched.** That is what sparse means, and it is why none of the three carries a default.
+- **At least one property is required.** Naming an entry and changing nothing is refused before the command runs: `update "changelog-entry": at least one property is required: --description, --type, --user-facing`.
+- **`--description` and `--type` can be cleared.** Both are nullable, so `--unset-description` and `--unset-type` exist and remove the field rather than writing an empty string to it. A cleared property is a write, so it satisfies the at-least-one rule; supplying a value and its unset together is a parse error.
+
+Naming no entry at all is refused too, by the `entry-selection` constraint: at least one of `--commits`, `--id`.
+
 The following table distinguishes the four commands that interact with changelog entries and GitHub Release notes:
 
 | Command | What it does | Target file | Use case |
@@ -340,7 +348,10 @@ If an entry has the wrong type or description, use `changelog edit` to modify it
 
 ```bash
 # Find the entry by commit hash and change its type from feature to fix
-rlsbl changelog edit --commit a1b2c3d --type fix --description "Fix deploy crash when health check URL is unreachable"
+rlsbl changelog edit --commits a1b2c3d --type fix --description "Fix deploy crash when health check URL is unreachable"
+
+# Flip an entry to internal and drop the description it no longer needs
+rlsbl changelog edit --id 18c9... --no-user-facing --unset-description --unset-type
 ```
 
 ### Amending a released version

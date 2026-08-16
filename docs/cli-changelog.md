@@ -22,11 +22,11 @@ Append a structured changelog entry to the project's unreleased.jsonl file. Each
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--commits` |  | str |  |  | Comma-separated list of commit hashes to associate with this changelog entry |
-| `--description` |  | str |  |  | Human-readable description of the change, shown in the generated CHANGELOG.md |
-| `--type` |  | str |  |  | Classification of the change: feature, fix, or breaking (required if user-facing) |
-| `--user-facing` |  | bool | True |  | Mark this entry as user-facing (included in generated CHANGELOG.md output) |
-| `--auto-commit` |  | bool | True |  | Auto-commit unreleased.jsonl after appending the entry |
-| `--allow-batch` |  | bool |  |  | Auto-create an exclusion if this entry exceeds the commit batch limit |
+| `--description` |  | str |  |  | Human-readable description of the change, shown in the generated CHANGELOG.md (required unless --no-user-facing) |
+| `--type` |  | str |  |  | Classification of the change (required unless --no-user-facing) |
+| `--user-facing` |  | str |  |  | Mark this entry as user-facing, included in generated CHANGELOG.md output (the handler treats an absent flag as user-facing) |
+| `--auto-commit` |  | str |  |  | Auto-commit unreleased.jsonl after appending the entry (the handler commits when neither form is passed) |
+| `--allow-batch` |  | str |  |  | Auto-create an exclusion if this entry exceeds the commit batch limit |
 
 ## changelog generate
 
@@ -38,7 +38,7 @@ Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | bool | True |  | Auto-commit generated CHANGELOG.md and per-version .md files |
+| `--auto-commit` |  | str |  |  | Auto-commit generated CHANGELOG.md and per-version .md files (the handler commits when neither form is passed) |
 
 ## changelog amend
 
@@ -54,9 +54,9 @@ Append a changelog entry to a released version's JSONL file. Temporarily unlocks
 | `--commits` |  | str |  |  | Comma-separated commit hashes to associate with the amended changelog entry |
 | `--id` |  | str |  |  | Entry ID (ULID) to select the target entry for amendment |
 | `--description` |  | str |  |  | Human-readable description for the amended entry in CHANGELOG.md |
-| `--type` |  | str |  |  | Classification for the amended entry: feature, fix, or breaking (required if user-facing) |
-| `--user-facing` |  | bool | True |  | Mark the amended entry as user-facing (included in CHANGELOG.md output) |
-| `--validate-hashes` |  | bool | True |  | Validate commit hashes via git rev-parse before appending |
+| `--type` |  | str |  |  | Classification for the amended entry (required unless --no-user-facing) |
+| `--user-facing` |  | str |  |  | Mark the amended entry as user-facing, included in CHANGELOG.md output (the handler treats an absent flag as user-facing) |
+| `--validate-hashes` |  | str |  |  | Validate commit hashes via git rev-parse before appending (the handler validates when neither form is passed) |
 
 ## changelog edit
 
@@ -70,10 +70,10 @@ Modify an existing changelog entry in unreleased or released JSONL files. Finds 
 | --- | --- | --- | --- | --- | --- |
 | `--commits` |  | str |  |  | Comma-separated commit hashes identifying the target entry |
 | `--id` |  | str |  |  | Entry ID (ULID) identifying the target entry to edit in the JSONL file |
-| `--type` |  | str |  |  | New type value (feature, fix, breaking); also disambiguates multi-entry commits |
+| `--type` |  | str |  |  | New type value; also disambiguates a commit covered by several entries |
 | `--description` |  | str |  |  | Replacement description text for the matched changelog entry |
-| `--user-facing` |  | bool |  |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |
-| `--auto-commit` |  | bool | True |  | Automatically commit the edited JSONL changelog file to git after modification |
+| `--user-facing` |  | str |  |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |
+| `--auto-commit` |  | str |  |  | Automatically commit the edited JSONL changelog file to git after modification (the handler commits when neither form is passed) |
 
 ## changelog remap
 
@@ -86,5 +86,5 @@ Remap stale commit hashes in JSONL changelog files using a mapping of old SHAs t
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--map-file` |  | str |  |  | Path to a file of 'old_sha new_sha' lines (same format as git's post-rewrite hook) |
-| `--from-journal` |  | bool |  |  | Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) |
-| `--stdin` |  | bool |  |  | Read the old/new SHA map from stdin (for piping from git's post-rewrite hook) |
+| `--from-journal` |  | str |  |  | Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) |
+| `--stdin` |  | str |  |  | Read the old/new SHA map from stdin (for piping from git's post-rewrite hook) |

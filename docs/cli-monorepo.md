@@ -23,7 +23,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | bool | True |  | Automatically commit the generated workspace.toml configuration file to git |
+| `--auto-commit` |  | str |  |  | Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed) |
 
 ## monorepo add
 
@@ -44,7 +44,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | `--dev-only` |  | str |  |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
 | `--releasable` |  | str |  |  | Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning) |
 | `--registry-name` |  | str |  |  | Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix) |
-| `--auto-commit` |  | bool | True |  | Auto-commit workspace.toml and trigger scaffold/sync commits |
+| `--auto-commit` |  | str |  |  | Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed) |
 
 ### Arguments
 
@@ -82,7 +82,7 @@ Inline every project's CI jobs into a single generated ci-router.yml (and publis
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | bool | True |  | Auto-commit merged workflow files in .github/workflows/ |
+| `--auto-commit` |  | str |  |  | Auto-commit merged workflow files in .github/workflows/ (the handler commits when neither form is passed) |
 
 ## monorepo status
 
@@ -100,10 +100,10 @@ Check package name availability on a target registry for all projects in the mon
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str |  |  | Registry to query for name availability across all workspace projects (npm, pypi, go, or github) |
+| `--target` |  | str |  |  | Registry to query for name availability across all workspace projects |
 | `--prefix` |  | str |  |  | String to prepend to each project name before checking availability |
 | `--suffix` |  | str |  |  | String to append to each project name before checking availability |
-| `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries (default: 200) |
+| `--delay` |  | str | 200 |  | Milliseconds to wait between consecutive registry API queries |
 
 ## monorepo outdated
 
@@ -145,11 +145,11 @@ Export the monorepo dependency graph as DOT (Graphviz) or an indented text tree;
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--format` |  | str | text |  | Rendering for the dependency graph: dot (Graphviz) or text |
+| `--format` |  | str |  |  | Rendering for the dependency graph (the handler renders text when omitted) |
 | `--output` |  | str |  |  | File path to write the graph output to instead of printing to stdout |
 | `--root` |  | str |  |  | Filter to show only transitive dependencies reachable from this package |
 | `--reverse` |  | str |  |  | Filter to show only transitive reverse dependencies of this package |
-| `--depth` |  | int |  |  | Maximum number of dependency hops to traverse from the root or reverse node |
+| `--depth` |  | str |  |  | Maximum number of dependency hops to traverse from the root or reverse node |
 
 ## monorepo impact
 
@@ -161,7 +161,7 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--depth` |  | int |  |  | Maximum number of dependency hops to traverse when computing transitive impact |
+| `--depth` |  | str |  |  | Maximum number of dependency hops to traverse when computing transitive impact |
 | `--since` |  | str |  |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
 
 ## monorepo extract
@@ -187,7 +187,7 @@ Absorb an external repository as a package in the monorepo. Rewrites the source'
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--name` |  | str |  |  | Workspace project name for the absorbed package (default: basename of the destination path) |
+| `--name` |  | str |  |  | Workspace project name for the absorbed package (the basename of the destination path when omitted) |
 | `--registry-name` |  | str |  |  | Package registry identity recorded in workspace.toml (used verbatim for name checks) |
 | `--releasable` |  | str |  |  | Releasable group to assign the absorbed package to |
 

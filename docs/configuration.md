@@ -403,12 +403,14 @@ Some CLI flags override config.json keys for a single invocation, providing temp
 | `--no-tag` | `tag` | project + user | Disables ecosystem tagging for this invocation |
 | `--allow-dirty` | (none) | release only | Skips clean working tree check |
 | `--watch`/`--no-watch` | (none) | release only | Controls CI monitoring after push |
-| `--push-timeout` | `push_timeout` | release only | Push timeout in seconds for this invocation (0, the default, means use the config key, else the shipped 300s) |
-| `--ci-timeout` | `ci_timeout` | release only | CI-gate timeout in seconds for this invocation (0, the default, means use the config key, else the shipped 3600s) |
-| `--check-timeout` | `check_timeout` | release only | Check-subprocess timeout in seconds for this invocation, covering built-in checks, config-declared external checks and their scope guards (0, the default, means use the config key, else the shipped 900s) |
-| `--hook-timeout` | `hook_timeout` | release only | Release-hook timeout in seconds for this invocation (0, the default, means use the config key, else no timeout) |
+| `--push-timeout` | `push_timeout` | release only | Push timeout in seconds for this invocation (omit it and the config key applies, else the shipped 300s) |
+| `--ci-timeout` | `ci_timeout` | release only | CI-gate timeout in seconds for this invocation (omit it and the config key applies, else the shipped 3600s) |
+| `--check-timeout` | `check_timeout` | release only | Check-subprocess timeout in seconds for this invocation, covering built-in checks, config-declared external checks and their scope guards (omit it and the config key applies, else the shipped 900s) |
+| `--hook-timeout` | `hook_timeout` | release only | Release-hook timeout in seconds for this invocation (omit it and the config key applies, else no timeout) |
 
 Global flags `--dry-run`, `--approve-consequential`, and `--quiet` are runtime-only and have no `config.json` equivalent. They affect the current invocation but are never persisted to configuration.
+
+Each timeout flag is `presence="optional"`: absence arrives at the handler AS absence, so there is no sentinel value to reserve and a number you pass is the number that applies.
 
 Timeouts are never read from the environment. `RLSBL_PUSH_TIMEOUT`, `RLSBL_CHECK_TIMEOUT`, `RLSBL_HOOK_TIMEOUT`, `RLSBL_BUILD_TIMEOUT`, and `RLSBL_BUILD_TIMEOUT_<TARGET>` were removed: a timeout is declared in `.rlsbl/config.json` or passed explicitly on the command line, never picked up from ambient environment state.
 

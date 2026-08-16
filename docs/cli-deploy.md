@@ -23,4 +23,4 @@ Run the configured deployment pipeline for the project. Supports named deploy ta
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `target_name` | no | Named deploy target from the project's deploy configuration to execute |
+| `target_name` | yes | Named deploy target from the project's deploy configuration to execute |

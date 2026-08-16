@@ -134,6 +134,7 @@ order: 90
 - [rlsbl.releasable_migration](../rlsbl-releasable_migration/)
 - [rlsbl.release_file](../rlsbl-release_file/)
 - [rlsbl.resolved_target](../rlsbl-resolved_target/)
+- [rlsbl.saferm](../rlsbl-saferm/)
 - [rlsbl.secret_scan](../rlsbl-secret_scan/)
 - [rlsbl.snapshot](../rlsbl-snapshot/)
 - [rlsbl.strictcli_detect](../rlsbl-strictcli_detect/)

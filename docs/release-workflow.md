@@ -381,7 +381,12 @@ The command:
 7. Force-pushes the branch and affected tags, each with an explicit `--force-with-lease` expectation captured from the actual remote (`git ls-remote`) before the rewrite. safegit's `pre_rewrite_remotes` (the local tracking snapshot) is only cross-checked informationally — it may be stale and is never the lease authority.
 8. Recreates GitHub Releases for affected tags with updated changelog notes
 
-Flags: `--pattern`, `--file`, or `--recipe` (what to scrub), `--replace` or `--mangle` (match-mode replacement strategy; both require `--pattern`), `--reason` (required, appears in commit message), `--from-commit` or `--entire-history` (scope; file mode requires `--from-commit`).
+The command carries two selectors, each electing exactly one of its members, and the framework -- not the command -- refuses a wrong combination:
+
+- **mode**: `--pattern <re>`, `--file <path>`, or `--recipe <toml>`. Naming none of them, or two, is a parse error.
+- **commit-range**: `--from-commit <sha>` or `--entire-history`. Same rule. (File mode still requires `--from-commit`: safegit's `scrub file` has no whole-history form.)
+
+`--replace` and `--mangle` are the match-mode replacement strategy, and they live **inside** the `--pattern` scope: they exist only while match mode is elected. Passing one under `--file` or `--recipe` is refused with the sentence naming both sides — `flag '--replace' is only valid under '--pattern', but '--file' was elected` — rather than being accepted and ignored. `--reason` is required and appears in the commit message.
 
 Error recovery: if the command fails partway, `scrub-result.json` preserves the safegit output at `.rlsbl/releases/scrub-result.json` (for releasable releases: `.rlsbl-monorepo/releasables/<name>/releases/scrub-result.json`). Re-running the command resumes from the last completed step without re-running safegit.
 

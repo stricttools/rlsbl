@@ -24,4 +24,4 @@ Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass o
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `sha` | no | Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted) |
+| `sha` | yes | Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted) |

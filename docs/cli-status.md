@@ -18,4 +18,4 @@ Display the current project version, branch, last release tag, unreleased commit
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Target a specific registry (auto-detected if omitted) |
-| `--registry` |  | bool |  |  | Query the package registry for the latest published version |
+| `--registry` |  | str |  |  | Query the package registry for the latest published version |

@@ -18,7 +18,7 @@ Generate or update CI/CD workflows, git hooks, changelog, and license files. Saf
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | str |  |  | Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one. |
-| `--publish-mode` |  | str |  |  | Publish mode: "ci" to publish via CI pipelines, or "none" to suppress publishing. Required for private repos; public repos default to "ci". |
-| `--auto-commit` |  | bool | True |  | Auto-commit scaffolded files after writing them to disk |
-| `--skip-shared` |  | bool |  |  | Skip processing of shared workflow templates across targets |
-| `--auto-tag` |  | bool | True |  | Add or update the rlsbl GitHub topic tag on this invocation |
+| `--publish-mode` |  | str |  |  | Publish mode. Required for private repos; when omitted, public repos are scaffolded as "ci". |
+| `--auto-commit` |  | str |  |  | Auto-commit scaffolded files after writing them to disk (the handler commits when neither --auto-commit nor --no-auto-commit is passed) |
+| `--skip-shared` |  | str |  |  | Skip processing of shared workflow templates across targets |
+| `--auto-tag` |  | str |  |  | Add or update the rlsbl GitHub topic tag on this invocation (the handler tags when neither --auto-tag nor --no-auto-tag is passed) |

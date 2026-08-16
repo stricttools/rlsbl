@@ -17,4 +17,4 @@ Search GitHub for repositories tagged with the rlsbl topic and list them. Use --
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--mine` |  | bool |  |  | Filter results to only show repositories owned by the authenticated GitHub user |
+| `--mine` |  | str |  |  | Filter results to only show repositories owned by the authenticated GitHub user |

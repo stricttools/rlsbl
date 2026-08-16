@@ -21,11 +21,11 @@ Install the project locally for development by running each detected target's ow
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--all` |  | bool |  |  | In monorepo mode, install every project in the workspace |
+| `--all` |  | str |  |  | In monorepo mode, install every project in the workspace |
 | `--include` |  | str |  |  | In monorepo mode, comma-separated project names to include |
 | `--exclude` |  | str |  |  | In monorepo mode, comma-separated project names to exclude |
-| `--uninstall` |  | bool |  |  | Reverse a previous dev install (where supported by the target) |
-| `--target` |  | str |  |  | Install mode: 'global' installs as a global tool/symlink, 'venv' installs into the project's local environment only (e.g. uv sync, npm install). Required -- there is no default mode. |
+| `--uninstall` |  | str |  |  | Reverse a previous dev install (where supported by the target) |
+| `--target` |  | str |  |  | Install mode. Required -- there is no default mode. |
 
 ## dev sync
 

@@ -1,42 +1,64 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "defaults": {
-    "schema_version": 1,
+    "schema_version": 2,
     "app": {
       "env_prefix": null,
       "config": false,
+      "config_format": "json",
+      "config_path": null,
+      "config_conflict_mode": "cli-wins",
+      "proc_observe_allowlist": [],
       "global_flags": [],
       "commands": {},
       "groups": {},
       "deprecated": {},
-      "tag_contracts": {}
+      "tag_contracts": {},
+      "checks": {},
+      "config_fields": {},
+      "infra": {}
     },
     "flag": {
       "short": null,
-      "default": null,
       "env": null,
-      "choices": null,
-      "repeatable": false,
-      "unique": false,
       "env_separator": null,
+      "prefixed": true,
+      "choices": null,
+      "elect_by": null,
+      "unique": false,
+      "conflict_mode": null,
       "negatable": null,
-      "hidden": false
+      "nullable": false
     },
     "arg": {
-      "type": "str",
-      "required": true,
-      "default": null,
       "variadic": false,
       "choices": null
     },
+    "choice": {
+      "flags": []
+    },
+    "choice_record": {
+      "help": null
+    },
     "command": {
+      "consequential": false,
+      "dry_run_supported": true,
+      "dry_run_unsupported_reason": null,
+      "update_of": null,
+      "write_mode": null,
+      "payload_schema": null,
+      "owns_stdout": false,
       "passthrough": false,
       "flags": [],
+      "flag_sets": [],
       "args": [],
       "tags": [],
       "constraints": [],
       "hidden": false,
-      "interactive": false
+      "interactive": false,
+      "config_fields": [],
+      "grants": [],
+      "forwarding": null
     },
     "group": {
       "commands": {},
@@ -44,6 +66,18 @@
       "deprecated": {},
       "tags": [],
       "hidden": false
+    },
+    "config_field": {
+      "default": null,
+      "bound_commands": []
+    },
+    "check": {
+      "scope": null
+    },
+    "infra": {
+      "roots": [],
+      "handshakes": [],
+      "connections": []
     }
   },
   "project_id": "rlsbl",
@@ -321,34 +355,49 @@
       "flags": [
         {
           "name": "all",
-          "type": "bool",
           "help": "Run every registered check regardless of tag or name filters",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
           "default": false,
           "negatable": true
         },
         {
           "name": "tag",
-          "type": "str",
           "help": "Tag DSL expression to select checks (e.g. 'changelog & !quality')",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
           "default": ""
         },
         {
           "name": "name",
-          "type": "str",
           "help": "Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*')",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
           "default": ""
         },
         {
           "name": "list",
-          "type": "bool",
           "help": "List all registered checks with their tags and exit without running",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
           "default": false,
           "negatable": true
         },
         {
           "name": "ignore-warnings",
-          "type": "bool",
           "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
           "default": false,
           "negatable": true
         }
@@ -467,14 +516,19 @@
       "flags": [
         {
           "name": "target",
-          "type": "str",
           "help": "Target a specific registry (auto-detected if omitted)",
-          "default": ""
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         },
         {
           "name": "registry",
-          "type": "bool",
           "help": "Query the package registry for the latest published version",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
           "default": false,
           "negatable": true
         }
@@ -487,35 +541,59 @@
       "flags": [
         {
           "name": "target",
-          "type": "str",
           "help": "Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one.",
-          "default": ""
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         },
         {
           "name": "publish-mode",
-          "type": "str",
-          "help": "Publish mode: \"ci\" to publish via CI pipelines, or \"none\" to suppress publishing. Required for private repos; public repos default to \"ci\".",
-          "default": ""
+          "help": "Publish mode. Required for private repos; when omitted, public repos are scaffolded as \"ci\".",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "ci",
+              "none"
+            ]
+          },
+          "presence": "optional",
+          "choices": [
+            {
+              "value": "ci",
+              "help": "publish via the scaffolded CI pipelines"
+            },
+            {
+              "value": "none",
+              "help": "suppress publishing to public registries"
+            }
+          ]
         },
         {
           "name": "auto-commit",
-          "type": "bool",
-          "help": "Auto-commit scaffolded files after writing them to disk",
-          "default": true,
+          "help": "Auto-commit scaffolded files after writing them to disk (the handler commits when neither --auto-commit nor --no-auto-commit is passed)",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
           "negatable": true
         },
         {
           "name": "skip-shared",
-          "type": "bool",
           "help": "Skip processing of shared workflow templates across targets",
-          "default": false,
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
           "negatable": true
         },
         {
           "name": "auto-tag",
-          "type": "bool",
-          "help": "Add or update the rlsbl GitHub topic tag on this invocation",
-          "default": true,
+          "help": "Add or update the rlsbl GitHub topic tag on this invocation (the handler tags when neither --auto-tag nor --no-auto-tag is passed)",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
           "negatable": true
         }
       ]
@@ -664,16 +742,47 @@
       "flags": [
         {
           "name": "target",
-          "type": "str",
-          "help": "Registry to query for name availability (npm, pypi, go, or github); repeatable",
-          "default": [],
-          "repeatable": true,
+          "help": "Registry to query for name availability; repeatable",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "npm",
+                "pypi",
+                "go",
+                "github"
+              ]
+            }
+          },
+          "presence": "required",
+          "choices": [
+            {
+              "value": "npm",
+              "help": "the npm registry"
+            },
+            {
+              "value": "pypi",
+              "help": "the Python Package Index"
+            },
+            {
+              "value": "go",
+              "help": "the Go module proxy"
+            },
+            {
+              "value": "github",
+              "help": "GitHub repository names"
+            }
+          ],
           "unique": true
         },
         {
           "name": "delay",
-          "type": "str",
-          "help": "Milliseconds to wait between consecutive registry API queries (default: 200)",
+          "help": "Milliseconds to wait between consecutive registry API queries",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
           "default": "200"
         }
       ]
@@ -686,15 +795,33 @@
       "flags": [
         {
           "name": "target",
-          "type": "str",
-          "help": "Target package registry to publish the placeholder to (npm or pypi)",
-          "default": ""
+          "help": "Target package registry to publish the placeholder to",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "npm",
+              "pypi"
+            ]
+          },
+          "presence": "required",
+          "choices": [
+            {
+              "value": "npm",
+              "help": "publish the placeholder to the npm registry"
+            },
+            {
+              "value": "pypi",
+              "help": "publish the placeholder to the Python Package Index"
+            }
+          ]
         },
         {
           "name": "force-publish",
-          "type": "bool",
           "help": "Publish even when the availability check reports the name as taken or returns an ambiguous status. Distinct from the framework's --approve-consequential, which only skips the confirmation prompt.",
-          "default": false,
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
           "negatable": false
         }
       ],
@@ -713,8 +840,11 @@
       "flags": [
         {
           "name": "mine",
-          "type": "bool",
           "help": "Filter results to only show repositories owned by the authenticated GitHub user",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
           "default": false,
           "negatable": true
         }
@@ -727,16 +857,22 @@
       "flags": [
         {
           "name": "target",
-          "type": "str",
           "help": "Registry whose CI workflow to watch (auto-detected if omitted)",
-          "default": ""
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         },
         {
           "name": "run-id",
-          "type": "str",
           "help": "GitHub Actions workflow run ID to poll directly instead of searching by SHA",
-          "default": [],
-          "repeatable": true,
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
           "unique": true
         }
       ],
@@ -744,7 +880,10 @@
         {
           "name": "sha",
           "help": "Git commit SHA whose CI workflows to monitor (defaults to HEAD if omitted)",
-          "required": false
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         }
       ]
     },
@@ -856,16 +995,21 @@
       "flags": [
         {
           "name": "target",
-          "type": "str",
           "help": "Registry whose deploy pipeline to run (auto-detected if omitted)",
-          "default": ""
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         }
       ],
       "args": [
         {
           "name": "target_name",
           "help": "Named deploy target from the project's deploy configuration to execute",
-          "required": false
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         }
       ]
     },
@@ -878,9 +1022,12 @@
       "flags": [
         {
           "name": "message",
-          "type": "str",
           "help": "Commit message for the autogenerated-file commit (added with Autogenerated trailer)",
-          "short": "m"
+          "value_schema": {
+            "type": "string"
+          },
+          "short": "m",
+          "presence": "required"
         }
       ]
     }
@@ -898,57 +1045,77 @@
           "flags": [
             {
               "name": "push-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.",
-              "default": 0
+              "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "ci-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; 0 (the default) means use ci_timeout, else the shipped default.",
-              "default": 0
+              "help": "Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "check-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; 0 (the default) means use check_timeout, else the shipped default.",
-              "default": 0
+              "help": "Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "hook-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for each release hook. Overrides the hook_timeout config key; 0 (the default) means use hook_timeout, else no timeout.",
-              "default": 0
+              "help": "Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "watch",
-              "type": "bool",
               "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "required",
               "negatable": true
             },
             {
               "name": "allow-dirty",
-              "type": "bool",
               "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "required",
               "negatable": true
             },
             {
               "name": "bump",
-              "type": "str",
               "help": "Bump type: patch, minor, major, infra, prerelease. Skips the release file.",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "description",
-              "type": "str",
               "help": "Short release description summarizing the changes (required with --bump)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "preid",
-              "type": "str",
               "help": "Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ]
         },
@@ -960,32 +1127,43 @@
           "flags": [
             {
               "name": "push-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.",
-              "default": 0
+              "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "ci-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; 0 (the default) means use ci_timeout, else the shipped default.",
-              "default": 0
+              "help": "Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "check-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; 0 (the default) means use check_timeout, else the shipped default.",
-              "default": 0
+              "help": "Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "hook-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for each release hook. Overrides the hook_timeout config key; 0 (the default) means use hook_timeout, else no timeout.",
-              "default": 0
+              "help": "Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "watch",
-              "type": "bool",
               "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "required",
               "negatable": true
             }
           ]
@@ -1005,8 +1183,11 @@
           "flags": [
             {
               "name": "watch",
-              "type": "bool",
               "help": "After retry, automatically watch CI runs to completion (--no-watch to skip)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "required",
               "negatable": true
             }
           ]
@@ -1019,7 +1200,10 @@
             {
               "name": "version",
               "help": "Version whose GitHub Release notes to sync (defaults to current version)",
-              "required": false
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ]
         },
@@ -1031,15 +1215,19 @@
           "flags": [
             {
               "name": "target",
-              "type": "str",
               "help": "Target a specific registry for version detection (auto-detected if omitted)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "version",
-              "type": "str",
               "help": "Version to undo (for non-latest releases that are provably unpublished)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ]
         },
@@ -1051,21 +1239,29 @@
           "flags": [
             {
               "name": "reason",
-              "type": "str",
               "help": "Human-readable explanation of why this version is being deprecated",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "use",
-              "type": "str",
               "help": "Suggest this version as a replacement in the deprecation notice",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ],
           "args": [
             {
               "name": "version",
-              "help": "Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1)"
+              "help": "Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1077,21 +1273,29 @@
           "flags": [
             {
               "name": "reason",
-              "type": "str",
               "help": "Human-readable explanation of why this version is being yanked",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "use",
-              "type": "str",
               "help": "Suggest this version as a replacement in the yank notice",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ],
           "args": [
             {
               "name": "version",
-              "help": "Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)"
+              "help": "Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1102,77 +1306,105 @@
           "consequential": true,
           "flags": [
             {
-              "name": "replace",
-              "type": "str",
-              "help": "Match mode: literal text to substitute for each match (mutually exclusive with --mangle)",
-              "default": ""
+              "name": "mode",
+              "help": "Which scrub mode to run: match a regex, rewrite one file, or execute a recipe TOML. Exactly one must be elected, and the elected one decides which further flags exist.",
+              "presence": "required",
+              "choices": [
+                {
+                  "name": "pattern",
+                  "help": "Match mode: rewrite every occurrence of a regex throughout history",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "regex pattern to match against file contents",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    },
+                    {
+                      "name": "replace",
+                      "help": "literal text to substitute for each match (mutually exclusive with --mangle)",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "optional"
+                    },
+                    {
+                      "name": "mangle",
+                      "help": "replace matched content with random ASCII of the same length (mutually exclusive with --replace)",
+                      "value_schema": {
+                        "type": "boolean"
+                      },
+                      "presence": "optional",
+                      "negatable": false
+                    }
+                  ]
+                },
+                {
+                  "name": "file",
+                  "help": "File mode: rewrite one file throughout history",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "path of the file to rewrite throughout history; it is replaced with its current on-disk content, or removed if absent (requires --from-commit)",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                },
+                {
+                  "name": "recipe",
+                  "help": "Recipe mode: execute a scrub recipe TOML via safegit scrub run",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "path to a scrub recipe TOML file; per-operation pattern/replace/mangle live inside the recipe",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                }
+              ],
+              "elect_by": "member-flags"
             },
             {
-              "name": "mangle",
-              "type": "bool",
-              "help": "Match mode: replace matched content with random ASCII of same length (mutually exclusive with --replace)",
-              "default": false,
-              "negatable": false
+              "name": "commit-range",
+              "help": "Which commits the rewrite covers: everything descended from one commit, or the entire history from the initial commit onward. Exactly one must be elected.",
+              "presence": "required",
+              "choices": [
+                {
+                  "name": "from-commit",
+                  "help": "Rewrite from one commit onward",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "SHA of the earliest commit to rewrite (all descendants are also rewritten)",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                },
+                {
+                  "name": "entire-history",
+                  "help": "Rewrite every commit in the repository from the initial commit onward (match and recipe modes only; file mode requires --from-commit)"
+                }
+              ],
+              "elect_by": "member-flags"
             },
             {
               "name": "reason",
-              "type": "str",
-              "help": "Reason for scrubbing (required, used in commit message)",
-              "default": ""
-            },
-            {
-              "name": "pattern",
-              "type": "str",
-              "help": "Match mode: regex pattern to match against file contents (mutually exclusive with --file and --recipe)"
-            },
-            {
-              "name": "file",
-              "type": "str",
-              "help": "File mode: path of the file to rewrite throughout history; it is replaced with its current on-disk content, or removed if absent (mutually exclusive with --pattern and --recipe; requires --from-commit)"
-            },
-            {
-              "name": "recipe",
-              "type": "str",
-              "help": "Recipe mode: path to a scrub recipe TOML file executed via safegit scrub run; per-operation pattern/replace/mangle live inside the recipe (mutually exclusive with --pattern and --file)"
-            },
-            {
-              "name": "from-commit",
-              "type": "str",
-              "help": "SHA of the earliest commit to rewrite (all descendants are also rewritten)"
-            },
-            {
-              "name": "entire-history",
-              "type": "bool",
-              "help": "Rewrite every commit in the repository from the initial commit onward (match and recipe modes only; file mode requires --from-commit)",
-              "default": false,
-              "negatable": false
-            }
-          ],
-          "constraints": [
-            {
-              "type": "mutex",
-              "flags": [
-                "pattern",
-                "file",
-                "recipe"
-              ]
-            },
-            {
-              "type": "mutex",
-              "flags": [
-                "from-commit",
-                "entire-history"
-              ]
-            },
-            {
-              "type": "requires",
-              "flag": "replace",
-              "depends_on": "pattern"
-            },
-            {
-              "type": "requires",
-              "flag": "mangle",
-              "depends_on": "pattern"
+              "help": "Why this content is being scrubbed. Recorded in the rewrite commit message and in the scrub archive, so it is the audit trail for an irreversible history rewrite.",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1184,9 +1416,11 @@
           "flags": [
             {
               "name": "push-timeout",
-              "type": "int",
-              "help": "Timeout in seconds for each tag push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.",
-              "default": 0
+              "help": "Timeout in seconds for each tag push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             }
           ]
         }
@@ -1203,41 +1437,72 @@
           "flags": [
             {
               "name": "commits",
-              "type": "str",
               "help": "Comma-separated list of commit hashes to associate with this changelog entry",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             },
             {
               "name": "description",
-              "type": "str",
-              "help": "Human-readable description of the change, shown in the generated CHANGELOG.md",
-              "default": ""
+              "help": "Human-readable description of the change, shown in the generated CHANGELOG.md (required unless --no-user-facing)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "type",
-              "type": "str",
-              "help": "Classification of the change: feature, fix, or breaking (required if user-facing)",
-              "default": ""
+              "help": "Classification of the change (required unless --no-user-facing)",
+              "value_schema": {
+                "type": "string",
+                "enum": [
+                  "feature",
+                  "fix",
+                  "breaking"
+                ]
+              },
+              "presence": "optional",
+              "choices": [
+                {
+                  "value": "feature",
+                  "help": "a new capability users can reach"
+                },
+                {
+                  "value": "fix",
+                  "help": "a user-visible defect that no longer happens"
+                },
+                {
+                  "value": "breaking",
+                  "help": "a change that requires action from users"
+                }
+              ]
             },
             {
               "name": "user-facing",
-              "type": "bool",
-              "help": "Mark this entry as user-facing (included in generated CHANGELOG.md output)",
-              "default": true,
+              "help": "Mark this entry as user-facing, included in generated CHANGELOG.md output (the handler treats an absent flag as user-facing)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             },
             {
               "name": "auto-commit",
-              "type": "bool",
-              "help": "Auto-commit unreleased.jsonl after appending the entry",
-              "default": true,
+              "help": "Auto-commit unreleased.jsonl after appending the entry (the handler commits when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             },
             {
               "name": "allow-batch",
-              "type": "bool",
               "help": "Auto-create an exclusion if this entry exceeds the commit batch limit",
-              "default": false,
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             }
           ]
@@ -1249,9 +1514,11 @@
           "flags": [
             {
               "name": "auto-commit",
-              "type": "bool",
-              "help": "Auto-commit generated CHANGELOG.md and per-version .md files",
-              "default": true,
+              "help": "Auto-commit generated CHANGELOG.md and per-version .md files (the handler commits when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             }
           ]
@@ -1263,44 +1530,79 @@
           "flags": [
             {
               "name": "version",
-              "type": "str",
-              "help": "Semver of the already-released version whose JSONL to amend (e.g. 0.39.0)"
+              "help": "Semver of the already-released version whose JSONL to amend (e.g. 0.39.0)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             },
             {
               "name": "commits",
-              "type": "str",
-              "help": "Comma-separated commit hashes to associate with the amended changelog entry"
+              "help": "Comma-separated commit hashes to associate with the amended changelog entry",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             },
             {
               "name": "id",
-              "type": "str",
               "help": "Entry ID (ULID) to select the target entry for amendment",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "description",
-              "type": "str",
               "help": "Human-readable description for the amended entry in CHANGELOG.md",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "type",
-              "type": "str",
-              "help": "Classification for the amended entry: feature, fix, or breaking (required if user-facing)",
-              "default": ""
+              "help": "Classification for the amended entry (required unless --no-user-facing)",
+              "value_schema": {
+                "type": "string",
+                "enum": [
+                  "feature",
+                  "fix",
+                  "breaking"
+                ]
+              },
+              "presence": "optional",
+              "choices": [
+                {
+                  "value": "feature",
+                  "help": "a new capability users can reach"
+                },
+                {
+                  "value": "fix",
+                  "help": "a user-visible defect that no longer happens"
+                },
+                {
+                  "value": "breaking",
+                  "help": "a change that requires action from users"
+                }
+              ]
             },
             {
               "name": "user-facing",
-              "type": "bool",
-              "help": "Mark the amended entry as user-facing (included in CHANGELOG.md output)",
-              "default": true,
+              "help": "Mark the amended entry as user-facing, included in CHANGELOG.md output (the handler treats an absent flag as user-facing)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             },
             {
               "name": "validate-hashes",
-              "type": "bool",
-              "help": "Validate commit hashes via git rev-parse before appending",
-              "default": true,
+              "help": "Validate commit hashes via git rev-parse before appending (the handler validates when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             }
           ]
@@ -1309,43 +1611,108 @@
           "name": "edit",
           "help": "Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash or entry ID, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.",
           "effect": "mutating",
+          "update_of": {
+            "resource": "changelog-entry",
+            "identity": [
+              "commits",
+              "id"
+            ],
+            "properties": [
+              "description",
+              "type",
+              "user-facing"
+            ]
+          },
+          "write_mode": "sparse",
           "flags": [
             {
               "name": "commits",
-              "type": "str",
               "help": "Comma-separated commit hashes identifying the target entry",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "id",
-              "type": "str",
               "help": "Entry ID (ULID) identifying the target entry to edit in the JSONL file",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "type",
-              "type": "str",
-              "help": "New type value (feature, fix, breaking); also disambiguates multi-entry commits",
-              "default": ""
+              "help": "New type value; also disambiguates a commit covered by several entries",
+              "value_schema": {
+                "type": "string",
+                "enum": [
+                  "feature",
+                  "fix",
+                  "breaking"
+                ]
+              },
+              "presence": "optional",
+              "choices": [
+                {
+                  "value": "feature",
+                  "help": "a new capability users can reach"
+                },
+                {
+                  "value": "fix",
+                  "help": "a user-visible defect that no longer happens"
+                },
+                {
+                  "value": "breaking",
+                  "help": "a change that requires action from users"
+                }
+              ],
+              "nullable": true
             },
             {
               "name": "description",
-              "type": "str",
               "help": "Replacement description text for the matched changelog entry",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "nullable": true
             },
             {
               "name": "user-facing",
-              "type": "bool",
               "help": "Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             },
             {
               "name": "auto-commit",
-              "type": "bool",
-              "help": "Automatically commit the edited JSONL changelog file to git after modification",
-              "default": true,
+              "help": "Automatically commit the edited JSONL changelog file to git after modification (the handler commits when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
+            }
+          ],
+          "constraints": [
+            {
+              "type": "at_least_one",
+              "name": "entry-selection",
+              "members": [
+                {
+                  "kind": "flag",
+                  "name": "commits",
+                  "when": "present"
+                },
+                {
+                  "kind": "flag",
+                  "name": "id",
+                  "when": "present"
+                }
+              ]
             }
           ]
         },
@@ -1356,23 +1723,52 @@
           "flags": [
             {
               "name": "map-file",
-              "type": "str",
               "help": "Path to a file of 'old_sha new_sha' lines (same format as git's post-rewrite hook)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "from-journal",
-              "type": "bool",
               "help": "Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl)",
-              "default": false,
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             },
             {
               "name": "stdin",
-              "type": "bool",
               "help": "Read the old/new SHA map from stdin (for piping from git's post-rewrite hook)",
-              "default": false,
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
+            }
+          ],
+          "constraints": [
+            {
+              "type": "at_least_one",
+              "name": "map-source",
+              "members": [
+                {
+                  "kind": "flag",
+                  "name": "map-file",
+                  "when": "non_empty"
+                },
+                {
+                  "kind": "flag",
+                  "name": "from-journal",
+                  "when": "true"
+                },
+                {
+                  "kind": "flag",
+                  "name": "stdin",
+                  "when": "true"
+                }
+              ]
             }
           ]
         }
@@ -1391,9 +1787,11 @@
           "flags": [
             {
               "name": "auto-commit",
-              "type": "bool",
-              "help": "Automatically commit the generated workspace.toml configuration file to git",
-              "default": true,
+              "help": "Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             }
           ]
@@ -1405,70 +1803,94 @@
           "flags": [
             {
               "name": "name",
-              "type": "str",
               "help": "Display name for the project in workspace.toml (defaults to directory name)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "target",
-              "type": "str",
               "help": "Registry this project publishes to (e.g. npm, pypi, go)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "watch",
-              "type": "str",
               "help": "Comma-separated glob patterns for change detection in CI workflows",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "subtree-remote",
-              "type": "str",
               "help": "Git remote URL for split-publishing this project as a standalone repo",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "depends-on",
-              "type": "str",
               "help": "Comma-separated names of workspace projects this project depends on",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "library",
-              "type": "str",
               "help": "Mark as a shared library consumed by other workspace projects (true/false)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "dev-only",
-              "type": "str",
               "help": "Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "releasable",
-              "type": "str",
               "help": "Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "registry-name",
-              "type": "str",
               "help": "Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "auto-commit",
-              "type": "bool",
-              "help": "Auto-commit workspace.toml and trigger scaffold/sync commits",
-              "default": true,
+              "help": "Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             }
           ],
           "args": [
             {
               "name": "path",
-              "help": "Relative path from the repo root to the project directory to register"
+              "help": "Relative path from the repo root to the project directory to register",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1481,7 +1903,11 @@
           "args": [
             {
               "name": "path",
-              "help": "Relative path from the repo root of the project to unregister from workspace.toml"
+              "help": "Relative path from the repo root of the project to unregister from workspace.toml",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1497,9 +1923,11 @@
           "flags": [
             {
               "name": "auto-commit",
-              "type": "bool",
-              "help": "Auto-commit merged workflow files in .github/workflows/",
-              "default": true,
+              "help": "Auto-commit merged workflow files in .github/workflows/ (the handler commits when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             }
           ]
@@ -1516,25 +1944,59 @@
           "flags": [
             {
               "name": "target",
-              "type": "str",
-              "help": "Registry to query for name availability across all workspace projects (npm, pypi, go, or github)"
+              "help": "Registry to query for name availability across all workspace projects",
+              "value_schema": {
+                "type": "string",
+                "enum": [
+                  "npm",
+                  "pypi",
+                  "go",
+                  "github"
+                ]
+              },
+              "presence": "required",
+              "choices": [
+                {
+                  "value": "npm",
+                  "help": "the npm registry"
+                },
+                {
+                  "value": "pypi",
+                  "help": "the Python Package Index"
+                },
+                {
+                  "value": "go",
+                  "help": "the Go module proxy"
+                },
+                {
+                  "value": "github",
+                  "help": "GitHub repository names"
+                }
+              ]
             },
             {
               "name": "prefix",
-              "type": "str",
               "help": "String to prepend to each project name before checking availability",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "suffix",
-              "type": "str",
               "help": "String to append to each project name before checking availability",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "delay",
-              "type": "str",
-              "help": "Milliseconds to wait between consecutive registry API queries (default: 200)",
+              "help": "Milliseconds to wait between consecutive registry API queries",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "default",
               "default": "200"
             }
           ]
@@ -1562,7 +2024,11 @@
           "args": [
             {
               "name": "project",
-              "help": "Name of the workspace project to split and push as a standalone mirror repo"
+              "help": "Name of the workspace project to split and push as a standalone mirror repo",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1669,32 +2135,57 @@
           "flags": [
             {
               "name": "format",
-              "type": "str",
-              "help": "Rendering for the dependency graph: dot (Graphviz) or text",
-              "default": "text"
+              "help": "Rendering for the dependency graph (the handler renders text when omitted)",
+              "value_schema": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "dot"
+                ]
+              },
+              "presence": "optional",
+              "choices": [
+                {
+                  "value": "text",
+                  "help": "an indented text tree"
+                },
+                {
+                  "value": "dot",
+                  "help": "a Graphviz DOT document"
+                }
+              ]
             },
             {
               "name": "output",
-              "type": "str",
               "help": "File path to write the graph output to instead of printing to stdout",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "root",
-              "type": "str",
               "help": "Filter to show only transitive dependencies reachable from this package",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "reverse",
-              "type": "str",
               "help": "Filter to show only transitive reverse dependencies of this package",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "depth",
-              "type": "int",
-              "help": "Maximum number of dependency hops to traverse from the root or reverse node"
+              "help": "Maximum number of dependency hops to traverse from the root or reverse node",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             }
           ]
         },
@@ -1745,14 +2236,19 @@
           "flags": [
             {
               "name": "depth",
-              "type": "int",
-              "help": "Maximum number of dependency hops to traverse when computing transitive impact"
+              "help": "Maximum number of dependency hops to traverse when computing transitive impact",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
               "name": "since",
-              "type": "str",
               "help": "Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ]
         },
@@ -1763,11 +2259,19 @@
           "args": [
             {
               "name": "package_name",
-              "help": "Name of the package as defined in workspace.toml to extract into a standalone repo"
+              "help": "Name of the package as defined in workspace.toml to extract into a standalone repo",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             },
             {
               "name": "target_path",
-              "help": "Filesystem path where the new standalone repository will be created"
+              "help": "Filesystem path where the new standalone repository will be created",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1779,31 +2283,45 @@
           "flags": [
             {
               "name": "name",
-              "type": "str",
-              "help": "Workspace project name for the absorbed package (default: basename of the destination path)",
-              "default": ""
+              "help": "Workspace project name for the absorbed package (the basename of the destination path when omitted)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "registry-name",
-              "type": "str",
               "help": "Package registry identity recorded in workspace.toml (used verbatim for name checks)",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "releasable",
-              "type": "str",
               "help": "Releasable group to assign the absorbed package to",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ],
           "args": [
             {
               "name": "source_repo",
-              "help": "Filesystem path to the external git repository to absorb"
+              "help": "Filesystem path to the external git repository to absorb",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             },
             {
               "name": "dest_path",
-              "help": "Destination directory (and workspace path) the source repo's history is rewritten under"
+              "help": "Destination directory (and workspace path) the source repo's history is rewritten under",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1814,11 +2332,19 @@
           "args": [
             {
               "name": "releasable_name",
-              "help": "Name of the releasable group in workspace.toml to extract"
+              "help": "Name of the releasable group in workspace.toml to extract",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             },
             {
               "name": "target_path",
-              "help": "Filesystem path where the new repository will be created"
+              "help": "Filesystem path where the new repository will be created",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1834,7 +2360,11 @@
           "args": [
             {
               "name": "releasable_name",
-              "help": "Name of the releasable group in workspace.toml to migrate"
+              "help": "Name of the releasable group in workspace.toml to migrate",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         },
@@ -1845,11 +2375,19 @@
           "args": [
             {
               "name": "old_name",
-              "help": "Current name of the releasable group in workspace.toml"
+              "help": "Current name of the releasable group in workspace.toml",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             },
             {
               "name": "new_name",
-              "help": "New name for the releasable group in workspace.toml and state directories"
+              "help": "New name for the releasable group in workspace.toml and state directories",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
           ]
         }
@@ -1867,38 +2405,52 @@
               "flags": [
                 {
                   "name": "push-timeout",
-                  "type": "int",
-                  "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; 0 (the default) means use push_timeout, else the shipped default.",
-                  "default": 0
+                  "help": "Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.",
+                  "value_schema": {
+                    "type": "integer"
+                  },
+                  "presence": "optional"
                 },
                 {
                   "name": "ci-timeout",
-                  "type": "int",
-                  "help": "Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; 0 (the default) means use ci_timeout, else the shipped default.",
-                  "default": 0
+                  "help": "Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default.",
+                  "value_schema": {
+                    "type": "integer"
+                  },
+                  "presence": "optional"
                 },
                 {
                   "name": "check-timeout",
-                  "type": "int",
-                  "help": "Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; 0 (the default) means use check_timeout, else the shipped default.",
-                  "default": 0
+                  "help": "Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default.",
+                  "value_schema": {
+                    "type": "integer"
+                  },
+                  "presence": "optional"
                 },
                 {
                   "name": "hook-timeout",
-                  "type": "int",
-                  "help": "Timeout in seconds for each release hook. Overrides the hook_timeout config key; 0 (the default) means use hook_timeout, else no timeout.",
-                  "default": 0
+                  "help": "Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout.",
+                  "value_schema": {
+                    "type": "integer"
+                  },
+                  "presence": "optional"
                 },
                 {
                   "name": "watch",
-                  "type": "bool",
                   "help": "After batch release, automatically watch CI runs to completion (--no-watch to skip)",
+                  "value_schema": {
+                    "type": "boolean"
+                  },
+                  "presence": "required",
                   "negatable": true
                 },
                 {
                   "name": "allow-dirty",
-                  "type": "bool",
                   "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
+                  "value_schema": {
+                    "type": "boolean"
+                  },
+                  "presence": "required",
                   "negatable": true
                 }
               ]
@@ -1912,9 +2464,11 @@
               "flags": [
                 {
                   "name": "packages",
-                  "type": "str",
-                  "help": "Comma-separated package names to include (default: all)",
-                  "default": ""
+                  "help": "Comma-separated package names to include (every package when omitted)",
+                  "value_schema": {
+                    "type": "string"
+                  },
+                  "presence": "optional"
                 }
               ]
             },
@@ -1938,37 +2492,58 @@
           "flags": [
             {
               "name": "all",
-              "type": "bool",
               "help": "In monorepo mode, install every project in the workspace",
-              "default": false,
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             },
             {
               "name": "include",
-              "type": "str",
               "help": "In monorepo mode, comma-separated project names to include",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "exclude",
-              "type": "str",
               "help": "In monorepo mode, comma-separated project names to exclude",
-              "default": ""
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
               "name": "uninstall",
-              "type": "bool",
               "help": "Reverse a previous dev install (where supported by the target)",
-              "default": false,
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
               "negatable": true
             },
             {
               "name": "target",
-              "type": "str",
-              "help": "Install mode: 'global' installs as a global tool/symlink, 'venv' installs into the project's local environment only (e.g. uv sync, npm install). Required -- there is no default mode.",
+              "help": "Install mode. Required -- there is no default mode.",
+              "value_schema": {
+                "type": "string",
+                "enum": [
+                  "global",
+                  "venv"
+                ]
+              },
+              "presence": "required",
               "choices": [
-                "global",
-                "venv"
+                {
+                  "value": "global",
+                  "help": "install as a global tool or symlink (uv tool install -e, npm link, go install, ...)"
+                },
+                {
+                  "value": "venv",
+                  "help": "install into the project's own local environment only (uv sync, npm install, ...)"
+                }
               ]
             }
           ]
@@ -1987,122 +2562,6 @@
     }
   },
   "checks": {
-    "lock": {
-      "tags": [
-        "project"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "version-consistency": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "name-consistency": {
-      "tags": [
-        "project"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "license-consistency": {
-      "tags": [
-        "project"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "description-consistency": {
-      "tags": [
-        "project"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "private-hook-stale": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "config-schema": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "license-file": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "local-tag": {
-      "tags": [
-        "release"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "version-consistency"
-      ]
-    },
-    "remote-tag": {
-      "tags": [
-        "release"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": false,
-      "needs_network": true,
-      "depends_on": [
-        "local-tag"
-      ]
-    },
-    "github-release": {
-      "tags": [
-        "release"
-      ],
-      "severity": "error",
-      "fast": false,
-      "pure": false,
-      "needs_network": true,
-      "depends_on": [
-        "remote-tag"
-      ]
-    },
     "branch-sync": {
       "tags": [
         "release"
@@ -2111,100 +2570,6 @@
       "fast": true,
       "pure": false,
       "needs_network": true,
-      "depends_on": []
-    },
-    "changelog-entry": {
-      "tags": [
-        "changelog"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "version-consistency"
-      ]
-    },
-    "library-lint": {
-      "tags": [
-        "quality",
-        "preflight"
-      ],
-      "severity": "error",
-      "fast": false,
-      "pure": false,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace:library"
-    },
-    "changelog-hashes": {
-      "tags": [
-        "changelog",
-        "preflight-changelog"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "changelog-range": {
-      "tags": [
-        "changelog",
-        "preflight-changelog"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "changelog-hashes"
-      ]
-    },
-    "changelog-coverage": {
-      "tags": [
-        "changelog",
-        "preflight-changelog"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "changelog-hashes"
-      ]
-    },
-    "changelog-orphans": {
-      "tags": [
-        "changelog",
-        "preflight-changelog"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "changelog-schema": {
-      "tags": [
-        "changelog",
-        "preflight-changelog"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "changelog-user-facing": {
-      "tags": [
-        "changelog",
-        "preflight-changelog"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
       "depends_on": []
     },
     "changelog-batch-commits": {
@@ -2229,6 +2594,31 @@
       "needs_network": false,
       "depends_on": []
     },
+    "changelog-coverage": {
+      "tags": [
+        "changelog",
+        "preflight-changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "changelog-hashes"
+      ]
+    },
+    "changelog-entry": {
+      "tags": [
+        "changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "version-consistency"
+      ]
+    },
     "changelog-format-version": {
       "tags": [
         "changelog"
@@ -2250,155 +2640,64 @@
       "needs_network": false,
       "depends_on": []
     },
-    "workspace-ci-router": {
+    "changelog-hashes": {
       "tags": [
-        "workspace"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
+      "depends_on": []
     },
-    "workspace-ci-synced": {
+    "changelog-orphans": {
       "tags": [
-        "workspace"
+        "changelog",
+        "preflight-changelog"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "changelog-range": {
+      "tags": [
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
       "pure": true,
       "needs_network": false,
       "depends_on": [
-        "workspace-ci-router"
-      ],
-      "scope": "workspace:non_dev_node"
+        "changelog-hashes"
+      ]
     },
-    "workspace-targets": {
+    "changelog-schema": {
       "tags": [
-        "workspace"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "workspace-unregistered": {
-      "tags": [
-        "workspace"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "error",
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
+      "depends_on": []
     },
-    "workspace-stale-entries": {
+    "changelog-user-facing": {
       "tags": [
-        "workspace"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "dev-only-boundary": {
-      "tags": [
-        "workspace"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "unversioned-boundary": {
-      "tags": [
-        "workspace"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "dead-workspace-packages": {
-      "tags": [
-        "workspace"
+        "changelog",
+        "preflight-changelog"
       ],
       "severity": "warn",
-      "fast": false,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "subtree-remote-reachable": {
-      "tags": [
-        "workspace"
-      ],
-      "severity": "error",
-      "fast": false,
-      "pure": false,
-      "needs_network": true,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "workspace-unbuildable": {
-      "tags": [
-        "workspace"
-      ],
-      "severity": "error",
-      "fast": false,
-      "pure": false,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "layers-violations": {
-      "tags": [],
-      "severity": "error",
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace:non_dev_only"
+      "depends_on": []
     },
-    "deps-unused": {
-      "tags": [],
-      "severity": "error",
-      "fast": false,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "deps-undeclared": {
-      "tags": [],
-      "severity": "error",
-      "fast": false,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "deps-stale": {
-      "tags": [],
-      "severity": "error",
-      "fast": false,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "deps-runtime-test-only": {
+    "circular-deps": {
       "tags": [
         "quality"
       ],
@@ -2406,19 +2705,27 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
+      "depends_on": []
     },
-    "deps-dev-in-lib": {
+    "config-schema": {
       "tags": [
-        "quality"
+        "project"
       ],
       "severity": "error",
-      "fast": false,
+      "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
+      "depends_on": []
+    },
+    "cross-repo-path-sources": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
     },
     "dead-modules": {
       "tags": [
@@ -2440,7 +2747,42 @@
       "needs_network": false,
       "depends_on": []
     },
-    "circular-deps": {
+    "dead-workspace-packages": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "warn",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "dep-floors": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
+    },
+    "deps-dev-in-lib": {
+      "tags": [
+        "quality"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "deps-runtime-test-only": {
       "tags": [
         "quality"
       ],
@@ -2448,11 +2790,61 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "deps-stale": {
+      "tags": [],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "deps-undeclared": {
+      "tags": [],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "deps-unused": {
+      "tags": [],
+      "severity": "error",
+      "fast": false,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "description-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
       "depends_on": []
     },
-    "scaffold-unreplaced-vars": {
+    "dev-only-boundary": {
       "tags": [
-        "quality"
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "dev-overlay-drift": {
+      "tags": [
+        "project",
+        "preflight"
       ],
       "severity": "error",
       "fast": true,
@@ -2460,31 +2852,9 @@
       "needs_network": false,
       "depends_on": []
     },
-    "ruff-lint": {
+    "dunder-version-missing": {
       "tags": [
-        "quality"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": false,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "lint": {
-      "tags": [
-        "quality",
-        "preflight"
-      ],
-      "severity": "error",
-      "fast": false,
-      "pure": false,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "lint-scope-guard": {
-      "tags": [
-        "quality",
-        "preflight"
+        "project"
       ],
       "severity": "error",
       "fast": true,
@@ -2514,7 +2884,71 @@
       "needs_network": false,
       "depends_on": []
     },
-    "type-check": {
+    "github-release": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [
+        "remote-tag"
+      ]
+    },
+    "go-companion-tags": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "layers-violations": {
+      "tags": [],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace:non_dev_only"
+    },
+    "library-lint": {
+      "tags": [
+        "quality",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace:library"
+    },
+    "license-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "license-file": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "lint": {
       "tags": [
         "quality",
         "preflight"
@@ -2525,7 +2959,7 @@
       "needs_network": false,
       "depends_on": []
     },
-    "type-check-scope-guard": {
+    "lint-scope-guard": {
       "tags": [
         "quality",
         "preflight"
@@ -2536,11 +2970,67 @@
       "needs_network": false,
       "depends_on": []
     },
-    "publish-mode-workflow": {
+    "local-tag": {
+      "tags": [
+        "release"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "version-consistency"
+      ]
+    },
+    "lock": {
       "tags": [
         "project"
       ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "maven-central-metadata": {
+      "tags": [
+        "quality",
+        "maven",
+        "preflight"
+      ],
       "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "member-pytest-config": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace:non_dev_node"
+    },
+    "mixed-tag-schemes": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "name-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "warn",
       "fast": true,
       "pure": true,
       "needs_network": false,
@@ -2549,81 +3039,6 @@
     "npm-private-mismatch": {
       "tags": [
         "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "target-version-readable": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "dunder-version-missing": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "selfdoc-version-drift": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "scaffold-conflicts": {
-      "tags": [
-        "project",
-        "prepush",
-        "release"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "cross-repo-path-sources": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
-    },
-    "requires-services": {
-      "tags": [
-        "project"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "config-schema"
-      ]
-    },
-    "dev-overlay-drift": {
-      "tags": [
-        "project",
-        "preflight"
       ],
       "severity": "error",
       "fast": true,
@@ -2661,6 +3076,172 @@
       "needs_network": false,
       "depends_on": []
     },
+    "private-hook-stale": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "publish-mode-workflow": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "releasable-residue": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "remote-tag": {
+      "tags": [
+        "release"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [
+        "local-tag"
+      ]
+    },
+    "requires-services": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
+    },
+    "root-rlsbl-conflict": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "ruff-lint": {
+      "tags": [
+        "quality"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "scaffold-conflicts": {
+      "tags": [
+        "project",
+        "prepush",
+        "release"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "scaffold-gitignore-stale": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "scaffold-unreplaced-vars": {
+      "tags": [
+        "quality"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "selfdoc-version-drift": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "strictspec-certificate-gate": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
+    },
+    "stricttest-floor": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
+    },
+    "subtree-remote-reachable": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "target-version-readable": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
     "test-suite": {
       "tags": [
         "prepush",
@@ -2689,10 +3270,9 @@
       ],
       "scope": "workspace:non_dev_only"
     },
-    "maven-central-metadata": {
+    "type-check": {
       "tags": [
         "quality",
-        "maven",
         "preflight"
       ],
       "severity": "error",
@@ -2701,18 +3281,18 @@
       "needs_network": false,
       "depends_on": []
     },
-    "scaffold-gitignore-stale": {
+    "type-check-scope-guard": {
       "tags": [
-        "workspace"
+        "quality",
+        "preflight"
       ],
-      "severity": "warn",
+      "severity": "error",
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
+      "depends_on": []
     },
-    "root-rlsbl-conflict": {
+    "unversioned-boundary": {
       "tags": [
         "workspace"
       ],
@@ -2723,7 +3303,17 @@
       "depends_on": [],
       "scope": "workspace"
     },
-    "go-companion-tags": {
+    "version-consistency": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "workspace-ci-router": {
       "tags": [
         "workspace"
       ],
@@ -2734,7 +3324,7 @@
       "depends_on": [],
       "scope": "workspace"
     },
-    "releasable-residue": {
+    "workspace-ci-synced": {
       "tags": [
         "workspace"
       ],
@@ -2742,21 +3332,45 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": [],
-      "scope": "workspace"
-    },
-    "member-pytest-config": {
-      "tags": [
-        "workspace"
+      "depends_on": [
+        "workspace-ci-router"
       ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
       "scope": "workspace:non_dev_node"
     },
-    "mixed-tag-schemes": {
+    "workspace-stale-entries": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "workspace-targets": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "workspace-unbuildable": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
+    "workspace-unregistered": {
       "tags": [
         "workspace"
       ],
@@ -2768,45 +3382,6 @@
       "scope": "workspace"
     },
     "wrapper-producer": {
-      "tags": [
-        "project",
-        "preflight"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "config-schema"
-      ]
-    },
-    "strictspec-certificate-gate": {
-      "tags": [
-        "project",
-        "preflight"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "config-schema"
-      ]
-    },
-    "stricttest-floor": {
-      "tags": [
-        "project",
-        "preflight"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "config-schema"
-      ]
-    },
-    "dep-floors": {
       "tags": [
         "project",
         "preflight"

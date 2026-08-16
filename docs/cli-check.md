@@ -17,8 +17,8 @@ Run project checks registered via the check framework and report results
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--all` |  | bool |  |  | Run every registered check regardless of tag or name filters |
+| `--all` |  | str |  |  | Run every registered check regardless of tag or name filters |
 | `--tag` |  | str |  |  | Tag DSL expression to select checks (e.g. 'changelog & !quality') |
 | `--name` |  | str |  |  | Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*') |
-| `--list` |  | bool |  |  | List all registered checks with their tags and exit without running |
-| `--ignore-warnings` |  | bool |  |  | Treat warn-severity results as passing so they do not cause nonzero exit |
+| `--list` |  | str |  |  | List all registered checks with their tags and exit without running |
+| `--ignore-warnings` |  | str |  |  | Treat warn-severity results as passing so they do not cause nonzero exit |
