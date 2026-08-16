@@ -508,17 +508,38 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
     if inp.monorepo_root:
         lock_targets.append({"workspace_root": str(inp.monorepo_root)})
 
+    owed_syncs = []
     for paths in lock_targets:
-        for sync in _target_lockfile_syncs(paths, log):
-            steps.append(PlanStep(
-                kind=SYNC_LOCKFILE,
-                release_step="VERSION_BUMPED",
-                summary=f"run {' '.join(sync['cmd'])} in {sync['cwd']}",
-                payload=sync,
-            ))
-            norm = os.path.normpath(sync["lockfile_path"])
-            if norm not in files_to_commit:
-                files_to_commit.append(norm)
+        owed_syncs.extend(_target_lockfile_syncs(paths, log))
+
+    # A workspace project the release never bumps can still lock one that it
+    # does, through an editable uv path source. Its uv.lock goes stale on THIS
+    # write and nothing else will refresh it before CI reads it, so the refresh
+    # belongs in this commit (see :func:`_devnode_lock_syncs`).
+    if inp.monorepo_root:
+        from .execute import _devnode_lock_syncs
+
+        bumped_dirs = {project_dir}
+        for mp_path in (state.member_package_paths or ()):
+            bumped_dirs.add(os.path.join(str(inp.monorepo_root), mp_path))
+        if state.monorepo_project_path:
+            bumped_dirs.add(
+                os.path.join(str(inp.monorepo_root), state.monorepo_project_path)
+            )
+        owed_syncs.extend(
+            _devnode_lock_syncs(inp.monorepo_root, bumped_dirs, log)
+        )
+
+    for sync in owed_syncs:
+        steps.append(PlanStep(
+            kind=SYNC_LOCKFILE,
+            release_step="VERSION_BUMPED",
+            summary=f"run {' '.join(sync['cmd'])} in {sync['cwd']}",
+            payload=sync,
+        ))
+        norm = os.path.normpath(sync["lockfile_path"])
+        if norm not in files_to_commit:
+            files_to_commit.append(norm)
 
     if inp.monorepo_root:
         # Workspace-root lockfiles are included unconditionally: a lockfile can

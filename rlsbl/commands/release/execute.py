@@ -1272,7 +1272,7 @@ _LOCKFILE_SPECS = [
 _LOCKFILE_SYNC_TIMEOUT = 30
 
 
-def _target_lockfile_syncs(target_paths, log):
+def _target_lockfile_syncs(target_paths, log, specs=None):
     """Which lockfile syncs a release owes, and what each one runs.
 
     Pure: every question that decides whether a sync is owed -- does the
@@ -1283,6 +1283,11 @@ def _target_lockfile_syncs(target_paths, log):
     a preview is a question asked after a recorded mutation: the framework
     answers with a stale carrier and the preview truncates on the reply.
 
+    *specs* narrows the ecosystems considered (defaults to every entry of
+    :data:`_LOCKFILE_SPECS`).  The dev_node refresh passes the uv spec alone:
+    such a project is not a release target, and the only lockfile the bump can
+    stale there is the one recording the bumped sibling.
+
     Returns a list of dicts the plan carries verbatim::
 
         {"cwd": ..., "cmd": [...], "lockfile": ..., "lockfile_path": ...,
@@ -1292,7 +1297,9 @@ def _target_lockfile_syncs(target_paths, log):
 
     syncs = []
     for _target_name, t_path in target_paths.items():
-        for lockfile, tool_name, sync_cmd, guard_file in _LOCKFILE_SPECS:
+        for lockfile, tool_name, sync_cmd, guard_file in (
+            specs if specs is not None else _LOCKFILE_SPECS
+        ):
             if guard_file and not os.path.exists(os.path.join(t_path, guard_file)):
                 continue
             lockfile_path = os.path.join(t_path, lockfile)
@@ -1333,6 +1340,100 @@ def _target_lockfile_syncs(target_paths, log):
                 "lockfile_path": norm_path,
                 "timeout": _LOCKFILE_SYNC_TIMEOUT,
             })
+    return syncs
+
+
+# The uv entry of :data:`_LOCKFILE_SPECS`, by name rather than by index, so a
+# reordering of the list cannot silently repoint the dev_node refresh.
+_UV_LOCKFILE_SPEC = [s for s in _LOCKFILE_SPECS if s[0] == "uv.lock"]
+
+
+def _uv_lock_path_sources(lock_path):
+    """Directories a ``uv.lock`` resolves PATH sources into, absolute.
+
+    uv records a path dependency as ``source = { editable = "../sibling" }``
+    (editable install) or ``source = { directory = "../sibling" }``, relative to
+    the lock's own directory. Both record the sibling's version in the same
+    place and go stale on the same event, so both are read.
+
+    An unreadable or unparseable lock yields nothing: it is not evidence that a
+    refresh is owed, and the lock-pin failure it would otherwise mask surfaces
+    at CI as it does today.
+    """
+    import tomllib
+
+    try:
+        with open(lock_path, "rb") as fh:
+            data = tomllib.load(fh)
+    except Exception:
+        return []
+    base = os.path.dirname(os.path.abspath(lock_path))
+    found = []
+    for package in data.get("package") or []:
+        source = package.get("source")
+        if not isinstance(source, dict):
+            continue
+        for key in ("editable", "directory"):
+            rel = source.get(key)
+            if isinstance(rel, str) and rel:
+                found.append(os.path.normpath(os.path.join(base, rel)))
+    return found
+
+
+def _devnode_lock_syncs(monorepo_root, bumped_dirs, log):
+    """``uv lock`` syncs owed by non-releasable projects this bump stales.
+
+    A workspace project that is never released -- a ``dev_node``, or one with
+    ``releasable = false`` -- can install a releasable sibling through an
+    editable uv path source, which makes its ``uv.lock`` record that sibling's
+    version. The version bump is the moment that lock goes stale, and the only
+    moment the release can refresh it as part of the candidate commit.
+
+    Left to CI, the staleness is found by the dev_node's own lock-pin test
+    AFTER the candidate is pushed, and the fix-forward for it touches only the
+    dev_node's path -- so every releasable's path-filtered job then concludes
+    skipped on the resumed candidate. The whole wedge starts here.
+
+    Only projects the release does NOT bump are considered: a releasable
+    sibling re-locks itself on its own release, and writing into its tree here
+    would put another releasable's files in this release's commit.
+
+    Returns the same sync dicts :func:`_target_lockfile_syncs` produces.
+    """
+    from ...workspace import load_workspace
+    from ...workspace_types import project_is_releasable
+
+    if not monorepo_root or not bumped_dirs:
+        return []
+    try:
+        projects = load_workspace(str(monorepo_root))
+    except Exception as exc:
+        from ...utils import warn_exception
+
+        warn_exception("could not read the workspace for dev_node locks", exc)
+        return []
+
+    wanted = {os.path.normpath(os.path.abspath(d)) for d in bumped_dirs}
+    syncs = []
+    for project in projects:
+        if project_is_releasable(project):
+            continue
+        path = project["path"]
+        project_dir = os.path.join(str(monorepo_root), path)
+        lock_path = os.path.join(project_dir, "uv.lock")
+        if not os.path.exists(lock_path):
+            continue
+        if not any(src in wanted for src in _uv_lock_path_sources(lock_path)):
+            continue
+        owed = _target_lockfile_syncs(
+            {"dev_node": project_dir}, log, specs=_UV_LOCKFILE_SPEC,
+        )
+        if owed:
+            log(
+                f"Refreshing {path}/uv.lock: it locks a bumped sibling as an "
+                f"editable path source"
+            )
+        syncs.extend(owed)
     return syncs
 
 

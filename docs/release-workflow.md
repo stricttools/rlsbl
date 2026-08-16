@@ -180,7 +180,7 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 9 | Run built-in tests (`uv run pytest` / `go test` / `npm test`) | Yes |
 | 10 | Run built-in lint (library projects only) | Yes |
 | 11 | Run `pre-release.sh` hook | Yes |
-| 12 | Write new version to all detected target files + `.rlsbl/version` | Yes |
+| 12 | Write new version to all detected target files + `.rlsbl/version`, and re-sync the lockfiles that write stales (including a non-releasable workspace project whose `uv.lock` records a bumped sibling as an editable path source) | Yes |
 | 13 | Commit (message = tag string, e.g. `v1.2.3`) — **not** tagged | Yes |
 | 14 | Regenerate the monorepo snapshot, so the snapshot commit is part of what CI verifies | Yes |
 | 15 | **Push the version-bump commit to the release branch UNTAGGED** — this is the release candidate | Yes |

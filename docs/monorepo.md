@@ -122,6 +122,8 @@ Dev nodes are projects at the edge of the dependency graph that nothing user-fac
 - Remove `dev_node = true` from workspace.toml to make a project releasable
 - The `dev-only-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
+A dev node is excluded from releases but not from their consequences. When its `uv.lock` records a releasable sibling through an editable path source (`source = { editable = "../python" }`), that lock pins the sibling's version — and the version bump is what stales it. So the release runs `uv lock` in every non-releasable workspace project whose lock resolves a path source into a directory the bump touches, and the refreshed lock joins the version-bump commit. The candidate is then self-consistent from the first push: a dev node's lock-pin meta-test passes on it, instead of going red at the CI gate and forcing a dev-node-only fix-forward whose window no releasable's paths filter matches.
+
 ## Dependency graph
 
 The workspace builds a directed dependency graph from two complementary sources, combining automatic manifest scanning with explicit declarations to capture all inter-project relationships. This graph drives topological release ordering, impact analysis, dead-package detection, and the dev-only boundary guardrail that prevents user-facing projects from depending on dev nodes:
