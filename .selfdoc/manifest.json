@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.114.0",
+  "version": "0.115.0",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -4274,6 +4274,16 @@
           "level": 3,
           "text": "`release_check_filters`",
           "anchor": "release_check_filters"
+        },
+        {
+          "level": 3,
+          "text": "`_check_run_order`",
+          "anchor": "_check_run_order"
+        },
+        {
+          "level": 3,
+          "text": "`has_verdict`",
+          "anchor": "has_verdict"
         },
         {
           "level": 3,
@@ -15417,6 +15427,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-16T08:37:51.562259+00:00",
+  "last_gen": "2026-08-16T10:03:17.306150+00:00",
   "theme": "minimal"
 }
