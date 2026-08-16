@@ -42,27 +42,27 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         self.assertEqual(mock_run_cmd.call_count, 2)
 
     def test_invalid_target_hard_error(self):
-        """Passing --target invalid should sys.exit(1) with error message."""
-        from rlsbl import cmd_check_name
+        """An unknown registry is refused by the declaration, at parse time.
 
-        with patch("sys.stderr") as mock_stderr:
-            with self.assertRaises(SystemExit) as cm:
-                cmd_check_name(cli_ctx(json=False), target=["invalid"], delay="200")
-            self.assertEqual(cm.exception.code, 1)
+        `--target` carries `choices=[Choice("npm"), ...]` since the strictcli
+        0.41 migration, so the handler never runs and never re-validates.
+        """
+        from rlsbl import app
 
-    def test_multiple_invalid_targets_listed(self):
-        """All invalid targets should be listed in the error message."""
-        from rlsbl import cmd_check_name
-        from io import StringIO
+        result = app.test(["check-name", "mypackage", "--target", "invalid"])
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("invalid", result.stderr)
+        self.assertIn("npm, pypi, go, github", result.stderr)
 
-        captured = StringIO()
-        with patch("sys.stderr", captured):
-            with self.assertRaises(SystemExit) as cm:
-                cmd_check_name(cli_ctx(json=False), target=["bad1", "bad2"], delay="200")
-            self.assertEqual(cm.exception.code, 1)
-        output = captured.getvalue()
-        self.assertIn("'bad1'", output)
-        self.assertIn("'bad2'", output)
+    def test_invalid_target_reported_on_the_first_bad_value(self):
+        """The parser refuses the first value that is not a declared choice."""
+        from rlsbl import app
+
+        result = app.test([
+            "check-name", "mypackage", "--target", "bad1", "--target", "bad2",
+        ])
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("bad1", result.stderr)
 
     @patch("rlsbl.commands.check.run_cmd")
     @patch("rlsbl._variadic_args", ["mypackage"])
@@ -79,12 +79,16 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         self.assertEqual(mock_run_cmd.call_args_list[0][0][0], "pypi")
 
     def test_empty_target_list_errors(self):
-        """Passing no --target should sys.exit(1)."""
-        from rlsbl import cmd_check_name
+        """No --target at all is the declaration's refusal, not the handler's.
 
-        with self.assertRaises(SystemExit) as cm:
-            cmd_check_name(cli_ctx(json=False), target=[], delay="200")
-        self.assertEqual(cm.exception.code, 1)
+        `presence="required"` on a repeatable flag demands at least one
+        occurrence from some source.
+        """
+        from rlsbl import app
+
+        result = app.test(["check-name", "mypackage"])
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("--target", result.stderr)
 
 
 if __name__ == "__main__":

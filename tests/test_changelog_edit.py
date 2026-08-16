@@ -487,18 +487,59 @@ class TestCmdEdit:
         # The packages field must be preserved through the edit.
         assert entries[0].packages == ["alpha-core", "alpha-web"]
 
-    def test_edit_no_changes(self, rlsbl_repo):
-        """Passing --commits without any edit flags errors."""
+    def test_edit_no_changes(self, rlsbl_repo, monkeypatch):
+        """Naming an entry but no property is refused by the update declaration.
+
+        `changelog edit` declares `update_of("changelog-entry",
+        write_mode="sparse")`, so the at-least-one-property rule is the
+        framework's and fires at parse time -- `cmd_edit` no longer re-checks
+        it, which is why this asserts through the CLI door.
+        """
+        from rlsbl import app
+
         sha = _make_commit(rlsbl_repo)
         _add_unreleased_entry(rlsbl_repo, sha, description="My feature", entry_type="feature")
+        monkeypatch.chdir(rlsbl_repo)
+
+        result = app.test(["changelog", "edit", "--commits", sha, "--no-auto-commit"])
+        assert result.exit_code == 1
+        assert 'update "changelog-entry": at least one property is required' in result.stderr
+
+    def test_edit_no_selection(self, rlsbl_repo, monkeypatch):
+        """Naming a property but no entry is the entry-selection constraint."""
+        from rlsbl import app
+
+        sha = _make_commit(rlsbl_repo)
+        _add_unreleased_entry(rlsbl_repo, sha, description="My feature", entry_type="feature")
+        monkeypatch.chdir(rlsbl_repo)
+
+        result = app.test(["changelog", "edit", "--description", "new", "--no-auto-commit"])
+        assert result.exit_code == 1
+        assert "entry-selection" in result.stderr
+
+    def test_unset_description_clears_the_field(self, rlsbl_repo):
+        """`--unset-description` WRITES absence, and is told apart from untouched.
+
+        `--description` is `nullable=True`, so the framework mints
+        `--unset-description` and `ctx.unset("description")` answers it; both a
+        cleared and an untouched property deliver None.
+        """
+        sha = _make_commit(rlsbl_repo)
+        _add_unreleased_entry(
+            rlsbl_repo, sha, description="My feature", entry_type="feature",
+        )
 
         flags = {
             "commits": sha,
-            "type": "",
-            "description": "",
-            "user-facing": None,
+            "type": None,
+            "description": None,
+            "user-facing": False,
+            "unset-description": True,
             "auto-commit": False,
         }
-        with pytest.raises(SystemExit) as exc_info:
-            cmd_edit(flags, project_root=rlsbl_repo)
-        assert exc_info.value.code == 1
+        cmd_edit(flags, project_root=rlsbl_repo)
+
+        changes_dir = get_changes_dir(str(rlsbl_repo))
+        entries = parse_jsonl(os.path.join(changes_dir, "unreleased.jsonl"))
+        assert entries[0].user_facing is False
+        assert entries[0].description is None

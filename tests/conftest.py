@@ -128,13 +128,23 @@ class _CliCtx:
     """
 
     def __init__(self, dry_run=False, approve_consequential=False,
-                 quiet=False, verbose=False, json=False):
+                 quiet=False, verbose=False, json=False, unset=()):
         self.dry_run = dry_run
         self.approve_consequential = approve_consequential
         self.quiet = quiet
         self.verbose = verbose
         self.json = json
         self.payload_value = None
+        self._unset = set(unset)
+
+    def unset(self, name):
+        """Answer the framework-minted ``--unset-<prop>`` of an update command.
+
+        A cleared property and an untouched one both deliver None, so this is
+        the only thing that tells them apart. ``unset=("description",)`` on the
+        constructor is how a direct handler call states a clear.
+        """
+        return name in self._unset or name.replace("_", "-") in self._unset
 
     def payload(self, value):
         """Capture the machine payload the handler supplies (contract §19.4).
@@ -154,10 +164,10 @@ class _CliCtx:
 
 
 def cli_ctx(dry_run=False, approve_consequential=False, quiet=False,
-            verbose=False, json=False):
+            verbose=False, json=False, unset=()):
     """Build a stand-in dispatch context for a direct command-handler call."""
     return _CliCtx(dry_run=dry_run, approve_consequential=approve_consequential,
-                   quiet=quiet, verbose=verbose, json=json)
+                   quiet=quiet, verbose=verbose, json=json, unset=unset)
 
 
 def make_ctx(project_root, config=None):

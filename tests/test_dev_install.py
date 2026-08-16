@@ -667,8 +667,13 @@ def test_cli_target_declares_exactly_the_two_modes():
         f for f in app._groups["dev"].commands["install"].flags if f.name == "target"
     )
     assert flag.choices == ["global", "venv"]
-    # No default: the caller must state the mode explicitly.
-    assert flag.default is None
+    # Every choices entry is a value-plus-help record since strictcli 0.41, and
+    # both modes carry help.
+    assert [c.value for c in flag.choice_records] == ["global", "venv"]
+    assert all(c.help for c in flag.choice_records)
+    # Required, so the caller must state the mode explicitly -- and a required
+    # declaration carries no default at all.
+    assert flag.presence == "required"
 
 
 def test_cli_target_is_required(tmp_path, monkeypatch):

@@ -802,22 +802,25 @@ def cmd_edit(flags, project_root):
     is_released = version is not None
 
     # Apply edits
+    writes_type = bool(flags.get("type"))
+    writes_description = bool(flags.get("description"))
     if user_facing_value is False:
-        # Flip the flag only. description/type stay on the line: they are
-        # unused while the entry is non-user-facing (generation filters on
-        # user_facing), and they survive a later flip back.
+        # Flip the flag. description/type stay on the line unless the
+        # invocation CLEARS them: they are unused while the entry is
+        # non-user-facing (generation filters on user_facing) and survive a
+        # later flip back, so removing them has to be asked for.
         entry.user_facing = False
     elif user_facing_value is True:
         entry.user_facing = True
         # If the entry doesn't already have description/type, require them
-        if not entry.description and not has_description:
+        if not entry.description and not writes_description:
             print(
                 "Error: --description is required when setting --user-facing "
                 "on an entry without an existing description.",
                 file=sys.stderr,
             )
             sys.exit(1)
-        if not entry.type and not has_type:
+        if not entry.type and not writes_type:
             print(
                 "Error: --type is required when setting --user-facing "
                 "on an entry without an existing type.",
@@ -825,10 +828,17 @@ def cmd_edit(flags, project_root):
             )
             sys.exit(1)
 
-    if has_type and user_facing_value is not False:
-        entry.type = None if unset_type else flags["type"]
-    if has_description and user_facing_value is not False:
-        entry.description = None if unset_description else flags["description"]
+    # A clear is a write of absence and is honored whatever --user-facing did;
+    # a value write is suppressed when the same invocation flips the entry to
+    # non-user-facing, where the value would have no reader.
+    if unset_type:
+        entry.type = None
+    elif writes_type and user_facing_value is not False:
+        entry.type = flags["type"]
+    if unset_description:
+        entry.description = None
+    elif writes_description and user_facing_value is not False:
+        entry.description = flags["description"]
 
     # Validate the edited entry
     errors = validate_schema(entry)

@@ -68,31 +68,24 @@ class TestModulesDeleted:
 
 class TestCliSurface:
 
-    def test_check_name_rejects_crates(self, monkeypatch, capsys):
-        import sys
+    def test_check_name_rejects_crates(self):
+        """`--target crates` is refused by the declaration, not by the handler.
 
-        monkeypatch.setattr(
-            sys, "argv", ["rlsbl", "check-name", "serde", "--target", "crates"]
-        )
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(cli_ctx(json=False), target=["crates"], delay=0)
-        assert exc.value.code == 1
-        err = capsys.readouterr().err
-        assert "crates" in err
-        assert "npm, pypi, go, github" in err
+        The registry list is `choices=[Choice("npm"), ...]` since the strictcli
+        0.41 migration, so the refusal happens at parse time and names every
+        legal value.
+        """
+        result = app.test(["check-name", "serde", "--target", "crates"])
+        assert result.exit_code == 1
+        assert "crates" in result.stderr
+        assert "npm, pypi, go, github" in result.stderr
 
-    def test_claim_name_rejects_crates(self, monkeypatch, capsys):
-        import sys
-
-        monkeypatch.setattr(
-            sys, "argv", ["rlsbl", "claim-name", "serde", "--target", "crates"]
-        )
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(cli_ctx(), target="crates", force_publish=False)
-        assert exc.value.code == 1
-        err = capsys.readouterr().err
-        assert "crates" in err
-        assert "Valid: npm, pypi" in err
+    def test_claim_name_rejects_crates(self):
+        """`claim-name --target crates` is likewise a parse-time refusal."""
+        result = app.test(["claim-name", "serde", "--target", "crates"])
+        assert result.exit_code == 1
+        assert "crates" in result.stderr
+        assert "npm, pypi" in result.stderr
 
     def test_check_name_help_does_not_offer_crates(self):
         result = app.test(["check-name", "--help"])

@@ -256,14 +256,16 @@ class TestCmdCheckName:
     """Cover cmd_check_name handler paths (lines 429-454)."""
 
     def test_exits_when_no_target(self):
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(cli_ctx(json=False), target=[], delay="200")
-        assert exc.value.code == 1
+        """`--target` is `presence="required"`, so absence never reaches the handler."""
+        result = rlsbl.app.test(["check-name", "my-package"])
+        assert result.exit_code == 1
+        assert "--target" in result.stderr
 
     def test_exits_on_invalid_targets(self):
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_check_name(cli_ctx(json=False), target=["bogus"], delay="200")
-        assert exc.value.code == 1
+        """An undeclared registry is refused by `choices=`, at parse time."""
+        result = rlsbl.app.test(["check-name", "my-package", "--target", "bogus"])
+        assert result.exit_code == 1
+        assert "bogus" in result.stderr
 
     @patch("rlsbl.commands.check.run_cmd")
     def test_delegates_to_check_run_cmd(self, mock_run):
@@ -340,11 +342,13 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_release_undo(cli_ctx(), target="npm", version="")
+        rlsbl.cmd_release_undo(cli_ctx(), target="npm", version=None)
         mock_run.assert_called_once()
         assert mock_run.call_args[1]["ctx"] is not None
         flags = mock_run.call_args[0][2]
-        assert flags["version"] is None  # empty string -> None
+        # --version is presence="optional": absence arrives AS absence, so the
+        # handler has no empty string to translate.
+        assert flags["version"] is None
         assert flags["dry-run"] is False
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
@@ -352,7 +356,7 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates_with_version(self, mock_run, *_):
-        rlsbl.cmd_release_undo(cli_ctx(), target="", version="0.9.0")
+        rlsbl.cmd_release_undo(cli_ctx(), target=None, version="0.9.0")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][2]
         assert flags["version"] == "0.9.0"
@@ -362,7 +366,7 @@ class TestCmdReleaseUndo:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
     def test_delegates_dry_run(self, mock_run, *_):
-        rlsbl.cmd_release_undo(cli_ctx(dry_run=True), target="", version="")
+        rlsbl.cmd_release_undo(cli_ctx(dry_run=True), target=None, version=None)
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][2]
         assert flags["dry-run"] is True
@@ -396,12 +400,19 @@ class TestCmdReleaseScrub:
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.release_scrub.run_cmd")
     def test_delegates(self, mock_run, *_):
-        rlsbl.cmd_release_scrub(cli_ctx(dry_run=True), pattern="secret", file=None, recipe=None, replace="XXX", mangle=False, from_commit="abc123", entire_history=False, reason="test")
+        rlsbl.cmd_release_scrub(
+            cli_ctx(dry_run=True),
+            mode=rlsbl.ScrubPattern(value="secret", replace="XXX", mangle=None),
+            commit_range=rlsbl.ScrubFromCommit(value="abc123"),
+            reason="test",
+        )
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][0]
         assert flags["pattern"] == "secret"
+        assert flags["replace"] == "XXX"
         assert flags["from-commit"] == "abc123"
         assert flags["recipe"] is None
+        assert flags["entire-history"] is False
 
 
 class TestReleaseScrubCliParsing:
@@ -477,20 +488,49 @@ class TestReleaseScrubCliParsing:
         assert "--recipe" in result.stderr
         mock_run.assert_not_called()
 
-    def test_replace_requires_pattern(self):
+    def test_replace_is_scoped_to_pattern(self):
+        """`--replace` lives INSIDE the pattern choice's scope.
+
+        It used to be a command-level flag plus a `Requires` constraint saying
+        so from the outside; since the strictcli 0.41 migration the scope is
+        the declaration, and the refusal names both sides.
+        """
         result, mock_run = self._scrub(
             ["--file", "f.txt", "--replace", "X",
              "--from-commit", "abc", "--reason", "r"])
         assert result.exit_code == 1
-        assert "requires '--pattern'" in result.stderr
+        assert "'--replace' is only valid under '--pattern'" in result.stderr
+        assert "'--file' was elected" in result.stderr
         mock_run.assert_not_called()
 
-    def test_mangle_requires_pattern(self):
+    def test_mangle_is_scoped_to_pattern(self):
         result, mock_run = self._scrub(
             ["--recipe", "x.toml", "--mangle",
              "--from-commit", "abc", "--reason", "r"])
         assert result.exit_code == 1
-        assert "requires '--pattern'" in result.stderr
+        assert "'--mangle' is only valid under '--pattern'" in result.stderr
+        assert "'--recipe' was elected" in result.stderr
+        mock_run.assert_not_called()
+
+    def test_commit_range_selector_required(self):
+        """Naming a mode but no range is the range selector's own refusal."""
+        result, mock_run = self._scrub(["--recipe", "x.toml", "--reason", "r"])
+        assert result.exit_code == 1
+        assert "--from-commit" in result.stderr
+        assert "--entire-history" in result.stderr
+        mock_run.assert_not_called()
+
+    def test_empty_mode_value_is_value_validation(self):
+        """`--pattern ""` ELECTS match mode; the empty regex is then refused.
+
+        Election says which member was named -- the empty string is an
+        explicit act, so the guard against it belongs to the command's value
+        validation, not to the selector.
+        """
+        result, mock_run = self._scrub(
+            ["--pattern", "", "--from-commit", "abc", "--reason", "r"])
+        assert result.exit_code == 1
+        assert "--pattern requires a non-empty value" in result.stderr
         mock_run.assert_not_called()
 
     def test_replace_and_mangle_mutually_exclusive(self):
@@ -668,7 +708,7 @@ class TestCmdChlogEdit:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.changelog_cmd.cmd_edit")
     def test_delegates(self, mock_edit, _):
-        rlsbl.cmd_chlog_edit(cli_ctx(), commits="abc", id="", type="fix", description="updated", user_facing=True, auto_commit=True)
+        rlsbl.cmd_chlog_edit(cli_ctx(), commits="abc", id=None, type="fix", description="updated", user_facing=True, auto_commit=True)
         mock_edit.assert_called_once()
         flags = mock_edit.call_args[0][0]
         assert flags["user-facing"] is True
