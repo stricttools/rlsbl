@@ -686,13 +686,18 @@ def cmd_edit(flags, project_root):
     the file atomically. For released files, temporarily unlocks the
     read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.
 
-    Required flags:
-    - --commits: comma-separated commit hashes identifying the target entry
+    This is a sparse update of one changelog entry, and the CLI declares it as
+    one (``update_of("changelog-entry", write_mode="sparse")``). Two rules that
+    used to be hand-rolled here are the framework's now and are NOT re-checked:
 
-    At least one edit flag required:
-    - --type: new type value (feature, fix, breaking)
-    - --description: new description text
-    - --user-facing / --no-user-facing: set user_facing status
+    - **at least one property** (``--description`` / ``--type`` /
+      ``--user-facing``) is refused at parse time by the update declaration;
+    - **at least one identity member** (``--commits`` / ``--id``) is refused by
+      the ``entry-selection`` at-least-one constraint.
+
+    ``unset-type`` / ``unset-description`` carry ``ctx.unset(...)``: a cleared
+    property is a WRITE of absence, which is why it cannot be read off the
+    value (an untouched property delivers the same None).
 
     Under --dry-run, all validation and entry matching runs but nothing is
     written: no file rewrite, no CHANGELOG.md regeneration, no GitHub
@@ -700,26 +705,15 @@ def cmd_edit(flags, project_root):
     """
     ws_context = _resolve_workspace_project(project_root)
 
-    # Validate at least one edit flag is provided
-    has_type = bool(flags.get("type"))
-    has_description = bool(flags.get("description"))
-    user_facing_value = flags.get("user-facing")  # None means not set
-    has_user_facing_change = user_facing_value is not None
-    if not (has_type or has_description or has_user_facing_change):
-        print(
-            "Error: at least one edit flag is required "
-            "(--type, --description, --user-facing, --no-user-facing).",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    unset_type = bool(flags.get("unset-type"))
+    unset_description = bool(flags.get("unset-description"))
+    has_type = bool(flags.get("type")) or unset_type
+    has_description = bool(flags.get("description")) or unset_description
+    user_facing_value = flags.get("user-facing")  # None means not written
 
-    # Parse selection criteria: --id or --commits
+    # Selection criteria: --id or --commits (the constraint guarantees one).
     id_filter = flags.get("id") or None
-    commits_raw = flags.get("commits", "")
-
-    if not id_filter and not commits_raw:
-        print("Error: --commits or --id is required.", file=sys.stderr)
-        sys.exit(1)
+    commits_raw = flags.get("commits") or ""
 
     search_set = set()
     if commits_raw:
@@ -832,9 +826,9 @@ def cmd_edit(flags, project_root):
             sys.exit(1)
 
     if has_type and user_facing_value is not False:
-        entry.type = flags["type"]
+        entry.type = None if unset_type else flags["type"]
     if has_description and user_facing_value is not False:
-        entry.description = flags["description"]
+        entry.description = None if unset_description else flags["description"]
 
     # Validate the edited entry
     errors = validate_schema(entry)
