@@ -2,6 +2,23 @@
 
 # Changelog
 
+## 0.116.0
+
+rlsbl on strictcli 0.41: mandatory presence declarations across the CLI, member-spelled selectors, changelog edit as a true sparse-update command with --unset-*, the schema-version stamp preserving the v2 byte canon, and TypeScript app support in the schema-dump step.
+
+### Breaking
+
+- **rlsbl now requires strictcli 0.41.0 or newer, and every flag declares its presence.** A flag you omit now reaches rlsbl as absent instead of as `""` or `0`, which changes one argv: `--push-timeout 0` and its `--ci-timeout` / `--check-timeout` / `--hook-timeout` siblings no longer mean "use the config key" -- omit the flag to get that. Values are checked against declared choices at parse time (`--target` on `check-name`, `claim-name`, `monorepo check-names` and `dev install`; `--type` on the changelog commands; `scaffold --publish-mode`; `monorepo graph --format`), and flags the handlers used to refuse after starting are refused before the command runs (`changelog add --commits`, `changelog amend --version` and `--commits`, `release scrub --reason`). `release scrub` gets two exactly-one selections -- the mode and the commit range -- and `--replace` / `--mangle` now belong to `--pattern` scope, so passing one under `--file` or `--recipe` names both sides instead of being quietly accepted.
+
+### Features
+
+- **`rlsbl changelog edit` can now clear a field, and refuses an edit that changes nothing.** The command declares itself as a sparse update of one changelog entry: a property you do not pass is left untouched, at least one of `--description` / `--type` / `--user-facing` is required (naming an entry and changing nothing is refused before anything is read), and the new `--unset-description` / `--unset-type` remove a field rather than writing an empty string into it -- which is what a non-user-facing entry needs. Naming no entry at all is likewise refused up front, by name, instead of after the search.
+- **The release now dumps the strictcli schema for TypeScript projects too.** Detection knew Python and Go only, so a TS strictcli app released whatever `.strictcli/schema.json` happened to be committed, with nothing to say the dump had never run. A `package.json` declaring the `strictcli` npm package and exactly one `bin` now resolves to `node <bin> --dump-schema`; an ambiguous or missing `bin` is a hard error, the same rule the Go branch already applies to several main packages.
+
+### Fixes
+
+- **A release of a strictcli project no longer mangles its `.strictcli/schema.json`.** Writing the new version into the freshly-dumped schema re-encoded the whole document, which silently destroyed strictcli's canonical byte encoding: every non-ASCII character in any help text came back out as a `\uXXXX` escape, and the canonical float form went with it. Every release rewrote the file into something no strictcli implementation would write, and the next dump reverted it. The version is now patched textually -- one line, every other byte preserved.
+
 ## 0.115.1
 
 The publish/CI gates never let a skipped check outrank a real verdict of the same name, and every saferm invocation states its mandatory error mode.
