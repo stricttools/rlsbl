@@ -328,6 +328,8 @@ class TestSafermInvocation:
         assert call[0] == "saferm"
         assert call[1] == "delete"
         assert "--description" in call
+        # saferm's --on-error is mandatory: without it the delete exits 1.
+        assert call[call.index("--on-error") + 1] == "abort"
         assert str(proj_dir / ".rlsbl" / "config.json") == call[-1]
         assert any("config.json" in str(p) for p in removed)
 
@@ -396,12 +398,15 @@ class TestSafermInvocation:
         assert saferm_calls[0][0] == "saferm"
         assert saferm_calls[0][1] == "delete"
         assert "--description" in saferm_calls[0]
+        # saferm's --on-error is mandatory: without it the delete exits 1.
+        assert saferm_calls[0][saferm_calls[0].index("--on-error") + 1] == "abort"
         assert orphan_rel == saferm_calls[0][-1]
 
         # Second call: base file
         assert saferm_calls[1][0] == "saferm"
         assert saferm_calls[1][1] == "delete"
         assert "--description" in saferm_calls[1]
+        assert saferm_calls[1][saferm_calls[1].index("--on-error") + 1] == "abort"
 
         # Verify the orphan shows up in created list
         orphan_entries = [e for e in created if e[1] == "removed (orphan)"]
@@ -470,6 +475,8 @@ class TestOrphanBaseSweep:
         assert len(saferm_calls) == 1
         assert saferm_calls[0][0] == "saferm"
         assert saferm_calls[0][1] == "delete"
+        # saferm's --on-error is mandatory: without it the delete exits 1.
+        assert saferm_calls[0][saferm_calls[0].index("--on-error") + 1] == "abort"
         # _finalize_scaffold operates from cwd, so paths are relative
         assert saferm_calls[0][-1] == os.path.join(BASES_DIR, "old", "workflow.yml")
 

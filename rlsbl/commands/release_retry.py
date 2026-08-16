@@ -107,7 +107,12 @@ def _cleanup_retry_file(retry_path, log):
     """Delete retry.toml via saferm after successful retry."""
     try:
         effects.run(
-            ["saferm", "delete", "--description", "Retry completed successfully", retry_path],
+            [
+                "saferm", "delete",
+                "--description", "Retry completed successfully",
+                "--on-error", "abort",
+                retry_path,
+            ],
             check=True,
             capture_output=True,
             text=True,

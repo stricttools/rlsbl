@@ -305,6 +305,7 @@ def _saferm_dir(path, project_name, subdir_name):
             [
                 "saferm", "delete", "-r",
                 "--description", description,
+                "--on-error", "abort",
                 path,
             ],
             check=True,
@@ -333,6 +334,7 @@ def _saferm_file(path, project_name, file_name):
             [
                 "saferm", "delete",
                 "--description", description,
+                "--on-error", "abort",
                 path,
             ],
             check=True,

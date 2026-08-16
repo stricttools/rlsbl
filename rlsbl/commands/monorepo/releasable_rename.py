@@ -118,6 +118,7 @@ def _saferm_file(path):
             "saferm", "delete", "-f",
             "--description",
             "Removing stale changelog validation cache after releasable rename",
+            "--on-error", "abort",
             path,
         ],
         check=True,

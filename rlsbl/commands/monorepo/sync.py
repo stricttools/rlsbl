@@ -574,7 +574,12 @@ def _saferm_workflow(filepath, description):
     """
     try:
         effects.run(
-            ["saferm", "delete", "--description", description, filepath],
+            [
+                "saferm", "delete",
+                "--description", description,
+                "--on-error", "abort",
+                filepath,
+            ],
             check=True,
             capture_output=True,
             text=True,
