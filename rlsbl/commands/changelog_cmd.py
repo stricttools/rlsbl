@@ -707,8 +707,6 @@ def cmd_edit(flags, project_root):
 
     unset_type = bool(flags.get("unset-type"))
     unset_description = bool(flags.get("unset-description"))
-    has_type = bool(flags.get("type")) or unset_type
-    has_description = bool(flags.get("description")) or unset_description
     user_facing_value = flags.get("user-facing")  # None means not written
 
     # Selection criteria: --id or --commits (the constraint guarantees one).

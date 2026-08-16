@@ -53,6 +53,7 @@ from ...workspace import (
     read_releasable_version,
 )
 from ... import effects
+from ...saferm import saferm_delete
 
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -113,17 +114,12 @@ def _resolve_tag_commit(root, tag):
 
 def _saferm_file(path):
     """Delete a stale cache file via saferm (audit trail; -f skips if missing)."""
-    effects.run(
-        [
-            "saferm", "delete", "-f",
-            "--description",
-            "Removing stale changelog validation cache after releasable rename",
-            "--on-error", "abort",
-            path,
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
+    saferm_delete(
+        path,
+        skip_missing=True,
+        description=(
+            "Removing stale changelog validation cache after releasable rename"
+        ),
     )
 
 

@@ -23,6 +23,7 @@ from ...workspace import find_workspace_root, load_workspace, WORKSPACE_DIR, WOR
 from ...targets import detect_targets, resolve_releasable_config_dir, TARGETS
 from ...tag_glob import _mixed_tag_schemes, _mixed_scheme_error
 from ... import effects
+from ...saferm import saferm_delete
 
 # Backward-compatible aliases (private names used by monorepo __init__.py re-exports)
 _inject_working_directory = inject_working_directory
@@ -572,23 +573,11 @@ def _saferm_workflow(filepath, description):
     Raises RuntimeError if saferm is not on PATH and propagates
     subprocess.CalledProcessError if saferm exits non-zero.
     """
-    try:
-        effects.run(
-            [
-                "saferm", "delete",
-                "--description", description,
-                "--on-error", "abort",
-                filepath,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise RuntimeError(
-            "saferm is not installed or not on PATH. "
-            "Install saferm before running sync."
-        ) from None
+    saferm_delete(
+        filepath,
+        description=description,
+        install_hint="Install saferm before running sync.",
+    )
 
 
 def _sync_import_names(root, projects):

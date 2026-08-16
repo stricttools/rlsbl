@@ -27,6 +27,7 @@ from ..utils import check_gh_auth, check_gh_installed, run, run_gh
 from ..workspace import find_workspace_root, resolve_project
 from .watch import run_cmd as watch_run_cmd
 from .. import effects
+from ..saferm import saferm_delete
 
 
 def _find_dispatch_workflows():
@@ -106,17 +107,7 @@ def _scaffold_retry_file(
 def _cleanup_retry_file(retry_path, log):
     """Delete retry.toml via saferm after successful retry."""
     try:
-        effects.run(
-            [
-                "saferm", "delete",
-                "--description", "Retry completed successfully",
-                "--on-error", "abort",
-                retry_path,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        saferm_delete(retry_path, description="Retry completed successfully")
         log(f"Cleaned up: {retry_path}")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         # Non-fatal: warn but don't fail the retry

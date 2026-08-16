@@ -20,6 +20,7 @@ from .workspace import (
     load_workspace,
 )
 from . import effects
+from .saferm import saferm_delete
 
 
 # Files and directories expected to remain in a per-package .rlsbl/ after
@@ -296,27 +297,15 @@ def _saferm_dir(path, project_name, subdir_name):
     Raises RuntimeError if saferm is not on PATH.
     Raises subprocess.CalledProcessError if saferm exits non-zero.
     """
-    description = (
-        f"Removing per-package .rlsbl/{subdir_name}/ from '{project_name}' "
-        f"-- release state moved to per-releasable directory"
+    saferm_delete(
+        path,
+        recursive=True,
+        description=(
+            f"Removing per-package .rlsbl/{subdir_name}/ from '{project_name}' "
+            f"-- release state moved to per-releasable directory"
+        ),
+        install_hint="Install saferm before running cleanup.",
     )
-    try:
-        effects.run(
-            [
-                "saferm", "delete", "-r",
-                "--description", description,
-                "--on-error", "abort",
-                path,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise RuntimeError(
-            "saferm is not installed or not on PATH. "
-            "Install saferm before running cleanup."
-        ) from None
 
 
 def _saferm_file(path, project_name, file_name):
@@ -325,24 +314,11 @@ def _saferm_file(path, project_name, file_name):
     Raises RuntimeError if saferm is not on PATH.
     Raises subprocess.CalledProcessError if saferm exits non-zero.
     """
-    description = (
-        f"Removing per-package {file_name} from '{project_name}' "
-        f"-- state moved to per-releasable directory"
+    saferm_delete(
+        path,
+        description=(
+            f"Removing per-package {file_name} from '{project_name}' "
+            f"-- state moved to per-releasable directory"
+        ),
+        install_hint="Install saferm before running cleanup.",
     )
-    try:
-        effects.run(
-            [
-                "saferm", "delete",
-                "--description", description,
-                "--on-error", "abort",
-                path,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        raise RuntimeError(
-            "saferm is not installed or not on PATH. "
-            "Install saferm before running cleanup."
-        ) from None

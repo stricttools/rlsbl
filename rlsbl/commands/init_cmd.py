@@ -25,6 +25,7 @@ from ..targets import TARGETS, detect_targets
 from ..tagging import ensure_tags
 from ..utils import commit_files, is_private_repo
 from .. import effects
+from ..saferm import saferm_delete
 
 MANAGED_FILES = os.path.join(".rlsbl", "managed-files.json")
 BASES_DIR = os.path.join(".rlsbl", "bases")
@@ -241,18 +242,12 @@ def _skip_redundant_releasable_configs(project_root, warnings):
     rel_config = read_json_config(rel_path)
 
     if pkg_config == rel_config:
-        effects.run(
-            [
-                "saferm", "delete",
-                "--description",
+        saferm_delete(
+            pkg_path,
+            description=(
                 "Removing redundant per-package .rlsbl/config.json "
-                "(identical to releasable config)",
-                "--on-error", "abort",
-                pkg_path,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
+                "(identical to releasable config)"
+            ),
         )
         removed.append(pkg_path)
         print(
@@ -1292,33 +1287,17 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
             continue
         stored_hash = old_managed[orphan_path]
         if file_hash(orphan_path) == stored_hash:
-            effects.run(
-                [
-                    "saferm", "delete",
-                    "--description",
-                    f"Removing orphaned scaffold file: {orphan_path}",
-                    "--on-error", "abort",
-                    orphan_path,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
+            saferm_delete(
+                orphan_path,
+                description=f"Removing orphaned scaffold file: {orphan_path}",
             )
             orphan_removed.add(orphan_path)
             # Also clean up the merge base if it exists
             base_path = os.path.join(BASES_DIR, orphan_path)
             if os.path.exists(base_path):
-                effects.run(
-                    [
-                        "saferm", "delete",
-                        "--description",
-                        f"Removing orphaned scaffold merge base: {base_path}",
-                        "--on-error", "abort",
-                        base_path,
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True,
+                saferm_delete(
+                    base_path,
+                    description=f"Removing orphaned scaffold merge base: {base_path}",
                 )
                 # Prune empty parent directories up to BASES_DIR
                 try:
@@ -1347,17 +1326,9 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                     if dry_run:
                         print(f"Would remove orphaned base: {base_abs}")
                     else:
-                        effects.run(
-                            [
-                                "saferm", "delete",
-                                "--description",
-                                f"Removing orphaned scaffold merge base: {base_abs}",
-                                "--on-error", "abort",
-                                base_abs,
-                            ],
-                            check=True,
-                            capture_output=True,
-                            text=True,
+                        saferm_delete(
+                            base_abs,
+                            description=f"Removing orphaned scaffold merge base: {base_abs}",
                         )
                         print(f"Removing orphaned scaffold merge base: {base_abs}")
                         # Prune empty parent directories up to BASES_DIR
@@ -1372,17 +1343,9 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     # Clean up legacy hashes.json if present
     legacy_hashes = os.path.join(".rlsbl", "hashes.json")
     if os.path.exists(legacy_hashes):
-        effects.run(
-            [
-                "saferm", "delete",
-                "--description",
-                "legacy hashes.json no longer used by scaffold",
-                "--on-error", "abort",
-                legacy_hashes,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
+        saferm_delete(
+            legacy_hashes,
+            description="legacy hashes.json no longer used by scaffold",
         )
 
     # Ecosystem tagging

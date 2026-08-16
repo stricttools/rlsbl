@@ -6,11 +6,16 @@ places without the flag, so those deletions silently never happened -- most
 visibly ``release retry``, which left its ``retry.toml`` behind and dirtied the
 working tree for the next release.
 
-Two layers here:
+The guardrail used to be a source sweep over every hand-written ``saferm``
+argv, which can only catch the next omission AFTER someone writes it. The
+structural fix replaced the nine literals with one constructor,
+:func:`rlsbl.saferm.saferm_delete`, which has no parameter for the error mode
+because there is nothing to decide. The three layers here follow from that:
 
-* per-call-site tests that capture the argv rlsbl actually builds, and
-* a source sweep that walks every ``saferm`` argv literal in the package, so a
-  new call site cannot reintroduce the omission.
+* the constructor's own argv, asserted directly;
+* per-call-site tests that capture the argv rlsbl actually builds;
+* a source sweep that now asserts the ABSENCE of any hand-written ``saferm``
+  argv outside the constructor, so a new call site cannot route around it.
 
 ``rlsbl._effects_direct.run`` is the primitive the conftest saferm mock also
 patches; patching it again here nests over that fixture and wins.
@@ -56,6 +61,80 @@ def saferm_argv():
 
     with patch("rlsbl._effects_direct.run", side_effect=_run):
         yield captured
+
+
+# ---------------------------------------------------------------------------
+# The constructor: the one place an argv is built
+# ---------------------------------------------------------------------------
+
+
+def test_constructor_builds_the_mandatory_argv(tmp_path, saferm_argv):
+    """The minimal call already carries the description and the error mode."""
+    from rlsbl.saferm import saferm_delete
+
+    target = tmp_path / "f.txt"
+    target.write_text("x")
+
+    saferm_delete(str(target), description="because")
+
+    assert saferm_argv == [[
+        "saferm", "delete", "--description", "because",
+        "--on-error", "abort", str(target),
+    ]]
+
+
+def test_constructor_places_recursive_and_skip_missing_before_the_options(
+    tmp_path, saferm_argv,
+):
+    """``-r`` and ``-f`` are short options and sit right after the subcommand."""
+    from rlsbl.saferm import saferm_delete
+
+    target = tmp_path / "d"
+    target.mkdir()
+
+    saferm_delete(str(target), description="why", recursive=True, skip_missing=True)
+
+    assert saferm_argv[0][:4] == ["saferm", "delete", "-r", "-f"]
+    assert_on_error_abort(saferm_argv[0])
+
+
+def test_constructor_has_no_error_mode_parameter():
+    """The error mode is not a decision, so it is not a parameter."""
+    import inspect
+
+    from rlsbl.saferm import saferm_delete
+
+    params = inspect.signature(saferm_delete).parameters
+    assert "on_error" not in params
+    assert set(params) == {
+        "path", "description", "recursive", "skip_missing", "install_hint",
+    }
+    # description is keyword-only and mandatory: it is the audit trail.
+    assert params["description"].default is inspect.Parameter.empty
+    assert params["description"].kind is inspect.Parameter.KEYWORD_ONLY
+
+
+def test_constructor_reraises_a_missing_binary_with_the_install_hint(tmp_path):
+    """``install_hint`` turns FileNotFoundError into a sentence a user can act on."""
+    from rlsbl.saferm import saferm_delete
+
+    with patch("rlsbl._effects_direct.run", side_effect=FileNotFoundError()):
+        with pytest.raises(RuntimeError) as exc:
+            saferm_delete(
+                str(tmp_path / "f"),
+                description="why",
+                install_hint="Install saferm before running cleanup.",
+            )
+    assert "Install saferm before running cleanup." in str(exc.value)
+
+
+def test_constructor_propagates_a_missing_binary_without_a_hint(tmp_path):
+    """Without a hint the caller handles the absence itself (release retry does)."""
+    from rlsbl.saferm import saferm_delete
+
+    with patch("rlsbl._effects_direct.run", side_effect=FileNotFoundError()):
+        with pytest.raises(FileNotFoundError):
+            saferm_delete(str(tmp_path / "f"), description="why")
 
 
 # ---------------------------------------------------------------------------
@@ -133,8 +212,10 @@ def test_monorepo_sync_workflow_delete_declares_on_error(tmp_path, saferm_argv):
 
 
 # ---------------------------------------------------------------------------
-# Source sweep: no call site anywhere may omit the flag
+# Source sweep: the constructor is the ONLY place an argv is built
 # ---------------------------------------------------------------------------
+
+SAFERM_MODULE = RLSBL_PACKAGE / "saferm.py"
 
 
 def _saferm_argv_literals():
@@ -155,22 +236,32 @@ def _saferm_argv_literals():
             yield path, node.lineno, consts
 
 
-def test_source_sweep_finds_the_known_call_sites():
-    """The sweep really walks the package (guards against a silent zero-match)."""
+def test_the_sweep_really_walks_the_package():
+    """The constructor's own argv is found (guards against a silent zero-match)."""
     sites = list(_saferm_argv_literals())
-    assert len(sites) >= 8, f"expected the known saferm delete sites, found {sites}"
+    assert [s[0] for s in sites] == [SAFERM_MODULE], (
+        f"expected the constructor's argv and nothing else, found {sites}"
+    )
 
 
-@pytest.mark.parametrize(
-    "path,lineno,consts",
-    [pytest.param(*s, id=f"{s[0].name}:{s[1]}") for s in _saferm_argv_literals()],
-)
-def test_every_saferm_delete_literal_declares_on_error(path, lineno, consts):
-    """Every literal ``saferm delete`` argv in rlsbl/ carries ``--on-error abort``."""
-    assert "--on-error" in consts, (
-        f"{path}:{lineno} builds a saferm delete argv without --on-error; "
-        "saferm requires the flag and exits 1 without it"
+def test_no_module_builds_a_saferm_argv_by_hand():
+    """A new call site must go through the constructor, not spell argv again.
+
+    This is the structural half of the guardrail. The old sweep checked that
+    every hand-written argv carried ``--on-error``, which meant a new omission
+    was caught only after it was written; there is now one argv in the package
+    and nowhere else to write one.
+    """
+    offenders = [
+        f"{path}:{lineno}"
+        for path, lineno, _ in _saferm_argv_literals()
+        if path != SAFERM_MODULE
+    ]
+    assert not offenders, (
+        "these build a saferm delete argv by hand instead of calling "
+        f"rlsbl.saferm.saferm_delete: {', '.join(offenders)}"
     )
-    assert consts[consts.index("--on-error") + 1] == "abort", (
-        f"{path}:{lineno} does not request --on-error abort"
-    )
+
+# The constructor's own argv is asserted byte for byte at runtime, by
+# test_constructor_builds_the_mandatory_argv above: it assembles the list
+# across several statements, so a static read of one literal cannot see it.
