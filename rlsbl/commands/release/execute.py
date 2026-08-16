@@ -529,11 +529,73 @@ def _widened_window_base(state_path, *, cwd):
     return None
 
 
+# Written onto the release state when the guard determines that this
+# candidate's push window cannot trigger the project's CI and the release owes
+# a ``run_all`` dispatch once the commit is on the remote. Names the SHA the
+# dispatch must correlate to, so a dispatch is never made for a candidate other
+# than the one the guard judged, and a crash between the push and the dispatch
+# is repaired by a resume rather than silently skipped.
+RUN_ALL_DISPATCH_KEY = "run_all_dispatch_for"
+
+
+def _has_published_candidate(state_path):
+    """Did an earlier attempt already push a candidate for this release?
+
+    ``BRANCH_PUSHED`` is the only marker that says so, and it is the whole
+    discriminator between the two empty-window shapes: a fresh release whose
+    own version-bump commit somehow misses every filter (a configuration
+    defect, refused), and a resume whose fix-forward is honestly narrow (the
+    commit is owed a dispatch, not a refusal). The state's ``candidate_sha``
+    cannot serve: the single-release path rewrites it with the NEW tip before
+    the guard runs.
+    """
+    state = load_release_state(state_path) or {}
+    return "BRANCH_PUSHED" in (state.get("completed_steps") or [])
+
+
+def _owe_run_all_dispatch(state_path, candidate_sha):
+    """Record that *candidate_sha* needs a ``run_all`` dispatch after its push."""
+    state = load_release_state(state_path) or {}
+    state[RUN_ALL_DISPATCH_KEY] = candidate_sha
+    save_release_state(state_path, state)
+
+
+def run_all_dispatch_owed(state_path, candidate_sha):
+    """Is a ``run_all`` dispatch owed for exactly *candidate_sha*?"""
+    state = load_release_state(state_path) or {}
+    return bool(candidate_sha) and state.get(RUN_ALL_DISPATCH_KEY) == candidate_sha
+
+
+def clear_run_all_dispatch(state_path):
+    """Forget the owed dispatch: it has been made and correlated."""
+    state = load_release_state(state_path) or {}
+    if state.pop(RUN_ALL_DISPATCH_KEY, None) is not None:
+        save_release_state(state_path, state)
+
+
+def dispatch_owed_run_all(state_path, *, candidate_sha, branch, config=None,
+                          log=None):
+    """Make the owed ``run_all`` dispatch for *candidate_sha*, once.
+
+    Called AFTER the candidate is on the remote -- the dispatch resolves a ref,
+    so the commit has to be there for the run to be about it at all. That
+    ordering is the whole point of the fix: the guard used to refuse before the
+    push, which made its own prescribed remedy unreachable.
+    """
+    from ..watch import dispatch_run_all
+
+    if not run_all_dispatch_owed(state_path, candidate_sha):
+        return None
+    entry = dispatch_run_all(branch, candidate_sha, config=config, log=log)
+    clear_run_all_dispatch(state_path)
+    return entry
+
+
 def _guard_empty_candidate_window(*, candidate_sha, remote_head, needs_push,
                                   state_path, monorepo_root, monorepo_name,
                                   releasable_name, version, tag, branch,
                                   cwd, log):
-    """Refuse a candidate whose diff window cannot trigger this project's CI.
+    """Judge a candidate whose diff window cannot trigger this project's CI.
 
     The generated monorepo router gates each project's CI job on a
     dorny/paths-filter over the paths a push touched, computed against the
@@ -544,23 +606,38 @@ def _guard_empty_candidate_window(*, candidate_sha, remote_head, needs_push,
     candidate was already pushed, the fix commit touches somebody else's
     paths, and the new window no longer contains the version bump at all.
 
+    Two shapes, two answers:
+
+    - **A resume owed a push, whose candidate was already published once**
+      (``BRANCH_PUSHED`` recorded). The fix-forward is honestly narrow and
+      widening it would be a lie in the history, so the release PUSHES the
+      candidate and dispatches the router itself with ``run_all=true``, then
+      gates on the dispatched run. Refusing here instead deadlocked the
+      remedy: the dispatch resolves a ref, so it needs the very commit the
+      refusal was withholding. The dispatch is recorded as owed on the state
+      (:data:`RUN_ALL_DISPATCH_KEY`) and made by the caller after the push.
+    - **Anything else** -- a fresh release whose own version-bump commit
+      matches none of its filters -- is a configuration defect, and stays a
+      hard error. Nothing is pushed, tagged or finalized, the state stays
+      resumable, and the version is not burnt.
+
+    A repository with no generated router on disk has nothing to dispatch, so
+    the refusal stands there too.
+
     Only monorepo projects have a router, so a standalone repository (whose CI
     runs on every push) is not guarded. Neither is a branch with no remote
     head -- there is no before-SHA, hence no window to reason about.
-
-    Raises :class:`ReleaseCIError`: nothing is pushed, tagged or finalized, the
-    state stays resumable, and the version is not burnt.
     """
     if not (monorepo_root and monorepo_name):
-        return
+        return None
     if not remote_head:
-        return
+        return None
 
     patterns = _release_router_patterns(
         monorepo_root, monorepo_name, releasable_name,
     )
     if not patterns:
-        return
+        return None
 
     base_sha = remote_head
     if not needs_push:
@@ -580,12 +657,27 @@ def _guard_empty_candidate_window(*, candidate_sha, remote_head, needs_push,
             f"pre-check is skipped and the CI gate decides.",
             file=sys.stderr,
         )
-        return
+        return None
     if any(
         _router_pattern_matches(path, pattern)
         for path in changed for pattern in patterns
     ):
-        return
+        return None
+
+    from ..watch import router_workflow_path
+
+    if needs_push and _has_published_candidate(state_path) and (
+        router_workflow_path(monorepo_root)
+    ):
+        _owe_run_all_dispatch(state_path, candidate_sha)
+        log(
+            f"The candidate's push window cannot trigger {monorepo_name}'s "
+            f"router job, and its candidate was already published once: "
+            f"pushing {candidate_sha[:12]} and dispatching the router with "
+            f"run_all=true instead of refusing (nothing is waived -- every "
+            f"member's real CI jobs run on this exact commit)"
+        )
+        return RUN_ALL_DISPATCH_KEY
 
     detail = _empty_candidate_window_message(
         version=version, tag=tag, branch=branch, candidate_sha=candidate_sha,
@@ -2247,6 +2339,18 @@ def _run_release_mutating(state: ReleaseState):
                     f"({str(flags['ci-verified-sha'])[:12]})"
                 )
             else:
+                # The candidate is on the remote now. If the window guard
+                # judged that this push cannot trigger the project's router
+                # job -- an honestly narrow fix-forward on a resume -- the
+                # dispatch it recorded as owed is made HERE, before the gate,
+                # so the gate has a run that actually exercises this project
+                # to read. Recorded on the state rather than kept in memory:
+                # a crash between the push and the dispatch is then repaired
+                # by a resume instead of walking into a skipped-check refusal.
+                dispatch_owed_run_all(
+                    _state_path, candidate_sha=candidate_sha, branch=branch,
+                    config=ctx.config, log=log,
+                )
                 _ci_timeout = get_ci_timeout(
                     ctx.config, override=flags.get("ci-timeout"),
                 )

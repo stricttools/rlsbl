@@ -15,7 +15,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -75,13 +75,21 @@ class TestReleaseRouterPatterns:
         assert ".rlsbl-monorepo/releasables/alpha/CHANGELOG.md" in patterns
 
 
-def _prepare_resumable_candidate(root, core, unrelated_path="docs/notes.md"):
+def _prepare_resumable_candidate(root, core, unrelated_path="docs/notes.md",
+                                 published=True):
     """Stage the resumed-sibling shape.
 
     The release's version-bump commit is ALREADY the remote head (a previous
     attempt pushed it as the candidate and CI came back red). The operator
     fixed forward -- but the fix touches somebody else's paths, so the new
     push window no longer contains anything of this project's.
+
+    ``published=False`` drops the ``BRANCH_PUSHED`` marker and the recorded
+    candidate: an attempt that committed but never published one. That is the
+    discriminator the guard branches on -- an empty window with no prior
+    published candidate is a configuration defect and stays a hard error, while
+    the published shape is an honestly narrow fix-forward that rlsbl pushes and
+    dispatches ``run_all`` for.
     """
     pkg = json.loads((core / "package.json").read_text())
     pkg["version"] = "1.0.1"
@@ -115,10 +123,10 @@ def _prepare_resumable_candidate(root, core, unrelated_path="docs/notes.md"):
         "blog": False,
         "completed_steps": [
             "VERSION_BUMPED", "COMMITTED", "SNAPSHOT_REGENERATED",
-            "BRANCH_PUSHED",
+            *(["BRANCH_PUSHED"] if published else []),
         ],
         "release_commits": [bump_sha],
-        "candidate_sha": bump_sha,
+        **({"candidate_sha": bump_sha} if published else {}),
     })
     return state_path, bump_sha
 
@@ -169,10 +177,22 @@ def _run_resume(root, core, remote_head, extra_patches=()):
 
 
 class TestEmptyWindowRefusedBeforeTheCiWait:
+    """No candidate was ever published, so an empty window is a config defect.
 
-    def test_resumed_sibling_window_is_refused(self, tmp_project, capsys):
-        core = _setup_releasable_workspace(tmp_project)
-        _state_path, bump_sha = _prepare_resumable_candidate(tmp_project, core)
+    The workspace here HAS a generated router, so the refusal is the guard's
+    verdict on the shape rather than an artifact of having nothing to dispatch.
+    """
+
+    def _staged(self, tmp_project):
+        core = _setup_releasable_workspace(
+            tmp_project, root_workflows=("ci-router.yml",),
+        )
+        return core, _prepare_resumable_candidate(
+            tmp_project, core, published=False,
+        )
+
+    def test_an_unpublished_candidate_window_is_refused(self, tmp_project, capsys):
+        core, (_state_path, bump_sha) = self._staged(tmp_project)
 
         waits = []
         with patch(
@@ -192,8 +212,7 @@ class TestEmptyWindowRefusedBeforeTheCiWait:
         assert "rlsbl release resume" in err
 
     def test_nothing_was_pushed(self, tmp_project):
-        core = _setup_releasable_workspace(tmp_project)
-        _state_path, bump_sha = _prepare_resumable_candidate(tmp_project, core)
+        core, (_state_path, bump_sha) = self._staged(tmp_project)
 
         with patch("rlsbl.commands.release.push_if_needed") as pushed:
             with pytest.raises(SystemExit):
@@ -205,8 +224,7 @@ class TestEmptyWindowRefusedBeforeTheCiWait:
         pushed.assert_not_called()
 
     def test_no_tag_was_created(self, tmp_project):
-        core = _setup_releasable_workspace(tmp_project)
-        _state_path, bump_sha = _prepare_resumable_candidate(tmp_project, core)
+        core, (_state_path, bump_sha) = self._staged(tmp_project)
 
         with pytest.raises(SystemExit):
             _run_resume(tmp_project, core, remote_head=bump_sha)
@@ -266,6 +284,135 @@ class TestWindowThatDoesTriggerCiIsAllowed:
             version="1.0.1", tag="alpha@v1.0.1", branch="main",
             cwd=str(tmp_project), log=lambda m: None,
         )
+
+
+class TestStrandedResumeDispatchesRunAllItself:
+    """The single-release path's twin of the batch orchestrator's fix.
+
+    `rlsbl release run` on one member reaches the SAME guard, from
+    ``phase_a``'s GUARD_CANDIDATE_WINDOW step, and deadlocked the same way: the
+    refusal fired before the push, while its own prescribed remedy (dispatch
+    the router at the candidate with ``run_all=true``) needs the fix commit on
+    the remote to be dispatchable at all.
+
+    On a resume whose candidate was already published once, the release now
+    pushes the candidate and dispatches the router itself, then gates on the
+    dispatched run. The refusal stays for the fresh case.
+    """
+
+    def _staged(self, tmp_project):
+        """The stranded shape, in a workspace that HAS a generated router."""
+        core = _setup_releasable_workspace(
+            tmp_project, root_workflows=("ci-router.yml",),
+        )
+        _state_path, bump_sha = _prepare_resumable_candidate(tmp_project, core)
+        return core, bump_sha
+
+    @staticmethod
+    def _gh_recorder(head_sha, calls):
+        def fake_gh(args, **kwargs):
+            calls.append(list(args))
+            if list(args[:2]) == ["run", "list"]:
+                return json.dumps([{
+                    "databaseId": 77,
+                    "headSha": head_sha,
+                    "status": "queued",
+                    "workflowName": "CI Router",
+                }])
+            return ""
+        return fake_gh
+
+    def test_the_candidate_is_pushed_and_run_all_is_dispatched(self, tmp_project):
+        core, bump_sha = self._staged(tmp_project)
+        head = _git_head(tmp_project)
+        calls = []
+        # Through extra_patches: _run_resume patches the same name itself, and
+        # its patch is started last, so a plain nested one would be shadowed.
+        pushed = MagicMock()
+
+        with patch("rlsbl.commands.watch.run_gh",
+                   side_effect=self._gh_recorder(head, calls)):
+            _run_resume(
+                tmp_project, core, remote_head=bump_sha,
+                extra_patches=(
+                    patch("rlsbl.commands.release.push_if_needed", pushed),
+                ),
+            )
+
+        # The FIRST push is the candidate (the later one carries the
+        # finalization commits and the tags).
+        assert pushed.call_args_list, "the candidate was never pushed"
+        assert pushed.call_args_list[0].kwargs["sha"] == head
+        assert any(
+            call[:2] == ["workflow", "run"]
+            and "ci-router.yml" in call
+            and "run_all=true" in call
+            for call in calls
+        ), f"the release must dispatch the run_all workflow itself; got {calls}"
+
+    def test_the_release_completes_at_the_same_version(self, tmp_project):
+        core, bump_sha = self._staged(tmp_project)
+        head = _git_head(tmp_project)
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        state_path = get_state_path(str(tmp_project), releasable_dir=rel_dir)
+        calls = []
+
+        with patch("rlsbl.commands.watch.run_gh",
+                   side_effect=self._gh_recorder(head, calls)):
+            _run_resume(tmp_project, core, remote_head=bump_sha)
+
+        tags = subprocess.run(
+            ["git", "tag", "--list", "alpha@v1.0.1"],
+            cwd=str(tmp_project), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert tags == "alpha@v1.0.1"
+        assert not os.path.exists(state_path)
+
+    def test_a_fresh_release_is_still_refused(self, tmp_project, capsys):
+        """No prior published candidate: an empty window is a config defect."""
+        from rlsbl.commands.release.execute import _guard_empty_candidate_window
+
+        _setup_releasable_workspace(
+            tmp_project, root_workflows=("ci-router.yml",),
+        )
+        head = _git_head(tmp_project)
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        state_path = get_state_path(str(tmp_project), releasable_dir=rel_dir)
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        save_release_state(state_path, {
+            "release_commits": [],
+            "completed_steps": ["VERSION_BUMPED", "COMMITTED"],
+        })
+
+        with pytest.raises(Exception) as exc:
+            _guard_empty_candidate_window(
+                candidate_sha=head, remote_head=head, needs_push=True,
+                state_path=state_path,
+                monorepo_root=str(tmp_project), monorepo_name="core",
+                releasable_name="alpha",
+                version="1.0.1", tag="alpha@v1.0.1", branch="main",
+                cwd=str(tmp_project), log=lambda m: None,
+            )
+        assert "cannot trigger this project's CI" in str(exc.value)
+
+    def test_no_router_on_disk_leaves_the_refusal_in_place(self, tmp_project):
+        """Nothing to dispatch: the honest answer is still the hard error."""
+        from rlsbl.commands.release.execute import _guard_empty_candidate_window
+
+        core = _setup_releasable_workspace(tmp_project)
+        state_path, bump_sha = _prepare_resumable_candidate(tmp_project, core)
+        head = _git_head(tmp_project)
+
+        with pytest.raises(Exception) as exc:
+            _guard_empty_candidate_window(
+                candidate_sha=head, remote_head=bump_sha, needs_push=True,
+                state_path=state_path,
+                monorepo_root=str(tmp_project), monorepo_name="core",
+                releasable_name="alpha",
+                version="1.0.1", tag="alpha@v1.0.1", branch="main",
+                cwd=str(tmp_project), log=lambda m: None,
+            )
+        assert "cannot trigger this project's CI" in str(exc.value)
 
 
 class TestCandidateAlreadyOnTheRemote:

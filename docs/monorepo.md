@@ -343,13 +343,23 @@ Nothing is waived by the dispatch. The jobs execute for real, and a job that fai
 
 One wrinkle both gates handle explicitly: GitHub does not expand a matrix for a job its `if` skipped. The skipped job collapses to a single check run under the unsuffixed name (`cli-ci / test`), while the run that executes it emits one per leg (`cli-ci / test (3.12)`). They never share a name, so a plain per-name collapse would leave the skip standing. A `skipped` check is therefore dropped when a strictly later check run for the **same job** -- its matrix expansion, matched by name -- exists; the legs are then judged on their own conclusions. Nothing else can cover a skip: not a sibling job, not a merely prefix-sharing name (`test-extra` is a different job), and not an earlier run. If the skip is the latest word about that job, it stands and the gate refuses.
 
-Typical sequence when a release stops at a skipped member:
+Typical sequence when a release stops at a skipped member, after the run has already concluded:
 
 ```bash
 gh workflow run ci-router.yml --ref main -f run_all=true
 gh run watch <run-id>
 rlsbl release resume
 ```
+
+### rlsbl dispatches it itself when a resume's window is empty
+
+The dispatch above needs the commit **on the remote**, because it resolves a ref. That used to deadlock: a resume whose fix-forward touched none of the releasing project's paths was refused by the pre-push window guard, and the refusal withheld the very push the prescribed remedy required.
+
+So on exactly that shape -- a push is owed **and** an earlier attempt already published a candidate (`BRANCH_PUSHED` is recorded) -- the release no longer refuses. It pushes the candidate, dispatches `ci-router.yml` with `run_all=true` itself, correlates the created run to the pushed commit by head SHA, and then runs the CI gate on it. The dispatch is recorded as owed on the release state before the push, so a crash in between is repaired by `rlsbl release resume` rather than walking into a skipped-check refusal.
+
+Nothing is relaxed by this. Every member's real jobs run on the candidate, a failure still blocks the release, and the correlation is fail-closed: if the dispatched run belongs to some other commit (something else reached the branch in between), that is a hard error rather than a gate on a run nobody established.
+
+The refusal stays for every other empty window -- most of all a **fresh** release whose own version-bump commit matches none of its filters, which is a configuration defect and not an honestly narrow fix-forward. A workspace with no generated `ci-router.yml` on disk has nothing to dispatch, so it keeps the refusal too.
 
 ## Workspace checks
 

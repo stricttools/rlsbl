@@ -289,8 +289,10 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
     # per-member push site, so one mock.patch covers every push in a batch.
     from ..release import push_if_needed
     from ..release.execute import (
-        _guard_empty_candidate_window, guard_foreign_commits,
+        _guard_empty_candidate_window, clear_run_all_dispatch,
+        guard_foreign_commits, run_all_dispatch_owed,
     )
+    from ..watch import dispatch_run_all
     from ..release.release_state import (
         load_release_state, save_release_state, save_step,
     )
@@ -341,6 +343,20 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
         f"Pushed the batch release candidate {sha[:12]} to origin/{branch} "
         f"(untagged, {len(pending)} member(s))"
     )
+
+    # A stranded batch -- members whose candidate was already published, went
+    # red, and were fixed forward outside every member's paths -- owes a
+    # run_all dispatch, and it is owed HERE: the dispatch resolves a ref, so it
+    # needs the commit that was just pushed. ONE dispatch covers the batch (the
+    # router runs every member's jobs in one run), so it is made once and every
+    # owed member's marker is cleared against that same SHA.
+    owed = [
+        p for p in pending if run_all_dispatch_owed(p[2], sha)
+    ]
+    if owed:
+        dispatch_run_all(branch, sha, log=log)
+        for _name, _project_dir, _state_path in owed:
+            clear_run_all_dispatch(_state_path)
 
     # Record the publication in every member's state: the candidate is on the
     # remote now, so a later resume must neither re-push it nor roll back past

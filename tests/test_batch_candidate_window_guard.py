@@ -14,6 +14,7 @@ member's paths were touched, which is exactly the half-skipped batch this
 whole two-pass design exists to prevent.
 """
 
+import json
 import os
 from unittest.mock import patch
 
@@ -59,6 +60,36 @@ def _seed_member_states(root, bump_shas):
             "releasable_name": rel_name,
             "release_commits": [bump_shas[rel_name]],
             "completed_steps": ["VERSION_BUMPED", "COMMITTED"],
+        })
+        pending.append((rel_name, os.path.join(str(root), rel_name), state_path))
+    return pending
+
+
+def _seed_stranded_member_states(root, bump_shas, candidate_sha):
+    """One in-progress state per member, as a STRANDED resume leaves them.
+
+    The distinguishing fact against :func:`_seed_member_states`: an earlier
+    attempt already pushed a candidate (``BRANCH_PUSHED`` is recorded and
+    ``candidate_sha`` names the commit that reached the remote), and CI came
+    back red. The operator fixed forward outside every member's paths.
+    """
+    pending = []
+    for rel_name, project_name in MEMBERS:
+        rel_dir = get_releasable_dir(str(root), rel_name)
+        state_path = get_state_path(str(root), releasable_dir=rel_dir)
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        save_release_state(state_path, {
+            "new_version": "1.0.1",
+            "tag": f"{rel_name}@v1.0.1",
+            "branch": "main",
+            "registry": "npm",
+            "monorepo_name": project_name,
+            "releasable_name": rel_name,
+            "release_commits": [bump_shas[rel_name]],
+            "candidate_sha": candidate_sha,
+            "completed_steps": [
+                "VERSION_BUMPED", "COMMITTED", "BRANCH_PUSHED",
+            ],
         })
         pending.append((rel_name, os.path.join(str(root), rel_name), state_path))
     return pending
@@ -204,3 +235,111 @@ class TestBatchCandidateWindowGuard:
                 pin_sha=None, trail=(),
             )
         pushed.assert_called_once()
+
+
+class TestStrandedResumeDispatchesRunAllItself:
+    """The guard used to deadlock its own remedy.
+
+    A batch whose members were already published as a candidate, went red, and
+    were fixed forward outside every member's paths hit the guard BEFORE the
+    push -- and the guard's prescribed remedy (dispatch the router at the
+    candidate with ``run_all=true``) needs that fix commit ON THE REMOTE to be
+    dispatchable at all. Refusing before the push made the remedy unreachable:
+    the release could neither proceed nor be repaired.
+
+    So for exactly that shape -- a push is owed AND a prior candidate was
+    already published -- rlsbl pushes the candidate and dispatches the run_all
+    workflow itself, then gates on the dispatched run. The refusal stays for the
+    fresh case, where an empty window is a configuration defect rather than an
+    honestly narrow fix-forward.
+    """
+
+    def _stranded(self, tmp_project):
+        """Both members published, red, then a fix-forward outside every watch."""
+        _setup_releasable_batch_workspace(tmp_project)
+        wf_dir = tmp_project / ".github" / "workflows"
+        wf_dir.mkdir(parents=True, exist_ok=True)
+        (wf_dir / "ci-router.yml").write_text(
+            "name: CI Router\non:\n  push:\n    branches: [main]\n"
+            "  workflow_dispatch:\n    inputs:\n      run_all:\n"
+            "        type: boolean\njobs: {}\n"
+        )
+        git(tmp_project, "add", ".github/workflows/ci-router.yml")
+        git(tmp_project, "commit", "-q", "-m", "ci: router")
+        bump_shas = {}
+        for rel_name, _project_name in MEMBERS:
+            bump_shas[rel_name] = _commit_touching(
+                tmp_project, f"{rel_name}/package.json", f"{rel_name}@v1.0.1",
+            )
+        published = git(tmp_project, "rev-parse", "HEAD")
+        pending = _seed_stranded_member_states(
+            tmp_project, bump_shas, published,
+        )
+        fix_sha = _commit_touching(
+            tmp_project, "docs/notes.md", "docs: fix forward",
+        )
+        return pending, published, fix_sha
+
+    @staticmethod
+    def _gh_recorder(head_sha, calls):
+        def fake_gh(args, **kwargs):
+            calls.append(list(args))
+            if list(args[:2]) == ["run", "list"]:
+                return json.dumps([{
+                    "databaseId": 4242,
+                    "headSha": head_sha,
+                    "status": "queued",
+                    "workflowName": "CI Router",
+                    "event": "workflow_dispatch",
+                }])
+            return ""
+        return fake_gh
+
+    def test_the_candidate_is_pushed_and_run_all_is_dispatched(self, tmp_project):
+        pending, published, fix_sha = self._stranded(tmp_project)
+        calls = []
+
+        with patch("rlsbl.commands.watch.run_gh",
+                   side_effect=self._gh_recorder(fix_sha, calls)):
+            pushed = _run_candidate_push(
+                tmp_project, pending, remote_head=published,
+            )
+
+        pushed.assert_called_once()
+        assert any(
+            call[:2] == ["workflow", "run"]
+            and "ci-router.yml" in call
+            and "run_all=true" in call
+            for call in calls
+        ), (
+            f"the release must dispatch the run_all workflow itself; gh calls: "
+            f"{calls}"
+        )
+
+    def test_the_dispatch_is_correlated_to_the_pushed_candidate(self, tmp_project):
+        """A dispatched run for some other commit proves nothing: fail closed."""
+        pending, published, _fix = self._stranded(tmp_project)
+        calls = []
+
+        with patch("rlsbl.commands.watch.run_gh",
+                   side_effect=self._gh_recorder("f" * 40, calls)), \
+             patch("rlsbl.commands.watch.RUN_ALL_DISPATCH_ATTEMPTS", 2), \
+             patch("rlsbl.commands.watch.RUN_ALL_DISPATCH_INTERVAL", 0):
+            with pytest.raises(Exception) as exc:
+                _run_candidate_push(
+                    tmp_project, pending, remote_head=published,
+                )
+        assert "run_all" in str(exc.value)
+
+    def test_no_resumable_failure_is_recorded(self, tmp_project):
+        pending, published, fix_sha = self._stranded(tmp_project)
+        calls = []
+
+        with patch("rlsbl.commands.watch.run_gh",
+                   side_effect=self._gh_recorder(fix_sha, calls)):
+            _run_candidate_push(tmp_project, pending, remote_head=published)
+
+        for _name, _dir, state_path in pending:
+            state = load_release_state(state_path)
+            assert "CI_VERIFIED" not in (state.get("failed_steps") or {})
+            assert "BRANCH_PUSHED" in state["completed_steps"]

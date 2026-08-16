@@ -659,6 +659,118 @@ def push_triggered_workflows(repo_root=None):
     return found
 
 
+# A dispatched workflow run does not exist the instant ``gh workflow run``
+# returns: GitHub creates it asynchronously. The correlation poll below is what
+# turns "the dispatch was accepted" into "a run exists for THIS commit", which
+# is the only statement the CI gate can act on.
+RUN_ALL_DISPATCH_ATTEMPTS = 12
+RUN_ALL_DISPATCH_INTERVAL = 5
+
+
+class RunAllDispatchError(Exception):
+    """The router's ``run_all`` dispatch could not be made or correlated.
+
+    Fail-closed: the release refuses rather than entering a CI gate that would
+    read a run nobody established, or wait out its whole budget on runs that
+    were never created.
+    """
+
+
+def router_workflow_path(workspace_root):
+    """The generated CI router's path under *workspace_root*, or None."""
+    from ..ci_router import CI_ROUTER_FILE
+
+    path = os.path.join(
+        str(workspace_root), ".github", "workflows", CI_ROUTER_FILE,
+    )
+    return path if os.path.exists(path) else None
+
+
+def dispatch_run_all(branch, commit_sha, *, config=None, log=None,
+                     attempts=None, interval=None):
+    """Dispatch the CI router at *branch* with ``run_all=true``, for *commit_sha*.
+
+    The router filters every project's job on the paths a PUSH touched, so an
+    honestly narrow fix-forward leaves most members' jobs ``skipped`` -- a
+    conclusion both the release gate and the publish gate refuse. Dispatching
+    the router on the same commit with the filter short-circuited runs every
+    member's real CI jobs; the later run's check runs supersede the skipped
+    ones per name (:func:`rlsbl.ci_checks.latest_check_runs`). Nothing is
+    waived: a job that fails in the dispatched run still blocks the release.
+
+    The dispatch names a REF, not a commit, so the run it creates is correlated
+    back to *commit_sha* by head SHA before this returns. A run for any other
+    commit -- something pushed to the branch between the release's own push and
+    the dispatch -- proves nothing about the candidate and is a hard error.
+
+    Returns the correlated run dict. Raises :class:`RunAllDispatchError`.
+    """
+    from ..ci_router import CI_ROUTER_FILE
+    from .monorepo.sync import RUN_ALL_INPUT
+
+    # Read at call time, not bound as defaults, so the correlation budget is
+    # one knob a caller (or a test) can turn.
+    attempts = max(1, attempts or RUN_ALL_DISPATCH_ATTEMPTS)
+    interval = RUN_ALL_DISPATCH_INTERVAL if interval is None else interval
+
+    def _log(msg):
+        (log or (lambda m: print(m, file=sys.stderr)))(msg)
+
+    _log(
+        f"Dispatching {CI_ROUTER_FILE} on {branch} with {RUN_ALL_INPUT}=true "
+        f"so every member's CI runs on {commit_sha[:12]}"
+    )
+    try:
+        run_gh(
+            ["workflow", "run", CI_ROUTER_FILE, "--ref", branch,
+             "-f", f"{RUN_ALL_INPUT}=true"],
+            config=config,
+        )
+    except Exception as exc:
+        raise RunAllDispatchError(
+            f"could not dispatch {CI_ROUTER_FILE} with {RUN_ALL_INPUT}=true on "
+            f"{branch}: {exc}\n"
+            f"The candidate is on the remote, untagged; nothing was tagged, "
+            f"released or finalized and no version is burnt.\n"
+            f"A router generated before the {RUN_ALL_INPUT} input existed "
+            f"rejects the input -- regenerate it with `rlsbl monorepo sync`, "
+            f"commit it, and resume."
+        ) from exc
+
+    for _ in range(attempts):
+        try:
+            raw = run_gh(
+                ["run", "list", "--workflow", CI_ROUTER_FILE,
+                 "--event", "workflow_dispatch", "--limit", "20",
+                 "--json", "databaseId,headSha,status,workflowName"],
+                config=config,
+            )
+            for entry in json.loads(raw) or []:
+                if entry.get("headSha") == commit_sha:
+                    _log(
+                        f"Dispatched run {entry.get('databaseId')} is on "
+                        f"{commit_sha[:12]}; the CI gate will read it"
+                    )
+                    return entry
+        except RunAllDispatchError:
+            raise
+        except Exception:
+            pass
+        time.sleep(interval)
+
+    raise RunAllDispatchError(
+        f"dispatched {CI_ROUTER_FILE} with {RUN_ALL_INPUT}=true on {branch}, "
+        f"but no dispatched run appeared for the candidate {commit_sha} within "
+        f"{attempts * interval}s.\n"
+        f"The candidate is on the remote, untagged; nothing was tagged, "
+        f"released or finalized and no version is burnt.\n"
+        f"A dispatch resolves the ref at dispatch time, so a commit pushed to "
+        f"{branch} in between would have taken the run instead. Check "
+        f"`gh run list --workflow {CI_ROUTER_FILE}`, make {branch} point at the "
+        f"candidate again, and resume."
+    )
+
+
 def wait_for_ci_green(commit_sha, *, timeout, check_filters, log=None,
                       config=None, repo_root=None, label=None,
                       discovery_grace=CI_DISCOVERY_GRACE_SECONDS):
