@@ -1408,7 +1408,10 @@ def _patch_schema_version(project_dir, version):
     match = _SCHEMA_VERSION_LINE.search(content)
     if match is None:
         raise ReleaseValidationError(
-            f"{schema_path} has no top-level 'version' key"
+            f"{schema_path} has no top-level 'version' key on a line of its "
+            "own. Either the schema declares no version, or the file is not in "
+            "strictcli's canonical encoding -- which means something other "
+            "than a strictcli dump wrote it."
         )
 
     # The value is re-encoded as a JSON string literal in the same canonical

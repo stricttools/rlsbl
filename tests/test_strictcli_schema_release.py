@@ -13,6 +13,28 @@ from rlsbl.commands.release.validate import ReleaseValidationError
 from rlsbl.release_file import ReleaseConfig
 
 
+# A schema document in strictcli's own canonical v2 encoding, which is the only
+# shape this file's subject ever meets: two-space indent, one member per line,
+# `": "` between key and value, empty containers inline, one trailing newline.
+# The version patch is textual and anchored to that shape on purpose -- a
+# decode/re-encode round trip silently rewrites the whole document (see
+# tests/test_schema_version_patch.py).
+_CANONICAL_SCHEMA = """\
+{
+  "schema_version": 2,
+  "version": "1.0.0",
+  "commands": []
+}
+"""
+
+_CANONICAL_SCHEMA_WITHOUT_VERSION = """\
+{
+  "schema_version": 2,
+  "commands": []
+}
+"""
+
+
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
     return ReleaseConfig(
@@ -150,7 +172,7 @@ class TestStrictcliSchemaDumpFunction:
         schema_dir = tmp_path / ".strictcli"
         schema_dir.mkdir()
         schema_path = schema_dir / "schema.json"
-        schema_path.write_text(json.dumps({"version": "1.0.0", "commands": []}))
+        schema_path.write_text(_CANONICAL_SCHEMA)
 
         messages = []
         with patch("rlsbl.commands.release.effects") as mock_sp:
@@ -178,7 +200,7 @@ class TestStrictcliSchemaDumpFunction:
         schema_dir = tmp_path / ".strictcli"
         schema_dir.mkdir()
         schema_path = schema_dir / "schema.json"
-        schema_path.write_text(json.dumps({"version": "1.0.0", "commands": []}))
+        schema_path.write_text(_CANONICAL_SCHEMA)
 
         messages = []
         with patch("rlsbl.commands.release.effects") as mock_sp:
@@ -224,7 +246,7 @@ class TestStrictcliSchemaDumpFunction:
         schema_dir = tmp_path / ".strictcli"
         schema_dir.mkdir()
         schema_path = schema_dir / "schema.json"
-        schema_path.write_text(json.dumps({"commands": []}))
+        schema_path.write_text(_CANONICAL_SCHEMA_WITHOUT_VERSION)
 
         messages = []
         with patch("rlsbl.commands.release.effects") as mock_sp:
@@ -232,7 +254,7 @@ class TestStrictcliSchemaDumpFunction:
             mock_sp.CalledProcessError = subprocess.CalledProcessError
             mock_sp.TimeoutExpired = subprocess.TimeoutExpired
 
-            with pytest.raises(ReleaseValidationError, match="no 'version' key"):
+            with pytest.raises(ReleaseValidationError, match="no top-level 'version' key"):
                 _run_strictcli_schema_dump(
                     {}, lambda msg: messages.append(msg),
                     project_dir=str(tmp_path),
