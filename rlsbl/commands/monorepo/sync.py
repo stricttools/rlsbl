@@ -191,9 +191,10 @@ def router_filter_patterns(project, releasables=None):
 #
 # Dispatching the router at the candidate with ``run_all=true`` re-runs the SAME
 # commit with the filter short-circuited, so every member's job runs for real.
-# Nothing is relaxed: the jobs still have to pass, and the later run's check runs
-# supersede the skipped ones per name under the collapse-to-latest rule both
-# gates already apply (:func:`rlsbl.ci_checks.latest_check_runs`).
+# Nothing is relaxed: the jobs still have to pass, and the dispatched run's real
+# conclusions supersede the skipped ones per name under the rule both gates
+# apply (:func:`rlsbl.ci_checks.latest_check_runs`) -- a skip is the absence of
+# a verdict, so the order in which GitHub stamped the two suites is irrelevant.
 #
 # ``inputs`` is empty outside ``workflow_dispatch``/``workflow_call``, so on a
 # push ``inputs.run_all`` is null -- falsy, and the filter decides alone.

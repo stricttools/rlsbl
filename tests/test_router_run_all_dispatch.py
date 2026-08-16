@@ -13,10 +13,11 @@ and abandoning the version.
 
 ``workflow_dispatch`` with ``run_all: true`` is the third exit and the
 structural one: it re-runs the SAME commit with the filter short-circuited, so
-every member's job runs for real. The later run's check runs supersede the
-skipped ones per name (the collapse-to-latest rule both gates already apply),
-so the release gate then sees a genuine success everywhere. Nothing is relaxed:
-the jobs must still pass.
+every member's job runs for real. The dispatched run's conclusions supersede
+the skipped ones per name -- a skip is the absence of a verdict, so it loses to
+any real conclusion of the same name whichever suite GitHub stamped first -- and
+the release gate then sees a genuine success everywhere. Nothing is relaxed: the
+jobs must still pass.
 """
 
 import pytest
@@ -180,18 +181,111 @@ class TestRunAllConclusionsSupersedeSkipped:
             )
         assert "failure" in str(exc.value)
 
-    def test_an_older_success_never_supersedes_a_newer_skip(self):
-        """Ordering is by start time, not by which conclusion we would prefer."""
+    def test_a_pending_check_run_never_counts_as_a_verdict(self):
+        """An in-flight run of the same job is not a conclusion at all."""
+        pending = _check_run("core-ci / test", None, run_id=2,
+                             started_at="2026-08-08T11:00:00Z")
+        pending["status"] = "in_progress"
         runs = [
-            _check_run("core-ci / test", "success", run_id=1,
+            _check_run("core-ci / test", "skipped", run_id=1,
                        started_at="2026-08-08T10:00:00Z"),
-            _check_run("core-ci / test", "skipped", run_id=2,
-                       started_at="2026-08-08T11:00:00Z"),
+            pending,
         ]
-        with pytest.raises(ProjectCINotRunError):
+        with pytest.raises(ProjectCINotRunError) as exc:
             verify_project_ci_ran(
                 "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
             )
+        assert "in_progress" in str(exc.value)
+
+
+class TestASkipRecordedAFTERTheDispatchedVerdict:
+    """A skip stamped later than the dispatched run's real conclusion.
+
+    This is the shape the batch gate actually meets. rlsbl dispatches the
+    router with ``run_all=true`` immediately after pushing the candidate,
+    while the push run's own project jobs are still queued behind the
+    router's ``detect`` job. GitHub stamps a skipped check run only when the
+    job is finally evaluated, so the push run's ``skipped`` routinely carries
+    a LATER ``started_at`` (and a higher id) than the dispatched run's real
+    conclusion for the same job name.
+
+    Ordering by time therefore hands the gate the skip and the candidate is
+    refused although every job ran and passed on it -- the exact promise
+    :data:`RUN_ALL_REMEDY` makes ("the run-all conclusions supersede the
+    skipped ones") going unmet. A ``skipped`` conclusion is the ABSENCE of a
+    verdict, so any completed non-skipped conclusion of the same name
+    supersedes it, whichever check suite recorded it and in whatever order.
+    """
+
+    FILTER = CheckFilter("go-strictcli", r"^(go\-strictcli\-ci) / ")
+
+    def _runs(self, dispatched_conclusion, *, skip_first=False):
+        """The two check runs one SHA carries after a run_all dispatch.
+
+        With *skip_first* false the push run's skip is stamped AFTER the
+        dispatched conclusion -- the ordering that broke the batch gate.
+        """
+        skip_at = "2026-08-08T10:00:00Z" if skip_first else "2026-08-08T11:00:00Z"
+        skip_id = 1 if skip_first else 2
+        return [
+            _check_run("go-strictcli-ci / test", "skipped", run_id=skip_id,
+                       started_at=skip_at),
+            _check_run("go-strictcli-ci / test", dispatched_conclusion,
+                       run_id=3 - skip_id,
+                       started_at="2026-08-08T10:30:00Z"),
+        ]
+
+    def test_a_later_recorded_skip_does_not_hide_the_dispatched_success(self):
+        verify_project_ci_ran(
+            "a" * 40, [self.FILTER], fetch=lambda: self._runs("success"),
+            attempts=1,
+        )
+
+    def test_a_later_recorded_skip_does_not_hide_a_dispatched_failure(self):
+        """Nothing is waived: the dispatched run's failure still blocks."""
+        with pytest.raises(ProjectCINotRunError) as exc:
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER], fetch=lambda: self._runs("failure"),
+                attempts=1,
+            )
+        assert "failure" in str(exc.value)
+
+    def test_the_earlier_recorded_skip_is_superseded_too(self):
+        """Order is irrelevant now: the verdict wins either way."""
+        verify_project_ci_ran(
+            "a" * 40, [self.FILTER],
+            fetch=lambda: self._runs("success", skip_first=True), attempts=1,
+        )
+
+    def test_a_member_with_only_skips_still_refuses(self):
+        """Two suites, both skipped: no verdict exists, so the gate refuses."""
+        runs = [
+            _check_run("go-strictcli-ci / test", "skipped", run_id=1,
+                       started_at="2026-08-08T10:00:00Z"),
+            _check_run("go-strictcli-ci / test", "skipped", run_id=2,
+                       started_at="2026-08-08T11:00:00Z"),
+        ]
+        with pytest.raises(ProjectCINotRunError) as exc:
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+            )
+        assert "go-strictcli: go-strictcli-ci / test: skipped" in str(exc.value)
+        assert RUN_ALL_REMEDY in str(exc.value)
+
+    def test_one_members_supersede_never_covers_another_members_skip(self):
+        """The batch shape: the gate still names the member that never ran."""
+        other = CheckFilter("core", r"^(core\-ci) / ")
+        runs = self._runs("success") + [
+            _check_run("core-ci / test", "skipped", run_id=9,
+                       started_at="2026-08-08T11:00:00Z"),
+        ]
+        with pytest.raises(ProjectCINotRunError) as exc:
+            verify_project_ci_ran(
+                "a" * 40, [self.FILTER, other], fetch=lambda: runs, attempts=1,
+            )
+        message = str(exc.value)
+        assert "core: core-ci / test: skipped" in message
+        assert "go-strictcli" not in message
 
 
 class TestTheRemedyIsNamedWhereTheOperatorHitsIt:
@@ -237,9 +331,12 @@ class TestASkippedMatrixJobIsSupersededByItsLegs:
     whose every job had in fact run and passed.
 
     A ``skipped`` conclusion is the ABSENCE of a verdict, not a verdict. It is
-    dropped only when a strictly later check run for the SAME job (its matrix
-    expansion) exists, and those legs are then judged on their own conclusions.
-    Nothing else can cover a skip: not a sibling job, not an earlier run.
+    dropped when a completed, non-skipped check run for the SAME job (its
+    matrix expansion) exists, and those legs are then judged on their own
+    conclusions. Which suite stamped which first is irrelevant -- a push run
+    records its skip whenever its ``detect`` job finally releases it, often
+    after the dispatched run has already concluded. Nothing else can cover a
+    skip: not a sibling job, not a merely prefix-sharing name.
     """
 
     FILTER = CheckFilter("cli", r"^(cli\-ci) / ")
@@ -273,11 +370,21 @@ class TestASkippedMatrixJobIsSupersededByItsLegs:
             )
         assert "failure" in str(exc.value)
 
-    def test_earlier_legs_do_not_supersede_a_later_skip(self):
-        """The skip is the latest word about that job; it stands."""
+    def test_earlier_legs_supersede_a_later_recorded_skip(self):
+        """A skip stamped after the legs is still the absence of a verdict."""
         runs = self._runs(
             ("cli-ci / test (3.12)", "success", 1, 0),
             ("cli-ci / test", "skipped", 2, 1),
+        )
+        verify_project_ci_ran(
+            "a" * 40, [self.FILTER], fetch=lambda: runs, attempts=1,
+        )
+
+    def test_skipped_legs_never_cover_a_skipped_job(self):
+        """Legs that were themselves skipped answer nothing."""
+        runs = self._runs(
+            ("cli-ci / test", "skipped", 1, 0),
+            ("cli-ci / test (3.12)", "skipped", 2, 1),
         )
         with pytest.raises(ProjectCINotRunError) as exc:
             verify_project_ci_ran(

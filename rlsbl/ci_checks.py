@@ -61,8 +61,9 @@ PASSING_CONCLUSION = "success"
 # alternative the operator otherwise reaches for -- a churn commit under the
 # member's paths, invented solely to widen the window -- is a lie in the history
 # and in the changelog. The dispatch re-runs the SAME commit with the filter
-# short-circuited; the jobs still have to pass, and the later run's check runs
-# supersede the skipped ones per name (:func:`latest_check_runs`).
+# short-circuited; the jobs still have to pass, and the dispatched run's real
+# conclusions supersede the skipped ones per name (:func:`latest_check_runs`),
+# in whichever order GitHub happened to stamp the two suites.
 #
 # rlsbl makes this dispatch ITSELF on the shape that used to deadlock: a resume
 # whose candidate was already published once and whose fix-forward touches none
@@ -249,32 +250,61 @@ SKIPPED_CONCLUSION = "skipped"
 MATRIX_LEG_SUFFIX = " ("
 
 
+def _check_run_order(run):
+    """Recency key for one check run: ``started_at``, then numeric ``id``."""
+    return (run.get("started_at") or "", int(run.get("id") or 0))
+
+
+def has_verdict(run):
+    """True when *run* concluded something other than ``skipped``.
+
+    A check still in flight has no conclusion at all, and ``skipped`` is the
+    ABSENCE of one, so neither can supersede a skip -- only a real verdict can.
+    """
+    return (
+        run.get("status") == "completed"
+        and run.get("conclusion") != SKIPPED_CONCLUSION
+    )
+
+
 def latest_check_runs(check_runs, regex, *, exclude_run_id=None):
-    """Matching check runs, collapsed to the latest verdict per job.
+    """Matching check runs, collapsed to one verdict per job.
 
     Mirrors the publish gate's jq pipeline: filter by name, drop this
-    workflow's own runs, group by name and keep the newest
-    (``started_at``, then numeric ``id``) so a retried run supersedes the
-    stale one it replaced.
+    workflow's own runs, group by name ACROSS EVERY CHECK SUITE on the commit
+    and keep the newest (``started_at``, then numeric ``id``) so a retried run
+    supersedes the stale one it replaced.
 
-    One thing a per-name collapse cannot see on its own: GitHub does not expand
-    a matrix for a job its ``if`` skipped. The whole job collapses to ONE check
+    Recency alone cannot decide a skip, and that is not a detail. A ``run_all``
+    dispatch (see :data:`RUN_ALL_REMEDY`) deliberately puts TWO check runs of
+    the same name on one commit: ``skipped`` from the push-triggered suite
+    whose paths filter found nothing, and a real conclusion from the dispatched
+    suite. rlsbl dispatches immediately after pushing the candidate, while the
+    push run's project jobs are still queued behind the router's ``detect``
+    job -- so GitHub stamps the skip LATER than the dispatched run's verdict as
+    a matter of course. Collapsing purely by time hands the gate the skip and
+    refuses a commit whose jobs all ran and passed.
+
+    So a skip never wins over a verdict: when the latest check run for a name
+    is ``skipped``, it is replaced by the latest COMPLETED non-skipped check
+    run of that same name, in whichever suite and whatever order the two were
+    recorded. Success passes, failure fails -- nothing is waived. When every
+    check run for that name is skipped (or none has concluded), the skip
+    stands and the gate refuses.
+
+    One more thing a per-name collapse cannot see: GitHub does not expand a
+    matrix for a job its ``if`` skipped. The whole job collapses to ONE check
     run under the unsuffixed name (``cli-ci / test``), while the run that
     actually executes it emits one per leg (``cli-ci / test (3.12)``). The two
-    never share a name, so the skip would outlive the run that answered it --
-    which is exactly the state a ``run_all`` dispatch exists to leave behind
-    (see :data:`RUN_ALL_REMEDY`): the push run skipped the job, the dispatched
-    run ran every leg of it.
-
-    So a ``skipped`` check run is dropped when a STRICTLY LATER check run for
-    the SAME job -- its matrix expansion, by name -- exists. The legs are then
-    judged on their own conclusions like any other check, so nothing is waived:
-    a red leg still fails the gate. Nothing else can cover a skip. Not a sibling
-    job, not a merely prefix-sharing name, and not an earlier run: if the skip
-    is the latest word about that job, it stands and the gate refuses.
+    never share a name, so the skip would outlive the run that answered it. A
+    ``skipped`` check run is therefore also dropped when a completed,
+    non-skipped check run for the SAME job -- its matrix expansion, by name --
+    exists; the legs are then judged on their own conclusions, so a red leg
+    still fails the gate. Nothing else can cover a skip: not a sibling job, not
+    a merely prefix-sharing name, and not a leg that was itself skipped.
     """
     pattern = re.compile(regex)
-    by_name: dict[str, tuple] = {}
+    grouped: dict[str, list] = {}
     for run in check_runs:
         name = run.get("name") or ""
         if not pattern.search(name):
@@ -283,16 +313,23 @@ def latest_check_runs(check_runs, regex, *, exclude_run_id=None):
             run.get("details_url") or ""
         ):
             continue
-        key = (run.get("started_at") or "", int(run.get("id") or 0))
-        current = by_name.get(name)
-        if current is None or key >= current[0]:
-            by_name[name] = (key, run)
+        grouped.setdefault(name, []).append(run)
+
+    by_name: dict[str, dict] = {}
+    for name, runs in grouped.items():
+        chosen = max(runs, key=_check_run_order)
+        if chosen.get("conclusion") == SKIPPED_CONCLUSION:
+            verdicts = [r for r in runs if has_verdict(r)]
+            if verdicts:
+                chosen = max(verdicts, key=_check_run_order)
+        by_name[name] = chosen
 
     kept = []
     for name in sorted(by_name):
-        key, run = by_name[name]
+        run = by_name[name]
         if run.get("conclusion") == SKIPPED_CONCLUSION and any(
-            other.startswith(name + MATRIX_LEG_SUFFIX) and by_name[other][0] > key
+            other.startswith(name + MATRIX_LEG_SUFFIX)
+            and has_verdict(by_name[other])
             for other in by_name
         ):
             continue

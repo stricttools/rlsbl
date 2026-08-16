@@ -506,7 +506,13 @@ class TestSkippedMatrixJobSupersededByItsLegs:
         )
         assert [r["conclusion"] for r in _not_success(runs)] == ["skipped"]
 
-    def test_an_earlier_leg_never_covers_a_later_skip(self):
+    def test_an_earlier_leg_covers_a_later_recorded_skip(self):
+        """The push run stamps its skip whenever ``detect`` releases the job.
+
+        That is routinely after the dispatched run already concluded, so the
+        gate cannot decide this by timestamp: a completed, non-skipped leg
+        supersedes the skip whichever suite recorded it first.
+        """
         runs = _dedup_runs(
             [
                 _cr("cli-ci / test (3.12)", "completed", "success", 100,
@@ -516,7 +522,22 @@ class TestSkippedMatrixJobSupersededByItsLegs:
             ],
             regex=self.REGEX,
         )
-        assert [r["conclusion"] for r in _not_success(runs)] == ["skipped"]
+        assert [r["name"] for r in runs] == ["cli-ci / test (3.12)"]
+        assert _not_success(runs) == []
+
+    def test_a_skipped_leg_never_covers_a_skipped_job(self):
+        runs = _dedup_runs(
+            [
+                _cr("cli-ci / test", "completed", "skipped", 100,
+                    "2026-08-08T10:00:00Z", run_id="1"),
+                _cr("cli-ci / test (3.12)", "completed", "skipped", 200,
+                    "2026-08-08T10:05:00Z", run_id="2"),
+            ],
+            regex=self.REGEX,
+        )
+        assert sorted(r["conclusion"] for r in _not_success(runs)) == [
+            "skipped", "skipped",
+        ]
 
     def test_a_prefix_sharing_job_never_covers_a_skip(self):
         """``test-extra`` is a different job, not a leg of ``test``."""
@@ -530,3 +551,67 @@ class TestSkippedMatrixJobSupersededByItsLegs:
             regex=self.REGEX,
         )
         assert [r["conclusion"] for r in _not_success(runs)] == ["skipped"]
+
+
+@requires_jq
+class TestASkipRecordedAfterTheDispatchedVerdict:
+    """Same-name supersede, the publish gate's half.
+
+    Both gates read one SHA that carries two check runs under the SAME name:
+    ``skipped`` from the push-triggered suite (its paths filter found nothing)
+    and a real conclusion from the ``run_all`` dispatch suite. The skip is
+    stamped when the router's ``detect`` job finally releases the job, so it
+    routinely carries the LATER ``started_at``. Collapsing purely by time then
+    hands the gate the skip and blocks a commit whose jobs all ran.
+    """
+
+    REGEX = "^(go\\-strictcli\\-ci) / "
+
+    def _both(self, dispatched_conclusion):
+        return _dedup_runs(
+            [
+                # The dispatched suite concludes FIRST; the push suite's skip
+                # is stamped after it.
+                _cr("go-strictcli-ci / test", "completed",
+                    dispatched_conclusion, 100, "2026-08-08T10:30:00Z",
+                    run_id="2"),
+                _cr("go-strictcli-ci / test", "completed", "skipped", 200,
+                    "2026-08-08T11:00:00Z", run_id="1"),
+            ],
+            regex=self.REGEX,
+        )
+
+    def test_the_dispatched_success_supersedes_the_later_skip(self):
+        runs = self._both("success")
+        assert [r["conclusion"] for r in runs] == ["success"]
+        assert _not_success(runs) == []
+
+    def test_a_dispatched_failure_still_blocks(self):
+        runs = self._both("failure")
+        assert [r["conclusion"] for r in _not_success(runs)] == ["failure"]
+
+    def test_only_skips_still_block(self):
+        runs = _dedup_runs(
+            [
+                _cr("go-strictcli-ci / test", "completed", "skipped", 100,
+                    "2026-08-08T10:30:00Z", run_id="2"),
+                _cr("go-strictcli-ci / test", "completed", "skipped", 200,
+                    "2026-08-08T11:00:00Z", run_id="1"),
+            ],
+            regex=self.REGEX,
+        )
+        assert [r["conclusion"] for r in _not_success(runs)] == ["skipped"]
+
+    def test_a_newer_in_flight_run_still_makes_the_gate_wait(self):
+        """A pending run is not a verdict, so it must not be superseded away."""
+        runs = _dedup_runs(
+            [
+                _cr("go-strictcli-ci / test", "completed", "failure", 100,
+                    "2026-08-08T10:00:00Z", run_id="1"),
+                _cr("go-strictcli-ci / test", "in_progress", None, 200,
+                    "2026-08-08T11:00:00Z", run_id="2"),
+            ],
+            regex=self.REGEX,
+        )
+        assert [r["status"] for r in runs] == ["in_progress"]
+        assert _pending_count(runs) == 1

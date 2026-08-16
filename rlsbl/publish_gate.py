@@ -208,16 +208,27 @@ while :; do
   # numeric id as tiebreak for retries within the same second) BEFORE the
   # pending / not-success logic runs. This way the newest run decides: still
   # running -> wait; genuinely red -> hard fail.
+  # Recency alone cannot decide a SKIP, though. A `run_all` router dispatch
+  # deliberately puts two check runs of the same name on one commit: "skipped"
+  # from the push-triggered suite whose paths filter found nothing, and a real
+  # conclusion from the dispatched suite. The push suite stamps its skip only
+  # when its `detect` job finally releases the job, routinely AFTER the
+  # dispatched run concluded -- so the latest-per-name run is the skip, and a
+  # commit whose jobs all ran would be refused. When the latest check for a
+  # name is skipped it is therefore replaced by the latest COMPLETED
+  # non-skipped check of that same name, in whichever suite: success passes,
+  # failure fails, and a name that is only ever skipped still blocks.
   # Then one more collapse, for the one case a per-name grouping cannot see:
   # GitHub does not expand a matrix for a job its `if` skipped, so the whole job
   # becomes ONE check run under the unsuffixed name ("cli-ci / test"), while the
   # run that actually executes it emits one per leg ("cli-ci / test (3.12)").
   # They never share a name, so the skip would outlive the run that answered it
   # -- exactly the state a `run_all` router dispatch leaves behind. A skipped
-  # check is dropped only when a STRICTLY LATER check for the SAME job (its
+  # check is dropped when a COMPLETED, non-skipped check for the SAME job (its
   # matrix expansion, by name) exists; the legs are then judged on their own
   # conclusions, so a red leg still fails. Nothing else covers a skip: not a
-  # sibling job, not a merely prefix-sharing name, and not an earlier run.
+  # sibling job, not a merely prefix-sharing name, and not a leg that was
+  # itself skipped.
   # Mirrors rlsbl.ci_checks.latest_check_runs -- the two gates answer the same
   # question and must never diverge.
   runs="$(jq -s --arg re "$CI_CHECK_REGEX" --arg run_id "$GITHUB_RUN_ID" '
@@ -226,14 +237,21 @@ while :; do
       | select((.details_url // "") | contains("/actions/runs/" + $run_id + "/") | not)
       | {name, status, conclusion, id, started_at} ]
     | group_by(.name)
-    | map(sort_by(.started_at, .id) | last)
+    | map(
+        . as $g
+        | ($g | sort_by(.started_at, .id) | last) as $newest
+        | (if $newest.conclusion == "skipped"
+           then ([ $g[] | select(.status == "completed" and .conclusion != "skipped") ]
+                 | sort_by(.started_at, .id) | last // $newest)
+           else $newest end))
     | . as $latest
     | map(. as $c
         | select(
             $c.conclusion != "skipped"
             or ([ $latest[]
                   | select((.name | startswith($c.name + " ("))
-                           and ([.started_at, .id] > [$c.started_at, $c.id])) ]
+                           and .status == "completed"
+                           and .conclusion != "skipped") ]
                 | length) == 0))' <<< "$resp")"
   total="$(jq 'length' <<< "$runs")"
 

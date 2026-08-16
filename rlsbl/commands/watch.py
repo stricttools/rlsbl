@@ -694,9 +694,10 @@ def dispatch_run_all(branch, commit_sha, *, config=None, log=None,
     honestly narrow fix-forward leaves most members' jobs ``skipped`` -- a
     conclusion both the release gate and the publish gate refuse. Dispatching
     the router on the same commit with the filter short-circuited runs every
-    member's real CI jobs; the later run's check runs supersede the skipped
-    ones per name (:func:`rlsbl.ci_checks.latest_check_runs`). Nothing is
-    waived: a job that fails in the dispatched run still blocks the release.
+    member's real CI jobs; the dispatched run's conclusions supersede the
+    skipped ones per name (:func:`rlsbl.ci_checks.latest_check_runs`),
+    whichever suite GitHub stamped first. Nothing is waived: a job that fails
+    in the dispatched run still blocks the release.
 
     The dispatch names a REF, not a commit, so the run it creates is correlated
     back to *commit_sha* by head SHA before this returns. A run for any other
