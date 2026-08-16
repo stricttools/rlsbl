@@ -1,6 +1,7 @@
 """Detect whether a project uses strictcli and extract its entry point."""
 
 import glob
+import json
 import os
 
 import tomlkit
@@ -20,7 +21,8 @@ class StrictcliDetectError(RlsblError):
 def detect_strictcli(project_dir: str = ".") -> tuple[str, str] | None:
     """Check if a project uses strictcli and return its entry point info.
 
-    First checks Python (pyproject.toml). If not found, checks Go (go.mod).
+    Checks Python (pyproject.toml), then Go (go.mod), then TypeScript
+    (package.json) -- one branch per strictcli implementation.
 
     For Python: if the project depends on strictcli and has a [project.scripts]
     entry, returns (entry_point_name, "python").
@@ -29,6 +31,9 @@ def detect_strictcli(project_dir: str = ".") -> tuple[str, str] | None:
     packages via the go toolchain (go_introspect) and returns
     (package_path, "go") -- see _detect_go_strictcli for the resolution
     rules (single main, or the one main whose dir imports strictcli).
+
+    For TypeScript: if package.json depends on the ``strictcli`` npm package
+    and declares a ``bin``, returns (bin_script_path, "typescript").
 
     Args:
         project_dir: path to the project root (default: current directory).
@@ -39,7 +44,10 @@ def detect_strictcli(project_dir: str = ".") -> tuple[str, str] | None:
     result = _detect_python_strictcli(project_dir)
     if result:
         return result
-    return _detect_go_strictcli(project_dir)
+    result = _detect_go_strictcli(project_dir)
+    if result:
+        return result
+    return _detect_ts_strictcli(project_dir)
 
 
 def _detect_python_strictcli(project_dir: str) -> tuple[str, str] | None:
@@ -71,6 +79,54 @@ def _detect_python_strictcli(project_dir: str) -> tuple[str, str] | None:
     # Get the first key (entry point name)
     entry_point = next(iter(scripts))
     return (entry_point, "python")
+
+
+_TS_DEP_SECTIONS = ("dependencies", "devDependencies", "peerDependencies")
+
+
+def _detect_ts_strictcli(project_dir: str) -> tuple[str, str] | None:
+    """Detect strictcli in a TypeScript/npm project via package.json.
+
+    A strictcli TS app depends on the ``strictcli`` npm package and declares a
+    ``bin``. The entry point is the bin's SCRIPT PATH (not its command name):
+    the dump runs it with node directly, so it does not depend on the package
+    having been installed or linked first.
+
+    ``bin`` takes two shapes -- a bare string (the package's own name is the
+    command) or a map of command name to path. A map with several commands is
+    resolved the way the Go branch resolves several main packages: it is not
+    resolvable, so it is a hard error rather than a silent "no strictcli here".
+    """
+    package_json_path = os.path.join(project_dir, "package.json")
+    if not os.path.exists(package_json_path):
+        return None
+
+    try:
+        with open(package_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    has_strictcli = any(
+        "strictcli" in (data.get(section) or {}) for section in _TS_DEP_SECTIONS
+    )
+    if not has_strictcli:
+        return None
+
+    bin_entry = data.get("bin")
+    if isinstance(bin_entry, str):
+        return (bin_entry, "typescript")
+    if isinstance(bin_entry, dict) and len(bin_entry) == 1:
+        return (next(iter(bin_entry.values())), "typescript")
+
+    declared = ", ".join(f'"{k}"' for k in (bin_entry or {})) or "(none)"
+    raise StrictcliDetectError(
+        f"package.json in {project_dir} depends on strictcli, but the entry "
+        f"point could not be determined: bin entries declared: {declared}. "
+        "Declare exactly one bin so the schema dump knows what to run."
+    )
 
 
 def _is_strictcli_module_path(path: str) -> bool:

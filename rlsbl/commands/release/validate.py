@@ -7,6 +7,7 @@ version/tag computation, and changelog state validation.
 
 import json
 import os
+import re
 import sys
 
 from ...strictcli_detect import detect_strictcli
@@ -1296,11 +1297,19 @@ def _abort_on_npm_provenance(configs, *, gh_config):
 
 
 def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
-    """Build the command list for running --dump-schema based on language."""
+    """Build the command list for running --dump-schema based on language.
+
+    One branch per strictcli implementation. TypeScript apps are npm packages
+    whose ``bin`` entry names a built JS file, so the dump runs that file
+    directly with node -- there is no install step to depend on, exactly as
+    ``go run`` needs no built binary.
+    """
     if lang == "python":
         return ["uv", "run", entry_point, "--dump-schema"]
     elif lang == "go":
         return ["go", "run", entry_point, "--dump-schema"]
+    elif lang == "typescript":
+        return ["node", entry_point, "--dump-schema"]
     else:
         raise ValueError(f"unsupported strictcli language: {lang}")
 
@@ -1356,8 +1365,28 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
         _patch_schema_version(project_dir, version)
 
 
+# The top-level ``version`` member of a canonically-encoded schema document:
+# two spaces of indent (depth 1), the key, ``": "``, a JSON string literal, and
+# an optional comma. Anchored at exactly two spaces so a ``version`` key nested
+# deeper -- a flag NAMED version, a nested object with its own -- can never
+# match, and anchored at the line start so it cannot match inside a string.
+_SCHEMA_VERSION_LINE = re.compile(
+    r'^  "version": "(?:[^"\\]|\\.)*"(,?)$', re.MULTILINE,
+)
+
+
 def _patch_schema_version(project_dir, version):
-    """Replace the ``version`` key in .strictcli/schema.json with *version*.
+    """Replace the top-level ``version`` value in .strictcli/schema.json.
+
+    The patch is TEXTUAL: it rewrites exactly one line and preserves every
+    other byte. strictcli writes this file in its own canonical encoding
+    (schema v2) -- raw UTF-8, no HTML escaping, canonical floats, two-space
+    indent, one trailing newline -- and a decode/re-encode round trip through
+    ``json.dumps`` silently produces a different document. Most visibly,
+    ``json.dumps`` defaults to ``ensure_ascii=True``, so every non-ASCII
+    character in any help text came back as a ``\\uXXXX`` escape and every
+    consumer release rewrote its schema file into something no strictcli
+    implementation would ever write.
 
     Writes atomically via a temp file + os.replace.
     """
@@ -1374,20 +1403,22 @@ def _patch_schema_version(project_dir, version):
         )
 
     with open(schema_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        content = f.read()
 
-    if "version" not in data:
+    match = _SCHEMA_VERSION_LINE.search(content)
+    if match is None:
         raise ReleaseValidationError(
-            f"{schema_path} has no 'version' key"
+            f"{schema_path} has no top-level 'version' key"
         )
 
-    data["version"] = version
+    # The value is re-encoded as a JSON string literal in the same canonical
+    # form the document uses (``ensure_ascii=False``), never spliced in raw.
+    replacement = f'  "version": {json.dumps(version, ensure_ascii=False)}{match.group(1)}'
+    patched = content[:match.start()] + replacement + content[match.end():]
 
     # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
     # here before the chokepoint absorbed it (see the effects module).
-    effects.atomic_write_text(
-        schema_path, json.dumps(data, indent=2) + "\n", file_mode=0o600,
-    )
+    effects.atomic_write_text(schema_path, patched, file_mode=0o600)
 
 
 def validate_blog_body(project_dir, blog_enabled, *, releases_dir=None):

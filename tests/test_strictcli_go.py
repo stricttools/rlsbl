@@ -1,5 +1,6 @@
-"""Tests for Go strictcli detection and schema dump branching."""
+"""Tests for Go and TypeScript strictcli detection, and schema dump branching."""
 
+import json
 import os
 import subprocess
 from unittest.mock import MagicMock, patch
@@ -374,3 +375,82 @@ class TestSchemaDumpBranching:
             _run_strictcli_schema_dump(
                 {"dry-run": True}, MagicMock(), project_dir=str(tmp_path)
             )
+
+
+class TestTypescriptDetection:
+    """TypeScript/npm strictcli apps: package.json -> node <bin> --dump-schema.
+
+    Until this branch existed, `rlsbl release run` in a TS strictcli project
+    silently dumped nothing: detection knew Python and Go only, so the release
+    shipped whatever `.strictcli/schema.json` happened to be committed.
+    """
+
+    def _write_package_json(self, tmp_path, data):
+        (tmp_path / "package.json").write_text(json.dumps(data), encoding="utf-8")
+
+    def test_typescript_schema_dump_command(self):
+        cmd = _schema_dump_command("dist/cli.js", "typescript")
+        assert cmd == ["node", "dist/cli.js", "--dump-schema"]
+
+    def test_string_bin_is_the_entry_point(self, tmp_path):
+        self._write_package_json(tmp_path, {
+            "name": "demo",
+            "dependencies": {"strictcli": "^0.41.0"},
+            "bin": "dist/cli.js",
+        })
+        assert detect_strictcli(str(tmp_path)) == ("dist/cli.js", "typescript")
+
+    def test_single_entry_bin_map_is_the_entry_point(self, tmp_path):
+        self._write_package_json(tmp_path, {
+            "name": "demo",
+            "dependencies": {"strictcli": "^0.41.0"},
+            "bin": {"demo": "./bin/demo.js"},
+        })
+        assert detect_strictcli(str(tmp_path)) == ("./bin/demo.js", "typescript")
+
+    def test_dev_dependency_counts(self, tmp_path):
+        self._write_package_json(tmp_path, {
+            "name": "demo",
+            "devDependencies": {"strictcli": "^0.41.0"},
+            "bin": "dist/cli.js",
+        })
+        assert detect_strictcli(str(tmp_path))[1] == "typescript"
+
+    def test_no_strictcli_dependency_is_not_a_strictcli_project(self, tmp_path):
+        self._write_package_json(tmp_path, {
+            "name": "demo",
+            "dependencies": {"commander": "^12.0.0"},
+            "bin": "dist/cli.js",
+        })
+        assert detect_strictcli(str(tmp_path)) is None
+
+    def test_ambiguous_bin_map_is_a_hard_error(self, tmp_path):
+        self._write_package_json(tmp_path, {
+            "name": "demo",
+            "dependencies": {"strictcli": "^0.41.0"},
+            "bin": {"demo": "./a.js", "demo2": "./b.js"},
+        })
+        with pytest.raises(StrictcliDetectError) as exc:
+            detect_strictcli(str(tmp_path))
+        assert "entry point could not be determined" in str(exc.value)
+
+    def test_missing_bin_is_a_hard_error(self, tmp_path):
+        self._write_package_json(tmp_path, {
+            "name": "demo",
+            "dependencies": {"strictcli": "^0.41.0"},
+        })
+        with pytest.raises(StrictcliDetectError):
+            detect_strictcli(str(tmp_path))
+
+    def test_python_wins_over_typescript_in_a_polyglot_root(self, tmp_path):
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "demo"\ndependencies = ["strictcli"]\n'
+            '[project.scripts]\ndemo = "demo:main"\n',
+            encoding="utf-8",
+        )
+        self._write_package_json(tmp_path, {
+            "name": "demo",
+            "dependencies": {"strictcli": "^0.41.0"},
+            "bin": "dist/cli.js",
+        })
+        assert detect_strictcli(str(tmp_path)) == ("demo", "python")
