@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.116.0",
+  "version": "0.117.0",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -4307,8 +4307,28 @@
         },
         {
           "level": 3,
-          "text": "`fetch_check_runs`",
-          "anchor": "fetch_check_runs"
+          "text": "`_decode_paginated`",
+          "anchor": "_decode_paginated"
+        },
+        {
+          "level": 3,
+          "text": "`_gh_json`",
+          "anchor": "_gh_json"
+        },
+        {
+          "level": 3,
+          "text": "`_job_verdict`",
+          "anchor": "_job_verdict"
+        },
+        {
+          "level": 3,
+          "text": "`fetch_run_jobs`",
+          "anchor": "fetch_run_jobs"
+        },
+        {
+          "level": 3,
+          "text": "`fetch_ci_jobs`",
+          "anchor": "fetch_ci_jobs"
         },
         {
           "level": 3,
@@ -7762,6 +7782,11 @@
           "level": 3,
           "text": "`_classify_failure`",
           "anchor": "_classify_failure"
+        },
+        {
+          "level": 3,
+          "text": "`_failure_region`",
+          "anchor": "_failure_region"
         },
         {
           "level": 3,
@@ -15494,6 +15519,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-17T13:23:12.485373+00:00",
+  "last_gen": "2026-08-17T18:46:42.675362+00:00",
   "theme": "minimal"
 }
