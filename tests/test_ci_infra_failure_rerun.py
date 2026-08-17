@@ -24,6 +24,7 @@ The properties under test:
 - when it genuinely does not retry, the abort message names the manual remedy.
 """
 
+import json
 import subprocess
 from unittest.mock import patch
 
@@ -93,10 +94,11 @@ class TestBoundedRerunOfTheFailedJobs:
     def test_an_infra_failure_reruns_the_failed_jobs_and_waits(self, capsys):
         ci_run = {"databaseId": 4242, "name": "CI", "headBranch": "main"}
         with patch("rlsbl.commands.watch.time"), \
+                patch("rlsbl.commands.watch._fetch_failure_log",
+                      return_value=STRANDED_LOG), \
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),  # the stale run: failed
-                STRANDED_LOG,                            # run view --log-failed
                 "",                                      # run rerun --failed
                 "",                                      # watching the rerun: green
             ]
@@ -119,13 +121,13 @@ class TestBoundedRerunOfTheFailedJobs:
     def test_the_rerun_is_bounded_to_one_attempt(self, capsys):
         ci_run = {"databaseId": 4242, "name": "CI", "headBranch": "main"}
         with patch("rlsbl.commands.watch.time"), \
+                patch("rlsbl.commands.watch._fetch_failure_log",
+                      return_value=STRANDED_LOG), \
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),  # the stale run: failed
-                STRANDED_LOG,                            # run view --log-failed
                 "",                                      # run rerun --failed
                 subprocess.CalledProcessError(1, "gh"),  # the rerun fails too
-                STRANDED_LOG,                            # rerun log tail
             ]
             result = _watch_single_run(ci_run, "candidate", "user/repo")
 
@@ -141,10 +143,11 @@ class TestBoundedRerunOfTheFailedJobs:
         """Only the infra tier reruns the failed jobs; a flake rewinds all."""
         ci_run = {"databaseId": 55, "name": "CI", "headBranch": "main"}
         with patch("rlsbl.commands.watch.time"), \
+                patch("rlsbl.commands.watch._fetch_failure_log",
+                      return_value="read tcp: i/o timeout"), \
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),
-                "read tcp: i/o timeout",
                 "",
                 "",
             ]
@@ -164,10 +167,14 @@ class TestNotRetryingNamesTheRemedy:
     ):
         ci_run = {"databaseId": 909, "name": "CI", "headBranch": "main"}
         with patch("rlsbl.commands.watch.time"), \
+                patch("rlsbl.commands.watch._fetch_failure_log",
+                      return_value=(
+                          "short test summary info\n"
+                          "FAILED tests/test_x.py::test_y"
+                      )), \
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),
-                "short test summary info\nFAILED tests/test_x.py::test_y",
             ]
             _watch_single_run(ci_run, "candidate", "user/repo")
 
@@ -206,10 +213,26 @@ class TestResumedGateRecoversFromAStaleInfraRun:
                 if outcome is not True:
                     raise subprocess.CalledProcessError(1, "gh")
                 return ""
-            if args[:2] == ["run", "view"] and "--log-failed" in args:
-                return STRANDED_LOG
             if args[:2] == ["run", "rerun"]:
                 return ""
+            # The failure logs are read the way rlsbl reads every job: the run
+            # object for its attempt, the attempt-scoped job list, then each
+            # failing job's own log.
+            if args[0] == "api":
+                path = args[-1]
+                if path.endswith("/actions/runs/77"):
+                    return '{"run_attempt": 1}'
+                if "/attempts/1/jobs" in path:
+                    return json.dumps({"jobs": [{
+                        "id": 4321, "run_id": 77, "run_attempt": 1,
+                        "name": "strictcli-ci / test", "status": "completed",
+                        "conclusion": "failure",
+                        "started_at": "2026-08-06T20:11:04Z",
+                        "html_url": "https://github.com/user/repo/actions/"
+                                    "runs/77/job/4321",
+                    }]})
+                if path.endswith("/actions/jobs/4321/logs"):
+                    return STRANDED_LOG
             return ""
 
         return fake, calls
@@ -224,6 +247,7 @@ class TestResumedGateRecoversFromAStaleInfraRun:
         # The stale run fails; its rerun passes.
         fake, calls = self._gh_dispatcher([False, True])
         with patch("rlsbl.commands.watch.time") as fake_time, \
+                patch("rlsbl.utils.run_gh", side_effect=fake), \
                 patch("rlsbl.commands.watch.run_gh", side_effect=fake):
             fake_time.time.side_effect = lambda: 0.0
             verdict, results = wait_for_ci_green(

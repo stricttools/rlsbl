@@ -73,10 +73,17 @@ def _notify(title, body, url=None):
 # new signatures can be appended without touching the classification logic.
 # Add deterministic signatures here as new blind-retry-wasted cases are observed.
 
-# Last N lines of the failing step log to fetch and classify.
+# Last N lines of a failing job's log region to keep and classify.
 _LOG_TAIL_LINES = 100
-# Timeout (seconds) for the `gh run view --log-failed` fetch. Matches the
-# 30s budget used for the retry dispatch below (external calls must be bounded).
+# Lines of context kept before each ``##[error]`` marker, so a signature that
+# lives one line above the marker (a command's own stderr) still matches.
+_LOG_ERROR_CONTEXT_LINES = 5
+# How many failing jobs of one run to fetch logs for. A monorepo router run
+# has dozens of jobs; classification needs a few, and the rest are named
+# without their logs.
+_LOG_FETCH_MAX_JOBS = 5
+# Timeout (seconds) for each log read. Matches the 30s budget used for the
+# retry dispatch below (external calls must be bounded).
 _LOG_FETCH_TIMEOUT = 30
 
 # Infrastructure: the run died BELOW the code under test -> rerun the failed
@@ -199,10 +206,10 @@ def _classify_failure(log_text):
     istic then outranks transient so a log holding both a hard error and
     incidental network chatter follows the hard error, which is the real cause.
 
-    An EMPTY tail is infra, not unknown: ``--log-failed`` returning nothing for
-    a failed run means no step ever produced output, so the job died before
-    execution -- runner never acquired, actions never resolved, or the run was
-    cancelled while still queued.
+    An EMPTY tail is infra, not unknown: a failed run whose jobs produced no
+    log output at all -- or which has no failing job to read a log from -- died
+    before execution, so nothing about the code was established. Runner never
+    acquired, actions never resolved, or the run was cancelled while queued.
     """
     if not log_text or not log_text.strip():
         return "infra"
@@ -218,18 +225,75 @@ def _classify_failure(log_text):
     return "unknown"
 
 
-def _fetch_failure_log(run_id, config=None):
-    """Fetch the tail of the failing step's log for a run via gh.
+def _failure_region(lines):
+    """The part of one job's log worth classifying.
 
-    Runs `gh run view <id> --log-failed` (through run_gh, so GH_REPO resolution
-    and thread-safe env handling apply) with a bounded timeout, and returns the
-    last _LOG_TAIL_LINES lines joined as a single string. Propagates any
-    exception from the gh call so the caller can emit a loud fallback note.
+    A failed job's log ends in its post-steps and cleanup, so a blind tail of
+    a long log holds runner housekeeping and not the failure. Actions marks
+    every failure with an ``##[error]`` line, so those lines -- with a few
+    lines of context each -- are the region. A job that emitted no marker at
+    all (killed before it could) has no region to prefer, and its own tail is
+    taken instead.
     """
-    raw = run_gh(["run", "view", str(run_id), "--log-failed"],
-                 config=config, timeout=_LOG_FETCH_TIMEOUT)
-    lines = raw.splitlines()
-    return "\n".join(lines[-_LOG_TAIL_LINES:])
+    marked = [i for i, line in enumerate(lines) if "##[error]" in line]
+    if not marked:
+        return lines[-_LOG_TAIL_LINES:]
+    keep = sorted({
+        i
+        for mark in marked
+        for i in range(max(0, mark - _LOG_ERROR_CONTEXT_LINES), mark + 1)
+    })
+    return [lines[i] for i in keep][-_LOG_TAIL_LINES:]
+
+
+def _fetch_failure_log(run_id, config=None):
+    """Fetch the failing jobs' logs for a run, as one classifiable string.
+
+    Reads the run's jobs through the attempt-scoped endpoint
+    (:func:`rlsbl.ci_checks.fetch_run_jobs`) -- the same single endpoint the
+    release gate uses -- and then each failing job's own log
+    (``/actions/jobs/<id>/logs``). Both are keyed by ids rlsbl already holds,
+    so neither depends on the repo-level Actions collections that ``gh run
+    view`` walks and that 404 on some repositories, taking the whole failure
+    classification with them.
+
+    Every failing job is named in the returned text, so the operator reading a
+    fifty-job router run sees WHICH jobs failed rather than only the workflow.
+    At most _LOG_FETCH_MAX_JOBS of them are fetched -- enough to classify,
+    bounded so a mass failure cannot stall the watch. Propagates any exception
+    from the gh calls so the caller can emit a loud note.
+    """
+    from ..ci_checks import PASSING_CONCLUSION, SKIPPED_CONCLUSION, fetch_run_jobs
+
+    jobs = fetch_run_jobs(str(run_id), config=config)
+    failed = [
+        job for job in jobs
+        if job.get("conclusion") not in (PASSING_CONCLUSION, SKIPPED_CONCLUSION, None)
+    ]
+    sections = []
+    for job in failed[:_LOG_FETCH_MAX_JOBS]:
+        raw = run_gh(
+            ["api", "--method", "GET",
+             f"repos/{{owner}}/{{repo}}/actions/jobs/{job['id']}/logs"],
+            config=config, timeout=_LOG_FETCH_TIMEOUT,
+        )
+        region = [line for line in _failure_region(raw.splitlines()) if line.strip()]
+        if not region:
+            # A job that produced no output is not a verdict about the code,
+            # and a header naming it would read as one to the classifier: an
+            # empty result is what makes this an infrastructure failure.
+            continue
+        sections.append(
+            "\n".join([f"--- {job['name']} ({job['conclusion']}) ---", *region])
+        )
+    if not sections:
+        return ""
+    if len(failed) > _LOG_FETCH_MAX_JOBS:
+        sections.append(
+            f"--- and {len(failed) - _LOG_FETCH_MAX_JOBS} more failing job(s): "
+            f"{', '.join(job['name'] for job in failed[_LOG_FETCH_MAX_JOBS:])} ---"
+        )
+    return "\n".join(sections)
 
 
 def _retry_workflow(workflow_name, repo_slug, label, failed_run_id,
@@ -914,7 +978,14 @@ def wait_for_ci_green(commit_sha, *, timeout, check_filters, log=None,
     # publish gate's own predicate before the caller is allowed to tag.
     if verdict == CI_GREEN:
         verify_project_ci_ran(
-            commit_sha, check_filters, cwd=repo_root, config=config, log=_log,
+            commit_sha, check_filters,
+            # Every run this gate watched, in order and deduplicated: an
+            # in-place rerun keeps the failed run's id, so the same id can
+            # appear twice.
+            run_ids=list(dict.fromkeys(
+                str(r["run_id"]) for r in results if r.get("run_id")
+            )),
+            cwd=repo_root, config=config, log=_log,
         )
 
     return verdict, results

@@ -140,7 +140,7 @@ def _gate_patches(check_runs):
         ),
         patch("rlsbl.commands.watch.run_gh",
               return_value='{"nameWithOwner": "o/r"}'),
-        patch("rlsbl.ci_checks.fetch_check_runs", return_value=list(check_runs)),
+        patch("rlsbl.ci_checks.fetch_ci_jobs", return_value=list(check_runs)),
         # No sleeping between check-run discovery attempts in tests.
         patch("rlsbl.ci_checks.CHECK_DISCOVERY_ATTEMPTS", 1),
     )
@@ -562,62 +562,3 @@ class TestReleasableMembersAreAllVerified:
                 str(tmp_project), [str(tmp_project / "packages" / "ghost")]
             )
         assert "not inside any project registered in the workspace" in str(exc.value)
-
-
-# --------------------------------------------------------------------------- #
-# Check-run fetching
-# --------------------------------------------------------------------------- #
-
-
-class TestFetchCheckRuns:
-
-    def test_paginated_pages_are_all_decoded(self):
-        from rlsbl.ci_checks import fetch_check_runs
-
-        page1 = json.dumps({"check_runs": [_check_run("a", "success")]})
-        page2 = json.dumps({"check_runs": [_check_run("b", "skipped", run_id=2)]})
-        with patch("rlsbl.utils.run_gh", return_value=page1 + "\n" + page2):
-            runs = fetch_check_runs("a" * 40)
-        assert [r["name"] for r in runs] == ["a", "b"]
-
-    def test_the_request_is_scoped_to_the_candidate_commit(self):
-        from rlsbl.ci_checks import fetch_check_runs
-
-        seen = {}
-
-        def fake(args, **kwargs):
-            seen["args"] = args
-            seen["cwd"] = kwargs.get("cwd")
-            return json.dumps({"check_runs": []})
-
-        with patch("rlsbl.utils.run_gh", side_effect=fake):
-            fetch_check_runs("b" * 40, cwd=os.sep)
-        assert "b" * 40 in seen["args"][-1]
-        assert "check-runs" in seen["args"][-1]
-        assert seen["cwd"] == os.sep
-
-    def test_the_request_matches_the_get_pinned_observe_prefix(self):
-        """Without --method GET the paginated read is not an observe.
-
-        The allowlist pins ``gh api`` to ``--method GET`` because the bare
-        prefix would legalize POST.  A read that omits the flag therefore
-        matches nothing, so under ``--dry-run`` it is recorded instead of
-        performed -- and the CI gate reads a carrier where it expected JSON.
-        """
-        from rlsbl import observe_allowlist as oa
-        from rlsbl.ci_checks import fetch_check_runs
-
-        seen = {}
-
-        def fake(args, **kwargs):
-            seen["argv"] = ["gh", *args]
-            return json.dumps({"check_runs": []})
-
-        with patch("rlsbl.utils.run_gh", side_effect=fake):
-            fetch_check_runs("c" * 40)
-
-        argv = seen["argv"]
-        assert any(
-            len(e.argv) <= len(argv) and tuple(argv[: len(e.argv)]) == e.argv
-            for e in oa.OBSERVE_ALLOWLIST
-        ), f"{' '.join(argv)} matches no observe prefix"

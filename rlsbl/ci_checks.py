@@ -27,6 +27,15 @@ This module is the single predicate both gates now use:
   passes. ``skipped`` and ``cancelled`` prove nothing about the commit and
   are hard errors on both sides.
 
+The two gates read that answer from the two sources available to them. The
+publish gate runs inside Actions and polls the commit's CHECK RUNS. The
+release gate reads the JOBS of the runs it already discovered and watched,
+through the attempt-scoped endpoint (:func:`fetch_run_jobs`). Actions names a
+commit's check runs after the jobs that produced them, so the two see the same
+names with the same conclusions -- and the attempt-scoped read is the one that
+answers for the attempt that just concluded, which is what an in-place rerun
+leaves behind.
+
 Three outcomes stay explicitly distinct, and the release gate reports each
 differently (see :func:`verify_project_ci_ran`):
 
@@ -353,38 +362,108 @@ def failing_check_runs(runs):
     return problems
 
 
-def fetch_check_runs(sha, *, cwd=None, config=None):
-    """Every check run GitHub recorded for *sha*."""
-    from .utils import run_gh
+def _decode_paginated(raw, key):
+    """Collect ``key`` out of every page ``gh api --paginate`` concatenated.
 
-    raw = run_gh(
-        [
-            "api",
-            # ``--method GET`` is not decoration: the observe allowlist pins
-            # ``gh api`` to the GET form, because the bare prefix would
-            # legalize POST.  Without it this read matches no prefix, so a
-            # preview RECORDS it and the gate reads a carrier where it
-            # expected JSON.
-            "--method", "GET",
-            "--paginate",
-            f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100",
-        ],
-        config=config,
-        cwd=cwd,
-    )
-    runs = []
-    # --paginate on a non-array response concatenates one JSON object per
-    # page, so decode the stream rather than assuming a single document.
+    ``--paginate`` on a non-array response emits one JSON object per page back
+    to back, so the stream is decoded rather than parsed as one document.
+    """
+    items = []
     decoder = json.JSONDecoder()
     idx = 0
-    text = raw.strip()
+    text = (raw or "").strip()
     while idx < len(text):
         obj, end = decoder.raw_decode(text, idx)
-        runs.extend(obj.get("check_runs") or [])
+        items.extend(obj.get(key) or [])
         idx = end
         while idx < len(text) and text[idx] in " \t\r\n":
             idx += 1
-    return runs
+    return items
+
+
+def _gh_json(path, *, paginate=False, cwd=None, config=None):
+    """GET *path* through ``gh api``, returning the raw stdout."""
+    from .utils import run_gh
+
+    argv = [
+        "api",
+        # ``--method GET`` is not decoration: the observe allowlist pins
+        # ``gh api`` to the GET form, because the bare prefix would legalize
+        # POST.  Without it this read matches no prefix, so a preview RECORDS
+        # it and the gate reads a carrier where it expected JSON.
+        "--method", "GET",
+    ]
+    if paginate:
+        argv.append("--paginate")
+    argv.append(path)
+    return run_gh(argv, config=config, cwd=cwd)
+
+
+def _job_verdict(job):
+    """One job, in the record shape the collapse logic reads.
+
+    Actions names a commit's check runs after the jobs that produced them, so
+    a job record carries exactly the fields
+    :func:`latest_check_runs` needs. ``html_url`` is carried as
+    ``details_url`` because that is where the run id lives for the
+    ``exclude_run_id`` filter, in the same ``/actions/runs/<id>/`` form the
+    check-run payload uses.
+    """
+    return {
+        "name": job.get("name") or "",
+        "status": job.get("status"),
+        "conclusion": job.get("conclusion"),
+        "started_at": job.get("started_at") or "",
+        "id": job.get("id") or 0,
+        "details_url": job.get("html_url") or "",
+        "run_id": job.get("run_id"),
+        "run_attempt": job.get("run_attempt"),
+    }
+
+
+def fetch_run_jobs(run_id, *, cwd=None, config=None):
+    """Every job of *run_id*'s LATEST attempt, as verdict records.
+
+    Two reads, both keyed by the run id the caller already holds: the run
+    object (for ``run_attempt``), then the ATTEMPT-SCOPED job list.
+
+    The unscoped ``/actions/runs/<id>/jobs`` collection is never read, and
+    that is deliberate rather than defensive. It answers for a run's whole
+    history without saying which attempt a job belongs to, while every caller
+    here wants the attempt that just concluded -- an in-place rerun keeps the
+    run id and only the attempt advances. It is also the endpoint that 404s on
+    repositories where the run object and the attempt-scoped job list both
+    answer normally, which is how a green candidate's release aborted on a
+    bare ``gh: Not Found (HTTP 404)``. There is one endpoint for jobs, and it
+    is this one.
+    """
+    run_obj = json.loads(
+        _gh_json(
+            f"repos/{{owner}}/{{repo}}/actions/runs/{run_id}",
+            cwd=cwd, config=config,
+        )
+        or "{}"
+    )
+    attempt = int(run_obj.get("run_attempt") or 1)
+    raw = _gh_json(
+        f"repos/{{owner}}/{{repo}}/actions/runs/{run_id}/attempts/{attempt}"
+        f"/jobs?per_page=100",
+        paginate=True, cwd=cwd, config=config,
+    )
+    return [_job_verdict(job) for job in _decode_paginated(raw, "jobs")]
+
+
+def fetch_ci_jobs(run_ids, *, cwd=None, config=None):
+    """The jobs of every run in *run_ids*, as one flat list of verdicts.
+
+    The release gate collapses these by name across runs
+    (:func:`latest_check_runs`), so a member's job in a ``run_all`` dispatch
+    supersedes the same member's skipped job in the push run.
+    """
+    jobs = []
+    for run_id in run_ids:
+        jobs.extend(fetch_run_jobs(run_id, cwd=cwd, config=config))
+    return jobs
 
 
 # ---------------------------------------------------------------------------
@@ -455,8 +534,9 @@ def _failed_checks_message(sha, failures):
     return "\n".join(lines)
 
 
-def verify_project_ci_ran(sha, filters, *, cwd=None, config=None, log=None,
-                          fetch=None, attempts=CHECK_DISCOVERY_ATTEMPTS,
+def verify_project_ci_ran(sha, filters, *, run_ids=None, cwd=None, config=None,
+                          log=None, fetch=None,
+                          attempts=CHECK_DISCOVERY_ATTEMPTS,
                           interval=CHECK_DISCOVERY_INTERVAL,
                           exclude_run_id=None):
     """Hard-error unless every project in *filters* ran and passed CI on *sha*.
@@ -465,7 +545,18 @@ def verify_project_ci_ran(sha, filters, *, cwd=None, config=None, log=None,
     workflow of their own (``CheckFilter.regex is None``) get a loud notice
     on stderr and are not enforced -- an absent workflow is an observable
     fact about the project, not a skipped job.
+
+    *run_ids* are the workflow runs the caller already discovered and watched
+    for *sha*; their jobs are the verdicts this gate reads
+    (:func:`fetch_ci_jobs`). It is required unless *fetch* supplies the
+    records directly -- a caller with neither is a hard error rather than a
+    gate that silently verifies nothing.
     """
+    if fetch is None and not run_ids:
+        raise TypeError(
+            "verify_project_ci_ran needs run_ids (the workflow runs "
+            "discovered for the candidate) or an explicit fetch"
+        )
     enforced = [f for f in filters if f.regex]
     for flt in filters:
         if flt.regex is None:
@@ -481,7 +572,9 @@ def verify_project_ci_ran(sha, filters, *, cwd=None, config=None, log=None,
     if not enforced:
         return
 
-    fetch = fetch or (lambda: fetch_check_runs(sha, cwd=cwd, config=config))
+    fetch = fetch or (
+        lambda: fetch_ci_jobs(run_ids, cwd=cwd, config=config)
+    )
 
     all_runs = []
     matched: dict[str, list] = {}

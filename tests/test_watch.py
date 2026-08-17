@@ -544,12 +544,13 @@ class TestAutoRetry:
         # run_gh calls: original watch, log fetch, rerun, retry watch
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             "",  # retry watch (same id) succeeds
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log", return_value=""):
+            # An empty log -> infra -> rerun of the failed jobs.
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
         assert result["name"] == "CI"
@@ -566,12 +567,12 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             "",  # retry watch succeeds
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log", return_value=""):
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
         assert result["passed"] is True
         assert result["run_id"] == "100"
 
@@ -583,13 +584,13 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             subprocess.CalledProcessError(1, "gh"),  # retry watch also fails
-            "some retry failure output",  # gh run view --log-failed (retry tail)
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   side_effect=["", "some retry failure output"]):
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is False
         assert result["run_id"] == "100"
@@ -605,12 +606,13 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             "",  # gh run rerun <id>
             "",  # retry watch succeeds
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log", return_value=""):
+            # An empty log -> infra -> rerun of the failed jobs.
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
         assert result["passed"] is True
         assert result["run_id"] == "100"
         err = capsys.readouterr().err
@@ -624,11 +626,11 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            "",  # gh run view --log-failed (empty tail -> infra -> rerun failed jobs)
             subprocess.CalledProcessError(1, "gh"),  # gh run rerun trigger fails
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log", return_value=""):
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
         assert result["passed"] is False
         assert result["run_id"] == "100"  # original run ID, not retry
         err = capsys.readouterr().err
@@ -1038,12 +1040,13 @@ class TestRerunFailureLogTail:
         """(d) On a double failure, the rerun's failing-step log tail is
         printed next to the run URL."""
         mock_run_gh.side_effect = [
-            "",                                                 # gh run rerun <id>
-            subprocess.CalledProcessError(1, "gh"),             # retry watch fails
-            "FAILED tests/test_x.py::test_y - assert 1 == 2",   # gh run view --log-failed (retry tail)
+            "",                                      # gh run rerun <id>
+            subprocess.CalledProcessError(1, "gh"),  # retry watch fails
         ]
 
-        result = _retry_workflow("CI", "user/repo", "test-label", "100")
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   return_value="FAILED tests/test_x.py::test_y - assert 1 == 2"):
+            result = _retry_workflow("CI", "user/repo", "test-label", "100")
 
         assert result["passed"] is False
         assert result["run_id"] == "100"
@@ -1060,12 +1063,13 @@ class TestRerunFailureLogTail:
         """(e) When the retry-tail log fetch is broken, a loud note is printed
         and the failure result is still returned (fetch never breaks return)."""
         mock_run_gh.side_effect = [
-            "",                                          # gh run rerun <id>
-            subprocess.CalledProcessError(1, "gh"),      # retry watch fails
-            subprocess.TimeoutExpired("gh", 30),         # gh run view --log-failed fails
+            "",                                      # gh run rerun <id>
+            subprocess.CalledProcessError(1, "gh"),  # retry watch fails
         ]
 
-        result = _retry_workflow("CI", "user/repo", "test-label", "100")
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   side_effect=subprocess.TimeoutExpired("gh", 30)):
+            result = _retry_workflow("CI", "user/repo", "test-label", "100")
 
         assert result["passed"] is False
         assert result["run_id"] == "100"
@@ -1161,32 +1165,73 @@ class TestClassifyFailure:
 
 
 class TestFetchFailureLog:
-    """Unit tests for _fetch_failure_log tail-capping and gh invocation."""
+    """Unit tests for _fetch_failure_log: which endpoints, and how much log.
 
-    @patch("rlsbl.commands.watch.run_gh")
-    def test_returns_last_n_lines(self, mock_run_gh):
-        """Only the last _LOG_TAIL_LINES lines are returned."""
+    The endpoint contract itself (attempt-scoped, never the unscoped job
+    collection) has its own suite in
+    tests/test_ci_gate_attempt_scoped_jobs.py.
+    """
+
+    def _gh(self, log, *, job_id=7, conclusion="failure"):
+        def fake(args, **kwargs):
+            path = args[-1]
+            if path.endswith("/actions/runs/123"):
+                return json.dumps({"run_attempt": 1})
+            if "/attempts/1/jobs" in path:
+                return json.dumps({"jobs": [{
+                    "id": job_id, "run_id": 123, "run_attempt": 1,
+                    "name": "ci / test", "status": "completed",
+                    "conclusion": conclusion,
+                    "started_at": "2026-08-05T00:00:00Z",
+                    "html_url":
+                        f"https://github.com/o/r/actions/runs/123/job/{job_id}",
+                }]})
+            if path.endswith(f"/actions/jobs/{job_id}/logs"):
+                return log
+            raise AssertionError(f"unexpected gh request: {path}")
+
+        return fake
+
+    def test_caps_the_region_at_the_tail_length(self):
+        """A job with no error marker contributes its last N lines."""
         from rlsbl.commands.watch import _LOG_TAIL_LINES
         lines = [f"line {i}" for i in range(_LOG_TAIL_LINES + 50)]
-        mock_run_gh.return_value = "\n".join(lines)
+        gh = self._gh("\n".join(lines))
 
-        tail = _fetch_failure_log("123")
-        tail_lines = tail.splitlines()
-        assert len(tail_lines) == _LOG_TAIL_LINES
-        assert tail_lines[-1] == lines[-1]
-        assert tail_lines[0] == lines[50]
+        with patch("rlsbl.utils.run_gh", side_effect=gh), \
+             patch("rlsbl.commands.watch.run_gh", side_effect=gh):
+            text = _fetch_failure_log("123")
 
-    @patch("rlsbl.commands.watch.run_gh")
-    def test_invokes_gh_log_failed_with_timeout(self, mock_run_gh):
-        """Uses `gh run view <id> --log-failed` with a bounded timeout."""
+        body = text.splitlines()[1:]  # the first line names the job
+        assert len(body) == _LOG_TAIL_LINES
+        assert body[-1] == lines[-1]
+        assert body[0] == lines[50]
+
+    def test_reads_the_job_log_with_a_bounded_timeout(self):
         from rlsbl.commands.watch import _LOG_FETCH_TIMEOUT
-        mock_run_gh.return_value = "boom"
-        _fetch_failure_log("777")
-        args = mock_run_gh.call_args
-        assert args[0][0] == ["run", "view", "777", "--log-failed"]
-        assert args[1]["timeout"] == _LOG_FETCH_TIMEOUT
+        seen = {}
+        gh = self._gh("boom")
 
-    @patch("rlsbl.commands.watch.run_gh")
+        def recording(args, **kwargs):
+            if args[-1].endswith("/logs"):
+                seen["args"] = args
+                seen["timeout"] = kwargs.get("timeout")
+            return gh(args, **kwargs)
+
+        with patch("rlsbl.utils.run_gh", side_effect=recording), \
+             patch("rlsbl.commands.watch.run_gh", side_effect=recording):
+            _fetch_failure_log("123")
+
+        assert seen["args"][-1].endswith("repos/{owner}/{repo}/actions/jobs/7/logs")
+        assert seen["timeout"] == _LOG_FETCH_TIMEOUT
+
+    def test_a_passing_job_contributes_nothing(self):
+        gh = self._gh("irrelevant", conclusion="success")
+        with patch("rlsbl.utils.run_gh", side_effect=gh), \
+             patch("rlsbl.commands.watch.run_gh", side_effect=gh):
+            assert _fetch_failure_log("123") == ""
+
+    @patch("rlsbl.utils.run_gh")
     def test_propagates_gh_exception(self, mock_run_gh):
         """A gh failure propagates so the caller can emit a loud note."""
         mock_run_gh.side_effect = subprocess.CalledProcessError(1, "gh")
@@ -1207,15 +1252,15 @@ class TestRetryClassification:
         det_log = "short test summary info\nFAILED tests/test_x.py::test_y - assert"
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
-            det_log,                                 # gh run view --log-failed
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log", return_value=det_log):
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is False
         assert result["run_id"] == "100"
-        # Exactly two gh calls: the watch and the log fetch -- NO retry trigger.
-        assert mock_run_gh.call_count == 2
+        # One gh call, the watch itself -- NO retry trigger.
+        assert mock_run_gh.call_count == 1
         err = capsys.readouterr().err
         assert "failure log tail:" in err
         assert "FAILED tests/test_x.py" in err  # tail is printed
@@ -1230,12 +1275,13 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),   # original watch fails
-            "read tcp: i/o timeout",                  # gh run view --log-failed
             "",                                       # gh run rerun <id>
             "",                                       # retry watch (same id) succeeds
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   return_value="read tcp: i/o timeout"):
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
         assert result["run_id"] == "100"
@@ -1252,12 +1298,13 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),   # original watch fails
-            "something totally unrecognized happened",  # gh run view --log-failed
             "",                                       # gh run rerun <id>
             "",                                       # retry watch (same id) succeeds
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   return_value="something totally unrecognized happened"):
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
         assert result["run_id"] == "100"
@@ -1273,12 +1320,13 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),          # original watch fails
-            subprocess.TimeoutExpired("gh", 30),             # gh run view --log-failed fails
             "",                                              # gh run rerun <id>
             "",                                              # retry watch (same id) succeeds
         ]
 
-        result = _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   side_effect=subprocess.TimeoutExpired("gh", 30)):
+            result = _watch_single_run(ci_run, "test-label", "user/repo")
 
         assert result["passed"] is True
         assert result["run_id"] == "100"
@@ -1296,10 +1344,11 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),
-            "goreleaser: error: invalid config\nyaml: line 4: bad",
         ]
 
-        _watch_single_run(ci_run, "test-label", "user/repo")
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   return_value="goreleaser: error: invalid config\nyaml: line 4: bad"):
+            _watch_single_run(ci_run, "test-label", "user/repo")
         err = capsys.readouterr().err
         assert "failure log tail:" in err
         assert "goreleaser: error: invalid config" in err
