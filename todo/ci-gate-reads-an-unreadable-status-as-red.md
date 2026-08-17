@@ -75,6 +75,35 @@ Neither failure is reported as an outcome of its own: the release ends on
 operator at code that CI never showed to be broken. An operator following that
 instruction has nothing to fix.
 
+## The same 404 then blocked the release outright
+
+After the transient failure was rerun by hand and CI went green, the release
+was re-run. The gate reported `[CI Router] passed` and the very next line was:
+
+```
+rlsbl: batch candidate <sha>: [CI Router] passed
+Error: gh: Not Found (HTTP 404)
+```
+
+No `--- Completing <member> ---` line follows, so the abort is inside the gate
+after the watch returned, before the per-member completion loop -- the point
+where the gate verifies that each pending member's CI job actually ran on the
+candidate. That check enumerates the run's jobs, and on this repository:
+
+| Request | Result |
+|---|---|
+| `gh api repos/OWNER/REPO/actions/runs/<id>/jobs` | `404 Not Found` |
+| `gh api repos/OWNER/REPO/actions/runs/<id>/attempts/<n>/jobs` | 200, all 151 jobs |
+
+So the release cannot complete at all here, on a candidate whose CI is green,
+because one endpoint 404s while the attempt-scoped form of the same query
+answers. The error reaches the operator as a bare `Error: gh: Not Found
+(HTTP 404)` with no indication of which check it belonged to or what it was
+looking for. The state file still reads `BRANCH_PUSHED`; nothing is tagged.
+
+This makes option 1 below the decisive one rather than a robustness nicety: the
+attempt-scoped endpoint is not a fallback, it is the one that works.
+
 ## Possible directions
 
 Listed as options, not a decision:
