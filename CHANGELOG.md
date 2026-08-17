@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.117.1
+
+The CI gate reads jobs through the attempt-scoped endpoint (repos with broken collection endpoints no longer abort a green gate), and a releasable target declared with a path no longer crashes the batch planner.
+
+### Fixes
+
+- **CI gate no longer aborts on a 404.** Job enumeration and failure-log reads now go through the attempt-scoped Actions endpoints, which answer on repositories where the repo-level collections 404. A green candidate is no longer stranded by `gh: Not Found (HTTP 404)`, transient CI failures are classified and retried again, and a failed run's log names the jobs that actually failed.
+- **A releasable target declared with a path no longer crashes the release.** A monorepo releasable whose `config.json` names a target in a subdirectory -- `{"name": "npm", "path": "npm"}`, the record form a per-project config already accepted -- aborted `rlsbl monorepo release run` with `unhashable type: 'dict'` after the release plan had been resolved. The declared targets are read as names now, and a record missing its name is refused by a sentence that names the file and the entry.
+
 ## 0.117.0
 
 The scrub flow reads safegit's interface_version 2 envelope and requires safegit 0.28.0 or later.
