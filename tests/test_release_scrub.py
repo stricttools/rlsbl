@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import stat
 from io import StringIO
 from pathlib import Path
@@ -34,15 +35,20 @@ def _safegit_envelope(payload, *, dry_run=False, command="scrub.match", preview=
     exactly one document (strictcli effects contract 19.2) and safegit's own
     data is its ``payload`` member. Tests mock safegit's stdout, so they mock
     the envelope.
+
+    From safegit 0.28.0 the envelope is ``interface_version`` 2: it carries a
+    ``writes`` member (contract 19.2/27.5), null on every command that is not
+    an update -- which is every scrub command.
     """
     return json.dumps({
-        "interface_version": 1,
+        "interface_version": 2,
         "app": "safegit",
         "app_version": SAFEGIT_FLOOR,
         "command": command,
         "exit_code": 0,
         "payload": payload,
         "dry_run": dry_run,
+        "writes": None,
         "preview": preview if preview is not None else [],
         "preview_error": None,
         "diagnostics": [],
@@ -2583,15 +2589,22 @@ class TestSafegitEnvelopeParsing:
     safegit's own data is the envelope's ``payload``. The pre-0.27.0 shape --
     safegit's own bare JSON object, followed under --dry-run by the framework's
     would-do log -- is refused by name rather than half-read.
+
+    From safegit 0.28.0 the envelope is version 2: it grew a ``writes`` member
+    (contract 19.2/27.5), null on every command that declares no ``update_of``,
+    which is every scrub command. Version 1 is not read: safegit is pre-stable,
+    the floor names a safegit that emits 2, and dual recognition would be a
+    compatibility shim.
     """
 
     def test_envelope_parses_whole(self):
         from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
         stdout = (
-            '{"interface_version": 1, "app": "safegit", "command": '
+            '{"interface_version": 2, "app": "safegit", "command": '
             '"scrub.file", "exit_code": 0, "payload": {"version": 1, '
             '"dry_run": true, "commit_count": 3}, "dry_run": true, '
+            '"writes": null, '
             '"preview": [{"seq": 1, "verb": "run"}], "preview_error": null, '
             '"diagnostics": []}\n'
         )
@@ -2600,11 +2613,12 @@ class TestSafegitEnvelopeParsing:
             "version": 1, "dry_run": True, "commit_count": 3,
         }
         assert envelope["preview"] == [{"seq": 1, "verb": "run"}]
+        assert envelope["writes"] is None
 
     def test_bare_pre_envelope_json_is_refused_by_name(self):
         from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
-        with pytest.raises(ValueError, match="0.27.0"):
+        with pytest.raises(ValueError, match=re.escape(SAFEGIT_FLOOR)):
             _parse_safegit_envelope('{"version": 1, "dry_run": true}\n')
 
     def test_trailing_would_do_log_is_a_hard_error(self):
@@ -2621,14 +2635,25 @@ class TestSafegitEnvelopeParsing:
     def test_empty_output_names_the_required_safegit(self):
         from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
-        with pytest.raises(ValueError, match="0.27.0"):
+        with pytest.raises(ValueError, match=re.escape(SAFEGIT_FLOOR)):
             _parse_safegit_envelope("   \n")
 
     def test_unknown_interface_version_is_a_hard_error(self):
         from rlsbl.commands.release_scrub import _parse_safegit_envelope
 
         with pytest.raises(ValueError, match="interface_version"):
-            _parse_safegit_envelope('{"interface_version": 2, "payload": {}}\n')
+            _parse_safegit_envelope('{"interface_version": 3, "payload": {}}\n')
+
+    def test_superseded_interface_version_1_is_a_hard_error(self):
+        """The pre-0.28.0 envelope is refused, not read as a version 2.
+
+        rlsbl's floor names a safegit whose envelope is version 2, so an
+        envelope declaring 1 is an old binary and is named as such.
+        """
+        from rlsbl.commands.release_scrub import _parse_safegit_envelope
+
+        with pytest.raises(ValueError, match="interface_version"):
+            _parse_safegit_envelope('{"interface_version": 1, "payload": {}}\n')
 
     def test_non_json_is_a_hard_error(self):
         from rlsbl.commands.release_scrub import _parse_safegit_envelope

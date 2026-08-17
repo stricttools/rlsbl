@@ -55,8 +55,20 @@ from .. import effects
 # two releases ship together, and a scrub is rare enough that requiring the
 # matching pair is the honest cost.
 #
+# 0.28.0 is safegit built on the framework release whose envelope declares
+# `interface_version` 2: the document grew a `writes` member (strictcli
+# effects contract 19.2/27.5), the write set of a command declaring
+# `update_of`, null on every command that declares none -- which is every
+# scrub command, so this flow ignores its value but must not choke on the key.
+# The payload keys this flow reads are unchanged. Version 1 is not read: same
+# reasoning as above, dual recognition of two envelope versions would be a
+# compatibility shim for a pre-stable single-consumer coupling.
+#
 # The integration test harness builds exactly this version.
-SAFEGIT_MIN_VERSION = (0, 27, 0)
+SAFEGIT_MIN_VERSION = (0, 28, 0)
+
+# The strictcli envelope version safegit's --json speaks at that floor.
+SAFEGIT_INTERFACE_VERSION = 2
 
 
 def _save_step(path, data, step_name):
@@ -150,9 +162,17 @@ def _parse_safegit_envelope(output):
     trailing would-do log to tolerate any more, and no partial decode that
     could silently swallow a second document.
 
+    The envelope this flow reads is version 2 (contract 19.2): the member set
+    is `interface_version`, `app`, `app_version`, `command`, `exit_code`,
+    `payload`, `dry_run`, `writes`, `preview`, `preview_error`, `diagnostics`.
+    `writes` is null on a scrub command (it names the write set of an update
+    command, contract 27.5) and this flow does not read it.
+
     Anything that is not an envelope is refused by name: the pre-0.27.0 shape
     was safegit's own bare JSON object, and reading it as a payload would
-    produce a scrub state file missing every key this flow needs.
+    produce a scrub state file missing every key this flow needs. An envelope
+    declaring any other `interface_version` -- version 1, the pre-0.28.0
+    safegit -- is refused the same way, by name and with the floor to install.
     """
     text = output.strip()
     if not text:
@@ -172,11 +192,12 @@ def _parse_safegit_envelope(output):
             f"{_safegit_floor_str()}; an older safegit prints its own JSON "
             "object instead, which this flow no longer reads."
         )
-    if envelope["interface_version"] != 1:
+    if envelope["interface_version"] != SAFEGIT_INTERFACE_VERSION:
         raise ValueError(
             "safegit's envelope declares interface_version "
             f"{envelope['interface_version']!r}, which this rlsbl does not "
-            "know how to read (expected 1)"
+            f"know how to read (expected {SAFEGIT_INTERFACE_VERSION}); the "
+            f"scrub flow needs safegit >= {_safegit_floor_str()}"
         )
     return envelope
 

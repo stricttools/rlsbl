@@ -1098,16 +1098,19 @@ def _safegit_envelope(payload, *, dry_run=False, command="scrub.match"):
     """Wrap *payload* in the machine-mode envelope safegit's --json emits.
 
     From safegit 0.27.0 stdout carries exactly one document (strictcli effects
-    contract 19.2) and safegit's own data is its ``payload`` member.
+    contract 19.2) and safegit's own data is its ``payload`` member. From
+    0.28.0 the envelope is version 2 and carries a ``writes`` member, null on
+    every non-update command.
     """
     return json.dumps({
-        "interface_version": 1,
+        "interface_version": 2,
         "app": "safegit",
         "app_version": ".".join(str(p) for p in SAFEGIT_MIN_VERSION),
         "command": command,
         "exit_code": 0,
         "payload": payload,
         "dry_run": dry_run,
+        "writes": None,
         "preview": [],
         "preview_error": None,
         "diagnostics": [],

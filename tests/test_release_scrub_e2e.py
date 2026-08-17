@@ -502,7 +502,9 @@ class TestJournalRecoveryE2E:
         # safegit speaks the framework's machine mode: stdout is one envelope
         # and safegit's own data is its payload.
         envelope = json.loads(result.stdout)
-        assert envelope["interface_version"] == 1
+        assert envelope["interface_version"] == 2
+        # A scrub command declares no update_of, so the v2 write set is null.
+        assert envelope["writes"] is None
         data = envelope["payload"]
         assert data["rewrites"], "direct scrub must have rewritten commits"
 
