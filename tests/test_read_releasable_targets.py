@@ -51,6 +51,28 @@ class TestReadReleasableTargets:
         with pytest.raises(ConfigError, match="targets must be a list"):
             read_releasable_targets(path)
 
+    def test_entry_with_a_path_is_returned_as_its_name(self, tmp_path):
+        """A releasable whose target lives in a subdirectory declares it as a
+        record, exactly as a per-project config does. Both callers of this
+        function want names -- one puts them in a set, the other in the release
+        file's include list -- so the record is reduced to its name here rather
+        than leaking a dict into a set() and raising "unhashable type: 'dict'".
+        """
+        path = _write_config(
+            tmp_path, {"targets": ["pypi", {"name": "npm", "path": "npm"}]}
+        )
+        assert read_releasable_targets(path) == ["pypi", "npm"]
+
+    def test_entry_record_without_a_name_is_a_hard_error(self, tmp_path):
+        path = _write_config(tmp_path, {"targets": ["pypi", {"path": "npm"}]})
+        with pytest.raises(ConfigError, match="target entry missing 'name'"):
+            read_releasable_targets(path)
+
+    def test_entry_of_an_unusable_type_is_a_hard_error(self, tmp_path):
+        path = _write_config(tmp_path, {"targets": ["pypi", 7]})
+        with pytest.raises(ConfigError, match="invalid target entry"):
+            read_releasable_targets(path)
+
 
 class TestSharedBanMessages:
     def test_empty_message_shared(self):

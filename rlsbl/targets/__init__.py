@@ -232,7 +232,13 @@ def read_releasable_targets(rel_config_path):
     """Read the ``targets`` list from a releasable config, enforcing the ban.
 
     Returns:
-    - the declared list, when the config has a non-empty ``targets`` list;
+    - the declared targets as a list of **names**, when the config has a
+      non-empty ``targets`` list. An entry may be a bare name or the record
+      form a target in a subdirectory needs (``{"name": "npm", "path":
+      "npm"}``); both reduce to the name here, because both callers want
+      names -- ``validate_release_targets`` puts them in a set and
+      ``collect_releasable_targets`` puts them in the release file's include
+      list, and a record reaching either is a crash rather than a diagnosis;
     - ``None``, when the ``targets`` key is absent (callers fall through to
       member-level detection -- backward compat for releasables that haven't
       declared targets yet).
@@ -256,7 +262,25 @@ def read_releasable_targets(rel_config_path):
         raise ConfigError(non_list_targets_ban_message(rel_config_path, rel_targets))
     if not rel_targets:
         raise ConfigError(empty_targets_ban_message(rel_config_path))
-    return rel_targets
+    names = []
+    for entry in rel_targets:
+        if isinstance(entry, str):
+            names.append(entry)
+            continue
+        if isinstance(entry, dict):
+            name = entry.get("name")
+            if not name:
+                raise ConfigError(
+                    f"target entry missing 'name' in {rel_config_path}: {entry}"
+                )
+            names.append(name)
+            continue
+        raise ConfigError(
+            f"invalid target entry in {rel_config_path}: {entry!r} "
+            f"({type(entry).__name__}); declare a name or a "
+            '{"name": ..., "path": ...} record'
+        )
+    return names
 
 
 def collect_releasable_targets(releasable_name, member_projects, workspace_root):
