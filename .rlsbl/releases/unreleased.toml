@@ -2,9 +2,9 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "The CI gate reads jobs through the attempt-scoped endpoint (repos with broken collection endpoints no longer abort a green gate), and a releasable target declared with a path no longer crashes the batch planner."
 # Optional context explaining why these changes were made
 context = ""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
