@@ -1,92 +1,107 @@
-# The CI gate turned an unreadable run status into a red verdict
+# A CI gate that cannot read logs cannot classify, so a transient red is never retried
 
 ## What happened
 
-A batch release pushed its candidate, found the CI run for it, and then
-declared the gate red:
+A batch release pushed its candidate, found the CI run, and reported:
 
 ```
-Pushed the batch release candidate 4d59e0ca92bd to origin/main (untagged, 1 member(s))
-Waiting for CI on the release candidate 4d59e0ca92bd (1 push-triggered workflow file(s): ci-router.yml)...
-Found 1 CI run(s) for 4d59e0ca92bd; waiting for completion...
-rlsbl: batch candidate 4d59e0ca92bd: [CI Router] FAILED
-rlsbl: https://github.com/smm-h/<repo>/actions/runs/<id>
-rlsbl: batch candidate 4d59e0ca92bd: [CI Router] could not fetch failure logs: Command '['gh', 'run', 'view', '<id>', '--log-failed']' returned non-zero exit status 1.; retrying without classification
-rlsbl: batch candidate 4d59e0ca92bd: [CI Router] CI failed, retrying once...
-rlsbl: batch candidate 4d59e0ca92bd: [CI Router] retry trigger failed: Command '['gh', 'run', 'rerun', '<id>']' returned non-zero exit status 1.
+Found 1 CI run(s) for <sha>; waiting for completion...
+rlsbl: batch candidate <sha>: [CI Router] FAILED
+rlsbl: https://github.com/OWNER/REPO/actions/runs/<id>
+rlsbl: batch candidate <sha>: [CI Router] could not fetch failure logs: Command '['gh', 'run', 'view', '<id>', '--log-failed']' returned non-zero exit status 1.; retrying without classification
+rlsbl: batch candidate <sha>: [CI Router] CI failed, retrying once...
+rlsbl: batch candidate <sha>: [CI Router] retry trigger failed: Command '['gh', 'run', 'rerun', '<id>']' returned non-zero exit status 1.
 Error: CI did not pass on the batch release candidate <sha>.
   Failing workflow(s): CI Router
 ```
 
-The run had not failed. Queried directly at the moment rlsbl gave up:
+The verdict was correct -- the run did conclude `failure`. Two of roughly fifty
+parallel jobs failed, both on the same thing:
 
-```json
-{"conclusion": null, "run_attempt": 1, "status": "in_progress"}
+```
+##[error]Response status code does not indicate success: 429 (Too Many Requests).
+##[error]Failed to download archive 'https://codeload.github.com/astral-sh/setup-uv/tar.gz/<sha>' after 3 attempts.
+##[error]Failed to fetch version data: 429 Too Many Requests
 ```
 
-`run_attempt: 1` and `conclusion: null` -- it was never rerun and had not
-concluded. The release aborted at the gate on a verdict that was not the run's.
+GitHub rate-limited the action downloads. That is the textbook non-deterministic
+failure the classified auto-retry exists for -- and neither half of the recovery
+worked, because both shell out to `gh` subcommands that 404 on this repository.
 
-## Why the probe failed
+## Why both halves failed
 
-On this repository the **repo-level** workflow-runs endpoint 404s while the
-per-workflow and per-run endpoints answer normally, with the same token:
+On this repository the **repo-level** Actions endpoints 404 while the
+per-workflow, per-run and per-attempt endpoints answer normally, with the same
+token:
 
 | Request | Result |
 |---|---|
 | `gh api repos/OWNER/REPO/actions/runs` | `404 Not Found` |
 | `gh run list` (uses the above) | `failed to get runs: HTTP 404` |
-| `gh run view <id>` (uses `.../runs/<id>/jobs`) | `failed to get jobs: HTTP 404` |
-| `gh api repos/OWNER/REPO/actions/workflows` | 200, one workflow |
-| `gh api repos/OWNER/REPO/actions/workflows/<wfid>/runs` | 200, runs listed |
+| `gh api repos/OWNER/REPO/actions/runs/<id>/jobs` | `404 Not Found` |
+| `gh run view <id>` / `--log-failed` (uses the above) | `failed to get jobs: HTTP 404` |
+| `gh run rerun <id>` | exit 1 |
 | `gh api repos/OWNER/REPO/actions/runs/<id>` | 200, full run object |
+| `gh api repos/OWNER/REPO/actions/workflows/<wfid>/runs` | 200, runs listed |
+| `gh api repos/OWNER/REPO/actions/runs/<id>/attempts/1/jobs` | 200, every job with its conclusion |
+| `gh api repos/OWNER/REPO/actions/jobs/<jobid>/logs` | 200, full log |
 
 The repository is private, Actions is enabled
-(`actions/permissions` -> `{"enabled": true}`), the repo is neither archived
-nor disabled, and the token carries `repo` and `workflow`. Whatever produces
-the 404 on the collection endpoint, the state of the run is plainly readable
-through two other endpoints rlsbl already has the run id for.
+(`actions/permissions` -> `{"enabled": true}`), it is neither archived nor
+disabled, and the token carries `repo` and `workflow`. Whatever produces the
+404 on the collection endpoints, **every fact the gate needed was reachable**:
+the run's conclusion, each job's conclusion, and each failing job's log --
+through endpoints that take the run id rlsbl already had and printed.
 
-## The actual defect
+## The defect
 
-Whatever the API quirk, the gate's own logic is what turned it into a bad
-release outcome: **a status it could not read became `FAILED`.** The release
-flow documents four verdicts -- green, red, timeout, not-configured -- and this
-was none of them; it was "the probe errored". Red is the one verdict that stops
-a release and tells the operator to go fix code, and it is the wrong answer for
-a run that is still running.
+The classified auto-retry -- "a deterministic failure is never retried,
+anything else is rerun once in place" -- silently degrades to *no retry at all*
+when the log fetch fails. The message says so plainly ("retrying without
+classification") and then the retry itself fails, so a 429 on an action
+download aborted a release that a single rerun would have carried.
 
-The two follow-up messages show the same conflation twice more: the
-`--log-failed` fetch failed and was reported as "could not fetch failure logs
-... retrying without classification" (so the FAILED verdict was already fixed
-before anything had been classified), and `gh run rerun` failed too -- a rerun
-that would have been wrong anyway, since the run was mid-flight.
+Two things follow:
+
+1. **The classifier depends on `gh run view --log-failed`**, a single command
+   whose failure removes the whole classification. There is no fallback to the
+   per-job logs endpoint, which works here.
+2. **The retry depends on `gh run rerun`**, likewise. `POST
+   repos/OWNER/REPO/actions/runs/<id>/rerun-failed-jobs` is the API underneath
+   and is not affected by whatever breaks the collection endpoints.
+
+Neither failure is reported as an outcome of its own: the release ends on
+"CI did not pass ... Fix forward on the release branch", which points the
+operator at code that CI never showed to be broken. An operator following that
+instruction has nothing to fix.
 
 ## Possible directions
 
 Listed as options, not a decision:
 
-1. **A probe error is not a verdict.** Distinguish "the run concluded failure"
-   from "the status could not be read". The latter should retry with backoff and
-   then surface its own error naming the failed command -- never `FAILED`, and
-   never a rerun.
-2. **Read the run rlsbl already found.** The gate has the run id (it prints the
-   URL). `gh api repos/OWNER/REPO/actions/runs/<id>` returns `status` and
-   `conclusion` directly and worked here throughout. Preferring the per-run
-   endpoint over `gh run list` / `gh run view` removes the dependency on the
-   collection endpoint entirely.
-3. **Never rerun a run that has not concluded.** `status != "completed"` should
-   make the retry path unreachable regardless of how the verdict was reached.
-4. **Say which command produced the verdict.** The red message names the
-   workflow but not the probe, so an operator cannot tell a real red from an
-   unreadable one without querying GitHub by hand.
+1. **Reach the run through the id rlsbl already has.** Prefer
+   `gh api .../actions/runs/<id>`, `.../attempts/<n>/jobs` and
+   `.../actions/jobs/<jobid>/logs` over `gh run list` / `gh run view`. That
+   removes the dependency on the collection endpoints for status, per-job
+   conclusions and failure logs alike.
+2. **Rerun through the API.** `POST .../actions/runs/<id>/rerun-failed-jobs`
+   instead of `gh run rerun`.
+3. **Make "could not classify" its own outcome.** It is neither the green, red,
+   timeout nor not-configured verdict the release flow documents, and it should
+   not silently collapse into "red, no retry". At minimum the final error should
+   say the classification was unavailable and name the command that failed, so
+   the fix-forward instruction is not given for an unclassified failure.
+4. **Say which jobs failed.** The gate names the workflow (`CI Router`) but not
+   the failing jobs; with fifty jobs in a monorepo router that is a long way
+   from the two that actually failed.
 
 ## Consequences observed
 
 Nothing was burnt -- the main-as-candidate ordering held, the candidate commit
 sits on the release branch untagged, and re-running the release resumes at the
-same version. The cost was a wasted release cycle and a misleading instruction
-to "fix forward" against code that was never shown to be broken.
+same version. The cost was a release cycle spent on a transient failure the
+built-in retry was designed to absorb, plus the manual work of querying GitHub
+by hand to discover that the failure was a 429 and not the code.
 
 ## Affected files
 
@@ -97,5 +112,6 @@ to "fix forward" against code that was never shown to be broken.
 
 ## Effort
 
-Small for options 2 and 3. Small-to-medium for option 1, depending on how many
-call sites share the verdict enum.
+Small for options 2 and 4. Small-to-medium for option 1 (one accessor per fact,
+all three endpoints already proven). Medium for option 3 if the verdict enum is
+shared across several call sites.
