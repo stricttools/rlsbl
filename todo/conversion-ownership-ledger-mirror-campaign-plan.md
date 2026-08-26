@@ -21,7 +21,7 @@ accumulate as local commits on main.
   new repo's tree is proven byte-identical (git tree-object comparison,
   taken after the history filter and before any state transforms). Deletion
   goes through saferm; when saferm is absent, rm is used only when a
-  dedicated positively-named flag was passed (working name `--rm-fallback`);
+  dedicated `--delete-with-rm` flag was passed;
   saferm absent without the flag is a hard error naming both remedies. The
   flag is never defaulted. Extract becomes consequential.
 - Absorb runs its history rewrite in a working clone under the monorepo's
@@ -35,7 +35,9 @@ accumulate as local commits on main.
   A ref-name collision, and a version released on both sides, are hard
   errors at plan time. The auto-created singleton releasable's tag format
   is written explicitly into the workspace file, derived from the member's
-  primary target scheme (path-prefixed for Go, name-prefixed otherwise).
+  primary target scheme (path-prefixed for Go, name-prefixed otherwise);
+  a source whose targets span both schemes is a plan-time hard error with
+  an operator-declared tag format as the named remedy.
 - Conversions record facts (predecessor/successor repo identity, tag maps,
   departed tag globs) in a committed lineage record in the releasable state
   directory; follow-up obligations are standing checks derived from those
@@ -66,7 +68,11 @@ accumulate as local commits on main.
   companion plus alias tags — leased writes, hard-error tripwire on any
   ref the ledger cannot explain, per-target materialization policy under
   which a Go version whose recorded module path differs from the current
-  one is never materialized). Consent is file-driven: plan writes a file,
+  one is never materialized). The convergence lives in the existing
+  release reconcile command, which gains the ledger as a second
+  explanation source beside the rewrite journal — one command, one merged
+  plan, the tripwire consults both sources before declaring a ref
+  foreign. Consent is file-driven: plan writes a file,
   apply reads it, the command is consequential. The never-push rule is
   restated as namespace ownership: branch heads are written only by
   releases; tags and GitHub Releases are written only by the reconciler
@@ -119,6 +125,20 @@ accumulate as local commits on main.
   recovered from existing sources (CHANGELOG, GitHub Release notes); when
   nothing exists, the backfill hard-errors listing the versions that need
   operator-supplied text. Nothing is fabricated.
+
+Decision-origin note: the grounding-derived consequences in this list —
+extract's consequential classification, the packages-field narrowing, the
+two retired-key hard errors, the singleton tag-format derivation with its
+mixed-scheme plan-time refusal, the root-member check exemption, the
+in-file anchors on the CI-verified candidate, the in-place backfill of
+read-only archives, the recover-or-error backfill descriptions, the
+file-driven reconciler consent, and the mechanics bundle — were adopted on
+trust of the session's recommendation ([%%]); they are freely reversible
+and must never be cited as the user's deliberate intent. The rulings named
+before them (releasable unit, move-out, ledger-through-reconciler,
+release mirrors, ownership model, root resolution, unattributable-commit
+hard error, mirror ownership contract, merged reconciler surface, the
+surfaced test skip, and every name) are the user's deliberate decisions.
 
 ## Executor conventions
 
@@ -265,8 +285,10 @@ rlsbl/checks/quality.py, and the hand-typed other-target manifest list in
 the plain target (derive from the manifest union in rlsbl/checks/__init__).
 
 - Each feature declares one explicit unsupported-target policy; the test
-  runner's silent pass for unknown targets becomes an explicit skip with a
-  reason or an error.
+  runner's silent pass for unknown targets becomes an explicit skip naming
+  the target and reason, surfaced in the release step summary rather than
+  buried in verbose output (the candidate's CI verification remains the
+  test net for runnerless ecosystems).
 - Verify: a new test asserts no target-name literal appears in a
   feature-support conditional outside the targets package (or an
   equivalent structural guard); all existing behavior tests pass with
@@ -457,21 +479,26 @@ Effort: large. Independent of phase 3. Required by phases 6, 8, 9.
   fixture's archive carries the anchor; undo restores and re-finalizes an
   anchored archive.
 
-### 4.2 The backfill command
+### 4.2 The backfill script
 
-- A new consequential release subcommand (working name
-  `release backfill-anchors`; confirm the name at review) derives anchors
-  for every archived version from existing tags across all recognized tag
-  schemes, unlocking and relocking read-only files via the established
-  writable pattern, stamping the missing format-version marker on pre-gate
-  archives, and materializing missing archives from recoverable sources
-  (existing CHANGELOG content, GitHub Release notes). Versions with no
-  recoverable description, and versions whose tags cannot be found under
-  any recognized scheme, are listed in a hard error for operator input —
-  nothing fabricated, nothing skipped silently.
-- Verify: backfill on a fixture with pre-gate archives, a missing archive,
-  and an old-scheme tag produces anchors, a stamped gate, and the two
-  hard-error lists respectively; runs are idempotent.
+- A repo script (following the existing backfill_changelog.py precedent:
+  a one-time migration ships as a script under scripts/, never a CLI
+  command) derives anchors for every archived version from existing tags
+  across all recognized tag schemes, unlocking and relocking read-only
+  files via the established writable pattern, stamping the missing
+  format-version marker on pre-gate archives, and materializing missing
+  archives from recoverable sources (existing CHANGELOG content, GitHub
+  Release notes). Versions with no recoverable description, and versions
+  whose tags cannot be found under any recognized scheme, are listed in a
+  hard error for operator input — nothing fabricated, nothing skipped
+  silently. Dry-run mode first with per-version reporting, per the batch
+  discipline; runs are idempotent.
+- The missing-anchor hard error introduced by the consumer switch (4.3)
+  names this script as its remedy, and the docs describe running it from
+  the rlsbl repo exactly as the changelog backfill docs already do.
+- Verify: the script on a fixture with pre-gate archives, a missing
+  archive, and an old-scheme tag produces anchors, a stamped gate, and
+  the two hard-error lists respectively; a second run changes nothing.
 
 ### 4.3 The consumer switch
 
@@ -506,7 +533,9 @@ and 9.
 
 ### 5.1 Go module-path rewrite
 
-- A standalone plan/apply command rewriting the module line (single reader
+- `rlsbl rewrite go-module-path`, in a new rewrite command group (the
+  home for this family as it grows): a standalone plan/apply command
+  rewriting the module line (single reader
   exists in utils; the writer is new) and sweeping every import site via
   the existing tree-sitter Go import scanner and the equality-or-prefix
   match rule from the import scanners. Plan reports per-file occurrence
@@ -517,7 +546,8 @@ and 9.
 
 ### 5.2 uv path-source rewrite
 
-- Generalize the existing pypi build-time dependency rewriter into a
+- `rlsbl rewrite uv-path-sources`: generalize the existing pypi
+  build-time dependency rewriter into a
   working-tree plan/apply command covering project dependencies, optional
   dependencies, dependency groups, and tool-uv-sources entries; floors at
   the locked version; a floor version absent from the registry is a hard
@@ -547,7 +577,8 @@ Effort: extra large. Depends on phases 0, 3, 4, 5.
   archives, config — reusing the migration module's copy helpers and the
   locked-file write pattern); tag translation via the kept classifier with
   the boundary tag and lineage record; then the source side — saferm
-  deletion under the rm-fallback contract, workspace edit committed,
+  deletion under the `--delete-with-rm` consent contract, workspace edit
+  committed,
   router re-synced, snapshot regenerated, departed tag globs recorded.
   The repo lock is held. Inbound local-dependency edges refuse before any
   mutation; the departing name joins the floor list.
@@ -556,7 +587,7 @@ Effort: extra large. Depends on phases 0, 3, 4, 5.
   command list via the template.
 - Verify: round-trip (absorb then extract) coherence test on
   releasable-layout fixtures; tree-verification failure aborts with both
-  hashes; rm-fallback matrix (saferm present, absent-with-flag,
+  hashes; deletion-consent matrix (saferm present, absent-with-flag,
   absent-without-flag); dependent-edge refusal names the phase-5 command;
   source workspace passes all workspace checks immediately after apply.
 
@@ -592,8 +623,9 @@ Effort: extra large. Depends on phases 0, 3, 4, 5.
 
 - The narrative conversion chapter in docs/monorepo.md (semantics, tag
   policy, verification, the follow-up model); regenerated CLI docs; the
-  selfdoc generation-exclusion inconsistency for the monorepo commands
-  package resolved.
+  stale generated API page for the extract module removed (the monorepo
+  commands package stays excluded from API generation; the underlying
+  stale-output problem is filed as a todo in selfdoc).
 - Verify: docs build; the docs freshness tests pass.
 
 ---
@@ -605,9 +637,9 @@ Effort: medium. Depends on phases 0 (facts), 4 (ledger), 6 (writers).
 - Go module identity: the module path in go.mod must equal the origin
   remote's repository identity plus the member subdirectory (catches
   conversions, renames, and hand-moved modules alike).
-- Lockfile-manifest consistency: locks resolve the current manifests
-  (extending the dependency-floor precedent; the check name must avoid
-  the existing repo-lock check's name).
+- Lockfile-manifest consistency: the dep-locks check (sibling of
+  dep-floors, which it structurally mirrors) — locks resolve the current
+  manifests.
 - npm token presence on the repo via the GitHub API (a pinned observe
   allowlist entry for listing secret names is required).
 - Old-repo-archived and old-Go-module-deprecation-published: derived from
