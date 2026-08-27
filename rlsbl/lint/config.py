@@ -7,24 +7,6 @@ from dataclasses import dataclass, field
 from ..errors import ConfigError
 
 
-# Per-language default forbidden imports
-_DEFAULT_FORBIDDEN = {
-    "python": [
-        "argparse", "click", "typer",
-        "flask", "fastapi", "django",
-        "uvicorn", "granian", "starlette",
-        "tornado", "bottle",
-    ],
-    "go": [
-        "net/http",
-        "github.com/spf13/cobra",
-        "github.com/urfave/cli",
-    ],
-    "npm": [
-        "express", "koa", "hono",
-        "commander", "yargs",
-    ],
-}
 
 
 @dataclass
@@ -108,8 +90,12 @@ def load_language_config(
     ``<releasable>/lint/<language>.toml`` is used. If neither exists, the
     per-language defaults apply.
     """
+    from .languages import get_language
+
     member_path = os.path.join(project_path, ".rlsbl", "lint", f"{language}.toml")
-    defaults = _DEFAULT_FORBIDDEN.get(language, [])
+    # The LANGUAGES table is the single place a language's defaults are
+    # declared; this used to be a second dict keyed by the same names.
+    defaults = list(get_language(language).default_forbidden_imports)
 
     config_path = member_path
     if not os.path.isfile(config_path) and releasable_lint_dir:

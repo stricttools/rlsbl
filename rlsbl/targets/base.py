@@ -41,6 +41,18 @@ class BaseTarget:
     auto_detectable: ClassVar[str] = "yes"
     BUILD_TIMEOUT_DEFAULT: ClassVar[int] = 120
 
+    lint_language: ClassVar[str | None] = None
+    """Which library-lint language this target's sources are written in.
+
+    The lint taxonomy (``python``, ``go``, ``npm``, ``maven`` -- see
+    ``rlsbl.lint.languages``) is deliberately separate from the target
+    taxonomy: ``pypi`` publishes ``python``, and one language can back several
+    targets. This property is the single bridge between the two, replacing the
+    hand-listed target sets the library-lint check used to carry.
+
+    None means the target does not participate in library boundary lint.
+    """
+
     @property
     def name(self):
         """Target registry name. Subclasses must override."""

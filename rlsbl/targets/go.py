@@ -50,6 +50,7 @@ class GoTarget(BaseTarget):
     """Release target for Go projects (go.mod + VERSION file)."""
 
     detection_files = ("go.mod",)
+    lint_language = "go"
     capabilities = frozenset({"read_name", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Go modules"
 

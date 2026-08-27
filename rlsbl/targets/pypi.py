@@ -94,6 +94,7 @@ class PypiTarget(BaseTarget):
     """Release target for Python projects (pyproject.toml)."""
 
     detection_files = ("pyproject.toml",)
+    lint_language = "python"
     capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Python / PyPI"
 

@@ -54,6 +54,18 @@ TARGETS = {
 }
 
 
+def targets_with_library_lint():
+    """Targets that participate in library boundary lint.
+
+    Derived by asking every registered target which lint language its sources
+    are written in. Adding a target with a ``lint_language`` puts it in scope
+    automatically; there is no set to remember to edit.
+    """
+    return frozenset(
+        name for name, target in TARGETS.items() if target.lint_language is not None
+    )
+
+
 def resolve_releasable_config_dir_for_ctx(ctx):
     """Resolve the releasable config directory from a check context.
 
