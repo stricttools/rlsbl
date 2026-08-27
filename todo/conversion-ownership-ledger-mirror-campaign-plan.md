@@ -40,10 +40,22 @@ Campaign preconditions and lifecycle:
 
 ## Decisions this plan encodes
 
-Rulings marked [%%] were adopted on trust of the session's recommendation
-per the user's decision-origin convention: freely reversible, never to be
-cited as deliberate intent. Unmarked rulings are the user's deliberate
-decisions.
+Decision origin: most rulings below are the user's deliberate decisions
+(chosen in explicit question rounds or ordered directly). The following
+specific elements were adopted on trust of the session's recommendation
+per the user's decision-origin convention — freely reversible, never to
+be cited as deliberate intent: extract's consequential classification;
+the narrowing of auto-derived packages lists to single-owner attribution
+(manual broadening via changelog edit remains); the retired-key load-time
+hard errors; the singleton tag-format derivation and its mixed-scheme
+plan-time refusal; the exemption of manifest-less root members from the
+stale-entries and targets checks; the in-file anchors recording the
+CI-verified candidate; the in-place backfill of read-only archives; the
+file-driven reconciler consent; and the mechanics bundle (Go
+module-proxy evidence source, expected-ref sets, repo lock on
+conversions, reserved-name rules, reused job-key derivation, persisted
+promotion split map). The packages-narrowing and check-exemption items
+appear only in this list; the ownership phase implements them.
 
 - The releasable is the portable unit of conversion. Extraction operates
   on releasables only. Absorb always targets a releasable, auto-creating
@@ -51,7 +63,7 @@ decisions.
 - Implicit mode (a workspace with no releasables section) is DELETED
   entirely. The migrate-releasable command and its module — restored in
   June 2026 with a commit message declaring them temporary — are deleted
-  with it, after their two remaining uses (converting the last two
+  with it, after their remaining uses (converting the last
   implicit-mode fleet workspaces during the final-phase sweep). Only
   their history-corrupting defects are fixed first. Post-release, an
   implicit-mode workspace is a load-time hard error naming a migration
@@ -63,7 +75,7 @@ decisions.
   when the `--delete-with-rm` flag was passed (registered
   presence-optional: passing it enables the fallback, absence means
   saferm is required and its absence is a hard error naming both
-  remedies). Extract is consequential. [%%]
+  remedies). Extract is consequential.
 - Conversion consent contract: plan/apply within one invocation — the
   plan is computed and shown, apply proceeds under the command's
   consequential consent (`--approve-consequential` answers it). No plan
@@ -82,7 +94,7 @@ decisions.
   format is written explicitly, derived from the member's primary target
   scheme; a source whose targets span both schemes (path-prefixed and
   name-prefixed) is a plan-time hard error with an operator-declared tag
-  format as the named remedy. [%%]
+  format as the named remedy.
 - Conversions record facts (predecessor/successor repo identity,
   old-to-new tag maps, departed tag globs, boundary aliases) in a
   committed lineage record in the releasable state directory. Follow-up
@@ -112,7 +124,7 @@ decisions.
   the root tree for standalone projects) — authored into the archive by
   the finalization step before the file is locked; an anchor appearing
   in an operator's unreleased.toml is a validation error (anchors are
-  finalization-authored only). [%%]
+  finalization-authored only).
 - Ledger read semantics: "the latest release from here" means the
   highest anchored version whose commit is an ancestor of HEAD (what
   git describe meant), specified as a per-consumer table; absolute reads
@@ -150,7 +162,7 @@ decisions.
   differs from the current one, and the published-evidence guard gains
   a module-proxy evidence source for Go (the tag-based probe is
   circular for tag adjudication; both sources combine under the
-  existing fail-closed rule). [%%]
+  existing fail-closed rule).
 - The unpublished-refs standing check is reconciler-pointing: its
   errors name `release reconcile` as the remedy; missing-remotely is
   the reconciler's routine materialize work surfaced as a blocking
@@ -177,7 +189,7 @@ decisions.
   check; the scaffold layer is acknowledged deliberate divergence. The
   split correspondence map is regenerated on demand and persisted with
   the lineage record (regeneration requires the monorepo, which
-  promotion retires). [%%]
+  promotion retires).
 - Workspace ownership: every NON-TOOL-OWNED file has exactly one owning
   member — most specific member path wins; the mandatory root member
   (reserved name `root`) owns the remainder; the tool-owned exempt set
@@ -188,7 +200,7 @@ decisions.
   migration script (loader-sited errors are safe: migrations are
   scripts editing raw TOML, never rlsbl commands, so no tool needs to
   load invalid state; the pinned install covers the mid-campaign
-  window). [%%]
+  window).
 - CI triggering derives from declared dependency edges (all scopes)
   plus built-in rules: workspace-root manifest/lockfile changes trigger
   every member; release-machinery paths are auto-appended; a router
@@ -221,9 +233,9 @@ decisions.
   declared pgdesign target), never in detect(), which runs in every
   repository. General error-siting principle (executor convention
   below): errors fire where a feature is used, not where the world is
-  scanned. [%%]
+  scanned.
 - Network-dependent checks are fail-closed: inconclusive is a hard
-  error; rerun when the network is back. [%%]
+  error; rerun when the network is back.
 
 ## Phase dependency table
 
@@ -344,8 +356,8 @@ Effort: medium.
 Effort: small (shrunk by the implicit-mode deletion ruling: only the
 history-corrupting consolidation defects are fixed — the consolidation
 functions survive by moving into the phase-10 migration script when the
-command and module are deleted in 6.3, and they run exactly twice more,
-in the final-phase fleet conversions).
+command and module are deleted in 6.3, and they run only in the
+final-phase fleet conversions).
 
 ### 1.1 migrate-releasable: history-corrupting defects only
 
@@ -416,7 +428,7 @@ Effort: extra large.
 
 - Delete the capabilities class attribute; derive per axis by
   introspection. Enumerate ALL current readers before deleting (the
-  grounding found six, including two getattr-with-frozenset-default
+  grounding found several, including two getattr-with-frozenset-default
   sites in pipelines/base.py and release execute that would silently
   degrade — the getattr default pattern is banned in the replacement).
 - Correct the false docs claims (the pipelines doc's nonexistent
@@ -481,10 +493,15 @@ root member's only territory).
 - load_workspace hard-errors (loader-sited, per the ruling) on: no
   path-"." member; a path-"." member named anything but `root` (the
   name auto-applies when omitted); a non-root member named `root`; a
-  watch key anywhere; an implicit-mode workspace; the per-project
-  mirror-remote key. Each error names the migration script.
-- monorepo init scaffolds explicit mode: the root stanza plus a
-  releasables section.
+  watch key anywhere; an implicit-mode workspace. Each error names the
+  migration script. (The per-project mirror-remote key's relocation
+  error belongs to phase 9, where its releasable-level replacement
+  arrives — adding it here would break the mirror machinery and its
+  tests for the six phases in between.)
+- monorepo init scaffolds explicit mode: the root stanza (as a dev
+  node — the safe scaffold default; promoting the root member into a
+  releasable is the per-repo choice) plus an empty releasables section
+  with a comment naming that choice.
 - Root members without a detectable root manifest are exempt from
   stale-entries and targets checks as dev nodes are.
 - Job keys, filter keys, and check regexes derive from the reserved
@@ -499,7 +516,7 @@ root member's only territory).
 ### 3.3 Root-directory command resolution
 
 - Enumerate ALL resolve_project call sites by grep (grounding counted
-  about thirty; the plan's earlier list of eleven was a sample) and
+  about thirty; any shorter list is a sample) and
   classify each: project-scoped (resolves to the root member) vs
   workspace-scoped (switches to find_workspace_root).
 - `release run` at any workspace root requires `--releasable <name>`;
@@ -604,7 +621,7 @@ Effort: extra large.
   from tags across all recognized schemes; unlock/edit/relock via the
   established writable pattern (note: the helper is JSONL-named —
   rename or add a sibling for TOML); stamps the missing format-version
-  marker on pre-gate archives; materializes missing archives. Dry-run
+  marker on archives predating it; materializes missing archives. Dry-run
   first with per-version reporting; idempotent; explicitly one-time and
   pre-reconciler (post-phase-8, tag repair belongs to the reconciler).
 - rlsbl's own history workstream, sequenced before 4.3 and 4.4:
@@ -616,10 +633,12 @@ Effort: extra large.
   unanchorable marker only if recovery fails); the stray unexplainable
   tag and the local/remote tag delta found in review are reconciled so
   the new checks register green.
-- Verify: script fixtures for pre-gate archives, a missing archive,
-  and an old-scheme tag (anchors, stamped gate, and the hard-error
-  lists respectively); second run changes nothing; rlsbl's own repo
-  passes 4.4's check after the workstream.
+- Verify: script fixtures for a marker-less archive, a missing
+  archive, and an UNRECOGNIZABLE tag (anchor plus stamped marker,
+  materialized archive, and the operator-input hard-error list
+  respectively — a tag under any recognized scheme anchors normally);
+  second run changes nothing; rlsbl's own repo passes 4.4's check
+  after the workstream.
 
 ### 4.3 The consumer switch
 
@@ -710,9 +729,10 @@ Effort: extra large. Built on the 0.3 skeleton.
   internal_dep_floors. Consolidate the several clean-tree probes found
   in review onto the shared helper.
 - Consequential (the pinning tests and README template updated with
-  it). For a MIRRORED releasable, deletion verification uses the
-  promotion proof (phase 9): tree equality against the mirror's
-  pre-scaffold split commit.
+  it). A MIRRORED releasable is a plan-time hard refusal in this phase
+  (its deletion proof is promotion's, which phase 9 wires); phase 9
+  replaces the refusal with the promotion path — tree equality against
+  the mirror's pre-scaffold split commit.
 - Verify (one per goal): round-trip coherence on releasable-layout
   fixtures; verification failure aborts naming both hashes; the
   deletion-consent matrix (saferm present / absent-with-flag /
@@ -783,20 +803,21 @@ Effort: extra large. Built on the 0.3 skeleton.
 
 ## Phase 7 — Standing checks from facts
 
-Effort: large (five networked checks, each four-place).
+Effort: large (each check registers four-place).
 
 - go-module-identity: go.mod module path equals origin identity plus
-  member subdirectory.
+  member subdirectory (local: reads go.mod and git remote config).
 - dep-locks: lockfiles resolve current manifests (sibling of
-  dep-floors).
+  dep-floors; local).
 - npm-token-presence via the GitHub API (the existing gh api GET
   allowlist pin likely covers the argv — verify; the policy of
   listing secret names was accepted with the check's ratification).
 - old-repo-archived and go-deprecation-published: from lineage facts
   plus the GitHub API and the module proxy respectively (both proxy
   readers extend the existing registry client).
-- All fail-closed (inconclusive = error), network-tagged,
-  preflight-class.
+- The network-dependent checks are fail-closed (inconclusive = error)
+  and network-tagged, preflight-class; the local ones are ordinary
+  error checks.
 - Verify (per check): pass, fail, and inconclusive fixtures; four-place
   registration; error messages name their remedies.
 
@@ -836,8 +857,9 @@ Effort: large.
 
 Effort: large.
 
-- Mirror destination moves to the Releasable (loader + serialization +
-  the relocated-key loader error from 3.2; multi-member releasable
+- Mirror destination moves to the Releasable (loader + serialization;
+  the relocated per-project key becomes a loader hard error HERE, in
+  the same change that adds its replacement; multi-member releasable
   with a mirror is a hard error).
 - One mirror-publication module: writes the converged tip's tag and
   the mirror GitHub Release (the existing unaccounted Release creation
@@ -887,15 +909,15 @@ Effort: medium.
   pure projections was NOT adopted; tags remain real refs the
   reconciler converges).
 - The workspace migration script (scripts/): adds the root stanza,
-  removes watch keys, converts implicit-mode workspaces (the two
-  remaining fleet ones use it during the sweep), relocates the mirror
+  removes watch keys, converts implicit-mode workspaces (the remaining
+  fleet ones use it during the sweep), relocates the mirror
   remote key; raw-TOML editing, dry-run first, per-file reporting.
 - Quiescent-tree full verification: entire suite, all checks
   (network checks fail-closed — an inconclusive network answer blocks,
   rerun when it clears, per the ruling), docs build.
 - Changelog entries; the release file; the single release.
 - Post-release, same session: restore the editable install; run the
-  migration script across every fleet workspace — including the two
+  migration script across every fleet workspace — including the
   implicit-mode conversions, which the script performs itself via the
   consolidation functions it inherited from the deleted module; re-run
   each repo's checks green.
