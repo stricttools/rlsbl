@@ -616,7 +616,9 @@ def workspace_toml(body="", *, releasables=(), root_member=ROOT_MEMBER_TOML):
     """
     declares_releasables = "[[releasables]]" in body or "releasables =" in body
     declares_root = 'path = "."' in body or "path = '.'" in body
-    if declares_root:
+    # A body that declares `projects` as an inline array cannot also carry a
+    # [[projects]] table -- that is a duplicate key, not a member list.
+    if declares_root or "projects =" in body:
         root_member = ""
 
     # Order is load-bearing in TOML: a top-level key written after a table

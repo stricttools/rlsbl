@@ -38,7 +38,7 @@ from rlsbl.workspace import (
     is_explicit_mode,
     load_workspace,
 )
-from conftest import make_workspace, with_root_member, workspace_toml
+from conftest import make_workspace, with_root_member, workspace_toml, declared_members
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,11 @@ def _make_explicit_workspace(root, releasables, projects):
                 lines.append("library = true")
             lines.append("")
     else:
-        lines.append("projects = []")
+        lines.append("[[projects]]")
+        lines.append('path = "."')
+        lines.append('name = "root"')
+        lines.append("dev_only = true")
+        lines.append("releasable = false")
         lines.append("")
 
     for rel in releasables:
@@ -198,11 +202,13 @@ class TestScaffoldReleasableDirs:
         # Content preserved
         assert "abc" in open(unreleased).read()
 
-    def test_no_releasables_section_returns_empty(self, tmp_path):
-        """Without [[releasables]] section, returns empty list."""
-        make_workspace(tmp_path, [
-            {"path": "lib", "name": "lib"},
-        ])
+    def test_no_releasables_returns_empty(self, tmp_path):
+        """A workspace declaring no releasables scaffolds no releasable dirs."""
+        make_workspace(
+            tmp_path,
+            [{"path": "lib", "name": "lib", "releasable": False}],
+            releasables=[],
+        )
 
         files = scaffold_releasable_dirs(str(tmp_path))
         assert files == []
@@ -251,13 +257,15 @@ class TestReleasableMemberChangelogSkip:
         assert _is_releasable_member_project(proj_dir) is True
 
     def test_is_releasable_member_project_false_no_releasables(self, mock_git_repo):
-        """_is_releasable_member_project returns False without [[releasables]]."""
+        """A member outside every releasable is not a releasable member."""
         proj_dir = mock_git_repo / "lib"
         proj_dir.mkdir()
 
-        make_workspace(mock_git_repo, [
-            {"path": "lib", "name": "lib"},
-        ])
+        make_workspace(
+            mock_git_repo,
+            [{"path": "lib", "name": "lib", "releasable": False}],
+            releasables=[],
+        )
 
         assert _is_releasable_member_project(proj_dir) is False
 
@@ -341,7 +349,7 @@ class TestMonorepoAddReleasable:
                 "auto-commit": False,
             }, project_root=mock_git_repo)
 
-        projects = load_workspace(str(mock_git_repo))
+        projects = declared_members(load_workspace(str(mock_git_repo)))
         assert len(projects) == 1
         assert projects[0].releasable == "www"
 
@@ -356,7 +364,7 @@ class TestMonorepoAddReleasable:
                 "auto-commit": False,
             }, project_root=mock_git_repo)
 
-        projects = load_workspace(str(mock_git_repo))
+        projects = declared_members(load_workspace(str(mock_git_repo)))
         assert len(projects) == 1
         assert projects[0].releasable is False
 
@@ -381,18 +389,19 @@ class TestMonorepoAddReleasable:
                 "auto-commit": False,
             }, project_root=mock_git_repo)
 
-    def test_add_without_releasable_flag(self, mock_git_repo):
-        """--releasable is optional when adding a project."""
-        from rlsbl.workspace import save_workspace
+    def test_add_without_releasable_flag_is_refused(self, mock_git_repo):
+        """--releasable is required: every workspace declares its releasables.
+
+        A member with no ``releasable`` key cannot be read back, so add
+        refuses rather than writing one.
+        """
         make_workspace(str(mock_git_repo), [])
         self._make_project_dir(mock_git_repo, "lib")
 
-        with patch("rlsbl.effects.run"):
-            _cmd_add(["lib"], {
-                "auto-commit": False,
-            }, project_root=mock_git_repo)
+        with pytest.raises(SystemExit):
+            with patch("rlsbl.effects.run"):
+                _cmd_add(["lib"], {
+                    "auto-commit": False,
+                }, project_root=mock_git_repo)
 
-        projects = load_workspace(str(mock_git_repo))
-        assert len(projects) == 1
-        # releasable field should not be present
-        assert projects[0].releasable is None
+        assert declared_members(load_workspace(str(mock_git_repo))) == []

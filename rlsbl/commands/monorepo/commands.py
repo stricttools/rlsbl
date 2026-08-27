@@ -812,6 +812,16 @@ def _cmd_check_names(args, flags, project_root):
 
     from ..check import _check_single_name, _format_table_row
 
+    from ...workspace import project_is_dev_only
+
+    # A dev node publishes nothing, so it has no registry identity to check --
+    # and every workspace has at least one (its root member, when that member
+    # is a dev node). Asking a registry about it is pointless contact.
+    projects = [p for p in projects if not project_is_dev_only(p)]
+    if not projects:
+        print("No publishable projects in workspace.")
+        return
+
     rows = []
     for i, proj in enumerate(projects):
         # A project's registry_name IS its registry identity: use it verbatim,

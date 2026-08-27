@@ -19,7 +19,7 @@ class TestBatchReleaseInit:
     """Tests for _cmd_batch_release_init."""
 
     def test_scaffolds_correct_toml_structure(self, mock_git_repo):
-        """Creates unreleased.toml with [packages.<name>] sections and detected targets."""
+        """Creates unreleased.toml with [releasables.<name>] sections and detected targets."""
         # Set up a workspace with two projects (npm and pypi)
         make_workspace(mock_git_repo, [
             {"path": "pkg-a", "name": "pkg-a"},
@@ -48,21 +48,21 @@ class TestBatchReleaseInit:
         assert os.path.exists(batch_path)
 
         data = tomlkit.loads(open(batch_path).read())
-        assert "packages" in data
+        assert "releasables" in data
 
         # pkg-a should have npm target
-        assert "pkg-a" in data["packages"]
-        assert data["packages"]["pkg-a"]["bump"] == ""
-        assert data["packages"]["pkg-a"]["description"] == ""
-        assert "npm" in data["packages"]["pkg-a"]["include"]
-        assert data["packages"]["pkg-a"]["exclude"] == []
+        assert "pkg-a" in data["releasables"]
+        assert data["releasables"]["pkg-a"]["bump"] == ""
+        assert data["releasables"]["pkg-a"]["description"] == ""
+        assert "npm" in data["releasables"]["pkg-a"]["include"]
+        assert data["releasables"]["pkg-a"]["exclude"] == []
 
         # pkg-b should have pypi target
-        assert "pkg-b" in data["packages"]
-        assert data["packages"]["pkg-b"]["bump"] == ""
-        assert data["packages"]["pkg-b"]["description"] == ""
-        assert "pypi" in data["packages"]["pkg-b"]["include"]
-        assert data["packages"]["pkg-b"]["exclude"] == []
+        assert "pkg-b" in data["releasables"]
+        assert data["releasables"]["pkg-b"]["bump"] == ""
+        assert data["releasables"]["pkg-b"]["description"] == ""
+        assert "pypi" in data["releasables"]["pkg-b"]["include"]
+        assert data["releasables"]["pkg-b"]["exclude"] == []
 
     def test_errors_on_existing_non_empty_file(self, mock_git_repo):
         """Exits with error if unreleased.toml already exists and is non-empty."""
@@ -83,7 +83,7 @@ class TestBatchReleaseInit:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         os.makedirs(os.path.dirname(batch_path), exist_ok=True)
         with open(batch_path, "w") as f:
-            f.write("[packages.pkg-a]\nbump = \"patch\"\n")
+            f.write("[releasables.pkg-a]\nbump = \"patch\"\n")
 
         with pytest.raises(SystemExit) as exc_info:
             _cmd_batch_release_init(project_root=mock_git_repo)
@@ -145,8 +145,8 @@ class TestBatchReleaseInit:
 
         # Operator fills in bump and description
         doc = tomlkit.loads(open(batch_path).read())
-        doc["packages"]["pkg-a"]["bump"] = "minor"
-        doc["packages"]["pkg-a"]["description"] = "a real release"
+        doc["releasables"]["pkg-a"]["bump"] = "minor"
+        doc["releasables"]["pkg-a"]["description"] = "a real release"
         filled_text = tomlkit.dumps(doc)
         with open(batch_path, "w") as f:
             f.write(filled_text)
@@ -213,7 +213,7 @@ class TestBatchReleaseInit:
         os.makedirs(os.path.dirname(batch_path), exist_ok=True)
 
         # A racing init got here first and wrote a filled file.
-        racer_text = '[packages.pkg-a]\nbump = "minor"\ndescription = "racer"\ninclude = ["npm"]\nexclude = []\n'
+        racer_text = '[releasables.pkg-a]\nbump = "minor"\ndescription = "racer"\ninclude = ["npm"]\nexclude = []\n'
         with open(batch_path, "w") as f:
             f.write(racer_text)
 
@@ -252,8 +252,8 @@ class TestBatchReleaseInit:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
 
-        assert "lib" in data["packages"]
-        assert "test-infra" not in data["packages"]
+        assert "lib" in data["releasables"]
+        assert "test-infra" not in data["releasables"]
 
     def test_creates_releases_directory(self, mock_git_repo):
         """Creates the releases/ directory if it doesn't exist."""
@@ -309,11 +309,11 @@ class TestBatchReleaseInit:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
 
-        assert "has-target" in data["packages"]
-        assert "no-target" not in data["packages"]
+        assert "has-target" in data["releasables"]
+        assert "no-target" not in data["releasables"]
 
         captured = capsys.readouterr()
-        assert "no targets detected for no-target" in captured.err
+        assert "no targets detected for releasable 'no-target'" in captured.err
 
 
 class TestPackagesFilter:
@@ -350,8 +350,8 @@ class TestPackagesFilter:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
 
-        assert "pkg-a" in data["packages"]
-        assert "pkg-b" not in data["packages"]
+        assert "pkg-a" in data["releasables"]
+        assert "pkg-b" not in data["releasables"]
         # pkg-b should not appear even as a comment
         raw = open(batch_path).read()
         assert "pkg-b" not in raw
@@ -365,8 +365,8 @@ class TestPackagesFilter:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
 
-        assert "pkg-a" in data["packages"]
-        assert "pkg-b" in data["packages"]
+        assert "pkg-a" in data["releasables"]
+        assert "pkg-b" in data["releasables"]
 
     def test_packages_unknown_name_errors(self, mock_git_repo):
         """Providing a name that doesn't exist in workspace.toml exits with error."""
@@ -418,7 +418,7 @@ class TestCommentOutZeroCommits:
 
         # Should appear as comments, not as a real TOML section
         assert "# pkg-a: no unreleased commits since pkg-a@v1.0.0" in raw
-        assert "# [packages.pkg-a]" in raw
+        assert "# [releasables.pkg-a]" in raw
         assert '# bump = ""' in raw
 
         # Should NOT be parseable as a real packages entry
@@ -454,8 +454,8 @@ class TestCommentOutZeroCommits:
         data = tomlkit.loads(open(batch_path).read())
 
         # Should be a real section, not commented out
-        assert "pkg-a" in data["packages"]
-        assert data["packages"]["pkg-a"]["bump"] == ""
+        assert "pkg-a" in data["releasables"]
+        assert data["releasables"]["pkg-a"]["bump"] == ""
 
     def test_untagged_package_not_commented(self, mock_git_repo):
         """A package with no tags at all (first release) is scaffolded normally."""
@@ -478,7 +478,7 @@ class TestCommentOutZeroCommits:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
 
-        assert "pkg-a" in data["packages"]
+        assert "pkg-a" in data["releasables"]
 
     def test_mixed_active_and_inactive(self, mock_git_repo):
         """Active packages get real sections; inactive ones get commented sections."""
@@ -518,12 +518,12 @@ class TestCommentOutZeroCommits:
         data = tomlkit.loads(raw)
 
         # 'active' is a real section
-        assert "active" in data["packages"]
+        assert "active" in data["releasables"]
 
         # 'stale' is commented out
         assert "stale" not in data.get("packages", {})
         assert "# stale: no unreleased commits since stale@v0.5.0" in raw
-        assert "# [packages.stale]" in raw
+        assert "# [releasables.stale]" in raw
 
 
 class TestRenderCommentedSection:
