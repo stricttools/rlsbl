@@ -186,6 +186,44 @@ class TestUndoHasNoOwnPrompt:
         )
 
 
+def _undo_run_stub(*, fail_on=None, release_sha=None):
+    """A ``run`` stand-in for the undo flow, driven by argv rather than order.
+
+    These tests used to script ``run`` with a positional ``side_effect`` list,
+    and the list drifted from the flow: the audit step's own ``git add`` and
+    ``git commit`` consumed the entries meant for the tag deletion, so a test
+    named for a failing ``git tag -d`` really exercised a failing audit commit
+    -- and the entries meant for ``git log`` / ``git revert`` were never
+    reached at all, since the walk collected no commits. Selecting the failing
+    call by its argv keeps each test on the step it names.
+
+    ``fail_on`` is a predicate over the argv list. ``release_sha``, when given,
+    makes the release-commit walk find one version-bump commit, so the revert
+    step actually runs.
+    """
+    def _run(cmd, args=None, **kwargs):
+        argv = list(args or [])
+        if fail_on is not None and fail_on(argv):
+            raise Exception(f"{' '.join(['git'] + argv[:2])} failed")
+        if argv[:1] == ["describe"]:
+            return "v1.0.0"
+        if release_sha:
+            if argv[:3] == ["rev-list", "-n", "1"]:
+                return release_sha
+            if argv[:1] == ["log"]:
+                return "v1.0.0"  # the version-bump commit's subject
+        return ""
+    return _run
+
+
+def _summary_row(output, label):
+    """The summary line for *label*, so a test asserts on ITS step's status."""
+    for line in output.splitlines():
+        if line.startswith(label):
+            return line
+    raise AssertionError(f"no {label!r} row in the summary:\n{output}")
+
+
 class TestUndoGhDeleteFails:
     """Covers lines 118-120: gh release delete fails."""
 
@@ -201,13 +239,7 @@ class TestUndoGhDeleteFails:
     def test_gh_delete_failure_shows_summary(self, mock_run, mock_run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "v1.0.0",                               # git describe
-            "",                                      # git push origin :v1.0.0
-            "",                                      # git tag -d v1.0.0
-            "v1.0.0",                               # git log -1 --format=%s
-            "",                                      # git revert
-        ]
+        mock_run.side_effect = _undo_run_stub()
         mock_run_gh.side_effect = [
             "",                                      # gh release view -> OK
             Exception("delete failed"),              # gh release delete -> FAILS
@@ -215,8 +247,7 @@ class TestUndoGhDeleteFails:
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {}, ctx=_ctx())
-        # Summary table should be printed (has FAILED step)
-        assert "FAILED" in out.getvalue()
+        assert "FAILED" in _summary_row(out.getvalue(), "Delete GitHub Release")
 
 
 class TestUndoRemoteTagDeleteFails:
@@ -234,17 +265,13 @@ class TestUndoRemoteTagDeleteFails:
     def test_remote_tag_delete_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "v1.0.0",
-            Exception("push failed"),         # git push origin :v1.0.0 -> FAILS
-            "",                               # git tag -d
-            "v1.0.0",                        # git log
-            "",                               # git revert
-        ]
+        mock_run.side_effect = _undo_run_stub(
+            fail_on=lambda argv: argv[:1] == ["push"],
+        )
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {}, ctx=_ctx())
-        assert "FAILED" in out.getvalue()
+        assert "FAILED" in _summary_row(out.getvalue(), "Delete remote tag")
 
 
 class TestUndoLocalTagDeleteFails:
@@ -262,17 +289,13 @@ class TestUndoLocalTagDeleteFails:
     def test_local_tag_delete_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "v1.0.0",
-            "",                              # git push origin :v1.0.0
-            Exception("tag -d failed"),      # git tag -d -> FAILS
-            "v1.0.0",                       # git log
-            "",                              # git revert
-        ]
+        mock_run.side_effect = _undo_run_stub(
+            fail_on=lambda argv: argv[:2] == ["tag", "-d"],
+        )
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {}, ctx=_ctx())
-        assert "FAILED" in out.getvalue()
+        assert "FAILED" in _summary_row(out.getvalue(), "Delete local tag")
 
 
 class TestUndoRevertException:
@@ -300,17 +323,14 @@ class TestUndoRevertException:
     def test_revert_exception(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "v1.0.0",
-            "",                                # git push origin :v1.0.0
-            "",                                # git tag -d
-            "v1.0.0",                         # git log
-            Exception("revert failed"),        # git revert -> FAILS
-        ]
+        mock_run.side_effect = _undo_run_stub(
+            release_sha="a" * 40,
+            fail_on=lambda argv: argv[:1] == ["revert"],
+        )
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {}, ctx=_ctx())
-        assert "FAILED" in out.getvalue()
+        assert "FAILED" in _summary_row(out.getvalue(), "Revert commits")
 
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
