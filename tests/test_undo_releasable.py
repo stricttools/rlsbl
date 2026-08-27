@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from githarness import add_remote, git as _git, remote_ref
 from rlsbl.commands.release.release_state import (
     get_state_path,
@@ -238,6 +240,75 @@ class TestUndoReleasablePaths:
         # Audit record written at the releasable level.
         rel_dir = get_releasable_dir(str(tmp_project), "alpha")
         assert (Path(rel_dir) / "undo-audit.json").exists()
+
+
+class TestNonLatestAuditFailureRefusesTheUndo:
+    """The ``--version`` path is fail-closed on the audit record too.
+
+    Both undo paths execute the same plan, so the audit record is the same
+    precondition on each: an audit file that cannot be appended to refuses the
+    operation while the tag, the companion tags and the GitHub Release still
+    exist.
+    """
+
+    def test_corrupt_audit_refuses_before_any_destruction(
+        self, tmp_project, monkeypatch, capsys,
+    ):
+        core = _setup_released_releasable_workspace(tmp_project)
+        _git(tmp_project, "tag", "core/v1.0.1")
+        _git(tmp_project, "push", "-q", "origin", "core/v1.0.1")
+
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        audit = Path(rel_dir) / "undo-audit.json"
+        audit.write_text('[{"version": "0.9.0"}')  # a half-written array
+        _git(tmp_project, "add", os.path.relpath(str(audit), str(tmp_project)))
+        _git(tmp_project, "commit", "-q", "-m", "chore: pre-existing audit record")
+
+        monkeypatch.chdir(core)
+        ctx = create_context(Path(str(core)), workspace_root=Path(str(tmp_project)))
+
+        gh_calls = []
+
+        def spy_gh(args, **kwargs):
+            gh_calls.append(list(args))
+            if args[:2] == ["release", "view"]:
+                return ""
+            return ""
+
+        head_before = _git(tmp_project, "rev-parse", "HEAD")
+        tags_before = _git(tmp_project, "tag", "-l")
+
+        with pytest.raises(SystemExit) as exc:
+            _run_undo(
+                ctx,
+                flags={"version": "1.0.1"},
+                extra_patches=[
+                    patch("rlsbl.commands.undo.run_gh", side_effect=spy_gh),
+                    patch(
+                        "rlsbl.commands.release.execute.collect_companion_tags",
+                        return_value=["core/v1.0.1"],
+                    ),
+                ],
+            )
+        assert exc.value.code == 1
+
+        assert not any(a[:2] == ["release", "delete"] for a in gh_calls), (
+            f"the GitHub Release must survive; gh calls: {gh_calls}"
+        )
+        assert _git(tmp_project, "tag", "-l") == tags_before
+        assert remote_ref(tmp_project, "refs/tags/alpha@v1.0.1") != ""
+        assert remote_ref(tmp_project, "refs/tags/core/v1.0.1") != ""
+        assert _git(tmp_project, "rev-parse", "HEAD") == head_before
+        # The finalized changelog was not un-finalized either.
+        changes_dir = Path(get_releasable_changes_dir(str(tmp_project), "alpha"))
+        assert (changes_dir / "1.0.1.jsonl").exists()
+
+        # The unreadable file is left exactly as found.
+        assert audit.read_text() == '[{"version": "0.9.0"}'
+
+        err = capsys.readouterr().err
+        assert "undo-audit.json" in err
+        assert "not readable JSON" in err
 
 
 class TestUndoClearsStandaloneState:

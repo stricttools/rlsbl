@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 from ..changelog.files import get_changes_dir, unfinalize_version
 from ..changelog.generate import generate_changelog
+from ..errors import RlsblError
 from ..evidence_gate import EvidenceKind, Verdict, run_evidence_gate, write_undo_audit
 from ..member_context import resolve_member_context
 from ..release_file import unfinalize_release_file
@@ -596,12 +597,22 @@ def _restore_release_file(plan, uc, results):
 
 
 def _execute_plan(plan, uc, flags, ctx):
-    """Execute a computed UndoPlan. Writes the audit journal BEFORE any deletion."""
+    """Execute a computed UndoPlan.
+
+    Writes the audit journal BEFORE any deletion, on both the latest and the
+    ``--version`` path (both reach here). If the journal cannot be written the
+    undo is refused outright: no GitHub Release, tag or commit is touched.
+    """
     results = []
     tag = plan.tag
 
     # 1. Audit journal -- written and committed BEFORE any destructive action
     #    on EVERY path, capturing the full plan (tag, target SHAs, evidence).
+    #    This is a PRECONDITION, not a best-effort step: a failure here refuses
+    #    the whole undo while everything it would destroy is still intact.
+    #    Recording a FAILED row and destroying the release anyway produced the
+    #    one outcome the journal exists to prevent -- a deleted GitHub Release,
+    #    deleted tags and reverted commits with no record of any of it.
     try:
         audit_path = write_undo_audit(
             plan.audit_dir, plan.version, tag, plan.gate_result,
@@ -617,10 +628,25 @@ def _execute_plan(plan, uc, flags, ctx):
             run("git", ["commit", "-m", f"chore: audit record for undo of {tag}"])
         except subprocess.CalledProcessError:
             pass  # nothing to commit (audit file unchanged) is acceptable
-        results.append(("Write audit record", OK, "-"))
-    except Exception:
-        traceback.print_exc()
-        results.append(("Write audit record", FAILED, "manually write undo-audit.json"))
+    except Exception as exc:
+        expected = os.path.join(plan.audit_dir, "undo-audit.json")
+        if not isinstance(exc, RlsblError):
+            # An unexpected failure (a permission problem, a broken git) is a
+            # bug rather than operator-facing text, so its trace is printed.
+            traceback.print_exc()
+        print(
+            f"Error: the undo audit record for {tag} ({expected}) could not "
+            f"be written: {exc}",
+            file=sys.stderr,
+        )
+        print(
+            f"Undo refused: nothing was destroyed. The GitHub Release, the "
+            f"tag {tag} and the release commits are untouched. Repair or move "
+            f"aside the audit file, then re-run.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    results.append(("Write audit record", OK, "-"))
 
     # 2. Delete the GitHub Release
     if plan.github_release_exists:

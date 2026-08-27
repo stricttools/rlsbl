@@ -381,6 +381,67 @@ class TestEvidenceGate:
 
 
 # --------------------------------------------------------------------------- #
+# (e) The audit record is a precondition, not a best-effort step
+# --------------------------------------------------------------------------- #
+
+class TestAuditFailureRefusesTheUndo:
+    """An audit record that cannot be written stops the undo dead.
+
+    The execution step promises the journal is written BEFORE any destructive
+    action on every path. A blanket ``except`` around the write turned that
+    promise into a printed traceback and a FAILED row while the GitHub Release,
+    the tags and the release commits were destroyed anyway -- leaving no record
+    of what was destroyed, in exactly the run where the record is needed.
+    """
+
+    def _corrupt_audit(self, repo):
+        """A pre-existing audit file that cannot be parsed, committed clean."""
+        audit = repo / ".rlsbl" / "undo-audit.json"
+        audit.write_text("not json")
+        git(repo, "add", ".rlsbl/undo-audit.json")
+        git(repo, "commit", "-q", "-m", "chore: pre-existing audit record")
+        return audit
+
+    def test_unwritable_audit_refuses_before_any_destruction(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        repo = tmp_path / "repo"
+        _make_released_repo(repo, n_commits=5)
+        monkeypatch.chdir(repo)
+        audit = self._corrupt_audit(repo)
+
+        head_before = git(repo, "rev-parse", "HEAD")
+        tags_before = git(repo, "tag", "-l")
+        remote_before = snapshot_remote_refs(repo)
+
+        gh = _FakeGh()
+        with pytest.raises(SystemExit) as exc:
+            _run_undo(repo, {}, gh=gh)
+        assert exc.value.code == 1
+
+        # The GitHub CLI was never asked to delete anything.
+        assert not gh.deleted, f"gh calls: {gh.calls}"
+        # No tag deleted, locally or on the remote.
+        assert git(repo, "tag", "-l") == tags_before
+        assert snapshot_remote_refs(repo) == remote_before
+        assert remote_ref(repo, "refs/tags/v1.0.1") != ""
+        # No commit reverted: the released version still stands.
+        assert git(repo, "rev-parse", "HEAD") == head_before
+        assert json.loads((repo / "package.json").read_text())["version"] == "1.0.1"
+        assert (repo / ".rlsbl/changes/1.0.1.jsonl").exists()
+
+        # The unreadable file is left exactly as found, for the operator.
+        assert audit.read_text() == "not json"
+
+        err = capsys.readouterr().err
+        assert "undo-audit.json" in err, "the refusal must name the audit file"
+        assert "not readable JSON" in err, (
+            "the hard error from the audit writer must be surfaced, not "
+            "swallowed into a generic warning"
+        )
+
+
+# --------------------------------------------------------------------------- #
 # GitHub Release absence and no-tags handling
 # --------------------------------------------------------------------------- #
 
