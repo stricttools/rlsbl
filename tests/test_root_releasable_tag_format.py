@@ -212,7 +212,14 @@ class TestBareVersionRootReleasable:
         prefix = _get_monorepo_tag_prefix(root_member, str(root), releasables)
         assert prefix == "v"
 
-    def test_status_reports_the_tag(self, tmp_path):
+    def test_status_reports_the_tag(self, tmp_path, capsys):
+        """`monorepo status` names the bare-version tag, not "(none)".
+
+        The releasable's row resolves its tag through the declared
+        ``tag_format``; resolving it through the workspace default
+        (``{name}@v{version}``) would match nothing and report the releasable
+        as never released.
+        """
         from rlsbl.commands.monorepo import _cmd_status
 
         root = _bare_version_root_workspace(tmp_path)
@@ -229,6 +236,12 @@ class TestBareVersionRootReleasable:
             _cmd_status({}, project_root=".")
         finally:
             os.chdir(cwd)
+
+        out = capsys.readouterr().out
+        rows = [line for line in out.splitlines() if line.startswith("app")]
+        assert rows, f"no row for the releasable in:\n{out}"
+        assert "v1.2.3" in rows[0], rows
+        assert "(none)" not in rows[0], rows
 
     def test_coverage_anchors_on_the_bare_version_tag(self, tmp_path, capsys):
         """The unreleased range starts at ``v1.2.3``, not at the repo's first commit."""
