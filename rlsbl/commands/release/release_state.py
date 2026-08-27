@@ -203,11 +203,17 @@ def resolve_resume_source(workspace_root, cwd=".") -> tuple[str, str]:
 
     from ...workspace import load_workspace, members_of, resolve_project
 
+    from ...ownership import is_root_member
+
     workspace_root = str(workspace_root)
     project = resolve_project(workspace_root, cwd)
-    if project is None:
-        # Not inside a member package (e.g. at the workspace root):
-        # look for releasable in-flight state.
+    if project is None or is_root_member(project):
+        # Not inside a member package's own directory. The root member's
+        # directory IS the workspace root, so standing there means "somewhere
+        # in this workspace", not "in this one package" -- resolve the resume
+        # source from the in-flight releasable state instead. A root member
+        # mid-release is found that way too, since its state lives under its
+        # releasable like every other member's.
         rel_states = find_releasable_state_files(workspace_root)
         if not rel_states:
             raise StateResolutionError(

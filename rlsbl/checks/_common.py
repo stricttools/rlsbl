@@ -238,11 +238,18 @@ def _get_all_changelog_contexts(ctx):
         single = _get_changelog_context(ctx)
         return [single] if single is not None else []
 
+    from ..ownership import is_root_member
+
     ws_root = str(ctx.workspace_root)
     proj = resolve_project(ws_root, str(ctx.project_root))
 
-    if proj is not None or not is_explicit_mode(ws_root) or not getattr(ctx, "releasables", None):
-        # CWD is inside a project, or implicit mode -- single context
+    # The root member's directory IS the workspace root, so standing there
+    # means "the whole workspace", not "this one member" -- every releasable's
+    # changelog is in scope, including the root member's own.
+    at_workspace_root = proj is None or is_root_member(proj)
+
+    if not at_workspace_root or not is_explicit_mode(ws_root) or not getattr(ctx, "releasables", None):
+        # CWD is inside a member package -- single context
         single = _get_changelog_context(ctx)
         return [single] if single is not None else []
 

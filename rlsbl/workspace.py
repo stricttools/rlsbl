@@ -647,14 +647,14 @@ def resolve_project(root, cwd="."):
     """Determine which project cwd is inside, returning a WorkspaceProject or None.
 
     Uses the one path rule (:func:`rlsbl.ownership.member_for_directory`): the
-    most specific declared member path wins.
+    most specific declared member path wins, and the root member answers for
+    every directory no other member claims -- including the repository root
+    itself, which is exactly what a member declared at ``path = "."`` always
+    matched.
 
-    The root member does NOT answer here. It owns the residual for *file*
-    attribution, but "which project is this directory in?" is a different
-    question, and several commands act on the answer "none of them, you are at
-    the workspace root" -- ``release run`` refuses there, ``check`` iterates
-    every releasable there. Handing them the root member instead would change
-    what those commands do, which is a decision of its own.
+    ``None`` only when *cwd* is outside the workspace tree entirely. Inside a
+    workspace, some member always answers, because a workspace always declares
+    a root member.
     """
     from .ownership import member_for_directory
 
@@ -666,7 +666,7 @@ def resolve_project(root, cwd="."):
     relative = os.path.relpath(abs_cwd, abs_root)
 
     return member_for_directory(
-        relative, load_workspace(root), include_root=False,
+        relative, load_workspace(root), include_root=True,
     )
 
 
