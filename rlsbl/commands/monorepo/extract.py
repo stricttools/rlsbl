@@ -766,7 +766,12 @@ def validate_absorb_preconditions(workspace_root, source_repo_path, dest_path, n
             f"source path is not a git repository: {source_repo_path}"
         )
 
-    status = _run_git(source_repo_path, "status", "--porcelain")
+    # ``--no-optional-locks`` is what puts this read on the observe allowlist,
+    # so a preview really runs it instead of recording it -- the check below
+    # has to DECIDE, and it also keeps the read off ``index.lock``.
+    status = _run_git(
+        source_repo_path, "--no-optional-locks", "status", "--porcelain"
+    )
     if status:
         raise ExtractError(
             f"source repository has uncommitted changes: {source_repo_path}. "
