@@ -1128,7 +1128,9 @@ def _setup_monorepo_with_releasable_state(tmp_path):
     changes dirs at all.
 
     Layout: releasable ``core`` (members pkgA, pkgB) and releasable ``extras``
-    (member pkgC), each with one released version and one unreleased entry.
+    (member pkgC). Each carries the released state for the version the factory
+    tags (``ns.initial_version``: locked JSONL, generated .md, archived release
+    file) plus the unreleased entries added below.
 
     Returns (root, commit_hashes).
     """
@@ -1147,8 +1149,10 @@ def _setup_monorepo_with_releasable_state(tmp_path):
     hash_b = _make_commit(root, "pkgB/main.py", "print('B')", "add pkgB")
     hash_c = _make_commit(root, "pkgC/main.py", "print('C')", "add pkgC")
 
-    # Release state for each releasable: one released version plus the
-    # unreleased entries that reference the commits above.
+    # Unreleased entries referencing the commits above. The released version
+    # (``ns.initial_version``, the one the factory tags) already has its full
+    # trio, so this pass only adds the unreleased side -- naming that version
+    # again would be refused as a rewrite of released state.
     make_releasable_state(
         root,
         "core",
@@ -1163,12 +1167,6 @@ def _setup_monorepo_with_releasable_state(tmp_path):
                 description="Feature B", type="feature", packages=["pkgB"],
             ),
         ],
-        versioned_entries={"0.0.1": [
-            ChangelogEntry(
-                commits=[hash_a], user_facing=True,
-                description="Core first release", type="feature",
-            ),
-        ]},
         release_file=DEFAULT_RELEASE_FILE,
     )
     make_releasable_state(
@@ -1181,7 +1179,6 @@ def _setup_monorepo_with_releasable_state(tmp_path):
                 description="Feature C", type="feature", packages=["pkgC"],
             ),
         ],
-        versioned_entries={"0.0.1": []},
     )
 
     subprocess.run(

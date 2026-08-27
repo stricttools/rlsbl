@@ -117,6 +117,104 @@ class TestMultiReleasableFixtureDefaults:
             assert expected_tag in tags, f"tag {expected_tag} not found in {tags}"
 
 
+class TestInitialReleaseState:
+    """The version the factory TAGS is a released version, so it has state.
+
+    Real rlsbl never leaves a tag standing over nothing: a released version
+    always has its trio -- ``changes/<v>.jsonl``, ``changes/<v>.md`` and
+    ``releases/v<v>.toml``. A fixture that tags without writing them models a
+    repo the tools cannot produce.
+    """
+
+    def test_tagged_version_has_its_trio(self, multi_releasable_monorepo):
+        ns = multi_releasable_monorepo
+        for rel in ns.releasables:
+            changes_dir = get_releasable_changes_dir(str(ns.root), rel.name)
+            releases_dir = os.path.join(
+                get_releasable_dir(str(ns.root), rel.name), "releases"
+            )
+            jsonl = os.path.join(changes_dir, f"{ns.initial_version}.jsonl")
+            md = os.path.join(changes_dir, f"{ns.initial_version}.md")
+            archive = os.path.join(releases_dir, f"v{ns.initial_version}.toml")
+            assert os.path.isfile(jsonl), f"{rel.name}: {jsonl} missing"
+            assert os.path.isfile(md), f"{rel.name}: {md} missing"
+            assert os.path.isfile(archive), f"{rel.name}: {archive} missing"
+            # Locked exactly as rlsbl locks released state.
+            assert not os.access(jsonl, os.W_OK)
+            assert not os.access(archive, os.W_OK)
+
+    def test_initial_release_is_user_facing_and_resolvable(
+        self, multi_releasable_monorepo,
+    ):
+        """The released entry is a real one: a user-facing entry over a commit
+        that resolves in the repo, which is what a release requires."""
+        import subprocess
+
+        ns = multi_releasable_monorepo
+        changes_dir = get_releasable_changes_dir(str(ns.root), "alpha")
+        entries = parse_jsonl(
+            os.path.join(changes_dir, f"{ns.initial_version}.jsonl")
+        )
+        assert entries
+        assert all(e.user_facing for e in entries)
+        for entry in entries:
+            for sha in entry.commits:
+                subprocess.run(
+                    ["git", "cat-file", "-e", sha + "^{commit}"],
+                    cwd=str(ns.root), check=True,
+                    capture_output=True, text=True,
+                )
+
+    def test_caller_supplied_version_wins(self, multi_releasable_monorepo_factory):
+        """An explicit entry list for the initial version replaces the default
+        one -- the factory never fights the caller for that slot."""
+        ns = multi_releasable_monorepo_factory(
+            releasable_changes={
+                "alpha": {
+                    "versions": {
+                        "0.1.0": [
+                            ChangelogEntry(
+                                commits=["cafebabe"], user_facing=True,
+                                description="Caller's own entry", type="fix",
+                            ),
+                        ],
+                    },
+                },
+            },
+        )
+        changes_dir = get_releasable_changes_dir(str(ns.root), "alpha")
+        entries = parse_jsonl(os.path.join(changes_dir, "0.1.0.jsonl"))
+        assert [e.description for e in entries] == ["Caller's own entry"]
+
+    def test_damaged_state_is_opt_in(self, multi_releasable_monorepo_factory):
+        """A test that WANTS the damaged shape (a tag with no state behind it)
+        declares it, rather than getting it by default."""
+        ns = multi_releasable_monorepo_factory(write_initial_release_state=False)
+        for rel in ns.releasables:
+            changes_dir = get_releasable_changes_dir(str(ns.root), rel.name)
+            releases_dir = os.path.join(
+                get_releasable_dir(str(ns.root), rel.name), "releases"
+            )
+            assert not os.path.exists(
+                os.path.join(changes_dir, f"{ns.initial_version}.jsonl")
+            )
+            assert not os.path.exists(
+                os.path.join(releases_dir, f"v{ns.initial_version}.toml")
+            )
+
+    def test_initial_release_state_is_committed(
+        self, multi_releasable_monorepo,
+    ):
+        import subprocess
+
+        ns = multi_releasable_monorepo
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(ns.root), capture_output=True, text=True, check=True,
+        )
+        assert result.stdout.strip() == ""
+
+
 class TestMultiReleasableFactory:
     """Tests using the factory fixture for custom configurations."""
 

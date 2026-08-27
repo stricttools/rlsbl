@@ -1173,6 +1173,7 @@ def _create_multi_releasable_monorepo(
     releasable_changes=None,
     releasable_releases=None,
     initial_version="0.1.0",
+    write_initial_release_state=True,
 ):
     """Build a multi-releasable monorepo test repo.
 
@@ -1198,6 +1199,16 @@ def _create_multi_releasable_monorepo(
             Released versions named in ``releasable_changes`` are archived
             automatically.
         initial_version: version string for all releasables (default "0.1.0").
+        write_initial_release_state: when True (the default), every releasable
+            gets the full released trio for ``initial_version`` -- a locked
+            ``changes/<v>.jsonl`` with one user-facing entry over a commit that
+            resolves, its generated ``.md``, and the ``releases/v<v>.toml``
+            archive -- so the tag the factory creates stands over real released
+            state, as it always does in a real repo. A releasable that names
+            ``initial_version`` in ``releasable_changes["versions"]`` keeps its
+            own entries. Pass False to get the DAMAGED shape on purpose: a
+            tagged version with no state behind it, which real rlsbl never
+            produces and only a test about that damage should ask for.
 
     Returns:
         SimpleNamespace with root, releasables, projects, and per-project dirs.
@@ -1248,18 +1259,34 @@ def _create_multi_releasable_monorepo(
         )
         project_dirs[proj["name"]] = proj_dir
 
+    # The commit the default released changelog entry points at. Every hash in
+    # a real released JSONL resolves, so the fixture's does too.
+    initial_sha = git_head(tmp_path)
+
     # Set up per-releasable state directories (version, changes, releases,
     # config.json, hooks) -- the real releasable layout.
     for rel in releasables:
         changes = releasable_changes.get(rel.name, {})
         releases = releasable_releases.get(rel.name, {})
+        versions = dict(changes.get("versions") or {})
+        if write_initial_release_state and initial_version not in versions:
+            from rlsbl.changelog.schema import ChangelogEntry
+
+            versions[initial_version] = [
+                ChangelogEntry(
+                    commits=[initial_sha],
+                    user_facing=True,
+                    description=f"Initial {rel.name} release",
+                    type="feature",
+                ),
+            ]
         make_releasable_state(
             tmp_path,
             rel.name,
             version=initial_version,
             config=releasable_configs.get(rel.name, {}),
             unreleased_entries=changes.get("unreleased"),
-            versioned_entries=changes.get("versions"),
+            versioned_entries=versions or None,
             release_file=releases.get("unreleased"),
             archived_releases=releases.get("archives"),
             hooks=hook_configs.get(rel.name),
