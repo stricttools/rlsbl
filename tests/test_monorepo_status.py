@@ -69,7 +69,7 @@ class TestMonorepoStatus:
         assert "Path" in captured.out
         assert "Target" in captured.out
         assert "Version" in captured.out
-        assert "Tag" in captured.out
+        assert "Released" in captured.out
         assert "Coverage" in captured.out
         # Project row
         assert "pkg-a" in captured.out
@@ -87,22 +87,26 @@ class TestMonorepoStatus:
         assert "(none)" in captured.out
 
     def test_status_shows_released(self, mock_git_repo, capsys):
-        """A project with a tag matching its version shows that tag."""
+        """A project with an archived release shows that release."""
+        from conftest import archive_release, git_head, ledger_dir
+
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib", version="1.0.0")
         _cmd_add(["mylib"], {"releasable": "false"}, project_root=".")
-        # Create a matching tag
         subprocess.run(
             ["git", "tag", "mylib@v1.0.0"],
             cwd=str(mock_git_repo),
             check=True,
         )
+        archive_release(
+            ledger_dir(mock_git_repo / "mylib"), "1.0.0", git_head(mock_git_repo),
+        )
         capsys.readouterr()
         _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
-        assert "mylib@v1.0.0" in captured.out
-        # The root member has no tag of its own; mylib's row shows one.
+        # The root member has released nothing; mylib's row names its release.
         mylib_row = _row_for(captured.out, "mylib")
+        assert "1.0.0" in mylib_row
         assert "(none)" not in mylib_row
 
     def test_status_no_workspace(self, mock_git_repo, capsys):
@@ -209,6 +213,13 @@ def _releasable_workspace(repo, members=("pkg-a", "pkg-b"), name="alpha",
         ["git", "commit", "-q", "-m", "workspace setup"], cwd=str(repo), check=True,
     )
     subprocess.run(["git", "tag", f"{name}@v{version}"], cwd=str(repo), check=True)
+    # The LEDGER entry the status table reads: the archive, not the tag.
+    from conftest import archive_release, git_head
+
+    archive_release(
+        os.path.join(os.path.dirname(changes_dir), "releases"),
+        version, git_head(repo),
+    )
     return changes_dir
 
 
@@ -331,6 +342,11 @@ class TestMonorepoStatusCoverage:
         subprocess.run(
             ["git", "tag", "tool@v3.0.0"], cwd=str(mock_git_repo), check=True,
         )
+        from conftest import archive_release, git_head, ledger_dir
+
+        archive_release(
+            ledger_dir(mock_git_repo / "tool"), "3.0.0", git_head(mock_git_repo),
+        )
         sha = _commit_file(mock_git_repo, "tool/t.js", message="feat: tool")
         _write_entry(str(tool_changes), sha)
 
@@ -370,8 +386,14 @@ def _unreleasable_member_workspace(repo, name="pkg-a", version="1.0.0",
         ["git", "commit", "-q", "-m", "workspace setup"], cwd=str(repo), check=True,
     )
     if tag:
+        from conftest import archive_release, git_head
+
         subprocess.run(
             ["git", "tag", f"{name}@v{version}"], cwd=str(repo), check=True,
+        )
+        archive_release(
+            os.path.join(str(repo), name, ".rlsbl", "releases"),
+            version, git_head(repo),
         )
     return changes_dir
 

@@ -355,30 +355,36 @@ def _cmd_list(flags, project_root):
         print(f"{name_col}  {proj['path']}")
 
 
-def _latest_tag_for_glob(tag_glob):
-    """Return the newest tag matching *tag_glob*, or None when there is none.
+def _latest_release_for_row(changes_dir, tag_glob):
+    """The release a status row reports, from that row's own LEDGER.
 
-    The version parsed out of the tag is no longer needed: the status table
-    reports real JSONL coverage over the ``<tag>..HEAD`` range instead of
-    counting CHANGELOG bullets above the tag's heading.
+    Returns ``(fact, anchor)``: the project's latest archived release as a
+    displayable fact (annotated when this checkout does not contain it), and
+    the highest archived release this checkout DOES contain, which is what
+    bounds the coverage range. The two differ exactly when the checkout
+    predates a release, and the table shows both rather than collapsing them.
+
+    This used to be ``git tag -l <glob> --sort=-v:refname``, which reported
+    whatever the tag namespace happened to hold.
     """
-    try:
-        result = effects.run(
-            ["git", "tag", "-l", tag_glob, "--sort=-v:refname"],
-            capture_output=True, text=True, check=True,
-        )
-        first_line = result.stdout.strip().split("\n")[0].strip() if result.stdout.strip() else ""
-        if first_line:
-            return first_line
-    except Exception:
-        pass
-    return None
+    from ...ledger import (
+        latest_release_fact,
+        range_anchor,
+        releases_dir_for_changes_dir,
+    )
+
+    releases_dir = releases_dir_for_changes_dir(changes_dir)
+    return (
+        latest_release_fact(releases_dir, tag_glob=tag_glob),
+        range_anchor(releases_dir, tag_glob=tag_glob),
+    )
 
 
-def _coverage_column(latest_tag, changes_dir, scope):
+def _coverage_column(anchor, changes_dir, scope):
     """Return the Coverage-column string for one status row.
 
-    Real JSONL coverage: the commits since *latest_tag*, scoped to the row's
+    Real JSONL coverage: the commits since *anchor* -- the ledger entry for
+    the highest archived release this checkout contains -- scoped to the row's
     members via *scope* (an :class:`~rlsbl.ownership.OwnershipScope`, which
     carries the whole member list), minus the exempt ones, cross-referenced
     against the row's
@@ -401,7 +407,7 @@ def _coverage_column(latest_tag, changes_dir, scope):
     from ...changelog.validate import filter_exempt_commits
     from ...git_util import filter_commits_for_scope
 
-    range_spec = f"{latest_tag}..HEAD" if latest_tag else "HEAD"
+    range_spec = f"{anchor.candidate_sha}..HEAD" if anchor else "HEAD"
     commits = _git_log_hashes(range_spec)
     # Scope first, then exempt -- the order the authoritative coverage check
     # uses, so an unrelated package's changelog churn is never counted here.
@@ -454,14 +460,15 @@ def _cmd_status_explicit(root, projects):
         except Exception:
             version = "?"
         tag_glob = resolve_monorepo_tag_glob(None, root, releasable=rel)
-        latest_tag = _latest_tag_for_glob(tag_glob)
+        rel_changes = get_releasable_changes_dir(root, rel.name)
+        fact, anchor = _latest_release_for_row(rel_changes, tag_glob)
         coverage = _coverage_column(
-            latest_tag, get_releasable_changes_dir(root, rel.name),
+            anchor, rel_changes,
             OwnershipScope.for_members(projects, members),
         )
         member_names = ", ".join(m["name"] for m in members)
         members_col = f"{len(members)} ({member_names})" if members else "0"
-        rows.append((rel.name, "releasable", str(version), latest_tag or "(none)", coverage, members_col))
+        rows.append((rel.name, "releasable", str(version), fact.label(), coverage, members_col))
 
     for proj in projects:
         if proj["name"] in claimed:
@@ -477,14 +484,15 @@ def _cmd_status_explicit(root, projects):
             except Exception:
                 version = "?"
         tag_glob = resolve_monorepo_tag_glob(proj, root, releasable=None)
-        latest_tag = _latest_tag_for_glob(tag_glob)
+        proj_changes = get_changes_dir(os.path.join(root, path))
+        fact, anchor = _latest_release_for_row(proj_changes, tag_glob)
         coverage = _coverage_column(
-            latest_tag, get_changes_dir(os.path.join(root, path)),
+            anchor, proj_changes,
             OwnershipScope.for_member(projects, proj),
         )
-        rows.append((name, "project", str(version), latest_tag or "(none)", coverage, "-"))
+        rows.append((name, "project", str(version), fact.label(), coverage, "-"))
 
-    headers = ("Name", "Kind", "Version", "Tag", "Coverage", "Members")
+    headers = ("Name", "Kind", "Version", "Released", "Coverage", "Members")
     widths = [len(h) for h in headers]
     for row in rows:
         for i in range(len(headers)):
@@ -551,29 +559,24 @@ def _cmd_status(flags, project_root):
             except Exception:
                 version = "?"
 
-        # Find latest tag using target-aware glob
-        latest_tag = None
-        try:
-            if first_target_name and first_target_name in TARGETS:
-                tag_glob = TARGETS[first_target_name].monorepo_tag_glob(name, path=path)
-            else:
-                tag_glob = f"{name}@v*"
-            latest_tag = _latest_tag_for_glob(tag_glob)
-        except Exception:
-            pass
+        # The tag glob names this package's tag scheme; the release itself
+        # comes from its LEDGER. Releasable members read the releasable's
+        # changes dir -- and therefore its archives -- not the package's.
+        if first_target_name and first_target_name in TARGETS:
+            tag_glob = TARGETS[first_target_name].monorepo_tag_glob(name, path=path)
+        else:
+            tag_glob = f"{name}@v*"
 
-        # Real JSONL coverage for this package. Releasable members read the
-        # releasable's changes dir, not the package's.
         from ...changelog.files import get_changes_dir
         _cl_changes_dir = None
         _cl_rel_name = releasable_map.get(name, "") if explicit else ""
         if _cl_rel_name:
             from ...workspace import get_releasable_changes_dir
             _cl_changes_dir = get_releasable_changes_dir(root, _cl_rel_name)
+        _changes_dir = _cl_changes_dir or get_changes_dir(os.path.join(root, path))
+        fact, anchor = _latest_release_for_row(_changes_dir, tag_glob)
         coverage_str = _coverage_column(
-            latest_tag,
-            _cl_changes_dir or get_changes_dir(os.path.join(root, path)),
-            OwnershipScope.for_member(projects, proj),
+            anchor, _changes_dir, OwnershipScope.for_member(projects, proj),
         )
 
         # Dependency counts
@@ -595,7 +598,7 @@ def _cmd_status(flags, project_root):
         # Releasable membership (explicit mode only)
         releasable_str = releasable_map.get(name, "") if explicit else ""
 
-        rows.append((name, path, target_display, version, latest_tag or "(none)", coverage_str, library_str, dev_only_str, deps_str, rdeps_str, remote_str, releasable_str))
+        rows.append((name, path, target_display, version, fact.label(), coverage_str, library_str, dev_only_str, deps_str, rdeps_str, remote_str, releasable_str))
 
     # Determine which dynamic columns to show
     any_library = any(row[6] != "" for row in rows)
@@ -606,7 +609,7 @@ def _cmd_status(flags, project_root):
     any_releasable = any(row[11] != "" for row in rows)
 
     # Calculate column widths
-    base_headers = ("Project", "Path", "Target", "Version", "Tag", "Coverage")
+    base_headers = ("Project", "Path", "Target", "Version", "Released", "Coverage")
     if any_releasable:
         base_headers = base_headers + ("Releasable",)
     if any_library:
