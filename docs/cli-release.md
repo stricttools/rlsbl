@@ -30,6 +30,7 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 | `--bump` |  | str | optional |  | Bump type: patch, minor, major, infra, prerelease. Skips the release file. |
 | `--description` |  | str | optional |  | Short release description summarizing the changes (required with --bump) |
 | `--preid` |  | str | optional |  | Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump. |
+| `--releasable` |  | str | optional |  | Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it. |
 
 ## release resume
 

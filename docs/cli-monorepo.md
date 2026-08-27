@@ -31,7 +31,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 ## monorepo add
 
-Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.
+Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, subtree remote URL, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.
 
 **Effect:** mutating
 
@@ -41,7 +41,6 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | --- | --- | --- | --- | --- | --- |
 | `--name` |  | str | optional |  | Display name for the project in workspace.toml (defaults to directory name) |
 | `--target` |  | str | optional |  | Registry this project publishes to (e.g. npm, pypi, go) |
-| `--watch` |  | str | optional |  | Comma-separated glob patterns for change detection in CI workflows |
 | `--subtree-remote` |  | str | optional |  | Git remote URL for split-publishing this project as a standalone repo |
 | `--depends-on` |  | str | optional |  | Comma-separated names of workspace projects this project depends on |
 | `--library` |  | str | optional |  | Mark as a shared library consumed by other workspace projects (true/false) |
@@ -72,7 +71,7 @@ Unregister a project from the monorepo workspace.toml by its path. This removes 
 
 ## monorepo list
 
-Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.
+Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as subtree remotes, inter-project dependencies, and whether the project is marked as a library.
 
 **Effect:** read_only
 
