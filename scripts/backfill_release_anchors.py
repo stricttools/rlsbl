@@ -310,8 +310,6 @@ def read_archive_state(path: str) -> dict:
         "format_version": "format_version" in data,
         "anchored": any(f in data for f in ANCHOR_FIELDS),
         "unanchorable": bool(data.get(UNANCHORABLE_FIELD)),
-        "bump": data.get("bump", ""),
-        "description": data.get("description", ""),
     }
 
 
