@@ -428,6 +428,10 @@ def build_matrix() -> dict:
         "target_order": list(MATRIX_COLUMNS),
         "checks": _check_scopes(),
         "tables": {
+            "axes": {
+                "headers": ["Axis", "What it says about a target"],
+                "rows": [[axis.name, axis.doc] for axis in TARGET_AXES],
+            },
             "targets": {"headers": target_headers, "rows": target_rows},
             "feature_matrix": {"headers": matrix_headers, "rows": matrix_rows},
             "pipelines": {"headers": pipeline_headers, "rows": pipeline_rows},

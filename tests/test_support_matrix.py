@@ -74,9 +74,9 @@ class TestTheCommittedArtifact:
         doc = json.loads(COMMITTED.read_text(encoding="utf-8"))
         assert set(doc["checks"]) == set(CHECK_TARGETS)
 
-    def test_it_carries_the_three_docs_tables(self):
+    def test_it_carries_every_docs_table(self):
         doc = json.loads(COMMITTED.read_text(encoding="utf-8"))
-        assert set(doc["tables"]) == {"targets", "feature_matrix", "pipelines"}
+        assert set(doc["tables"]) == {"axes", "targets", "feature_matrix", "pipelines"}
         for table in doc["tables"].values():
             assert table["headers"]
             assert table["rows"]

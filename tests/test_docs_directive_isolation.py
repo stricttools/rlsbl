@@ -26,6 +26,7 @@ DIRECTIVES_DIR = REPO_ROOT / "docs" / "directives"
 # Every directive registered in selfdoc.json, with the attrs its resolve takes.
 DIRECTIVES = [
     "target_table",
+    "target_axes",
     "feature_matrix",
     "pipeline_table",
     "target_count",

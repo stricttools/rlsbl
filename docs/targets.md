@@ -31,13 +31,13 @@ When `rlsbl release run`, `rlsbl scaffold`, or `rlsbl targets` needs to know whi
 
 2. **Auto-detection fallback** — If no `targets` array exists in config, every registered target's `detect()` method is called against the directory. Targets that return `True` are included.
 
-The `auto_detectable` ClassVar on each target controls detection behavior:
+The `auto_detectable` ClassVar on each target controls detection behavior. Which targets hold which value is the `Auto-detectable` column of the table above, not a list repeated here:
 
-| Value | Meaning | Example targets |
-| ----- | ------- | --------------- |
-| `"yes"` | Standard file-based detection | npm, pypi, go, deno, hex, maven, docker, dart, zig, spec, pgdesign, swift, native-ios, native-android |
-| `"conditional"` | Detects only when specific conditions are met beyond file presence | plain (VERSION exists AND no other manifest present) |
-| `"no"` | Never auto-detected; must be declared in config | swift-apple |
+| Value | Meaning |
+| ----- | ------- |
+| `"yes"` | Standard file-based detection |
+| `"conditional"` | Detects only when specific conditions are met beyond file presence (`plain` requires a `VERSION` file AND no other manifest) |
+| `"no"` | Never auto-detected; must be declared in config |
 
 ### Detection priority
 
@@ -50,27 +50,7 @@ When multiple targets could match the same manifest file (e.g., a project with b
 
 ## Detection files
 
-Each target class declares a `detection_files` ClassVar listing the filenames whose presence triggers detection. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. The table below shows each target's detection files:
-
-| Target | Detection files |
-| ------ | --------------- |
-| npm | `package.json` |
-| pypi | `pyproject.toml` |
-| go | `go.mod` |
-| deno | `deno.json`, `deno.jsonc` |
-| hex | `mix.exs` |
-| maven | `build.gradle.kts`, `build.gradle`, `pom.xml` |
-| swift | `Package.swift` |
-| swift-apple | (none -- opt-in only) |
-| dart | `pubspec.yaml` |
-| flutter | (none -- content-based, shares `pubspec.yaml` with dart) |
-| docker | `Dockerfile` |
-| zig | `build.zig.zon`, `build.zig` |
-| spec | `version.json` |
-| pgdesign | `pgdesign.toml` |
-| native-ios | (none -- content-based, scans for `.xcodeproj`) |
-| native-android | (none -- content-based, shares gradle files with maven) |
-| plain | (none -- conditional on `VERSION` file with no other manifests) |
+Each target class declares a `detection_files` ClassVar listing the filenames whose presence triggers detection; the `Detection files` column of the table above is that declaration, rendered. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. A target whose column is blank decides by file *content* instead — flutter and dart share `pubspec.yaml`, native-android and maven share the Gradle files, native-ios scans for an `.xcodeproj`, and `plain` yields to every other target's manifest.
 
 ## The ReleaseTarget protocol
 
@@ -111,17 +91,19 @@ Individual targets override only the methods specific to their ecosystem.
 
 There is no declared capability set. What a target supports is derived from the
 target itself, one property per axis, so the answer cannot disagree with the
-code that implements it:
+code that implements it. The axes are declared once, in
+`rlsbl.targets.introspect`, and every registered target must answer every one
+of them — a target that cannot, or an axis added to the protocol without a
+declaration here, is an error at import time:
 
-| Property | Meaning | How it is answered |
-| -------- | ------- | ------------------ |
-| `supports_read_name` | Target can extract the package name from its manifest | The class overrides `read_name` |
-| `supports_read_metadata` | Target can extract license and description | The class overrides `read_metadata` |
-| `provides_ci_templates` | Target provides CI workflow templates for scaffold | The target's template directory ships `ci.yml.tpl` |
-| `supports_dev_install` | Target supports `rlsbl dev install` (editable local installs) | `dev_install_command()` yields a spec for at least one mode |
-| `supports_publication_probe` | Target can ask its registry whether a version is published | The class overrides `publication_probe` |
+:-: table-target-axes
 
-Each is consulted at the point of use. `rlsbl dev install` asks each target for
+Every target's answer to every axis is generated into
+`rlsbl/data/support-matrix.json`, which is committed, rendered into the tables
+on this page, and kept in step with the code by the `target-matrix-fresh`
+check.
+
+Each axis is consulted at the point of use. `rlsbl dev install` asks each target for
 its install specs and skips the ones that have none, naming them. Four sites
 decide whether to run a publication probe, and every one of them reads
 `supports_publication_probe` rather than defaulting the answer:
@@ -139,27 +121,7 @@ nothing alongside the result rather than skipping them silently.
 
 ## Ecosystem classification
 
-Each target has an `ecosystem` string used for display and grouping in commands like `rlsbl targets` and `rlsbl monorepo list`. Every target maps to a distinct ecosystem label, providing a human-readable name for each registry and platform:
-
-| Ecosystem | Targets |
-| --------- | ------- |
-| Node.js / npm | npm |
-| Python / PyPI | pypi |
-| Go modules | go |
-| Deno / JSR | deno |
-| Elixir / Hex | hex |
-| Java / Maven | maven |
-| Swift (SPM) | swift |
-| Swift (Apple) | swift-apple |
-| Dart / pub.dev | dart |
-| Flutter | flutter |
-| Docker | docker |
-| Zig | zig |
-| Specification | spec |
-| PostgreSQL | pgdesign |
-| iOS | native-ios |
-| Android | native-android |
-| Plain | plain |
+Each target has an `ecosystem` string used for display and grouping in commands like `rlsbl targets` and `rlsbl monorepo list`. Every target maps to a distinct ecosystem label, providing a human-readable name for each registry and platform; the `Ecosystem` column of the table above is the mapping.
 
 ## Per-target notes
 
@@ -246,14 +208,13 @@ Each target has an `ecosystem` string used for display and grouping in commands 
 
 - Detection: `version.json` file presence
 - Version: reads/writes `{"version": "X.Y.Z"}` in `version.json`
-- Capabilities: `read_name` and `ci_templates` (a stub CI template for users to add their own validation commands) — no `dev_install`, no publish
+- Its CI template is a stub, for users to add their own validation commands; there is no publish step
 - Use case: spec-only projects that need version tracking without any build or publish step — the tagged GitHub Release is the publication
 
 ### pgdesign
 
 - Detection: `pgdesign.toml` file presence
 - Version: reads/writes the `version` field in `pgdesign.toml`
-- Capabilities: minimal — no `ci_templates`, no `dev_install`
 - No publish mechanism — version bumping only (the tagged GitHub Release is the artifact)
 - Use case: PostgreSQL schema design projects managed by the pgdesign tool
 
@@ -273,8 +234,7 @@ Each target has an `ecosystem` string used for display and grouping in commands 
 
 - Detection: conditional — `VERSION` file must exist AND no other target manifest is present
 - Version: reads/writes plain text `VERSION` file (single line, e.g. `0.5.2`)
-- Supports nothing beyond version bumping and tagging: it reads no name, reads no metadata, ships no CI template, has no dev install, and cannot probe a registry
-- Consequently: no CI workflows generated by scaffold, no `rlsbl dev install` support, and no publish step (no pipeline links to it)
+- Supports nothing beyond version bumping and tagging — its row in the table above is blank on every optional axis, so scaffold generates no CI workflow, `rlsbl dev install` has nothing to run, and no pipeline links to it
 - The stand-off set: plain will not auto-detect when any other target's manifest is present. That set is derived from every registered target's `detection_files`, plus `Cargo.toml` and `selfdoc.json` — manifests left behind by retired targets that no current target claims
 - Use case: projects that need version tracking but don't fit any ecosystem (e.g., documentation-only repos, script collections, infrastructure projects)
 - Also bumps `pyproject.toml` version if that file exists with a `[project].version` field
