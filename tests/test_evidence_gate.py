@@ -33,7 +33,7 @@ class TestRegistryProbeSource:
     def test_gather_published(self):
         target = MagicMock()
         target.name = "npm"
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.PUBLISHED, "npm", "1.0.0", "found"
         )
@@ -46,7 +46,7 @@ class TestRegistryProbeSource:
     def test_gather_unpublished(self):
         target = MagicMock()
         target.name = "pypi"
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPUBLISHED, "pypi", "1.0.0", "not found"
         )
@@ -59,7 +59,7 @@ class TestRegistryProbeSource:
     def test_gather_unprobeable(self):
         target = MagicMock()
         target.name = "pypi"
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPROBEABLE, "pypi", "1.0.0", "error"
         )
@@ -69,27 +69,39 @@ class TestRegistryProbeSource:
         assert len(evidence) == 1
         assert evidence[0].kind == EvidenceKind.INCONCLUSIVE
 
-    def test_gather_no_probe_capability(self):
+    def test_gather_target_that_cannot_probe(self):
+        """The non-prober branch: no probe is run and the reason is stated.
+
+        ``supports_publication_probe`` is set explicitly because a bare
+        MagicMock answers every unset attribute with a truthy auto-attribute.
+        Leaving it unset sent this target down the prober branch, where the
+        mock's ``publication_probe`` return value fell through to INCONCLUSIVE
+        anyway -- the assertion below held while testing nothing.
+        """
         target = MagicMock()
         target.name = "plain"
-        target.capabilities = frozenset()
+        target.supports_publication_probe = False
 
         source = RegistryProbeSource()
         evidence = source.gather([target], "/fake", "1.0.0")
         assert len(evidence) == 1
         assert evidence[0].kind == EvidenceKind.INCONCLUSIVE
+        assert evidence[0].message == (
+            "target 'plain' does not support publication probing"
+        )
+        target.publication_probe.assert_not_called()
 
     def test_gather_multiple_targets(self):
         npm_target = MagicMock()
         npm_target.name = "npm"
-        npm_target.capabilities = frozenset({"publication_probe"})
+        npm_target.supports_publication_probe = True
         npm_target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPUBLISHED, "npm", "1.0.0", "not found"
         )
 
         pypi_target = MagicMock()
         pypi_target.name = "pypi"
-        pypi_target.capabilities = frozenset({"publication_probe"})
+        pypi_target.supports_publication_probe = True
         pypi_target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPUBLISHED, "pypi", "1.0.0", "not found"
         )
@@ -104,7 +116,7 @@ class TestRunEvidenceGate:
     def test_cleared_when_unpublished(self):
         target = MagicMock()
         target.name = "npm"
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPUBLISHED, "npm", "1.0.0", "not found"
         )
@@ -115,7 +127,7 @@ class TestRunEvidenceGate:
     def test_blocked_when_published(self):
         target = MagicMock()
         target.name = "npm"
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.PUBLISHED, "npm", "1.0.0", "found"
         )
@@ -125,13 +137,18 @@ class TestRunEvidenceGate:
         assert "published" in result.reason
 
     def test_blocked_when_all_inconclusive(self):
+        """A lone non-prober leaves the gate with no authoritative evidence."""
         target = MagicMock()
         target.name = "plain"
-        target.capabilities = frozenset()
+        target.supports_publication_probe = False
 
         result = run_evidence_gate([target], "/fake", "1.0.0")
         assert result.verdict == Verdict.BLOCKED
         assert "no authoritative" in result.reason
+        assert result.evidence[0].message == (
+            "target 'plain' does not support publication probing"
+        )
+        target.publication_probe.assert_not_called()
 
     def test_blocked_when_no_targets(self):
         result = run_evidence_gate([], "/fake", "1.0.0")
@@ -141,30 +158,35 @@ class TestRunEvidenceGate:
         """One unpublished + one inconclusive = CLEARED (has_unpublished, not all_inconclusive)."""
         npm = MagicMock()
         npm.name = "npm"
-        npm.capabilities = frozenset({"publication_probe"})
+        npm.supports_publication_probe = True
         npm.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPUBLISHED, "npm", "1.0.0", "not found"
         )
 
         plain = MagicMock()
         plain.name = "plain"
-        plain.capabilities = frozenset()
+        plain.supports_publication_probe = False
 
         result = run_evidence_gate([npm, plain], "/fake", "1.0.0")
         assert result.verdict == Verdict.CLEARED
+        # The inconclusive half really came from the non-prober branch.
+        plain.publication_probe.assert_not_called()
+        assert {e.kind for e in result.evidence} == {
+            EvidenceKind.UNPUBLISHED, EvidenceKind.INCONCLUSIVE,
+        }
 
     def test_blocked_published_overrides_unpublished(self):
         """One published + one unpublished = BLOCKED."""
         npm = MagicMock()
         npm.name = "npm"
-        npm.capabilities = frozenset({"publication_probe"})
+        npm.supports_publication_probe = True
         npm.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.PUBLISHED, "npm", "1.0.0", "found"
         )
 
         pypi = MagicMock()
         pypi.name = "pypi"
-        pypi.capabilities = frozenset({"publication_probe"})
+        pypi.supports_publication_probe = True
         pypi.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPUBLISHED, "pypi", "1.0.0", "not found"
         )

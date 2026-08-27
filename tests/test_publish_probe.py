@@ -32,19 +32,25 @@ class TestProbeBeforePublish(unittest.TestCase):
         pl = self._make_pipeline(target_name="nonexistent")
         self.assertTrue(pl.probe_before_publish("/dir", "1.0.0", ctx=None))
 
-    def test_target_without_probe_capability_proceeds(self):
-        """When target lacks publication_probe capability, proceed."""
+    def test_target_that_cannot_probe_proceeds_without_probing(self):
+        """A target answering supports_publication_probe False is never probed.
+
+        The attribute is configured explicitly: a bare MagicMock answers any
+        attribute with a truthy auto-attribute, so leaving it unset would take
+        the prober branch and assert nothing about this one.
+        """
         target = MagicMock()
-        target.capabilities = frozenset({"read_name"})
+        target.supports_publication_probe = False
         mock_targets = {"npm": target}
         pl = self._make_pipeline(target_name="npm")
         with patch("rlsbl.targets.TARGETS", mock_targets):
             self.assertTrue(pl.probe_before_publish("/dir", "1.0.0", ctx=None))
+        target.publication_probe.assert_not_called()
 
     def test_published_skips(self):
         """When probe returns PUBLISHED, probe_before_publish returns False."""
         target = MagicMock()
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             status=PublicationStatus.PUBLISHED,
             registry="npm",
@@ -64,7 +70,7 @@ class TestProbeBeforePublish(unittest.TestCase):
     def test_unpublished_proceeds(self):
         """When probe returns UNPUBLISHED, probe_before_publish returns True."""
         target = MagicMock()
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             status=PublicationStatus.UNPUBLISHED,
             registry="npm",
@@ -79,7 +85,7 @@ class TestProbeBeforePublish(unittest.TestCase):
     def test_unprobeable_proceeds(self):
         """When probe returns UNPROBEABLE, probe_before_publish returns True."""
         target = MagicMock()
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.publication_probe.return_value = PublicationProbeResult(
             status=PublicationStatus.UNPROBEABLE,
             registry="npm",
