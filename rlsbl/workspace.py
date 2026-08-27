@@ -249,8 +249,8 @@ def _validate_member_paths(data, projects):
 def validate_workspace_model(data, projects):
     """Enforce the workspace ownership model on a parsed workspace.toml.
 
-    Eight conditions, each a hard error carrying its own remedy, reported in
-    the order an operator can act on them:
+    Each condition below is a hard error carrying its own remedy, and they are
+    reported in the order an operator can act on them:
 
     1. an implicit-mode workspace (no ``[[releasables]]``) -- first, because
        every other remedy below is written for an explicit-mode workspace;

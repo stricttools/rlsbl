@@ -735,9 +735,14 @@ def _cmd_sync(flags, project_root):
     # Releasables drive BOTH routers: the CI router's paths filters (each
     # project's releasable finalize artifact) and the publish router's tag
     # prefixes. Loaded once, before either is generated.
-    from ...workspace import is_explicit_mode, load_releasables
+    # Unconditional: load_workspace above already refused an implicit-mode
+    # workspace, so by here every workspace declares its releasables and a
+    # mode test would only be a second spelling of a question already
+    # answered. The release-time simulation of these same filters
+    # (rlsbl.commands.release.execute) loads them the same way.
+    from ...workspace import load_releasables
 
-    releasables = load_releasables(root, projects) if is_explicit_mode(root) else None
+    releasables = load_releasables(root, projects)
 
     # Derive every member's paths filter from the workspace itself: ownership
     # territories, dependency territories, root-level manifests and the tool's

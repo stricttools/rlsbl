@@ -123,7 +123,7 @@ def register_workspace_checks(app):
         """The router's paths filters must match a fresh derivation from the workspace."""
         from ..errors import WorkspaceError
         from ..router_filters import PREDICATE_QUANTIFIER, RouterFilters
-        from ..workspace import is_explicit_mode, load_releasables, load_workspace
+        from ..workspace import load_releasables, load_workspace
 
         if ctx.workspace_root is None:
             return reporter.skipped("not a workspace")
@@ -157,7 +157,11 @@ def register_workspace_checks(app):
         # preflight) carry a single member. Deriving from a partial list would
         # report a fresh router as stale.
         projects = load_workspace(root)
-        releasables = load_releasables(root, projects) if is_explicit_mode(root) else None
+        # Unconditional: load_workspace refuses an implicit-mode workspace, so
+        # every workspace that gets here declares its releasables. `monorepo
+        # sync` and the release-time simulation of these same filters load them
+        # the same way -- three consumers of one derivation, one spelling.
+        releasables = load_releasables(root, projects)
         try:
             filters = RouterFilters(root, projects, releasables)
         except WorkspaceError as e:
