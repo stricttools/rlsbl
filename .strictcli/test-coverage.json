@@ -48,6 +48,8 @@
   "release.scrub",
   "release.undo",
   "release.yank",
+  "rewrite.go-module-path",
+  "rewrite.uv-path-sources",
   "scaffold",
   "status",
   "targets",
