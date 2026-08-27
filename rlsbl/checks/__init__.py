@@ -47,8 +47,10 @@ RLSBL_CONFIG = os.path.join(".rlsbl", "config.json")
 #   frozenset()  -- only works for these specific targets
 #   "workspace"  -- workspace-only, target-agnostic (graph/structure checks)
 #
-# For checks that use import scanners in workspace mode, the targets
-# listed are the languages the scanners support (pypi=Python, dart, npm).
+# For checks that use import scanners in workspace mode, the value is not a
+# hand-listed set at all: it is derived from the targets that implement the
+# matching protocol method (targets_with_import_analysis and friends), so the
+# scope follows the scanners rather than restating them here.
 
 CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # --- project tag (universal) ---
