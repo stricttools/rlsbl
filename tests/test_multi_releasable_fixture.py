@@ -2,11 +2,22 @@
 
 Ensures the fixture builds a valid monorepo with releasable structure
 that load_releasables() and members_of() can consume correctly.
+
+Also covers the releasable-state helpers (make_releasable_state,
+make_releasable_monorepo), which build the real
+``.rlsbl-monorepo/releasables/<name>/`` layout: version, changes/,
+releases/ and config.json.
 """
 
 import json
 import os
 
+from conftest import (
+    DEFAULT_RELEASE_FILE,
+    make_releasable_monorepo,
+    make_releasable_state,
+)
+from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
 from rlsbl.workspace import (
     load_releasables,
     load_workspace,
@@ -138,3 +149,161 @@ class TestMultiReleasableFactory:
         for rel in ns.releasables:
             version = read_releasable_version(str(ns.root), rel.name)
             assert version == "1.0.0"
+
+    def test_releasable_changes_content(self, multi_releasable_monorepo_factory):
+        """releasable_changes fills the releasable's OWN changes dir --
+        unreleased plus locked versioned files with their .md siblings."""
+        ns = multi_releasable_monorepo_factory(
+            releasable_changes={
+                "alpha": {
+                    "unreleased": [
+                        ChangelogEntry(
+                            commits=["deadbeef"],
+                            user_facing=True,
+                            description="Alpha feature",
+                            type="feature",
+                        ),
+                    ],
+                    "versions": {
+                        "0.1.0": [
+                            ChangelogEntry(
+                                commits=["cafebabe"],
+                                user_facing=True,
+                                description="Alpha first release",
+                                type="feature",
+                            ),
+                        ],
+                    },
+                },
+            },
+        )
+        changes_dir = get_releasable_changes_dir(str(ns.root), "alpha")
+
+        unreleased = parse_jsonl(os.path.join(changes_dir, "unreleased.jsonl"))
+        assert [e.description for e in unreleased] == ["Alpha feature"]
+
+        versioned_path = os.path.join(changes_dir, "0.1.0.jsonl")
+        released = parse_jsonl(versioned_path)
+        assert [e.description for e in released] == ["Alpha first release"]
+        # Released changelog files are read-only, as rlsbl locks them.
+        assert not os.access(versioned_path, os.W_OK)
+        assert os.path.isfile(os.path.join(changes_dir, "0.1.0.md"))
+
+        # beta was not named -- it still gets an empty unreleased.jsonl.
+        beta_changes = get_releasable_changes_dir(str(ns.root), "beta")
+        assert os.path.isfile(os.path.join(beta_changes, "unreleased.jsonl"))
+        assert parse_jsonl(os.path.join(beta_changes, "unreleased.jsonl")) == []
+
+    def test_released_version_gets_archive(self, multi_releasable_monorepo_factory):
+        """A version with a changelog file also gets its release-file archive,
+        which is where the description and context are read back from."""
+        ns = multi_releasable_monorepo_factory(
+            releasable_changes={"alpha": {"versions": {"0.1.0": []}}},
+        )
+        releases_dir = os.path.join(get_releasable_dir(str(ns.root), "alpha"), "releases")
+        archive = os.path.join(releases_dir, "v0.1.0.toml")
+        assert os.path.isfile(archive)
+        assert not os.access(archive, os.W_OK)
+
+    def test_release_file_written_on_request(self, multi_releasable_monorepo_factory):
+        ns = multi_releasable_monorepo_factory(
+            releasable_releases={"alpha": {"unreleased": DEFAULT_RELEASE_FILE}},
+        )
+        rel_dir = get_releasable_dir(str(ns.root), "alpha")
+        unreleased_toml = os.path.join(rel_dir, "releases", "unreleased.toml")
+        assert os.path.isfile(unreleased_toml)
+        assert 'bump = "patch"' in open(unreleased_toml).read()
+        # beta was not named: releases/ exists but holds no release file.
+        beta_releases = os.path.join(get_releasable_dir(str(ns.root), "beta"), "releases")
+        assert os.path.isdir(beta_releases)
+        assert not os.path.exists(os.path.join(beta_releases, "unreleased.toml"))
+
+    def test_releasable_state_is_committed(self, multi_releasable_monorepo_factory):
+        """The state the fixture writes is committed, so operations that read
+        committed state (clone, filter-repo) see it."""
+        import subprocess
+
+        ns = multi_releasable_monorepo_factory(
+            releasable_changes={"alpha": {"versions": {"0.1.0": []}}},
+        )
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(ns.root), capture_output=True, text=True, check=True,
+        )
+        assert result.stdout.strip() == ""
+
+
+class TestMakeReleasableState:
+    """make_releasable_state on its own, against a bare directory."""
+
+    def test_writes_full_state_directory(self, tmp_path):
+        rel_dir = make_releasable_state(
+            tmp_path,
+            "core",
+            version="0.4.2",
+            config={"publish_mode": "ci"},
+            unreleased_entries=[
+                ChangelogEntry(commits=["abc1234"], user_facing=False),
+            ],
+            versioned_entries={"0.4.1": []},
+            release_file=DEFAULT_RELEASE_FILE,
+            hooks={"pre-checks.sh": "#!/bin/bash\nexit 0\n"},
+        )
+        assert rel_dir == tmp_path / ".rlsbl-monorepo" / "releasables" / "core"
+        assert (rel_dir / "version").read_text().strip() == "0.4.2"
+        assert (rel_dir / "changes" / "unreleased.jsonl").is_file()
+        assert (rel_dir / "changes" / "0.4.1.jsonl").is_file()
+        assert (rel_dir / "releases" / "unreleased.toml").is_file()
+        assert (rel_dir / "releases" / "v0.4.1.toml").is_file()
+        assert json.loads((rel_dir / "config.json").read_text())["publish_mode"] == "ci"
+        assert os.access(str(rel_dir / "hooks" / "pre-checks.sh"), os.X_OK)
+
+    def test_explicit_archive_overrides_default(self, tmp_path):
+        rel_dir = make_releasable_state(
+            tmp_path,
+            "core",
+            versioned_entries={"0.1.0": []},
+            archived_releases={"0.1.0": 'bump = "minor"\ndescription = "custom"\n'},
+        )
+        body = (rel_dir / "releases" / "v0.1.0.toml").read_text()
+        assert 'description = "custom"' in body
+
+    def test_raw_line_entries_are_written_verbatim(self, tmp_path):
+        """A raw string entry lands on disk untouched, so a fixture can plant a
+        legacy line (no format_version) or a deliberately malformed one."""
+        rel_dir = make_releasable_state(
+            tmp_path,
+            "core",
+            unreleased_entries=['{"commits": ["abc1234"], "user_facing": false}'],
+        )
+        line = (rel_dir / "changes" / "unreleased.jsonl").read_text().strip()
+        assert line == '{"commits": ["abc1234"], "user_facing": false}'
+
+
+class TestMakeReleasableMonorepo:
+    """make_releasable_monorepo builds the repo at an arbitrary root."""
+
+    def test_builds_at_nested_root(self, tmp_path):
+        ns = make_releasable_monorepo(tmp_path / "mono")
+        assert ns.root == tmp_path / "mono"
+        projects = load_workspace(str(ns.root))
+        assert {r.name for r in load_releasables(str(ns.root), projects)} == {
+            "alpha", "beta",
+        }
+        # Sibling paths outside the repo stay free for extract targets.
+        assert not (tmp_path / "out").exists()
+
+    def test_custom_releasables_and_projects(self, tmp_path):
+        from rlsbl.workspace import Releasable
+
+        ns = make_releasable_monorepo(
+            tmp_path / "mono",
+            releasables=[Releasable(name="core")],
+            projects=[
+                {"path": "pkgA", "name": "pkgA", "releasable": "core"},
+                {"path": "pkgB", "name": "pkgB", "releasable": "core"},
+            ],
+        )
+        projects = load_workspace(str(ns.root))
+        assert {m.name for m in members_of("core", projects)} == {"pkgA", "pkgB"}
+        assert read_releasable_version(str(ns.root), "core") == ns.initial_version

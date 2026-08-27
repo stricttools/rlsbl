@@ -885,6 +885,177 @@ _DEFAULT_PROJECTS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Releasable state directories (.rlsbl-monorepo/releasables/<name>/)
+#
+# The releasable model keeps a releasable's whole release state OUTSIDE the
+# member packages: version, changes/, releases/ and config.json all live under
+# ``.rlsbl-monorepo/releasables/<name>/``. Fixtures that predate the model tend
+# to declare ``[[releasables]]`` but still put changelog state in per-package
+# ``<pkg>/.rlsbl/changes/``, which is the pre-releasable layout and exercises a
+# different code path. The helpers below build the real layout.
+# ---------------------------------------------------------------------------
+
+# A filled-in release file, as `release init` scaffolds it plus operator edits.
+# Passed as the ``release_file``/archive body when a fixture wants one on disk.
+DEFAULT_RELEASE_FILE = (
+    "format_version = 1\n"
+    'bump = "patch"\n'
+    'description = "Test release"\n'
+    'context = ""\n'
+    "include = []\n"
+    "exclude = []\n"
+)
+
+
+def jsonl_line(entry):
+    """Render one changelog entry as a single JSONL line (no trailing newline).
+
+    Accepts a ``ChangelogEntry`` (serialized through the real serializer, so the
+    line carries ``format_version``), a plain dict (JSON-encoded as given, for
+    tests that need a malformed or legacy line), or an already-serialized string.
+    """
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        return json.dumps(entry)
+    from rlsbl.changelog.schema import serialize_entry
+
+    return serialize_entry(entry)
+
+
+def write_jsonl(path, entries, *, lock=False):
+    """Write ``entries`` as JSONL to ``path`` (creating parent dirs).
+
+    ``lock`` chmods the file 444, matching how rlsbl locks a released
+    version's JSONL file.
+    """
+    path = str(path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for entry in entries:
+            f.write(jsonl_line(entry) + "\n")
+    if lock:
+        os.chmod(path, 0o444)
+
+
+def make_releasable_state(
+    root,
+    name,
+    *,
+    version="0.1.0",
+    config=None,
+    unreleased_entries=None,
+    versioned_entries=None,
+    release_file=None,
+    archived_releases=None,
+    hooks=None,
+    lock_versioned=True,
+):
+    """Create a releasable's state directory with the real releasable layout.
+
+    Writes ``.rlsbl-monorepo/releasables/<name>/`` containing:
+
+    - ``version``                      -- the releasable's current version
+    - ``changes/unreleased.jsonl``     -- always created (empty by default)
+    - ``changes/<v>.jsonl`` + ``.md``  -- one pair per ``versioned_entries`` key
+    - ``releases/``                    -- always created; holds ``unreleased.toml``
+      when ``release_file`` is given and ``v<version>.toml`` archives
+    - ``config.json``                  -- releasable-level config
+    - ``hooks/<name>``                 -- executable hook scripts
+
+    Args:
+        root: the monorepo root (str or Path).
+        name: releasable name.
+        version: value for the ``version`` file.
+        config: dict written to ``config.json`` (default ``{}``).
+        unreleased_entries: entries for ``changes/unreleased.jsonl``
+            (ChangelogEntry, dict or raw-line str -- see ``jsonl_line``).
+        versioned_entries: dict mapping version string to its entry list,
+            written as released (locked) ``<version>.jsonl`` files.
+        release_file: TOML body for ``releases/unreleased.toml``; omitted
+            when None. ``DEFAULT_RELEASE_FILE`` is a ready-made body.
+        archived_releases: dict mapping version string to the archived
+            ``releases/v<version>.toml`` body. Every version in
+            ``versioned_entries`` gets a default archive automatically (a
+            released version always has one); entries here add to or override
+            those defaults.
+        hooks: dict mapping hook file name to script content (chmod 755).
+        lock_versioned: chmod 444 the versioned changelog files, as rlsbl does.
+
+    Returns:
+        Path to the releasable's state directory.
+    """
+    root = str(root)
+    rel_dir = get_releasable_dir(root, name)
+    os.makedirs(rel_dir, exist_ok=True)
+
+    write_releasable_version(root, name, version)
+
+    changes_dir = get_releasable_changes_dir(root, name)
+    os.makedirs(changes_dir, exist_ok=True)
+    write_jsonl(
+        os.path.join(changes_dir, "unreleased.jsonl"), unreleased_entries or []
+    )
+
+    versioned_entries = versioned_entries or {}
+    for ver, entries in versioned_entries.items():
+        write_jsonl(
+            os.path.join(changes_dir, f"{ver}.jsonl"),
+            entries,
+            lock=lock_versioned,
+        )
+        md_path = os.path.join(changes_dir, f"{ver}.md")
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(f"## {ver}\n\n- No user-facing changes.\n")
+        if lock_versioned:
+            os.chmod(md_path, 0o444)
+
+    releases_dir = os.path.join(rel_dir, "releases")
+    os.makedirs(releases_dir, exist_ok=True)
+    if release_file is not None:
+        with open(
+            os.path.join(releases_dir, "unreleased.toml"), "w", encoding="utf-8"
+        ) as f:
+            f.write(release_file)
+
+    archives = {ver: DEFAULT_RELEASE_FILE for ver in versioned_entries}
+    archives.update(archived_releases or {})
+    for ver, body in archives.items():
+        archive_path = os.path.join(releases_dir, f"v{ver}.toml")
+        with open(archive_path, "w", encoding="utf-8") as f:
+            f.write(body)
+        os.chmod(archive_path, 0o444)
+
+    with open(os.path.join(rel_dir, "config.json"), "w", encoding="utf-8") as f:
+        json.dump(config or {}, f, indent=2)
+        f.write("\n")
+
+    if hooks:
+        hooks_dir = os.path.join(rel_dir, "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        for hook_name, hook_content in hooks.items():
+            hook_path = os.path.join(hooks_dir, hook_name)
+            with open(hook_path, "w", encoding="utf-8") as f:
+                f.write(hook_content)
+            os.chmod(hook_path, 0o755)
+
+    return Path(rel_dir)
+
+
+def make_releasable_monorepo(root, **kwargs):
+    """Build an explicit-mode releasable monorepo at ``root``.
+
+    Same keyword arguments as ``_create_multi_releasable_monorepo``; the only
+    difference is that ``root`` need not exist yet and need not be the pytest
+    ``tmp_path`` itself. Use this when the test also needs a sibling directory
+    outside the repo (an extract target, a source repo to absorb).
+    """
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    return _create_multi_releasable_monorepo(root, **kwargs)
+
+
 def _create_multi_releasable_monorepo(
     tmp_path,
     *,
@@ -892,6 +1063,8 @@ def _create_multi_releasable_monorepo(
     projects=None,
     releasable_configs=None,
     hook_configs=None,
+    releasable_changes=None,
+    releasable_releases=None,
     initial_version="0.1.0",
 ):
     """Build a multi-releasable monorepo test repo.
@@ -910,6 +1083,13 @@ def _create_multi_releasable_monorepo(
             written to ``<releasable_dir>/config.json``.
         hook_configs: dict mapping releasable name to hook config dict,
             written to ``<releasable_dir>/hooks/`` directory files.
+        releasable_changes: dict mapping releasable name to its changelog
+            content: ``{"unreleased": [entries], "versions": {ver: [entries]}}``.
+            Absent releasables get an empty ``unreleased.jsonl``.
+        releasable_releases: dict mapping releasable name to its release files:
+            ``{"unreleased": <toml body>, "archives": {ver: <toml body>}}``.
+            Released versions named in ``releasable_changes`` are archived
+            automatically.
         initial_version: version string for all releasables (default "0.1.0").
 
     Returns:
@@ -925,6 +1105,10 @@ def _create_multi_releasable_monorepo(
         releasable_configs = {}
     if hook_configs is None:
         hook_configs = {}
+    if releasable_changes is None:
+        releasable_changes = {}
+    if releasable_releases is None:
+        releasable_releases = {}
 
     # Initialize git repo
     run_git(tmp_path, "init", "-q", "-b", "main")
@@ -957,35 +1141,22 @@ def _create_multi_releasable_monorepo(
         )
         project_dirs[proj["name"]] = proj_dir
 
-    # Set up per-releasable state directories
+    # Set up per-releasable state directories (version, changes, releases,
+    # config.json, hooks) -- the real releasable layout.
     for rel in releasables:
-        # Version file
-        write_releasable_version(str(tmp_path), rel.name, initial_version)
-
-        # Changes directory with empty unreleased.jsonl
-        changes_dir = get_releasable_changes_dir(str(tmp_path), rel.name)
-        os.makedirs(changes_dir, exist_ok=True)
-        unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
-        with open(unreleased_path, "w") as f:
-            f.write("")
-
-        # Releasable-level config.json
-        rel_dir = get_releasable_dir(str(tmp_path), rel.name)
-        config = releasable_configs.get(rel.name, {})
-        config_path = os.path.join(rel_dir, "config.json")
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=2)
-            f.write("\n")
-
-        # Hook config (if provided) -- write hook scripts to hooks/ dir
-        if rel.name in hook_configs:
-            hooks_dir = os.path.join(rel_dir, "hooks")
-            os.makedirs(hooks_dir, exist_ok=True)
-            for hook_name, hook_content in hook_configs[rel.name].items():
-                hook_path = os.path.join(hooks_dir, hook_name)
-                with open(hook_path, "w") as f:
-                    f.write(hook_content)
-                os.chmod(hook_path, 0o755)
+        changes = releasable_changes.get(rel.name, {})
+        releases = releasable_releases.get(rel.name, {})
+        make_releasable_state(
+            tmp_path,
+            rel.name,
+            version=initial_version,
+            config=releasable_configs.get(rel.name, {}),
+            unreleased_entries=changes.get("unreleased"),
+            versioned_entries=changes.get("versions"),
+            release_file=releases.get("unreleased"),
+            archived_releases=releases.get("archives"),
+            hooks=hook_configs.get(rel.name),
+        )
 
     # Commit all workspace and project files
     run_git(tmp_path, "add", WORKSPACE_DIR)
