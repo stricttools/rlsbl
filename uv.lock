@@ -318,14 +318,14 @@ wheels = [
 
 [[package]]
 name = "strictspec"
-version = "0.2.1"
+version = "0.2.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/d6/3f350db3c04aa643ffc171659400e41e5fc3aeecbd098c75c728a5652b59/strictspec-0.2.1.tar.gz", hash = "sha256:59db55859a66fbdb34a6e19ca673cf9307c2f8d4477bfe12dbd59ae64c644b79", size = 74958, upload-time = "2026-08-17T17:24:05.966Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/80/2d3716a8eaef6710b541c0de716f7252dbd1ee494768ab69e504db29d20b/strictspec-0.2.3.tar.gz", hash = "sha256:ead923a013c32ea1a3475f91e709353304ec143db5d33cbd3dcf91c870705305", size = 75494, upload-time = "2026-08-24T10:09:54.344Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/87/62a8e2331ff73c5e59fab56f29e766f8e379d3a725934ea93ccbb43b6a7a/strictspec-0.2.1-py3-none-any.whl", hash = "sha256:41f6a3e1b0866f46ab4b43a4920ac16b3f255c914ca53813f62b029decb39ab5", size = 52596, upload-time = "2026-08-17T17:24:04.712Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/9a/2cbbc27b795b8aa55940eb796fc2b7f203b560c2da20b8b500bac9e690bc/strictspec-0.2.3-py3-none-any.whl", hash = "sha256:1f0ede57270b09b4dbfa66e038f21836cf700792b2c9b8df9c1e5c79c099de78", size = 52647, upload-time = "2026-08-24T10:09:53.024Z" },
 ]
 
 [[package]]

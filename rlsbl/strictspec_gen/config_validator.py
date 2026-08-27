@@ -1,6 +1,6 @@
 # strictspec generated validator. DO NOT EDIT.
 #
-# strictspec generator: 0.2.1
+# strictspec generator: 0.2.3
 # schema:              rlsbl-config (format_version 1)
 # regenerate:          strictspec gen --manifest strictspec.toml
 #
@@ -16,7 +16,7 @@ from strictspec import Diagnostic, Value
 
 # GENERATED_BY is the strictspec release that produced this file. The runtime
 # pairing guard hard-errors unless it matches the linked runtime exactly.
-GENERATED_BY = "0.2.1"
+GENERATED_BY = "0.2.3"
 SCHEMA_FORMAT_VERSION = 1
 
 # _EMBEDDED_SCHEMA carries the compiled schema (and its imported type-definition
