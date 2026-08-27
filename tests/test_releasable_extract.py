@@ -15,6 +15,11 @@ import subprocess
 
 import pytest
 
+from conftest import (
+    DEFAULT_RELEASE_FILE,
+    make_releasable_monorepo,
+    make_releasable_state,
+)
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
 from rlsbl.commands.monorepo.extract import (
     ExtractError,
@@ -32,9 +37,12 @@ from rlsbl.commands.monorepo.extract import (
 )
 from rlsbl.changelog.schema import parse_jsonl as _parse_jsonl_hashes
 from rlsbl.workspace import (
+    get_releasable_changes_dir,
+    get_releasable_dir,
     load_workspace,
     save_workspace,
     load_releasables,
+    Releasable,
     WorkspaceProject,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
@@ -1107,6 +1115,209 @@ name = "extras"
     )
 
     return root, {"pkgA": [hash_a], "pkgB": [hash_b], "pkgC": [hash_c]}
+
+
+def _setup_monorepo_with_releasable_state(tmp_path):
+    """Explicit-mode monorepo whose release state is in the REAL place.
+
+    ``_setup_monorepo_with_releasables`` above declares ``[[releasables]]`` but
+    keeps changelog state in per-package ``<pkg>/.rlsbl/changes/`` -- the
+    pre-releasable layout. This one puts version, changes/, releases/ and
+    config.json under ``.rlsbl-monorepo/releasables/<name>/``, which is where
+    the releasable model actually keeps them, and creates NO per-package
+    changes dirs at all.
+
+    Layout: releasable ``core`` (members pkgA, pkgB) and releasable ``extras``
+    (member pkgC), each with one released version and one unreleased entry.
+
+    Returns (root, commit_hashes).
+    """
+    root = tmp_path / "monorepo_rel_state"
+    ns = make_releasable_monorepo(
+        root,
+        releasables=[Releasable(name="core"), Releasable(name="extras")],
+        projects=[
+            {"path": "pkgA", "name": "pkgA", "releasable": "core"},
+            {"path": "pkgB", "name": "pkgB", "releasable": "core"},
+            {"path": "pkgC", "name": "pkgC", "releasable": "extras"},
+        ],
+    )
+
+    hash_a = _make_commit(root, "pkgA/main.py", "print('A')", "add pkgA")
+    hash_b = _make_commit(root, "pkgB/main.py", "print('B')", "add pkgB")
+    hash_c = _make_commit(root, "pkgC/main.py", "print('C')", "add pkgC")
+
+    # Release state for each releasable: one released version plus the
+    # unreleased entries that reference the commits above.
+    make_releasable_state(
+        root,
+        "core",
+        version=ns.initial_version,
+        unreleased_entries=[
+            ChangelogEntry(
+                commits=[hash_a], user_facing=True,
+                description="Feature A", type="feature", packages=["pkgA"],
+            ),
+            ChangelogEntry(
+                commits=[hash_b], user_facing=True,
+                description="Feature B", type="feature", packages=["pkgB"],
+            ),
+        ],
+        versioned_entries={"0.0.1": [
+            ChangelogEntry(
+                commits=[hash_a], user_facing=True,
+                description="Core first release", type="feature",
+            ),
+        ]},
+        release_file=DEFAULT_RELEASE_FILE,
+    )
+    make_releasable_state(
+        root,
+        "extras",
+        version=ns.initial_version,
+        unreleased_entries=[
+            ChangelogEntry(
+                commits=[hash_c], user_facing=True,
+                description="Feature C", type="feature", packages=["pkgC"],
+            ),
+        ],
+        versioned_entries={"0.0.1": []},
+    )
+
+    subprocess.run(
+        ["git", "add", WORKSPACE_DIR],
+        cwd=str(root), check=True, capture_output=True, text=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "releasable state"],
+        cwd=str(root), check=True, capture_output=True, text=True,
+    )
+
+    return root, {"pkgA": [hash_a], "pkgB": [hash_b], "pkgC": [hash_c]}
+
+
+@skip_no_filter_repo
+class TestCmdExtractReleasableOnReleasableState:
+    """The extract-releasable cases re-expressed on the real releasable-state
+    layout (state under ``.rlsbl-monorepo/releasables/<name>/``, no per-package
+    ``.rlsbl/changes/``).
+
+    These assert what the code does TODAY, including where that is a gap: the
+    extract implementation reads only per-package ``.rlsbl/changes/``, so on
+    this layout it migrates nothing and the extracted repo carries no release
+    state. The structural half of the extract (filter, workspace.toml, tags)
+    behaves the same as on the per-package layout.
+    """
+
+    def test_dry_run(self, tmp_path):
+        """Dry run returns member info without modifying anything."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        target = tmp_path / "extracted_rel"
+
+        result = cmd_extract_releasable(
+            str(root), "core", str(target), dry_run=True
+        )
+        assert result["dry_run"] is True
+        assert result["releasable_name"] == "core"
+        assert set(result["member_packages"]) == {"pkgA", "pkgB"}
+        assert result["is_monorepo"] is True
+        assert not target.exists()
+
+    def test_multi_member_creates_monorepo(self, tmp_path):
+        """Extracting a multi-member releasable creates a new monorepo whose
+        workspace.toml keeps the releasable grouping."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        target = tmp_path / "extracted_rel"
+
+        result = cmd_extract_releasable(str(root), "core", str(target))
+        assert result["is_monorepo"] is True
+
+        ws_file = target / WORKSPACE_DIR / WORKSPACE_FILE
+        assert ws_file.is_file()
+
+        new_projects = load_workspace(str(target))
+        names = [p.name for p in new_projects]
+        assert "pkgA" in names
+        assert "pkgB" in names
+        assert [r.name for r in load_releasables(str(target), new_projects)] == ["core"]
+
+        # Member files survived the filter.
+        assert (target / "pkgA" / "main.py").is_file()
+        assert (target / "pkgB" / "main.py").is_file()
+
+    def test_releasable_changelog_is_not_migrated(self, tmp_path):
+        """CURRENT BEHAVIOR: extract reads per-package .rlsbl/changes/ only, so
+        a releasable whose entries live in its own changes dir migrates zero
+        entries and the extracted repo gets no changelog at all."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        target = tmp_path / "extracted_rel"
+
+        result = cmd_extract_releasable(str(root), "core", str(target))
+
+        assert result["entries_migrated"] == 0
+        assert result["files_written"] == 0
+        # No changes dir is created for either member...
+        assert not (target / "pkgA" / ".rlsbl" / "changes").exists()
+        assert not (target / "pkgB" / ".rlsbl" / "changes").exists()
+        # ...and the source's releasable state dir is not carried over: it sits
+        # outside every member path, so the filter drops it.
+        assert not (
+            target / WORKSPACE_DIR / "releasables" / "core"
+        ).exists()
+
+    def test_source_releasable_state_left_behind(self, tmp_path):
+        """CURRENT BEHAVIOR: the source keeps the extracted releasable's state
+        directory even though workspace.toml no longer declares it."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        target = tmp_path / "extracted_rel"
+
+        cmd_extract_releasable(str(root), "core", str(target))
+
+        projects = load_workspace(str(root))
+        names = [p.name for p in projects]
+        assert "pkgA" not in names
+        assert "pkgB" not in names
+        assert "pkgC" in names
+        assert [r.name for r in load_releasables(str(root), projects)] == ["extras"]
+
+        # The orphaned state dir survives in the source monorepo.
+        assert os.path.isdir(get_releasable_dir(str(root), "core"))
+        assert os.path.isfile(
+            os.path.join(get_releasable_changes_dir(str(root), "core"),
+                         "unreleased.jsonl")
+        )
+
+    def test_single_member_creates_flat_repo(self, tmp_path):
+        """Extracting a single-member releasable hoists it to the repo root."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        target = tmp_path / "extracted_extras"
+
+        result = cmd_extract_releasable(str(root), "extras", str(target))
+        assert result["is_monorepo"] is False
+
+        assert os.path.isfile(str(target / "main.py"))
+        assert os.path.isfile(str(target / "pyproject.toml"))
+        # A flat repo gets a .rlsbl/config.json, but an empty unreleased.jsonl
+        # is written only when a source changes dir was found -- and there is
+        # none on this layout.
+        assert os.path.isfile(str(target / ".rlsbl" / "config.json"))
+        assert not (target / ".rlsbl" / "changes").exists()
+
+    def test_tags_are_kept_for_multi_member(self, tmp_path):
+        """The releasable-scheme tag is kept and foreign tags pruned, exactly as
+        on the per-package layout."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        _git_tag(root, "extras@v0.3.0")  # foreign -- must be pruned
+
+        target = tmp_path / "extracted_rel"
+        cmd_extract_releasable(str(root), "core", str(target))
+
+        tags = _run_git(str(target), "tag", "-l").split()
+        # make_releasable_monorepo tags each releasable at its initial version.
+        assert "core@v0.1.0" in tags
+        assert "extras@v0.1.0" not in tags
+        assert "extras@v0.3.0" not in tags
+        assert _run_git(str(target), "status", "--porcelain") == ""
 
 
 @skip_no_filter_repo
