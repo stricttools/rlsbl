@@ -834,6 +834,7 @@ name = "existing"
     return root
 
 
+@skip_no_filter_repo
 class TestCmdAbsorbDryRun:
     def test_dry_run_zero_mutations(self, tmp_path):
         """Dry run reports tags to import but mutates nothing."""

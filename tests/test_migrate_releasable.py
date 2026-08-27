@@ -630,6 +630,10 @@ class TestConsolidationPointTag:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    shutil.which("git-filter-repo") is None,
+    reason="git-filter-repo not installed",
+)
 class TestAbsorbChangelogRouting:
     """cmd_absorb routes changelogs to releasable dir when releasable_name is given."""
 
