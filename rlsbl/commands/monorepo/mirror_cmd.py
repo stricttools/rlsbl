@@ -25,6 +25,17 @@ covers pre-scaffold-layer mirrors) OR exactly one commit atop a split-lineage
 commit whose changed paths are all scaffold-owned. Anything else is a foreign
 commit -- a contract violation -- and is a hard error that touches nothing.
 
+The tripwire's walk asks an ancestry question per commit, and that question has
+three answers.  "No" and "cannot tell" both keep the walk moving, because a
+commit above the split boundary normally CANNOT be answered: its objects live
+on the mirror, not in the monorepo.  The difference shows up only when the walk
+reaches the end of the tip's history without ever finding a split-lineage
+commit.  If every answer along the way was a definite "no", the mirror really
+does hold unrelated work: ``contract_violated``.  If any answer was "cannot
+tell", the honest verdict is ``lineage_undetermined`` -- also a refusal that
+touches nothing, but one that names a git that could not answer (pruned or
+unfetched objects) instead of accusing an operator of authoring on the mirror.
+
 The observe/preview/apply machinery itself is not this module's: it comes from
 :mod:`rlsbl.preview_apply`. A mirror judges one subject (this project's whole
 mirror), so its preview is the one-item case of that module's keyed verdict
@@ -111,6 +122,10 @@ class MirrorPlan:
       * ``"scaffold_missing"``   -- the tip is a bare split-lineage commit (no scaffold
                                     layer). May also be behind (older split).
       * ``"contract_violated"``  -- a foreign commit exists on the mirror.
+      * ``"lineage_undetermined"`` -- the walk never reached a split-lineage
+                                    commit AND at least one ancestry question
+                                    was unanswerable, so whether the mirror is
+                                    foreign was never established.
       * ``"virgin"``             -- the remote is missing or empty.
     """
 
@@ -120,6 +135,10 @@ class MirrorPlan:
     split_lineage_sha: str | None = None
     behind: bool = False
     foreign_commits: list = field(default_factory=list)  # list of (sha, [paths])
+    # Commits whose split-lineage question git could not answer at all.  Only
+    # populated on the ``lineage_undetermined`` path: everywhere else an
+    # unanswerable commit is an ordinary above-the-boundary commit.
+    undetermined_commits: list = field(default_factory=list)
     remote_detail: str = ""
 
     @property
@@ -156,16 +175,27 @@ def _git_ok(args, cwd=None, timeout=180):
     return r.stdout.strip()
 
 
-def in_split_lineage(commit, split_sha, cwd):
-    """True iff ``commit`` is the current split commit or one of its ancestors.
+def split_lineage_answer(commit, split_sha, cwd):
+    """Is ``commit`` the current split commit or one of its ancestors?
 
-    The tripwire's fail-closed direction is "not lineage": when git cannot
-    answer -- an object the monorepo does not have, a truncated history -- the
-    commit is treated as foreign, which makes the reconciler refuse and touch
-    nothing.  Guessing "lineage" instead would force-push over a commit whose
-    origin was never established.
+    Returns the :class:`Ancestry` verdict rather than a bool, because the
+    reconciler needs all three answers, not two:
+
+    * **TRUE** -- the split boundary; the walk stops here.
+    * **FALSE** -- git checked: this commit is not part of the split lineage.
+    * **INDETERMINABLE** -- git could not check.  This is the ORDINARY answer
+      for a commit above the boundary: the mirror's scaffold layer exists only
+      on the remote, so the monorepo has no object to walk.  It is also what a
+      pruned or never-fetched split commit produces, which is why the walk
+      keeps it and the caller uses it only where the difference is real (see
+      :func:`observe`).
+
+    The walk's fail-closed direction is "not lineage" for BOTH non-TRUE
+    answers: a commit whose lineage was never established is never treated as
+    a boundary, so the reconciler refuses rather than force-pushing over
+    something it cannot account for.
     """
-    return ancestry(commit, split_sha, cwd=cwd, timeout=180) is Ancestry.TRUE
+    return ancestry(commit, split_sha, cwd=cwd, timeout=180)
 
 
 # ---------------------------------------------------------------------------
@@ -321,15 +351,40 @@ def observe(remote, root, project_path):
         chain = _first_parent_chain(clone_dir, tip)
         boundary = None
         above = []  # commits above the boundary, newest first
+        undetermined = []  # commits whose lineage question git could not answer
         for commit in chain:
-            if in_split_lineage(commit, split_sha, cwd=root):
+            verdict = split_lineage_answer(commit, split_sha, cwd=root)
+            if verdict is Ancestry.TRUE:
                 boundary = commit
                 break
+            if verdict is Ancestry.INDETERMINABLE:
+                undetermined.append(commit)
             above.append(commit)
 
         if boundary is None:
-            # No split lineage anywhere in the tip's history -> wholly foreign.
+            # Nothing in the tip's history answered "yes". Two very different
+            # situations end up here, and they must not share a verdict:
+            #
+            #  * every answer was a definite "no" -> the mirror really does
+            #    hold work unrelated to this project.
+            #  * some answer was "cannot tell" -> whether the mirror is foreign
+            #    was never established. Both refuse and touch nothing, but only
+            #    the first one may accuse anybody of authoring on the mirror.
+            #
+            # Below this branch a boundary was PROVEN, so the verdicts that
+            # authorize a write (behind, scaffold-missing) never rest on an
+            # unanswerable question -- and the unanswerable commits above a
+            # proven boundary are the ordinary case, judged by their paths.
             foreign = [(c, _commit_paths(clone_dir, c)) for c in above]
+            if undetermined:
+                return MirrorPlan(
+                    state="lineage_undetermined",
+                    split_sha=split_sha,
+                    remote_tip=tip,
+                    split_lineage_sha=None,
+                    foreign_commits=foreign,
+                    undetermined_commits=undetermined,
+                )
             return MirrorPlan(
                 state="contract_violated",
                 split_sha=split_sha,
@@ -418,6 +473,30 @@ def _remediation(plan, project_path):
     )
 
 
+def _undetermined_detail(plan, project_path):
+    """Remediation for a walk git could not finish.  Never an accusation."""
+    lines = [
+        f"  - commit {sha[:12]}: git could not tell whether it belongs to the "
+        f"split lineage."
+        for sha in plan.undetermined_commits
+    ]
+    body = "\n".join(lines)
+    return (
+        f"{body}\n"
+        f"The mirror's history never reached a split-lineage commit, and at "
+        f"least one ancestry question came back unanswerable rather than "
+        f"answered 'no'. The usual cause is objects the monorepo does not "
+        f"have: pruned by gc, or never fetched (a shallow clone).\n"
+        f"This is NOT a finding of foreign work -- nothing was touched, and "
+        f"nothing about who authored what has been established.\n"
+        f"Remediation: give the monorepo the objects and re-run. "
+        f"`git fetch --unshallow` (or `git fetch --deepen=<n>`) if the clone "
+        f"is shallow, `git fetch` the mirror remote to bring its commits "
+        f"local, and re-run `git subtree split --prefix {project_path}` to "
+        f"re-materialize the split lineage gc may have pruned."
+    )
+
+
 def verdict_item(plan, remote, project_path, project_name):
     """The mirror's :class:`VerdictItem` -- one subject, one whole repository.
 
@@ -466,6 +545,18 @@ def verdict_item(plan, remote, project_path, project_name):
         return VerdictItem(
             summary="foreign commit(s) detected on the mirror.",
             detail=_remediation(plan, project_path),
+            **common,
+        )
+    if plan.state == "lineage_undetermined":
+        return VerdictItem(
+            summary="git could not determine the mirror's lineage.",
+            facts=(
+                f"remote tip: {plan.remote_tip[:12]}",
+                f"current split: {plan.split_sha[:12]}",
+                "no commit in the tip's history could be confirmed as part of "
+                "the split lineage, and at least one check was unanswerable.",
+            ),
+            detail=_undetermined_detail(plan, project_path),
             **common,
         )
     if plan.state == "virgin":
@@ -650,6 +741,12 @@ def _cmd_mirror(flags, project_root):
 
     def _apply(item):
         plan = item.data
+        if plan.state == "lineage_undetermined":
+            print("Error: lineage-undetermined -- git could not determine "
+                  "whether the mirror shares this project's split lineage; "
+                  "nothing was touched.", file=sys.stderr)
+            print(_undetermined_detail(plan, project_path), file=sys.stderr)
+            sys.exit(1)
         if plan.state == "contract_violated":
             print("Error: contract-violated -- the mirror has foreign commit(s); "
                   "nothing was touched.", file=sys.stderr)

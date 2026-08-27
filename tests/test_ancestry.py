@@ -12,9 +12,15 @@ declares what INDETERMINABLE means for it:
 ============================================  ==============================
 caller                                        INDETERMINABLE maps to
 ============================================  ==============================
-mirror reconciler (split-lineage tripwire)    not lineage -> refuse, no writes
+mirror reconciler (split-lineage tripwire)    not a boundary -> keep walking;
+                                              if the walk ends with nothing
+                                              confirmed, a refusal of its own
+                                              (``lineage_undetermined``)
+                                              rather than the foreign-commit
+                                              verdict
 changelog validation cache                    cache miss -> recompute
-release ``require_recorded_candidate``        hard error, release refuses
+release ``require_recorded_candidate``        hard error naming the
+                                              unanswerable question
 ``release resume`` HEAD-descends check        hard error, exit 1
 ============================================  ==============================
 
@@ -253,7 +259,14 @@ class TestMirrorTripwireMapping:
     def test_indeterminable_refuses_too_and_writes_nothing(
         self, tmp_path, monkeypatch, capsys
     ):
-        """Fail-closed: an unanswerable lineage question refuses the push."""
+        """Fail-closed: an unanswerable lineage walk refuses the push.
+
+        The stub answers INDETERMINABLE to EVERY question, which is the
+        walk-reaches-the-end-with-nothing-confirmed case.  The refusal holds --
+        nothing is pushed -- but the verdict is not the foreign-commit one:
+        whether the mirror holds foreign work was never established, so saying
+        so would be an accusation the reconciler cannot support.
+        """
         from rlsbl.commands.monorepo import mirror_cmd
 
         root, remote, _ = self._mirror(tmp_path)
@@ -261,14 +274,62 @@ class TestMirrorTripwireMapping:
 
         _stub_ancestry(monkeypatch, mirror_cmd, Ancestry.INDETERMINABLE)
         plan = mirror_cmd.observe(remote, str(root), "mylib")
-        assert plan.state == "contract_violated"
+        assert plan.state == "lineage_undetermined"
+        assert plan.undetermined_commits
 
         with pytest.raises(SystemExit) as exc:
             mirror_cmd._cmd_mirror({"project": "mylib"}, project_root=root)
         assert exc.value.code == 1
-        assert "contract-violated" in capsys.readouterr().err
+        err = capsys.readouterr().err
+        assert "lineage-undetermined" in err
+        assert "could not determine" in err
+        # None of the foreign-commit verdict's accusing text may appear.
+        assert "contract-violated" not in err
+        assert "must never be authored on directly" not in err
+        assert "touches non-scaffold paths" not in err
         tip_after = _git(root, "ls-remote", remote, "refs/heads/main").split()[0]
         assert tip_after == tip_before
+
+    def test_indeterminable_above_a_proven_boundary_is_the_ordinary_case(
+        self, tmp_path
+    ):
+        """Per-call semantics: only the walk's OUTCOME changes the verdict.
+
+        The blanket stub above asserts a stronger claim than the code makes.
+        A mirror's scaffold layer exists only on the remote, so ITS lineage
+        question is unanswerable on every healthy run -- no stub required, as
+        the assertion below shows.  Refusing on the mere presence of an
+        INDETERMINABLE answer would therefore refuse normal operation.  What
+        decides is whether the walk ever confirmed a boundary.
+        """
+        from rlsbl.commands.monorepo.mirror_cmd import observe, split_lineage_answer
+
+        root, remote, split = self._mirror(tmp_path)
+
+        # A scaffold layer, authored the way the reconciler would: one commit
+        # atop the bare split touching only scaffold-owned paths.
+        work = tmp_path / "layer"
+        _git(tmp_path, "clone", "-q", remote, str(work))
+        _git(work, "config", "user.email", "t@t.local")
+        _git(work, "config", "user.name", "Test")
+        _git(work, "config", "commit.gpgsign", "false")
+        (work / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
+        (work / ".github" / "workflows" / "ci.yml").write_text("name: CI\n")
+        _git(work, "add", "-A")
+        _git(work, "commit", "-q", "-m", "chore: scaffold rlsbl CI")
+        _git(work, "push", "-q", "origin", "main")
+        layer = _git(work, "rev-parse", "HEAD")
+
+        # The layer commit's objects are on the mirror, not in the monorepo:
+        # git cannot answer, on a completely healthy mirror.
+        assert (
+            split_lineage_answer(layer, split, cwd=str(root))
+            is Ancestry.INDETERMINABLE
+        )
+
+        plan = observe(remote, str(root), "mylib")
+        assert plan.state == "converged"
+        assert plan.undetermined_commits == []
 
 
 # ---------------------------------------------------------------------------

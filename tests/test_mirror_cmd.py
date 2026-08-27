@@ -323,6 +323,79 @@ class TestContractViolation:
         assert _remote_main(remote) == tip_before  # untouched
 
 
+class TestLineageUndetermined:
+    """A walk git cannot finish refuses WITHOUT accusing anybody.
+
+    The hazard the foreign-commit verdict used to swallow: when the mirror's
+    whole history is made of commits the monorepo has no objects for -- pruned
+    by gc, never fetched, or (as here) genuinely from somewhere else -- every
+    ancestry question comes back unanswerable, not "no". The reconciler still
+    refuses and still touches nothing, but the remediation points at the
+    missing objects instead of telling the operator to stop authoring on a
+    mirror they never touched.
+    """
+
+    def _mirror_with_unreachable_history(self, remote, tmp_path):
+        """Push a history whose objects the monorepo does not have."""
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        _git(elsewhere, "init", "-q", "-b", "main")
+        _git(elsewhere, "config", "user.email", "t@t.local")
+        _git(elsewhere, "config", "user.name", "Test")
+        _git(elsewhere, "config", "commit.gpgsign", "false")
+        (elsewhere / "index.js").write_text("module.exports = 'other';\n")
+        _git(elsewhere, "add", "-A")
+        _git(elsewhere, "commit", "-q", "-m", "unrelated history")
+        _git(elsewhere, "push", "-q", remote, "main:refs/heads/main")
+        return _git(elsewhere, "rev-parse", "HEAD")
+
+    def test_plan_reports_lineage_undetermined(self, mono, tmp_path):
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        unreachable = self._mirror_with_unreachable_history(remote, tmp_path)
+
+        plan = observe(remote, str(mono), "mylib")
+        assert plan.state == "lineage_undetermined"
+        assert plan.undetermined_commits == [unreachable]
+
+    def test_apply_refuses_and_touches_nothing(self, mono, tmp_path, capsys):
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        self._mirror_with_unreachable_history(remote, tmp_path)
+        tip_before = _remote_main(remote)
+
+        with pytest.raises(SystemExit) as exc:
+            _cmd_mirror({"project": "mylib"}, project_root=mono)
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "lineage-undetermined" in err
+        assert "could not determine" in err
+        assert "never fetched" in err or "pruned" in err
+        for accusation in (
+            "contract-violated",
+            "must never be authored on directly",
+            "touches non-scaffold paths",
+        ):
+            assert accusation not in err, (
+                "the refusal must not accuse anybody of authoring on the "
+                f"mirror: the question was never answered.\n{err}"
+            )
+        assert _remote_main(remote) == tip_before  # untouched
+
+    def test_plan_mode_renders_the_verdict(self, mono, tmp_path, capsys):
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        self._mirror_with_unreachable_history(remote, tmp_path)
+        tip_before = _remote_main(remote)
+
+        _cmd_mirror({"project": "mylib", "dry-run": True}, project_root=mono)
+
+        out = capsys.readouterr().out
+        assert "lineage-undetermined" in out
+        assert "Remediation" in out
+        assert _remote_main(remote) == tip_before
+
+
 class TestInterruptedApplyHeals:
     """Simulate a kill between the split push and the scaffold commit."""
 
