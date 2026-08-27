@@ -194,17 +194,50 @@ class RouterFilters:
     ``depends_on`` names a project that does not exist has no derivable filter
     set, and a router generated as if the edge were absent would silently
     under-trigger the dependent's CI.  The command reports the error instead.
+
+    A manifest the graph could not READ is the same failure wearing different
+    clothes, and the graph is deliberately tolerant of it (see
+    :class:`~rlsbl.workspace_graph.WorkspaceGraph`) -- so this constructor asks
+    the graph whether any scan failed and refuses when one did.  The narrowing
+    is otherwise invisible from here and from the freshness check, which
+    re-derives from the same unreadable manifest and therefore agrees the
+    narrowed router is fresh.
     """
 
     def __init__(self, root, projects, releasables=None):
+        from .errors import WorkspaceError
         from .workspace_graph import WorkspaceGraph
 
         self.root = str(root)
         self.projects = list(projects)
         self.releasables = releasables
         self.graph = WorkspaceGraph(self.root, self.projects)
+        if self.graph.scan_errors:
+            listed = "\n".join(
+                f"  - {error.project}: {self._relative(error.path)} "
+                f"({error.message.split(': ', 1)[-1]})"
+                for error in self.graph.scan_errors
+            )
+            raise WorkspaceError(
+                "cannot derive the CI router's paths filters: a manifest could "
+                "not be read, so the workspace dependency graph is missing "
+                "edges and every filter derived from it would be NARROWER "
+                "than the workspace it describes -- a member would stop "
+                "reacting to a dependency it really has, and its CI job would "
+                "conclude `skipped` on the commit a release tags.\n"
+                f"{listed}\n"
+                "Fix the manifest(s) and re-run."
+            )
         self._by_name = {member_name(p): p for p in self.projects}
         self._root_triggers = root_trigger_files(self.root)
+
+    def _relative(self, path):
+        """*path* relative to the workspace root, when it is under it."""
+        try:
+            relative = os.path.relpath(path, self.root)
+        except ValueError:
+            return path
+        return path if relative.startswith(os.pardir) else relative
 
     def _dependency_members(self, project):
         """Every workspace member *project* depends on, transitively, any scope.

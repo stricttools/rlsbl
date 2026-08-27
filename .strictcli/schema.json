@@ -3467,7 +3467,8 @@
     },
     "workspace-unbuildable": {
       "tags": [
-        "workspace"
+        "workspace",
+        "preflight"
       ],
       "severity": "error",
       "fast": false,

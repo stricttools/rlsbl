@@ -77,6 +77,7 @@ def register_workspace_checks(app):
     @app.error_check("router-filters-fresh")
     def check_router_filters_fresh(ctx, reporter):
         """The router's paths filters must match a fresh derivation from the workspace."""
+        from ..errors import WorkspaceError
         from ..router_filters import PREDICATE_QUANTIFIER, RouterFilters
         from ..workspace import is_explicit_mode, load_releasables, load_workspace
 
@@ -113,7 +114,18 @@ def register_workspace_checks(app):
         # report a fresh router as stale.
         projects = load_workspace(root)
         releasables = load_releasables(root, projects) if is_explicit_mode(root) else None
-        filters = RouterFilters(root, projects, releasables)
+        try:
+            filters = RouterFilters(root, projects, releasables)
+        except WorkspaceError as e:
+            # Most often an unreadable manifest. Both sides of this comparison
+            # are derived from the same manifests, so a scan that failed makes
+            # the committed router and the fresh derivation agree on a filter
+            # narrower than the workspace -- agreement that means nothing.
+            # The derivation refuses; so does the check.
+            reporter.error(str(e))
+            return reporter.found(
+                "the router's filters cannot be derived from this workspace"
+            )
         fresh = {
             proj["name"]: filters.patterns_for(proj)
             for proj in projects

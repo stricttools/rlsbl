@@ -489,6 +489,61 @@ class TestRouterDerivedFilters:
         assert "Package.swift" not in content
 
 
+class TestSyncRefusesAnUnreadableManifest:
+    """Sync cannot write a router derived from a scan that failed.
+
+    A member's manifest that no scanner can parse contributes no dependency
+    edges, and the filters are derived from those edges: the router would come
+    out narrower than the workspace it describes, the dependent would stop
+    reacting to its dependency's territory, and the freshness check -- which
+    re-derives from the same broken manifest -- would call the narrowed router
+    fresh. So the manifest is the release-blocking error it always was, at the
+    moment the router is derived.
+    """
+
+    def _broken(self, base_path):
+        names = _init_workspace_with_projects(base_path, [
+            ("tooling", {"ci": True}),
+            ("core", {"ci": True}),
+        ])
+        with open(os.path.join(str(base_path), "core", "pyproject.toml"), "w") as f:
+            f.write("this is not valid toml [[[")
+        return names
+
+    def test_sync_refuses(self, mock_git_repo, capsys):
+        from rlsbl.errors import WorkspaceError
+
+        self._broken(mock_git_repo)
+        with pytest.raises(WorkspaceError):
+            _cmd_sync({}, project_root=".")
+
+    def test_the_refusal_names_the_file(self, mock_git_repo, capsys):
+        from rlsbl.errors import WorkspaceError
+
+        self._broken(mock_git_repo)
+        with pytest.raises(WorkspaceError) as exc:
+            _cmd_sync({}, project_root=".")
+        assert "pyproject.toml" in str(exc.value)
+        assert "core" in str(exc.value)
+
+    def test_the_committed_router_is_left_untouched(self, mock_git_repo, capsys):
+        """The refusal must not overwrite a correct router with a narrower one.
+
+        Registering the members already generated a router from manifests that
+        parsed. Breaking one and re-syncing must leave that router exactly as
+        it was, rather than rewriting it without the edges the broken manifest
+        would have contributed.
+        """
+        router = mock_git_repo / ".github" / "workflows" / "ci-router.yml"
+        self._broken(mock_git_repo)
+        before = router.read_text()
+
+        with pytest.raises(Exception):
+            _cmd_sync({}, project_root=".")
+
+        assert router.read_text() == before
+
+
 class TestSwiftSubtreeWarning:
     """Tests for the Swift subtree_remote warning in monorepo sync."""
 

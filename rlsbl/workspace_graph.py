@@ -37,6 +37,35 @@ class CycleError(Exception):
     """Raised when the workspace dependency graph contains a cycle."""
 
 
+class ManifestScanError(Exception):
+    """A manifest a scanner could not read or parse.
+
+    Raised by the scanners rather than swallowed into an empty dependency
+    list.  A failed scan contributes NO edges, and edges are what a dependent's
+    CI paths filter is derived from, so a swallowed failure quietly NARROWS
+    that filter: the dependent stops reacting to changes in its dependency's
+    territory, its job concludes ``skipped`` on the very commit a release tags,
+    and the freshness check -- re-deriving from the same broken manifest --
+    agrees the narrowed router is fresh.
+
+    :class:`WorkspaceGraph` catches it, keeps the tolerant behaviour its
+    rendering consumers rely on (a warning on stderr, no edges from that
+    manifest, the rest of the workspace still answerable), and records it on
+    :attr:`WorkspaceGraph.scan_errors`.  A consumer whose output must never be
+    narrower than the truth reads that attribute and refuses.
+    """
+
+    def __init__(self, path, cause, action="parse"):
+        self.path = str(path)
+        self.cause = cause
+        self.action = action
+        super().__init__(f"failed to {action} {self.path}: {cause}")
+
+
+#: One manifest scan that failed, attributed to the member it belongs to.
+ScanError = namedtuple("ScanError", ["project", "path", "message"])
+
+
 def _parse_pypi_dep_name(dep_string):
     """Extract the package name from a PEP 508 dependency string.
 
@@ -97,8 +126,7 @@ class PypiScanner:
             with open(manifest, "r", encoding="utf-8") as f:
                 data = tomlkit.parse(f.read())
         except Exception as exc:
-            print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
-            return []
+            raise ManifestScanError(manifest, exc) from exc
 
         deps = []
         project_section = data.get("project", {})
@@ -149,8 +177,7 @@ class NpmScanner:
             with open(manifest, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as exc:
-            print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
-            return []
+            raise ManifestScanError(manifest, exc) from exc
 
         deps = []
         dep_sections = [
@@ -191,8 +218,7 @@ class DartScanner:
             with open(manifest, "r", encoding="utf-8") as f:
                 data = yaml.load(f)
         except Exception as exc:
-            print(f"Warning: failed to parse {manifest}: {exc}", file=sys.stderr)
-            return []
+            raise ManifestScanError(manifest, exc) from exc
 
         if not isinstance(data, dict):
             return []
@@ -300,8 +326,7 @@ class MavenScanner:
             with open(catalog_path, "r", encoding="utf-8") as f:
                 data = tomlkit.parse(f.read())
         except Exception as exc:
-            print(f"Warning: failed to parse {catalog_path}: {exc}", file=sys.stderr)
-            return {}
+            raise ManifestScanError(catalog_path, exc) from exc
 
         libraries = data.get("libraries", {})
         result: dict[str, str] = {}
@@ -349,8 +374,7 @@ class MavenScanner:
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
         except Exception as exc:
-            print(f"Warning: failed to read {filepath}: {exc}", file=sys.stderr)
-            return []
+            raise ManifestScanError(filepath, exc, action="read") from exc
 
         deps = []
         unrecognized = []
@@ -468,8 +492,7 @@ class MavenScanner:
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
         except Exception as exc:
-            print(f"Warning: failed to read {filepath}: {exc}", file=sys.stderr)
-            return []
+            raise ManifestScanError(filepath, exc, action="read") from exc
 
         deps = []
         unrecognized = []
@@ -642,8 +665,7 @@ class MavenScanner:
         try:
             tree = ET.parse(filepath)
         except Exception as exc:
-            print(f"Warning: failed to parse {filepath}: {exc}", file=sys.stderr)
-            return []
+            raise ManifestScanError(filepath, exc) from exc
 
         root = tree.getroot()
 
@@ -685,7 +707,21 @@ SCANNERS: list[WorkspaceScanner] = [PypiScanner(), NpmScanner(), DartScanner(), 
 
 
 class WorkspaceGraph:
-    """Directed dependency graph of intra-workspace project dependencies."""
+    """Directed dependency graph of intra-workspace project dependencies.
+
+    Construction is tolerant of manifests it cannot read: the failure warns on
+    stderr, that manifest contributes no edges, and the rest of the workspace
+    is still answerable -- which is what ``monorepo impact``, ``monorepo
+    graph`` and ``monorepo status`` need on a half-broken tree.
+
+    Tolerance is only safe for a consumer that RENDERS the graph. A consumer
+    that derives something narrowing from it cannot tell "this member has no
+    dependencies" apart from "nobody could read this member's dependencies",
+    and picking the first silently drops a real edge.  Every failed scan is
+    therefore recorded on :attr:`scan_errors` (a list of :class:`ScanError`),
+    and such a consumer refuses when the list is non-empty -- see
+    :class:`rlsbl.router_filters.RouterFilters`.
+    """
 
     def __init__(self, root, projects):
         # Map: project_name -> list of Dependency
@@ -693,6 +729,10 @@ class WorkspaceGraph:
         # Map: project_name -> list of dependent project names
         self._rdeps = {}
         self._project_names = []
+        #: Every manifest scan that failed, in construction order. Empty means
+        #: every manifest in the workspace was read, so the edge set is
+        #: complete and anything derived from it is as wide as the truth.
+        self.scan_errors: list[ScanError] = []
 
         workspace_names = set()
         for proj in projects:
@@ -724,12 +764,23 @@ class WorkspaceGraph:
 
             found_deps = []
             for scanner in SCANNERS:
-                if isinstance(scanner, PypiScanner):
-                    found_deps.extend(scanner.scan(project_dir, workspace_names, pypi_name_map=pypi_name_map))
-                elif isinstance(scanner, MavenScanner):
-                    found_deps.extend(scanner.scan(project_dir, workspace_names, workspace_root=root))
-                else:
-                    found_deps.extend(scanner.scan(project_dir, workspace_names))
+                # One scanner's unreadable manifest costs that scanner's edges
+                # and nothing else: the remaining scanners still run, the
+                # warning still goes to stderr, and the failure is recorded so
+                # a narrowing consumer can refuse rather than derive from a
+                # graph that is missing edges nobody could see.
+                try:
+                    if isinstance(scanner, PypiScanner):
+                        found_deps.extend(scanner.scan(project_dir, workspace_names, pypi_name_map=pypi_name_map))
+                    elif isinstance(scanner, MavenScanner):
+                        found_deps.extend(scanner.scan(project_dir, workspace_names, workspace_root=root))
+                    else:
+                        found_deps.extend(scanner.scan(project_dir, workspace_names))
+                except ManifestScanError as exc:
+                    print(f"Warning: {exc}", file=sys.stderr)
+                    self.scan_errors.append(
+                        ScanError(project=name, path=exc.path, message=str(exc))
+                    )
 
             # Explicit depends_on from workspace config
             for dep_name in proj.get("depends_on", []):

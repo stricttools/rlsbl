@@ -3,8 +3,11 @@
 import os
 import textwrap
 
+import pytest
+
 from rlsbl.workspace_graph import (
     Dependency,
+    ManifestScanError,
     MavenScanner,
     SCANNERS,
     WorkspaceGraph,
@@ -360,14 +363,27 @@ class TestPomXmlDeps:
         assert names == {"core", "utils"}
 
     def test_malformed_pom(self, tmp_path, capsys):
-        """Malformed pom.xml produces warning, returns empty."""
+        """A malformed pom.xml is raised to the caller, not swallowed.
+
+        The scanner used to warn and return an empty list, which is
+        indistinguishable from "this project declares no dependencies" -- and
+        the CI router's paths filters are derived from those dependencies, so
+        an unreadable manifest silently narrowed them. The graph is still
+        tolerant (it warns and carries on); it also records the failure so a
+        consumer that must not narrow can refuse.
+        """
         proj_dir = tmp_path / "app"
         proj_dir.mkdir()
         (proj_dir / "pom.xml").write_text("this is not valid xml <<<")
 
         scanner = MavenScanner()
-        deps = scanner.scan(str(proj_dir), {"app", "core"})
-        assert deps == []
+        with pytest.raises(ManifestScanError) as exc:
+            scanner.scan(str(proj_dir), {"app", "core"})
+        assert exc.value.path.endswith("pom.xml")
+
+        graph = WorkspaceGraph(str(tmp_path), [{"path": "app", "name": "app"}])
+        assert graph.dependencies("app") == []
+        assert [e.project for e in graph.scan_errors] == ["app"]
         captured = capsys.readouterr()
         assert "Warning" in captured.err
 

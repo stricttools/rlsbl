@@ -334,8 +334,15 @@ needs_network = true
 depends_on = []
 scope = "workspace"
 
+# workspace-unbuildable: a member whose manifest `uv sync` cannot resolve is
+# also a member whose manifest the dependency scanners cannot read, and the CI
+# router's paths filters are derived from what those scanners find. A manifest
+# that stops parsing therefore removes dependency territories from the filters
+# derived from it. The router derivation refuses outright on an unreadable
+# manifest; this check is in "preflight" so the ordinary release path reports
+# the broken manifest as its own finding instead of only as a router failure.
 [checks.workspace-unbuildable]
-tags = ["workspace"]
+tags = ["workspace", "preflight"]
 severity = "error"
 fast = false
 pure = false

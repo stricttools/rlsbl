@@ -404,7 +404,7 @@ Fourteen checks run under `rlsbl check --tag workspace`, covering CI configurati
 | `unversioned-boundary` | error | Releasable projects cannot have runtime dependencies on unversioned (`releasable = false`) projects |
 | `dead-workspace-packages` | warn | Library projects with zero dependents (may indicate unused code) |
 | `subtree-remote-reachable` | error | All configured subtree_remote URLs must be accessible (network check) |
-| `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only) |
+| `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only); also tagged `preflight`, so a manifest that stopped resolving blocks the release rather than only narrowing the router's derived filters |
 | `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
 | `root-rlsbl-conflict` | error | Root `.rlsbl/` must not coexist with `.rlsbl-monorepo/` |
 | `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version |

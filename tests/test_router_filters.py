@@ -243,6 +243,62 @@ class TestDependencyTerritories:
             RouterFilters(tmp_path, members)
 
 
+class TestUnreadableManifestsRefuseToDeriveFilters:
+    """A manifest nobody could parse is not a member with no dependencies.
+
+    The scanners are tolerant by design -- a broken manifest warns and
+    contributes no edges, so the graph's rendering consumers keep working on a
+    half-broken tree. For a filter that is fatal: the lost edge silently
+    removes a dependency territory from the dependent's pattern list, the
+    dependent stops reacting to changes in its dependency, and its CI job
+    concludes ``skipped`` on the commit a release tags. Worse, the freshness
+    check re-derives from the same broken scan, so it agrees the narrowed
+    router is fresh.
+
+    The derivation therefore refuses on any recorded scan failure.
+    """
+
+    @staticmethod
+    def _members_with_a_broken_manifest(tmp_path):
+        (tmp_path / "packages" / "core").mkdir(parents=True)
+        (tmp_path / "packages" / "cli").mkdir(parents=True)
+        (tmp_path / "packages" / "core" / "pyproject.toml").write_text(
+            "this is not valid toml [[[", encoding="utf-8",
+        )
+        return [
+            _member("root", "."),
+            _member("core", "packages/core"),
+            _member("cli", "packages/cli"),
+        ]
+
+    def test_construction_refuses(self, tmp_path):
+        from rlsbl.errors import WorkspaceError
+
+        members = self._members_with_a_broken_manifest(tmp_path)
+        with pytest.raises(WorkspaceError):
+            RouterFilters(tmp_path, members)
+
+    def test_the_refusal_names_the_project_and_the_file(self, tmp_path):
+        from rlsbl.errors import WorkspaceError
+
+        members = self._members_with_a_broken_manifest(tmp_path)
+        with pytest.raises(WorkspaceError) as exc:
+            RouterFilters(tmp_path, members)
+        message = str(exc.value)
+        assert "core" in message
+        assert "pyproject.toml" in message
+
+    def test_a_readable_workspace_still_derives(self, tmp_path):
+        (tmp_path / "packages" / "core").mkdir(parents=True)
+        (tmp_path / "packages" / "core" / "pyproject.toml").write_text(
+            '[project]\nname = "core"\n', encoding="utf-8",
+        )
+        members = [_member("root", "."), _member("core", "packages/core")]
+        assert "packages/core/**" in RouterFilters(tmp_path, members).patterns_for(
+            members[1]
+        )
+
+
 class TestBuiltInTriggers:
 
     def test_root_manifests_and_lockfiles_trigger_every_member(self, tmp_path):
@@ -451,6 +507,23 @@ class TestRouterFiltersFreshCheck:
         )
         outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
         assert outcome.status == "fail"
+
+    def test_an_unreadable_manifest_fails_instead_of_passing(self, router_workspace):
+        """The check cannot re-derive from a scan that failed.
+
+        Both sides of the comparison come from the same manifests, so a
+        manifest nobody can parse makes the committed router and the fresh
+        derivation agree on a filter that is narrower than the truth. Agreeing
+        is not passing here.
+        """
+        core = router_workspace / "packages" / "core"
+        core.mkdir(parents=True, exist_ok=True)
+        (core / "pyproject.toml").write_text(
+            "this is not valid toml [[[", encoding="utf-8",
+        )
+        outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
+        assert outcome.status == "fail", outcome
+        assert any("pyproject.toml" in p.text for p in outcome.problems), outcome
 
     def test_it_derives_from_the_whole_workspace_not_the_context(self, router_workspace):
         """A context carrying one member (the releasable preflight) must not

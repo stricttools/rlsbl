@@ -45,7 +45,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 16 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
-Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (16 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`, `dep-floors`, `target-matrix-fresh`, `router-filters-fresh`, and the six path-capable tool checks `lint`, `lint-scope-guard`, `format`, `format-scope-guard`, `type-check`, `type-check-scope-guard`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
+Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (17 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`, `dep-floors`, `target-matrix-fresh`, `router-filters-fresh`, `workspace-unbuildable`, and the six path-capable tool checks `lint`, `lint-scope-guard`, `format`, `format-scope-guard`, `type-check`, `type-check-scope-guard`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
 
 ## Project checks
 
@@ -117,7 +117,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `unversioned-boundary` | error | No releasable project has a runtime dependency on an unversioned project (`releasable = false`, not dev-only) |
 | `dead-workspace-packages` | warn | Detects workspace packages with no commits since their last release |
 | `subtree-remote-reachable` | error | Configured subtree remote URLs are reachable (requires network) |
-| `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only) |
+| `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only); also tagged `preflight`, so a manifest that stopped resolving blocks the release rather than only narrowing the router's derived filters |
 | `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
 | `root-rlsbl-conflict` | error | Root `.rlsbl/` does not coexist with `.rlsbl-monorepo/` |
 | `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version; a broken member config is a hard failure |

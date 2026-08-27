@@ -583,7 +583,16 @@ class TestNpmPeerDependencies:
 
 
 class TestMalformedManifest:
-    """Malformed manifest is skipped with a warning."""
+    """Malformed manifest is skipped with a warning, and recorded.
+
+    Tolerance is deliberate for the consumers that render a graph (impact,
+    graph export, status): a broken manifest somewhere in the workspace must
+    not stop them answering about the rest of it. But "no dependencies" is
+    indistinguishable from "dependencies nobody could read", and a consumer
+    that DERIVES something narrowing from the edges (the CI router's paths
+    filters) must never treat the second as the first. So the graph also
+    records every failed scan on ``scan_errors``.
+    """
 
     def test_malformed_pyproject(self, tmp_path, capsys):
         projects = [
@@ -609,6 +618,48 @@ class TestMalformedManifest:
         assert graph.dependencies("a") == []
         captured = capsys.readouterr()
         assert "Warning" in captured.err
+
+    def test_a_failed_scan_is_recorded_on_the_graph(self, tmp_path, capsys):
+        projects = [
+            {"path": "packages/a", "name": "a"},
+            {"path": "packages/b", "name": "b"},
+        ]
+        root, projects = _make_workspace(tmp_path, projects, {
+            "a": ("pyproject.toml", "this is not valid toml [[["),
+        })
+        graph = WorkspaceGraph(root, projects)
+        capsys.readouterr()
+        assert len(graph.scan_errors) == 1
+        error = graph.scan_errors[0]
+        assert error.project == "a"
+        assert error.path.endswith(os.path.join("packages", "a", "pyproject.toml"))
+        assert "pyproject.toml" in error.message
+
+    def test_a_readable_workspace_records_nothing(self, tmp_path):
+        projects = [
+            {"path": "packages/a", "name": "a"},
+            {"path": "packages/b", "name": "b"},
+        ]
+        root, projects = _make_workspace(tmp_path, projects, {
+            "a": ("pyproject.toml", '[project]\nname = "a"\ndependencies = ["b"]\n'),
+        })
+        assert WorkspaceGraph(root, projects).scan_errors == []
+
+    def test_every_scanner_reports_its_own_failure(self, tmp_path, capsys):
+        """One broken manifest per ecosystem, each recorded against its member."""
+        projects = [
+            {"path": "packages/a", "name": "a"},
+            {"path": "packages/b", "name": "b"},
+            {"path": "packages/c", "name": "c"},
+        ]
+        root, projects = _make_workspace(tmp_path, projects, {
+            "a": ("pyproject.toml", "this is not valid toml [[["),
+            "b": ("package.json", "{not valid json"),
+            "c": ("pubspec.yaml", "name: c\n  bad: [indent\n"),
+        })
+        graph = WorkspaceGraph(root, projects)
+        capsys.readouterr()
+        assert {e.project for e in graph.scan_errors} == {"a", "b", "c"}
 
 
 class TestDeduplication:
