@@ -46,6 +46,25 @@ class BaseTarget:
         """Target registry name. Subclasses must override."""
         return "base"
 
+    def detect(self, dir_path):
+        """Return True when any declared ``detection_files`` entry exists here.
+
+        This is the declared-manifest half of detection, and it is the whole
+        story for a target whose presence is decided by a filename: npm by
+        ``package.json``, Go by ``go.mod``, and so on. Those targets declare
+        their filenames and inherit this method rather than restating the
+        same ``os.path.exists`` call.
+
+        Targets whose presence depends on file CONTENT -- Flutter and Dart
+        sharing ``pubspec.yaml``, an Android application versus a Gradle
+        library sharing ``build.gradle`` -- override this and inspect the
+        file. A target that declares no detection files never auto-detects.
+        """
+        return any(
+            os.path.exists(os.path.join(dir_path, filename))
+            for filename in self.detection_files
+        )
+
     def version_file(self, dir_path=None):
         """Return the relative path of the file that holds the project version."""
         return None

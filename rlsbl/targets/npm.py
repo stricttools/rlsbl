@@ -22,10 +22,6 @@ class NpmTarget(BaseTarget):
     def name(self):
         return "npm"
 
-    def detect(self, dir_path):
-        """Return True if dir_path contains a package.json."""
-        return os.path.exists(os.path.join(dir_path, "package.json"))
-
     def read_name(self, dir_path, ctx):
         """Read the package name from package.json."""
         pkg_path = os.path.join(dir_path, "package.json")

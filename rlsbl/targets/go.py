@@ -57,10 +57,6 @@ class GoTarget(BaseTarget):
     def name(self):
         return "go"
 
-    def detect(self, dir_path):
-        """Return True if dir_path contains a go.mod file."""
-        return os.path.exists(os.path.join(dir_path, "go.mod"))
-
     def read_name(self, dir_path, ctx):
         """Read the last segment of the module path from go.mod."""
         module_path = read_go_module_path(dir_path)

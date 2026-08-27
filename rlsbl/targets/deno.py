@@ -21,12 +21,6 @@ class DenoTarget(BaseTarget):
     def name(self):
         return "deno"
 
-    def detect(self, dir_path):
-        return (
-            os.path.exists(os.path.join(dir_path, "deno.json"))
-            or os.path.exists(os.path.join(dir_path, "deno.jsonc"))
-        )
-
     def read_name(self, dir_path, ctx):
         """Read the package name from deno.json."""
         config_path = self._config_path(dir_path)

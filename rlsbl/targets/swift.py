@@ -20,9 +20,6 @@ class SwiftTarget(BaseTarget):
     def name(self):
         return "swift"
 
-    def detect(self, dir_path):
-        return os.path.exists(os.path.join(dir_path, "Package.swift"))
-
     def read_name(self, dir_path, ctx):
         """Extract name from Package.swift."""
         package_path = os.path.join(dir_path, "Package.swift")

@@ -19,9 +19,6 @@ class DockerTarget(BaseTarget):
     def name(self):
         return "docker"
 
-    def detect(self, dir_path):
-        return os.path.exists(os.path.join(dir_path, "Dockerfile"))
-
     def read_name(self, dir_path, ctx):
         """Return image name from config or directory name."""
         config = ctx.config

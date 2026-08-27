@@ -56,12 +56,6 @@ class ZigTarget(BaseTarget):
     def name(self):
         return "zig"
 
-    def detect(self, dir_path):
-        """Return True if build.zig.zon exists, or build.zig as secondary."""
-        if os.path.exists(os.path.join(dir_path, ZON_FILE)):
-            return True
-        return os.path.exists(os.path.join(dir_path, BUILD_ZIG_FILE))
-
     def read_version(self, dir_path):
         """Read version, delegating to zig_version helpers."""
         return read_zig_version(dir_path)

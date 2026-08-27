@@ -1,5 +1,6 @@
 """Plain release target for projects with no build system, using a VERSION file for version tracking with tagging and GitHub Releases only."""
 
+import functools
 import os
 
 import tomlkit
@@ -9,29 +10,37 @@ from .. import effects
 
 VERSION_FILE = "VERSION"
 
-# Primary manifest files for all other targets. If any of these exist,
-# the directory belongs to a more specific target and plain should not
-# auto-detect.
-_OTHER_TARGET_MANIFESTS = (
-    "package.json",        # npm
-    "pyproject.toml",      # pypi
-    "go.mod",              # go
-    "Cargo.toml",          # cargo
-    "pubspec.yaml",        # dart, flutter
-    "Package.swift",       # swift, swift-apple
-    "mix.exs",             # hex
-    "deno.json",           # deno
-    "deno.jsonc",          # deno
-    "Dockerfile",          # docker
-    "build.gradle.kts",    # maven
-    "build.gradle",        # maven
-    "pom.xml",             # maven
-    "build.zig.zon",       # zig
-    "build.zig",           # zig
-    "pgdesign.toml",       # pgdesign
-    "selfdoc.json",        # docs
-    "version.json",        # spec
-)
+# Manifest files that belong to no CURRENTLY REGISTERED target but still mean
+# "some other build system owns this directory". Retired targets leave their
+# manifests behind in real projects, so plain must keep standing off them.
+#
+# Everything else in the stand-off set is derived from the registry -- see
+# ``_foreign_manifests`` -- so adding a target automatically teaches plain to
+# stay out of its way. Only genuinely target-less manifests are listed here.
+_EXTRA_FOREIGN_MANIFESTS = frozenset({
+    "Cargo.toml",     # the retired cargo target
+    "selfdoc.json",   # the retired docs target
+})
+
+
+@functools.lru_cache(maxsize=1)
+def _foreign_manifests():
+    """Every manifest filename that means "a target other than plain owns this".
+
+    Derived by unioning every registered target's ``detection_files`` with the
+    declared extras, minus plain's own (plain declares none: ``VERSION`` is far
+    too generic to auto-detect on).
+
+    Imported lazily because the registry instantiates ``PlainTarget``.
+    """
+    from . import TARGETS
+
+    names = set(_EXTRA_FOREIGN_MANIFESTS)
+    for name, target in TARGETS.items():
+        if name == "plain":
+            continue
+        names.update(target.detection_files)
+    return frozenset(names)
 
 
 class PlainTarget(BaseTarget):
@@ -53,7 +62,7 @@ class PlainTarget(BaseTarget):
         # primary manifest is present.
         if not os.path.exists(os.path.join(dir_path, VERSION_FILE)):
             return False
-        for manifest in _OTHER_TARGET_MANIFESTS:
+        for manifest in _foreign_manifests():
             if os.path.exists(os.path.join(dir_path, manifest)):
                 return False
         return True

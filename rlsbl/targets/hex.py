@@ -20,9 +20,6 @@ class HexTarget(BaseTarget):
     def name(self):
         return "hex"
 
-    def detect(self, dir_path):
-        return os.path.exists(os.path.join(dir_path, "mix.exs"))
-
     def read_name(self, dir_path, ctx):
         """Extract app name from mix.exs."""
         mix_path = os.path.join(dir_path, "mix.exs")
