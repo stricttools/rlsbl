@@ -20,8 +20,6 @@ carries only genuinely planned mutations.
 import json
 import subprocess
 
-import pytest
-
 import rlsbl
 from rlsbl.workspace import WORKSPACE_DIR, save_workspace
 
