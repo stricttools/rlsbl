@@ -242,7 +242,7 @@ requires-dist = [
     { name = "ruamel-yaml", specifier = ">=0.19.1" },
     { name = "selfdoc-core", marker = "python_full_version >= '3.12' and extra == 'docs'", specifier = ">=0.1.1" },
     { name = "strictcli", specifier = ">=0.41.0" },
-    { name = "strictspec", specifier = ">=0.2.1" },
+    { name = "strictspec", specifier = ">=0.2.3" },
     { name = "tomlkit", specifier = ">=0.12" },
     { name = "tree-sitter", specifier = ">=0.24" },
     { name = "tree-sitter-go", specifier = ">=0.23" },
