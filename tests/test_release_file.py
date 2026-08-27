@@ -11,6 +11,7 @@ from rlsbl.release_file import (
     VALID_BUMP_TYPES,
     VALID_PREIDS,
     get_release_file_path,
+    read_batch_release_file,
     read_release_file,
     unfinalize_release_file,
 )
@@ -76,6 +77,57 @@ class TestReadReleaseFileValid:
             f.write_text(f'format_version = 1\nbump = "{bump}"\ninclude = []\nexclude = []\ndescription = "test release"\n')
             cfg = read_release_file(str(f))
             assert cfg.bump == bump
+
+
+class TestReleaseFileErrorsNameTheFile:
+    """Every read failure says WHICH release file failed.
+
+    A diagnostic naming only the field ("missing required field: bump") is
+    unactionable in a workspace holding one editable release file per
+    releasable plus one archive per released version -- and the reader always
+    has the path in hand.
+    """
+
+    def test_schema_diagnostic_names_the_file(self, tmp_path):
+        f = tmp_path / "unreleased.toml"
+        f.write_text('format_version = 1\ninclude = ["pypi"]\nexclude = []\n')
+        with pytest.raises(ReleaseFileError) as exc:
+            read_release_file(str(f))
+        assert str(f) in str(exc.value)
+        assert "bump" in str(exc.value), "the diagnostic itself survives"
+
+    def test_toml_syntax_error_names_the_file(self, tmp_path):
+        f = tmp_path / "unreleased.toml"
+        f.write_text("bump = [broken\n")
+        with pytest.raises(ReleaseFileError) as exc:
+            read_release_file(str(f))
+        assert str(f) in str(exc.value)
+
+    def test_native_refinement_names_the_file(self, tmp_path):
+        # Not a strictspec diagnostic: the whitespace-only description is a
+        # consumer-native refusal, and it must name the file too.
+        f = tmp_path / "unreleased.toml"
+        f.write_text(
+            'format_version = 1\nbump = "patch"\ninclude = []\nexclude = []\n'
+            'description = "   "\n'
+        )
+        with pytest.raises(ReleaseFileError) as exc:
+            read_release_file(str(f))
+        assert str(f) in str(exc.value)
+
+    def test_batch_release_file_errors_name_the_file(self, tmp_path):
+        f = tmp_path / "unreleased.toml"
+        f.write_text('[packages.alpha]\nbump = "patch"\n')
+        with pytest.raises(ReleaseFileError) as exc:
+            read_batch_release_file(str(f))
+        assert str(f) in str(exc.value)
+
+    def test_the_file_is_named_once_not_per_layer(self, tmp_path):
+        f = tmp_path / "unreleased.toml"
+        f.write_text('format_version = 1\ninclude = ["pypi"]\nexclude = []\n')
+        with pytest.raises(ReleaseFileError) as exc:
+            read_release_file(str(f))
+        assert str(exc.value).count(str(f)) == 1
 
 
 class TestReadReleaseFileErrors:

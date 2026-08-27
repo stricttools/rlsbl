@@ -431,6 +431,29 @@ class TestCmdReleaseInvalidFile:
         captured = capsys.readouterr()
         assert "Error in release file" in captured.err
 
+    def test_the_error_names_the_release_file(self, tmp_project, capsys):
+        """The operator is told WHICH file to fix, not just what is wrong."""
+        (tmp_project / ".rlsbl").mkdir()
+        releases_dir = tmp_project / ".rlsbl" / "releases"
+        releases_dir.mkdir()
+        release_path = releases_dir / "unreleased.toml"
+        release_path.write_text(
+            'format_version = 1\nbump = "huge"\ninclude = ["npm"]\n'
+            'exclude = []\ndescription = "x"\n'
+        )
+
+        from rlsbl import cmd_release_run
+
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, bump="", description="", push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, preid="", releasable=None)
+
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert str(release_path) in err or os.path.join(
+            ".rlsbl", "releases", "unreleased.toml"
+        ) in err, err
+        assert "bump" in err, "the diagnostic itself survives"
+
 
 # ---------------------------------------------------------------------------
 # ReleaseConfig signature tests

@@ -5,6 +5,7 @@ Instead of passing bump type on the CLI, the user creates
 This module reads and validates that file's internal consistency.
 """
 
+import contextlib
 import os
 import re
 import sys
@@ -411,6 +412,22 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
     )
 
 
+@contextlib.contextmanager
+def _errors_name(path: str):
+    """Name *path* in every release-file error raised inside the block.
+
+    A diagnostic that says which FIELD failed but not which FILE is
+    unactionable: a workspace holds one editable release file per releasable
+    plus one archive per released version, and the reader always has the path
+    in hand. The prefix is applied once, at the read boundary, so no raising
+    site has to repeat it and no message carries it twice.
+    """
+    try:
+        yield
+    except ReleaseFileError as exc:
+        raise ReleaseFileError(f"{path}: {exc}") from exc
+
+
 def read_release_file(path: str) -> ReleaseConfig:
     """Read and validate a single-project release TOML file.
 
@@ -421,14 +438,15 @@ def read_release_file(path: str) -> ReleaseConfig:
     path -- their document shape is different and not yet strictspec-modeled.
 
     Raises FileNotFoundError if the file doesn't exist.
-    Raises ReleaseFileError for schema/validation failures.
+    Raises ReleaseFileError, naming *path*, for schema/validation failures.
     """
     with open(path, "rb") as f:
         raw = f.read()
 
-    _strictspec_validate_release_document(raw)
-    data = tomlkit.loads(raw.decode("utf-8"))
-    return _bind_release_config(data)
+    with _errors_name(path):
+        _strictspec_validate_release_document(raw)
+        data = tomlkit.loads(raw.decode("utf-8"))
+        return _bind_release_config(data)
 
 
 def write_archived_release_file(
@@ -678,11 +696,17 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
     exclude, optional targets, description, context).
 
     Raises FileNotFoundError if the file doesn't exist.
-    Raises ReleaseFileError for schema/validation failures.
+    Raises ReleaseFileError, naming *path*, for schema/validation failures.
     """
     with open(path, "r", encoding="utf-8") as f:
         data = tomlkit.load(f)
 
+    with _errors_name(path):
+        return _bind_batch_release_config(data)
+
+
+def _bind_batch_release_config(data) -> BatchReleaseConfig:
+    """Validate a parsed batch release document and build its config."""
     has_packages = "packages" in data
     has_releasables = "releasables" in data
 
