@@ -90,7 +90,8 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
     ),
     TargetAxis(
         "version_file",
-        "File that holds the version, or null when the target inherits one.",
+        "File that holds the version, or null when the filename is "
+        "per-project and cannot be stated statically.",
         lambda t: t.version_file(),
     ),
     TargetAxis(

@@ -50,7 +50,7 @@ When multiple targets could match the same manifest file (e.g., a project with b
 
 ## Detection files
 
-Each target class declares a `detection_files` ClassVar listing the filenames whose presence triggers detection; the `Detection files` column of the table above is that declaration, rendered. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. A target whose column is blank decides by file *content* instead — flutter and dart share `pubspec.yaml`, native-android and maven share the Gradle files, native-ios scans for an `.xcodeproj`, and `plain` yields to every other target's manifest.
+Each target class declares a `detection_files` ClassVar listing the filenames whose presence triggers detection; the `Detection files` column of the table above is that declaration, rendered. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. A target whose column is blank either decides by file *content* (native-android shares the Gradle files with maven and inspects them; native-ios scans for an `.xcodeproj`) or never auto-detects at all (swift-apple is selected only by explicit declaration). Shared manifests are disambiguated by content and annotated in the rendered column — flutter and dart share `pubspec.yaml`, and `plain` yields to every other target's manifest.
 
 ## The ReleaseTarget protocol
 

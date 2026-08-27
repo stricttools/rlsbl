@@ -281,7 +281,12 @@ class TestFreshnessCheck:
 
 
 class TestFourPlaceRegistration:
-    """A new check is registered in four places; none of them may be missed."""
+    """A new check is registered in four places; none of them may be missed.
+
+    A fifth place exists outside this class's reach: the EXPECTED_CHECKS
+    roster in tests/test_doctor_checks_migration.py, whose equality test
+    fails loudly when a check lands in checks.toml without joining it.
+    """
 
     def test_it_is_in_the_checks_metadata_registry(self):
         import tomllib

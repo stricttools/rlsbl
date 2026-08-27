@@ -36,8 +36,10 @@ These functions build intra-package import graphs by resolving each import state
 
 ```python
 class ImportScanner(Protocol):
-    def scan_imports(self, project_path: str) -> set[tuple[str, str, int]]:
-        """Returns (package_name, file_path, line_number) tuples."""
+    def scan_imports(self, project_path: str) -> set[tuple[str, str, int, bool]]:
+        """Returns (package_name, file_path, line_number, guarded) tuples.
+
+        Guarded imports are those inside try/except ImportError blocks."""
 ```
 
 This is the interface that low-level AST linters implement. The workspace-level scanners (above) consume this output and post-process it.
