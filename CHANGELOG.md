@@ -12,6 +12,7 @@
 - **`rlsbl release run` at a monorepo workspace root now requires `--releasable <name>`.** The root directory names the whole workspace rather than one releasable, so the invocation has to say which one; without the flag the command errors and lists the declared releasables. Running inside a member directory is unchanged, and passing the flag there (or in a standalone repository) is refused rather than ignored.
 - **The workspace `watch` key is gone from every surface.** `rlsbl monorepo add --watch` no longer exists, `rlsbl monorepo status` no longer renders a Watch column, and every error message and doc page that told you to adjust watch patterns now points at the derived `filters:` block instead. The loader still refuses a workspace that carries the key, naming the member and the line to delete.
 - **Workspace member paths must be unique.** The loader refuses a workspace whose members claim the same path (including two spellings of one path, and two root members) instead of letting declaration order decide which member owns a file.
+- **`rlsbl monorepo extract` is one command over the releasable, and it completes the move.** `monorepo extract-releasable` is gone and `monorepo extract` now takes a releasable name instead of a package name -- a releasable is the portable unit, since it owns the version, changelog, release archives and tag scheme a package alone does not. The conversion now verifies each member's tree object survives the history filter, transplants the releasable's whole release state (remapping the release anchors and changelog hashes onto the rewritten commits), keeps one boundary alias tag at the current version, writes a lineage record explaining the conversion, and removes the departed members and their state from the source in one commit. It previews the entire plan under `--dry-run` and refuses -- before writing anything -- a mirrored releasable, one owning the root member, an inbound dependency (naming the `rlsbl rewrite` command that severs it), and a missing saferm unless `--delete-with-rm` is passed. Being destructive to the repository you are standing in, it now asks for confirmation.
 
 ### Features
 
@@ -2532,6 +2533,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.53.0
 
+Renames the `internal` workspace flag to `changelog_exempt` so the name describes the behavior it produces, and gives dependency edges a scope (runtime, dev, peer, explicit) that the reverse graph can filter on.
+
 ### Breaking
 
 - **Breaking.** Renamed `internal` workspace flag to `changelog_exempt`. The new name describes the behavior (changelog enforcement exemption), preventing misuse.
@@ -2541,6 +2544,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Internal.** Added `scope` field to Dependency namedtuple (runtime/dev/peer/explicit). Reverse dependency graph now supports scope-filtered traversal.
 
 ## 0.52.0
+
+Adds the `internal = true` workspace flag exempting a project from changelog enforcement, teaches `deps-unused` to read JS/TS imports via tree-sitter, and fixes Go cmd-layout projects being misdetected as libraries.
 
 ### Breaking
 
@@ -2558,6 +2563,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.51.0
 
+`ProjectContext` becomes the single context object: the separate check context is deleted, every target method takes the context, and `monorepo_root` is renamed `workspace_root`.
+
 ### Breaking
 
 - **Breaking.** Renamed `monorepo_root` to `workspace_root` on `ProjectContext`. Deleted `ProjectCheckContext` — all check functions now receive `ProjectContext` with pre-loaded config.
@@ -2568,6 +2575,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Internal.** Added `[tool.uv.sources]` for editable strictcli install.
 
 ## 0.50.0
+
+Config helpers and every target's `publish()` take the already-loaded config and context instead of a project root, removing redundant disk reads during publish.
 
 ### Breaking
 
@@ -2580,6 +2589,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Internal.** Added regression test for release abort cleanup (unexpected-files scenario).
 
 ## 0.49.2
+
+Raises the npm name-check timeout to reduce CI flakiness, makes changelog finalization use git-relative paths consistently, and adds release integration tests that run against real git repositories rather than mocked subprocesses.
 
 ### Features
 
@@ -2594,11 +2605,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.49.1
 
+Monorepo release commits name their version-bumped files by the correct relative paths.
+
 ### Fixes
 
 - **Fix.** Monorepo release commits now use correct relative paths for version-bumped files.
 
 ## 0.49.0
+
+Commands receive a `ProjectContext` carrying config read once at startup, instead of a bare project root re-read from disk at every call.
 
 ### Breaking
 
@@ -2611,17 +2626,23 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.48.2
 
+Lockfile changes made by the version bump are no longer mistaken for a concurrent modification during the release.
+
 ### Fixes
 
 - **Fix.** Lockfile modifications from version bump no longer falsely flagged as concurrent changes during release.
 
 ## 0.48.1
 
+Fixes a `rlsbl scaffold` crash on Go, Zig and Docker projects caused by a missing `project_root` argument.
+
 ### Fixes
 
 - **Fix.** `rlsbl scaffold` no longer crashes for Go, Zig, and Docker projects (missing `project_root` argument in `template_vars`/`shared_template_mappings`).
 
 ## 0.48.0
+
+Every internal API takes an explicit `project_root` instead of falling back to the current directory, and an aborted release reverts its version-bumped files instead of leaving the working tree dirty.
 
 ### Breaking
 
@@ -2634,6 +2655,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Fix.** Release lock file is now created relative to the project root, not CWD.
 
 ## 0.47.0
+
+`release init` and `release retry` scaffold empty fields that must be filled in deliberately, `watch` gains `--run-id`, the monorepo CI sync is rewritten around structured YAML with per-job `working-directory`, and `status` and `unreleased` scope their commits to the current project.
 
 ### Breaking
 
@@ -2654,11 +2677,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.46.0
 
+The `--update` flag is removed. Bare `rlsbl scaffold` is idempotent: it creates what is missing and three-way merges what already exists, so it is safe to run at any time.
+
 ### Breaking
 
 - **Breaking.** `--update` flag removed from `scaffold`. Bare `rlsbl scaffold` is now idempotent — creates what's missing, three-way merges what exists. Run it anytime.
 
 ## 0.45.1
+
+Scaffold fixes: non-workflow files come from every detected target, npm targets resolve their own subdirectory, and the template engine gains an escape for literal braces.
 
 ### Fixes
 
@@ -2668,6 +2695,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Docs.** `release retry` help text updated to describe dispatch-only behavior.
 
 ## 0.45.0
+
+Directory scoping and target-specific tag patterns now apply consistently to monorepo changelog validation during a release, and `push_timeout` must be set explicitly instead of falling back to an implicit 120 seconds.
 
 ### Breaking
 
@@ -2684,11 +2713,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.44.0
 
+`release retry` becomes dispatch-only: it no longer deletes and re-creates the GitHub Release or re-uploads assets.
+
 ### Breaking
 
 - **Breaking.** `release retry` is now dispatch-only. It no longer deletes/re-creates the GitHub Release or re-uploads assets. It dispatches workflows from `retry.toml` via `gh workflow run`. Schema simplified to 3 fields: `version`, `dispatch`, `ref`.
 
 ## 0.43.1
+
+`release retry` always dispatches every workflow listed in retry.toml rather than only as a fallback, and npm targets get a scaffolded `.npmignore`.
 
 ### Features
 
@@ -2699,6 +2732,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Bug fix.** `release retry` now always dispatches all workflows listed in `retry.toml`, not just as a fallback when no runs are found. Fixes CI never being re-triggered when Publish triggers naturally.
 
 ## 0.43.0
+
+`edit-release`, `undo` and `yank` become subcommands of the `release` group, `release retry` becomes file-driven via retry.toml, and monorepo changelog coverage narrows to the commits touching the package's own files.
 
 ### Breaking
 
@@ -2719,6 +2754,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.42.0
 
+`rlsbl release` becomes a command group (`run`, `init`, `retry`), `run` requires an explicit `--watch`/`--no-watch`, every generated workflow gains a `workflow_dispatch` trigger, and a `pgdesign` target ships for database schema projects.
+
 ### Breaking
 
 - **Breaking.** `rlsbl release` is now a command group. Use `rlsbl release run` (was `rlsbl release`), `rlsbl release init` (was `rlsbl release-init`), and the new `rlsbl release retry`.
@@ -2737,6 +2774,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.41.7
 
+A release with no user-facing changelog entries is blocked, `changelog add` and `changelog amend` detect duplicate commits, and the docs target keeps selfdoc.json's `versions` array in sync.
+
 ### Features
 
 - **New feature.** Releases are now blocked when there are no user-facing changelog entries. Shown as a warning during `rlsbl check`, hard error during `rlsbl release`.
@@ -2748,6 +2787,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.41.6
 
+`selfdoc gen` runs before `selfdoc check` during a release, so the docs are regenerated from source before they are validated, and a check failure prints a clean error instead of a traceback.
+
 ### Features
 
 - **New feature.** Run `selfdoc gen --no-commit` before `selfdoc check` during release, ensuring docs are regenerated from source before validation.
@@ -2758,11 +2799,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.41.5
 
+npm moniker collision detection covers separator-free names, so `check-name` stops reporting a name as available when npm considers it identical to one that already exists.
+
 ### Fixes
 
 - **Fix.** Detect npm moniker collisions for separator-free names. Previously, `check-name pgspec --target npm` reported "available" even though `pg-spec` exists and npm considers them identical. Now generates insertion variants (inserting `-`, `.`, `_` at every position) and checks each. Also fixed dot separator handling -- dots are now treated identically to dashes and underscores, matching npm's actual normalization.
 
 ## 0.41.4
+
+Selfdoc content hashes are refreshed after the version bump, so a release no longer leaves the working tree dirty.
 
 ### Fixes
 
@@ -2770,17 +2815,23 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.41.3
 
+The docs target becomes versioned: it reads and writes its version from selfdoc.json and takes part in the version-consistency check instead of being skipped.
+
 ### Features
 
 - **DocsTarget is now a versioned target.** Reads and writes version from `selfdoc.json`. The `version-consistency` check now includes docs targets instead of skipping them.
 
 ## 0.41.2
 
+Go asset builds use goreleaser for cross-compilation when it is installed, falling back to a host-only `go build` when it is not.
+
 ### Features
 
 - **Go assets use goreleaser for cross-compilation.** When goreleaser is installed, `build_assets()` produces binaries for linux/darwin/windows x amd64/arm64. Falls back to host-only `go build` when goreleaser is unavailable.
 
 ## 0.41.1
+
+Adds release-time validation of the publish config and a `config-schema` check, and stops `library-lint` from firing on projects that are not libraries.
 
 ### Breaking
 
@@ -2795,6 +2846,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Fix: `library-lint` check skips non-library projects.** Standalone projects no longer produce 523 spurious lint errors in `rlsbl check --all`.
 
 ## 0.41.0
+
+The `private` config key becomes required with no implicit default, asset building and upload become built-in release steps configured per target, and `changelog amend` arrives for editing a released version's JSONL.
 
 ### Breaking
 
@@ -2819,11 +2872,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.40.1
 
+Updates the CI workflow for the `check` to `check-name` rename.
+
 ### Fixes
 
 - **Fix.** CI workflow updated for the `check` to `check-name` rename.
 
 ## 0.40.0
+
+Tests, lint and the remote check always run -- the `--skip-*` flags are gone -- and README.md and CLAUDE.md become selfdoc-generated from templates under `docs/`.
 
 ### Breaking
 
@@ -2834,6 +2891,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **selfdoc root file templates.** README.md and CLAUDE.md are now auto-generated by selfdoc from `docs/_README.md` and `docs/_CLAUDE.md` templates. Edit the templates, not the generated files.
 
 ## 0.39.0
+
+File-based releases: bump type and target selection move from CLI arguments into `.rlsbl/releases/unreleased.toml`. A unified `check` framework replaces `doctor`, `monorepo lint` and `changelog validate`; Dart and Flutter targets arrive alongside `monorepo graph`, `snapshot` and `impact`, architectural layer rules, dependency-import validation, and coordinated multi-package releases.
 
 ### Breaking
 
