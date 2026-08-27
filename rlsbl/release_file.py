@@ -47,6 +47,65 @@ UNANCHORABLE_FIELD = "unanchorable"
 # reject.
 _GIT_OBJECT_HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
 
+# The archive filename: ``v{X.Y.Z}.toml``, optionally with a pre-release
+# suffix. Strict, and anchored on both ends, so nothing else that happens to
+# live in a releases directory (``unreleased.toml``, ``in-progress.json``, a
+# batch plan sidecar) can be mistaken for a released version.
+_ARCHIVE_NAME_RE = re.compile(
+    r"^v(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?\.toml$"
+)
+
+# Pre-release channel ranks, for ordering archives. A stable version sorts
+# after every pre-release of the same base -- the same ordering the changelog
+# file lister uses.
+_PREID_RANK = {"alpha": 0, "beta": 1, "rc": 2}
+
+
+def archived_release_path(releases_dir: str, version: str) -> str:
+    """Return the archive path for *version* -- ``<releases_dir>/v{version}.toml``.
+
+    The one place the archive filename is spelled; the writer, the reader and
+    the ledger all go through it.
+    """
+    return os.path.join(releases_dir, f"v{version}.toml")
+
+
+def _archive_sort_key(name: str):
+    """Sort key for an archive filename, or None when it is not one."""
+    m = _ARCHIVE_NAME_RE.match(name)
+    if not m:
+        return None
+    major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    preid = m.group(4)
+    if preid is None:
+        return (major, minor, patch, 1, 0, 0)
+    return (major, minor, patch, 0, _PREID_RANK[preid], int(m.group(5)))
+
+
+def list_archived_versions(releases_dir: str) -> list[str]:
+    """List the versions archived in *releases_dir*, HIGHEST FIRST.
+
+    A pure filename scan: no archive is opened, so enumerating a repository's
+    whole release history costs one ``listdir``. This is deliberate -- the
+    ledger reads archives lazily, walking this list from the top and opening
+    only the ones it actually has to answer with.
+
+    A missing or unreadable directory yields an empty list: "no releases are
+    recorded here" is a real state (a project before its first release), not
+    an error. Errors belong to the callers that READ an entry, not to the scan.
+    """
+    try:
+        names = os.listdir(releases_dir)
+    except OSError:
+        return []
+    keyed = []
+    for name in names:
+        key = _archive_sort_key(name)
+        if key is not None:
+            keyed.append((key, name[1:-len(".toml")]))
+    keyed.sort(key=lambda pair: pair[0], reverse=True)
+    return [version for _key, version in keyed]
+
 
 # Project identification: "slug" is the machine identifier (URL-safe, lowercase,
 # hyphens) used in config keys and paths; "name" is the human-readable display
@@ -547,7 +606,7 @@ def write_archived_release_file(
         doc.add("tree_hashes", _anchor_tree_table(tree_hashes))
 
     effects.makedirs(releases_dir, exist_ok=True)
-    path = os.path.join(releases_dir, f"v{version}.toml")
+    path = archived_release_path(releases_dir, version)
     # file_mode, not a write-then-chmod: the archive is immutable from the
     # instant it exists, exactly like the renamed-and-chmodded standalone one.
     effects.atomic_write_text(path, tomlkit.dumps(doc), file_mode=0o444)
