@@ -1,9 +1,13 @@
 """The one ancestry implementation, and how every caller maps its outcomes.
 
 ``git merge-base --is-ancestor`` has three answers, not two: yes (exit 0), no
-(exit 1) and "I cannot tell" (exit 128 -- a missing object, a truncated
-history, a broken object store).  :func:`rlsbl.git_util.ancestry` returns all
-three, and each caller declares what INDETERMINABLE means for it:
+(exit 1) and "I cannot tell" (exit 128 -- a missing object, a broken object
+store).  Exit 1 is not always an honest "no" either: in a SHALLOW repository
+the walk stops at the graft boundary, so a commit whose connecting history was
+never downloaded gets the same exit 1 as a genuinely unrelated one.
+:func:`rlsbl.git_util.ancestry` therefore reports INDETERMINABLE for exit 1 in
+a shallow repository and FALSE for exit 1 in a full one, and each caller
+declares what INDETERMINABLE means for it:
 
 ============================================  ==============================
 caller                                        INDETERMINABLE maps to
@@ -100,6 +104,63 @@ class TestAncestryFunction:
             ancestry(missing, second, cwd=str(tmp_path / "repo"))
             is Ancestry.INDETERMINABLE
         )
+
+    def test_shallow_history_is_indeterminable_not_false(self, tmp_path):
+        """Exit 1 in a shallow repo is "cannot tell", not "checked, and no".
+
+        Both commits are present -- two ``--depth 1`` fetches put them there --
+        but the chain connecting them was never downloaded, so the walk from
+        the descendant hits the graft boundary and git reports exit 1: the
+        same answer it gives for a genuinely unrelated commit.  Reading that
+        as FALSE is how a truncated history turns into a confident wrong
+        decision, which is the exact failure this enum exists to prevent.
+        """
+        origin = tmp_path / "origin"
+        origin.mkdir()
+        _git(origin, "init", "-q", "-b", "main")
+        _git(origin, "config", "user.email", "t@t.local")
+        _git(origin, "config", "user.name", "Test")
+        _git(origin, "config", "commit.gpgsign", "false")
+        for i in ("one", "two", "three"):
+            (origin / "f.txt").write_text(i + "\n")
+            _git(origin, "add", "-A")
+            _git(origin, "commit", "-q", "-m", i)
+        oldest = _git(origin, "rev-parse", "HEAD~2")
+        newest = _git(origin, "rev-parse", "HEAD")
+        _git(origin, "branch", "oldest", oldest)
+
+        shallow = tmp_path / "shallow"
+        shallow.mkdir()
+        _git(shallow, "init", "-q", "-b", "main")
+        _git(shallow, "remote", "add", "origin", str(origin))
+        _git(shallow, "fetch", "-q", "--depth", "1", "origin",
+             "oldest:refs/remotes/origin/oldest")
+        _git(shallow, "fetch", "-q", "--depth", "1", "origin",
+             "main:refs/remotes/origin/main")
+
+        assert _git(shallow, "rev-parse", "--is-shallow-repository") == "true"
+        # Both objects really are here; only the chain between them is gone.
+        _git(shallow, "cat-file", "-e", oldest)
+        _git(shallow, "cat-file", "-e", newest)
+        assert (
+            subprocess.run(
+                ["git", "merge-base", "--is-ancestor", oldest, newest],
+                cwd=str(shallow), capture_output=True,
+            ).returncode == 1
+        ), "the reproduction is stale: git no longer answers exit 1 here"
+
+        assert (
+            ancestry(oldest, newest, cwd=str(shallow)) is Ancestry.INDETERMINABLE
+        )
+
+    def test_exit_code_1_in_a_full_repo_stays_false(self, tmp_path):
+        """The shallow probe must not turn every honest 'no' into a shrug."""
+        first, second = _repo_with_two_commits(tmp_path / "repo")
+        assert (
+            _git(tmp_path / "repo", "rev-parse", "--is-shallow-repository")
+            == "false"
+        )
+        assert ancestry(second, first, cwd=str(tmp_path / "repo")) is Ancestry.FALSE
 
     def test_exit_code_128_is_indeterminable(self, monkeypatch):
         monkeypatch.setattr(git_util.effects, "run", _FakeRun(128))

@@ -23,11 +23,26 @@ class Ancestry(enum.Enum):
 
     ``git merge-base --is-ancestor`` answers with three exit codes, not two:
     0 means yes, 1 means no, and anything else (128, typically) means git could
-    not answer -- an object the repository does not have, a shallow clone whose
-    history is truncated, a broken object store.  Collapsing that third case
-    into ``False`` makes "we do not know" indistinguishable from "we checked,
-    and no", which is how a truncated history quietly turns into a wrong
-    decision.  Every caller maps :attr:`INDETERMINABLE` explicitly.
+    not answer -- an object the repository does not have, a broken object
+    store.  Collapsing that third case into ``False`` makes "we do not know"
+    indistinguishable from "we checked, and no", which is how a truncated
+    history quietly turns into a wrong decision.
+
+    Exit 1 is not always an honest "no" either, which is why :func:`ancestry`
+    does more than translate exit codes.  In a SHALLOW repository the walk
+    from the descendant stops at the graft boundary, so a commit whose
+    connecting history was never downloaded gets exit 1 -- the same answer
+    git gives for a genuinely unrelated commit, for a question it cannot
+    answer.  Two ``--depth 1`` fetches into one repository reproduce it with
+    both commits present.  :func:`ancestry` therefore reports
+    :attr:`INDETERMINABLE` for exit 1 in a shallow repository, and keeps
+    :attr:`FALSE` for exit 1 in a full one.
+
+    Each caller decides what :attr:`INDETERMINABLE` means for it, and records
+    the decision where the call is: the mirror reconciler and the release's
+    recorded-candidate check branch on it separately from FALSE; the changelog
+    validation cache and ``release resume`` fold it into the same fail-safe
+    branch FALSE takes (recompute; refuse).
     """
 
     TRUE = "true"
@@ -47,6 +62,20 @@ def ancestry(
     A commit is its own ancestor, as git has it.  Never raises: a timeout or a
     missing git binary is :attr:`Ancestry.INDETERMINABLE`, same as git's own
     "I cannot answer" exit code.
+
+    Exact semantics, exit code by exit code:
+
+    * **0** -> :attr:`Ancestry.TRUE`.
+    * **1** -> :attr:`Ancestry.FALSE` in a full repository;
+      :attr:`Ancestry.INDETERMINABLE` when the repository is shallow, because
+      the walk stops at the graft boundary and git answers "no" to a question
+      it could not follow to the end.
+    * **anything else** (128, typically) -> :attr:`Ancestry.INDETERMINABLE`.
+
+    The shallowness probe is itself a read that can fail (no repository at
+    *cwd*, an ancient git).  An unreadable answer is taken as "not shallow",
+    which keeps an ordinary "no" ordinary: a *cwd* that is no repository at
+    all would have made ``merge-base`` exit 128 in the first place.
 
     Lives here rather than in a command handler because strictcli's
     effects-bypass lint reads a handler's own body: a ``ctx.effects`` call made
@@ -68,8 +97,27 @@ def ancestry(
     if result.returncode == 0:
         return Ancestry.TRUE
     if result.returncode == 1:
+        if _is_shallow(cwd, timeout=timeout):
+            return Ancestry.INDETERMINABLE
         return Ancestry.FALSE
     return Ancestry.INDETERMINABLE
+
+
+def _is_shallow(cwd: str | None, *, timeout: int | None) -> bool:
+    """Is the repository at *cwd* shallow?  False when the probe cannot say."""
+    try:
+        result = effects.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return False
+    if result.returncode != 0:
+        return False
+    return result.stdout.strip() == "true"
 
 
 def get_commit_files(sha):
