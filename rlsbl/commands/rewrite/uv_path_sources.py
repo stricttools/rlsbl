@@ -9,7 +9,9 @@ registry constraint floored at the version the lock already resolves:
   (``dep @ file:///...``) replaced by ``dep>=<locked version>``;
 * the matching ``[tool.uv.sources]`` path/workspace entry is deleted, because
   a source entry left behind keeps overriding the constraint that was just
-  written;
+  written.  A source declared as a LIST of marker-gated tables is PRUNED
+  instead: only its path/workspace elements go, so an ``index`` sibling
+  covering the platforms the checkout does not is left standing;
 * ``.rlsbl/config.json``'s ``internal_dep_floors`` gains every converted name,
   so rlsbl's ``dep-floors`` preflight check starts policing the floor it just
   created (the key is created when absent).

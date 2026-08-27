@@ -210,22 +210,43 @@ def detect_uv_path_sources(doc):
     for package, spec in sources.items():
         entries = spec if isinstance(spec, list) else [spec]
         for entry in entries:
-            if not hasattr(entry, "get"):
-                continue
-            if "path" in entry:
-                found[str(package)] = "path"
-                break
-            if entry.get("workspace"):
-                found[str(package)] = "workspace"
+            kind = _source_kind(entry)
+            if kind is not None:
+                found[str(package)] = kind
                 break
     return found
 
 
-def remove_uv_sources(doc, names):
-    """Delete ``[tool.uv.sources]`` entries for *names*.  Returns the count.
+def _source_kind(entry):
+    """``"path"``, ``"workspace"`` or None for one ``[tool.uv.sources]`` entry."""
+    if not hasattr(entry, "get"):
+        return None
+    if "path" in entry:
+        return "path"
+    if entry.get("workspace"):
+        return "workspace"
+    return None
 
-    An emptied ``sources`` table is removed too (and an emptied ``[tool.uv]``
-    with it), so the rewrite does not leave a header for nothing.
+
+def remove_uv_sources(doc, names):
+    """Remove the path/workspace sources for *names*.  Returns the count.
+
+    A source declared as a LIST of marker-gated tables is pruned rather than
+    deleted: only its path/workspace elements go, and a non-path sibling (an
+    ``index`` variant for the platforms the checkout does not cover, say)
+    stays.  Deleting the whole key would drop a declaration the caller never
+    asked about and that nothing else restores.  A list left with exactly one
+    element stays a list -- uv reads it identically, and collapsing it would
+    rewrite formatting this function was not asked to touch.
+
+    A list whose every element is a path/workspace source is removed entirely,
+    like a plain table.  An emptied ``sources`` table is removed too (and an
+    emptied ``[tool.uv]`` with it), so the rewrite does not leave a header for
+    nothing.
+
+    The count is per NAME, not per element: it answers "how many of the names
+    I asked about were sourced from a checkout", which is what both callers
+    compare against their preview.
     """
     tool = doc.get("tool")
     if tool is None:
@@ -239,9 +260,26 @@ def remove_uv_sources(doc, names):
 
     removed = 0
     for name in names:
-        if name in sources:
+        if name not in sources:
+            continue
+        spec = sources[name]
+        if not isinstance(spec, list):
             del sources[name]
             removed += 1
+            continue
+        # Delete back to front so the surviving indices stay valid.
+        doomed = [
+            i for i, entry in enumerate(spec)
+            if _source_kind(entry) is not None
+        ]
+        if not doomed:
+            continue
+        if len(doomed) == len(spec):
+            del sources[name]
+        else:
+            for i in reversed(doomed):
+                del spec[i]
+        removed += 1
     if removed and len(sources) == 0:
         del uv["sources"]
         if len(uv) == 0:

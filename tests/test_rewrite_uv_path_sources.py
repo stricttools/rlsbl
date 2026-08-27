@@ -140,6 +140,54 @@ class TestSharedPrimitives:
         assert remove_uv_sources(doc, ["core"]) == 1
         assert detect_uv_path_sources(doc) == {"helper": "workspace"}
 
+    def test_a_mixed_list_keeps_its_non_path_element(self):
+        """A marker-gated list loses only its path elements.
+
+        uv accepts a LIST of marker-gated tables for one package. Deleting the
+        whole key because ONE element is a path source silently drops the
+        others -- here, the index the package resolves from everywhere else.
+        """
+        doc = tomlkit.parse(textwrap.dedent("""\
+            [tool.uv.sources]
+            core = [
+                { path = "../core", marker = "sys_platform == 'linux'" },
+                { index = "testpypi", marker = "sys_platform != 'linux'" },
+            ]
+        """))
+        assert remove_uv_sources(doc, ["core"]) == 1
+        assert detect_uv_path_sources(doc) == {}
+        remaining = doc["tool"]["uv"]["sources"]["core"]
+        assert [dict(e) for e in remaining] == [
+            {"index": "testpypi", "marker": "sys_platform != 'linux'"},
+        ]
+
+    def test_a_list_of_only_path_elements_loses_the_whole_key(self):
+        doc = tomlkit.parse(textwrap.dedent("""\
+            [tool.uv.sources]
+            core = [
+                { path = "../core", marker = "sys_platform == 'linux'" },
+                { workspace = true, marker = "sys_platform != 'linux'" },
+            ]
+        """))
+        assert remove_uv_sources(doc, ["core"]) == 1
+        assert "tool" not in tomlkit.dumps(doc)
+
+    def test_an_array_of_tables_keeps_its_non_path_element(self):
+        """The same source declared as [[tool.uv.sources.core]] tables."""
+        doc = tomlkit.parse(textwrap.dedent("""\
+            [[tool.uv.sources.core]]
+            path = "../core"
+            marker = "sys_platform == 'linux'"
+
+            [[tool.uv.sources.core]]
+            index = "testpypi"
+            marker = "sys_platform != 'linux'"
+        """))
+        assert remove_uv_sources(doc, ["core"]) == 1
+        assert detect_uv_path_sources(doc) == {}
+        assert "index" in tomlkit.dumps(doc)
+        assert "../core" not in tomlkit.dumps(doc)
+
     def test_git_and_url_sources_are_not_path_sources(self):
         doc = tomlkit.parse(textwrap.dedent("""\
             [tool.uv.sources]
@@ -375,6 +423,30 @@ class TestApply:
             apply_item(item, root)
         config = json.loads((root / ".rlsbl" / "config.json").read_text())
         assert config["internal_dep_floors"] == ["core", "stricttest"]
+
+    def test_a_mixed_source_list_survives_the_conversion(self, tmp_path):
+        """End to end: the floor is written and the index sibling stays."""
+        root = _project(tmp_path, """\
+            [project]
+            name = "app"
+            dependencies = ["core", "requests>=2.0"]
+
+            [tool.uv.sources]
+            core = [
+                { path = "../core", marker = "sys_platform == 'linux'" },
+                { index = "testpypi", marker = "sys_platform != 'linux'" },
+            ]
+        """, LOCK)
+        for item in observe(root, probe=_published).items:
+            apply_item(item, root)
+
+        doc = tomlkit.parse((root / "pyproject.toml").read_text())
+        assert [str(d) for d in doc["project"]["dependencies"]] == [
+            "core>=1.2.3", "requests>=2.0",
+        ]
+        assert [dict(e) for e in doc["tool"]["uv"]["sources"]["core"]] == [
+            {"index": "testpypi", "marker": "sys_platform != 'linux'"},
+        ]
 
     def test_comments_and_unrelated_content_survive(self, tmp_path):
         root = _project(tmp_path, """\
