@@ -2449,6 +2449,11 @@
         },
         {
           "level": 3,
+          "text": "Releasables section",
+          "anchor": "releasables-section"
+        },
+        {
+          "level": 3,
           "text": "Layers section",
           "anchor": "layers-section"
         },
@@ -2651,6 +2656,16 @@
           "level": 3,
           "text": "`is_root_path`",
           "anchor": "is_root_path"
+        },
+        {
+          "level": 3,
+          "text": "`_declared_paths`",
+          "anchor": "_declared_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_validate_member_paths`",
+          "anchor": "_validate_member_paths"
         },
         {
           "level": 3,
@@ -4232,6 +4247,11 @@
           "level": 3,
           "text": "`_is_manifestless_root_member`",
           "anchor": "_is_manifestless_root_member"
+        },
+        {
+          "level": 3,
+          "text": "`_committed_router_filters`",
+          "anchor": "_committed_router_filters"
         },
         {
           "level": 3,
@@ -6349,16 +6369,6 @@
         },
         {
           "level": 3,
-          "text": "`_releasable_finalize_artifact`",
-          "anchor": "_releasable_finalize_artifact"
-        },
-        {
-          "level": 3,
-          "text": "`router_filter_patterns`",
-          "anchor": "router_filter_patterns"
-        },
-        {
-          "level": 3,
           "text": "`_generate_router`",
           "anchor": "_generate_router"
         },
@@ -6498,13 +6508,8 @@
         },
         {
           "level": 3,
-          "text": "`_router_pattern_matches`",
-          "anchor": "_router_pattern_matches"
-        },
-        {
-          "level": 3,
-          "text": "`_release_router_patterns`",
-          "anchor": "_release_router_patterns"
+          "text": "`_release_router_filters`",
+          "anchor": "_release_router_filters"
         },
         {
           "level": 3,
@@ -12065,6 +12070,83 @@
       ]
     },
     {
+      "path": "rlsbl-router_filters.md",
+      "title": "rlsbl.router_filters",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.router_filters",
+          "anchor": "rlsblrouter_filters"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.router_filters`",
+          "anchor": "rlsblrouter_filters"
+        },
+        {
+          "level": 3,
+          "text": "`_target_manifest_names`",
+          "anchor": "_target_manifest_names"
+        },
+        {
+          "level": 3,
+          "text": "`root_trigger_files`",
+          "anchor": "root_trigger_files"
+        },
+        {
+          "level": 3,
+          "text": "`territory_pattern`",
+          "anchor": "territory_pattern"
+        },
+        {
+          "level": 3,
+          "text": "`_finalize_artifact`",
+          "anchor": "_finalize_artifact"
+        },
+        {
+          "level": 3,
+          "text": "`RouterFilters`",
+          "anchor": "routerfilters"
+        },
+        {
+          "level": 4,
+          "text": "`_dependency_members`",
+          "anchor": "_dependency_members"
+        },
+        {
+          "level": 4,
+          "text": "`patterns_for`",
+          "anchor": "patterns_for"
+        },
+        {
+          "level": 4,
+          "text": "`filters_block`",
+          "anchor": "filters_block"
+        },
+        {
+          "level": 3,
+          "text": "`_glob_to_regex`",
+          "anchor": "_glob_to_regex"
+        },
+        {
+          "level": 3,
+          "text": "`matches_pattern`",
+          "anchor": "matches_pattern"
+        },
+        {
+          "level": 3,
+          "text": "`matches_filter`",
+          "anchor": "matches_filter"
+        },
+        {
+          "level": 3,
+          "text": "`any_path_matches`",
+          "anchor": "any_path_matches"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-saferm.md",
       "title": "rlsbl.saferm",
       "type": "doc",
@@ -15231,6 +15313,16 @@
         },
         {
           "level": 3,
+          "text": "`_declared_paths`",
+          "anchor": "_declared_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_validate_member_paths`",
+          "anchor": "_validate_member_paths"
+        },
+        {
+          "level": 3,
           "text": "`validate_workspace_model`",
           "anchor": "validate_workspace_model"
         },
@@ -15499,6 +15591,16 @@
           "anchor": "releasable"
         },
         {
+          "level": 4,
+          "text": "`declares_tag_format`",
+          "anchor": "declares_tag_format"
+        },
+        {
+          "level": 4,
+          "text": "`effective_tag_format`",
+          "anchor": "effective_tag_format"
+        },
+        {
           "level": 3,
           "text": "`WorkspaceProject`",
           "anchor": "workspaceproject"
@@ -15512,11 +15614,6 @@
           "level": 4,
           "text": "`path`",
           "anchor": "path"
-        },
-        {
-          "level": 4,
-          "text": "`watch`",
-          "anchor": "watch"
         },
         {
           "level": 4,
@@ -15619,6 +15716,16 @@
           "level": 3,
           "text": "`_require_sub_project_root`",
           "anchor": "_require_sub_project_root"
+        },
+        {
+          "level": 3,
+          "text": "`_at_workspace_root`",
+          "anchor": "_at_workspace_root"
+        },
+        {
+          "level": 3,
+          "text": "`_releasable_representative`",
+          "anchor": "_releasable_representative"
         },
         {
           "level": 3,
@@ -17086,6 +17193,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-27T16:53:24.657049+00:00",
+  "last_gen": "2026-08-27T20:01:33.703029+00:00",
   "theme": "minimal"
 }
