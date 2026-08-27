@@ -36,6 +36,15 @@ from rlsbl.commands.watch import (
 
 
 from conftest import cli_ctx
+from rlsbl.ledger import LedgerEntry
+
+
+def _released(version, sha="abc123full"):
+    """A ledger entry standing in for "this commit IS release <version>"."""
+    return LedgerEntry(
+        version=version, path=f"/fake/.rlsbl/releases/v{version}.toml",
+        candidate_sha=sha, unanchorable=False,
+    )
 
 class TestIsPublishWorkflow:
     """Unit tests for _is_publish_workflow name matching."""
@@ -189,15 +198,16 @@ class TestPrintWorkflowAudit:
 class TestNoRunsHint:
     """Tests for the release-retry hint when no CI runs are found."""
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("1.2.0"))
     @patch("rlsbl.commands.watch.poll_runs", return_value=[])
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
-    def test_hint_printed_when_tag_and_release_exist(self, mock_run, mock_run_gh, mock_poll, capsys):
-        """When no runs, commit has a tag, and GitHub Release exists, hint is printed."""
+    def test_hint_printed_when_released_and_release_exists(
+        self, mock_run, mock_run_gh, mock_poll, mock_released, capsys,
+    ):
+        """No runs, the commit IS a release, and its GitHub Release exists."""
         mock_run.side_effect = [
             "abc123full",  # git rev-parse (resolve arg)
-            "v1.2.0",  # git describe --tags --exact-match (label)
-            "v1.2.0",  # git describe --tags --exact-match (hint check)
         ]
         mock_run_gh.side_effect = [
             json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
@@ -213,15 +223,16 @@ class TestNoRunsHint:
         assert "rlsbl: hint: GitHub Release v1.2.0 exists but no workflows ran" in err
         assert "rlsbl release retry" in err
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("1.2.0"))
     @patch("rlsbl.commands.watch.poll_runs", return_value=[])
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
-    def test_no_hint_when_tag_exists_but_no_release(self, mock_run, mock_run_gh, mock_poll, capsys):
-        """When no runs, commit has a tag, but no GitHub Release, no hint."""
+    def test_no_hint_when_released_but_no_github_release(
+        self, mock_run, mock_run_gh, mock_poll, mock_released, capsys,
+    ):
+        """No runs, the commit IS a release, but no GitHub Release: no hint."""
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            "v1.2.0",  # git describe --tags --exact-match (label)
-            "v1.2.0",  # git describe --tags --exact-match (hint check)
         ]
         mock_run_gh.side_effect = [
             json.dumps({"nameWithOwner": "user/repo", "name": "repo"}),  # gh repo view
@@ -236,15 +247,16 @@ class TestNoRunsHint:
         assert "No CI runs found for abc123full" in err
         assert "hint:" not in err
 
+    @patch("rlsbl.commands.watch._release_at", return_value=None)
     @patch("rlsbl.commands.watch.poll_runs", return_value=[])
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
-    def test_no_hint_when_no_tag(self, mock_run, mock_run_gh, mock_poll, capsys):
-        """When no runs and commit has no tag, no hint."""
+    def test_no_hint_when_the_commit_shipped_nothing(
+        self, mock_run, mock_run_gh, mock_poll, mock_released, capsys,
+    ):
+        """When no runs and the commit is in no release, no hint."""
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            Exception("no tag"),  # git describe --tags --exact-match (label) fails
-            Exception("no tag"),  # git describe --tags --exact-match (hint check) fails
         ]
         mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})  # gh repo view
 
@@ -256,6 +268,7 @@ class TestNoRunsHint:
         assert "No CI runs found for abc123full" in err
         assert "hint:" not in err
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("1.2.0"))
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
@@ -264,7 +277,8 @@ class TestNoRunsHint:
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_hint_not_reached_when_runs_found(
-        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify, capsys
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit,
+        mock_notify, mock_released, capsys,
     ):
         """When CI runs are found, the hint logic is never reached."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -274,7 +288,6 @@ class TestNoRunsHint:
         ]
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            "v1.2.0",  # git describe
         ]
         mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})  # gh repo view
         mock_watch.return_value = [{"name": "CI", "passed": True}]
@@ -291,6 +304,7 @@ class TestNoRunsHint:
 class TestRePoll:
     """Tests for the re-poll logic that catches late-starting workflows."""
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("1.0.0"))
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit")
     @patch("rlsbl.commands.watch._watch_runs")
@@ -299,7 +313,8 @@ class TestRePoll:
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_late_run_discovered_on_repoll(
-        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit,
+        mock_notify, mock_released,
     ):
         """A run that appears only on the re-poll (not initial discovery) is still watched."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -314,7 +329,6 @@ class TestRePoll:
 
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            "v1.0.0",  # git describe
         ]
         mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})  # gh repo view
 
@@ -771,6 +785,7 @@ class TestReleaseUrl:
 class TestNotifyUrlInRunCmd:
     """Tests that run_cmd passes the right URL to _notify."""
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("1.0.0"))
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
@@ -779,7 +794,8 @@ class TestNotifyUrlInRunCmd:
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_failure_notification_passes_actions_url(
-        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit,
+        mock_notify, mock_released,
     ):
         """On failure, _notify is called with the failed run's Actions URL."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
@@ -789,7 +805,6 @@ class TestNotifyUrlInRunCmd:
         ]
         mock_run.side_effect = [
             "abc123full",
-            "v1.0.0",
         ]
         mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
         mock_watch.return_value = [{"name": "CI", "passed": False, "run_id": "100"}]
@@ -801,6 +816,7 @@ class TestNotifyUrlInRunCmd:
         mock_notify.assert_called_once()
         assert mock_notify.call_args[1]["url"] == "https://github.com/user/repo/actions/runs/100"
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("2.0.0"))
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch._watch_runs")
@@ -808,10 +824,11 @@ class TestNotifyUrlInRunCmd:
     @patch("rlsbl.commands.watch.time")
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
-    def test_success_notification_passes_release_url_with_tag(
-        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit, mock_notify
+    def test_success_notification_passes_release_url_for_a_released_commit(
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_watch, mock_audit,
+        mock_notify, mock_released,
     ):
-        """On success with a tag, _notify is called with the release page URL."""
+        """When the commit IS a release, _notify gets that release's page URL."""
         ci_run = {"databaseId": 100, "name": "CI", "status": "in_progress"}
         mock_poll.side_effect = [
             [ci_run],
@@ -819,7 +836,6 @@ class TestNotifyUrlInRunCmd:
         ]
         mock_run.side_effect = [
             "abc123full",
-            "v2.0.0",  # tag found
         ]
         mock_run_gh.return_value = json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
         mock_watch.return_value = [{"name": "CI", "passed": True, "run_id": "100"}]
@@ -904,6 +920,7 @@ class TestLatePollRetryDedup:
     treats it as a late-starting workflow.
     """
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("1.0.0"))
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch.poll_runs")
@@ -911,7 +928,8 @@ class TestLatePollRetryDedup:
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_retry_run_not_treated_as_late_run(
-        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify,
+        mock_released,
     ):
         """A failed CI run is reran in place; because the rerun keeps the run
         id, the re-poll (which sees that same id) never treats it as a
@@ -925,7 +943,6 @@ class TestLatePollRetryDedup:
         ]
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            "v1.0.0",      # git describe
         ]
 
         rerun_count = 0
@@ -969,6 +986,7 @@ class TestLatePollRetryDedup:
         audit_arg = mock_audit.call_args[0][0]
         assert len(audit_arg) == 2, f"Expected 2 results, got {audit_arg}"
 
+    @patch("rlsbl.commands.watch._release_at", return_value=_released("1.0.0"))
     @patch("rlsbl.commands.watch._notify")
     @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
     @patch("rlsbl.commands.watch.poll_runs")
@@ -976,7 +994,8 @@ class TestLatePollRetryDedup:
     @patch("rlsbl.commands.watch.run_gh")
     @patch("rlsbl.commands.watch.run")
     def test_single_initial_run_late_poll_no_double_retry(
-        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify
+        self, mock_run, mock_run_gh, mock_time, mock_poll, mock_audit, mock_notify,
+        mock_released,
     ):
         """Retry dedup must also apply when the initial pool has exactly one
         run: the single-run path uses the same shared-state machinery, so the
@@ -989,7 +1008,6 @@ class TestLatePollRetryDedup:
         ]
         mock_run.side_effect = [
             "abc123full",  # git rev-parse
-            "v1.0.0",      # git describe
         ]
 
         rerun_count = 0

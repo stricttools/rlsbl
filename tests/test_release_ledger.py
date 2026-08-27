@@ -49,8 +49,8 @@ Site                                                    Was
                                                         ``git describe
                                                         --tags --abbrev=0``
 ``rlsbl/commands/unreleased.py`` header / payload tag   ``git describe``
-``rlsbl/commands/watch.py`` commit labeling             ``git describe
-                                                        --exact-match``
+``rlsbl/commands/watch.py`` commit labeling and         ``git describe
+release-page URL                                        --exact-match``
 ``rlsbl/commands/undo.py`` ``_find_latest_tag``         ``git describe
                                                         --tags --abbrev=0``
 ``rlsbl/commands/undo.py`` predecessor lookup           ``git describe
@@ -413,6 +413,50 @@ class TestIndeterminable:
         _archive(clone / ".rlsbl" / "releases", "0.1.0", base)
         with pytest.raises(LedgerError, match="cannot determine"):
             ledger.range_anchor(str(clone / ".rlsbl" / "releases"))
+
+
+# --------------------------------------------------------------------------- #
+# Labelling one commit with the release it IS
+# --------------------------------------------------------------------------- #
+
+class TestReleaseAtCommit:
+
+    def test_a_release_candidate_names_its_version(self, repo):
+        entry = ledger.release_at_commit(_releases(repo), repo.shas["0.2.0"])
+        assert entry.version == "0.2.0"
+
+    def test_a_commit_between_releases_names_nothing(self, repo):
+        sha = _commit(repo, "after 0.3.0")
+        assert ledger.release_at_commit(_releases(repo), sha) is None
+
+    def test_a_commit_inside_a_later_release_names_nothing(self, repo):
+        # An ordinary commit that a LATER release contains: the answer is
+        # None, not the release above it and not the release below it.
+        ordinary = _commit(repo, "work")
+        later = _commit(repo, "v0.4.0")
+        _archive(_releases(repo), "0.4.0", later)
+        assert ledger.release_at_commit(_releases(repo), ordinary) is None
+        assert ledger.release_at_commit(_releases(repo), later).version == "0.4.0"
+
+    def test_survives_the_tag_being_deleted(self, repo):
+        _git(repo, "tag", "-d", "v0.2.0")
+        entry = ledger.release_at_commit(_releases(repo), repo.shas["0.2.0"])
+        assert entry.version == "0.2.0"
+
+    def test_costs_one_archive_read(self, repo, monkeypatch):
+        # The whole point of asking range_anchor at the commit rather than
+        # scanning: labelling a commit must not parse the entire history.
+        opened = []
+        real_open = open
+
+        def counting(path, *args, **kwargs):
+            if str(path).endswith(".toml"):
+                opened.append(str(path))
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", counting)
+        ledger.release_at_commit(_releases(repo), repo.shas["0.3.0"])
+        assert len(opened) == 1, opened
 
 
 # --------------------------------------------------------------------------- #

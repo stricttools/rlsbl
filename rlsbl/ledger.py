@@ -320,6 +320,26 @@ def unreleased_range(releases_dir: str, *, tag_glob: str | None = None,
     return f"{entry.candidate_sha}..HEAD"
 
 
+def release_at_commit(releases_dir: str, sha: str, *,
+                      tag_glob: str | None = None,
+                      cwd: str | None = None) -> LedgerEntry | None:
+    """The release *sha* IS, or None when it shipped no version.
+
+    Asked by displays that want to label a commit with its release
+    (``rlsbl watch``, which previously used ``git describe --exact-match`` and
+    so labelled from the tag namespace).
+
+    Costs ONE archive read, not a scan: the highest release contained in
+    *sha*'s own history is *sha* itself exactly when *sha* is a released
+    candidate, so :func:`range_anchor` answered at *sha* either names it or
+    names an earlier release -- and an earlier one means *sha* shipped nothing.
+    """
+    entry = range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd, head=sha)
+    if entry is None or not _same_commit(entry.candidate_sha, sha):
+        return None
+    return entry
+
+
 def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
                         cwd: str | None = None,
                         head: str = "HEAD") -> LatestReleaseFact:

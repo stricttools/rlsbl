@@ -10,8 +10,22 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..ci_checks import verify_project_ci_ran
+from ..ledger import release_at_commit, tag_for_version
 from ..utils import require_tool, run, run_gh
 from .. import effects
+
+
+def _release_at(commit_sha):
+    """The release *commit_sha* is, from the ledger, or None.
+
+    ``rlsbl watch`` takes a bare commit and runs from wherever it is invoked,
+    so the ledger it reads is the current project's ``.rlsbl/releases/``. A
+    directory with no archives answers None -- nothing was released here --
+    while a ledger that CANNOT answer (a tag disagreeing with an anchor, an
+    ancestry git cannot decide) raises, because a label derived from a ledger
+    rlsbl could not read would be a guess presented as a fact.
+    """
+    return release_at_commit(os.path.join(".rlsbl", "releases"), commit_sha)
 
 
 def _open_url(url):
@@ -1064,13 +1078,14 @@ def run_cmd(registry, args, flags):
             print("Error: could not get repo info. Is gh installed and authenticated?", file=sys.stderr)
             sys.exit(1)
 
-        # Try to find a tag for this commit for nicer display
-        try:
-            tag = run("git", ["describe", "--tags", "--exact-match", commit_sha])
-        except Exception:
-            tag = commit_sha[:12]
+        # Label the commit with the release it IS, read from the LEDGER --
+        # the archives record which commit each version shipped from, so a
+        # deleted or moved tag cannot mislabel it. A commit that shipped no
+        # version is labelled by its short hash, as before.
+        released = _release_at(commit_sha)
+        label_for_commit = released.version if released else commit_sha[:12]
 
-        label = f"{repo_name} {tag}" if repo_name else tag
+        label = f"{repo_name} {label_for_commit}" if repo_name else label_for_commit
 
         # Poll until at least one run appears (poll budget ~120s:
         # 30 attempts x 4s interval, see poll_runs defaults)
@@ -1084,8 +1099,9 @@ def run_cmd(registry, args, flags):
             )
             # Best-effort hint: if this commit has a GitHub Release but no
             # workflows ran, suggest `rlsbl release retry`.
-            try:
-                release_tag = run("git", ["describe", "--tags", "--exact-match", commit_sha])
+            released_here = _release_at(commit_sha)
+            if released_here is not None:
+                release_tag = tag_for_version(None, released_here.version)
                 try:
                     run_gh(["release", "view", release_tag])
                     print(
@@ -1095,8 +1111,6 @@ def run_cmd(registry, args, flags):
                     )
                 except Exception:
                     pass
-            except Exception:
-                pass
             sys.exit(0)
 
         print(f"rlsbl: {label}: found {len(runs)} CI run(s), watching...", file=sys.stderr)
@@ -1148,8 +1162,11 @@ def run_cmd(registry, args, flags):
         else:
             body = f"{len(results)}/{len(results)} passed"
             success_url = None
-            if repo_slug and tag and not tag.startswith(commit_sha[:8]):
-                success_url = f"https://github.com/{repo_slug}/releases/tag/{tag}"
+            if repo_slug and released is not None:
+                success_url = (
+                    f"https://github.com/{repo_slug}/releases/tag/"
+                    f"{tag_for_version(None, released.version)}"
+                )
             else:
                 success_url = _release_url(repo_slug)
             _notify(f"{label}: CI passed", body, url=success_url)
