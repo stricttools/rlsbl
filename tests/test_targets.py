@@ -5,7 +5,15 @@ import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
+# The axis -> derived-property map has ONE definition, in the file dedicated to
+# the axis derivations. It used to be restated here as CAPABILITY_AXES, free to
+# drift from the copy it duplicated.
+from test_target_capability_derivation import AXIS_PROPERTIES
+
 from rlsbl.context import ProjectContext
+from rlsbl.targets.base import BaseTarget
 from rlsbl.targets.protocol import ReleaseTarget
 from rlsbl.targets.npm import NpmTarget
 from rlsbl.targets.pypi import PypiTarget
@@ -833,9 +841,6 @@ class TestMavenTarget:
         assert MavenTarget().detect(str(tmp_path))
 
 
-import pytest
-
-
 class TestGoScaffoldTemplates:
     """Tests for Go scaffold template improvements (goreleaser main, version.go)."""
 
@@ -1263,20 +1268,58 @@ class TestGoMonorepoTagFormat:
         assert result == "auth-gateway/v*"
 
 
-# The axes the deleted ``capabilities`` frozenset used to encode, mapped to the
-# derived property that answers each one.
-CAPABILITY_AXES = {
-    "read_name": "supports_read_name",
-    "read_metadata": "supports_read_metadata",
-    "ci_templates": "provides_ci_templates",
-    "dev_install": "supports_dev_install",
-    "publication_probe": "supports_publication_probe",
-}
 VALID_AUTO_DETECTABLE = {"yes", "no", "conditional"}
 
 
+def _public_members(cls):
+    """Every non-underscore member of *cls*, including bare annotations.
+
+    ``dir()`` misses annotation-only declarations (``ecosystem: str`` on the
+    Protocol, ``detection_files`` on the base), which are exactly the members
+    a Protocol states without giving a value.
+    """
+    members = {name for name in dir(cls) if not name.startswith("_")}
+    members |= {
+        name for name in getattr(cls, "__annotations__", {})
+        if not name.startswith("_")
+    }
+    return members
+
+
+class TestProtocolCoversTheWholeTargetSurface:
+    """``ReleaseTarget`` is the named single authority for the interface.
+
+    It had gone stale: the axis migration added yank, run_tests, the
+    dead-module and cycle detectors, the registry-identity methods and every
+    derived support property to ``BaseTarget`` without stating any of them on
+    the Protocol, so the file that claims to define the interface described
+    only part of it.
+
+    The expected set is derived from ``BaseTarget`` rather than hand-listed,
+    so a member added there fails this test until the Protocol states it too.
+    """
+
+    def test_the_protocol_states_every_public_base_member(self):
+        missing = sorted(_public_members(BaseTarget) - _public_members(ReleaseTarget))
+        assert not missing, (
+            "ReleaseTarget does not declare: " + ", ".join(missing)
+            + "\n\nAdd each one to rlsbl/targets/protocol.py with the "
+            "signature and docstring it has on BaseTarget."
+        )
+
+    def test_every_support_axis_is_stated_on_the_protocol(self):
+        """The derived axis properties specifically, named one by one."""
+        stated = _public_members(ReleaseTarget)
+        for axis, prop in AXIS_PROPERTIES.items():
+            assert prop in stated, f"the '{axis}' axis property is not on the Protocol"
+
+    @pytest.mark.parametrize("name", sorted(TARGETS))
+    def test_every_registered_target_satisfies_the_protocol(self, name):
+        assert isinstance(TARGETS[name], ReleaseTarget)
+
+
 class TestTargetIntrospectionConformance:
-    """Conformance tests verifying every registered target declares capabilities, ecosystem, and auto_detectable."""
+    """Conformance tests verifying every registered target answers each support axis, ecosystem, and auto_detectable."""
 
     @pytest.mark.parametrize("name", list(TARGETS.keys()))
     def test_ecosystem_is_nonempty_string(self, name):
@@ -1301,7 +1344,7 @@ class TestTargetIntrospectionConformance:
             f"{name} still declares a capabilities attribute; the axes are "
             f"derived properties now"
         )
-        for axis in CAPABILITY_AXES.values():
+        for axis in AXIS_PROPERTIES.values():
             assert isinstance(getattr(target, axis), bool), (
                 f"{name}.{axis} did not answer a bool"
             )
