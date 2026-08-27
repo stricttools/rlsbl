@@ -146,7 +146,7 @@ def _setup_releasable_workspace(root, member_path="packages/core",
         members = with_root_member(members)
     save_workspace(
         str(root),
-        with_root_member(members),
+        members,
         releasables=[
             Releasable(name=releasable_name, tag_format=tag_format)
             if tag_format else Releasable(name=releasable_name)
@@ -169,7 +169,10 @@ def _setup_releasable_workspace(root, member_path="packages/core",
 
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial")
-    _git(root, "tag", f"{releasable_name}@v1.0.0")
+    _git(
+        root, "tag",
+        "v1.0.0" if tag_format else f"{releasable_name}@v1.0.0",
+    )
 
     # Member-scoped feature commit
     (member / "feature.txt").write_text("new feature\n")

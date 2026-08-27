@@ -14,7 +14,7 @@ from rlsbl.commands.unreleased import (
 )
 from rlsbl.utils import get_last_version_tag
 
-from conftest import with_root_member
+from conftest import with_root_member, make_workspace, make_releasable_state
 
 
 class TestGetLastTag:
@@ -184,11 +184,14 @@ class TestUnreleasedMonorepo:
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
-        # Set up JSONL changelogs for both
+        # Give each member its own releasable, and that releasable its
+        # changelog -- a member outside every releasable has none.
+        make_workspace(str(mock_git_repo), [
+            {"path": "alpha", "name": "alpha"},
+            {"path": "beta", "name": "beta"},
+        ])
         for proj in ["alpha", "beta"]:
-            changes_dir = mock_git_repo / proj / ".rlsbl" / "changes"
-            changes_dir.mkdir(parents=True, exist_ok=True)
-            (changes_dir / "unreleased.jsonl").write_text("")
+            make_releasable_state(mock_git_repo, proj, version="1.0.0")
 
         # Tag both
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)

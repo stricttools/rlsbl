@@ -58,7 +58,9 @@ class TestOutdatedNoDeps:
 
         _cmd_outdated({}, project_root=".")
         captured = capsys.readouterr()
-        assert "No projects in workspace." in captured.out
+        # A workspace always has its root member, and a lone member has no
+        # intra-workspace dependencies.
+        assert "No intra-workspace dependencies found." in captured.out
 
     def test_no_workspace(self, mock_git_repo):
         """No workspace should error and exit 1."""

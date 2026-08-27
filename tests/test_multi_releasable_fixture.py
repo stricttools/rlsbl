@@ -98,6 +98,10 @@ class TestMultiReleasableFixtureDefaults:
         ns = multi_releasable_monorepo
         for proj_name, proj_dir in ns.project_dirs.items():
             assert proj_dir.is_dir(), f"{proj_name} dir missing"
+            if proj_dir == ns.root:
+                # The root member owns the repository root, which the factory
+                # gives no manifest of its own.
+                continue
             assert (proj_dir / "pyproject.toml").is_file()
 
     def test_git_tags_exist(self, multi_releasable_monorepo):

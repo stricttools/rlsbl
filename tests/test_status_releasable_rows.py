@@ -74,7 +74,10 @@ class TestPerReleasableStatusRows:
 
         # One row for the releasable with its real tag (regression: was "(none)")
         assert "alpha@v1.0.0" in out
-        assert "(none)" not in out
+        # The releasable's own row carries the real tag; the root member's
+        # row has no tag of its own.
+        rel_row = next(line for line in out.splitlines() if line.startswith("alpha "))
+        assert "(none)" not in rel_row
         # Per-releasable header + members column
         assert "Releasable" not in out.split("\n")[0] or "Members" in out
         assert "Members" in out

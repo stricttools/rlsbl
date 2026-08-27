@@ -394,7 +394,7 @@ class TestInternalNames:
             'path = "packages/cli"\n'
             'registry_name = "my-cli"\n')
         )
-        assert workspace_package_names(tmp_path) == {"core", "my-cli"}
+        assert workspace_package_names(tmp_path) == {"core", "my-cli", "root"}
 
     def test_no_workspace_yields_no_names(self, tmp_path):
         assert workspace_package_names(tmp_path) == set()
