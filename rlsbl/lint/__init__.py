@@ -2,7 +2,13 @@
 
 Public API:
     lint_library(project_path) -> list[LintResult]
-    scan_imports(project_path) -> set  (ImportRecord or tuples)
+
+Import scanning is NOT here. ``rlsbl.import_scanners`` and
+``rlsbl.dep_validation`` drive the per-language scanners directly -- the
+linters' own ``scan_imports`` methods for Python and npm, and
+``rlsbl.lint.go_ast.scan_imports`` per file for Go. A project-wide
+``scan_imports`` used to sit in this module as a third way in; nothing in
+production ever called it.
 """
 
 import os
@@ -15,7 +21,7 @@ from .config import (
 from .languages import LANGUAGES, get_language
 from .result import LintResult
 
-__all__ = ["lint_library", "scan_imports"]
+__all__ = ["lint_library"]
 
 
 def _detect_languages(project_path: str) -> list[str]:
@@ -34,20 +40,6 @@ def _create_linter(language: str, parser_type: str):
     silent None would turn it into a lint that reports nothing and passes.
     """
     return get_language(language).linter(parser_type)
-
-
-def _create_import_scanner(language: str):
-    """Create the AST-based import scanner for a language, or None.
-
-    Import scanning always uses the AST parser (not regex) since it needs
-    accurate import extraction. None means the language declares no
-    project-wide scanner; ``get_language(language).scanner_absent_reason``
-    says why, and ``scan_imports`` reports it rather than dropping it.
-    """
-    lang = get_language(language)
-    if lang.import_scanner is None:
-        return None
-    return lang.import_scanner()
 
 
 def lint_library(
@@ -109,38 +101,3 @@ def lint_library(
             results.extend(linter.lint(project_path, config))
 
     return results
-
-
-def scan_imports(project_path: str) -> set:
-    """Collect all imports from source files in a project.
-
-    Detects languages present and uses AST-based scanners to extract
-    every import statement found.
-
-    Args:
-        project_path: path to the project root directory.
-
-    Returns a set of import records. Python imports are ImportRecord
-    dataclasses (top_level, full_path, filepath, line, guarded,
-    type_checking); npm imports are (package_name, file_path, line_number,
-    guarded) tuples.
-
-    A detected language that declares no project-wide scanner contributes
-    nothing here -- Go is scanned per file by ``dep_validation``, and JVM
-    sources rlsbl never parses at all (each language states its reason in
-    ``LANGUAGES``). That is not a silent skip a user can be misled by: the
-    checks built on import analysis take their scope from the targets that
-    implement the matching protocol method, so an ecosystem out of scope is
-    named in the check's own skip line.
-    """
-    project_path = os.path.abspath(project_path)
-    languages = _detect_languages(project_path)
-
-    all_imports: set = set()
-    for language in languages:
-        scanner = _create_import_scanner(language)
-        if scanner is None:
-            continue
-        all_imports.update(scanner.scan_imports(project_path))
-
-    return all_imports

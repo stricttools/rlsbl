@@ -64,14 +64,19 @@ derived: `targets_with_builtin_tests()`.
 `python` is not `pypi`, and one language may back several targets. The
 taxonomies stay distinct.
 
-What the two shared was the silent fallthrough: `_create_linter` and
-`_create_import_scanner` returned `None` for an unhandled language and the
-caller quietly did nothing. Consolidated into a single `LANGUAGES` table
-(`rlsbl/lint/languages.py`) that declares, per language, its detection
-manifests, linter factories, import-scanner availability and default exclude
-patterns. `_detect_languages`, `_create_linter`, `_create_import_scanner` and
-`_DEFAULT_EXCLUDE_PATTERNS` all derive from it, and a detected language with no
-import scanner is reported as an explicit skip rather than silently dropped.
+What the two shared was the silent fallthrough: `_create_linter` returned
+`None` for an unhandled language and the caller quietly did nothing.
+Consolidated into a single `LANGUAGES` table (`rlsbl/lint/languages.py`) that
+declares, per language, its detection manifests, linter factories and default
+exclude patterns. `_detect_languages`, `_create_linter` and
+`_DEFAULT_EXCLUDE_PATTERNS` all derive from it, and an unknown language is a
+hard error rather than a quiet no-op.
+
+The table briefly also carried an `import_scanner` factory and a
+`scanner_absent_reason`, feeding a project-wide `rlsbl.lint.scan_imports`.
+Nothing in production ever called it -- import scanning goes through
+`rlsbl.import_scanners` and `rlsbl.dep_validation` -- so that surface is
+deleted.
 
 The target-side question ("does this target get library lint at all?") is a
 separate, registry-derived set: `targets_with_library_lint()`.

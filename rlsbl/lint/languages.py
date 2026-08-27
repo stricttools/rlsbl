@@ -8,14 +8,21 @@ mapping between them is a single property on the target
 (``ReleaseTarget.lint_language``), not a name comparison repeated per call
 site.
 
-Before this table, the same four language names were spelled out in four
+Before this table, the same four language names were spelled out in several
 separate places: ``_detect_languages`` (manifest -> language),
-``_create_linter`` (language -> linter class), ``_create_import_scanner``
-(language -> scanner class), and ``_DEFAULT_EXCLUDE_PATTERNS`` (language ->
-excludes). Each one could drift from the others, and two of them answered an
-unknown language with a bare ``return None`` that the caller silently ignored.
-Everything now derives from ``LANGUAGES``, and an unknown language is a hard
-error rather than a quiet no-op.
+``_create_linter`` (language -> linter class), and
+``_DEFAULT_EXCLUDE_PATTERNS`` (language -> excludes). Each one could drift from
+the others, and one of them answered an unknown language with a bare ``return
+None`` that the caller silently ignored. Everything now derives from
+``LANGUAGES``, and an unknown language is a hard error rather than a quiet
+no-op.
+
+Import scanning is deliberately absent from this table. The per-language
+scanners are driven directly by ``rlsbl.import_scanners`` and
+``rlsbl.dep_validation`` -- the linters' own ``scan_imports`` methods for
+Python and npm, and ``rlsbl.lint.go_ast.scan_imports`` per file for Go. The
+table used to carry an ``import_scanner`` factory beside them that nothing in
+production ever consulted.
 """
 
 from dataclasses import dataclass
@@ -43,10 +50,6 @@ class LintLanguage:
             preference; ``"regex"`` is the opt-out for environments without
             a tree-sitter grammar. A language offering only one
             implementation lists it under both keys.
-        import_scanner: factory for the AST-based import scanner, or None.
-        scanner_absent_reason: why ``import_scanner`` is None. Required
-            whenever it is -- an absent scanner must state its absence, not
-            be an unexplained blank.
     """
 
     name: str
@@ -54,15 +57,8 @@ class LintLanguage:
     default_excludes: tuple[str, ...]
     linters: dict[str, Callable[[], object]]
     default_forbidden_imports: tuple[str, ...] = ()
-    import_scanner: Callable[[], object] | None = None
-    scanner_absent_reason: str | None = None
 
     def __post_init__(self):
-        if self.import_scanner is None and not self.scanner_absent_reason:
-            raise ValueError(
-                f"lint language '{self.name}' has no import scanner and no "
-                f"reason for its absence; state the reason"
-            )
         for key in ("default", "regex"):
             if key not in self.linters:
                 raise ValueError(
@@ -137,7 +133,6 @@ LANGUAGES: tuple[LintLanguage, ...] = (
             "uvicorn", "granian", "starlette",
             "tornado", "bottle",
         ),
-        import_scanner=_python_ast,
     ),
     LintLanguage(
         name="go",
@@ -148,12 +143,6 @@ LANGUAGES: tuple[LintLanguage, ...] = (
             "net/http",
             "github.com/spf13/cobra",
             "github.com/urfave/cli",
-        ),
-        import_scanner=None,
-        scanner_absent_reason=(
-            "Go imports are scanned per file by rlsbl.lint.go_ast.scan_imports, "
-            "which dep_validation drives directly; there is no project-wide "
-            "scanner object for this language"
         ),
     ),
     LintLanguage(
@@ -168,18 +157,12 @@ LANGUAGES: tuple[LintLanguage, ...] = (
             "express", "koa", "hono",
             "commander", "yargs",
         ),
-        import_scanner=_npm_ast,
     ),
     LintLanguage(
         name="maven",
         manifests=("build.gradle.kts", "build.gradle", "pom.xml"),
         default_excludes=(),
         linters={"default": _maven, "ast": _maven, "regex": _maven},
-        import_scanner=None,
-        scanner_absent_reason=(
-            "the Maven linter shells out to the project's own tool (detekt, "
-            "checkstyle, gradlew check); rlsbl never parses JVM sources itself"
-        ),
     ),
 )
 

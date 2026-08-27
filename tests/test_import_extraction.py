@@ -5,7 +5,6 @@ import os
 
 import pytest
 
-from rlsbl.lint import scan_imports
 from rlsbl.lint.npm_ast import NpmAstLinter
 from rlsbl.lint.protocol import ImportScanner
 from rlsbl.lint.python_ast import PythonAstLinter
@@ -232,36 +231,6 @@ class TestNpmImportExtraction:
         )
         linter = NpmAstLinter()
         result = linter.scan_imports(str(tmp_path))
-        assert result == set()
-
-
-class TestScanImportsTopLevel:
-    """Test the top-level scan_imports() function from rlsbl.lint."""
-
-    def test_python_project(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text(_PYPROJECT)
-        (tmp_path / "lib.py").write_text("import os\nimport json\n")
-        result = scan_imports(str(tmp_path))
-        pkg_names = {r.top_level for r in result}
-        assert pkg_names == {"os", "json"}
-
-    def test_npm_project(self, tmp_path):
-        (tmp_path / "package.json").write_text(
-            json.dumps({"name": "test", "version": "1.0.0"})
-        )
-        (tmp_path / "lib.js").write_text("import express from 'express';\n")
-        result = scan_imports(str(tmp_path))
-        pkg_names = {r[0] for r in result}
-        assert "express" in pkg_names
-
-    def test_no_language_markers(self, tmp_path):
-        """A directory with no language markers returns empty set."""
-        (tmp_path / "readme.txt").write_text("hello")
-        result = scan_imports(str(tmp_path))
-        assert result == set()
-
-    def test_empty_directory(self, tmp_path):
-        result = scan_imports(str(tmp_path))
         assert result == set()
 
 

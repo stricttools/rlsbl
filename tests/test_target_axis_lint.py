@@ -8,19 +8,17 @@ Two taxonomies meet here and must stay distinct:
   release flow dispatches on, whose participation in library lint is now a
   single property, ``ReleaseTarget.lint_language``.
 
-The dispatch used to be four parallel language lists that could drift, two of
-which answered an unknown language with a bare ``return None`` the caller
+The dispatch used to be several parallel language lists that could drift, one
+of which answered an unknown language with a bare ``return None`` the caller
 silently ignored. Both halves are pinned here.
 """
 
 import pytest
 
 from rlsbl.lint import (
-    _create_import_scanner,
     _create_linter,
     _detect_languages,
     lint_library,
-    scan_imports,
 )
 from rlsbl.lint.config import load_language_config
 from rlsbl.lint.languages import LANGUAGES, LANGUAGES_BY_NAME, get_language
@@ -62,10 +60,6 @@ class TestLanguageTableIsTheAuthority:
         # maven's linter shells out, so it declares no forbidden imports.
         assert load_language_config(".", "maven").forbidden_imports == []
 
-    def test_an_absent_import_scanner_must_state_a_reason(self):
-        for language in LANGUAGES:
-            if language.import_scanner is None:
-                assert language.scanner_absent_reason, language.name
 
 
 class TestNoSilentFallthrough:
@@ -75,9 +69,6 @@ class TestNoSilentFallthrough:
         with pytest.raises(ValueError, match="unknown lint language 'rust'"):
             _create_linter("rust", "ast")
 
-    def test_create_import_scanner_raises_on_an_unknown_language(self):
-        with pytest.raises(ValueError, match="unknown lint language 'rust'"):
-            _create_import_scanner("rust")
 
     def test_get_language_names_the_declared_set_in_its_error(self):
         with pytest.raises(ValueError) as exc:
@@ -85,29 +76,6 @@ class TestNoSilentFallthrough:
         for name in LANGUAGES_BY_NAME:
             assert name in str(exc.value)
 
-    def test_scan_imports_contributes_nothing_for_a_language_with_no_scanner(
-        self, tmp_path,
-    ):
-        """Go declares no project-wide scanner; dep_validation scans it per file.
-
-        Which ecosystems the import-analysis checks cover is not decided here
-        at all -- it is the targets' answer (``supports_import_analysis``), and
-        an ecosystem out of scope is named in the check's own skip line.
-        """
-        (tmp_path / "go.mod").write_text("module example.com/foo\n\ngo 1.22\n")
-        assert LANGUAGES_BY_NAME["go"].import_scanner is None
-        assert scan_imports(str(tmp_path)) == set()
-
-    def test_scan_imports_collects_from_a_scannable_project(self, tmp_path):
-        (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname = "x"\nversion = "0.1.0"\n'
-        )
-        (tmp_path / "lib.py").write_text("import os\n")
-        result = scan_imports(str(tmp_path))
-        assert {r.top_level for r in result} == {"os"}
-
-    def test_scan_imports_of_an_empty_directory_is_still_a_set(self, tmp_path):
-        assert scan_imports(str(tmp_path)) == set()
 
 
 class TestTargetSideBridge:
