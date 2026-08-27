@@ -100,7 +100,7 @@ def _make_commit(path, filename, message="change"):
 
 
 class TestDedupEntries:
-    """_dedup_entries merges entries with identical commit sets."""
+    """_dedup_entries merges entries whose commit set and content match."""
 
     def test_no_duplicates_unchanged(self):
         entries = [
@@ -136,7 +136,7 @@ class TestDedupEntries:
             ChangelogEntry(commits=["bbb", "aaa"], user_facing=True,
                            description="Fix 1", type="fix", packages=["a"]),
             ChangelogEntry(commits=["aaa", "bbb"], user_facing=True,
-                           description="Fix 2", type="fix", packages=["b"]),
+                           description="Fix 1", type="fix", packages=["b"]),
         ]
         result, merged_count = _dedup_entries(entries)
         assert len(result) == 1

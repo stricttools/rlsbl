@@ -18,6 +18,7 @@ import pytest
 
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry
 from rlsbl.releasable_migration import (
+    _dedup_entries,
     _derive_packages_for_entry,
     _extract_version_from_tag,
     _read_project_version,
@@ -731,6 +732,121 @@ class TestConsolidateChangelogsPreservesEntryIds:
         assert len(entries) == 1
         assert entries[0].description == "Shared change"
         assert entries[0].id == "id-only-one"
+
+
+# ---------------------------------------------------------------------------
+# _dedup_entries: only true duplicates collapse
+# ---------------------------------------------------------------------------
+
+
+class TestDedupEntriesContentKey:
+    """Dedup collapses entries only when their identifying content matches.
+
+    A commit may legitimately appear in several entries (e.g. one commit that
+    both adds a feature and fixes a bug). Grouping on the commit set alone
+    destroyed every entry but the first; the group key is the full content.
+    """
+
+    def test_same_commits_different_content_both_survive(self):
+        entries = [
+            ChangelogEntry(commits=["x1"], user_facing=True,
+                           description="Adds the thing", type="feature",
+                           id="id-1"),
+            ChangelogEntry(commits=["x1"], user_facing=True,
+                           description="Fixes the other thing", type="fix",
+                           id="id-2"),
+        ]
+
+        deduped, merged = _dedup_entries(entries)
+
+        assert merged == 0
+        assert [(e.id, e.description, e.type) for e in deduped] == [
+            ("id-1", "Adds the thing", "feature"),
+            ("id-2", "Fixes the other thing", "fix"),
+        ]
+
+    def test_identical_entries_collapse_and_union_packages(self):
+        """The same logical entry contributed by two members merges into one."""
+        entries = [
+            ChangelogEntry(commits=["x1"], user_facing=True,
+                           description="Shared change", type="feature",
+                           id="id-first", packages=["a"]),
+            ChangelogEntry(commits=["x1"], user_facing=True,
+                           description="Shared change", type="feature",
+                           id="id-second", packages=["b"]),
+        ]
+
+        deduped, merged = _dedup_entries(entries)
+
+        assert merged == 1
+        assert len(deduped) == 1
+        assert deduped[0].id == "id-first"
+        assert deduped[0].packages == ["a", "b"]
+
+    def test_bare_internal_entry_folds_into_user_facing_entry(self):
+        """A non-user-facing entry carries no description or type, so folding
+        it into a user-facing entry for the same commits loses nothing."""
+        entries = [
+            ChangelogEntry(commits=["x1"], user_facing=False, id="id-internal",
+                           packages=["a"]),
+            ChangelogEntry(commits=["x1"], user_facing=True,
+                           description="Shared change", type="feature",
+                           packages=["b"]),
+        ]
+
+        deduped, merged = _dedup_entries(entries)
+
+        assert merged == 1
+        assert len(deduped) == 1
+        assert deduped[0].description == "Shared change"
+        assert deduped[0].id == "id-internal"
+        assert deduped[0].packages == ["a", "b"]
+
+    def test_distinct_commit_sets_untouched(self):
+        entries = [
+            ChangelogEntry(commits=["x1"], user_facing=True,
+                           description="One", type="feature"),
+            ChangelogEntry(commits=["x2"], user_facing=True,
+                           description="One", type="feature"),
+        ]
+
+        deduped, merged = _dedup_entries(entries)
+
+        assert merged == 0
+        assert [e.commits for e in deduped] == [["x1"], ["x2"]]
+
+    def test_consolidation_keeps_distinct_entries_for_one_commit(self, tmp_project):
+        """End-to-end: two members describing the same commit differently both
+        reach the releasable's unreleased.jsonl."""
+        proj_a = _make_pypi_project(tmp_project, "a", "0.1.0")
+        proj_b = _make_pypi_project(tmp_project, "b", "0.1.0")
+
+        _write_unreleased_jsonl(proj_a, [
+            ChangelogEntry(commits=["eee5555"], user_facing=True,
+                           description="Adds the thing", type="feature",
+                           id="id-a"),
+        ])
+        _write_unreleased_jsonl(proj_b, [
+            ChangelogEntry(commits=["eee5555"], user_facing=True,
+                           description="Fixes the other thing", type="fix",
+                           id="id-b"),
+        ])
+
+        members = [
+            WorkspaceProject({"name": "a", "path": "a"}),
+            WorkspaceProject({"name": "b", "path": "b"}),
+        ]
+
+        result = consolidate_changelogs(str(tmp_project), "core", members)
+        assert result["duplicates_merged"] == 0
+        assert result["entries_merged"] == 2
+
+        from rlsbl.changelog.schema import parse_jsonl
+        entries = parse_jsonl(result["dest_path"])
+        assert {(e.id, e.description, e.type) for e in entries} == {
+            ("id-a", "Adds the thing", "feature"),
+            ("id-b", "Fixes the other thing", "fix"),
+        }
 
 
 # ---------------------------------------------------------------------------

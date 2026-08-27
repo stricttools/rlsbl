@@ -151,10 +151,12 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
     kept and written first, ahead of the member contributions -- consolidation
     adds to that file, it never replaces it.
 
-    Cross-package dedup: entries from different packages that reference the
-    exact same set of commits are merged into a single entry, combining
-    their ``packages`` lists. This prevents the same commit from appearing
-    in too many entries and violating ``max_entries_per_commit``.
+    Cross-package dedup: the same logical entry present in several packages
+    -- identical commit set, ``user_facing``, ``description``, ``type`` and
+    ``release_type`` -- is merged into a single entry, combining their
+    ``packages`` lists. This prevents the same commit from appearing in too
+    many entries and violating ``max_entries_per_commit``. Entries that share
+    a commit set but describe different things are kept apart.
 
     Batch limit exclusions: per-package ``batch_limits.exclusions`` from
     each member's ``.rlsbl/config.json`` are collected. After merging, any
@@ -304,12 +306,23 @@ def _derive_packages_for_entry(entry, member_projects, workspace_root):
 
 
 def _dedup_entries(entries):
-    """Deduplicate entries with identical commit sets.
+    """Deduplicate entries that describe the same change identically.
 
-    Entries from different packages that reference the exact same set of
-    commits are merged into one entry, combining their ``packages`` lists.
-    When merging, the first user-facing entry's description and type win
-    (non-user-facing entries contribute only their packages).
+    Two entries are duplicates only when their full identifying content
+    matches: the commit set, ``user_facing``, ``description``, ``type`` and
+    ``release_type``. That is the case consolidation creates -- the same
+    logical entry present in several member packages' files -- and those
+    collapse into one entry combining their ``packages`` lists.
+
+    Distinct entries that happen to share a commit set (one commit can be
+    both a feature and a fix, each with its own description) are NOT
+    duplicates and all survive; merging them would silently destroy every
+    description but one.
+
+    The one exception to content matching: a non-user-facing entry with no
+    description, type or release_type is folded into the first user-facing
+    entry for the same commits, since it has no content to lose and keeping
+    it would only inflate the entries-per-commit count.
 
     The merged entry keeps the surviving base entry's stable ``id`` so it
     stays addressable by ``changelog amend --id`` / ``changelog edit --id``.
@@ -321,16 +334,43 @@ def _dedup_entries(entries):
     the number of entries that were folded into another (i.e.,
     ``len(original) - len(deduped)``).
     """
-    # Group entries by their commit set (as a frozen sorted tuple for order-
-    # independent matching).
-    groups = {}
+    # Group by commit set first (sorted tuple, so commit order does not
+    # matter), then split each commit group into content groups. Insertion
+    # order is preserved at both levels so the output stays deterministic.
+    commit_groups = {}
     for entry in entries:
-        key = tuple(sorted(entry.commits))
-        groups.setdefault(key, []).append(entry)
+        commit_groups.setdefault(tuple(sorted(entry.commits)), []).append(entry)
+
+    groups = []
+    for commit_group in commit_groups.values():
+        content_groups = {}
+        for entry in commit_group:
+            key = (
+                entry.user_facing,
+                entry.description,
+                entry.type,
+                entry.release_type,
+            )
+            content_groups.setdefault(key, []).append(entry)
+
+        # Fold the content-free non-user-facing entries into the first
+        # user-facing group, if there is one. Their key already says they
+        # carry no description, type or release_type, so nothing is lost.
+        internal_key = (False, None, None, None)
+        internals = content_groups.get(internal_key)
+        if internals:
+            target = next(
+                (g for key, g in content_groups.items() if key[0]), None,
+            )
+            if target is not None:
+                target.extend(internals)
+                del content_groups[internal_key]
+
+        groups.extend(content_groups.values())
 
     deduped = []
     total_merged = 0
-    for _key, group in groups.items():
+    for group in groups:
         if len(group) == 1:
             deduped.append(group[0])
             continue
