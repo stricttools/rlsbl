@@ -956,7 +956,9 @@ def observe(dep) -> Preview:
 
     items.append(VerdictItem(
         key=ITEM_NEXT_STEPS,
-        state="next_steps",
+        # Not "next_steps": the renderer prints the key and then the state, and
+        # a state spelled like its key reads as a stutter.
+        state="operator_actions",
         summary="rlsbl never administers an external system; these are yours.",
         facts=tuple(_next_steps(dep)),
     ))
