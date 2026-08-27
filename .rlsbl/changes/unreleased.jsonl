@@ -62,3 +62,4 @@
 {"format_version":1,"id":"18cfb59aab8f2821c1d51d78db3944f2b6c6db4e05ffc3c7","commits":["7641a17421eca916f7c41879c666135a6db1bf3c"],"user_facing":false}
 {"format_version":1,"id":"18cfb59fcc6a1a707ecb160213354d4fa8f804903302bad4","commits":["8e2bdfc1811050b8c17851a715e794aed301c8d3"],"user_facing":false}
 {"format_version":1,"id":"18cfb5b0f6ad48fa10b944dd2988437da021d75f3aaf4dcf","commits":["88cb201c0e1350c84e886f1111e4d89fd63a3d64"],"user_facing":false}
+{"format_version":1,"id":"18cfb5b9f7c054f12e5c01344bd04cdf885c8c23b6d77833","commits":["4bfef52af86aac991e07b26a533563f3420537fa"],"user_facing":true,"description":"**`name-consistency` reports non-answering targets when names disagree.** A detected target that reports no package name is now named on the mismatch branch as well as the pass branch, so the mismatch detail no longer reads as the complete set of detected targets.","type":"fix"}
