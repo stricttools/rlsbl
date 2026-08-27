@@ -44,6 +44,23 @@ class BaseTarget:
     auto_detectable: ClassVar[str] = "yes"
     BUILD_TIMEOUT_DEFAULT: ClassVar[int] = 120
 
+    publisher_binds_to_repository: ClassVar[bool] = False
+    """Whether this registry's publishing authorization names the REPOSITORY.
+
+    False for a registry authenticated by a token the project carries: moving
+    the code to another repository changes nothing about who may publish it.
+    True where the authorization is a statement about a specific repository and
+    workflow -- PyPI Trusted Publishing is the case that exists -- so a project
+    that moves must be re-authorized before its next release, and rlsbl cannot
+    do it (registering a publisher is an act on an external system).
+
+    Declared rather than introspected: it is a fact about the registry's auth
+    model, not something the target's methods reveal.
+    """
+
+    publisher_setup_url: ClassVar[str] = ""
+    """Where a repository-bound publisher is registered. Empty when none is."""
+
     lint_language: ClassVar[str | None] = None
     """Which library-lint language this target's sources are written in.
 

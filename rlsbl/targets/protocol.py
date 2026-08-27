@@ -81,6 +81,17 @@ class ReleaseTarget(Protocol):
     ecosystem: str
     """Ecosystem identifier (e.g. 'node', 'python', 'go', 'jvm')."""
 
+    publisher_binds_to_repository: bool
+    """Whether this registry's publishing authorization names the REPOSITORY.
+
+    True where publishing is authorized for a specific repository and workflow
+    rather than by a token the project carries, so a project that MOVES to
+    another repository must be re-authorized before its next release.
+    """
+
+    publisher_setup_url: str
+    """Where a repository-bound publisher is registered. Empty when none is."""
+
     auto_detectable: str
     """Whether this target can be auto-detected: 'yes', 'no', or 'conditional'."""
 

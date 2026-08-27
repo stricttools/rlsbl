@@ -78,7 +78,6 @@ EXPECTED_EFFECTS = {
     "monorepo.impact": "read_only",
     "monorepo.extract": "mutating",
     "monorepo.absorb": "mutating",
-    "monorepo.extract-releasable": "mutating",
     "monorepo.cleanup": "mutating",
     "monorepo.migrate-releasable": "mutating",
     "monorepo.rename-releasable": "mutating",

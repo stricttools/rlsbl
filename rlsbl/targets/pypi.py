@@ -97,6 +97,13 @@ class PypiTarget(BaseTarget):
     lint_language = "python"
     ecosystem = "Python / PyPI"
 
+    # Trusted Publishing authorizes a specific repository and workflow to
+    # publish this project, so the authorization does not follow the code to a
+    # new repository: a pending publisher has to be registered for the new one
+    # before its first release there.
+    publisher_binds_to_repository = True
+    publisher_setup_url = "https://pypi.org/manage/account/publishing/"
+
     @property
     def name(self):
         return "pypi"

@@ -114,6 +114,14 @@ BANNED_METHOD_NAMES = {
     "symlink_to",
 }
 
+# The one receiver on which those names are not a bypass but the chokepoint
+# itself: ``effects.write_text(...)`` IS the sanctioned seam, and the scanner
+# cannot tell it from ``Path(...).write_text(...)`` by attribute name alone.
+# Every call on this receiver goes through rlsbl/effects.py by construction, so
+# the exemption is the receiver and nothing else -- a banned name on any other
+# object is still a finding.
+CHOKEPOINT_RECEIVERS = {"effects", "_direct"}
+
 WRITE_MODE_CHARS = ("w", "a", "x", "+")
 
 # The authorized spellings of a gh CLI invocation.  Everything else that puts
@@ -201,7 +209,8 @@ def _violations(path):
                 found.append((node.lineno, f"{base_name}.{func.attr}(...)"))
                 continue
             if func.attr in BANNED_METHOD_NAMES:
-                found.append((node.lineno, f".{func.attr}(...)"))
+                if base_name not in CHOKEPOINT_RECEIVERS:
+                    found.append((node.lineno, f".{func.attr}(...)"))
                 continue
             if func.attr == "mkdir" and base_name not in BANNED_ATTR_CALLS:
                 # Path(...).mkdir(...) -- os.mkdir is caught above.
@@ -328,6 +337,30 @@ def test_scanner_detects_a_planted_bypass(tmp_path):
     descriptions = [what for _, what in found]
     assert "subprocess.run(...)" in descriptions
     assert "open(..., 'w')" in descriptions
+
+
+def test_scanner_separates_the_chokepoints_writers_from_a_pathlib_write(tmp_path):
+    """``effects.write_text`` is the seam; ``Path(...).write_text`` is a bypass.
+
+    The two are one attribute name apart and the scanner cannot type the
+    receiver, so the exemption is asserted in both directions: the sanctioned
+    spelling produces no finding, and every other receiver still does.
+    """
+    planted = tmp_path / "planted_seam.py"
+    planted.write_text(
+        "from rlsbl import effects\n"
+        "from pathlib import Path\n"
+        "def go(p):\n"
+        "    effects.write_text(p, 'through the seam')\n"
+        "    effects.write_bytes(p, b'also')\n"
+        "    Path(p).write_text('around it')\n"
+        "    p.touch()\n",
+        encoding="utf-8",
+    )
+    descriptions = [what for _, what in _violations(str(planted))]
+    assert descriptions.count(".write_text(...)") == 1
+    assert ".write_bytes(...)" not in descriptions
+    assert ".touch(...)" in descriptions
 
 
 def test_scanner_detects_a_planted_tempfile_bypass(tmp_path):

@@ -724,26 +724,32 @@ def _next_steps(dep):
         f"next release (monorepo sync is re-run for you, but which jobs the "
         f"remaining members need is yours to confirm)",
     ]
-    if _moves_a_pypi_target(dep):
+    for target in _repository_bound_publishers(dep):
         steps.append(
-            "PyPI Trusted Publishing follows the repository, not the package: "
-            "add a pending publisher for the NEW repo at "
-            "https://pypi.org/manage/account/publishing/ before its first "
-            "release (a publish that fails for want of one is recovered with "
-            "`rlsbl release retry`, not a new version)"
+            f"{target.registry_display_name} publishing is authorized for a "
+            f"REPOSITORY, not for the package, so it does not follow the code: "
+            f"register the new repository at {target.publisher_setup_url} "
+            f"before its first release there (a publish that fails for want of "
+            f"one is recovered with `rlsbl release retry`, not a new version)"
         )
     return steps
 
 
-def _moves_a_pypi_target(dep):
-    """Does any departing member publish to PyPI?
+def _repository_bound_publishers(dep):
+    """The departing members' targets whose publisher names the repository.
 
-    Read from the member's own declaration; a member whose targets cannot be
-    detected simply does not add the hint (the hint is guidance, and guessing
-    wrong in either direction costs nothing that the plan does not already say).
+    Asked of the target rather than derived from its name: which registries
+    bind publishing to a repository is the registry's fact, and the target
+    registry is where rlsbl keeps those.
+
+    A member whose targets cannot be detected contributes no hint. That is
+    deliberate: the hint is guidance, and a broken declaration on a DEPARTING
+    member is not otherwise this conversion's business (its tag scheme comes
+    from the releasable).
     """
-    from ...targets import detect_targets, resolve_releasable_config_dir
+    from ...targets import TARGETS, detect_targets, resolve_releasable_config_dir
 
+    seen = {}
     for member in dep.members:
         try:
             entries = detect_targets(
@@ -754,9 +760,11 @@ def _moves_a_pypi_target(dep):
             )
         except ConfigError:
             continue
-        if any(e.name == "pypi" for e in entries):
-            return True
-    return False
+        for entry in entries:
+            target = TARGETS.get(entry.name)
+            if target is not None and target.publisher_binds_to_repository:
+                seen.setdefault(entry.name, target)
+    return [seen[name] for name in sorted(seen)]
 
 
 def _state_entries(dep):
