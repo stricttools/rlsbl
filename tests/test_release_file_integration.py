@@ -18,7 +18,7 @@ from rlsbl.commands.release import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 from githarness import write_covered_unreleased
-from conftest import cli_ctx
+from conftest import cli_ctx, tag_state_present
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,8 @@ class TestRunCmdWithReleaseConfig:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -126,7 +127,8 @@ class TestRunCmdWithReleaseConfig:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -171,7 +173,8 @@ class TestRunCmdWithReleaseConfig:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -254,7 +257,8 @@ class TestTargetExhaustivenessValidation:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -320,7 +324,8 @@ class TestTargetExhaustivenessValidation:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -464,7 +469,8 @@ class TestReleaseConfigSignature:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -626,7 +632,8 @@ class TestMonorepoDirectoryScoping:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")

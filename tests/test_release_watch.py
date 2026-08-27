@@ -21,6 +21,9 @@ from rlsbl.release_file import ReleaseConfig
 from githarness import write_covered_unreleased
 
 
+from conftest import tag_state_absent, tag_state_present
+
+
 @pytest.fixture(autouse=True)
 def _reset_lock_fd(monkeypatch):
     """Prevent cross-test leakage of the advisory lock file descriptor."""
@@ -68,7 +71,8 @@ class TestNoWatchPrintsHint:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -126,7 +130,8 @@ class TestWatchInvokesWatchCmd:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -205,6 +210,7 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True)
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_absent)
     @patch("rlsbl.commands.release.tag_exists_locally", return_value=False)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -289,6 +295,7 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True)
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_absent)
     @patch("rlsbl.commands.release.tag_exists_locally", return_value=False)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)

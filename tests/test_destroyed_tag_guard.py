@@ -22,14 +22,14 @@ import pytest
 from githarness import init_repo, commit_file, git
 from unittest.mock import MagicMock, patch
 
+from conftest import archive_release, git_head, ledger_dir
+from rlsbl.errors import LedgerError
+
 from rlsbl.commands.release.validate import (
     ReleaseValidationError,
     compute_release_version,
     _abort_on_destroyed_tag,
 )
-
-TAG_EXISTS_FN = "rlsbl.commands.release.tag_exists_locally"
-
 
 def _mock_target(version):
     target = MagicMock()
@@ -84,13 +84,14 @@ class TestDestroyedTagStandalone:
         head_before = git(repo, "rev-parse", "HEAD")
         assert git(repo, "status", "--porcelain") == ""
 
+        # No tag was ever created in this repo, so the tag read really answers
+        # ABSENT -- the destroyed-tag case, not a mocked one.
         target = _mock_target("1.2.3")
-        with patch(TAG_EXISTS_FN, return_value=False):
-            with pytest.raises(ReleaseValidationError) as exc:
-                compute_release_version(
-                    target, str(repo), None, None, None, lambda _m: None,
-                    project_dir=str(repo),
-                )
+        with pytest.raises(ReleaseValidationError) as exc:
+            compute_release_version(
+                target, str(repo), None, None, None, lambda _m: None,
+                project_dir=str(repo),
+            )
 
         msg = str(exc.value)
         assert "1.2.3" in msg
@@ -124,12 +125,11 @@ class TestDestroyedTagStandalone:
         _write_finalized_jsonl(repo / ".rlsbl" / "changes", "2.0.0")
 
         target = _mock_target("2.0.0")
-        with patch(TAG_EXISTS_FN, return_value=False):
-            with pytest.raises(ReleaseValidationError) as exc:
-                # No project_dir kwarg -> falls back to primary_path (str(repo)).
-                compute_release_version(
-                    target, str(repo), None, None, None, lambda _m: None,
-                )
+        with pytest.raises(ReleaseValidationError) as exc:
+            # No project_dir kwarg -> falls back to primary_path (str(repo)).
+            compute_release_version(
+                target, str(repo), None, None, None, lambda _m: None,
+            )
         assert "2.0.0" in str(exc.value)
 
     def test_new_project_still_takes_first_release_path(self, tmp_path):
@@ -148,11 +148,10 @@ class TestDestroyedTagStandalone:
         (changes / "unreleased.jsonl").write_text("")
 
         target = _mock_target("1.0.0")
-        with patch(TAG_EXISTS_FN, return_value=False):
-            current, new, bump, tag = compute_release_version(
-                target, str(repo), None, None, None, lambda _m: None,
-                project_dir=str(repo),
-            )
+        current, new, bump, tag = compute_release_version(
+            target, str(repo), None, None, None, lambda _m: None,
+            project_dir=str(repo),
+        )
         assert current == "1.0.0"
         assert new == "1.0.0"
         assert bump is None
@@ -170,12 +169,194 @@ class TestDestroyedTagStandalone:
         )
 
         target = _mock_target("0.1.0")
-        with patch(TAG_EXISTS_FN, return_value=False):
+        current, new, bump, tag = compute_release_version(
+            target, str(repo), None, None, None, lambda _m: None,
+            project_dir=str(repo),
+        )
+        assert (current, new, bump, tag) == ("0.1.0", "0.1.0", None, "v0.1.0")
+
+
+class TestPreviewDoesNotDiagnoseADestroyedTag:
+    """A preview must not report a destroyed tag for a healthy released version.
+
+    Reproduces the reported failure: ``rlsbl release run --dry-run`` on a
+    project whose current version IS tagged, locally and on the remote, aborted
+    with the destroyed-tag diagnosis and a three-option recovery procedure,
+    none of which applied. Two of the three recoveries are destructive-adjacent
+    (create tags by hand, or move the version forward), so acting on the
+    message made things worse -- and the message appeared for every release
+    after the first, on every project using JSONL changelogs.
+
+    The mechanism: past the preview's first recorded mutation the framework
+    answers observes with an unsettled carrier, ``tag_exists_locally``
+    collapses that onto ``False``, and the first-release branch then found the
+    finalized ``<version>.jsonl`` that exists for every released version.
+    "The tag is not there yet" is a fair reading for the COLLISION check on
+    the new tag; it is not a claim the preview can make about whether the
+    CURRENT version was ever released.
+
+    The fix reads that from the ledger instead: the archive for the current
+    version says it shipped, so the release computes a bump and the guard is
+    never consulted.
+    """
+
+    def _released_repo(self, tmp_path, version="1.2.3"):
+        """A repo where *version* really is released: archived, tagged, and
+        with the finalized changelog every released version leaves behind."""
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        commit_file(
+            repo,
+            "package.json",
+            json.dumps({"name": "pkg", "version": version}, indent=2) + "\n",
+            "initial",
+        )
+        changes = repo / ".rlsbl" / "changes"
+        _write_finalized_jsonl(changes, version)
+        (changes / "unreleased.jsonl").write_text("")
+        git(repo, "add", f".rlsbl/changes/{version}.jsonl",
+            ".rlsbl/changes/unreleased.jsonl")
+        git(repo, "commit", "-q", "-m", "released state")
+        git(repo, "tag", f"v{version}")
+        archive_release(ledger_dir(repo), version, git_head(repo))
+        return repo
+
+    def _unsettled_tag_read(self):
+        """``rlsbl.utils.run`` as a preview past its first recorded mutation.
+
+        Every observe comes back as the carrier standing in for a run that did
+        not happen -- which is exactly the state the report describes.
+        """
+        import strictcli
+
+        carrier = strictcli.Unsettled(
+            brand="preview", log=None, cmd_path="rlsbl release run",
+            forwardable=True,
+        )
+
+        def fake_run(binary, args, *rest, **kwargs):
+            if binary == "git" and args[:2] == ["tag", "-l"]:
+                return carrier
+            raise AssertionError(f"unexpected run: {binary} {args}")
+
+        return fake_run
+
+    def test_preview_computes_a_bump_instead_of_diagnosing_a_destroyed_tag(
+        self, tmp_path,
+    ):
+        repo = self._released_repo(tmp_path)
+        target = _mock_target("1.2.3")
+
+        with patch("rlsbl.utils.run", side_effect=self._unsettled_tag_read()):
             current, new, bump, tag = compute_release_version(
-                target, str(repo), None, None, None, lambda _m: None,
+                target, str(repo), "patch", None, None, lambda _m: None,
+                project_dir=str(repo),
+            )
+
+        assert (current, new, bump, tag) == ("1.2.3", "1.2.4", "patch", "v1.2.4")
+
+    def test_a_genuinely_unreleased_version_still_first_releases_in_a_preview(
+        self, tmp_path,
+    ):
+        """The other side of the same question: no archive, no release."""
+        repo = tmp_path / "fresh"
+        init_repo(repo)
+        commit_file(
+            repo,
+            "package.json",
+            json.dumps({"name": "pkg", "version": "0.1.0"}, indent=2) + "\n",
+            "initial",
+        )
+        (repo / ".rlsbl" / "changes").mkdir(parents=True)
+        (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+
+        target = _mock_target("0.1.0")
+        with patch("rlsbl.utils.run", side_effect=self._unsettled_tag_read()):
+            current, new, bump, tag = compute_release_version(
+                target, str(repo), "patch", None, None, lambda _m: None,
                 project_dir=str(repo),
             )
         assert (current, new, bump, tag) == ("0.1.0", "0.1.0", None, "v0.1.0")
+
+    def test_a_really_destroyed_tag_is_still_diagnosed(self, tmp_path):
+        """The guard the preview bug was firing from must still fire for real.
+
+        Same repo, same archived release -- but the tag is genuinely gone and
+        the tag read is answerable, so this IS the destroyed-tag case.
+        """
+        repo = self._released_repo(tmp_path)
+        git(repo, "tag", "-d", "v1.2.3")
+
+        target = _mock_target("1.2.3")
+        with pytest.raises(ReleaseValidationError) as exc:
+            compute_release_version(
+                target, str(repo), "patch", None, None, lambda _m: None,
+                project_dir=str(repo),
+            )
+        msg = str(exc.value)
+        assert "1.2.3" in msg
+        assert "v1.2.3" in msg
+
+
+class TestReleasePrepRefusesADivergentCheckout:
+    """A release may not be prepared on a history the latest release is not in.
+
+    Such a release would ship a tree the previous release is absent from --
+    reverting it -- and its changelog range would cover commits that already
+    shipped. Pre-mutation, before the version is even bumped.
+    """
+
+    def test_divergent_checkout_is_a_hard_error(self, tmp_path):
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        commit_file(
+            repo,
+            "package.json",
+            json.dumps({"name": "pkg", "version": "1.0.0"}, indent=2) + "\n",
+            "initial",
+        )
+        (repo / ".rlsbl" / "changes").mkdir(parents=True)
+        (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+
+        # 2.0.0 was released on a history this checkout does not contain.
+        git(repo, "checkout", "-q", "--orphan", "elsewhere")
+        commit_file(repo, "other.txt", "elsewhere\n", "released elsewhere")
+        elsewhere = git_head(repo)
+        git(repo, "checkout", "-q", "main")
+        archive_release(ledger_dir(repo), "2.0.0", elsewhere)
+
+        target = _mock_target("1.0.0")
+        with pytest.raises(LedgerError) as exc:
+            compute_release_version(
+                target, str(repo), "patch", None, None, lambda _m: None,
+                project_dir=str(repo),
+            )
+        msg = str(exc.value)
+        assert "2.0.0" in msg
+        assert elsewhere in msg
+        assert "not an ancestor" in msg
+
+    def test_a_checkout_that_contains_the_latest_release_proceeds(self, tmp_path):
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        commit_file(
+            repo,
+            "package.json",
+            json.dumps({"name": "pkg", "version": "1.0.0"}, indent=2) + "\n",
+            "initial",
+        )
+        (repo / ".rlsbl" / "changes").mkdir(parents=True)
+        (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+        git(repo, "tag", "v1.0.0")
+        archive_release(ledger_dir(repo), "1.0.0", git_head(repo))
+        commit_file(repo, "work.txt", "work\n", "more work")
+
+        target = _mock_target("1.0.0")
+        current, new, bump, tag = compute_release_version(
+            target, str(repo), "minor", None, None, lambda _m: None,
+            project_dir=str(repo),
+        )
+        assert (current, new, bump, tag) == ("1.0.0", "1.1.0", "minor", "v1.1.0")
 
 
 class TestDestroyedTagGuardUnit:

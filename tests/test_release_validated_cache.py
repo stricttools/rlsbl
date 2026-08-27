@@ -21,6 +21,9 @@ from rlsbl.release_file import ReleaseConfig
 from githarness import fake_run_dispatch
 
 
+from conftest import tag_state_present
+
+
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
     return ReleaseConfig(
@@ -61,7 +64,8 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True)
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -109,7 +113,8 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.acquire_lock")
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")

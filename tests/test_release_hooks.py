@@ -17,6 +17,9 @@ from rlsbl.utils import run as real_run
 from githarness import write_covered_unreleased
 
 
+from conftest import archive_release, ledger_dir, tag_state_present
+
+
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
     return ReleaseConfig(
@@ -64,7 +67,8 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -130,7 +134,8 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -201,7 +206,8 @@ class TestPreReleaseHookOutput:
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run_gh", return_value=""),
-            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False]),
+            patch("rlsbl.utils.local_tag_state", new=tag_state_present),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False]),
             patch("rlsbl.commands.release.run") as mock_run,
             patch("rlsbl.commands.release.commit_files", return_value=True),
             patch("rlsbl.commands.release.get_current_branch", return_value="main"),
@@ -304,7 +310,8 @@ class TestPostReleaseHookOutput:
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
-            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
+            patch("rlsbl.utils.local_tag_state", new=tag_state_present),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
@@ -409,7 +416,8 @@ class TestWatchSHABeforePostHook:
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
-            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
+            patch("rlsbl.utils.local_tag_state", new=tag_state_present),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
@@ -452,7 +460,8 @@ class TestHookTimeout:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -508,7 +517,8 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -561,7 +571,8 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -663,7 +674,8 @@ class TestHookCwdStandalone:
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
-            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
+            patch("rlsbl.utils.local_tag_state", new=tag_state_present),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
@@ -695,7 +707,8 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -769,7 +782,8 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -899,7 +913,8 @@ class TestHookCwdMonorepo:
             patch("rlsbl.commands.release.remote_branch_exists", return_value=True),
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True),
-            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False]),
+            patch("rlsbl.utils.local_tag_state", new=tag_state_present),
+            patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
@@ -987,6 +1002,14 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
     _git(repo, "tag", "v1.0.0")
+    # ...and its LEDGER entry: the unreleased range is bounded by the archived
+    # release, so without this every commit in the repo reads as unreleased.
+    archive_release(ledger_dir(repo), "1.0.0", _git_head(repo))
+    _git(repo, "add", ".rlsbl/releases")
+    _git(
+        repo, "commit", "-q", "-m", "release archive for 1.0.0",
+        "--trailer", "Autogenerated: true",
+    )
 
     # Make an unreleased feature commit
     (repo / "feature.txt").write_text("new feature\n")
@@ -1167,6 +1190,12 @@ class TestHookGeneratedFiles:
         _git(tmp_project, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
         _git(tmp_project, "commit", "-q", "-m", "initial")
         _git(tmp_project, "tag", "v1.0.0")
+        archive_release(ledger_dir(tmp_project), "1.0.0", _git_head(tmp_project))
+        _git(tmp_project, "add", ".rlsbl/releases")
+        _git(
+            tmp_project, "commit", "-q", "-m", "release archive for 1.0.0",
+            "--trailer", "Autogenerated: true",
+        )
 
         (tmp_project / "feature.txt").write_text("new feature\n")
         _git(tmp_project, "add", "feature.txt")

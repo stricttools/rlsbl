@@ -348,13 +348,22 @@ class TestComputeReleaseVersionReleasable:
 
         from rlsbl.commands.release.validate import compute_release_version
 
-        with patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False]):
-            current, new, bump, tag = compute_release_version(
-                mock_target, str(tmp_path), "minor",
-                None, None, lambda msg: None,
-                workspace_root=str(tmp_path),
-                releasable_name="core",
-            )
+        # The releasable's own LEDGER says 1.0.0 shipped, which is what puts
+        # this on the bump path.
+        from conftest import archive_release, git_head
+        from rlsbl.workspace import get_releasable_dir
+
+        archive_release(
+            os.path.join(get_releasable_dir(str(tmp_path), "core"), "releases"),
+            "1.0.0", git_head(tmp_path),
+        )
+        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(tmp_path), check=True)
+        current, new, bump, tag = compute_release_version(
+            mock_target, str(tmp_path), "minor",
+            None, None, lambda msg: None,
+            workspace_root=str(tmp_path),
+            releasable_name="core",
+        )
 
         assert current == "1.0.0"
         assert new == "1.1.0"

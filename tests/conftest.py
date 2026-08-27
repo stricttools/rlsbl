@@ -323,6 +323,26 @@ def make_commit(repo, filename="file.txt", message="change"):
     return git_head(repo)
 
 
+def tag_state_present(tag, cwd=None):
+    """Stand-in for ``local_tag_state``: the tag is in the repository.
+
+    Release-flow tests run against fixture directories with no real tags, and
+    ``compute_release_version`` asks the tri-state (never the collapsing bool)
+    whether the CURRENT version's tag is there. Patched with ``new=`` so no
+    extra mock argument reaches the test's signature.
+    """
+    from rlsbl.utils import LocalTagState
+
+    return LocalTagState.PRESENT
+
+
+def tag_state_absent(tag, cwd=None):
+    """Stand-in for ``local_tag_state``: the tag is genuinely not there."""
+    from rlsbl.utils import LocalTagState
+
+    return LocalTagState.ABSENT
+
+
 def ledger_dir(project_dir, *, releasable_dir=None):
     """The release-archive directory a test's ledger reads.
 

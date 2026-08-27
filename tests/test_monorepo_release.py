@@ -18,7 +18,7 @@ from githarness import write_covered_unreleased
 
 from rlsbl.workspace import get_releasable_changes_dir
 
-from conftest import workspace_toml
+from conftest import tag_state_present, workspace_toml
 
 
 def _rc(bump="patch", include=None, exclude=None):
@@ -172,7 +172,8 @@ class TestMonorepoRelease:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
@@ -269,7 +270,8 @@ class TestMonorepoRelease:
 
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     @patch("rlsbl.commands.release.is_clean_tree", return_value=True)

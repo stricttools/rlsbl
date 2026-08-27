@@ -216,6 +216,16 @@ def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
     )
 
 
+def version_is_archived(releases_dir: str, version: str) -> bool:
+    """Does the ledger record *version* as released?
+
+    A scan, not a read: the archive's mere existence is the record that the
+    release completed, and answering it opens no file. The three read errors
+    belong to the callers that go on to USE the entry.
+    """
+    return os.path.isfile(archived_release_path(releases_dir, version))
+
+
 def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
                cwd: str | None = None) -> LedgerEntry:
     """Read one archived release FOR USE, with all three read errors live.

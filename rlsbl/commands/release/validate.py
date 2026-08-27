@@ -577,15 +577,29 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     In implicit mode (the default, when either parameter is None), the version
     is read from the target's manifest as before.
 
-    ``project_dir`` locates the project's ``.rlsbl/changes/`` directory for the
-    destroyed-tag guard (see :func:`_abort_on_destroyed_tag`). When omitted it
-    falls back to ``primary_path``, which coincides with the project root for
-    standalone repos and implicit-mode monorepo projects.
+    ``project_dir`` locates the project's ``.rlsbl/`` state -- the release
+    archives that decide whether this version already shipped, and the changes
+    directory the destroyed-tag guard reads (see
+    :func:`_abort_on_destroyed_tag`). When omitted it falls back to
+    ``primary_path``, which coincides with the project root for standalone
+    repos and implicit-mode monorepo projects.
+
+    Whether this is a first release is decided by the LEDGER, not by the tag
+    namespace. A tag read is still consulted, but only as corroboration, and
+    its third answer is respected: under ``--dry-run`` past the first recorded
+    mutation the tag read is UNANSWERABLE, and reading that as "no tag" is what
+    made every preview of an already-released project abort with a
+    destroyed-tag diagnosis (see :class:`~rlsbl.utils.LocalTagState`).
 
     Returns (current_version, new_version, bump_type, tag).
     Raises ReleaseValidationError on invalid bump type or duplicate tag.
     """
     from . import bump_version, tag_exists_locally
+    from ...ledger import (
+        require_checkout_contains_latest,
+        version_is_archived,
+    )
+    from ...utils import LocalTagState, local_tag_state
 
     if workspace_root is not None and releasable_name is not None:
         from ...workspace import read_releasable_version
@@ -605,21 +619,52 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
         else:
             return target.tag_format(version)
 
-    current_tag = _make_tag(current_version)
-    current_tag_exists = tag_exists_locally(current_tag)
+    _guard_project_dir = project_dir if project_dir is not None else primary_path
+    releases_dir = _resolve_releases_dir(
+        _guard_project_dir, releasable_name=releasable_name,
+        workspace_root=workspace_root,
+    )
 
-    if not current_tag_exists:
-        # A missing current tag normally means "first release". But a tag that
-        # was destroyed (e.g. by an interrupted or undone release) is
-        # indistinguishable from "never tagged" by this check alone. A
-        # finalized changelog for this exact version proves it was released
-        # before -- abort PRE-MUTATION rather than re-running the whole
-        # pipeline only to crash at the finalize step.
-        _guard_project_dir = project_dir if project_dir is not None else primary_path
+    # Pre-mutation: refuse to release on a history the latest release is not
+    # in. Such a release would revert it, and its changelog range would cover
+    # commits that already shipped.
+    tag_glob = None
+    if releasable_tag_fmt is not None and releasable_name is not None:
+        tag_glob = _releasable_tag_glob(releasable_tag_fmt, releasable_name)
+    elif monorepo_name:
+        tag_glob = target.monorepo_tag_glob(
+            monorepo_name, path=monorepo_project_path
+        )
+    # The ancestry question is asked IN the project's own directory: git
+    # answers it from any path inside the repository, and the process cwd is
+    # not something this function should depend on.
+    require_checkout_contains_latest(
+        releases_dir, tag_glob=tag_glob, cwd=_guard_project_dir,
+    )
+
+    current_tag = _make_tag(current_version)
+    released_before = version_is_archived(releases_dir, current_version)
+    tag_state = local_tag_state(current_tag, _guard_project_dir)
+
+    if released_before and tag_state is LocalTagState.ABSENT:
+        # The ledger says this version shipped and the tag is genuinely gone
+        # (not merely unanswerable): a destroyed tag. Abort PRE-MUTATION
+        # rather than run the whole pipeline and crash at finalization.
         _abort_on_destroyed_tag(
             _guard_project_dir, current_version, current_tag,
             releasable_name=releasable_name, workspace_root=workspace_root,
         )
+
+    first_release = not released_before and tag_state is not LocalTagState.PRESENT
+    if first_release:
+        # No archive and no tag. One more record can still contradict "never
+        # released": a finalized, immutable <version>.jsonl, which a repository
+        # whose archives predate anchoring still has.
+        if tag_state is LocalTagState.ABSENT:
+            _abort_on_destroyed_tag(
+                _guard_project_dir, current_version, current_tag,
+                releasable_name=releasable_name, workspace_root=workspace_root,
+            )
         new_version = current_version
         bump_type = None
         tag = current_tag
@@ -637,8 +682,10 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
         tag = _make_tag(new_version)
         log(f"New version: {new_version} ({bump_type})")
 
-    # Check tag doesn't already exist
-    if tag_exists_locally(tag):
+    # Check tag doesn't already exist. Read in the project's own directory,
+    # the same place the current-version tag was read, so the two cannot
+    # disagree about which repository they are describing.
+    if tag_exists_locally(tag, _guard_project_dir):
         raise ReleaseValidationError(f'tag "{tag}" already exists.')
 
     # Pre-mutation remote collision check. The computed tag must not already
@@ -698,18 +745,41 @@ def resolve_changes_dir(project_dir, releasable_name=None, workspace_root=None):
     return changes_dir
 
 
+def _resolve_releases_dir(project_dir, *, releasable_name=None,
+                          workspace_root=None):
+    """The release archives -- the LEDGER -- for this project or releasable.
+
+    A releasable keeps its archives beside its changelog under
+    ``.rlsbl-monorepo/releasables/<name>/releases/``; everyone else under
+    ``<project>/.rlsbl/releases/``. Derived from the changes-dir resolution so
+    the two never disagree about which project's state is being read.
+    """
+    from ...ledger import releases_dir_for_changes_dir
+
+    if releasable_name and workspace_root:
+        from ...workspace import get_releasable_changes_dir
+        changes_dir = get_releasable_changes_dir(str(workspace_root), releasable_name)
+    else:
+        from ...changelog.files import get_changes_dir
+        changes_dir = get_changes_dir(project_dir)
+    return releases_dir_for_changes_dir(changes_dir)
+
+
 def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
                             releasable_name=None, workspace_root=None):
-    """Abort a "first release" that is really a re-release of a destroyed tag.
+    """Abort a release of a version the record says already shipped, untagged.
 
-    ``compute_release_version`` enters the first-release path whenever the
-    current version's tag does not exist locally. But "never tagged", "tag
-    existed and was later destroyed" (e.g. by an interrupted or undone
-    release), and "tag exists under an old format after a tag_format change"
-    are indistinguishable to that check. A finalized, immutable
-    ``.rlsbl/changes/<version>.jsonl`` for the exact current version proves the
-    version is NOT new: it was released once and its changelog was locked at
-    release time -- only the tag went missing.
+    "Never released", "released and the tag was later destroyed" (an
+    interrupted or undone release), and "released under an old tag format" are
+    indistinguishable from the tag alone. Two records can tell them apart, and
+    either one is enough:
+
+    * the LEDGER -- ``.rlsbl/releases/v<version>.toml``, written by the release
+      at its archive step and read-only from that instant. This is the
+      authority, and it is checked first.
+    * the finalized, immutable ``.rlsbl/changes/<version>.jsonl``, locked at
+      release time. Still consulted, because a repository whose releases
+      predate archiving has that record and no archive.
 
     Without this guard the release would run the entire pipeline (checks,
     tests, secret scan, version-bump commit) and only crash at the finalize
@@ -717,28 +787,39 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     rollback. This guard fires PRE-MUTATION -- nothing has been modified yet
     when it aborts, so no rollback is needed.
 
-    The changes directory is resolved via :func:`resolve_changes_dir`, so
-    releasable-mode monorepos resolve to the releasable's changes directory.
-    A project with no changes directory at all cannot have a finalized version
-    file, so the guard is a no-op there.
+    Directories are resolved the same way the rest of the release flow resolves
+    them, so releasable-mode monorepos read the releasable's own state. A
+    project with neither record is a genuine first release and the guard is a
+    no-op.
     """
-    try:
-        changes_dir = resolve_changes_dir(
-            project_dir, releasable_name=releasable_name,
-            workspace_root=workspace_root,
-        )
-    except ReleaseValidationError:
-        # No changes directory -> changelogs were never set up here, so there
-        # can be no finalized version file to contradict a first release.
-        return
+    from ...ledger import archived_release_path, version_is_archived
 
-    finalized = os.path.join(changes_dir, f"{current_version}.jsonl")
-    if not os.path.isfile(finalized):
-        return
+    releases_dir = _resolve_releases_dir(
+        project_dir, releasable_name=releasable_name,
+        workspace_root=workspace_root,
+    )
+    if version_is_archived(releases_dir, current_version):
+        record = archived_release_path(releases_dir, current_version)
+        record_kind = "release archive"
+    else:
+        try:
+            changes_dir = resolve_changes_dir(
+                project_dir, releasable_name=releasable_name,
+                workspace_root=workspace_root,
+            )
+        except ReleaseValidationError:
+            # No changes directory and no archive -> nothing was ever released
+            # here, so nothing contradicts a first release.
+            return
+        finalized = os.path.join(changes_dir, f"{current_version}.jsonl")
+        if not os.path.isfile(finalized):
+            return
+        record = finalized
+        record_kind = "finalized changelog"
 
     raise ReleaseValidationError(
         f"version {current_version} appears to have been released before: its "
-        f"finalized changelog {finalized} exists, but no tag \"{tag}\" is "
+        f"{record_kind} {record} exists, but no tag \"{tag}\" is "
         f"present. This happens when the tag was deleted (e.g. by an "
         f"interrupted or undone release), OR when the tag format changed since "
         f"this version was released -- the version was tagged under an "

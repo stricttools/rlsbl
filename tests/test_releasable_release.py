@@ -16,7 +16,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import sync_member_versions, workspace_toml, with_root_member, make_workspace
+from conftest import make_workspace, sync_member_versions, tag_state_absent, tag_state_present, with_root_member, workspace_toml
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import (
     _format_releasable_tag,
@@ -293,7 +293,8 @@ class TestReleasableReleaseOrder:
 
 class TestComputeReleaseVersionReleasable:
 
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.bump_version")
     def test_uses_releasable_tag_format(self, mock_bump, _tag_local):
         """compute_release_version uses releasable tag format when provided."""
@@ -316,6 +317,7 @@ class TestComputeReleaseVersionReleasable:
         # target.monorepo_tag_format should NOT have been called
         mock_target.monorepo_tag_format.assert_not_called()
 
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_absent)
     @patch("rlsbl.commands.release.tag_exists_locally", return_value=False)
     @patch("rlsbl.commands.release.run")
     def test_no_releasable_tag_fmt_uses_target_tag(self, mock_run, _tag_local):

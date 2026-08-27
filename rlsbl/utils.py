@@ -350,6 +350,36 @@ def remote_branch_exists(branch, cwd=None):
         return False
 
 
+class LocalTagState(Enum):
+    """Tri-state outcome of a local tag lookup.
+
+    ``UNKNOWN`` is what :func:`tag_exists_locally` collapses onto ``False``:
+    a preview past its first recorded mutation, where the framework answers
+    every observe with a carrier standing in for a run that did not happen.
+    Callers whose question is "does this tag need creating?" may read that as
+    "no" -- a preview creates no tags either way. Callers whose question is
+    "was this version ever released?" may NOT: absence of an answer is not
+    evidence of absence, and reading it as one is how a healthy release turned
+    into a destroyed-tag diagnosis under ``--dry-run``.
+    """
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    UNKNOWN = "unknown"
+
+
+def local_tag_state(tag, cwd=None):
+    """Is *tag* in the local repository -- or is the question unanswerable?
+
+    The honest form of :func:`tag_exists_locally`; see :class:`LocalTagState`
+    for which callers may collapse ``UNKNOWN``.
+    """
+    output = run("git", ["tag", "-l", tag], cwd=cwd)
+    if effects.unsettled(output):
+        return LocalTagState.UNKNOWN
+    return LocalTagState.PRESENT if output.strip() else LocalTagState.ABSENT
+
+
 def tag_exists_locally(tag, cwd=None):
     """Check whether a git tag exists in the local repository.
 
@@ -358,11 +388,10 @@ def tag_exists_locally(tag, cwd=None):
     stale carrier. "The tag is not there yet" is the state a preview is
     describing anyway: a preview creates no tags, so one it cannot see is one
     the run it previews would still have to create.
+
+    Callers that cannot make that reading use :func:`local_tag_state`.
     """
-    output = run("git", ["tag", "-l", tag], cwd=cwd)
-    if effects.unsettled(output):
-        return False
-    return bool(output.strip())
+    return local_tag_state(tag, cwd) is LocalTagState.PRESENT
 
 
 def tag_exists_on_remote(tag, cwd=None):

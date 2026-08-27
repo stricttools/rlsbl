@@ -23,6 +23,9 @@ from rlsbl.release_file import ReleaseConfig
 from githarness import fake_run_dispatch, write_covered_unreleased
 
 
+from conftest import tag_state_present
+
+
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
     return ReleaseConfig(
@@ -98,7 +101,8 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -124,7 +128,8 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -174,7 +179,8 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True)
-    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[True, False, False])
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
+    @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
@@ -217,6 +223,7 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=True)
+    @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
     @patch("rlsbl.commands.release.tag_exists_locally")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
@@ -252,7 +259,7 @@ class TestPrivatePublishGuardrail:
 
         from rlsbl.commands.release import run_cmd
 
-        mock_tag_local.side_effect = [True, False, False]
+        mock_tag_local.side_effect = [False, False]
         mock_run.side_effect = fake_run_dispatch(head_sha="abc123")
 
         run_cmd(_rc(), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "none", "targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": False, "assets": True, "max_asset_size_mb": 50}}}))
