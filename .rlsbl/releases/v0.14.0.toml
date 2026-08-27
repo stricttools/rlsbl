@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds router watch paths, subtree publishing to mirror repositories, and the swift-apple target, and makes scaffold write the detected target into config so later runs stop relying on auto-detection."
 candidate_sha = "8bd485a6bbb073fc068820e9f69639edd58902b1"
 
 [tree_hashes]

@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "First release under the name rlsbl (renamed from share-it-on): a stdlib-only Python CLI with `release`, `status`, `scaffold` and `check-name`, registry auto-detection from package.json and pyproject.toml, context-aware scaffolding, and dual-publish CI for npm and PyPI."
 candidate_sha = "f675037ec8e2f13f19b939fd2a3e3dd3a0d5ef6b"
 
 [tree_hashes]

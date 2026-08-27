@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "The private post-release hook checks `dist/` against `max_asset_size_mb` before uploading assets to a GitHub Release."
 candidate_sha = "1d90128b899a2f8e8b9ce040ed7063d5e92c5edc"
 
 [tree_hashes]

@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "`watch` re-polls after the initial runs finish, so workflows triggered late by GitHub Release creation are no longer missed."
 candidate_sha = "66e40f798ba32948f4d7fda8abb10bdcad016871"
 
 [tree_hashes]

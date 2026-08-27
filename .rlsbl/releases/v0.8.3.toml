@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Fixes `watch` against short SHAs, reorders the pre-release hook to fail fast, and moves the CI templates to Node 24 and `go-version-file`."
 candidate_sha = "32faf741e7e459f8ac56c149b6c1a3e8eb5e67fb"
 
 [tree_hashes]

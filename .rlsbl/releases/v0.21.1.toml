@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds `--allow-dirty` to `release`, and forwards an explicit `--target` through `monorepo add` to scaffold."
 candidate_sha = "38f95c92f3ddf3d9dd9521a95e52fb3d97e12bb5"
 
 [tree_hashes]

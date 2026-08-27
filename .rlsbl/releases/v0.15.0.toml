@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Removes the built-in config migration engine in favour of an external tool, adds `--json` output to `status`, and warns about Go projects whose main package layout would break `go install`."
 candidate_sha = "9c5c8e37d87a205fd2efe4ba746af18985a1137b"
 
 [tree_hashes]

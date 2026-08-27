@@ -9,5 +9,5 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Housekeeping release with no user-facing changes. It was never tagged and its commits no longer resolve in the current history, so its archive records no anchor."
 unanchorable = true

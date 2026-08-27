@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds the `doctor` command with seven release-state checks and a `--fix` mode, hardens the advisory lock, and improves Go and npm scaffolding (goreleaser ldflags and main detection, version.go, package-manager detection)."
 candidate_sha = "a5f4b1d05c758630667fa90a23048ab00be35373"
 
 [tree_hashes]

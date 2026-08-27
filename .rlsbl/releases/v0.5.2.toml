@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "A round of fixes to version detection from source checkouts, registry-specific CLAUDE.md publish instructions, gitignore merging, and the Go name check's wording."
 candidate_sha = "c75a97b29b97e00c656ca3c5c3cf06a5067592b8"
 
 [tree_hashes]

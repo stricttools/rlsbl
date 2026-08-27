@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Seven new release targets (Swift, Cargo, Deno, Hex, Maven, Docker and versioned specs), opt-in target declaration in config, hybrid local/CI publishing, a private-registry workflow, and tomlkit-based pyproject.toml editing."
 candidate_sha = "86f3503b4138d9ec857f7c3e668740cc74be5f93"
 
 [tree_hashes]

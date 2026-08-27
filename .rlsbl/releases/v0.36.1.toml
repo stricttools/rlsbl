@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Monorepo target detection and PyPI builds resolve paths against the monorepo root and run from the sub-project directory, fixing validation, status and build failures when run from inside a package."
 candidate_sha = "e27951f4c94452e10087375aad2b190d4763f7f9"
 
 [tree_hashes]

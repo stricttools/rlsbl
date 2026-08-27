@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Hardening pass on `watch` and `record-gif`: clean exit on interrupt, AppleScript escaping in notifications, a clear error for a valueless `--registry`, and call-time config path resolution."
 candidate_sha = "7515099c12f44c94b94e855f6b29bcced6481b83"
 
 [tree_hashes]

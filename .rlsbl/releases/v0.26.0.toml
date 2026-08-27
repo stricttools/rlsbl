@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds the `yank` command for deprecating or deleting a past release, keeps `__version__` in sync on PyPI releases, and requires a known type on user-facing changelog entries."
 candidate_sha = "a63b3e59f308d76ee34cdfb5ab77c6a7dc77e2dc"
 
 [tree_hashes]

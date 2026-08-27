@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "The monorepo publish router inlines each sub-project's publish steps instead of calling reusable workflows, which fixes PyPI Trusted Publishing, plus a hash cache that skips regeneration when nothing changed."
 candidate_sha = "3e92b71b78c80852565ed636131f4e1254304a21"
 
 [tree_hashes]

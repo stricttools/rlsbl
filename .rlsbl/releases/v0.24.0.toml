@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds `edit-release`, which re-syncs a version's GitHub Release notes from CHANGELOG.md."
 candidate_sha = "e877b95513dda7c39142da4fd2e32d6c25bf325b"
 
 [tree_hashes]

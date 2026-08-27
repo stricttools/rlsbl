@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Rewrites the codehome target as a root-scoped, one-repo-per-plugin model with plain semver tags, and adds the `register` command and plugin.json validation."
 candidate_sha = "24e0ddc3ef7cc6f4ef4a23b82766f77bdcb4a790"
 
 [tree_hashes]

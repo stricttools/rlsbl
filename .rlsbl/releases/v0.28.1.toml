@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "`status` applies the same changelog-only exemptions validation does, gitignore updates append instead of three-way merging, and the changelog backfill script defaults to the current directory."
 candidate_sha = "52a2f9ebdc15a3317156b6dd246d53e57ab2110d"
 
 [tree_hashes]

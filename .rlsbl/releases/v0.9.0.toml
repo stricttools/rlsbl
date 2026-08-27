@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "A large feature and hardening release: the `unreleased` and `prs` commands, a config management system with schema-driven migrations, an advisory lock against concurrent releases, parallel CI watching and registry checks, and a long list of release-safety fixes."
 candidate_sha = "fd7b9952924b60b40965d64ca543a9f4d40ae5ca"
 
 [tree_hashes]

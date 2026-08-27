@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "A breaking cleanup: the JSONL changelog is mandatory, the deprecated flat lint `ignore` key and the BaseTarget `get_*` aliases are gone, and lint returns nothing rather than guessing Python when no language marker is present."
 candidate_sha = "735bce772d6f70ea0f0ea87f55055950c1944e40"
 
 [tree_hashes]

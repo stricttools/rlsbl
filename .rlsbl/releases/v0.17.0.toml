@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Template variables from every detected target are merged during scaffold and namespaced per target, `doctor` gains metadata-consistency checks across targets, and targets may live in sub-directories."
 candidate_sha = "cd880456c8507da956caf2557121a71a41fd6acb"
 
 [tree_hashes]

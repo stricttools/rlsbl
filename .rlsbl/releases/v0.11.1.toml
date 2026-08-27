@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "The release aborts when the local branch is behind the remote, and `watch` reports which workflows actually ran, warning when a publish workflow on disk never triggered."
 candidate_sha = "61a6522d5f4d490beb393acb54b77723449ddb09"
 
 [tree_hashes]

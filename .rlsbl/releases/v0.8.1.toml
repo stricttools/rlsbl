@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Ships the templates inside the wheel so `rlsbl scaffold` works from a PyPI install, plus fixes to undo prerequisites, TOML keyword injection, discover pagination and non-ASCII package.json handling."
 candidate_sha = "52922fafa1a2e8b07bc6fe55b349a1b896574795"
 
 [tree_hashes]

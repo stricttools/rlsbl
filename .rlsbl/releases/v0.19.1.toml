@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Test-only release: the deploy tests no longer depend on the CI runner's branch name."
 candidate_sha = "c4c26b63d0d2719dbf030f5f26d68bd1a9ceb47f"
 
 [tree_hashes]

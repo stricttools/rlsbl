@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Built-in lint runs only on library projects, and CHANGELOG.md is regenerated after the JSONL is finalized so the released version heading carries the version number."
 candidate_sha = "2af4ac518aa7ee28b4286090c1a7b1c710c361e7"
 
 [tree_hashes]

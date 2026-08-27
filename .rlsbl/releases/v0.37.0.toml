@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Restores the path-based changelog-only exemption alongside the trailer check, and syncs uv.lock, package-lock.json and go.sum during the release, including the modified lockfiles in the release commit."
 candidate_sha = "4df5198a8d0eaffe8adf6044a30e50e9e7fa5e05"
 
 [tree_hashes]

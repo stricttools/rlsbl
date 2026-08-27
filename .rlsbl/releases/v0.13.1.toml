@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Monorepo follow-ups: synced workflows run in the right sub-directory, `monorepo add` reports which manifest files a project is missing, and publish workflows are composed dynamically from each target's own template."
 candidate_sha = "f6cb61d9176fd6179e8292047d9192defd15a6cc"
 
 [tree_hashes]

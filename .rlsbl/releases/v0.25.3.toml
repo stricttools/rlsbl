@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Changelog validation measures the unreleased range from the last version tag rather than origin/main, so it answers what has not been released instead of what has not been pushed."
 candidate_sha = "e9354ae13bac22601f565b02aad59ec557e64ecd"
 
 [tree_hashes]

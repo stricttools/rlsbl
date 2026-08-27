@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Fixes the doubled output path when a PyPI target lives in a sub-directory, and includes hook-generated files in the release commit instead of leaving them dirty."
 candidate_sha = "2176636c9e3830bc21d91d0ead6451d5ad60552c"
 
 [tree_hashes]

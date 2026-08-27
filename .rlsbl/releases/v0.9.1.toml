@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Moves project info behind `config show` so bare `rlsbl config` prints help, and fixes porcelain parsing in the release race-condition check."
 candidate_sha = "6c23861af8e61b6c770178d8c456ee1c8d4da448"
 
 [tree_hashes]

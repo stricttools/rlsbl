@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Introduces the structured JSONL changelog: per-commit entries in `.rlsbl/changes/` with `add`, `validate` and `generate` commands, plus a backfill script that migrates an existing CHANGELOG.md into it."
 candidate_sha = "80478eaedd7f802e5f522778f30865481af75a9e"
 
 [tree_hashes]

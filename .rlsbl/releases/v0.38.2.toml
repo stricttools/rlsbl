@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "The publish router gains a no-op job so a plain-target release succeeds when every conditional publish job is skipped."
 candidate_sha = "0e86435b93401c14e6bc9371f65478427a445ed0"
 
 [tree_hashes]

@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds a release confirmation prompt, a `config` command reporting detected registries and scaffolding state, an `undo` command that reverts a botched release, and a single merged publish workflow for dual-registry projects."
 candidate_sha = "21650abf7e0b2bfe4633ac05b8a2f83079f68c39"
 
 [tree_hashes]

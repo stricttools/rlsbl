@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Extracts the documentation system into selfdoc -- the docs target now delegates to that CLI -- removes the codehome target pending a better design, and adds GitHub repo counts to name checks."
 candidate_sha = "0d10cd0a6c9f152e9368d934c0e41ab1b9b9e2c4"
 
 [tree_hashes]

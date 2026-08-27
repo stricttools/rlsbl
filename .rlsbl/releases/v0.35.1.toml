@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Release finalization writes the per-version .md file, the release stops false-positiving on files its own hooks and generators wrote, and the old path-pattern changelog exemption is removed."
 candidate_sha = "7c07833805fdc148daa6d0ae2b554e1d56c08131"
 
 [tree_hashes]

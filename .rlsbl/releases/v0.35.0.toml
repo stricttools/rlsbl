@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Fixes the release crash introduced by the previous version's changelog preview heading, raises the `max_entries_per_commit` default to match documented practice, warns about stale monorepo changelog entries at finalization, and resolves Action versions from a single table at scaffold time."
 candidate_sha = "714202db7bc1fb464cbdd57f0cf672411acaff52"
 
 [tree_hashes]

@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds `monorepo lint` for unregistered and stale workspace entries, and fixes a run of monorepo release bugs: scoped tags, sub-project working directories, version files missed by the release commit, and coverage filtering in the pre-push hook."
 candidate_sha = "0f85eaba8fd72267be817543ba2003fbc5dd428b"
 
 [tree_hashes]

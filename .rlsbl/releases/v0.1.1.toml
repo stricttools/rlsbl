@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Pins astral-sh/setup-uv to v7 in the scaffolded workflows. The templates referenced a v8 tag that does not exist, so CI failed on every scaffolded project."
 candidate_sha = "d10c913260840a7e35455f7d7723598db7009709"
 
 [tree_hashes]

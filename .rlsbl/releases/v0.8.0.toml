@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Replaces every format-specific scaffold merge strategy with a universal three-way merge against bases stored in `.rlsbl/bases/`, and reports the exact action taken for each scaffolded file."
 candidate_sha = "35ddd9d8dcff63ef32cdc53a3ae07ba3cfccf2c3"
 
 [tree_hashes]

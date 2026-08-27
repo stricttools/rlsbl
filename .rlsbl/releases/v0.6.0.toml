@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Scaffolded helper scripts become built-in subcommands, hooks move to `.rlsbl/hooks/`, the pre-push hook becomes a one-line exec so it updates with the tool, and the new `rlsbl watch` replaces the built-in background CI watcher."
 candidate_sha = "1e6f3a1b0b2ab866653d60a5b141cc1647b2c843"
 
 [tree_hashes]

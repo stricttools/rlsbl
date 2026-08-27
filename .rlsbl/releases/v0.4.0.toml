@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Go project support: scaffolding with GoReleaser, CI and publish workflows, name availability via pkg.go.dev, cross-compilation templates, and a release path for registries whose version lives in the git tag rather than in a file."
 candidate_sha = "57070abe299991b02439f78f612aa6bea8bcb4ea"
 
 [tree_hashes]

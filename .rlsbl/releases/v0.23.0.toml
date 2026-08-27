@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Migrates the CLI to strictcli (per-command help, typed flags), makes hooks scaffold-managed, runs tests and lint as built-in pre-release checks, and extends the library lint to Go and npm with AST and regex backends."
 candidate_sha = "5e4b6981fa743d9dd584f640de367f25a2118aba"
 
 [tree_hashes]

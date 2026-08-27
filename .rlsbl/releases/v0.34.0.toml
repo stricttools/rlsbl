@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds configurable changelog batch limits, so no entry may reference more commits than `max_commits_per_entry` and no commit may appear in more entries than `max_entries_per_commit`."
 candidate_sha = "91562c5b2983010ff340bec801653bfe9fc702a1"
 
 [tree_hashes]

@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Cross-registry `depends_on` edges in the workspace manifest, a `plain` target for projects with no build system, a Zig target, and a shared npm binary-wrapper module used by both Go and Zig."
 candidate_sha = "91be7a1ab4a1b0a678e3665deabe18a0f3137c00"
 
 [tree_hashes]

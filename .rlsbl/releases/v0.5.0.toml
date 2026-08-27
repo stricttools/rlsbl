@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds post-release hooks, a background CI watcher with desktop notifications, and ecosystem discovery: releases auto-tag projects with the rlsbl keyword and GitHub topic, and `rlsbl discover` lists them."
 candidate_sha = "56df9c786bfae3e3c578016b8342ded15ebe8bc2"
 
 [tree_hashes]

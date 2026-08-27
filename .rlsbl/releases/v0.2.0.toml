@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "CLI redesign: every command becomes top-level, the positional registry argument becomes the `--registry` flag, and `check-name` is renamed to `check`."
 candidate_sha = "e5c5a1a4c56bc0edee8c7d28eea7acda10e58570"
 
 [tree_hashes]

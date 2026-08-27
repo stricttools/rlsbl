@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Target selection for a release becomes explicit: `--include`/`--exclude` flags plus a `release_targets` config key, replacing the single-purpose `--skip-docs`."
 candidate_sha = "af41c0564bec8050b5de7ced2b5a65534507cdf9"
 
 [tree_hashes]

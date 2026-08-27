@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Restores the changelog-only path exemption, rolls a failed push back locally, teaches `undo` about the two-commit release pattern, and moves monorepo Go tags to the path-based scheme the module proxy requires."
 candidate_sha = "609fc420cca0dd747335ccfe14fefb90edd43a01"
 
 [tree_hashes]

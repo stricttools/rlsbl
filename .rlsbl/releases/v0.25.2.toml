@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Infrastructure only: a test fixture pins its branch name so the suite passes on CI."
 candidate_sha = "86a78c5efede64f971380a719f1e86665018ec21"
 
 [tree_hashes]

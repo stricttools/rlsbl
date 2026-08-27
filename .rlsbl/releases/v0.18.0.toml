@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Go binary distribution: an opt-in Homebrew tap and an npm binary-wrapper package covering six platforms. Release target selection becomes config-only, so the `--include`/`--exclude` flags are removed."
 candidate_sha = "c439b13a907251edbbcdb060a05f7e5e10088665"
 
 [tree_hashes]

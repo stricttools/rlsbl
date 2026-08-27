@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Scaffold updates learn to merge rather than skip: JSON deep-merge for `.claude/settings.json` and comment-preserving job-level merge for CI workflows, with CHANGELOG.md, LICENSE and hooks formally user-owned."
 candidate_sha = "b4681e11ef90a53c25d6c98b1167470b90c660f2"
 
 [tree_hashes]

@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Release hooks stream their output live and report their real exit code, and the hook timeout becomes configurable instead of a silent 120-second kill."
 candidate_sha = "35ba2358e288b192a3731d2af3dfe274dc68033f"
 
 [tree_hashes]

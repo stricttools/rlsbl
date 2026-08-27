@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "`check` requires an explicit `--target` and gains multi-name checking with rate limiting; monorepo gains `check-names`, `outdated` and `release-order`, dependency columns in `status`, and PyPI path-dependency rewriting at build time."
 candidate_sha = "86531176037dc28c8c299bc937b2df1ec0a10e22"
 
 [tree_hashes]

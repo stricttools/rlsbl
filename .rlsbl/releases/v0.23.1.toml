@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Test and packaging fixes only: the npm wrapper test installs its Python dependencies and stops using the removed `--registry` flag."
 candidate_sha = "447e868493ed6601dd06c1f2b2f89222f946cf71"
 
 [tree_hashes]

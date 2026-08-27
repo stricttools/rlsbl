@@ -9,7 +9,7 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Makes the push timeout configurable so releases stop failing on repositories with slow pre-push hooks, and fixes rlsbl's own hook missing the Go VERSION file."
 candidate_sha = "ae2b0bdcfca7c2bf812cfc530b6841d18bf5b7fa"
 
 [tree_hashes]

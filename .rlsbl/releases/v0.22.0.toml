@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "Adds the library boundary lint for monorepo libraries, and makes name checking far more honest: PyPI Simple API lookups, stdlib collision detection, visual-similarity variants, and npm moniker conflicts."
 candidate_sha = "1d262f801345b20038352f6b80997af4b7e80c97"
 
 [tree_hashes]

@@ -9,7 +9,7 @@ format_version = 1
 bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
-description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+description = "A broad scaffold and release cycle: centralized GitHub Actions versions, `scaffold --dry-run`, stale pre-push hook regeneration, user-owned custom workflow files, config-driven per-target publishing, the `dev install` command, and a set of monorepo publish fixes."
 candidate_sha = "666e41db953d1635b3a5fccac06f9b8d71ef0077"
 
 [tree_hashes]
