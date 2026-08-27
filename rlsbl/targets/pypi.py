@@ -643,9 +643,14 @@ build-backend = "hatchling.build"
                 f"{pkg_name}=={pep440_version}? [y/N] "
             ).strip().lower()
         except (EOFError, KeyboardInterrupt):
+            # Close the prompt line the abandoned ``input`` left the cursor on.
+            # The newline belongs here, not in the message: the caller indents
+            # and prints the message itself, so folding it in emitted a
+            # whitespace-only line.
+            print()
             return YankOutcome(
                 status=YankStatus.INCOMPLETE,
-                message="\n  pypi: skipped -- remember to yank manually on PyPI",
+                message="pypi: skipped -- remember to yank manually on PyPI",
             )
         if answer == "y":
             return YankOutcome(
