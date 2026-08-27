@@ -42,6 +42,17 @@ class ExtractError(RlsblError):
     """Error during extract or absorb operations."""
 
 
+#: Seconds a single git invocation in a conversion may take. Generous next to
+#: the 120s the shared runner uses, because a conversion's git calls include
+#: whole-repository clones and merges rather than status reads -- and bounded,
+#: because a conversion that hangs forever is worse than one that fails.
+GIT_TIMEOUT = 600
+
+#: Seconds a git-filter-repo run may take. Larger again: rewriting every commit
+#: of a long history is the slowest thing either conversion does.
+FILTER_REPO_TIMEOUT = 3600
+
+
 def require_filter_repo():
     """Raise if git-filter-repo is not installed.
 
@@ -58,7 +69,7 @@ def require_filter_repo():
     return path
 
 
-def _run_git(cwd, *args):
+def _run_git(cwd, *args, timeout=GIT_TIMEOUT):
     """Run a git command and return stdout. Raises subprocess.CalledProcessError on failure."""
     result = effects.run(
         ["git"] + list(args),
@@ -66,6 +77,7 @@ def _run_git(cwd, *args):
         capture_output=True,
         text=True,
         check=True,
+        timeout=timeout,
     )
     return result.stdout.strip()
 
@@ -81,6 +93,7 @@ def _run_filter_repo(cwd, *args):
         effects.run(
             ["git-filter-repo", *args],
             cwd=str(cwd), check=True, capture_output=True, text=True,
+            timeout=FILTER_REPO_TIMEOUT,
         )
     except subprocess.CalledProcessError as exc:
         raise ExtractError(
@@ -112,7 +125,7 @@ def _commit_resolves(repo, commit_hash):
     """Whether ``commit_hash`` resolves to an existing commit object in ``repo``."""
     result = effects.run(
         ["git", "cat-file", "-e", commit_hash + "^{commit}"],
-        cwd=str(repo), capture_output=True, text=True,
+        cwd=str(repo), capture_output=True, text=True, timeout=GIT_TIMEOUT,
     )
     return result.returncode == 0
 
@@ -375,9 +388,10 @@ def cmd_absorb(
     try:
         clone_path = os.path.join(tmp_root, "clone")
         _run_git(workspace_root, "clone", "--no-local", source_repo_path, clone_path)
-        effects.run(
-            ["git-filter-repo", "--to-subdirectory-filter", dest_path, "--force"],
-            cwd=clone_path, check=True, capture_output=True, text=True,
+        # Through the shared runner, so the timeout and the error wrapping are
+        # the ones every filter-repo call in a conversion gets.
+        _run_filter_repo(
+            clone_path, "--to-subdirectory-filter", dest_path, "--force",
         )
         commit_map_path = os.path.join(
             clone_path, ".git", "filter-repo", "commit-map"
