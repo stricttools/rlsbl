@@ -9,7 +9,6 @@ and fall through to a stderr line for anything else. The dispatch is now
   renders as the same named skip line it printed before.
 """
 
-from unittest.mock import patch
 
 import pytest
 

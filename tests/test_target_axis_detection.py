@@ -12,7 +12,6 @@ belong to no current target. Targets that inspect file CONTENT keep their
 overrides -- that is the honest half of the axis, and this file pins it.
 """
 
-import os
 
 import pytest
 
