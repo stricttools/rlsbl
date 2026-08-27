@@ -83,7 +83,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.117.2",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 55 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 54 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite).",
   "proc_observe_allowlist": [
     [
       "git",
@@ -1799,7 +1799,7 @@
     },
     "monorepo": {
       "name": "monorepo",
-      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 19 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, extract-releasable, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.",
+      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 18 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.",
       "commands": {
         "init": {
           "name": "init",
@@ -2303,12 +2303,24 @@
         },
         "extract": {
           "name": "extract",
-          "help": "Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.",
+          "help": "Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their anchors, config and hooks -- is transplanted, the anchors and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. Refuses a mirrored releasable, one owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.",
           "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "delete-with-rm",
+              "help": "Delete the departed members' directories with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
+            }
+          ],
           "args": [
             {
-              "name": "package_name",
-              "help": "Name of the package as defined in workspace.toml to extract into a standalone repo",
+              "name": "releasable_name",
+              "help": "Name of the releasable group in workspace.toml to extract, with every member it owns",
               "value_schema": {
                 "type": "string"
               },
@@ -2316,7 +2328,7 @@
             },
             {
               "name": "target_path",
-              "help": "Filesystem path where the new standalone repository will be created",
+              "help": "Filesystem path where the new repository will be created (must not exist)",
               "value_schema": {
                 "type": "string"
               },
@@ -2367,29 +2379,6 @@
             {
               "name": "dest_path",
               "help": "Destination directory (and workspace path) the source repo's history is rewritten under",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "required"
-            }
-          ]
-        },
-        "extract-releasable": {
-          "name": "extract-releasable",
-          "help": "Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.",
-          "effect": "mutating",
-          "args": [
-            {
-              "name": "releasable_name",
-              "help": "Name of the releasable group in workspace.toml to extract",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "required"
-            },
-            {
-              "name": "target_path",
-              "help": "Filesystem path where the new repository will be created",
               "value_schema": {
                 "type": "string"
               },
