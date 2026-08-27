@@ -466,11 +466,10 @@ def write_matrix(project_root: str) -> bool:
         with open(path, encoding="utf-8") as f:
             if f.read() == fresh:
                 return False
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(fresh)
-    os.replace(tmp, path)
+    from .. import effects
+
+    effects.makedirs(os.path.dirname(path), exist_ok=True)
+    effects.atomic_write_text(path, fresh)
     return True
 
 
