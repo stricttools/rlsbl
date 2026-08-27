@@ -107,3 +107,4 @@
 {"format_version":1,"id":"18cfc40f6a9f8109f1a9cf41fca041ba84b8e90983f20c5b","commits":["6a821f224fab9cdc7599ff213f98fed969a6cc35"],"user_facing":true,"description":"**Releases no longer abort when a finalize file is unchanged.** A commit now names only the files whose staging actually changes the tree, so a byte-identical `CHANGELOG.md` regeneration no longer makes safegit refuse the release's finalize commit.","type":"fix"}
 {"format_version":1,"id":"18cfc42f95bba2e9aed8d95176474a0e885517a55e5d6c77","commits":["3faea4974aca2e8a75b60cf79be89b918864cdbc"],"user_facing":false}
 {"format_version":1,"id":"18cfc449632c6d694af3d2f559bf43359e5b98a30dc8b2f0","commits":["0d67e41c9f64d934d514fe6f3edd45e6ab06fba3"],"user_facing":false}
+{"format_version":1,"id":"18cfc49c873d48dd7467aea2bd7f4557aa6fd48ce8e007fa","commits":["259ed19fd82fe3a6effbeae73812494b36337362"],"user_facing":false}
