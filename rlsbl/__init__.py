@@ -2133,7 +2133,20 @@ def cmd_mono_migrate_releasable(ctx, releasable_name):
         cleanup = result.get("cleanup") or []
 
         print(f"Migrated releasable '{releasable_name}'")
-        print(f"  Changelogs merged: {changelogs.get('entries_merged', 0)} entries from {', '.join(changelogs.get('source_projects', []))}")
+        # entries_merged counts everything now in the releasable's
+        # unreleased.jsonl -- its own pre-existing entries plus the member
+        # contributions -- while source_projects lists only the members that
+        # contributed, which can be empty.
+        entry_count = changelogs.get("entries_merged", 0)
+        sources = changelogs.get("source_projects") or []
+        if sources:
+            print(f"  Changelogs: {entry_count} unreleased entries, "
+                  f"including contributions from {', '.join(sources)}")
+        elif entry_count:
+            print(f"  Changelogs: {entry_count} unreleased entries, "
+                  "all pre-existing in the releasable (no member contributed)")
+        else:
+            print("  Changelogs: no unreleased entries to merge")
         print(f"  Version: {versions.get('version', 'N/A')} ({versions.get('status', 'N/A')})")
         if tag.get("tag"):
             print(f"  Tag created: {tag['tag']} (from {tag.get('source_tag', 'N/A')})")
