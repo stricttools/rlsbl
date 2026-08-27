@@ -5,6 +5,7 @@ import sys
 import time
 
 from ...git_util import validate_subtree_remote_ssh_host
+from ...ownership import OwnershipScope
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace, save_workspace, WorkspaceProject, WORKSPACE_DIR, WORKSPACE_FILE
 from ...workspace_graph import WorkspaceGraph
@@ -17,8 +18,64 @@ def _cmd_init(flags, project_root):
     if os.path.isfile(ws_file):
         print("Error: Workspace already initialized.", file=sys.stderr)
         sys.exit(1)
-    save_workspace(root_dir, [])
+
+    from ...ownership import ROOT_MEMBER_NAME, ROOT_MEMBER_PATH
+    from ...workspace import Releasable
+
+    # Every workspace has a root member, and its KIND is a decision only the
+    # operator can make: a dev node whose root files need no changelog
+    # coverage, or a member of a named releasable whose root files do.
+    root_releasable = flags.get("root-releasable") or None
+    root_tag_format = flags.get("root-tag-format") or None
+    root_dev_node = bool(flags.get("root-dev-node"))
+
+    if not root_dev_node and not root_releasable:
+        print(
+            "Error: the root member's kind must be declared. Every workspace "
+            "declares the repository root as a member, and it is either:\n"
+            "  --root-dev-node                  a dev node -- root files are "
+            "exempt from changelog coverage\n"
+            "  --root-releasable <name> --tag-format <fmt>\n"
+            "                                   a member of a named releasable "
+            "-- root files get changelog coverage,\n"
+            "                                   and the releasable's tags use "
+            "the format you name\n"
+            "There is no default: which one a repository wants depends on "
+            "whether its root files ship to users.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if root_releasable and not root_tag_format:
+        print(
+            "Error: --tag-format is required with --root-releasable. A "
+            "releasable that owns the repository root must never inherit a "
+            "default tag format: pass \"v{version}\" for bare version tags, or "
+            "\"{name}@v{version}\" for the workspace scheme.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    root_member = {"path": ROOT_MEMBER_PATH, "name": ROOT_MEMBER_NAME}
+    if root_releasable:
+        root_member["releasable"] = root_releasable
+        releasables = [Releasable(name=root_releasable, tag_format=root_tag_format)]
+    else:
+        # A dev-node root member is both: dev_only (nothing user-facing may
+        # depend on it) and outside every releasable (it is never released).
+        root_member["dev_only"] = True
+        root_member["releasable"] = False
+        releasables = []
+
+    save_workspace(root_dir, [root_member], releasables=releasables)
     print("Initialized monorepo workspace in .rlsbl-monorepo/")
+    if root_releasable:
+        print(
+            f"Root member '{ROOT_MEMBER_NAME}' belongs to releasable "
+            f"'{root_releasable}' (tag format: {root_tag_format})."
+        )
+    else:
+        print(f"Root member '{ROOT_MEMBER_NAME}' is a dev node.")
 
     rel_ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
     if not flags.get("auto-commit", True):
@@ -54,8 +111,46 @@ def _cmd_add(args, flags, project_root, dry_run=False):
             print("Hint: create a project manifest (e.g., package.json, pyproject.toml, go.mod, version.json) in the directory.", file=sys.stderr)
             sys.exit(1)
 
-    name = flags.get("name") or os.path.basename(path.rstrip("/"))
+    from ...ownership import ROOT_MEMBER_NAME, ROOT_MEMBER_PATH
+    from ...workspace import is_root_path
+
     watch_raw = flags.get("watch")
+    if watch_raw:
+        print(
+            "Error: --watch is no longer supported. Territory is derived from "
+            "declared member paths, never enumerated: every file belongs to "
+            "the member with the most specific declared path, and the root "
+            "member owns everything no other member claims. If this member "
+            "needs to own files outside its own directory, register that "
+            "directory as a member of its own.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    adding_root = is_root_path(path)
+    if adding_root:
+        path = ROOT_MEMBER_PATH
+        name = flags.get("name") or ROOT_MEMBER_NAME
+        if name != ROOT_MEMBER_NAME:
+            print(
+                f"Error: the root member (path \".\") is named "
+                f"'{ROOT_MEMBER_NAME}' and nothing else -- job keys, router "
+                f"filters and check regexes are derived from that name. Drop "
+                f"--name, or pass --name {ROOT_MEMBER_NAME}.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    else:
+        name = flags.get("name") or os.path.basename(path.rstrip("/"))
+        if name == ROOT_MEMBER_NAME:
+            print(
+                f"Error: '{ROOT_MEMBER_NAME}' is reserved for the member that "
+                f"owns the repository root (path \".\"). Choose a different "
+                f"--name for the member at '{path}'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     subtree_remote = flags.get("subtree-remote")
     depends_on_raw = flags.get("depends-on")
     library_raw = flags.get("library")
@@ -150,8 +245,6 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         validate_subtree_remote_ssh_host(subtree_remote, root)
 
     project = {"path": path, "name": name}
-    if watch_raw:
-        project["watch"] = [w.strip() for w in watch_raw.split(",")]
     if subtree_remote:
         project["subtree_remote"] = subtree_remote
     if depends_on:
@@ -295,11 +388,13 @@ def _latest_tag_for_glob(tag_glob):
     return None
 
 
-def _coverage_column(latest_tag, changes_dir, scope_projects):
+def _coverage_column(latest_tag, changes_dir, scope):
     """Return the Coverage-column string for one status row.
 
     Real JSONL coverage: the commits since *latest_tag*, scoped to the row's
-    project(s), minus the exempt ones, cross-referenced against the row's
+    members via *scope* (an :class:`~rlsbl.ownership.OwnershipScope`, which
+    carries the whole member list), minus the exempt ones, cross-referenced
+    against the row's
     ``unreleased.jsonl``. Rendered ``covered/tracked`` with a
     ``(N exempted)`` suffix, matching ``rlsbl status``.
 
@@ -317,14 +412,16 @@ def _coverage_column(latest_tag, changes_dir, scope_projects):
     from ...changelog.files import read_unreleased
     from ...changelog.resolve import _git_log_hashes, resolve_hashes
     from ...changelog.validate import filter_exempt_commits
-    from ...git_util import filter_commits_for_releasable
+    from ...git_util import filter_commits_for_scope
 
     range_spec = f"{latest_tag}..HEAD" if latest_tag else "HEAD"
     commits = _git_log_hashes(range_spec)
     # Scope first, then exempt -- the order the authoritative coverage check
     # uses, so an unrelated package's changelog churn is never counted here.
-    if scope_projects:
-        in_scope = filter_commits_for_releasable(set(commits), scope_projects)
+    if scope is not None:
+        in_scope = filter_commits_for_scope(
+            set(commits), scope, operation="monorepo status coverage",
+        )
         commits = [c for c in commits if c in in_scope]
     non_exempt, _stats = filter_exempt_commits(commits)
     exempted = len(commits) - len(non_exempt)
@@ -372,7 +469,8 @@ def _cmd_status_explicit(root, projects):
         tag_glob = resolve_monorepo_tag_glob(None, root, releasable=rel)
         latest_tag = _latest_tag_for_glob(tag_glob)
         coverage = _coverage_column(
-            latest_tag, get_releasable_changes_dir(root, rel.name), members,
+            latest_tag, get_releasable_changes_dir(root, rel.name),
+            OwnershipScope.for_members(projects, members),
         )
         member_names = ", ".join(m["name"] for m in members)
         members_col = f"{len(members)} ({member_names})" if members else "0"
@@ -394,7 +492,8 @@ def _cmd_status_explicit(root, projects):
         tag_glob = resolve_monorepo_tag_glob(proj, root, releasable=None)
         latest_tag = _latest_tag_for_glob(tag_glob)
         coverage = _coverage_column(
-            latest_tag, get_changes_dir(os.path.join(root, path)), [proj],
+            latest_tag, get_changes_dir(os.path.join(root, path)),
+            OwnershipScope.for_member(projects, proj),
         )
         rows.append((name, "project", str(version), latest_tag or "(none)", coverage, "-"))
 
@@ -421,13 +520,15 @@ def _cmd_status(flags, project_root):
         print("No projects in workspace.")
         return
 
-    # Explicit releasable mode: render per-releasable rows (versions, tags,
-    # coverage, members). Standalone projects keep their own rows. Implicit
-    # mode falls through to the rich per-project table below.
+    # Every workspace declares its releasables, so the per-releasable summary
+    # (versions, tags, coverage, members) is always rendered first. The rich
+    # per-project table below still follows it: the two answer different
+    # questions -- what is released, and what each member is -- and the
+    # per-project columns (target, path, deps, remote) exist nowhere else.
     from ...workspace import is_explicit_mode
     if is_explicit_mode(root):
         _cmd_status_explicit(root, projects)
-        return
+        print()
 
     # Build dependency graph
     graph = WorkspaceGraph(root, projects)
@@ -485,7 +586,7 @@ def _cmd_status(flags, project_root):
         coverage_str = _coverage_column(
             latest_tag,
             _cl_changes_dir or get_changes_dir(os.path.join(root, path)),
-            [proj],
+            OwnershipScope.for_member(projects, proj),
         )
 
         # Dependency counts

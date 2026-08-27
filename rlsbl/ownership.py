@@ -177,16 +177,25 @@ def owner_of(filepath, members):
     return _most_specific_claim(normalized, members)
 
 
-def member_for_directory(dirpath, members):
+def member_for_directory(dirpath, members, *, include_root):
     """Return the member whose territory a *directory* falls in.
 
     The same most-specific-path rule :func:`owner_of` uses, minus the
     tool-owned exclusion: a directory is a place to run a command from, not a
-    file needing a changelog owner, so ``.rlsbl-monorepo/releasables/core``
-    resolves to the root member rather than to nothing.  ``""`` (the repository
-    root itself) resolves to the root member.
+    file needing a changelog owner.
+
+    *include_root* decides whether the root member may answer. It is mandatory
+    because the two questions it separates are genuinely different: file
+    attribution always gives the root member the residual, while "which project
+    am I standing in?" is a question several commands answer with "none of
+    them, you are at the workspace root" and act on. Callers state which they
+    are asking.
     """
-    return _most_specific_claim(normalize_path(dirpath), members)
+    normalized = normalize_path(dirpath)
+    candidates = members if include_root else [
+        m for m in members if not is_root_member(m)
+    ]
+    return _most_specific_claim(normalized, candidates)
 
 
 def _most_specific_claim(normalized, members):

@@ -22,6 +22,27 @@ from . import PROJECT_MANIFESTS
 from .. import effects
 
 
+def _is_manifestless_root_member(ctx, proj):
+    """Is *proj* the root member of a repository with no manifest at its root?
+
+    The root member is mandatory and owns whatever no other member claims, so a
+    workspace whose root is not itself a package still has one. Such a member
+    has no target and no manifest by construction, and the checks that demand
+    either exempt it -- for every other member, a missing manifest still means
+    a stale or unreleasable entry.
+    """
+    from ..ownership import is_root_member
+
+    if not is_root_member(proj):
+        return False
+    root = str(ctx.workspace_root)
+    if os.path.isfile(os.path.join(root, RLSBL_CONFIG)):
+        return False
+    return not any(
+        os.path.isfile(os.path.join(root, m)) for m in PROJECT_MANIFESTS
+    )
+
+
 def register_workspace_checks(app):
     """Register workspace-tag checks on *app*."""
 
@@ -113,7 +134,9 @@ def register_workspace_checks(app):
 
         checkable = [
             proj for proj in ctx.projects
-            if not project_is_dev_only(proj) and not _is_releasable_false(proj)
+            if not project_is_dev_only(proj)
+            and not _is_releasable_false(proj)
+            and not _is_manifestless_root_member(ctx, proj)
         ]
 
         missing = []
@@ -256,6 +279,11 @@ def register_workspace_checks(app):
 
         stale = []
         for proj in ctx.projects:
+            # A root member need not carry a manifest of its own: it exists to
+            # own the residual (README, scripts, CI config), and a repository
+            # whose root is not itself a package has nothing to declare there.
+            if _is_manifestless_root_member(ctx, proj):
+                continue
             dir_path = os.path.join(root, proj["path"])
             if not os.path.isdir(dir_path):
                 stale.append(proj["path"])

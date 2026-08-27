@@ -1613,9 +1613,26 @@ def cmd_chlog_remap(ctx, map_file, from_journal, stdin):
 mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml.")
 
 
+@strictcli.choice(
+    "root-dev-node",
+    help="The root member is a dev node: files at the repository root that no other member claims need no changelog coverage.",
+)
+class RootDevNode:
+    pass
+
+
+@strictcli.choice(
+    "root-releasable",
+    help="The root member belongs to a named releasable: files at the repository root that no other member claims get changelog coverage under it.",
+)
+class RootReleasable:
+    value: str = strictcli.member_value(help="name of the releasable the root member belongs to; it is created in [[releasables]]")
+    tag_format: str = strictcli.sub_flag(presence="required", help="tag format for that releasable, e.g. \"v{version}\" for bare version tags or \"{name}@v{version}\" for the workspace scheme; a root releasable never inherits a default")
+
+
 @mono.command(
     name="init",
-    help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
+    help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, in explicit mode, carrying the mandatory root member whose kind you declare. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
     effect="mutating",
     dry_run_supported=False,
     dry_run_unsupported_reason=(
@@ -1623,9 +1640,15 @@ mono = app.group("monorepo", help="Manage monorepo workspaces with multiple inde
         "no workspace to preview against until it exists"
     ),
 )
+@strictcli.choice_flag(
+    "root-member",
+    help="What kind of member owns the repository root. Every workspace has exactly one root member, and it owns every tracked file no other member claims; whether those files need changelog coverage is a per-repository decision with no default.",
+    presence="required",
+    elect_by="member-flags", choices=[RootDevNode, RootReleasable],
+)
 @strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed)")
 @effects.handler
-def cmd_mono_init(ctx, auto_commit):
+def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
     """Create a new monorepo workspace with .rlsbl-monorepo/ and workspace.toml."""
     auto_commit = _opt_default(auto_commit, True)
     # monorepo init does NOT require a pre-existing .rlsbl/ marker --
@@ -1649,7 +1672,13 @@ def cmd_mono_init(ctx, auto_commit):
               f"Use monorepo init from {existing_project} to convert it.", file=sys.stderr)
         sys.exit(1)
     from .commands.monorepo import _cmd_init
-    _cmd_init({"auto-commit": auto_commit}, project_root=root)
+    init_flags = {"auto-commit": auto_commit}
+    if isinstance(root_member, RootReleasable):
+        init_flags["root-releasable"] = root_member.value
+        init_flags["root-tag-format"] = root_member.tag_format
+    else:
+        init_flags["root-dev-node"] = True
+    _cmd_init(init_flags, project_root=root)
 
 
 @mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.", effect="mutating")
