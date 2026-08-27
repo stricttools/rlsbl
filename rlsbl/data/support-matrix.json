@@ -1,0 +1,2361 @@
+{
+  "axes": [
+    {
+      "doc": "Ecosystem label shown in listings.",
+      "name": "ecosystem"
+    },
+    {
+      "doc": "Whether detection runs without configuration: yes, no, or conditional.",
+      "name": "auto_detectable"
+    },
+    {
+      "doc": "Filenames whose presence in a directory declares this target.",
+      "name": "detection_files"
+    },
+    {
+      "doc": "Whether detection inspects file content (the target overrides detect).",
+      "name": "content_based_detection"
+    },
+    {
+      "doc": "File that holds the version, or null when the target inherits one.",
+      "name": "version_file"
+    },
+    {
+      "doc": "Standalone release tag pattern.",
+      "name": "tag_format"
+    },
+    {
+      "doc": "Monorepo release tag pattern.",
+      "name": "monorepo_tag_format"
+    },
+    {
+      "doc": "Glob matching every monorepo version tag for a package.",
+      "name": "monorepo_tag_glob"
+    },
+    {
+      "doc": "Extra tags created alongside the primary release tag.",
+      "name": "companion_tags"
+    },
+    {
+      "doc": "How the ecosystem spells the semver version 1.2.3-rc.1.",
+      "name": "format_version"
+    },
+    {
+      "doc": "How this target's registry is spelled in user-facing output.",
+      "name": "registry_display_name"
+    },
+    {
+      "doc": "Seconds allowed for this target's build before it is a timeout.",
+      "name": "build_timeout_default"
+    },
+    {
+      "doc": "Reads a package name from its manifest (overrides read_name).",
+      "name": "supports_read_name"
+    },
+    {
+      "doc": "Reads license and description from its manifest (overrides read_metadata).",
+      "name": "supports_read_metadata"
+    },
+    {
+      "doc": "Can ask its registry whether a version is published.",
+      "name": "supports_publication_probe"
+    },
+    {
+      "doc": "Its registry answers a latest-version query.",
+      "name": "supports_version_query"
+    },
+    {
+      "doc": "A name can be claimed on its registry by publishing a placeholder.",
+      "name": "supports_name_claim"
+    },
+    {
+      "doc": "Environment variables, any one of which authenticates a name claim.",
+      "name": "claim_token_env_vars"
+    },
+    {
+      "doc": "Its registry offers a removal action for a published version.",
+      "name": "supports_yank"
+    },
+    {
+      "doc": "Ships ci.yml.tpl, so scaffold can generate a CI workflow.",
+      "name": "provides_ci_templates"
+    },
+    {
+      "doc": "rlsbl dev install has something to run for this target.",
+      "name": "supports_dev_install"
+    },
+    {
+      "doc": "The local-install specs, keyed by mode (global, venv).",
+      "name": "dev_install_command"
+    },
+    {
+      "doc": "rlsbl can read its sources to follow imports (overrides find_dead_modules).",
+      "name": "supports_import_analysis"
+    },
+    {
+      "doc": "Import-cycle detection is meaningful for this ecosystem.",
+      "name": "supports_circular_dep_analysis"
+    },
+    {
+      "doc": "Its manifest states dependency floors a lockfile can resolve ahead of.",
+      "name": "supports_dep_floors"
+    },
+    {
+      "doc": "Which library-lint language its sources are written in, or null.",
+      "name": "lint_language"
+    },
+    {
+      "doc": "Ships a built-in test runner (overrides run_tests).",
+      "name": "has_builtin_test_runner"
+    },
+    {
+      "doc": "Workspace members of this target resolve into ONE shared environment.",
+      "name": "shares_workspace_environment"
+    }
+  ],
+  "checks": {
+    "branch-sync": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-batch-commits": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-batch-entries": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-coverage": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-entry": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-format-version": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-format-version-gate": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-hashes": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-orphans": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-range": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-schema": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "changelog-user-facing": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "circular-deps": {
+      "excluded": {
+        "go": "compiler rejects circular imports"
+      },
+      "kind": "targets",
+      "targets": [
+        "dart",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "config-schema": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "cross-repo-path-sources": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "dead-modules": {
+      "kind": "targets",
+      "targets": [
+        "dart",
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "dead-modules-stale": {
+      "kind": "targets",
+      "targets": [
+        "dart",
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "dead-workspace-packages": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "dep-floors": {
+      "kind": "targets",
+      "targets": [
+        "go",
+        "npm",
+        "pypi"
+      ]
+    },
+    "deps-dev-in-lib": {
+      "kind": "targets",
+      "targets": [
+        "dart",
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "deps-runtime-test-only": {
+      "kind": "targets",
+      "targets": [
+        "dart",
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "deps-stale": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "deps-undeclared": {
+      "kind": "targets",
+      "targets": [
+        "dart",
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "deps-unused": {
+      "kind": "targets",
+      "targets": [
+        "dart",
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "description-consistency": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "dev-only-boundary": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "dev-overlay-drift": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "dunder-version-missing": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "format": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "format-scope-guard": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "github-release": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "go-companion-tags": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "layers-violations": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "library-lint": {
+      "kind": "targets",
+      "targets": [
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "license-consistency": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "license-file": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "lint": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "lint-scope-guard": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "local-tag": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "lock": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "maven-central-metadata": {
+      "kind": "targets",
+      "targets": [
+        "maven"
+      ]
+    },
+    "member-pytest-config": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "mixed-tag-schemes": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "name-consistency": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "npm-private-mismatch": {
+      "kind": "targets",
+      "targets": [
+        "npm"
+      ]
+    },
+    "prepush-changelog-coverage": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "prepush-gitignore-guard": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "prepush-manual-warning": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "private-hook-stale": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "publish-mode-workflow": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "releasable-residue": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "remote-tag": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "requires-services": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "root-rlsbl-conflict": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "ruff-lint": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "scaffold-conflicts": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "scaffold-gitignore-stale": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "scaffold-unreplaced-vars": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "selfdoc-version-drift": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "strictspec-certificate-gate": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "stricttest-floor": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "subtree-remote-reachable": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "target-matrix-fresh": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "target-version-readable": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "test-suite": {
+      "kind": "targets",
+      "targets": [
+        "go",
+        "maven",
+        "npm",
+        "pypi"
+      ]
+    },
+    "test-suite-workspace": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "type-check": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "type-check-scope-guard": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
+    "unversioned-boundary": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "version-consistency": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
+    "workspace-ci-router": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "workspace-ci-synced": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "workspace-stale-entries": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "workspace-targets": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "workspace-unbuildable": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "workspace-unregistered": {
+      "kind": "workspace",
+      "targets": []
+    },
+    "wrapper-producer": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    }
+  },
+  "format_version": 1,
+  "generated_by": "rlsbl.targets.introspect.build_matrix",
+  "regenerate_with": "uv run python scripts/generate_support_matrix.py",
+  "tables": {
+    "feature_matrix": {
+      "headers": [
+        "Check",
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "maven"
+      ],
+      "rows": [
+        [
+          "circular-deps",
+          "yes",
+          "n/a",
+          "yes",
+          "yes",
+          "yes"
+        ],
+        [
+          "cross-repo-path-sources",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "dead-modules",
+          "yes",
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ],
+        [
+          "dead-modules-stale",
+          "yes",
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ],
+        [
+          "dep-floors",
+          "yes",
+          "yes",
+          "yes",
+          "no",
+          "no"
+        ],
+        [
+          "deps-dev-in-lib",
+          "yes",
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ],
+        [
+          "deps-runtime-test-only",
+          "yes",
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ],
+        [
+          "deps-undeclared",
+          "yes",
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ],
+        [
+          "deps-unused",
+          "yes",
+          "yes",
+          "yes",
+          "yes",
+          "yes"
+        ],
+        [
+          "dev-overlay-drift",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "dunder-version-missing",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "format",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "format-scope-guard",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "library-lint",
+          "yes",
+          "yes",
+          "yes",
+          "no",
+          "yes"
+        ],
+        [
+          "lint",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "lint-scope-guard",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "maven-central-metadata",
+          "no",
+          "no",
+          "no",
+          "no",
+          "yes"
+        ],
+        [
+          "npm-private-mismatch",
+          "no",
+          "no",
+          "yes",
+          "no",
+          "no"
+        ],
+        [
+          "ruff-lint",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "test-suite",
+          "yes",
+          "yes",
+          "yes",
+          "no",
+          "yes"
+        ],
+        [
+          "type-check",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "type-check-scope-guard",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ]
+      ]
+    },
+    "pipelines": {
+      "headers": [
+        "Type",
+        "Auth method",
+        "Required env vars",
+        "Ecosystem"
+      ],
+      "rows": [
+        [
+          "cloudflare-pages",
+          "none",
+          "",
+          "Cloudflare Pages"
+        ],
+        [
+          "deno",
+          "token",
+          "DENO_TOKEN",
+          "JSR (Deno)"
+        ],
+        [
+          "docker",
+          "credential",
+          "DOCKER_USERNAME, DOCKER_PASSWORD",
+          "Container registry"
+        ],
+        [
+          "go",
+          "none",
+          "",
+          "Go module proxy"
+        ],
+        [
+          "hex",
+          "token",
+          "HEX_API_KEY",
+          "hex.pm (Elixir)"
+        ],
+        [
+          "maven",
+          "none",
+          "",
+          "Maven Central / Gradle"
+        ],
+        [
+          "maven-central",
+          "none",
+          "",
+          "Maven Central (Central Portal)"
+        ],
+        [
+          "npm",
+          "token",
+          "NPM_TOKEN",
+          "npm registry"
+        ],
+        [
+          "pypi",
+          "token",
+          "PYPI_TOKEN",
+          "Python Package Index"
+        ]
+      ]
+    },
+    "targets": {
+      "headers": [
+        "Name",
+        "Ecosystem",
+        "Detection files",
+        "Version file",
+        "Auto-detectable",
+        "Tag format",
+        "Monorepo tag format",
+        "read_name",
+        "read_metadata",
+        "ci_templates",
+        "dev_install"
+      ],
+      "rows": [
+        [
+          "dart",
+          "Dart / pub.dev",
+          "pubspec.yaml",
+          "pubspec.yaml",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "✓",
+          "✓",
+          ""
+        ],
+        [
+          "deno",
+          "Deno / JSR",
+          "deno.json, deno.jsonc",
+          "deno.json",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          "global: deno install, venv: deno cache ."
+        ],
+        [
+          "docker",
+          "Docker",
+          "Dockerfile",
+          "VERSION",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          ""
+        ],
+        [
+          "flutter",
+          "Flutter",
+          "pubspec.yaml (flutter)",
+          "pubspec.yaml",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "✓",
+          "✓",
+          ""
+        ],
+        [
+          "go",
+          "Go modules",
+          "go.mod",
+          "VERSION",
+          "yes",
+          "v{version}",
+          "{path}/v{version}",
+          "✓",
+          "",
+          "✓",
+          "global: go install <install_paths from .rlsbl/config.json>"
+        ],
+        [
+          "hex",
+          "Elixir / Hex",
+          "mix.exs",
+          "mix.exs",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          "global: mix deps.get, venv: mix deps.get"
+        ],
+        [
+          "maven",
+          "Java / Maven",
+          "build.gradle.kts, build.gradle, pom.xml",
+          "---",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "✓",
+          "✓",
+          ""
+        ],
+        [
+          "native-android",
+          "Android",
+          "---",
+          "build.gradle",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          ""
+        ],
+        [
+          "native-ios",
+          "iOS",
+          "---",
+          "---",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          ""
+        ],
+        [
+          "npm",
+          "Node.js / npm",
+          "package.json",
+          "package.json",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "✓",
+          "✓",
+          "global: npm link, venv: npm install"
+        ],
+        [
+          "pgdesign",
+          "PostgreSQL",
+          "pgdesign.toml",
+          "pgdesign.toml",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          ""
+        ],
+        [
+          "plain",
+          "Plain",
+          "VERSION (conditional)",
+          "VERSION",
+          "conditional",
+          "v{version}",
+          "{name}@v{version}",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "pypi",
+          "Python / PyPI",
+          "pyproject.toml",
+          "pyproject.toml",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "✓",
+          "✓",
+          "global: uv tool install -e ., venv: uv sync --all-packages"
+        ],
+        [
+          "spec",
+          "Specification",
+          "version.json",
+          "version.json",
+          "yes",
+          "spec-v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          ""
+        ],
+        [
+          "swift",
+          "Swift (SPM)",
+          "Package.swift",
+          "VERSION",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          "global: swift build"
+        ],
+        [
+          "swift-apple",
+          "Swift (Apple)",
+          "---",
+          "VERSION",
+          "no",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          ""
+        ],
+        [
+          "zig",
+          "Zig",
+          "build.zig.zon, build.zig",
+          "VERSION",
+          "yes",
+          "v{version}",
+          "{name}@v{version}",
+          "✓",
+          "",
+          "✓",
+          "global: zig build install"
+        ]
+      ]
+    }
+  },
+  "target_order": [
+    "pypi",
+    "go",
+    "npm",
+    "dart",
+    "deno",
+    "hex",
+    "zig",
+    "swift",
+    "swift-apple",
+    "maven",
+    "native-android",
+    "native-ios",
+    "docker",
+    "flutter",
+    "pgdesign",
+    "plain",
+    "spec"
+  ],
+  "targets": {
+    "dart": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [
+        "pubspec.yaml"
+      ],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Dart / pub.dev",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "dart",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": true,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": true,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": true,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "pubspec.yaml"
+    },
+    "deno": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": false,
+      "detection_files": [
+        "deno.json",
+        "deno.jsonc"
+      ],
+      "dev_install_command": {
+        "global": {
+          "args": [
+            "install"
+          ],
+          "purpose": "for deno install",
+          "tool": "deno",
+          "uninstall_args_template": [
+            "uninstall",
+            "{name}"
+          ]
+        },
+        "venv": {
+          "args": [
+            "cache",
+            "."
+          ],
+          "purpose": "for caching Deno modules",
+          "tool": "deno",
+          "uninstall_args_template": null
+        }
+      },
+      "ecosystem": "Deno / JSR",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "deno",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": true,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "deno.json"
+    },
+    "docker": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": false,
+      "detection_files": [
+        "Dockerfile"
+      ],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Docker",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "docker",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "VERSION"
+    },
+    "flutter": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Flutter",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "flutter",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": true,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "pubspec.yaml"
+    },
+    "go": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [
+        "{path}/v{version}"
+      ],
+      "content_based_detection": false,
+      "detection_files": [
+        "go.mod"
+      ],
+      "dev_install_command": {
+        "global": {
+          "args": [
+            "install",
+            "<install_paths from .rlsbl/config.json>"
+          ],
+          "purpose": "for go install",
+          "tool": "go",
+          "uninstall_args_template": null
+        },
+        "venv": null
+      },
+      "ecosystem": "Go modules",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": true,
+      "lint_language": "go",
+      "monorepo_tag_format": "{path}/v{version}",
+      "monorepo_tag_glob": "{path}/v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "pkg.go.dev",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": true,
+      "supports_dev_install": true,
+      "supports_import_analysis": true,
+      "supports_name_claim": false,
+      "supports_publication_probe": true,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": true,
+      "supports_yank": true,
+      "tag_format": "v{version}",
+      "version_file": "VERSION"
+    },
+    "hex": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": false,
+      "detection_files": [
+        "mix.exs"
+      ],
+      "dev_install_command": {
+        "global": {
+          "args": [
+            "deps.get"
+          ],
+          "purpose": "for fetching Hex dependencies",
+          "tool": "mix",
+          "uninstall_args_template": null
+        },
+        "venv": {
+          "args": [
+            "deps.get"
+          ],
+          "purpose": "for fetching Hex dependencies",
+          "tool": "mix",
+          "uninstall_args_template": null
+        }
+      },
+      "ecosystem": "Elixir / Hex",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "hex",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": true,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "mix.exs"
+    },
+    "maven": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 300,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [
+        "build.gradle.kts",
+        "build.gradle",
+        "pom.xml"
+      ],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Java / Maven",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": true,
+      "lint_language": "maven",
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "maven",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": true,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": true,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": true,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": null
+    },
+    "native-android": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Android",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "native-android",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "build.gradle"
+    },
+    "native-ios": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "iOS",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "native-ios",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": null
+    },
+    "npm": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [
+        "NPM_TOKEN"
+      ],
+      "companion_tags": [],
+      "content_based_detection": false,
+      "detection_files": [
+        "package.json"
+      ],
+      "dev_install_command": {
+        "global": {
+          "args": [
+            "link"
+          ],
+          "purpose": "for npm link",
+          "tool": "npm",
+          "uninstall_args_template": [
+            "unlink"
+          ]
+        },
+        "venv": {
+          "args": [
+            "install"
+          ],
+          "purpose": "for npm install",
+          "tool": "npm",
+          "uninstall_args_template": null
+        }
+      },
+      "ecosystem": "Node.js / npm",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": true,
+      "lint_language": "npm",
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "npm",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": true,
+      "supports_dep_floors": true,
+      "supports_dev_install": true,
+      "supports_import_analysis": true,
+      "supports_name_claim": true,
+      "supports_publication_probe": true,
+      "supports_read_metadata": true,
+      "supports_read_name": true,
+      "supports_version_query": true,
+      "supports_yank": true,
+      "tag_format": "v{version}",
+      "version_file": "package.json"
+    },
+    "pgdesign": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 60,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [
+        "pgdesign.toml"
+      ],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "PostgreSQL",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "pgdesign",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "pgdesign.toml"
+    },
+    "plain": {
+      "auto_detectable": "conditional",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Plain",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": false,
+      "registry_display_name": "plain",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": false,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "VERSION"
+    },
+    "pypi": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [
+        "PYPI_TOKEN",
+        "UV_PUBLISH_TOKEN"
+      ],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [
+        "pyproject.toml"
+      ],
+      "dev_install_command": {
+        "global": {
+          "args": [
+            "tool",
+            "install",
+            "-e",
+            "."
+          ],
+          "purpose": "for editable Python install",
+          "tool": "uv",
+          "uninstall_args_template": [
+            "tool",
+            "uninstall",
+            "{name}"
+          ]
+        },
+        "venv": {
+          "args": [
+            "sync",
+            "--all-packages"
+          ],
+          "purpose": "for syncing the project venv",
+          "tool": "uv",
+          "uninstall_args_template": null
+        }
+      },
+      "ecosystem": "Python / PyPI",
+      "format_version": "1.2.3rc1",
+      "has_builtin_test_runner": true,
+      "lint_language": "python",
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "PyPI",
+      "shares_workspace_environment": true,
+      "supports_circular_dep_analysis": true,
+      "supports_dep_floors": true,
+      "supports_dev_install": true,
+      "supports_import_analysis": true,
+      "supports_name_claim": true,
+      "supports_publication_probe": true,
+      "supports_read_metadata": true,
+      "supports_read_name": true,
+      "supports_version_query": true,
+      "supports_yank": true,
+      "tag_format": "v{version}",
+      "version_file": "pyproject.toml"
+    },
+    "spec": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [
+        "version.json"
+      ],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Specification",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "spec",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "spec-v{version}",
+      "version_file": "version.json"
+    },
+    "swift": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": false,
+      "detection_files": [
+        "Package.swift"
+      ],
+      "dev_install_command": {
+        "global": {
+          "args": [
+            "build"
+          ],
+          "purpose": "for swift build",
+          "tool": "swift",
+          "uninstall_args_template": null
+        },
+        "venv": null
+      },
+      "ecosystem": "Swift (SPM)",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "swift",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": true,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "VERSION"
+    },
+    "swift-apple": {
+      "auto_detectable": "no",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": true,
+      "detection_files": [],
+      "dev_install_command": {
+        "global": null,
+        "venv": null
+      },
+      "ecosystem": "Swift (Apple)",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "swift-apple",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": false,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "VERSION"
+    },
+    "zig": {
+      "auto_detectable": "yes",
+      "build_timeout_default": 120,
+      "claim_token_env_vars": [],
+      "companion_tags": [],
+      "content_based_detection": false,
+      "detection_files": [
+        "build.zig.zon",
+        "build.zig"
+      ],
+      "dev_install_command": {
+        "global": {
+          "args": [
+            "build",
+            "install"
+          ],
+          "purpose": "for zig build install",
+          "tool": "zig",
+          "uninstall_args_template": null
+        },
+        "venv": null
+      },
+      "ecosystem": "Zig",
+      "format_version": "1.2.3-rc.1",
+      "has_builtin_test_runner": false,
+      "lint_language": null,
+      "monorepo_tag_format": "{name}@v{version}",
+      "monorepo_tag_glob": "{name}@v*",
+      "provides_ci_templates": true,
+      "registry_display_name": "zig",
+      "shares_workspace_environment": false,
+      "supports_circular_dep_analysis": false,
+      "supports_dep_floors": false,
+      "supports_dev_install": true,
+      "supports_import_analysis": false,
+      "supports_name_claim": false,
+      "supports_publication_probe": false,
+      "supports_read_metadata": false,
+      "supports_read_name": true,
+      "supports_version_query": false,
+      "supports_yank": false,
+      "tag_format": "v{version}",
+      "version_file": "VERSION"
+    }
+  }
+}
