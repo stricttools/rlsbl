@@ -1,5 +1,5 @@
 ---
-description: "Local development workflow: editable installs across 7 targets, sibling overlays via dev sync, overlay drift detection and mode, CI watching with retry, and pre-push enforcement."
+description: "Local development workflow: editable installs per target, sibling overlays via dev sync, overlay drift detection and mode, CI watching with retry, and pre-push enforcement."
 ---
 
 # Development workflow

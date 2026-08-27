@@ -26,7 +26,7 @@ Both targets are **conditionally auto-detectable** — they only activate when s
 
 ### Detection
 
-The native-ios target uses a 3-step activation check that ensures it only applies to genuine Xcode app projects, not Swift packages or other iOS-adjacent project types. The target activates when all 3 conditions are met:
+The native-ios target's activation check ensures it only applies to genuine Xcode app projects, not Swift packages or other iOS-adjacent project types. The target activates when every condition below is met:
 
 1. No `Package.swift` is present in the project root (SPM projects use the `swift` target instead)
 2. At least one `*.xcodeproj` directory exists containing a `project.pbxproj` file

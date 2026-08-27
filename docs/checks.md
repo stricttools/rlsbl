@@ -175,7 +175,7 @@ These 4 checks have no tag assignment and run only when explicitly requested via
 
 ## Target applicability
 
-Not all checks apply to all 18 targets. Each check declares its applicability as one of three categories, which determines whether it runs for a given project based on the project's detected targets:
+Not every check applies to every release target. Each check declares its applicability as one of three categories, which determines whether it runs for a given project based on the project's detected targets:
 
 - **Universal** (`None`): runs for any target -- most project, release, and changelog checks
 - **Workspace-only** (`"workspace"`): runs only in monorepo workspaces, target-agnostic

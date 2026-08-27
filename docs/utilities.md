@@ -134,7 +134,7 @@ rlsbl targets
 
 ### Output (targets)
 
-A table with 3 columns showing the detection status of all 18 supported release targets in the current project directory. Each row indicates whether the target's manifest file was found and which file stores the version:
+A table showing the detection status of every supported release target in the current project directory. Each row indicates whether the target's manifest file was found and which file stores the version:
 
 | Column | Description |
 | --- | --- |

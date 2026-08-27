@@ -1,10 +1,10 @@
 ---
-description: "Documentation index for rlsbl, a release orchestration CLI handling version bumps, JSONL changelogs, CI scaffolding, and GitHub Releases for 18 ecosystems."
+description: "Documentation index for rlsbl, a release orchestration CLI handling version bumps, JSONL changelogs, CI scaffolding, and GitHub Releases across every supported ecosystem."
 ---
 
 # rlsbl
 
-rlsbl is a release orchestration CLI that handles version bumping, structured JSONL changelogs, CI scaffolding, tagging, and GitHub Releases across 18 ecosystems. It supports single-target projects, multi-target projects, and monorepo workspaces with independent versioning.
+rlsbl is a release orchestration CLI that handles version bumping, structured JSONL changelogs, CI scaffolding, tagging, and GitHub Releases across every ecosystem its [release targets](targets.md) cover. It supports single-target projects, multi-target projects, and monorepo workspaces with independent versioning.
 
 ## Getting started
 

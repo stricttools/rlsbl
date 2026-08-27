@@ -72,7 +72,7 @@ There are 9 built-in pipeline types covering all major package registries and de
 
 ## Class hierarchy
 
-All 10 pipeline implementations inherit from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. Two intermediate mixins add authentication patterns: `TokenPipeline` for single-token auth (5 pipelines) and `CredentialPipeline` for username/password pairs (1 pipeline).
+Every pipeline implementation inherits from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. Two intermediate mixins add authentication patterns: `TokenPipeline` for single-token auth and `CredentialPipeline` for username/password pairs. Which pipeline uses which is the `Auth method` column of the table above.
 
 | Class | Auth pattern | Pipelines |
 | --- | --- | --- |

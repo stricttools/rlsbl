@@ -139,7 +139,7 @@ and orphan-detection checks catch the stale hash loudly (see Validation below);
 
 ## Validation
 
-`rlsbl check --tag changelog` runs 12 checks covering hash resolution, commit coverage, schema conformance, batch size limits, and the per-line `format_version` gate. All error-severity checks must pass before a release proceeds. Failed checks produce specific error messages identifying the exact entry or commit that caused the failure:
+`rlsbl check --tag changelog` runs the changelog checks: hash resolution, commit coverage, schema conformance, batch size limits, and the per-line `format_version` gate. All error-severity checks must pass before a release proceeds. Failed checks produce specific error messages identifying the exact entry or commit that caused the failure:
 
 | # | Check | What it verifies |
 | --- | --- | --- |
