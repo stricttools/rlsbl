@@ -262,6 +262,19 @@ class NpmTarget(BaseTarget):
             },
         }
 
+    def run_tests(self, *, project_dir=None, workspace_root=None,
+                  skip_sync=False, config=None, check_timeout=None):
+        """Run the package's `npm test` script."""
+        from ..testing import _run_npm_tests, resolve_test_timeout
+        from .outcomes import SuiteRunOutcome, SuiteRunStatus
+
+        timeout = resolve_test_timeout(config, check_timeout)
+        passed = _run_npm_tests(project_dir=project_dir, check_timeout=timeout)
+        return SuiteRunOutcome(
+            status=SuiteRunStatus.PASSED if passed else SuiteRunStatus.FAILED,
+            message=f"{self.name} tests {'passed' if passed else 'failed'}",
+        )
+
     def normalize_package_name(self, raw_name):
         """npm folds a name by removing hyphens, underscores and dots."""
         from .utils import normalize_npm

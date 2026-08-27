@@ -379,7 +379,7 @@ class TestMavenTestExecutionGradle:
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["./gradlew", "test"]
             assert mock_run.call_args.kwargs.get("cwd") == str(tmp_project)
@@ -393,7 +393,7 @@ class TestMavenTestExecutionGradle:
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
 
 
 class TestMavenTestExecutionMaven:
@@ -407,7 +407,7 @@ class TestMavenTestExecutionMaven:
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["mvn", "test"]
             assert mock_run.call_args.kwargs.get("cwd") == str(tmp_project)
@@ -420,7 +420,7 @@ class TestMavenTestExecutionMaven:
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
 
     def test_prefers_gradlew_over_pom(self, tmp_project):
         """When both gradlew and pom.xml exist, prefers gradlew."""
@@ -433,7 +433,7 @@ class TestMavenTestExecutionMaven:
 
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_args[0][0] == ["./gradlew", "test"]
 
     def test_no_gradlew_no_pom_fails(self, tmp_project):
@@ -442,7 +442,7 @@ class TestMavenTestExecutionMaven:
         with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
             mock_run.assert_not_called()
 
 

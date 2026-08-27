@@ -228,6 +228,17 @@ def _pytest_marker_args(config: dict) -> list[str]:
     return []
 
 
+def resolve_test_timeout(config: dict | None, check_timeout: int | None) -> int:
+    """Resolve the subprocess budget for a test run.
+
+    An explicit *check_timeout* from the caller wins; otherwise the project's
+    configured check timeout applies.
+    """
+    if check_timeout is not None:
+        return check_timeout
+    return get_check_timeout(config)
+
+
 def run_project_tests(
     target_name: str,
     *,
@@ -235,8 +246,8 @@ def run_project_tests(
     workspace_root: str | None = None,
     skip_sync: bool = False,
     config: dict | None = None,
-) -> bool:
-    """Run tests for the given project target type.
+):
+    """Run the built-in test suite for the given target.
 
     Args:
         target_name: registry/target identifier (e.g., "pypi", "go", "npm").
@@ -246,8 +257,14 @@ def run_project_tests(
         skip_sync: if True, skip the uv sync step (caller already synced).
         config: project config dict. Used to read uv_sync_verbose for pypi.
 
-    Returns True if tests pass (or are skipped), False on failure.
-    Does NOT call sys.exit -- that is the caller's responsibility.
+    Returns a ``SuiteRunOutcome``. Does NOT call sys.exit -- that is the
+    caller's responsibility.
+
+    The dispatch is the target protocol. This function used to be a chain of
+    name comparisons ending in ``return True``, so a target with no runner --
+    or a name that was not a target at all -- reported a PASSING test step for
+    a suite that never ran. A target that cannot run tests now answers SKIPPED
+    naming itself, and the caller renders that as a visible skip line.
 
     No dry-run parameter: the test suite reaches this through the impure
     ``test-suite`` check, which the check framework already lists rather than
@@ -255,27 +272,31 @@ def run_project_tests(
     never passed by any caller, and a second, hand-rolled skip would be a
     second place for the two answers to disagree.
     """
-    print("Running tests...")
+    from .targets import TARGETS
+    from .targets.outcomes import SuiteRunOutcome, SuiteRunStatus
 
-    timeout = get_check_timeout(config)
+    target = TARGETS.get(target_name)
+    if target is None:
+        return SuiteRunOutcome(
+            status=SuiteRunStatus.SKIPPED,
+            message=f"'{target_name}' is not a registered release target",
+        )
 
-    if target_name == "pypi":
-        return _run_pypi_tests(
+    if not target.has_builtin_test_runner:
+        return target.run_tests(
             project_dir=project_dir,
             workspace_root=workspace_root,
             skip_sync=skip_sync,
-            config=config or {},
-            check_timeout=timeout,
+            config=config,
         )
-    elif target_name == "go":
-        return _run_go_tests(project_dir=project_dir, check_timeout=timeout)
-    elif target_name == "npm":
-        return _run_npm_tests(project_dir=project_dir, check_timeout=timeout)
-    elif target_name == "maven":
-        return _run_maven_tests(project_dir=project_dir, check_timeout=timeout)
-    else:
-        # Unknown target, skip tests
-        return True
+
+    print("Running tests...")
+    return target.run_tests(
+        project_dir=project_dir,
+        workspace_root=workspace_root,
+        skip_sync=skip_sync,
+        config=config,
+    )
 
 
 def _run_pypi_tests(

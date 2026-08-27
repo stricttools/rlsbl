@@ -593,3 +593,16 @@ class MavenTarget(BaseTarget):
 
         # Fallback
         return ["./gradlew", "check"]
+
+    def run_tests(self, *, project_dir=None, workspace_root=None,
+                  skip_sync=False, config=None, check_timeout=None):
+        """Run the project's Gradle or Maven test task."""
+        from ..testing import _run_maven_tests, resolve_test_timeout
+        from .outcomes import SuiteRunOutcome, SuiteRunStatus
+
+        timeout = resolve_test_timeout(config, check_timeout)
+        passed = _run_maven_tests(project_dir=project_dir, check_timeout=timeout)
+        return SuiteRunOutcome(
+            status=SuiteRunStatus.PASSED if passed else SuiteRunStatus.FAILED,
+            message=f"{self.name} tests {'passed' if passed else 'failed'}",
+        )

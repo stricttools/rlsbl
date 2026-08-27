@@ -24,6 +24,12 @@ from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.checks.scope import scope_adapter
 from rlsbl.context import ProjectContext
+from rlsbl.targets.outcomes import SuiteRunOutcome, SuiteRunStatus
+# run_project_tests answers with a SuiteRunOutcome, not a bool: a target with no
+# built-in runner must be distinguishable from a suite that ran and passed.
+_TESTS_PASSED = SuiteRunOutcome(SuiteRunStatus.PASSED, "pypi tests passed")
+_TESTS_FAILED = SuiteRunOutcome(SuiteRunStatus.FAILED, "pypi tests failed")
+
 
 
 # ------------------------------------------------------------------
@@ -1958,7 +1964,7 @@ class TestTestSuiteCheck:
         ctx = make_ctx(repo)
         with (
             patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("pypi", str(repo))]),
-            patch("rlsbl.testing.run_project_tests", return_value=True),
+            patch("rlsbl.testing.run_project_tests", return_value=_TESTS_PASSED),
         ):
             result = app._check_defs["test-suite"].impl(ctx)
         assert result.status == "pass"
@@ -1974,7 +1980,7 @@ class TestTestSuiteCheck:
         ctx = make_ctx(repo)
         with (
             patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("pypi", str(repo))]),
-            patch("rlsbl.testing.run_project_tests", return_value=False),
+            patch("rlsbl.testing.run_project_tests", return_value=_TESTS_FAILED),
         ):
             result = app._check_defs["test-suite"].impl(ctx)
         assert result.status == "fail"

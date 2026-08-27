@@ -402,28 +402,46 @@ def register_quality_checks(app):
         if ctx.workspace_root is not None and str(ctx.project_root) == str(ctx.workspace_root):
             return reporter.skipped("workspace root -- use test-suite-workspace")
 
-        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
+        from ..targets import (
+            detect_targets,
+            resolve_releasable_config_dir_for_ctx,
+            targets_with_builtin_tests,
+        )
+        from ..targets.outcomes import SuiteRunStatus
         from ..testing import run_project_tests
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
-        recognized = {"pypi", "go", "npm", "maven"}
-        target_name = None
-        for name, _path in target_entries:
-            if name in recognized:
-                target_name = name
-                break
+        # Derived from the registry: a target ships a runner iff it overrides
+        # run_tests. The check no longer keeps its own copy of the set.
+        runnable = targets_with_builtin_tests()
+        target_name = next(
+            (name for name, _path in target_entries if name in runnable), None,
+        )
 
         if target_name is None:
-            return reporter.skipped("no recognized test target (pypi, go, npm, maven)")
+            detected = ", ".join(sorted({name for name, _path in target_entries}))
+            supported = ", ".join(sorted(runnable))
+            if detected:
+                return reporter.skipped(
+                    f"no target with a built-in test runner -- detected "
+                    f"{detected}; runners exist for {supported}"
+                )
+            return reporter.skipped(
+                f"no targets detected; test runners exist for {supported}"
+            )
 
-        passed = run_project_tests(
+        outcome = run_project_tests(
             target_name,
             project_dir=str(ctx.project_root),
             workspace_root=str(ctx.workspace_root) if ctx.workspace_root else None,
             config=ctx.config,
         )
-        if passed:
+        if outcome.status is SuiteRunStatus.SKIPPED:
+            # Unreachable while `runnable` is derived from the same property
+            # the runner uses, but a skip must never render as a pass.
+            return reporter.skipped(outcome.message)
+        if outcome.passed:
             return reporter.passed(f"{target_name} tests passed")
         reporter.error(f"{target_name} tests failed")
         return reporter.found(f"{target_name} tests failed")

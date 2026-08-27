@@ -55,7 +55,7 @@ class TestPypiTarget:
 
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             # Standalone: no sync, just uv run pytest
             assert mock_run.call_count == 1
             assert mock_run.call_args_list[0][0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
@@ -77,7 +77,7 @@ class TestPypiTarget:
                 "pypi", project_dir=str(tmp_project), workspace_root=str(ws_root)
             )
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 2
             # First call: uv sync --all-packages --quiet at workspace root
             assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
@@ -105,7 +105,7 @@ class TestPypiTarget:
                 config={"uv_sync_verbose": True},
             )
 
-            assert result is True
+            assert result.passed
             sync_call = mock_run.call_args_list[0][0][0]
             assert sync_call == ["uv", "sync", "--all-packages"]  # no --quiet
 
@@ -126,7 +126,7 @@ class TestPypiTarget:
                 "pypi", project_dir=str(tmp_project), workspace_root=str(ws_root)
             )
 
-            assert result is False
+            assert not result.passed
             # Only uv sync should have been called (not pytest)
             assert mock_run.call_count == 1
 
@@ -148,7 +148,7 @@ class TestPypiTarget:
 
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["python", "-P", "-m", "pytest"]
 
@@ -160,7 +160,7 @@ class TestPypiTarget:
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
             mock_run.assert_not_called()
 
 
@@ -188,7 +188,7 @@ class TestPypiMarkers:
             result = run_project_tests(
                 "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
             )
-            assert result is True
+            assert result.passed
             assert mock_run.call_args[0][0] == [
                 "uv", "run", "python", "-P", "-m", "pytest", "-m", "not integration"
             ]
@@ -208,7 +208,7 @@ class TestPypiMarkers:
             result = run_project_tests(
                 "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
             )
-            assert result is True
+            assert result.passed
             assert mock_run.call_args[0][0] == [
                 "uv", "run", "--group", "testing", "python", "-P", "-m", "pytest",
                 "-m", "not integration",
@@ -229,7 +229,7 @@ class TestPypiMarkers:
             result = run_project_tests(
                 "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
             )
-            assert result is True
+            assert result.passed
             assert mock_run.call_args[0][0] == [
                 "uv", "run", "--extra", "test", "python", "-P", "-m", "pytest",
                 "-m", "not integration",
@@ -250,7 +250,7 @@ class TestPypiMarkers:
                 "pypi", project_dir=str(tmp_project), workspace_root=str(ws_root),
                 config=self.MARKERS_CONFIG,
             )
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 2
             # sync call unaffected
             assert mock_run.call_args_list[0][0][0] == ["uv", "sync", "--all-packages", "--quiet"]
@@ -272,7 +272,7 @@ class TestPypiMarkers:
             result = run_project_tests(
                 "pypi", project_dir=str(tmp_project), config=self.MARKERS_CONFIG
             )
-            assert result is True
+            assert result.passed
             assert mock_run.call_args[0][0] == [
                 "python", "-P", "-m", "pytest", "-m", "not integration"
             ]
@@ -290,7 +290,7 @@ class TestPypiMarkers:
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests("pypi", project_dir=str(tmp_project), config={})
-            assert result is True
+            assert result.passed
             assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
 
 
@@ -351,7 +351,7 @@ class TestDevOverlayPreservation:
                 "pypi", project_dir=str(pkg), workspace_root=str(ws_root)
             )
 
-        assert result is True
+        assert result.passed
         assert mock_run.call_count == 2
         assert mock_run.call_args_list[0][0][0] == [
             "uv", "sync", "--all-packages", "--quiet",
@@ -375,7 +375,7 @@ class TestDevOverlayPreservation:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is True
+        assert result.passed
         assert mock_run.call_count == 2
         assert mock_run.call_args_list[0][0][0] == [
             "uv", "sync", "--inexact", "--quiet", "--no-install-package", "depa",
@@ -401,7 +401,7 @@ class TestDevOverlayPreservation:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is True
+        assert result.passed
         assert mock_run.call_args_list[0][0][0] == [
             "uv", "sync", "--inexact", "--quiet", "--group", "testing",
             "--no-install-package", "depa",
@@ -424,7 +424,7 @@ class TestDevOverlayPreservation:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         assert mock_run.call_count == 1
 
     def test_no_overlay_files_is_byte_identical(self, tmp_project):
@@ -439,7 +439,7 @@ class TestDevOverlayPreservation:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is True
+        assert result.passed
         assert mock_run.call_count == 1
         assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
 
@@ -456,7 +456,7 @@ class TestDevOverlayPreservation:
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         mock_run.assert_not_called()
         err = capsys.readouterr().err
         assert "dev-sources.toml.local-only" in err
@@ -478,7 +478,7 @@ class TestDevOverlayPreservation:
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         mock_run.assert_not_called()
         assert "depa" in capsys.readouterr().err
 
@@ -515,7 +515,7 @@ class TestDevOverlayPreservation:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
             result = run_project_tests("go", project_dir=str(tmp_project))
 
-        assert result is True
+        assert result.passed
         assert mock_run.call_args[0][0] == [
             "go", "test", "./...", "-race", "-short", "-count=1"
         ]
@@ -535,7 +535,7 @@ class TestGoTarget:
 
             result = run_project_tests("go", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == [
                 "go", "test", "./...", "-race", "-short", "-count=1"
@@ -549,7 +549,7 @@ class TestGoTarget:
 
             result = run_project_tests("go", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
 
 
 # ---------------------------------------------------------------------------
@@ -568,7 +568,7 @@ class TestNpmTarget:
 
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["npm", "test"]
             assert mock_run.call_args.kwargs.get("cwd") == str(tmp_project)
@@ -580,7 +580,7 @@ class TestNpmTarget:
         with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             mock_run.assert_not_called()
 
     def test_npm_no_package_json_fails(self, tmp_project):
@@ -588,7 +588,7 @@ class TestNpmTarget:
         with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
             mock_run.assert_not_called()
 
     def test_npm_corrupt_package_json_fails(self, tmp_project):
@@ -597,7 +597,7 @@ class TestNpmTarget:
         with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
             mock_run.assert_not_called()
 
     def test_npm_missing_tool_fails(self, tmp_project):
@@ -606,7 +606,7 @@ class TestNpmTarget:
         with patch("rlsbl.effects.run", side_effect=FileNotFoundError("npm")):
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
 
     def test_npm_failure_returns_false(self, tmp_project):
         """When npm test fails, returns False."""
@@ -617,7 +617,7 @@ class TestNpmTarget:
 
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
 
 
 # ---------------------------------------------------------------------------
@@ -633,7 +633,7 @@ class TestMavenTarget:
         with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
             mock_run.assert_not_called()
 
     def test_maven_mvn_missing_tool_fails(self, tmp_project):
@@ -642,7 +642,7 @@ class TestMavenTarget:
         with patch("rlsbl.effects.run", side_effect=FileNotFoundError("mvn")):
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-            assert result is False
+            assert not result.passed
 
 
 # ---------------------------------------------------------------------------
@@ -650,14 +650,36 @@ class TestMavenTarget:
 # ---------------------------------------------------------------------------
 
 class TestUnknownTarget:
-    """Tests for run_project_tests with unrecognized targets."""
+    """Tests for run_project_tests with targets that have no runner.
 
-    def test_unknown_target_returns_true(self, tmp_project):
-        """Unknown targets return True without running any subprocess."""
+    This class used to assert that such a target returned True. It did, and
+    that was the bug: a release of a project whose target ships no test runner
+    recorded a PASSING test step for a suite that never ran. The runner now
+    answers SKIPPED, naming what it could not run.
+    """
+
+    def test_a_name_that_is_not_a_target_skips_and_names_itself(self, tmp_project):
+        """A name outside the registry cannot report a pass."""
+        from rlsbl.targets.outcomes import SuiteRunStatus
+
         with patch("rlsbl.effects.run") as mock_run:
             result = run_project_tests("cargo", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.status is SuiteRunStatus.SKIPPED
+            assert not result.passed
+            assert "cargo" in result.message
+            mock_run.assert_not_called()
+
+    def test_a_registered_target_without_a_runner_skips(self, tmp_project):
+        """zig is a real target; it just has no built-in test command."""
+        from rlsbl.targets.outcomes import SuiteRunStatus
+
+        with patch("rlsbl.effects.run") as mock_run:
+            result = run_project_tests("zig", project_dir=str(tmp_project))
+
+            assert result.status is SuiteRunStatus.SKIPPED
+            assert not result.passed
+            assert "zig" in result.message
             mock_run.assert_not_called()
 
 
@@ -711,7 +733,7 @@ class TestWorkspaceRoot:
                 "pypi", project_dir=project, workspace_root=workspace
             )
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 2
             # uv sync runs at workspace root
             sync_call = mock_run.call_args_list[0]
@@ -739,7 +761,7 @@ class TestWorkspaceRoot:
                 skip_sync=True,
             )
 
-            assert result is True
+            assert result.passed
             # Only pytest should run, not uv sync
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
@@ -763,7 +785,7 @@ class TestWorkspaceRoot:
 
             result = run_project_tests("pypi", project_dir=project)
 
-            assert result is True
+            assert result.passed
             # No sync call -- only pytest
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
@@ -1025,7 +1047,7 @@ class TestTimeoutHint:
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         err = capsys.readouterr().err
         assert "timed out" in err
         assert CHECK_TIMEOUT_HINT in err
@@ -1041,7 +1063,7 @@ class TestTimeoutHint:
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
 
     def test_go_timeout_prints_hint(self, tmp_project, capsys):
@@ -1049,7 +1071,7 @@ class TestTimeoutHint:
         with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("go", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
 
     def test_maven_gradlew_timeout_prints_hint(self, tmp_project, capsys):
@@ -1059,7 +1081,7 @@ class TestTimeoutHint:
         with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         err = capsys.readouterr().err
         assert "timed out" in err
         assert CHECK_TIMEOUT_HINT in err
@@ -1070,7 +1092,7 @@ class TestTimeoutHint:
         with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("maven", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         err = capsys.readouterr().err
         assert "timed out" in err
         assert CHECK_TIMEOUT_HINT in err
@@ -1081,7 +1103,7 @@ class TestTimeoutHint:
         with patch("rlsbl.effects.run", side_effect=self._timeout):
             result = run_project_tests("npm", project_dir=str(tmp_project))
 
-        assert result is False
+        assert not result.passed
         assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
 
     def test_sync_workspace_timeout_prints_hint(self, tmp_project, capsys):
@@ -1122,7 +1144,7 @@ class TestPypiIntegration:
                 "pypi", project_dir=str(pkg), workspace_root=str(ws_root)
             )
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 2
             sync_cmd = mock_run.call_args_list[0][0][0]
             assert sync_cmd == ["uv", "sync", "--all-packages", "--quiet"]
@@ -1147,7 +1169,7 @@ class TestPypiIntegration:
 
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["uv", "run", "--extra", "test", "python", "-P", "-m", "pytest"]
 
@@ -1167,7 +1189,7 @@ class TestPypiIntegration:
 
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["uv", "run", "python", "-P", "-m", "pytest"]
 
@@ -1202,7 +1224,7 @@ class TestPypiIntegration:
 
             result = run_project_tests("pypi", project_dir=str(tmp_project))
 
-            assert result is True
+            assert result.passed
             assert mock_run.call_count == 1
             assert mock_run.call_args[0][0] == ["uv", "run", "--group", "testing", "python", "-P", "-m", "pytest"]
 

@@ -334,6 +334,45 @@ class BaseTarget:
         """
         return {"global": None, "venv": None}
 
+    @property
+    def has_builtin_test_runner(self):
+        """Whether this target ships a built-in test runner.
+
+        Derived from the override rather than declared, so the answer cannot
+        drift from the method. Callers that need the SET of such targets ask
+        ``rlsbl.targets.targets_with_builtin_tests()``.
+        """
+        return type(self).run_tests is not BaseTarget.run_tests
+
+    def run_tests(
+        self,
+        *,
+        project_dir=None,
+        workspace_root=None,
+        skip_sync=False,
+        config=None,
+        check_timeout=None,
+    ):
+        """Run this target's built-in test suite.
+
+        Targets whose ecosystem has a standard test command (``uv run
+        pytest``, ``go test``, ``npm test``, the Gradle/Maven test task)
+        override this. The default answers SKIPPED naming the target.
+
+        That default is the whole point of the method. The name chain this
+        replaced ended in a bare ``return True``, so a release of a project
+        whose target has no runner recorded a PASSING test step for a suite
+        that never ran.
+
+        Returns a :class:`~.outcomes.SuiteRunOutcome`.
+        """
+        from .outcomes import SuiteRunOutcome, SuiteRunStatus
+
+        return SuiteRunOutcome(
+            status=SuiteRunStatus.SKIPPED,
+            message=f"target '{self.name}' has no built-in test runner",
+        )
+
     def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
         """Remove a published version from this target's registry.
 

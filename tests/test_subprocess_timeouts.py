@@ -115,7 +115,7 @@ class TestMavenTestsTimeout:
         ):
             result = run_project_tests("maven", project_dir=str(tmp_path))
 
-        assert result is False
+        assert not result.passed
 
     def test_maven_uses_config_timeout(self, tmp_path):
         """run_project_tests passes config-driven timeout to subprocess.run."""
@@ -164,7 +164,7 @@ class TestPypiTestsTimeout:
 
             result = run_project_tests("pypi", project_dir=str(tmp_path))
 
-        assert result is False
+        assert not result.passed
 
     def test_pypi_uses_config_timeout(self, tmp_path):
         """run_project_tests passes config-driven timeout to subprocess.run."""
@@ -206,7 +206,7 @@ class TestGoTestsTimeout:
         ):
             result = run_project_tests("go", project_dir=str(tmp_path))
 
-        assert result is False
+        assert not result.passed
 
     def test_go_uses_config_timeout(self, tmp_path):
         """run_project_tests passes config-driven timeout to subprocess.run."""

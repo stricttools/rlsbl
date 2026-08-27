@@ -54,6 +54,18 @@ TARGETS = {
 }
 
 
+def targets_with_builtin_tests():
+    """Targets that ship a built-in test runner.
+
+    Derived from the targets that override ``run_tests``. The ``test-suite``
+    and ``test-suite-workspace`` checks each used to carry their own copy of
+    this set, which could disagree with the dispatch and with each other.
+    """
+    return frozenset(
+        name for name, target in TARGETS.items() if target.has_builtin_test_runner
+    )
+
+
 def targets_with_library_lint():
     """Targets that participate in library boundary lint.
 

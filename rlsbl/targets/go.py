@@ -449,6 +449,19 @@ class GoTarget(BaseTarget):
     def registry_display_name(self):
         return "pkg.go.dev"
 
+    def run_tests(self, *, project_dir=None, workspace_root=None,
+                  skip_sync=False, config=None, check_timeout=None):
+        """Run `go test ./...`."""
+        from ..testing import _run_go_tests, resolve_test_timeout
+        from .outcomes import SuiteRunOutcome, SuiteRunStatus
+
+        timeout = resolve_test_timeout(config, check_timeout)
+        passed = _run_go_tests(project_dir=project_dir, check_timeout=timeout)
+        return SuiteRunOutcome(
+            status=SuiteRunStatus.PASSED if passed else SuiteRunStatus.FAILED,
+            message=f"{self.name} tests {'passed' if passed else 'failed'}",
+        )
+
     def normalize_package_name(self, raw_name):
         """Go compares the last segment of a module path, lowercased."""
         from .utils import normalize_go

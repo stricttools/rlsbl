@@ -14,6 +14,12 @@ from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
 from rlsbl import app
 from rlsbl.utils import DEFAULT_CHECK_TIMEOUT
 from rlsbl.check_context import WorkspaceCheckContext
+from rlsbl.targets.outcomes import SuiteRunOutcome, SuiteRunStatus
+# run_project_tests answers with a SuiteRunOutcome, not a bool: a target with no
+# built-in runner must be distinguishable from a suite that ran and passed.
+_TESTS_PASSED = SuiteRunOutcome(SuiteRunStatus.PASSED, "pypi tests passed")
+_TESTS_FAILED = SuiteRunOutcome(SuiteRunStatus.FAILED, "pypi tests failed")
+
 
 
 # ------------------------------------------------------------------
@@ -250,7 +256,7 @@ class TestTestSuiteRunsAndPasses:
 
         ctx = make_ctx(prepush_repo)
 
-        with patch("rlsbl.testing.run_project_tests", return_value=True) as mock_tests:
+        with patch("rlsbl.testing.run_project_tests", return_value=_TESTS_PASSED) as mock_tests:
             result = app._check_defs["test-suite"].impl(ctx)
 
         assert result.status == "pass"
@@ -281,7 +287,7 @@ class TestTestSuiteFailsOnTestFailure:
 
         ctx = make_ctx(prepush_repo)
 
-        with patch("rlsbl.testing.run_project_tests", return_value=False):
+        with patch("rlsbl.testing.run_project_tests", return_value=_TESTS_FAILED):
             result = app._check_defs["test-suite"].impl(ctx)
 
         assert result.status == "fail"
@@ -521,7 +527,7 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
         ctx.push_stdin = push_stdin
 
         with (
-            patch("rlsbl.testing.run_project_tests", return_value=True) as mock_tests,
+            patch("rlsbl.testing.run_project_tests", return_value=_TESTS_PASSED) as mock_tests,
             patch("rlsbl.testing.sync_workspace", return_value=True) as mock_sync,
         ):
             result = app._check_defs["test-suite-workspace"].impl(ctx)
@@ -593,7 +599,7 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
         ctx.push_stdin = f"refs/heads/main {head_sha} refs/heads/main {base_sha}"
 
         with (
-            patch("rlsbl.testing.run_project_tests", return_value=True),
+            patch("rlsbl.testing.run_project_tests", return_value=_TESTS_PASSED),
             patch("rlsbl.testing.sync_workspace", return_value=True) as mock_sync,
         ):
             result = app._check_defs["test-suite-workspace"].impl(ctx)

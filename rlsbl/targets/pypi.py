@@ -505,6 +505,25 @@ class PypiTarget(BaseTarget):
     def registry_display_name(self):
         return "PyPI"
 
+    def run_tests(self, *, project_dir=None, workspace_root=None,
+                  skip_sync=False, config=None, check_timeout=None):
+        """Run the Python suite via uv (or bare pytest when uv is absent)."""
+        from ..testing import _run_pypi_tests, resolve_test_timeout
+        from .outcomes import SuiteRunOutcome, SuiteRunStatus
+
+        timeout = resolve_test_timeout(config, check_timeout)
+        passed = _run_pypi_tests(
+            project_dir=project_dir,
+            workspace_root=workspace_root,
+            skip_sync=skip_sync,
+            config=config or {},
+            check_timeout=timeout,
+        )
+        return SuiteRunOutcome(
+            status=SuiteRunStatus.PASSED if passed else SuiteRunStatus.FAILED,
+            message=f"{self.name} tests {'passed' if passed else 'failed'}",
+        )
+
     def normalize_package_name(self, raw_name):
         """PyPI folds runs of ``-_.`` to a single hyphen (PEP 503)."""
         from .utils import normalize_pypi

@@ -10,7 +10,7 @@ from enum import Enum
 from typing import NamedTuple
 
 
-class TestRunStatus(Enum):
+class SuiteRunStatus(Enum):
     """Result of a target's built-in test run."""
 
     PASSED = "passed"
@@ -18,25 +18,25 @@ class TestRunStatus(Enum):
     SKIPPED = "skipped"
 
 
-class TestRunOutcome(NamedTuple):
+class SuiteRunOutcome(NamedTuple):
     """Outcome of ``ReleaseTarget.run_tests``.
 
     ``message`` always names the target, so a SKIPPED outcome renders a step
     summary line a reader can act on rather than silence.
     """
 
-    status: TestRunStatus
+    status: SuiteRunStatus
     message: str
 
     @property
     def passed(self) -> bool:
         """True only when the suite actually ran and passed."""
-        return self.status is TestRunStatus.PASSED
+        return self.status is SuiteRunStatus.PASSED
 
     @property
     def skipped(self) -> bool:
         """True when this target has no built-in test runner."""
-        return self.status is TestRunStatus.SKIPPED
+        return self.status is SuiteRunStatus.SKIPPED
 
 
 class YankStatus(Enum):

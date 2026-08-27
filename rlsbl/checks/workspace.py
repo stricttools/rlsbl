@@ -700,8 +700,13 @@ def register_workspace_checks(app):
             return reporter.skipped("not in push context")
 
         from ..prepush_utils import _parse_stdin_refs
-        from ..git_util import affected_projects as _affected, get_push_changed_files
-        from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..git_util import affected_members as _affected, get_push_changed_files
+        from ..targets import (
+            detect_targets,
+            resolve_releasable_config_dir,
+            targets_with_builtin_tests,
+        )
+        from ..targets.outcomes import SuiteRunStatus
         from ..overlay_state import MalformedSentinelError, OverlayModeConflictError
         from ..testing import collect_active_overlays, run_project_tests, sync_workspace
 
@@ -719,8 +724,11 @@ def register_workspace_checks(app):
         if not affected:
             return reporter.passed("no affected projects need testing")
 
-        recognized = {"pypi", "go", "npm", "maven"}
+        # Derived from the registry, not a copy of the set the `test-suite`
+        # check carries: the two used to be able to disagree.
+        runnable = targets_with_builtin_tests()
         failed_projects = []
+        skipped_projects = []
         passed_count = 0
 
         project_targets = []
@@ -730,11 +738,9 @@ def register_workspace_checks(app):
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
             target_entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
 
-            target_name = None
-            for name, _path in target_entries:
-                if name in recognized:
-                    target_name = name
-                    break
+            target_name = next(
+                (name for name, _path in target_entries if name in runnable), None,
+            )
 
             project_targets.append((proj, project_dir, target_name))
             if target_name == "pypi":
@@ -761,15 +767,21 @@ def register_workspace_checks(app):
 
         for proj, project_dir, target_name in project_targets:
             if target_name is None:
+                # An affected project whose targets ship no test runner. It
+                # used to vanish from the report entirely, so the summary read
+                # as though every affected project had been tested.
+                skipped_projects.append(proj["name"])
                 continue
 
-            passed = run_project_tests(
+            outcome = run_project_tests(
                 target_name,
                 project_dir=project_dir,
                 workspace_root=str(ctx.workspace_root),
                 skip_sync=True,
             )
-            if passed:
+            if outcome.status is SuiteRunStatus.SKIPPED:
+                skipped_projects.append(proj["name"])
+            elif outcome.passed:
                 passed_count += 1
             else:
                 failed_projects.append(proj["name"])
@@ -777,7 +789,12 @@ def register_workspace_checks(app):
         if failed_projects:
             reporter.error(f"tests failed for: {', '.join(failed_projects)}")
             return reporter.found(f"tests failed for: {', '.join(failed_projects)}")
-        return reporter.passed(f"{passed_count} project(s) tests passed")
+        summary = f"{passed_count} project(s) tests passed"
+        if skipped_projects:
+            summary += (
+                f"; no test runner for: {', '.join(sorted(skipped_projects))}"
+            )
+        return reporter.passed(summary)
 
     @app.warn_check("scaffold-gitignore-stale")
     def check_scaffold_gitignore_stale(ctx, reporter):
