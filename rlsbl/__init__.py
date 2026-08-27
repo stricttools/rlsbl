@@ -664,7 +664,7 @@ _STATUS_PAYLOAD_SCHEMA = {
             "type": ["string", "null"],
             "enum": [
                 "AHEAD", "BEHIND", "SAME", "ERROR",
-                "PRIVATE", "UNPUBLISHED", None,
+                "PRIVATE", "UNPUBLISHED", "NO_REGISTRY_API", None,
             ],
         },
     },

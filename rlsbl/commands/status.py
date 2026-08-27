@@ -194,8 +194,17 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     if flags.get("registry"):
         from ..config import suppresses_publish
         is_private = suppresses_publish(ctx.config)
+        from ..targets import targets_with_version_queries
+
         if is_private:
             drift = "PRIVATE"
+        elif registry not in targets_with_version_queries():
+            # This ecosystem has no latest-version API at all, which is not a
+            # failed query: the target would answer "Unknown registry", and
+            # rendering that as ERROR read exactly like a timeout or an HTTP
+            # 500. The set that CAN answer is derived from the targets that
+            # implement query_latest_version, never hand-listed here.
+            drift = "NO_REGISTRY_API"
         else:
             from ..registry import query_registry_version
             result = query_registry_version(name, registry)
@@ -331,6 +340,8 @@ def run_cmd(registry, args, flags, ctx):
             print("Registry:  (skipped, private project)")
         elif drift == "UNPUBLISHED":
             print(f"Registry:  (not found on {data['target']})")
+        elif drift == "NO_REGISTRY_API":
+            print(f"Registry:  (no version API for {data['target']})")
         elif drift == "ERROR":
             print("Registry:  (query failed)")
         elif reg_ver is not None:
