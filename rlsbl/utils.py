@@ -726,6 +726,11 @@ def commit_files(
 
     Returns True on success. When allow_failure is True, catches errors and
     returns False with a warning to stderr. When False, exceptions propagate.
+    ``allow_failure`` covers the refusals below as well: a caller that declared
+    a failed commit survivable does not get a hard error because the file list
+    turned out to be uncommittable. The ONE thing it never silences is
+    ``expected_root`` -- committing into the wrong repository is a safety
+    refusal, not a commit failure.
 
     ``return_result`` returns the commit run's own result instead of True.
     Under a preview that result is the framework's carrier standing in for the
@@ -741,9 +746,9 @@ def commit_files(
     regeneration altered a byte -- and safegit 0.29+ refuses a commit that
     names a path whose staging leaves the tree unchanged. The list is filtered
     through :func:`partition_stageable` first, so every caller inherits the
-    behavior; a gitignored path is a hard error rather than a drop, and an
-    empty result is a stated no-op. ``require_change`` turns that no-op into a
-    hard error, for the caller whose expected change MUST have materialized.
+    behavior; a gitignored path is a refusal rather than a drop, and an empty
+    result is a stated no-op. ``require_change`` turns that no-op into a
+    refusal, for the caller whose expected change MUST have materialized.
 
     The filter is skipped under a preview: the writes a preview's commit would
     carry were recorded rather than performed, so asking the working tree about
@@ -751,23 +756,29 @@ def commit_files(
     """
     if expected_root is not None:
         assert_git_toplevel(cwd, expected_root)
+    def _refuse(error):
+        if allow_failure:
+            print(f"Warning: commit failed: {error}", file=sys.stderr)
+            return False
+        raise error
+
     if not effects.previewing():
         stageable, ignored = partition_stageable(files, cwd=cwd)
         if ignored:
-            raise GitError(
+            return _refuse(GitError(
                 f"refusing to commit: {', '.join(ignored)} "
                 f"{'is' if len(ignored) == 1 else 'are'} gitignored and untracked, "
                 f"so the commit {message!r} would carry nothing for "
                 f"{'it' if len(ignored) == 1 else 'them'}. Un-ignore the path or "
                 f"stop naming it in this commit."
-            )
+            ))
         if not stageable:
             if require_change:
-                raise GitError(
+                return _refuse(GitError(
                     f"refusing to commit {message!r}: nothing to commit -- none of "
                     f"the named files changed ({', '.join(files) or 'no files named'}). "
                     f"The change this commit exists to record did not materialize."
-                )
+                ))
             print(
                 f"Nothing to commit for {message!r} (named files are unchanged); "
                 f"skipping."
