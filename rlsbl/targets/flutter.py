@@ -13,7 +13,6 @@ class FlutterTarget(DartTarget):
 
     # Shares pubspec.yaml with dart; no unique detection files.
     detection_files = ()
-    capabilities = frozenset({"read_name", "read_metadata", "ci_templates"})
     ecosystem = "Flutter"
 
     # A Flutter app IS Dart sources, so the inherited Dart import analysers

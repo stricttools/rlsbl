@@ -22,7 +22,6 @@ class PgdesignTarget(BaseTarget):
 
     detection_files = ("pgdesign.toml",)
     BUILD_TIMEOUT_DEFAULT = 60
-    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "PostgreSQL"
 
     @property
@@ -61,9 +60,6 @@ class PgdesignTarget(BaseTarget):
         """Return the directory name as the project name."""
         return os.path.basename(os.path.abspath(dir_path))
 
-    def read_metadata(self, dir_path):
-        """Pgdesign projects have no standard metadata beyond version."""
-        return {}
 
     def read_version(self, dir_path):
         """Read version from pgdesign.toml [project].version."""

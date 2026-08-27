@@ -191,15 +191,15 @@ class TestCapabilityConsistency:
     """Verify that targets declaring publication_probe capability have a working probe."""
 
     def test_probe_capable_targets_return_non_default(self):
-        """Targets with publication_probe in capabilities must override the method."""
+        """supports_publication_probe is exactly the set that overrides it."""
         from rlsbl.targets import TARGETS
         from rlsbl.targets.base import BaseTarget
 
         for name, target in TARGETS.items():
-            if "publication_probe" in target.capabilities:
+            if target.supports_publication_probe:
                 # The method must be overridden (not the BaseTarget default)
                 assert type(target).publication_probe is not BaseTarget.publication_probe, \
-                    f"target '{name}' declares publication_probe capability but uses the default BaseTarget implementation"
+                    f"target '{name}' answers supports_publication_probe but uses the default BaseTarget implementation"
 
     def test_non_probe_targets_use_default(self):
         """Targets without publication_probe capability should use the default."""
@@ -207,10 +207,10 @@ class TestCapabilityConsistency:
         from rlsbl.targets.base import BaseTarget
 
         for name, target in TARGETS.items():
-            if "publication_probe" not in target.capabilities:
+            if not target.supports_publication_probe:
                 result = target.publication_probe("/fake", "1.0.0")
                 assert result.status == PublicationStatus.UNPROBEABLE, \
-                    f"target '{name}' lacks publication_probe capability but returned {result.status}"
+                    f"target '{name}' does not support probing but returned {result.status}"
 
 
 class TestYankCommand:
@@ -227,7 +227,7 @@ class TestYankCommand:
 
         target = MagicMock()
         target.name = "npm"
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.tag_format.return_value = "v1.0.0"
         target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.PUBLISHED, "npm", "1.0.0", "my-pkg@1.0.0 found"
@@ -262,7 +262,7 @@ class TestYankCommand:
 
         target = MagicMock()
         target.name = "plain"
-        target.capabilities = frozenset()
+        target.supports_publication_probe = False
         target.tag_format.return_value = "v1.0.0"
 
         mock_member.return_value = MagicMock(targets=[TargetEntry("plain", ".")])
@@ -290,7 +290,7 @@ class TestYankCommand:
 
         target = MagicMock()
         target.name = "npm"
-        target.capabilities = frozenset({"publication_probe"})
+        target.supports_publication_probe = True
         target.tag_format.return_value = "v1.0.0"
         target.publication_probe.return_value = PublicationProbeResult(
             PublicationStatus.UNPUBLISHED, "npm", "1.0.0", "not found"

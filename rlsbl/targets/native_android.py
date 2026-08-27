@@ -13,7 +13,6 @@ class NativeAndroidTarget(BaseTarget):
 
     # Content-based detection — no manifest conflicts with maven's detection_files.
     detection_files = ()
-    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "Android"
     auto_detectable = "yes"
 

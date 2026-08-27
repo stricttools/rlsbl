@@ -16,8 +16,37 @@ class ReleaseTarget(Protocol):
         """Unique identifier for this target (e.g. 'npm', 'pypi', 'codehome')."""
         ...
 
-    capabilities: frozenset[str]
-    """Set of capabilities this target supports (e.g. 'publish', 'build_assets', 'dev_install')."""
+    # There is no ``capabilities`` attribute. What a target supports is
+    # answered per axis by asking the target -- ``supports_publication_probe``,
+    # ``supports_read_name``, ``supports_read_metadata``,
+    # ``supports_dev_install``, ``provides_ci_templates`` -- each derived from
+    # the implementation rather than stored beside it. A declared set could
+    # disagree with the code it described, and did.
+
+    @property
+    def supports_publication_probe(self) -> bool:
+        """Whether ``publication_probe`` gives a real answer for this target."""
+        ...
+
+    @property
+    def supports_read_name(self) -> bool:
+        """Whether ``read_name`` reads a real name for this target."""
+        ...
+
+    @property
+    def supports_read_metadata(self) -> bool:
+        """Whether ``read_metadata`` reads real metadata for this target."""
+        ...
+
+    @property
+    def supports_dev_install(self) -> bool:
+        """Whether ``dev_install_command`` yields a spec for any mode."""
+        ...
+
+    @property
+    def provides_ci_templates(self) -> bool:
+        """Whether this target ships a CI workflow template to scaffold."""
+        ...
 
     ecosystem: str
     """Ecosystem identifier (e.g. 'node', 'python', 'go', 'jvm')."""

@@ -2,7 +2,7 @@
 
 from rlsbl.targets import TARGETS
 from rlsbl.targets.introspect import (
-    CAPABILITY_COLUMNS,
+    SUPPORT_COLUMNS,
     HEADERS,
     generate_target_table_data,
 )
@@ -48,16 +48,20 @@ class TestRows:
 
 
 class TestCapabilityCheckmarks:
-    def test_capability_checkmarks_match_frozenset(self):
-        """For each target, the checkmark columns match the target's capabilities."""
+    def test_capability_checkmarks_match_the_derived_answers(self):
+        """Each checkmark column reflects the target's own derived answer.
+
+        These cells used to read a hand-declared frozenset that had drifted
+        from the code; they now ask the property the table names.
+        """
         headers, rows = generate_target_table_data()
         by_name = _rows_by_name(rows)
         for target_name, target in TARGETS.items():
             row = by_name[target_name]
-            for cap in CAPABILITY_COLUMNS:
+            for cap, prop in SUPPORT_COLUMNS:
                 col_idx = headers.index(cap)
                 cell = row[col_idx]
-                if cap in target.capabilities:
+                if getattr(target, prop):
                     assert cell == "✓", (
                         f"{target_name}.{cap}: expected checkmark, got {cell!r}"
                     )

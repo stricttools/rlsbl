@@ -18,7 +18,6 @@ class MavenTarget(BaseTarget):
     detection_files = ("build.gradle.kts", "build.gradle", "pom.xml")
     lint_language = "maven"
     BUILD_TIMEOUT_DEFAULT = 300
-    capabilities = frozenset({"read_name", "read_metadata", "ci_templates"})
     ecosystem = "Java / Maven"
 
     @property

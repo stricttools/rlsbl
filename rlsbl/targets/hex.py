@@ -13,7 +13,6 @@ class HexTarget(BaseTarget):
     """Release target for Hex/Elixir projects (mix.exs)."""
 
     detection_files = ("mix.exs",)
-    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
     ecosystem = "Elixir / Hex"
 
     @property
@@ -30,9 +29,6 @@ class HexTarget(BaseTarget):
         app_match = re.search(r'app:\s*:(\w+)', content)
         return app_match.group(1) if app_match else None
 
-    def read_metadata(self, dir_path):
-        """Hex metadata extraction not yet implemented."""
-        return {}
 
     def read_version(self, dir_path):
         """Read the version from mix.exs."""

@@ -50,7 +50,7 @@ class _FakeRegistry:
     models one that is merely slow.
     """
 
-    capabilities = frozenset({"publication_probe"})
+    supports_publication_probe = True
 
     def __init__(self, name, statuses):
         self.name = name
@@ -72,7 +72,7 @@ class _FakeRegistry:
 class _UnprobeableRegistry:
     """A target with no probe capability at all."""
 
-    capabilities = frozenset({"read_name"})
+    supports_publication_probe = False
 
     def __init__(self, name):
         self.name = name

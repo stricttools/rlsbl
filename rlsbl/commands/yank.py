@@ -124,7 +124,7 @@ def run_cmd(args, flags, project_root):
         for entry in entries:
             t = TARGETS[entry.name]
             target_objects.append(t)
-            if "publication_probe" in t.capabilities:
+            if t.supports_publication_probe:
                 result = t.publication_probe(project_dir, version)
                 probe_results.append((t, result))
             else:

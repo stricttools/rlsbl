@@ -221,9 +221,18 @@ class TestNativeAndroidProperties:
         target = NativeAndroidTarget()
         assert target.ecosystem == "Android"
 
-    def test_capabilities(self):
+    def test_support_axes(self):
+        """Reads a name and ships CI templates; nothing else.
+
+        These used to be a declared frozenset; each axis is now the target's
+        own derived answer.
+        """
         target = NativeAndroidTarget()
-        assert target.capabilities == frozenset({"read_name", "ci_templates"})
+        assert target.supports_read_name
+        assert target.provides_ci_templates
+        assert not target.supports_read_metadata
+        assert not target.supports_dev_install
+        assert not target.supports_publication_probe
 
     def test_detection_files_empty(self):
         target = NativeAndroidTarget()

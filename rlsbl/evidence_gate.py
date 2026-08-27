@@ -100,7 +100,7 @@ class RegistryProbeSource:
 
         evidence = []
         for target in targets:
-            if "publication_probe" not in target.capabilities:
+            if not target.supports_publication_probe:
                 evidence.append(Evidence(
                     source=self.name,
                     target=target.name,

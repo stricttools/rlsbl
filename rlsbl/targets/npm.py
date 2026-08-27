@@ -16,7 +16,6 @@ class NpmTarget(BaseTarget):
 
     detection_files = ("package.json",)
     lint_language = "npm"
-    capabilities = frozenset({"read_name", "read_metadata", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Node.js / npm"
 
     @property

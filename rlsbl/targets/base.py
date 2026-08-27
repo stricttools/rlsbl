@@ -3,6 +3,10 @@
 import os
 from typing import ClassVar
 
+# The scaffold template that makes a target's directory a source of CI
+# workflows. Its presence is what ``provides_ci_templates`` answers from.
+CI_TEMPLATE_FILENAME = "ci.yml.tpl"
+
 
 class TemplateVars(dict):
     """Dict subclass that auto-generates namespaced ``{target}.{key}`` entries.
@@ -36,7 +40,6 @@ class BaseTarget:
     """
 
     detection_files: ClassVar[tuple[str, ...]] = ()
-    capabilities: ClassVar[frozenset[str]] = frozenset()
     ecosystem: ClassVar[str] = ""
     auto_detectable: ClassVar[str] = "yes"
     BUILD_TIMEOUT_DEFAULT: ClassVar[int] = 120
@@ -109,7 +112,14 @@ class BaseTarget:
         return None
 
     def read_metadata(self, dir_path):
-        """Read project metadata (license, description) from the manifest file."""
+        """Read project metadata (license, description) from the manifest file.
+
+        The default is empty, and that is the right answer for every ecosystem
+        whose manifest carries no license or description (Go modules, Swift
+        packages, deno.json, Dockerfiles, ...). Those targets do NOT override
+        this to return an empty dict of their own: not overriding it is what
+        makes ``supports_read_metadata`` answer honestly.
+        """
         return {}
 
     def template_vars(self, dir_path, ctx):
@@ -333,6 +343,68 @@ class BaseTarget:
         Default returns {"global": None, "venv": None} (unsupported).
         """
         return {"global": None, "venv": None}
+
+    # -- Derived capability answers -----------------------------------------
+    #
+    # These replaced a hand-declared ``capabilities: frozenset[str]``, which
+    # had already drifted from the code it described: several targets
+    # implemented ``read_metadata`` without declaring it, and two of the
+    # strings it could hold (``publish``, ``build_assets``) were declared by
+    # no target and read by nothing.
+    #
+    # Each answer is derived per axis, by whichever means is honest for that
+    # axis: whether the class overrides a method, whether a method actually
+    # yields anything, or whether the shipped templates contain the file. None
+    # of them is a stored declaration that can disagree with the behaviour.
+    #
+    # There is deliberately no ``getattr(target, ..., default)`` form for any
+    # of these. Four call sites decide whether to run a publication probe from
+    # ``supports_publication_probe``, and a silent default at any of them would
+    # answer "no evidence" for a target that can in fact answer.
+
+    @property
+    def supports_publication_probe(self):
+        """Whether this target can ask its registry if a version is published."""
+        return type(self).publication_probe is not BaseTarget.publication_probe
+
+    @property
+    def supports_read_name(self):
+        """Whether this target can read a package name out of its manifest."""
+        return type(self).read_name is not BaseTarget.read_name
+
+    @property
+    def supports_read_metadata(self):
+        """Whether this target can read license/description from its manifest."""
+        return type(self).read_metadata is not BaseTarget.read_metadata
+
+    @property
+    def supports_dev_install(self):
+        """Whether ``rlsbl dev install`` has anything to run for this target.
+
+        Behavioural rather than override-based: a subclass can inherit a
+        ``dev_install_command`` whose specs resolve to nothing for it, and the
+        honest answer there is "no".
+        """
+        specs = self.dev_install_command(".")
+        return any(specs.get(mode) is not None for mode in ("global", "venv"))
+
+    @property
+    def provides_ci_templates(self):
+        """Whether this target ships a CI workflow template.
+
+        Answered from the template directory rather than declared: a target
+        provides CI templates exactly when its template directory contains
+        ``ci.yml.tpl``, which is the file the scaffold renders into
+        ``.github/workflows/ci.yml``.
+        """
+        return self._has_template(CI_TEMPLATE_FILENAME)
+
+    def _has_template(self, filename):
+        """Whether this target's template directory ships *filename*."""
+        directory = self.template_dir()
+        if directory is None:
+            return False
+        return os.path.isfile(os.path.join(directory, filename))
 
     shares_workspace_environment: ClassVar[bool] = False
     """Whether workspace members of this target share ONE resolved environment.

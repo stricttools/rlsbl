@@ -1263,7 +1263,15 @@ class TestGoMonorepoTagFormat:
         assert result == "auth-gateway/v*"
 
 
-VALID_CAPABILITIES = {"read_name", "read_metadata", "ci_templates", "dev_install", "publication_probe"}
+# The axes the deleted ``capabilities`` frozenset used to encode, mapped to the
+# derived property that answers each one.
+CAPABILITY_AXES = {
+    "read_name": "supports_read_name",
+    "read_metadata": "supports_read_metadata",
+    "ci_templates": "provides_ci_templates",
+    "dev_install": "supports_dev_install",
+    "publication_probe": "supports_publication_probe",
+}
 VALID_AUTO_DETECTABLE = {"yes", "no", "conditional"}
 
 
@@ -1280,16 +1288,23 @@ class TestTargetIntrospectionConformance:
         assert target.ecosystem != "", f"{name}.ecosystem is empty"
 
     @pytest.mark.parametrize("name", list(TARGETS.keys()))
-    def test_capabilities_is_frozenset_of_valid_values(self, name):
-        """Every target must declare capabilities as a frozenset with values from the allowed set."""
+    def test_every_support_axis_answers_a_bool(self, name):
+        """Every axis the deleted ``capabilities`` frozenset encoded is now a
+        derived property, and every target must answer all of them.
+
+        The frozenset itself is gone: it was a declaration that could disagree
+        with the code it described, and did -- eight targets implemented
+        ``read_metadata`` without listing it.
+        """
         target = TARGETS[name]
-        assert isinstance(target.capabilities, frozenset), (
-            f"{name}.capabilities is {type(target.capabilities).__name__}, expected frozenset"
+        assert not hasattr(target, "capabilities"), (
+            f"{name} still declares a capabilities attribute; the axes are "
+            f"derived properties now"
         )
-        invalid = target.capabilities - VALID_CAPABILITIES
-        assert not invalid, (
-            f"{name}.capabilities contains invalid values: {invalid}"
-        )
+        for axis in CAPABILITY_AXES.values():
+            assert isinstance(getattr(target, axis), bool), (
+                f"{name}.{axis} did not answer a bool"
+            )
 
     @pytest.mark.parametrize("name", list(TARGETS.keys()))
     def test_auto_detectable_is_valid(self, name):

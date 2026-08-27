@@ -46,7 +46,6 @@ def _foreign_manifests():
 class PlainTarget(BaseTarget):
     """Release target for projects that have no build system or package registry."""
 
-    capabilities = frozenset()
     ecosystem = "Plain"
     auto_detectable = "conditional"
 

@@ -51,7 +51,6 @@ class GoTarget(BaseTarget):
 
     detection_files = ("go.mod",)
     lint_language = "go"
-    capabilities = frozenset({"read_name", "ci_templates", "dev_install", "publication_probe"})
     ecosystem = "Go modules"
 
     @property
@@ -65,9 +64,6 @@ class GoTarget(BaseTarget):
             return None
         return module_path.rsplit("/", 1)[-1] if "/" in module_path else module_path
 
-    def read_metadata(self, dir_path):
-        """Go modules have no license/description in go.mod."""
-        return {}
 
     def publication_probe(self, dir_path, version, ctx=None):
         """Probe for a specific version by checking tag existence via git.

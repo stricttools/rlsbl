@@ -12,7 +12,6 @@ class DockerTarget(BaseTarget):
     """Release target for Docker projects (Dockerfile + VERSION file)."""
 
     detection_files = ("Dockerfile",)
-    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "Docker"
 
     @property
@@ -28,9 +27,6 @@ class DockerTarget(BaseTarget):
             return image
         return os.path.basename(os.path.abspath(dir_path))
 
-    def read_metadata(self, dir_path):
-        """Docker projects have no standard metadata in the manifest."""
-        return {}
 
     def read_version(self, dir_path):
         """Read version from the VERSION file."""

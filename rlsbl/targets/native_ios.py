@@ -13,7 +13,6 @@ class NativeIosTarget(BaseTarget):
     """Release target for native iOS apps using Xcode or Tuist."""
 
     detection_files = ()  # Content-based detection
-    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "iOS"
     auto_detectable = "yes"
 

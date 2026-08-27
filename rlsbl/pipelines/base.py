@@ -47,7 +47,10 @@ class BasePipeline:
         if target is None:
             return True
 
-        if "publication_probe" not in getattr(target, "capabilities", frozenset()):
+        # Asked of the target, never getattr-with-default: a default here
+        # would silently skip the probe for a target that can answer, and
+        # publish over a version that is already on the registry.
+        if not target.supports_publication_probe:
             return True
 
         result = target.publication_probe(dir_path, version, ctx)

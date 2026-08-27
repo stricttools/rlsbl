@@ -15,7 +15,6 @@ class SwiftAppleTarget(SwiftTarget):
 
     # Opt-in only; shares Package.swift with swift target.
     detection_files = ()
-    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "Swift (Apple)"
     auto_detectable = "no"
 

@@ -14,7 +14,6 @@ class DenoTarget(BaseTarget):
     """Release target for Deno projects (deno.json / deno.jsonc)."""
 
     detection_files = ("deno.json", "deno.jsonc")
-    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
     ecosystem = "Deno / JSR"
 
     @property
@@ -32,9 +31,6 @@ class DenoTarget(BaseTarget):
         data = json.loads(cleaned)
         return data.get("name")
 
-    def read_metadata(self, dir_path):
-        """deno.json has no standard license/description fields."""
-        return {}
 
     def _config_path(self, dir_path):
         """Return the path to deno.json or deno.jsonc, preferring deno.json."""

@@ -1,5 +1,5 @@
 ---
-description: "Pipeline architecture: 9 built-in types, 3 auth patterns, custom assets, capability gating, launcher shims with download modes, and migration guide."
+description: "Pipeline architecture: 9 built-in types, 3 auth patterns, custom assets, the pre-publish registry probe, launcher shims with download modes, and migration guide."
 ---
 
 # Pipelines
@@ -119,16 +119,27 @@ Custom assets allow attaching arbitrary build artifacts to GitHub Releases along
 }
 ```
 
-## Capability gating
+## What decides whether a pipeline step runs
 
-Pipeline steps are gated on 2 target capabilities (`publish` and `build_assets`). Each release target declares which pipeline operations it supports, and rlsbl skips steps the target cannot handle rather than failing. This allows you to configure pipelines broadly without worrying about targets that lack publish or build support — the system gracefully omits inapplicable steps while still executing the rest of the release flow.
+A pipeline runs because it is configured, and it publishes for the target its
+`target` key links it to. Whether a target publishes at all is decided by that
+configuration — by `publish_mode`, and by whether a pipeline names the target —
+never by a property of the target itself. A target with no pipeline linked to it
+is a version-bump-only target (`plain` and `spec` are the usual cases): it gets
+its version written and its tag created, and no publish step runs for it because
+none is configured.
 
-| Capability | Effect when absent |
+The one target property a pipeline does consult is whether the target can ask its
+registry if a version is already published:
+
+| Property | Effect |
 | --- | --- |
-| `publish` | The publish step is skipped entirely for that target |
-| `build_assets` | Asset building is skipped for that target |
+| `supports_publication_probe` | When true, the pipeline probes the registry before publishing and skips the publish when the version is already served. When false, the publish proceeds without a pre-check. |
 
-This means a target that does not support publishing (e.g., a documentation-only target) will not attempt to run any pipeline's publish step, even if pipelines are configured. The pipeline config remains valid — it simply has no effect for that target.
+Targets answer that from whether they implement `publication_probe` — npm, PyPI
+and Go do. There is no declared capability set behind any of this: what a target
+supports is derived from the target, per axis. See
+[targets.md](targets.md#what-a-target-supports).
 
 ## Migration from old publish key
 

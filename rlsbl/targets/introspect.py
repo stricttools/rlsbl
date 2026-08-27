@@ -1,26 +1,38 @@
-"""Target introspection -- generates raw table data for all release targets showing ecosystem, detection files, capabilities, and tag formats."""
+"""Target introspection -- generates raw table data for all release targets showing ecosystem, detection files, supported operations, and tag formats."""
 
 from . import TARGETS
 
-CAPABILITY_COLUMNS = ("read_name", "read_metadata", "ci_templates")
+# Support columns and the property each one asks. The table used to read a
+# hand-declared ``capabilities`` frozenset, which had drifted from the code:
+# several targets implemented read_metadata without declaring it, and the
+# swift-apple row's dev-install cell was blank for the opposite reason.
+SUPPORT_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("read_name", "supports_read_name"),
+    ("read_metadata", "supports_read_metadata"),
+    ("ci_templates", "provides_ci_templates"),
+)
 
 HEADERS = [
     "Name", "Ecosystem", "Detection files", "Version file", "Auto-detectable",
-    "Tag format", "Monorepo tag format", "read_name",
-    "read_metadata", "ci_templates", "dev_install",
+    "Tag format", "Monorepo tag format",
+    *(column for column, _prop in SUPPORT_COLUMNS),
+    "dev_install",
 ]
+
+# Targets whose detection is decided by file content rather than by a
+# filename, with the phrasing the table shows for them.
+_DETECTION_OVERRIDES = {
+    "plain": "VERSION (conditional)",
+    "flutter": "pubspec.yaml (flutter)",
+}
 
 
 def _format_dev_install(target) -> str:
     """Format the dev_install_command output into a compact string."""
-    if "dev_install" not in target.capabilities:
-        return ""
     result = target.dev_install_command(".")
-    global_spec = result.get("global")
-    venv_spec = result.get("venv")
-
     parts = []
-    for mode, spec in [("global", global_spec), ("venv", venv_spec)]:
+    for mode in ("global", "venv"):
+        spec = result.get(mode)
         if spec is not None:
             tool = spec["tool"]
             args = " ".join(spec["args"])
@@ -32,22 +44,18 @@ def _format_dev_install(target) -> str:
 def generate_target_table_data() -> tuple[list[str], list[list[str]]]:
     """Generate raw data for a markdown table of all release targets.
 
-    Returns ``(headers, rows)`` where *headers* is an 11-element list and
-    each row is an 11-element list of strings, sorted alphabetically by
-    target name.
+    Returns ``(headers, rows)`` where each row has one cell per header, sorted
+    alphabetically by target name.
     """
     rows: list[list[str]] = []
 
     for target_name, target in sorted(TARGETS.items()):
         # Detection files
-        if target_name == "plain":
-            detection = "VERSION (conditional)"
-        elif target_name == "flutter":
-            detection = "pubspec.yaml (flutter)"
-        elif target.detection_files:
-            detection = ", ".join(target.detection_files)
-        else:
-            detection = "---"
+        detection = _DETECTION_OVERRIDES.get(target_name)
+        if detection is None:
+            detection = (
+                ", ".join(target.detection_files) if target.detection_files else "---"
+            )
 
         # Version file
         vf = target.version_file()
@@ -60,13 +68,10 @@ def generate_target_table_data() -> tuple[list[str], list[list[str]]]:
         # Monorepo tag format
         monorepo_tf = target.monorepo_tag_format("{name}", "{version}", "{path}")
 
-        # Capability columns
-        cap_cells = []
-        for cap in CAPABILITY_COLUMNS:
-            cap_cells.append("✓" if cap in target.capabilities else "")
-
-        # Dev install
-        dev_install = _format_dev_install(target)
+        # Support columns, each derived from the target rather than declared
+        support_cells = [
+            "✓" if getattr(target, prop) else "" for _column, prop in SUPPORT_COLUMNS
+        ]
 
         row = [
             target_name,
@@ -76,8 +81,8 @@ def generate_target_table_data() -> tuple[list[str], list[list[str]]]:
             target.auto_detectable,
             tag_format,
             monorepo_tf,
-            *cap_cells,
-            dev_install,
+            *support_cells,
+            _format_dev_install(target),
         ]
         rows.append(row)
 

@@ -432,8 +432,13 @@ class TestMavenReadMetadataGradle:
 
 
 class TestMavenCapabilities:
-    """read_metadata is in the capabilities frozenset."""
+    """The maven target answers supports_read_metadata."""
 
-    def test_read_metadata_in_capabilities(self):
-        """MavenTarget.capabilities includes 'read_metadata'."""
-        assert "read_metadata" in MavenTarget.capabilities
+    def test_read_metadata_is_supported(self):
+        """MavenTarget implements read_metadata, so it answers True.
+
+        This used to read a declared frozenset. The answer is derived from the
+        override now, which is why eight targets that merely restated the empty
+        default stopped claiming support for it.
+        """
+        assert MavenTarget().supports_read_metadata

@@ -13,7 +13,6 @@ class SwiftTarget(BaseTarget):
     """Release target for Swift packages (Package.swift + VERSION file)."""
 
     detection_files = ("Package.swift",)
-    capabilities = frozenset({"read_name", "ci_templates", "dev_install"})
     ecosystem = "Swift (SPM)"
 
     @property
@@ -30,9 +29,6 @@ class SwiftTarget(BaseTarget):
         match = re.search(r'name:\s*"([^"]+)"', content)
         return match.group(1) if match else None
 
-    def read_metadata(self, dir_path):
-        """Swift packages have no standard license/description in Package.swift."""
-        return {}
 
     def read_version(self, dir_path):
         """Read version from the VERSION file."""

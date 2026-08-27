@@ -15,7 +15,6 @@ class SpecTarget(BaseTarget):
     """
 
     detection_files = ("version.json",)
-    capabilities = frozenset({"read_name", "ci_templates"})
     ecosystem = "Specification"
 
     @property
@@ -26,9 +25,6 @@ class SpecTarget(BaseTarget):
         """Return the directory name as the project name."""
         return os.path.basename(os.path.abspath(dir_path))
 
-    def read_metadata(self, dir_path):
-        """Spec projects have no standard metadata in version.json."""
-        return {}
 
     def detect(self, dir_path):
         """True if version.json exists in root or spec/ subdir."""

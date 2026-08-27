@@ -52,7 +52,7 @@ def register_workspace_checks(app):
                 entries = []
             if entries:
                 has_ci = any(
-                    "ci_templates" in TARGETS[e.name].capabilities
+                    TARGETS[e.name].provides_ci_templates
                     for e in entries
                     if e.name in TARGETS
                 )
@@ -64,7 +64,7 @@ def register_workspace_checks(app):
         if not required:
             msg = "no in-scope projects require CI inlining"
             if skipped:
-                msg += f" ({skipped} skipped, no ci_templates capability)"
+                msg += f" ({skipped} skipped, no CI templates)"
             return reporter.passed(msg)
 
         router_path = os.path.join(
@@ -98,7 +98,7 @@ def register_workspace_checks(app):
             )
         msg = f"all {len(required)} project(s) inlined in ci-router.yml"
         if skipped:
-            msg += f" ({skipped} skipped, no ci_templates capability)"
+            msg += f" ({skipped} skipped, no CI templates)"
         return reporter.passed(msg)
 
     @app.error_check("workspace-targets")
