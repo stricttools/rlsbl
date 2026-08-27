@@ -18,7 +18,18 @@ def _changes_dirs_for_ctx(ctx):
     the format_version gate covers exactly the files that are validated. Returns
     an empty list when there is no changes dir.
     """
-    return [changes_dir for changes_dir, _tag, _proj, _entries in _get_all_changelog_contexts(ctx)]
+    return [changes_dir for changes_dir, _tag, _scope, _entries in _get_all_changelog_contexts(ctx)]
+
+
+def _scope_is_releasable(scope):
+    """Does any member in *scope* produce releases (and therefore a changelog)?
+
+    A scope over a single ``releasable = false`` member has no changelog to
+    validate; a releasable's member scope always has at least one.
+    """
+    from ..workspace import project_is_releasable
+
+    return any(project_is_releasable(m) for m in scope.owned_members())
 
 
 def register_changelog_checks(app):
@@ -146,7 +157,7 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, _tag_glob, _project, entries in all_contexts:
+        for _changes_dir, _tag_glob, _scope, entries in all_contexts:
             passed, details = check_hashes_resolve(entries)
             if not passed:
                 all_passed = False
@@ -169,8 +180,8 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, tag_glob, project, entries in all_contexts:
-            passed, details = check_in_range(entries, tag_glob, project=project)
+        for _changes_dir, tag_glob, scope, entries in all_contexts:
+            passed, details = check_in_range(entries, tag_glob, scope=scope)
             if not passed:
                 all_passed = False
                 all_details.extend(details)
@@ -193,14 +204,12 @@ def register_changelog_checks(app):
         all_details = []
         all_passed = True
         checked_any = False
-        for _changes_dir, tag_glob, project, entries in all_contexts:
-            # In implicit mode, project is a single WorkspaceProject; skip if non-releasable.
-            # In explicit mode, project is a list of members (always releasable).
-            if project is not None and not isinstance(project, list) and not project.is_releasable:
+        for _changes_dir, tag_glob, scope, entries in all_contexts:
+            if scope is not None and not _scope_is_releasable(scope):
                 continue
 
             checked_any = True
-            passed, details = check_coverage(entries, tag_glob, project=project)
+            passed, details = check_coverage(entries, tag_glob, scope=scope)
             if not passed:
                 all_passed = False
                 all_details.extend(details)
@@ -230,8 +239,8 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, tag_glob, project, entries in all_contexts:
-            passed, details = check_no_orphans(entries, tag_glob, project=project)
+        for _changes_dir, tag_glob, scope, entries in all_contexts:
+            passed, details = check_no_orphans(entries, tag_glob, scope=scope)
             if not passed:
                 all_passed = False
                 all_details.extend(details)
@@ -253,7 +262,7 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, _tag_glob, _project, entries in all_contexts:
+        for _changes_dir, _tag_glob, _scope, entries in all_contexts:
             passed, details = check_schema(entries)
             if not passed:
                 all_passed = False
@@ -277,10 +286,8 @@ def register_changelog_checks(app):
         all_details = []
         any_failed = False
         checked_any = False
-        for _changes_dir, _tag_glob, project, entries in all_contexts:
-            # In implicit mode, project is a single WorkspaceProject; skip if non-releasable.
-            # In explicit mode, project is a list of members (always releasable).
-            if project is not None and not isinstance(project, list) and not project.is_releasable:
+        for _changes_dir, _tag_glob, scope, entries in all_contexts:
+            if scope is not None and not _scope_is_releasable(scope):
                 continue
 
             checked_any = True
@@ -311,7 +318,7 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, _tag_glob, _project, entries in all_contexts:
+        for _changes_dir, _tag_glob, _scope, entries in all_contexts:
             passed, details = check_batch_size_commits(entries, batch_config, version="unreleased")
             if not passed:
                 all_passed = False
@@ -340,7 +347,7 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for changes_dir, _tag_glob, _project, _entries in all_contexts:
+        for changes_dir, _tag_glob, _scope, _entries in all_contexts:
             entries_by_version = _read_all_versioned_entries(changes_dir)
             passed, details = check_batch_size_entries(entries_by_version, batch_config)
             if not passed:

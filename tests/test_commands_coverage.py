@@ -1582,10 +1582,13 @@ class TestCheckProjectScopeReleasable:
 
         releasable = MagicMock()
         releasable.name = "myrel"
-        members = [MagicMock()]
-        ctx = _ResolvedContext(project=MagicMock(), releasable=releasable, member_projects=members)
+        members = [{"path": "pkg-a", "name": "pkg-a"}]
+        ctx = _ResolvedContext(
+            project=MagicMock(), releasable=releasable, member_projects=members,
+            all_projects=[{"path": ".", "name": "root"}, *members],
+        )
 
-        with patch(f"{MOD_CL}.filter_commits_for_releasable", return_value=set()):
+        with patch(f"{MOD_CL}.filter_commits_for_scope", return_value=set()):
             with pytest.raises(SystemExit):
                 _check_project_scope(["abc123"], ctx)
 
@@ -1885,33 +1888,78 @@ class TestGetGeneratedFiles:
 
 
 class TestDerivePackagesFromCommits:
-    """Covers lines 229-250: _derive_packages_from_commits."""
+    """Covers _derive_packages_from_commits: single-owner package derivation."""
+
+    ROOT = {"path": ".", "name": "root"}
+    PKG_A = {"path": "pkg-a", "name": "pkg-a"}
+    PKG_A_INNER = {"path": "pkg-a/inner", "name": "pkg-a-inner"}
+
+    def _scope(self, owned, members=None):
+        from rlsbl.ownership import OwnershipScope
+
+        members = members or [self.ROOT, self.PKG_A]
+        return OwnershipScope.for_members(members, owned)
 
     def test_no_members(self):
         from rlsbl.commands.changelog_cmd import _derive_packages_from_commits
 
-        assert _derive_packages_from_commits(["abc"], []) is None
+        assert _derive_packages_from_commits(["abc"], self._scope([])) is None
+
+    def test_none_scope(self):
+        from rlsbl.commands.changelog_cmd import _derive_packages_from_commits
+
+        assert _derive_packages_from_commits(["abc"], None) is None
 
     def test_with_members(self):
         from rlsbl.commands.changelog_cmd import _derive_packages_from_commits
 
-        member = MagicMock()
-        member.name = "pkg-a"
-
         with patch("rlsbl.git_util.get_commit_files", return_value=["pkg-a/file.py"]):
-            with patch("rlsbl.git_util.file_matches_project", return_value=True):
-                result = _derive_packages_from_commits(["abc123"], [member])
+            result = _derive_packages_from_commits(
+                ["abc123"], self._scope([self.PKG_A]),
+            )
         assert result == ["pkg-a"]
 
-    def test_commit_files_none(self):
+    def test_narrows_to_the_single_owner(self):
+        """A file under a nested member no longer claims its parent too.
+
+        The derivation used to add every member whose path prefixed the file,
+        so a commit under ``pkg-a/inner`` claimed both members. Each file now
+        names exactly one.
+        """
         from rlsbl.commands.changelog_cmd import _derive_packages_from_commits
 
-        member = MagicMock()
-        member.name = "pkg-a"
+        members = [self.ROOT, self.PKG_A, self.PKG_A_INNER]
+        scope = self._scope([self.PKG_A, self.PKG_A_INNER], members)
+        with patch(
+            "rlsbl.git_util.get_commit_files",
+            return_value=["pkg-a/inner/file.py"],
+        ):
+            result = _derive_packages_from_commits(["abc123"], scope)
+        assert result == ["pkg-a-inner"]
+
+    def test_out_of_scope_owner_does_not_leak(self):
+        """A member outside the scope is never named, even when it owns a file."""
+        from rlsbl.commands.changelog_cmd import _derive_packages_from_commits
+
+        other = {"path": "pkg-b", "name": "pkg-b"}
+        members = [self.ROOT, self.PKG_A, other]
+        scope = self._scope([self.PKG_A], members)
+        with patch(
+            "rlsbl.git_util.get_commit_files",
+            return_value=["pkg-a/file.py", "pkg-b/file.py"],
+        ):
+            result = _derive_packages_from_commits(["abc123"], scope)
+        assert result == ["pkg-a"]
+
+    def test_commit_files_none_is_a_hard_error(self):
+        """An undeterminable commit is never silently skipped."""
+        from rlsbl.commands.changelog_cmd import _derive_packages_from_commits
+        from rlsbl.ownership import OwnershipError
 
         with patch("rlsbl.git_util.get_commit_files", return_value=None):
-            result = _derive_packages_from_commits(["abc123"], [member])
-        assert result is None
+            with pytest.raises(OwnershipError) as exc:
+                _derive_packages_from_commits(["abc123"], self._scope([self.PKG_A]))
+        assert "abc123" in str(exc.value)
 
 
 class TestCmdGenerateNoChangesDir:

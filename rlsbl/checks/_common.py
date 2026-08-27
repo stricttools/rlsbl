@@ -110,26 +110,22 @@ def _resolve_version_and_tag(ctx):
 
 
 def _get_changelog_context(ctx):
-    """Resolve changes_dir, tag_glob, project, and entries for changelog checks.
+    """Resolve changes_dir, tag_glob, scope, and entries for changelog checks.
 
-    Returns ``(changes_dir, tag_glob, project, entries)`` or ``None`` when the
+    Returns ``(changes_dir, tag_glob, scope, entries)`` or ``None`` when the
     changes directory does not exist (caller should return skip).
 
-    The ``project`` value depends on mode:
-
-    - **Standalone** (no workspace): ``None``.
-    - **Implicit monorepo** (no ``[[releasables]]``): a single WorkspaceProject
-      dict with ``path`` and ``watch`` keys for scoping.
-    - **Explicit monorepo** (``[[releasables]]`` present): a list of
-      WorkspaceProject instances representing all member projects of the
-      releasable.  Callers that pass ``project`` to validation functions
-      handle both single-project and list-of-projects via
-      ``filter_commits_for_releasable``.
+    The ``scope`` value is an :class:`~rlsbl.ownership.OwnershipScope` -- the
+    whole workspace member list plus the names of the members whose files this
+    changelog covers -- or ``None`` for a standalone project with no workspace.
+    Attribution needs the whole list even when only some members are in scope,
+    because a file's owner is decided against every member.
 
     In explicit mode, ``changes_dir`` points to the releasable's changes
     directory (``.rlsbl-monorepo/releasables/{name}/changes/``) and
     ``tag_glob`` is derived from the releasable's ``tag_format``.
     """
+    from ..ownership import OwnershipScope
     from ..changelog.files import get_changes_dir, read_unreleased
     from ..workspace import (
         get_releasable_changes_dir,
@@ -176,8 +172,9 @@ def _get_changelog_context(ctx):
         tag_glob = rel.tag_format.replace("{version}", "*").replace("{name}", rel.name)
         # All member projects of this releasable for commit scoping
         member_projects = members_of(rel.name, ctx.projects)
+        scope = OwnershipScope.for_members(ctx.projects, member_projects)
         entries = read_unreleased(changes_dir)
-        return changes_dir, tag_glob, member_projects, entries
+        return changes_dir, tag_glob, scope, entries
 
     # Implicit mode: per-project changes dir
     changes_dir = get_changes_dir(str(ctx.project_root))
@@ -196,7 +193,7 @@ def _get_changelog_context(ctx):
         tag_glob = f"{proj['name']}@v*"
 
     entries = read_unreleased(changes_dir)
-    return changes_dir, tag_glob, proj, entries
+    return changes_dir, tag_glob, OwnershipScope.for_member(ctx.projects, proj), entries
 
 
 def _resolve_tag_glob(ctx):
@@ -224,10 +221,11 @@ def _get_all_changelog_contexts(ctx):
     explicit-mode workspace, iterates all releasables and returns a context
     tuple for each one that has a changes directory.
 
-    Returns a list of ``(changes_dir, tag_glob, project, entries)`` tuples,
+    Returns a list of ``(changes_dir, tag_glob, scope, entries)`` tuples,
     or an empty list when no contexts are available (caller should skip).
     """
     from ..changelog.files import read_unreleased
+    from ..ownership import OwnershipScope
     from ..workspace import (
         get_releasable_changes_dir,
         is_explicit_mode,
@@ -256,8 +254,9 @@ def _get_all_changelog_contexts(ctx):
             continue
         tag_glob = rel.tag_format.replace("{version}", "*").replace("{name}", rel.name)
         member_projects = members_of(rel.name, ctx.projects)
+        scope = OwnershipScope.for_members(ctx.projects, member_projects)
         entries = read_unreleased(changes_dir)
-        contexts.append((changes_dir, tag_glob, member_projects, entries))
+        contexts.append((changes_dir, tag_glob, scope, entries))
     return contexts
 
 

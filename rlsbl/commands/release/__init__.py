@@ -728,8 +728,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # --- Validate changelog ---
     # In monorepo mode, resolve the project dict for scoped coverage checks.
-    # For releasable mode, pass the full member project list so
-    # _filter_commits_for_scope uses filter_commits_for_releasable.
+    # For releasable mode, pass the full member project list; the
+    # preflight-changelog check builds the ownership scope from it.
     monorepo_project = None
     if releasable_name and member_projs:
         monorepo_project = member_projs

@@ -19,6 +19,8 @@ depend on it.  Commit-level attribution (which needs git) is in
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .errors import RlsblError
 
 
@@ -172,7 +174,23 @@ def owner_of(filepath, members):
     normalized = normalize_path(filepath)
     if not normalized or is_tool_owned_path(normalized):
         return None
+    return _most_specific_claim(normalized, members)
 
+
+def member_for_directory(dirpath, members):
+    """Return the member whose territory a *directory* falls in.
+
+    The same most-specific-path rule :func:`owner_of` uses, minus the
+    tool-owned exclusion: a directory is a place to run a command from, not a
+    file needing a changelog owner, so ``.rlsbl-monorepo/releasables/core``
+    resolves to the root member rather than to nothing.  ``""`` (the repository
+    root itself) resolves to the root member.
+    """
+    return _most_specific_claim(normalize_path(dirpath), members)
+
+
+def _most_specific_claim(normalized, members):
+    """The most specific member path claiming *normalized*; root is the residual."""
     best = None
     best_len = -1
     for member in members:
@@ -210,6 +228,69 @@ def owner_names_of_files(files, members) -> set:
         if owner is not None:
             names.add(member_name(owner))
     return names
+
+
+@dataclass(frozen=True)
+class OwnershipScope:
+    """A question asked of attribution: *which* members' files am I after?
+
+    Attribution needs the **whole** member list to answer at all -- a file
+    under ``pkg/inner`` belongs to ``pkg/inner`` even when the caller only
+    cares about ``pkg``, and a root file belongs to the root member even when
+    the caller only cares about ``pkg``.  Handing a function the members it
+    cares about and nothing else is what let a file be claimed by two members
+    at once, so the two halves travel together: ``members`` is every member in
+    the workspace, ``owned`` names the subset in scope.
+    """
+
+    members: tuple
+    owned: frozenset
+
+    @classmethod
+    def for_members(cls, all_members, scope_members) -> "OwnershipScope":
+        """Scope covering *scope_members* (e.g. a releasable's members)."""
+        return cls(
+            members=tuple(all_members),
+            owned=frozenset(member_name(m) for m in scope_members),
+        )
+
+    @classmethod
+    def for_member(cls, all_members, one_member) -> "OwnershipScope":
+        """Scope covering exactly one member."""
+        return cls.for_members(all_members, [one_member])
+
+    @classmethod
+    def everything(cls, all_members) -> "OwnershipScope":
+        """Scope covering every member of the workspace."""
+        return cls.for_members(all_members, all_members)
+
+    def owner_name_of(self, filepath) -> str | None:
+        """Name of the member owning *filepath* (any member, in scope or not)."""
+        return owner_name_of(filepath, self.members)
+
+    def claims(self, filepath) -> bool:
+        """Is *filepath* owned by a member in scope?"""
+        return self.owner_name_of(filepath) in self.owned
+
+    def claims_any(self, files) -> bool:
+        """Is any path in *files* owned by a member in scope?"""
+        for path in files:
+            if self.claims(path):
+                return True
+        return False
+
+    def owned_members(self) -> list:
+        """The in-scope members themselves, in workspace declaration order."""
+        return [m for m in self.members if member_name(m) in self.owned]
+
+    def describe(self) -> str:
+        """A short human name for the scope, for error messages."""
+        names = sorted(self.owned)
+        if not names:
+            return "(no members)"
+        if len(names) == 1:
+            return names[0]
+        return ", ".join(names)
 
 
 def unowned_paths(files, members) -> list:

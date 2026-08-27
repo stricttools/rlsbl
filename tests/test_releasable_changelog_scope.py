@@ -4,8 +4,9 @@ Verifies that when releasing a multi-member releasable, changelog
 coverage checks only consider commits touching the releasable's member
 projects -- not all commits in the repo.
 
-Covers Phase 1b fix: passing member_projs list to validate_changelog_state
-so _filter_commits_for_scope uses filter_commits_for_releasable.
+Covers the releasable-scoped coverage check: validate_changelog_state is
+handed the releasable's members, and the ownership scope built from them
+decides which commits the check considers.
 """
 
 import os
@@ -17,6 +18,7 @@ import pytest
 
 from conftest import make_commit, run_git
 from rlsbl.changelog.validate import check_coverage
+from rlsbl.ownership import OwnershipScope
 from rlsbl.workspace import WorkspaceProject, get_releasable_changes_dir
 
 
@@ -32,8 +34,10 @@ def two_releasable_repo(tmp_path, monkeypatch):
     Releasable A: members pkg-a1/, pkg-a2/
     Releasable B: members pkg-b1/
 
-    Returns (root, projects_a, projects_b) where projects_a and projects_b
-    are lists of WorkspaceProject suitable for passing as monorepo_project.
+    Returns (root, scope_a, scope_b) -- the ownership scopes for the two
+    releasables. Each carries the WHOLE workspace member list (both
+    releasables' members plus the root member) alongside the names in scope,
+    because a file's owner is decided against every member.
     """
     monkeypatch.chdir(tmp_path)
 
@@ -62,8 +66,14 @@ def two_releasable_repo(tmp_path, monkeypatch):
     projects_b = [
         WorkspaceProject({"name": "b1", "path": "pkg-b1", "releasable": "rel-b"}),
     ]
+    root_member = WorkspaceProject({"name": "root", "path": ".", "dev_only": True})
+    all_members = [root_member, *projects_a, *projects_b]
 
-    return tmp_path, projects_a, projects_b
+    return (
+        tmp_path,
+        OwnershipScope.for_members(all_members, projects_a),
+        OwnershipScope.for_members(all_members, projects_b),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +87,7 @@ class TestReleasableChangelogScope:
     def test_commit_in_releasable_a_excluded_from_b(self, two_releasable_repo):
         """A commit touching only releasable-A's files is excluded from
         releasable-B's validation (not flagged as uncovered)."""
-        root, projects_a, projects_b = two_releasable_repo
+        root, scope_a, scope_b = two_releasable_repo
 
         # Commit touching only releasable-A member
         sha_a = make_commit(root, "pkg-a1/code.py", "change in a1")
@@ -90,7 +100,7 @@ class TestReleasableChangelogScope:
         # Coverage check for releasable B with its member projects
         # should pass because the commit is outside B's scope
         passed, details = check_coverage(
-            [], tag_glob="rel-b@v*", project=projects_b,
+            [], tag_glob="rel-b@v*", scope=scope_b,
         )
         assert passed, f"Expected pass (commit outside B's scope), got: {details}"
         # Verify the commit was explicitly skipped
@@ -100,14 +110,14 @@ class TestReleasableChangelogScope:
     def test_commit_in_releasable_b_included_in_b(self, two_releasable_repo):
         """A commit touching releasable-B's files IS included in
         releasable-B's validation (flagged as uncovered if no entry)."""
-        root, projects_a, projects_b = two_releasable_repo
+        root, scope_a, scope_b = two_releasable_repo
 
         # Commit touching releasable-B member
         sha_b = make_commit(root, "pkg-b1/code.py", "change in b1")
 
         # Coverage check for releasable B with no entries should fail
         passed, details = check_coverage(
-            [], tag_glob="rel-b@v*", project=projects_b,
+            [], tag_glob="rel-b@v*", scope=scope_b,
         )
         assert not passed, "Expected fail (commit in B's scope with no entry)"
         uncovered_msgs = [d for d in details if "not covered" in d]
@@ -117,7 +127,7 @@ class TestReleasableChangelogScope:
     def test_commit_touching_both_releasables_included_in_both(self, two_releasable_repo):
         """A commit touching files in BOTH releasables is included in
         both validations."""
-        root, projects_a, projects_b = two_releasable_repo
+        root, scope_a, scope_b = two_releasable_repo
 
         # Create a commit touching files in both releasables
         (root / "pkg-a1" / "shared.py").write_text("shared a1\n")
@@ -134,7 +144,7 @@ class TestReleasableChangelogScope:
         # Coverage check for releasable A with no entries should fail
         # (the commit touches pkg-a1 which is in A)
         passed_a, details_a = check_coverage(
-            [], tag_glob="rel-a@v*", project=projects_a,
+            [], tag_glob="rel-a@v*", scope=scope_a,
         )
         assert not passed_a, "Expected fail for A (commit touches A's files)"
         uncovered_a = [d for d in details_a if "not covered" in d]
@@ -142,7 +152,7 @@ class TestReleasableChangelogScope:
 
         # Coverage check for releasable B with no entries should also fail
         passed_b, details_b = check_coverage(
-            [], tag_glob="rel-b@v*", project=projects_b,
+            [], tag_glob="rel-b@v*", scope=scope_b,
         )
         assert not passed_b, "Expected fail for B (commit touches B's files)"
         uncovered_b = [d for d in details_b if "not covered" in d]
@@ -151,20 +161,20 @@ class TestReleasableChangelogScope:
     def test_root_commit_excluded_from_both_releasables(self, two_releasable_repo):
         """A workspace-root commit (touching no member's files) is
         excluded from both releasables' validations."""
-        root, projects_a, projects_b = two_releasable_repo
+        root, scope_a, scope_b = two_releasable_repo
 
         # Commit touching only workspace root
         sha_root = make_commit(root, "README.md", "update readme")
 
         # Coverage check for releasable A should pass (root commit outside scope)
         passed_a, details_a = check_coverage(
-            [], tag_glob="rel-a@v*", project=projects_a,
+            [], tag_glob="rel-a@v*", scope=scope_a,
         )
         assert passed_a, f"Expected pass for A, got: {details_a}"
 
         # Coverage check for releasable B should also pass
         passed_b, details_b = check_coverage(
-            [], tag_glob="rel-b@v*", project=projects_b,
+            [], tag_glob="rel-b@v*", scope=scope_b,
         )
         assert passed_b, f"Expected pass for B, got: {details_b}"
 

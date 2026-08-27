@@ -207,7 +207,10 @@ def _probe_publication(resolved_targets, version, ctx, *, log, delays=None):
         impl = TARGETS.get(rt.name)
         if impl is None:
             continue
-        if "publication_probe" not in getattr(impl, "capabilities", frozenset()):
+        # Asked of the target, never getattr-with-default: a default here
+        # would drop a probeable target out of the verification set without
+        # a word.
+        if not impl.supports_publication_probe:
             continue
         probeable.append((impl, rt.path))
     if not probeable:
@@ -445,8 +448,7 @@ def _router_pattern_matches(path, pattern):
     from the project's ``path``) and arbitrary globs (from ``watch``, plus the
     releasable's CHANGELOG artifact). The globstar is a prefix test -- picomatch
     matches direct children as well as nested ones -- and everything else goes
-    through ``fnmatch``, the same approximation ``file_matches_project`` uses
-    for watch globs.
+    through ``fnmatch``, which approximates picomatch for the remaining globs.
     """
     if pattern.endswith("/**"):
         prefix = pattern[: -len("/**")].rstrip("/")

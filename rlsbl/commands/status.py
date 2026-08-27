@@ -8,7 +8,7 @@ from ..changelog import get_changes_dir, read_unreleased, resolve_hashes
 from ..changelog.resolve import _get_last_version_tag, _unreleased_range
 from ..changelog.validate import filter_exempt_commits
 from ..ci_router import discover_project_ci_sources
-from ..git_util import filter_commits_for_project, filter_commits_for_releasable
+from ..git_util import filter_commits_for_scope
 from ..targets import TARGETS, detect_targets
 from ..errors import GitError
 from ..utils import (
@@ -43,17 +43,17 @@ def _compare_versions(local, remote):
 
 
 def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=None,
-                    flags=None, changes_dir=None, members=None):
+                    flags=None, changes_dir=None, scope=None):
     """Collect status data as a dict.
 
     When tag_glob is set (monorepo mode), it is forwarded to
     _unreleased_range so coverage uses the correct scoped tag.
 
-    When project is set (monorepo mode), unreleased commits are filtered
-    to only those touching the project's files (by path prefix or watch
-    globs), so the count reflects actual project-specific changes. When
-    members is set (a releasable's member projects), the scope is the whole
-    releasable -- a commit touching ANY member is the releasable's commit.
+    When *scope* is set (monorepo mode), unreleased commits are filtered to
+    those touching a file the scope's members own, so the count reflects
+    actual project-specific changes. A releasable's scope spans every member
+    -- a commit touching ANY member is the releasable's commit -- and a root
+    member's scope covers every file no other member claims.
 
     changes_dir overrides where the JSONL changelog lives; releasable members
     keep theirs under the releasable, not the member package.
@@ -135,11 +135,10 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
             # check uses. Exempting first would count another project's
             # changelog churn as this project's exempted commits.
             in_scope = all_unreleased
-            if project and in_scope:
-                if members:
-                    keep = filter_commits_for_releasable(set(in_scope), members)
-                else:
-                    keep = filter_commits_for_project(set(in_scope), project)
+            if scope is not None and in_scope:
+                keep = filter_commits_for_scope(
+                    set(in_scope), scope, operation="status coverage",
+                )
                 in_scope = [c for c in in_scope if c in keep]
             non_exempt, _exempt_stats = filter_exempt_commits(in_scope)
             unreleased_commits = non_exempt
@@ -246,6 +245,7 @@ def run_cmd(registry, args, flags, ctx):
     releasable_config_dir = None
     releasable_changes_dir = None
     releasable_members = None
+    ws_projects = None
     try:
         ws_root = find_workspace_root(root_str)
         if ws_root is not None:
@@ -291,10 +291,22 @@ def run_cmd(registry, args, flags, ctx):
         tag_glob = target.monorepo_tag_glob(monorepo_project["name"], path=monorepo_project["path"])
     else:
         tag_glob = None
+
+    # The ownership scope this status reports on: a releasable's members when
+    # in one, otherwise the single member the cwd resolves to. Attribution
+    # always sees the whole workspace member list.
+    status_scope = None
+    if monorepo_project is not None and ws_projects is not None:
+        from ..ownership import OwnershipScope
+        if releasable_members:
+            status_scope = OwnershipScope.for_members(ws_projects, releasable_members)
+        else:
+            status_scope = OwnershipScope.for_member(ws_projects, monorepo_project)
+
     data = _collect_status(
         registry, primary_path, tag_glob=tag_glob,
         ctx=ctx, project=monorepo_project, flags=flags,
-        changes_dir=releasable_changes_dir, members=releasable_members,
+        changes_dir=releasable_changes_dir, scope=status_scope,
     )
 
     if flags.get("json"):

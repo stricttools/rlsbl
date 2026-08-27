@@ -21,7 +21,8 @@ def register_prepush_checks(app):
             _get_pushed_commits,
             _parse_stdin_refs,
         )
-        from ..git_util import affected_projects, filter_commits_for_project, get_push_changed_files
+        from ..git_util import affected_members, filter_commits_for_scope, get_push_changed_files
+        from ..ownership import OwnershipScope
 
         if ctx.push_stdin is None:
             return reporter.skipped("not in push context")
@@ -47,7 +48,7 @@ def register_prepush_checks(app):
                 return reporter.skipped("could not determine changed files")
 
             projects = load_workspace(ws_root)
-            affected = affected_projects(changed_files, projects)
+            affected = affected_members(changed_files, projects)
             if not affected:
                 return reporter.passed("no affected projects")
 
@@ -58,8 +59,6 @@ def register_prepush_checks(app):
             failures = []
 
             if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
-                from ..git_util import filter_commits_for_releasable
-
                 checked_releasables = set()
                 for proj in affected:
                     if not project_is_releasable(proj):
@@ -72,7 +71,11 @@ def register_prepush_checks(app):
                     if not os.path.isdir(rel_changes_dir):
                         continue
                     member_projs = members_of(rel.name, projects)
-                    rel_commits = filter_commits_for_releasable(all_pushed, member_projs)
+                    rel_commits = filter_commits_for_scope(
+                        all_pushed,
+                        OwnershipScope.for_members(projects, member_projs),
+                        operation="pre-push changelog coverage",
+                    )
                     if not rel_commits:
                         continue
                     error = _check_jsonl_changelog(
@@ -88,7 +91,11 @@ def register_prepush_checks(app):
                     proj_dir = os.path.join(ws_root, proj["path"])
                     if not changes_dir_exists(proj_dir):
                         continue
-                    proj_commits = filter_commits_for_project(all_pushed, proj)
+                    proj_commits = filter_commits_for_scope(
+                        all_pushed,
+                        OwnershipScope.for_member(projects, proj),
+                        operation="pre-push changelog coverage",
+                    )
                     if not proj_commits:
                         continue
                     error = _check_jsonl_changelog(proj_dir, refs, pushed_commits=proj_commits)

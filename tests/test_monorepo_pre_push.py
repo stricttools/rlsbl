@@ -12,54 +12,71 @@ from conftest import run_git, git_head, make_commit, make_workspace as _make_wor
 from rlsbl.prepush_utils import _parse_stdin_refs
 from rlsbl.git_util import (
     get_commit_files,
-    file_matches_project,
-    filter_commits_for_project,
-    affected_projects,
+    affected_members,
+    filter_commits_for_scope,
 )
+from rlsbl.ownership import OwnershipScope, owner_name_of
 
 
 # -- Unit tests for helpers ---------------------------------------------------
 
 
-class TestFileMatchesProject:
+ROOT = {"path": ".", "name": "root"}
+
+
+def scope_for(proj, *others):
+    """Ownership scope over one member, with the root member as residual owner."""
+    members = [ROOT, proj, *others]
+    return OwnershipScope.for_member(members, proj)
+
+
+class TestFileOwnership:
+    """Attribution is single-owner: the most specific declared path wins."""
+
     def test_file_inside_project_path(self):
         proj = {"path": "pkg-a", "name": "pkg-a"}
-        assert file_matches_project("pkg-a/src/main.js", proj)
+        assert owner_name_of("pkg-a/src/main.js", [ROOT, proj]) == "pkg-a"
 
     def test_file_is_project_root(self):
         proj = {"path": "pkg-a", "name": "pkg-a"}
-        assert file_matches_project("pkg-a", proj)
+        assert owner_name_of("pkg-a", [ROOT, proj]) == "pkg-a"
 
     def test_file_outside_project(self):
         proj = {"path": "pkg-a", "name": "pkg-a"}
-        assert not file_matches_project("pkg-b/src/main.js", proj)
+        assert owner_name_of("pkg-b/src/main.js", [ROOT, proj]) == "root"
 
     def test_file_with_similar_prefix(self):
         """pkg-ab should not match pkg-a (no partial prefix match)."""
         proj = {"path": "pkg-a", "name": "pkg-a"}
-        assert not file_matches_project("pkg-ab/src/main.js", proj)
+        assert owner_name_of("pkg-ab/src/main.js", [ROOT, proj]) == "root"
 
-    def test_watch_glob_match(self):
+    def test_watch_glob_does_not_grant_ownership(self):
+        """A watch glob is not a territory claim -- the owner is the root member.
+
+        Attribution used to accept watch globs as a second way to claim a file,
+        which let two members claim the same path. Ownership is decided by
+        declared paths alone.
+        """
         proj = {"path": "pkg-a", "name": "pkg-a", "watch": ["shared/**"]}
-        assert file_matches_project("shared/utils.js", proj)
+        assert owner_name_of("shared/utils.js", [ROOT, proj]) == "root"
 
-    def test_watch_exact_file_match(self):
+    def test_watch_exact_file_does_not_grant_ownership(self):
         proj = {"path": "pkg-a", "name": "pkg-a", "watch": ["Package.swift"]}
-        assert file_matches_project("Package.swift", proj)
+        assert owner_name_of("Package.swift", [ROOT, proj]) == "root"
 
-    def test_watch_no_match(self):
+    def test_unwatched_file_still_belongs_to_the_root_member(self):
         proj = {"path": "pkg-a", "name": "pkg-a", "watch": ["shared/**"]}
-        assert not file_matches_project("other/file.js", proj)
+        assert owner_name_of("other/file.js", [ROOT, proj]) == "root"
 
 
-class TestAffectedProjects:
+class TestAffectedMembers:
     def test_single_project_affected(self):
         projects = [
             {"path": "pkg-a", "name": "a"},
             {"path": "pkg-b", "name": "b"},
         ]
         changed = {"pkg-a/src/main.js"}
-        result = affected_projects(changed, projects)
+        result = affected_members(changed, projects)
         assert len(result) == 1
         assert result[0]["name"] == "a"
 
@@ -69,7 +86,7 @@ class TestAffectedProjects:
             {"path": "pkg-b", "name": "b"},
         ]
         changed = {"pkg-a/src/main.js", "pkg-b/lib/index.js"}
-        result = affected_projects(changed, projects)
+        result = affected_members(changed, projects)
         assert len(result) == 2
         names = {p["name"] for p in result}
         assert names == {"a", "b"}
@@ -80,17 +97,28 @@ class TestAffectedProjects:
             {"path": "pkg-b", "name": "b"},
         ]
         changed = {"README.md", "docs/guide.md"}
-        result = affected_projects(changed, projects)
+        result = affected_members(changed, projects)
         assert result == []
 
-    def test_watch_triggers_affected(self):
+    def test_root_member_takes_the_residual(self):
+        """With a root member declared, root files affect it -- and only it."""
+        projects = [ROOT, {"path": "pkg-a", "name": "a"}]
+        result = affected_members({"README.md", "docs/guide.md"}, projects)
+        assert [p["name"] for p in result] == ["root"]
+
+    def test_watch_does_not_make_a_member_affected(self):
         projects = [
             {"path": "pkg-a", "name": "a", "watch": ["shared/**"]},
         ]
-        changed = {"shared/utils.js"}
-        result = affected_projects(changed, projects)
-        assert len(result) == 1
-        assert result[0]["name"] == "a"
+        assert affected_members({"shared/utils.js"}, projects) == []
+
+    def test_nested_member_claims_alone(self):
+        projects = [
+            {"path": "pkg", "name": "outer"},
+            {"path": "pkg/inner", "name": "inner"},
+        ]
+        result = affected_members({"pkg/inner/a.py"}, projects)
+        assert [p["name"] for p in result] == ["inner"]
 
 
 class TestParseStdinRefs:
@@ -190,8 +218,8 @@ class TestGetCommitFiles:
         assert "go/feature.go" in files
 
 
-class TestFilterCommitsForProject:
-    """Unit tests for filter_commits_for_project."""
+class TestFilterCommitsForScope:
+    """Unit tests for filter_commits_for_scope."""
 
     def test_go_only_commit_not_in_python(self, monorepo_fixture):
         """A commit touching only go/ files is NOT included for the python project."""
@@ -199,7 +227,10 @@ class TestFilterCommitsForProject:
         sha = make_commit(root, "go/main.go", "go-only change")
 
         python_proj = {"path": "python", "name": "mypylib"}
-        result = filter_commits_for_project({sha}, python_proj)
+        go_proj = {"path": "go", "name": "mygolib"}
+        result = filter_commits_for_scope(
+            {sha}, scope_for(python_proj, go_proj), operation="test",
+        )
         assert result == set()
 
     def test_go_only_commit_in_go(self, monorepo_fixture):
@@ -208,7 +239,7 @@ class TestFilterCommitsForProject:
         sha = make_commit(root, "go/main.go", "go-only change")
 
         go_proj = {"path": "go", "name": "mygolib"}
-        result = filter_commits_for_project({sha}, go_proj)
+        result = filter_commits_for_scope({sha}, scope_for(go_proj), operation="test")
         assert result == {sha}
 
     def test_cross_project_commit_in_both(self, monorepo_fixture):
@@ -222,8 +253,12 @@ class TestFilterCommitsForProject:
 
         python_proj = {"path": "python", "name": "mypylib"}
         go_proj = {"path": "go", "name": "mygolib"}
-        assert filter_commits_for_project({sha}, python_proj) == {sha}
-        assert filter_commits_for_project({sha}, go_proj) == {sha}
+        assert filter_commits_for_scope(
+            {sha}, scope_for(python_proj, go_proj), operation="test",
+        ) == {sha}
+        assert filter_commits_for_scope(
+            {sha}, scope_for(go_proj, python_proj), operation="test",
+        ) == {sha}
 
     def test_python_only_commit_not_in_go(self, monorepo_fixture):
         """A commit touching only python/ files is NOT included for the go project."""
@@ -231,7 +266,10 @@ class TestFilterCommitsForProject:
         sha = make_commit(root, "python/app.py", "python-only change")
 
         go_proj = {"path": "go", "name": "mygolib"}
-        result = filter_commits_for_project({sha}, go_proj)
+        python_proj = {"path": "python", "name": "mypylib"}
+        result = filter_commits_for_scope(
+            {sha}, scope_for(go_proj, python_proj), operation="test",
+        )
         assert result == set()
 
     def test_python_only_commit_in_python(self, monorepo_fixture):
@@ -240,5 +278,38 @@ class TestFilterCommitsForProject:
         sha = make_commit(root, "python/app.py", "python-only change")
 
         python_proj = {"path": "python", "name": "mypylib"}
-        result = filter_commits_for_project({sha}, python_proj)
+        result = filter_commits_for_scope(
+            {sha}, scope_for(python_proj), operation="test",
+        )
         assert result == {sha}
+
+    def test_root_file_commit_belongs_to_the_root_member(self, monorepo_fixture):
+        """The defect this replaces: a root member matched nothing at all.
+
+        A ``path = "."`` member computed a ``"./"`` prefix, which no git path
+        ever starts with, so its coverage was silently vacuous.
+        """
+        root = monorepo_fixture.root
+        sha = make_commit(root, "README.md", "root-only change")
+
+        python_proj = {"path": "python", "name": "mypylib"}
+        members = [ROOT, python_proj]
+        assert filter_commits_for_scope(
+            {sha}, OwnershipScope.for_member(members, ROOT), operation="test",
+        ) == {sha}
+        assert filter_commits_for_scope(
+            {sha}, OwnershipScope.for_member(members, python_proj), operation="test",
+        ) == set()
+
+    def test_undeterminable_commit_is_a_hard_error(self, monorepo_fixture):
+        """A git read that cannot answer is never a silent include or skip."""
+        from rlsbl.ownership import OwnershipError
+
+        proj = {"path": "python", "name": "mypylib"}
+        with patch("rlsbl.git_util.get_commit_files", return_value=None):
+            with pytest.raises(OwnershipError) as exc:
+                filter_commits_for_scope(
+                    {"deadbeef"}, scope_for(proj), operation="the test operation",
+                )
+        assert "deadbeef" in str(exc.value)
+        assert "the test operation" in str(exc.value)

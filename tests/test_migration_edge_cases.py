@@ -205,7 +205,7 @@ class TestConsolidateDuplicateEntries:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         # Without dedup: 2 entries. With dedup: 1 entry.
         assert result["entries_merged"] == 1
@@ -240,7 +240,7 @@ class TestConsolidateDuplicateEntries:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
         assert result["entries_merged"] == 3  # 1 deduped + 2 unique
         assert result["duplicates_merged"] == 1
 
@@ -359,7 +359,7 @@ class TestConsolidateBatchExclusions:
         ])
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         assert result["exclusions_created"] == 1
 
@@ -373,7 +373,7 @@ class TestConsolidateBatchExclusions:
         ])
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         assert result["exclusions_created"] == 0
 
@@ -436,7 +436,7 @@ class TestConsolidateWithConsolidationTag:
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
         result = consolidate_changelogs(
-            str(tmp_project), "core", members,
+            str(tmp_project), "core", members, all_projects=members,
             tag_format="{name}@v{version}", version="0.1.0",
         )
 
@@ -458,7 +458,7 @@ class TestConsolidateWithConsolidationTag:
         ])
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         assert result["consolidation_tag"] is None
 
@@ -474,7 +474,7 @@ class TestConsolidateWithConsolidationTag:
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
         result = consolidate_changelogs(
-            str(tmp_project), "core", members,
+            str(tmp_project), "core", members, all_projects=members,
             tag_format="{name}@v{version}", version="0.1.0",
         )
 

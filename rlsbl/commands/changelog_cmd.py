@@ -21,7 +21,8 @@ from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, generate_entry_id, parse_jsonl, serialize_entry, validate_schema
 from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
-from ..git_util import filter_commits_for_project, filter_commits_for_releasable
+from ..git_util import filter_commits_for_scope
+from ..ownership import OwnershipScope
 from ..utils import commit_files
 from ..workspace import (
     find_workspace_root,
@@ -40,11 +41,20 @@ from .. import effects
 class _ResolvedContext:
     """Carries project, releasable, and workspace info for changelog commands."""
 
-    def __init__(self, project, releasable=None, ws_root=None, member_projects=None):
+    def __init__(self, project, releasable=None, ws_root=None, member_projects=None,
+                 all_projects=None):
         self.project = project
         self.releasable = releasable
         self.ws_root = ws_root
         self.member_projects = member_projects or []
+        # Every member of the workspace, not just this releasable's: file
+        # attribution is decided against the whole list (see rlsbl.ownership).
+        self.all_projects = list(all_projects) if all_projects else []
+
+    def scope(self):
+        """The ownership scope this changelog covers."""
+        in_scope = self.member_projects or ([self.project] if self.project else [])
+        return OwnershipScope.for_members(self.all_projects or in_scope, in_scope)
 
     @property
     def is_releasable(self):
@@ -83,10 +93,10 @@ def _resolve_workspace_project(project_root):
         sys.exit(1)
 
     # Check for explicit releasable mode
+    projects = load_workspace(ws_root)
     releasable = None
     member_projects = []
     if is_explicit_mode(ws_root):
-        projects = load_workspace(ws_root)
         releasables = load_releasables(ws_root, projects=projects)
         releasable = resolve_releasable_for_project(project, releasables)
         if releasable is not None:
@@ -97,47 +107,52 @@ def _resolve_workspace_project(project_root):
         releasable=releasable,
         ws_root=ws_root,
         member_projects=member_projects,
+        all_projects=projects,
     )
 
 
 def _check_project_scope(resolved_commits, ws_context):
-    """Verify all commits touch files belonging to the project or releasable.
+    """Verify all commits touch files this changelog's members own.
 
-    Hard error if any commit does not touch the project's files.
-    In explicit releasable mode, checks against all member projects.
+    Hard error if any commit owns none of the scope's files.  Ownership is
+    single-owner: a commit touching only another member's directory belongs in
+    that member's changelog, and a commit touching only root files belongs in
+    the root member's.
     Skipped when ws_context is None (standalone mode).
     """
     if ws_context is None:
         return
 
-    # In explicit releasable mode, scope to the releasable's members
-    if isinstance(ws_context, _ResolvedContext) and ws_context.releasable is not None:
-        members = ws_context.member_projects
-        in_scope = filter_commits_for_releasable(set(resolved_commits), members)
-        for sha in resolved_commits:
-            if sha not in in_scope:
-                print(
-                    f"Error: commit {sha[:12]} does not touch files in "
-                    f"releasable '{ws_context.releasable.name}'. Use the "
-                    f"correct project directory or update watch patterns "
-                    f"in workspace.toml.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-        return
+    if isinstance(ws_context, _ResolvedContext):
+        scope = ws_context.scope()
+        if ws_context.releasable is not None:
+            subject = f"releasable '{ws_context.releasable.name}'"
+        else:
+            project = ws_context.project
+            subject = (
+                f"project '{project.get('name', 'unknown')}' "
+                f"(path: {project.get('path', 'unknown')})"
+            )
+    else:
+        # A raw project handed in directly (no workspace resolution).
+        scope = OwnershipScope.for_member([ws_context], ws_context)
+        subject = (
+            f"project '{ws_context.get('name', 'unknown')}' "
+            f"(path: {ws_context.get('path', 'unknown')})"
+        )
 
-    # Implicit mode or raw project: scope to single project
-    project = ws_context.project if isinstance(ws_context, _ResolvedContext) else ws_context
-    in_scope = filter_commits_for_project(set(resolved_commits), project)
+    in_scope = filter_commits_for_scope(
+        set(resolved_commits), scope, operation="changelog add scope check",
+    )
     for sha in resolved_commits:
         if sha not in in_scope:
-            name = project.get("name", project.get("path", "unknown"))
-            path = project.get("path", "unknown")
             print(
-                f"Error: commit {sha[:12]} does not touch files in "
-                f"project '{name}' (path: {path}). Use the correct "
-                f"project directory or update watch patterns in "
-                f"workspace.toml.",
+                f"Error: commit {sha[:12]} does not touch files owned by "
+                f"{subject}. Every file belongs to exactly one workspace "
+                f"member: the most specific declared path in workspace.toml "
+                f"wins, and the root member owns whatever no other member "
+                f"claims. Add the entry from the owning member's directory "
+                f"instead.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -291,27 +306,28 @@ def _resolve_changes_dir(ws_context, project_root):
     return get_changes_dir(project_root)
 
 
-def _derive_packages_from_commits(resolved_commits, member_projects):
+def _derive_packages_from_commits(resolved_commits, scope):
     """Derive the list of affected package names from commit file paths.
 
-    For each commit, checks which member projects have files touched.
-    Returns a sorted, deduplicated list of project names, or None if
-    there are no member projects to check against.
+    Single-owner attribution: each changed file names exactly one member, so a
+    commit that touches ``pkg/inner`` no longer claims ``pkg`` as well.  Only
+    members inside *scope* are reported -- another releasable's packages never
+    leak into this changelog -- and the result is sorted and deduplicated, or
+    ``None`` when nothing in scope was touched.
+
+    The narrowing is deliberate and only affects what is *derived*: a manual
+    broadening via ``rlsbl changelog edit`` stays exactly as written.
     """
-    if not member_projects:
+    if scope is None or not scope.owned:
         return None
-    from ..git_util import get_commit_files, file_matches_project
+    from ..git_util import commit_owner_names
 
     affected = set()
     for sha in resolved_commits:
-        files = get_commit_files(sha)
-        if files is None:
-            continue
-        for filepath in files:
-            for proj in member_projects:
-                if file_matches_project(filepath, proj):
-                    name = proj.name if hasattr(proj, "name") else proj["name"]
-                    affected.add(name)
+        owners = commit_owner_names(
+            sha, scope.members, operation="changelog add packages derivation",
+        )
+        affected.update(owners & scope.owned)
     return sorted(affected) if affected else None
 
 
@@ -327,7 +343,7 @@ def _populate_packages_field(entry, resolved_commits, ws_context):
             and ws_context.releasable is not None
             and ws_context.member_projects):
         packages = _derive_packages_from_commits(
-            resolved_commits, ws_context.member_projects,
+            resolved_commits, ws_context.scope(),
         )
         if packages:
             entry.packages = packages

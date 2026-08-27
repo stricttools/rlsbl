@@ -1,21 +1,27 @@
-"""Shared git utilities: commit ancestry, and path-filtering for projects.
+"""Shared git utilities: commit ancestry, and commit-level file attribution.
 
 Holds :func:`ancestry`, the single implementation of the "is A an ancestor of
 B?" question every part of rlsbl asks (the mirror tripwire, the changelog
-validation cache, the release candidate check, the resume check), plus
-functions to retrieve files changed by a commit, check whether
-a file belongs to a project (by path prefix or watch globs), filter
-a set of commits to those touching a specific project's files,
-validate SSH host consistency between origin and subtree remotes,
-and detect manual pushes to release branches.
+validation cache, the release candidate check, the resume check), plus the
+commit-level half of file attribution -- retrieving the files a commit changed
+and asking :mod:`rlsbl.ownership` who owns them -- and the SSH host check for
+subtree remotes and manual-push detection.
+
+Attribution itself (which member owns a path) is decided in
+:mod:`rlsbl.ownership` and nowhere else.  This module only supplies the git
+reads it needs.
 """
 
 import enum
-import fnmatch
 import re
 import subprocess
 import sys
 from . import effects
+from .ownership import (
+    OwnershipError,
+    member_name,
+    owner_names_of_files,
+)
 
 
 class Ancestry(enum.Enum):
@@ -146,80 +152,51 @@ def get_commit_files(sha):
     return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
 
 
-def file_matches_project(filepath, project):
-    """Check whether a file path belongs to a project.
+def commit_files(sha, *, operation):
+    """Return the files a commit changed, or raise naming the commit.
 
-    A file belongs to a project if:
-    - It starts with the project's path prefix, OR
-    - It matches any of the project's watch globs
+    :func:`get_commit_files` answers ``None`` when git could not say -- a
+    missing object, a timeout, no git at all.  Every attribution caller used to
+    turn that into a guess (include the commit "to be safe", or drop it), so a
+    broken read silently changed which member a commit was charged to.  It is
+    a hard error instead, naming the commit and the operation that asked.
     """
-    proj_path = project["path"]
-    # Normalize: ensure prefix ends with /
-    prefix = proj_path.rstrip("/") + "/"
-    if filepath == proj_path or filepath.startswith(prefix):
-        return True
+    files = get_commit_files(sha)
+    if files is None:
+        raise OwnershipError(
+            f"cannot determine the files changed by commit {sha} "
+            f"({operation}): `git diff-tree` gave no answer. The commit may be "
+            f"missing from this repository (a shallow clone, a rewritten "
+            f"history), or git is unavailable. Fetch the commit or run the "
+            f"command in a full clone -- attribution cannot be guessed."
+        )
+    return files
 
-    for glob_pattern in project.get("watch", []):
-        if fnmatch.fnmatch(filepath, glob_pattern):
-            return True
 
-    return False
+def commit_owner_names(sha, members, *, operation) -> set:
+    """Names of the members owning any file the commit *sha* changed.
 
-
-def filter_commits_for_project(commits, project):
-    """Filter commits to only those that touch files belonging to a project.
-
-    Takes a set of commit SHAs and a project dict. For each commit, gets its
-    changed files and checks whether any file matches the project (by path
-    prefix or watch globs).
-
-    Returns the subset of commits where at least one file belongs to the project.
+    Tool-owned paths (:mod:`rlsbl.ownership`) contribute no owner, so a commit
+    that only touches changelog state yields the empty set.
     """
+    return owner_names_of_files(commit_files(sha, operation=operation), members)
+
+
+def filter_commits_for_scope(commits, scope, *, operation):
+    """Filter *commits* to those touching a file owned by a member in *scope*.
+
+    *scope* is an :class:`~rlsbl.ownership.OwnershipScope`, which carries the
+    whole member list alongside the subset asked about -- attribution needs
+    both, because a file's owner is decided against every member, not just the
+    ones the caller cares about.  ``None`` means "no workspace" and returns
+    *commits* unchanged.
+    """
+    if scope is None:
+        return set(commits)
     filtered = set()
     for sha in commits:
-        files = get_commit_files(sha)
-        if files is None:
-            # Cannot determine files -- include the commit to be safe
+        if scope.claims_any(commit_files(sha, operation=operation)):
             filtered.add(sha)
-            continue
-        for filepath in files:
-            if file_matches_project(filepath, project):
-                filtered.add(sha)
-                break
-    return filtered
-
-
-def filter_commits_for_releasable(commits, member_projects):
-    """Filter commits to those touching files in any of the member projects.
-
-    Like ``filter_commits_for_project`` but accepts a list of projects
-    (the members of a releasable).  Calls ``get_commit_files()`` once per
-    commit and checks in-memory against the combined path prefixes and
-    watch globs of all member projects.
-
-    Args:
-        commits: set of commit SHAs to filter.
-        member_projects: list of project dicts/WorkspaceProject instances,
-            each with ``path`` and optionally ``watch`` keys.
-
-    Returns:
-        The subset of commits where at least one file belongs to any
-        member project.
-    """
-    filtered = set()
-    for sha in commits:
-        files = get_commit_files(sha)
-        if files is None:
-            # Cannot determine files -- include the commit to be safe
-            filtered.add(sha)
-            continue
-        for filepath in files:
-            for proj in member_projects:
-                if file_matches_project(filepath, proj):
-                    filtered.add(sha)
-                    break
-            if sha in filtered:
-                break
     return filtered
 
 
@@ -336,19 +313,16 @@ def get_push_changed_files(refs):
     return changed
 
 
-def affected_projects(changed_files, projects):
-    """Determine which projects are affected by the changed files.
+def affected_members(changed_files, members):
+    """Determine which workspace members own at least one of *changed_files*.
 
-    Returns a list of project dicts that have at least one changed file
-    matching their path prefix or watch globs.
+    Single-owner attribution: a file counts for exactly one member, so a change
+    under ``pkg/inner`` affects ``pkg/inner`` and not its parent, and a change
+    to a root file affects the root member alone.  Members are returned in
+    workspace declaration order.
     """
-    result = []
-    for proj in projects:
-        for f in changed_files:
-            if file_matches_project(f, proj):
-                result.append(proj)
-                break
-    return result
+    owners = owner_names_of_files(changed_files, members)
+    return [m for m in members if member_name(m) in owners]
 
 
 def detect_manual_push_branches(stdin_lines, release_branches):

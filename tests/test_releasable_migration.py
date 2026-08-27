@@ -27,6 +27,7 @@ from rlsbl.releasable_migration import (
     create_migration_tag,
     detect_migration_state,
 )
+from rlsbl.ownership import OwnershipScope
 from rlsbl.workspace import (
     WORKSPACE_DIR,
     WORKSPACE_FILE,
@@ -408,7 +409,7 @@ class TestConsolidateChangelogsMerge:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         assert result["entries_merged"] == 2
         assert set(result["source_projects"]) == {"a", "b"}
@@ -429,7 +430,7 @@ class TestConsolidateChangelogsMerge:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
         assert result["entries_merged"] == 1
         assert result["source_projects"] == ["a"]
 
@@ -443,7 +444,7 @@ class TestConsolidateChangelogsMerge:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
         assert result["entries_merged"] == 0
         assert result["source_projects"] == []
 
@@ -454,7 +455,7 @@ class TestConsolidateChangelogsMerge:
         ])
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
-        result = consolidate_changelogs(str(tmp_project), "myrel", members)
+        result = consolidate_changelogs(str(tmp_project), "myrel", members, all_projects=members)
 
         expected_dir = get_releasable_changes_dir(str(tmp_project), "myrel")
         assert result["dest_path"] == os.path.join(expected_dir, "unreleased.jsonl")
@@ -471,7 +472,7 @@ class TestConsolidateChangelogsMerge:
         ])
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         # Read back the merged file
         from rlsbl.changelog.schema import parse_jsonl
@@ -512,7 +513,7 @@ class TestConsolidateChangelogsPackagesField:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         from rlsbl.changelog.schema import parse_jsonl
         entries = parse_jsonl(result["dest_path"])
@@ -529,7 +530,7 @@ class TestConsolidateChangelogsPackagesField:
         ])
 
         members = [WorkspaceProject({"name": "a", "path": "a"})]
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         from rlsbl.changelog.schema import parse_jsonl
         entries = parse_jsonl(result["dest_path"])
@@ -576,7 +577,7 @@ class TestConsolidateChangelogsVersionedFiles:
             WorkspaceProject({"name": "auth", "path": "auth"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         # Check the releasable's changes dir for versioned files
         from rlsbl.changelog.schema import parse_jsonl
@@ -637,7 +638,7 @@ class TestConsolidateChangelogsPreservesEntryIds:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         from rlsbl.changelog.schema import parse_jsonl
         entries = parse_jsonl(result["dest_path"])
@@ -665,7 +666,7 @@ class TestConsolidateChangelogsPreservesEntryIds:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        consolidate_changelogs(str(tmp_project), "core", members)
+        consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         from rlsbl.changelog.schema import parse_jsonl
         dest_changes = get_releasable_changes_dir(str(tmp_project), "core")
@@ -694,7 +695,7 @@ class TestConsolidateChangelogsPreservesEntryIds:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
         assert result["duplicates_merged"] == 1
 
         from rlsbl.changelog.schema import parse_jsonl
@@ -725,7 +726,7 @@ class TestConsolidateChangelogsPreservesEntryIds:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
 
         from rlsbl.changelog.schema import parse_jsonl
         entries = parse_jsonl(result["dest_path"])
@@ -837,7 +838,7 @@ class TestDedupEntriesContentKey:
             WorkspaceProject({"name": "b", "path": "b"}),
         ]
 
-        result = consolidate_changelogs(str(tmp_project), "core", members)
+        result = consolidate_changelogs(str(tmp_project), "core", members, all_projects=members)
         assert result["duplicates_merged"] == 0
         assert result["entries_merged"] == 2
 
@@ -871,7 +872,9 @@ class TestDerivePackagesForEntry:
         ]
 
         entry = ChangelogEntry(commits=[sha], user_facing=False)
-        result = _derive_packages_for_entry(entry, members, str(tmp_project))
+        result = _derive_packages_for_entry(
+            entry, OwnershipScope.for_members(members, members), str(tmp_project),
+        )
         assert result == ["b"]
 
     def test_commit_touching_multiple_projects(self, tmp_project):
@@ -899,7 +902,9 @@ class TestDerivePackagesForEntry:
         ]
 
         entry = ChangelogEntry(commits=[sha], user_facing=False)
-        packages = _derive_packages_for_entry(entry, members, str(tmp_project))
+        packages = _derive_packages_for_entry(
+            entry, OwnershipScope.for_members(members, members), str(tmp_project),
+        )
         assert packages == ["a", "b"]
 
     def test_empty_when_no_files_match(self, tmp_project):
@@ -912,7 +917,9 @@ class TestDerivePackagesForEntry:
         ]
 
         entry = ChangelogEntry(commits=[sha], user_facing=False)
-        packages = _derive_packages_for_entry(entry, members, str(tmp_project))
+        packages = _derive_packages_for_entry(
+            entry, OwnershipScope.for_members(members, members), str(tmp_project),
+        )
         assert packages == []
 
 

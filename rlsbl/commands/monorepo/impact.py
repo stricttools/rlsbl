@@ -4,29 +4,21 @@ import os
 import subprocess
 import sys
 
+from ...ownership import owner_name_of
 from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import WorkspaceGraph
 from ... import effects
 
 
 def _map_file_to_package(file_path, projects, root):
-    """Map a file path (relative to repo root) to its containing package name.
+    """Map a file path (relative to repo root) to its owning package name.
 
-    Checks which project's path is a prefix of the file path.  When multiple
-    projects match (nested paths), the most specific (longest) prefix wins.
-    Returns the project name or None if no project matches.
+    The one attribution rule, from :mod:`rlsbl.ownership`: the most specific
+    declared member path wins, the root member owns the residual, and a
+    tool-owned path (changelog state, the workspace directory, the generated
+    router) belongs to no package.  Returns the package name, or ``None``.
     """
-    # Normalize separators
-    file_path = file_path.replace("\\", "/").rstrip("/")
-    best_name = None
-    best_len = -1
-    for proj in projects:
-        proj_path = proj["path"].replace("\\", "/").rstrip("/")
-        if file_path == proj_path or file_path.startswith(proj_path + "/"):
-            if len(proj_path) > best_len:
-                best_name = proj["name"]
-                best_len = len(proj_path)
-    return best_name
+    return owner_name_of(file_path, projects)
 
 
 def _get_changed_files_from_git(since_ref, root):

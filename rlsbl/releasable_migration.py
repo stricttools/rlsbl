@@ -18,7 +18,8 @@ from .changelog.generate import generate_version_file, _read_release_metadata
 from .changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
 from .config import read_json_config
 from .errors import WorkspaceError
-from .git_util import get_commit_files, file_matches_project
+from .git_util import get_commit_files
+from .ownership import OwnershipScope, owner_names_of_files
 from .targets import detect_targets, TARGETS
 from .workspace import (
     get_releasable_changes_dir,
@@ -139,13 +140,13 @@ def _read_project_version(project_path):
 
 
 def consolidate_changelogs(workspace_root, releasable_name, member_projects,
-                           *, tag_format=None, version=None):
+                           *, all_projects, tag_format=None, version=None):
     """Merge member packages' unreleased.jsonl into per-releasable changelog.
 
     For each member project, reads their per-package unreleased.jsonl and
     merges all entries into the releasable's changes directory. Each entry
     gains a ``packages`` field listing which member packages are affected
-    (derived from commit file paths via project path/watch matching).
+    (derived from commit file paths via single-owner attribution).
 
     Entries already present in the releasable's own ``unreleased.jsonl`` are
     kept and written first, ahead of the member contributions -- consolidation
@@ -204,6 +205,12 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
     # member entry cannot be duplicated here.)
     all_entries = list(read_unreleased(dest_changes_dir))
     source_projects = []
+    # Attribution is resolved against every workspace member, not just this
+    # releasable's -- a file under a member outside the releasable belongs to
+    # that member, and must not be charged to a member of this one. The caller
+    # supplies the list rather than this function re-reading workspace.toml,
+    # so the migration works on a member list it has already resolved.
+    packages_scope = OwnershipScope.for_members(all_projects, member_projects)
 
     for proj in member_projects:
         proj_path = os.path.join(workspace_root, proj.path)
@@ -214,7 +221,7 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
             for entry in entries:
                 # Derive packages field from commit file paths
                 packages = _derive_packages_for_entry(
-                    entry, member_projects, workspace_root
+                    entry, packages_scope, workspace_root
                 )
                 merged = ChangelogEntry(
                     commits=entry.commits,
@@ -285,25 +292,25 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
     }
 
 
-def _derive_packages_for_entry(entry, member_projects, workspace_root):
+def _derive_packages_for_entry(entry, scope, workspace_root):
     """Derive the packages field for a changelog entry.
 
-    For each commit in the entry, checks which member projects are
-    affected by the commit's changed files. Returns a sorted, deduplicated
-    list of project names.
+    For each commit in the entry, resolves the owner of every changed file and
+    keeps the owners inside *scope* (an
+    :class:`~rlsbl.ownership.OwnershipScope`).  Single-owner attribution: a
+    file counts for exactly one member.  Returns a sorted, deduplicated list of
+    project names.
 
     If commit files cannot be determined (e.g., not in a git repo during
-    testing), returns an empty list.
+    testing), that commit contributes nothing -- migration reads historical
+    entries whose commits may predate the current history.
     """
     affected = set()
     for sha in entry.commits:
         files = get_commit_files(sha)
         if files is None:
             continue
-        for filepath in files:
-            for proj in member_projects:
-                if file_matches_project(filepath, proj):
-                    affected.add(proj.name)
+        affected.update(owner_names_of_files(files, scope.members) & scope.owned)
     return sorted(affected)
 
 
@@ -1135,6 +1142,7 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False):
         workspace_root, releasable_name, member_projects,
         tag_format=target_releasable.tag_format,
         version=consolidated_version,
+        all_projects=projects,
     )
     result["changelogs"] = changelog_result
 

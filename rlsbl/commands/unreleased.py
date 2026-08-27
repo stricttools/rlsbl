@@ -6,7 +6,7 @@ import sys
 
 from ..changelog import get_changes_dir, read_unreleased, resolve_hashes
 from ..changelog.validate import filter_exempt_commits
-from ..git_util import filter_commits_for_project, filter_commits_for_releasable
+from ..git_util import filter_commits_for_scope
 from ..targets import TARGETS, detect_targets
 from ..utils import get_last_version_tag
 from ..workspace import find_workspace_root, load_workspace, resolve_project
@@ -62,20 +62,21 @@ def _resolve_scope(root_str):
       member's entries live under ``.rlsbl-monorepo/releasables/<name>/``,
       NOT under the member package -- resolving it per-package made every
       releasable member report "JSONL changelog not set up".
-    - ``members`` are the releasable's member projects (empty otherwise), used
-      to scope commits to the whole releasable rather than one member.
+    - ``scope`` is the ownership scope commits are attributed against: the
+      whole releasable when the project is in one, the single member
+      otherwise, and ``None`` outside a workspace.
     """
     project = None
     tag_glob = None
     changes_dir = get_changes_dir(root_str)
-    members = []
+    scope = None
     try:
         ws_root = find_workspace_root(root_str)
         if ws_root is None:
-            return project, tag_glob, changes_dir, members
+            return project, tag_glob, changes_dir, scope
         project = resolve_project(ws_root, root_str)
         if project is None:
-            return project, tag_glob, changes_dir, members
+            return project, tag_glob, changes_dir, scope
 
         from ..workspace import (
             get_releasable_changes_dir,
@@ -85,10 +86,11 @@ def _resolve_scope(root_str):
             resolve_releasable_for_project,
         )
 
+        from ..ownership import OwnershipScope
+
         rel = None
-        ws_projects = None
+        ws_projects = load_workspace(ws_root)
         if is_explicit_mode(ws_root):
-            ws_projects = load_workspace(ws_root)
             releasables = load_releasables(ws_root, ws_projects)
             rel = resolve_releasable_for_project(project, releasables)
 
@@ -96,8 +98,11 @@ def _resolve_scope(root_str):
             from ..commands.release.validate import _releasable_tag_glob
             tag_glob = _releasable_tag_glob(rel.tag_format, rel.name)
             changes_dir = get_releasable_changes_dir(ws_root, rel.name)
-            members = members_of(rel.name, ws_projects)
+            scope = OwnershipScope.for_members(
+                ws_projects, members_of(rel.name, ws_projects),
+            )
         else:
+            scope = OwnershipScope.for_member(ws_projects, project)
             from ..targets import resolve_releasable_config_dir
             rel_dir = resolve_releasable_config_dir(project, ws_root)
             targets = detect_targets(root_str, releasable_config_dir=rel_dir)
@@ -108,7 +113,7 @@ def _resolve_scope(root_str):
                 )
     except Exception:
         pass
-    return project, tag_glob, changes_dir, members
+    return project, tag_glob, changes_dir, scope
 
 
 def run_cmd(registry, args, flags, project_root):
@@ -121,7 +126,7 @@ def run_cmd(registry, args, flags, project_root):
     """
     root_str = str(project_root)
 
-    monorepo_project, tag_glob, changes_dir, members = _resolve_scope(root_str)
+    monorepo_project, tag_glob, changes_dir, scope = _resolve_scope(root_str)
 
     tag = get_last_version_tag(tag_glob) if tag_glob else get_last_version_tag()
     commits = _get_commits_since(tag)
@@ -130,12 +135,11 @@ def run_cmd(registry, args, flags, project_root):
     # apply the exemption filter -- the same order the authoritative coverage
     # check uses, so `unreleased`, `status`, and `rlsbl check --tag changelog`
     # answer the same question the same way.
-    if monorepo_project and commits:
+    if scope is not None and commits:
         commit_shas = set(c["hash"] for c in commits)
-        if members:
-            in_scope = filter_commits_for_releasable(commit_shas, members)
-        else:
-            in_scope = filter_commits_for_project(commit_shas, monorepo_project)
+        in_scope = filter_commits_for_scope(
+            commit_shas, scope, operation="unreleased listing",
+        )
         commits = [c for c in commits if c["hash"] in in_scope]
 
     if not commits:

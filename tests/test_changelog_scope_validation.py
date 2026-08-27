@@ -127,7 +127,7 @@ class TestChangelogAddRejectsOutOfScopeCommit:
             cmd_add(flags, project_root=alpha_dir)
 
         captured = capsys.readouterr()
-        assert "does not touch files in project" in captured.err
+        assert "does not touch files owned by project" in captured.err
         assert "'alpha'" in captured.err
         assert "workspace.toml" in captured.err
 
@@ -229,11 +229,8 @@ class TestRootCommitIsInScope:
 
     def test_git_util_sees_the_root_commit_files(self, fresh_releasable_monorepo,
                                                  monkeypatch):
-        from rlsbl.git_util import (
-            filter_commits_for_project,
-            filter_commits_for_releasable,
-            get_commit_files,
-        )
+        from rlsbl.git_util import filter_commits_for_scope, get_commit_files
+        from rlsbl.ownership import OwnershipScope
 
         root = fresh_releasable_monorepo
         monkeypatch.chdir(root)
@@ -244,8 +241,13 @@ class TestRootCommitIsInScope:
         assert "python/src/mod.py" in files
 
         proj = {"path": "python", "name": "pylib"}
-        assert filter_commits_for_project({sha}, proj) == {sha}
-        assert filter_commits_for_releasable({sha}, [proj]) == {sha}
+        members = [{"path": ".", "name": "root"}, proj]
+        assert filter_commits_for_scope(
+            {sha}, OwnershipScope.for_member(members, proj), operation="test",
+        ) == {sha}
+        assert filter_commits_for_scope(
+            {sha}, OwnershipScope.for_members(members, [proj]), operation="test",
+        ) == {sha}
 
     def test_changelog_add_accepts_the_root_commit(self, fresh_releasable_monorepo,
                                                    monkeypatch):
