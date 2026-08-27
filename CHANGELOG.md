@@ -2,6 +2,64 @@
 
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- **`watch` patterns no longer grant file ownership.** A member's `watch` globs used to extend its changelog-coverage territory, so a watched file could belong to several members at once. Ownership is decided by declared member paths alone; a file outside every member's directory belongs to the root member.
+- **Every workspace must now declare a root member.** `workspace.toml` declares the repository root as a member (`path = "."`, named `root`), which owns every tracked file no other member claims. The loader refuses a workspace without one, one whose root member is named anything else, one that gives another member the reserved name, one carrying a `watch` key, an implicit-mode workspace with no `[[releasables]]`, and a releasable owning the root member without an explicit `tag_format` -- each error naming its own remedy.
+- **Commands run at a monorepo workspace root now resolve to the root member.** The workspace root is that member's own directory, so `rlsbl status`, `changelog add` and the rest report on it instead of refusing with "not inside any project". `release resume` and the changelog checks still treat standing there as "somewhere in this workspace" and look across every releasable.
+- **`rlsbl release run` at a monorepo workspace root now requires `--releasable <name>`.** The root directory names the whole workspace rather than one releasable, so the invocation has to say which one; without the flag the command errors and lists the declared releasables. Running inside a member directory is unchanged, and passing the flag there (or in a standalone repository) is refused rather than ignored.
+- **The workspace `watch` key is gone from every surface.** `rlsbl monorepo add --watch` no longer exists, `rlsbl monorepo status` no longer renders a Watch column, and every error message and doc page that told you to adjust watch patterns now points at the derived `filters:` block instead. The loader still refuses a workspace that carries the key, naming the member and the line to delete.
+- **Workspace member paths must be unique.** The loader refuses a workspace whose members claim the same path (including two spellings of one path, and two root members) instead of letting declaration order decide which member owns a file.
+
+### Features
+
+- **`rlsbl rewrite go-module-path`.** Renames a Go module path across a repository: the module-path tokens in every `go.mod` and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-anchored. `--dry-run` prints a per-file plan with occurrence counts, and an apply refuses if a count moved since the preview.
+- **`rlsbl rewrite uv-path-sources`.** Converts path- and workspace-sourced Python dependencies into registry constraints floored at the version `uv.lock` resolves, covering `[project].dependencies`, optional-dependency extras and PEP 735 dependency groups, deleting the matching `[tool.uv.sources]` entry and declaring each converted name in `internal_dep_floors`. A locked version PyPI does not have -- or a registry probe that fails to answer -- is a hard error naming the release-first remedy, so an unsatisfiable floor is never written.
+- **`rlsbl monorepo status` shows both tables.** The per-releasable summary and the per-member table are rendered together; previously a workspace saw one or the other, and the per-member columns (target, path, dependency counts, subtree remote) were unreachable in a workspace that declared releasables.
+- **A committed support matrix, and a check that keeps it fresh.** `rlsbl/data/support-matrix.json` records what every release target supports on every axis, plus each check's target scope and the pipeline table, all derived from the registries rather than written down beside them. The new `target-matrix-fresh` check (error, `project` + `preflight`) fails when the committed file no longer matches a regeneration, so a stale matrix blocks the release instead of shipping. Regenerate with `uv run python scripts/generate_support_matrix.py`.
+- **Monorepo CI router path filters are now derived from the workspace.** A member's filter is its own territory plus the territories of everything it depends on (transitively, every dependency scope), the workspace-root manifests and lockfiles, and the tool's own machinery; the root member gets everything minus the other members' territories. Nothing is declared per project any more, and the generated router now sets `predicate-quantifier: some-with-excludes` so those exclusions actually apply.
+- **New check `router-filters-fresh`.** The generated `ci-router.yml`'s `filters:` block must match a fresh derivation from the workspace. A stale block silently under-triggers a member's CI, and a member whose job concludes `skipped` on the commit a release tags cannot pass the publish check. Runs under `rlsbl check --tag workspace` and in the release preflight.
+- **New script.** `scripts/backfill_release_anchors.py` backfills release archives in one reviewed pass: it anchors every archived version to the commit it shipped from, stamps the strictspec `format_version` gate onto archives written before the gate existed, materializes archives for released versions that never had one, and records a permanent `unanchorable = true` marker on a version whose commit cannot be recovered from any source.
+- **New script.** `scripts/set_archived_descriptions.py` rewrites the `description` field of archived release files from a reviewed JSON map, unlocking and relocking each 0444 archive, with a mandatory plan and a written-count assertion.
+
+### Fixes
+
+- `rlsbl monorepo absorb --dry-run` no longer aborts before it can preview anything: its source-repo precondition check read the worktree with a command the preview refused to run.
+- **strictspec floor corrected.** Installing rlsbl could resolve a `strictspec` older than its generated validators require, making every rlsbl command fail at import with a runtime-version error. The declared floor now matches what the validators call for.
+- **`monorepo mirror --dry-run` renders a plan again.** The preview used to stop at step 1 with "branched on unsettled value" because observation's `git subtree split` and inspection clone were recorded instead of run; both are now allowlisted observes, and the plan no longer advertises scratch directories no apply would create.
+- **Ancestry checks no longer trust a shallow repository's "no".** With both commits present but the connecting history truncated by a shallow fetch, git answers "not an ancestor" to a question it cannot follow to the end; rlsbl now treats that as undetermined, so the mirror tripwire, the release's CI-verified candidate check and `release resume` refuse instead of acting on a wrong answer.
+- **Mirror honesty on unanswerable history.** When git cannot determine whether mirror commits descend from the current subtree split (pruned or unfetched objects), `monorepo mirror` now reports a distinct `lineage-undetermined` verdict with a fetch/deepen remedy instead of accusing the mirror of foreign commits.
+- `workspace-unregistered` no longer reports a member's declared target path subdirectory (e.g. `{"name": "npm", "path": "npm"}`) as an unregistered project
+- **Similarly-named Go modules no longer confuse strictcli detection.** A project importing a module whose path merely begins with another module's path (`github.com/o/foo-extras` next to `github.com/o/foo`) was matched as importing the latter, which could name the wrong main package as a repo's CLI entry point.
+- The pgdesign target no longer silently detects an undeclared `schema/` subdirectory: detection looks only at the directory it is handed, and a schema in a subdirectory is declared with an explicit target path (`{"name": "pgdesign", "path": "schema"}`). Version and schema resolution raise a hard error naming that remedy instead of guessing.
+- Commits that only touch rlsbl's own generated files no longer need changelog coverage: the exempt set now also covers `.rlsbl/bases/`, `.rlsbl/lint/` and the generated `.github/workflows/ci-router.yml`, alongside the changelog and release state it already covered.
+- **`rlsbl release yank` no longer passes over a target in silence.** A target with no registry-removal action is now reported explicitly by name instead of relying on a fallthrough in the command's name-based dispatch.
+- **A project whose target has no built-in test runner no longer records a passing test step.** The release's test step, `rlsbl check --tag quality` and the pre-push workspace test check now report an explicit skip naming the target instead of silently succeeding, and `test-suite-workspace` lists affected projects it could not test rather than dropping them from its count.
+- **`rlsbl rewrite go-module-path` no longer skips whole directories.** The sweep visited everything except `vendor/` and `.git/` as documented, but inherited the linters' build-output exclusions, so Go packages in ordinary directories named `build`, `dist`, `static`, `public`, `assets` or `node_modules` were silently left un-renamed while the command reported success.
+- **Go imports written as raw strings are no longer invisible.** An import written with backquotes instead of double quotes compiles identically, but the Go import scanner skipped it -- so `rlsbl rewrite go-module-path` left it un-renamed, and the dead-package and strictcli detectors did not count it as a reference.
+- **A workspace root member now owns its files.** A member declared at `path = "."` computed a prefix no git path could ever match, so it owned nothing: its changelog coverage was silently vacuous and only `watch` patterns gave it any territory. Every tracked file now belongs to exactly one member -- the most specific declared path wins, and the root member owns whatever no other member claims.
+- **An aborted `rlsbl rewrite` now says what it already wrote.** The count-mismatch abort read as if nothing had been written; it now enumerates the files or dependencies applied before the failure (which stay on disk -- there is no rollback) and states that a re-run re-plans from the current tree. A planned file that disappears between the preview and the apply is reported as an error naming the file instead of a traceback.
+- **The pipelines and targets documentation no longer describes things that do not exist.** The pipelines page claimed publish and asset steps were decided by `publish` and `build_assets` target capabilities that no target ever declared and no code ever read; it now describes what actually decides a publish step. The targets page claimed the `name-consistency` check skips targets that cannot read a name, when it asks every detected target and reports the ones that answered nothing.
+- **`rlsbl release yank` probes and yanks subdirectory targets correctly.** A target declared with a `path` was probed against the project root's manifest instead of its own, so its publication status could come from the wrong package entirely.
+- **`name-consistency` reports non-answering targets when names disagree.** A detected target that reports no package name is now named on the mismatch branch as well as the pass branch, so the mismatch detail no longer reads as the complete set of detected targets.
+- **`rlsbl status --registry` distinguishes "no version API" from a failed query.** Targets whose ecosystem has no latest-version endpoint (zig, docker, plain and the rest) no longer print `(query failed)`, which read as a network problem; they name the missing API and skip the request. The JSON payload gains a `NO_REGISTRY_API` drift value.
+- **The documentation tables no longer import rlsbl to render.** The release-target table, the check-vs-target matrix, the pipeline table and the target count now read the committed support matrix, so building the docs needs the repository rather than an installed rlsbl -- the import path that once failed a release when the documentation environment lost its rlsbl overlay.
+- **The targets and checks pages stop restating what the tools already generate.** The detection-files, ecosystem-classification and capability tables on the release-targets page were hand-typed duplicates of columns the generated table already renders; the support axes are now a rendered table covering every axis rather than five of them. Several pages also carried counts that had drifted from the registries -- 18 ecosystems against 17 registered, 12 changelog checks against 11 -- and now describe without counting.
+- **`rlsbl monorepo release run` tags every package again in packages mode.** It looked for each member's release state beside the package instead of under the member's releasable, so it treated each one as already finished: no tags, no finalized changelogs, and a success report.
+- **`rlsbl monorepo check-names` no longer queries registries about dev nodes.** A dev node publishes nothing, so it has no registry identity to check; every workspace has at least one once its root member is a dev node.
+- **`rlsbl dev install --all` no longer fails on dev nodes.** A dev node ships nothing, so there is nothing to install from it; the run used to abort with "no targets detected". Naming one through `--include` still selects it.
+- **Changelog coverage no longer exempts nested lookalikes of root-only tool files.** A path named `.rlsbl-monorepo/...` or `.github/workflows/ci-router.yml` below the repository root is a hand-written file with an owner, not rlsbl's own bookkeeping, so commits touching only such files need changelog coverage again.
+- **A broken `workspace.toml` now surfaces its loader error instead of looking like a repository with no releasables.** Releasable-config resolution swallowed every exception and answered "no releasable", so a workspace the loader had refused produced a generated publish router with unrendered template variables and no explanation.
+- **Releases no longer abort when a finalize file is unchanged.** A commit now names only the files whose staging actually changes the tree, so a byte-identical `CHANGELOG.md` regeneration no longer makes safegit refuse the release's finalize commit.
+- **Undo audit file is no longer silently discarded.** A corrupted `undo-audit.json` was previously overwritten with a fresh single-record array, losing the record of every past undo; `rlsbl release undo` now reports it as an error and leaves the file untouched for repair.
+- **Fixed:** an unreadable workspace manifest no longer narrows the generated CI router's paths filters. A manifest no dependency scanner could parse contributed no edges, so `rlsbl monorepo sync` wrote a filter missing a dependency territory and exited 0 -- and `router-filters-fresh` passed, because it re-derived from the same broken manifest. Changes to a dependency could then stop triggering its dependents' CI. Sync, the freshness check and the release-time window simulation now refuse, naming each project and file, and `workspace-unbuildable` runs in the release preflight.
+- **Fixed:** `router-filters-fresh` now compares the generated CI router's whole filters block against a fresh derivation, so a filter entry deleted by hand is reported (missing, extra, stale and differing entries are each named by member). Previously the check only walked the committed entries, and a member whose entry had been removed -- whose CI therefore never ran again -- passed silently.
+- **The empty-candidate-window refusal no longer offers excluded paths.** The remediation list now separates negated filter patterns under a 'Not counting' heading instead of telling the operator to commit under paths the filter excludes.
+- **Undo refuses without its audit record.** `rlsbl release undo` no longer deletes the GitHub Release, the tags and the release commits when its `undo-audit.json` cannot be written -- an unwritable or malformed audit file now refuses the whole operation before anything is destroyed, naming the file and the repair.
+- **Release-file errors name the file.** A schema or validation failure on a release file now says which file failed (`<path>: <diagnostic>`) instead of reporting only the field, for both single-project and batch release files.
+
 ## 0.117.2
 
 Fixes two data-corrupting defects in releasable migration: changelog entries no longer lose their stable ids through consolidation, and a releasable's own unreleased entries are no longer destroyed when no member has entries.
@@ -2799,11 +2857,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.38.2
 
+The publish router gains a no-op job so a plain-target release succeeds when every conditional publish job is skipped.
+
 ### Fixes
 
 - **Fix.** Publish router no longer fails for plain-target releases. Added a no-op job so GitHub Actions workflows succeed even when all conditional publish jobs are skipped.
 
 ## 0.38.1
+
+Fixes the doubled output path when a PyPI target lives in a sub-directory, and includes hook-generated files in the release commit instead of leaving them dirty.
 
 ### Features
 
@@ -2814,6 +2876,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Fix PyPI build for subdirectory targets.** `uv build --out-dir` no longer produces a doubled path (e.g. `pypi/pypi/dist`) when the pypi target lives in a subdirectory.
 
 ## 0.38.0
+
+The monorepo publish router inlines each sub-project's publish steps instead of calling reusable workflows, which fixes PyPI Trusted Publishing, plus a hash cache that skips regeneration when nothing changed.
 
 ### Breaking
 
@@ -2830,6 +2894,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.37.0
 
+Restores the path-based changelog-only exemption alongside the trailer check, and syncs uv.lock, package-lock.json and go.sum during the release, including the modified lockfiles in the release commit.
+
 ### Features
 
 - **New feature.** Auto-sync lockfiles during release. After version bump, rlsbl detects uv.lock, package-lock.json, and go.sum, runs the appropriate sync command, and includes modified lockfiles in the release commit.
@@ -2841,6 +2907,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.36.1
 
+Monorepo target detection and PyPI builds resolve paths against the monorepo root and run from the sub-project directory, fixing validation, status and build failures when run from inside a package.
+
 ### Fixes
 
 - **Fix.** Monorepo target detection now resolves project paths relative to the monorepo root, not the current directory. Fixes changelog validation and status reporting when running from inside a sub-project.
@@ -2848,11 +2916,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.36.0
 
+The private post-release hook checks `dist/` against `max_asset_size_mb` before uploading assets to a GitHub Release.
+
 ### Features
 
 - **New feature.** Asset size guard in private post-release hook -- checks files in `dist/` against `max_asset_size_mb` (default 2MB) before uploading to GitHub Releases.
 
 ## 0.35.1
+
+Release finalization writes the per-version .md file, the release stops false-positiving on files its own hooks and generators wrote, and the old path-pattern changelog exemption is removed.
 
 ### Features
 
@@ -2864,6 +2936,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Bug fix.** Release flow no longer false-positives on files written by hooks, lint, or changelog generation.
 
 ## 0.35.0
+
+Fixes the release crash introduced by the previous version's changelog preview heading, raises the `max_entries_per_commit` default to match documented practice, warns about stale monorepo changelog entries at finalization, and resolves Action versions from a single table at scaffold time.
 
 ### Features
 
@@ -2877,11 +2951,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.34.0
 
+Adds configurable changelog batch limits, so no entry may reference more commits than `max_commits_per_entry` and no commit may appear in more entries than `max_entries_per_commit`.
+
 ### Features
 
 - **Configurable changelog batch-limits validation.** `rlsbl changelog validate` now checks that no entry has more than `max_commits_per_entry` (default 5) commits and that no commit appears in more than `max_entries_per_commit` (default 2) entries. Both limits configurable per project via the `batch_limits` section in `.rlsbl/config.json`. Known violations can be silenced via an `exclusions` list with a required `reason` field for audit purposes.
 
 ## 0.33.0
+
+`dev install` grows `--global`/`--venv` and four more targets, an empty `release_branches` list becomes an error instead of a silent fallback, and an aborted release no longer leaves a regenerated CHANGELOG.md in the working tree.
 
 ### Features
 
@@ -2895,6 +2973,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **`rlsbl release` no longer pollutes the working tree on abort.** Previously, when a pre-mutation check (selfdoc, tests, lint, hooks) failed, the regenerated `CHANGELOG.md` was left in the working tree and had to be manually reverted. The write is now deferred until after all pre-checks pass.
 
 ## 0.32.0
+
+A broad scaffold and release cycle: centralized GitHub Actions versions, `scaffold --dry-run`, stale pre-push hook regeneration, user-owned custom workflow files, config-driven per-target publishing, the `dev install` command, and a set of monorepo publish fixes.
 
 ### Features
 
@@ -2918,6 +2998,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.31.0
 
+Restores the changelog-only path exemption, rolls a failed push back locally, teaches `undo` about the two-commit release pattern, and moves monorepo Go tags to the path-based scheme the module proxy requires.
+
 ### Breaking
 
 - **Breaking.** Go targets in monorepos now use path-based tags (`go/v0.1.1`) instead of name-based (`go-strictcli@v0.1.1`), matching Go module proxy requirements. All tag discovery and matching updated.
@@ -2935,6 +3017,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.30.1
 
+Every rlsbl-created commit carries the Autogenerated trailer by default, the pre-push hook blocks pushes that gitignore rlsbl-managed changelog files, and coverage reads the versioned JSONL files as well as unreleased.jsonl.
+
 ### Features
 
 - **Feature.** All `commit_files()` calls now default to `autogenerated=True`, ensuring every rlsbl-generated commit carries the `Autogenerated: true` trailer.
@@ -2946,6 +3030,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Fix.** Pre-push hook now reads all JSONL files (unreleased + versioned) for coverage, fixing release pushes being blocked after changelog finalization.
 
 ## 0.30.0
+
+Changelog coverage exemption moves to the `Autogenerated: true` git trailer, with a new `rlsbl commit` command that writes it; path patterns and commit-message regexes are gone.
 
 ### Breaking
 
@@ -2959,11 +3045,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.29.1
 
+The release no longer aborts when validation updates the `.validated` changelog cache.
+
 ### Fixes
 
 - **Fix.** Release no longer aborts when the `.validated` changelog cache is updated during validation.
 
 ## 0.29.0
+
+Adds `monorepo lint` for unregistered and stale workspace entries, and fixes a run of monorepo release bugs: scoped tags, sub-project working directories, version files missed by the release commit, and coverage filtering in the pre-push hook.
 
 ### Features
 
@@ -2979,6 +3069,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.28.1
 
+`status` applies the same changelog-only exemptions validation does, gitignore updates append instead of three-way merging, and the changelog backfill script defaults to the current directory.
+
 ### Fixes
 
 - **Fix: status applies changelog-only exemptions.** `rlsbl status` now excludes changelog-only commits from the JSONL coverage count, consistent with `changelog validate`. Shows exemption count when applicable.
@@ -2986,6 +3078,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Fix: backfill script uses CWD as default project root.** `scripts/backfill_changelog.py` now operates on the current directory instead of hardcoding rlsbl's own root. Accepts `--project-root` for explicit override.
 
 ## 0.28.0
+
+Renames the monorepo publish router to publish.yml so PyPI Trusted Publishing claims survive a move between layouts, fixes several sync path bugs, reverts the strict changelog type validation, and auto-commits generated changelog files.
 
 ### Breaking
 
@@ -3004,6 +3098,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.27.0
 
+A breaking cleanup: the JSONL changelog is mandatory, the deprecated flat lint `ignore` key and the BaseTarget `get_*` aliases are gone, and lint returns nothing rather than guessing Python when no language marker is present.
+
 ### Breaking
 
 - **Breaking: JSONL changelog required.** `rlsbl release` now requires `.rlsbl/changes/` to exist. The manual CHANGELOG.md heading check fallback has been removed. Run `rlsbl scaffold --update` to set up JSONL changelogs.
@@ -3013,11 +3109,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.26.1
 
+The `Watch CI` hint now names the release commit instead of a post-hook auto-commit.
+
 ### Fixes
 
 - **Fix: Watch CI hint points to the correct commit.** The release command now captures the pushed SHA before running post-release hooks, so `rlsbl watch` targets the release commit instead of a post-hook auto-commit.
 
 ## 0.26.0
+
+Adds the `yank` command for deprecating or deleting a past release, keeps `__version__` in sync on PyPI releases, and requires a known type on user-facing changelog entries.
 
 ### Features
 
@@ -3031,9 +3131,13 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.25.4
 
+Documentation release: frontmatter descriptions on the hand-written pages and expanded CLI help text feeding the generated docs.
+
 - No user-facing changes.
 
 ## 0.25.3
+
+Changelog validation measures the unreleased range from the last version tag rather than origin/main, so it answers what has not been released instead of what has not been pushed.
 
 ### Fixes
 
@@ -3041,9 +3145,13 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.25.2
 
+Infrastructure only: a test fixture pins its branch name so the suite passes on CI.
+
 - No user-facing changes.
 
 ## 0.25.1
+
+Built-in lint runs only on library projects, and CHANGELOG.md is regenerated after the JSONL is finalized so the released version heading carries the version number.
 
 ### Fixes
 
@@ -3051,6 +3159,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Fix: CHANGELOG.md regenerated after JSONL finalization.** The release command now regenerates CHANGELOG.md after renaming `unreleased.jsonl` to the versioned file, so the changelog heading shows the version number instead of "Unreleased".
 
 ## 0.25.0
+
+Introduces the structured JSONL changelog: per-commit entries in `.rlsbl/changes/` with `add`, `validate` and `generate` commands, plus a backfill script that migrates an existing CHANGELOG.md into it.
 
 ### Features
 
@@ -3065,15 +3175,21 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.24.0
 
+Adds `edit-release`, which re-syncs a version's GitHub Release notes from CHANGELOG.md.
+
 ### Features
 
 - **`rlsbl edit-release [version]`.** New command that updates GitHub Release notes from CHANGELOG.md. Auto-detects the current version if none is given. Supports `--dry-run` to preview without changes.
 
 ## 0.23.1
 
+Test and packaging fixes only: the npm wrapper test installs its Python dependencies and stops using the removed `--registry` flag.
+
 - No user-facing changes.
 
 ## 0.23.0
+
+Migrates the CLI to strictcli (per-command help, typed flags), makes hooks scaffold-managed, runs tests and lint as built-in pre-release checks, and extends the library lint to Go and npm with AST and regex backends.
 
 ### Breaking
 
@@ -3097,6 +3213,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.22.1
 
+Name checking short-circuits once a name is taken, explains why a name was rejected, always shows the PyPI caveats, and reports which validations ran.
+
 ### Features
 
 - **Name check short-circuiting.** When a name is already taken, variant checking and GitHub repo lookups are now skipped, reducing API calls from 6 to 1-2 per taken name. Ultranormalization breaks after the first conflict instead of checking all 64 variants.
@@ -3107,6 +3225,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Rate limit retry visibility.** HTTP 429 retries now print "Rate limited, retrying in Ns..." to stderr instead of sleeping silently.
 
 ## 0.22.0
+
+Adds the library boundary lint for monorepo libraries, and makes name checking far more honest: PyPI Simple API lookups, stdlib collision detection, visual-similarity variants, and npm moniker conflicts.
 
 ### Features
 
@@ -3124,6 +3244,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.21.2
 
+Release hooks stream their output live and report their real exit code, and the hook timeout becomes configurable instead of a silent 120-second kill.
+
 ### Features
 
 - **Hook output is now visible.** Pre-release and post-release hooks stream stdout/stderr to the terminal in real-time. On failure, the actual exit code is shown instead of a generic error message.
@@ -3131,12 +3253,16 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.21.1
 
+Adds `--allow-dirty` to `release`, and forwards an explicit `--target` through `monorepo add` to scaffold.
+
 ### Features
 
 - **`rlsbl release --allow-dirty`.** Release with uncommitted changes in the working tree. Pre-existing dirty files are tracked and excluded from the unexpected-files safety check, so genuinely new unexpected files are still caught.
 - **`monorepo add` passes `--target` to scaffold.** When an explicit target is specified (e.g., `--target plain`), it is forwarded to the scaffold subprocess instead of relying on auto-detection. Removes a special case where `monorepo add` pre-created a VERSION file for plain targets.
 
 ## 0.21.0
+
+Cross-registry `depends_on` edges in the workspace manifest, a `plain` target for projects with no build system, a Zig target, and a shared npm binary-wrapper module used by both Go and Zig.
 
 ### Features
 
@@ -3148,6 +3274,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **CI router fix for projects without workflows.** `monorepo sync` no longer includes projects without CI workflows in the CI router, preventing references to non-existent workflow files.
 
 ## 0.20.0
+
+`check` requires an explicit `--target` and gains multi-name checking with rate limiting; monorepo gains `check-names`, `outdated` and `release-order`, dependency columns in `status`, and PyPI path-dependency rewriting at build time.
 
 ### Breaking
 
@@ -3167,9 +3295,13 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.19.1
 
+Test-only release: the deploy tests no longer depend on the CI runner's branch name.
+
 - No user-facing changes.
 
 ## 0.19.0
+
+Adds the `deploy` command with SSH deploys, health checks and automatic rollback, runs it after publish, and makes every command work from any sub-directory by discovering the project root.
 
 ### Features
 
@@ -3182,11 +3314,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.18.1
 
+Adds the `env_file` config key so a release can load the environment its targets' publish steps need.
+
 ### Features
 
 - **`env_file` config key.** Set `"env_file": "~/path/to/.env"` in `.rlsbl/config.json` to load environment variables before release. Useful for secrets needed by target publish steps (e.g., `CLOUDFLARE_API_TOKEN` for docs deploys).
 
 ## 0.18.0
+
+Go binary distribution: an opt-in Homebrew tap and an npm binary-wrapper package covering six platforms. Release target selection becomes config-only, so the `--include`/`--exclude` flags are removed.
 
 ### Breaking
 
@@ -3199,6 +3335,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.17.0
 
+Template variables from every detected target are merged during scaffold and namespaced per target, `doctor` gains metadata-consistency checks across targets, and targets may live in sub-directories.
+
 ### Features
 
 - **Cross-target metadata in templates.** Multi-target projects now merge template variables from all targets during scaffold, not just the primary. Variables are namespaced by target (`{{pypi.minRequiredPython}}`, `{{npm.minRequiredNode}}`). CI templates include runtime version references from project manifests (`requires-python`, `engines.node`, `go` directive, `rust-version`).
@@ -3207,11 +3345,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.16.1
 
+Scaffolding an npm project without a lockfile now warns and tells you to install, instead of leaving CI to fail on `npm ci`.
+
 ### Features
 
 - **npm scaffold: lockfile warning.** `rlsbl scaffold` now warns when an npm project has no lockfile (`package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`) and adds a "run npm install" step to the next steps output. Prevents broken CI from `npm ci` failing on first push.
 
 ## 0.16.0
+
+Adds the `doctor` command with seven release-state checks and a `--fix` mode, hardens the advisory lock, and improves Go and npm scaffolding (goreleaser ldflags and main detection, version.go, package-manager detection).
 
 ### Features
 
@@ -3225,6 +3367,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.15.0
 
+Removes the built-in config migration engine in favour of an external tool, adds `--json` output to `status`, and warns about Go projects whose main package layout would break `go install`.
+
 ### Features
 
 - **Deleted built-in config migration engine.** Removed `rlsbl/lib/` (ConfigMigrator, schema_loader, ~440 LOC), the `rlsbl config` subcommand tree, and all associated tests (~1,500 LOC). Config migrations are now handled by the external `migrable` tool.
@@ -3234,6 +3378,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Go root main detection.** `rlsbl scaffold` warns when a Go project has its main package in `cmd/<name>/` instead of the project root, since `go install module@latest` won't work.
 
 ## 0.14.0
+
+Adds router watch paths, subtree publishing to mirror repositories, and the swift-apple target, and makes scaffold write the detected target into config so later runs stop relying on auto-detection.
 
 ### Features
 
@@ -3247,6 +3393,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.13.1
 
+Monorepo follow-ups: synced workflows run in the right sub-directory, `monorepo add` reports which manifest files a project is missing, and publish workflows are composed dynamically from each target's own template.
+
 ### Features
 
 - **Monorepo sync adds `working-directory`.** Synced CI workflows now include `defaults: run: working-directory: {path}` so steps run in the correct project subdirectory.
@@ -3254,6 +3402,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Dynamic merged publish workflows.** Multi-target projects now get dynamically generated publish workflows composed from each target's individual template. Supports all 11 targets, replaces the static npm+pypi+go-only merged template.
 
 ## 0.13.0
+
+Monorepo support: the `monorepo` command family, a workspace manifest, per-project scoped releases with prefixed tags, and a sync step that lifts per-project CI into routers at the repository root.
 
 ### Features
 
@@ -3263,6 +3413,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Scaffold triggers monorepo sync.** Running `rlsbl scaffold` inside a monorepo project automatically syncs workflows to root.
 
 ## 0.12.0
+
+Seven new release targets (Swift, Cargo, Deno, Hex, Maven, Docker and versioned specs), opt-in target declaration in config, hybrid local/CI publishing, a private-registry workflow, and tomlkit-based pyproject.toml editing.
 
 ### Features
 
@@ -3275,6 +3427,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.11.3
 
+Target selection for a release becomes explicit: `--include`/`--exclude` flags plus a `release_targets` config key, replacing the single-purpose `--skip-docs`.
+
 ### Features
 
 - **`--include`/`--exclude` release flags.** Control which targets run during release. Replaces `--skip-docs`.
@@ -3282,11 +3436,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.11.2
 
+`watch` re-polls after the initial runs finish, so workflows triggered late by GitHub Release creation are no longer missed.
+
 ### Features
 
 - **Watch re-polls for late-starting workflows.** After initial runs complete, waits 5 seconds and re-polls for workflows that started late (e.g., Publish triggered by GitHub Release creation). Fixes missing Publish detection.
 
 ## 0.11.1
+
+The release aborts when the local branch is behind the remote, and `watch` reports which workflows actually ran, warning when a publish workflow on disk never triggered.
 
 ### Features
 
@@ -3294,6 +3452,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Watch reports which workflows ran.** After CI completes, prints a summary table of workflow names and results. Warns if a publish workflow exists on disk but didn't trigger.
 
 ## 0.11.0
+
+Extracts the documentation system into selfdoc -- the docs target now delegates to that CLI -- removes the codehome target pending a better design, and adds GitHub repo counts to name checks.
 
 ### Features
 
@@ -3303,6 +3463,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.10.1
 
+Rewrites the codehome target as a root-scoped, one-repo-per-plugin model with plain semver tags, and adds the `register` command and plugin.json validation.
+
 ### Features
 
 - **Codehome target rewrite.** Now root-scoped: each plugin (or plugin group) lives in its own repo with `plugin.json`. Standard `v1.2.3` tags, no namespacing. Push is delivery.
@@ -3311,6 +3473,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Plugin validation.** Release validates `plugin.json` has required fields (name, version, description) and valid semver.
 
 ## 0.10.0
+
+Adds multi-target releases: a codehome plugin target, a docs target that generates and deploys documentation, the `targets` command, and the `--target`/`--scope` flags that deprecate `--registry`.
 
 ### Features
 
@@ -3324,12 +3488,16 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.9.1
 
+Moves project info behind `config show` so bare `rlsbl config` prints help, and fixes porcelain parsing in the release race-condition check.
+
 ### Features
 
 - **`rlsbl config show` subcommand.** Bare `rlsbl config` now prints help; use `config show` for project info.
 - **Race condition parsing fix.** Porcelain parser handles stripped leading whitespace correctly.
 
 ## 0.9.0
+
+A large feature and hardening release: the `unreleased` and `prs` commands, a config management system with schema-driven migrations, an advisory lock against concurrent releases, parallel CI watching and registry checks, and a long list of release-safety fixes.
 
 ### Features
 
@@ -3353,6 +3521,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.8.3
 
+Fixes `watch` against short SHAs, reorders the pre-release hook to fail fast, and moves the CI templates to Node 24 and `go-version-file`.
+
 ### Features
 
 - Pre-release hook runs Python checks before npm (faster failure)
@@ -3365,6 +3535,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.8.2
 
+Hardening pass on `watch` and `record-gif`: clean exit on interrupt, AppleScript escaping in notifications, a clear error for a valueless `--registry`, and call-time config path resolution.
+
 ### Features
 
 - Handle KeyboardInterrupt in watch command (clean exit, no stack trace)
@@ -3374,6 +3546,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - Add `--width`, `--height`, `--font-size`, `--duration` flags to record-gif
 
 ## 0.8.1
+
+Ships the templates inside the wheel so `rlsbl scaffold` works from a PyPI install, plus fixes to undo prerequisites, TOML keyword injection, discover pagination and non-ASCII package.json handling.
 
 ### Features
 
@@ -3386,6 +3560,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.8.0
 
+Replaces every format-specific scaffold merge strategy with a universal three-way merge against bases stored in `.rlsbl/bases/`, and reports the exact action taken for each scaffolded file.
+
 ### Features
 
 - **Universal three-way merge for scaffold updates.** Replaced all format-specific merge strategies (YAML job-level, JSON deep-merge, line-based, section append) with `git merge-file`. Bases are stored in `.rlsbl/bases/` at scaffold time. On `--update`, user customizations and template updates merge cleanly; conflicts get git-style conflict markers.
@@ -3393,6 +3569,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Detailed scaffold output.** Every file now shows its action: created, updated, merged, unchanged, user-owned, or CONFLICTS.
 
 ## 0.7.0
+
+Scaffold updates learn to merge rather than skip: JSON deep-merge for `.claude/settings.json` and comment-preserving job-level merge for CI workflows, with CHANGELOG.md, LICENSE and hooks formally user-owned.
 
 ### Features
 
@@ -3404,6 +3582,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.6.0
 
+Scaffolded helper scripts become built-in subcommands, hooks move to `.rlsbl/hooks/`, the pre-push hook becomes a one-line exec so it updates with the tool, and the new `rlsbl watch` replaces the built-in background CI watcher.
+
 ### Features
 
 - **Scripts moved to subcommands.** `check-prs.sh`, `record-gif.sh`, and `pre-push-hook.sh` are no longer scaffolded into `scripts/`. They are now built-in subcommands: `rlsbl record-gif`, `rlsbl pre-push-check`.
@@ -3413,6 +3593,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - **Pre-push hook is a one-liner.** `.git/hooks/pre-push` now calls `exec rlsbl pre-push-check "$@"` instead of being a full script copy. Updates happen via `uv tool upgrade rlsbl`, not re-scaffolding.
 
 ## 0.5.2
+
+A round of fixes to version detection from source checkouts, registry-specific CLAUDE.md publish instructions, gitignore merging, and the Go name check's wording.
 
 ### Features
 
@@ -3425,12 +3607,16 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.5.1
 
+The CI watcher writes its verdict to stderr (with the run URL on failure) instead of guessing at a tty, and scaffolded .gitignore files carry the `*.local-only` pattern.
+
 ### Features
 
 - **CI watcher prints to stderr.** The background CI watcher now writes results to inherited stderr instead of attempting tty detection. AI agents and terminal users both see CI pass/fail in their output stream. On failure, the GitHub Actions run URL is printed.
 - **`*.local-only` gitignore pattern.** Scaffolded `.gitignore` now includes `*.local-only`. Use a `.local-only/` directory or `*.local-only` suffix to keep files out of version control without per-file gitignore entries.
 
 ## 0.5.0
+
+Adds post-release hooks, a background CI watcher with desktop notifications, and ecosystem discovery: releases auto-tag projects with the rlsbl keyword and GitHub topic, and `rlsbl discover` lists them.
 
 ### Features
 
@@ -3445,6 +3631,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.4.2
 
+Makes the push timeout configurable so releases stop failing on repositories with slow pre-push hooks, and fixes rlsbl's own hook missing the Go VERSION file.
+
 ### Features
 
 - Configurable push timeout via `RLSBL_PUSH_TIMEOUT` env var (default 120s), fixing timeouts on repos with slow pre-push hooks
@@ -3456,6 +3644,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.4.1
 
+Reworks the Go adapter around a VERSION file instead of git tags, bootstraps a first release without bumping, and teaches the pre-release and pre-push hooks to recognize Go projects.
+
 ### Features
 
 - Go adapter uses VERSION file as version source (not git tags)
@@ -3466,6 +3656,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.4.0
 
+Go project support: scaffolding with GoReleaser, CI and publish workflows, name availability via pkg.go.dev, cross-compilation templates, and a release path for registries whose version lives in the git tag rather than in a file.
+
 ### Features
 
 - Go project support: scaffold with GoReleaser, CI, and publish workflows
@@ -3475,9 +3667,13 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.3.1
 
+Housekeeping release with no user-facing changes. It was never tagged and its commits no longer resolve in the current history, so its archive records no anchor.
+
 - No user-facing changes.
 
 ## 0.3.0
+
+Adds a release confirmation prompt, a `config` command reporting detected registries and scaffolding state, an `undo` command that reverts a botched release, and a single merged publish workflow for dual-registry projects.
 
 ### Features
 
@@ -3487,6 +3683,8 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 - Merged publish workflow for dual-registry projects (scaffold generates one file with both npm + pypi jobs)
 
 ## 0.2.0
+
+CLI redesign: every command becomes top-level, the positional registry argument becomes the `--registry` flag, and `check-name` is renamed to `check`.
 
 ### Features
 
@@ -3500,11 +3698,15 @@ The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinte
 
 ## 0.1.1
 
+Pins astral-sh/setup-uv to v7 in the scaffolded workflows. The templates referenced a v8 tag that does not exist, so CI failed on every scaffolded project.
+
 ### Fixes
 
 - Fix astral-sh/setup-uv version (v8 tag doesn't exist, use v7)
 
 ## 0.1.0
+
+First release under the name rlsbl (renamed from share-it-on): a stdlib-only Python CLI with `release`, `status`, `scaffold` and `check-name`, registry auto-detection from package.json and pyproject.toml, context-aware scaffolding, and dual-publish CI for npm and PyPI.
 
 ### Features
 
