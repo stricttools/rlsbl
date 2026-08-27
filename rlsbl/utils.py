@@ -174,11 +174,17 @@ def working_tree_status(cwd=None):
     """The porcelain status lines of the working tree at ``cwd``.
 
     The raw lines, NOT stripped: each is ``XY <path>`` and the leading status
-    columns carry meaning (a global strip eats the first line's leading space
-    and corrupts its path). :func:`working_tree_paths` is the parsed form.
+    columns carry meaning. This deliberately does NOT go through :func:`run`,
+    which strips the whole output -- that eats the leading space of the FIRST
+    line whenever the first change is unstaged (`` D path``), and the parsed
+    path then loses its first character. :func:`working_tree_paths` is the
+    parsed form.
     """
-    status = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=cwd)
-    return [line for line in status.splitlines() if line.strip()]
+    result = effects.run(
+        ["git", "--no-optional-locks", "status", "--porcelain"],
+        cwd=cwd, capture_output=True, text=True, check=True, timeout=120,
+    )
+    return [line for line in result.stdout.splitlines() if line.strip()]
 
 
 def working_tree_paths(cwd=None):

@@ -13,18 +13,31 @@ reader consults the record to EXPLAIN a divergence it already observed.
 Where the file lives
 --------------------
 
-One resolution function, :func:`get_lineage_path`, decides the path, and both
-locations hold the same format:
+One resolution function, :func:`get_lineage_path`, decides the path, and all
+three locations hold the same format:
 
 - explicit-monorepo mode: inside the releasable's state directory,
   ``.rlsbl-monorepo/releasables/<name>/lineage.jsonl`` -- pass
   ``releasable_dir`` (build it with
   :func:`rlsbl.workspace_types.get_releasable_dir`);
 - standalone repos, including a standalone successor produced by an extract:
-  ``<project>/.rlsbl/lineage.jsonl``.
+  ``<project>/.rlsbl/lineage.jsonl``;
+- the workspace itself: ``<root>/.rlsbl-monorepo/lineage.jsonl`` -- pass
+  ``workspace=True``.
 
-This mirrors :func:`rlsbl.release_file.get_releases_dir` exactly -- the same
-``releasable_dir``-or-``.rlsbl`` fork, so the two state homes never drift apart.
+The first two mirror :func:`rlsbl.release_file.get_releases_dir` exactly -- the
+same ``releasable_dir``-or-``.rlsbl`` fork, so the two state homes never drift
+apart.
+
+The third exists because some surgery facts are scoped to the REPOSITORY rather
+than to any releasable in it. A departure record is the case that forced it:
+when a releasable is extracted, its tag globs stop belonging to the source, and
+that is a fact about the source repository's tag namespace, not about a
+releasable that is no longer there. There is also nowhere else to put it -- a
+workspace has no ``<root>/.rlsbl/`` at all (rlsbl's own ``root-rlsbl-conflict``
+check refuses one beside ``.rlsbl-monorepo/``), and picking some surviving
+releasable's record would file a repository-wide fact under an arbitrary
+releasable.
 
 On-disk format and the append pattern
 -------------------------------------
@@ -98,6 +111,7 @@ from typing import ClassVar
 
 from . import effects
 from .errors import RlsblError
+from .workspace_types import WORKSPACE_DIR
 
 
 LINEAGE_FILENAME = "lineage.jsonl"
@@ -125,21 +139,40 @@ class LineageError(RlsblError):
 # ---------------------------------------------------------------------------
 
 
-def get_lineage_path(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
-    """Return the path to this project's lineage record.
+def get_lineage_path(
+    project_dir: str = ".",
+    *,
+    releasable_dir: str | None = None,
+    workspace: bool = False,
+) -> str:
+    """Return the path to a lineage record.
 
     ``releasable_dir`` is the releasable's state directory
     (``.rlsbl-monorepo/releasables/<name>/``); when given, the record sits
-    directly in it, beside ``version`` and ``releases/``. Otherwise it is the
-    standalone home, ``<project_dir>/.rlsbl/lineage.jsonl`` -- which is also
-    where a standalone successor produced by an extract finds its own record.
+    directly in it, beside ``version`` and ``releases/``. ``workspace=True``
+    selects the WORKSPACE-scoped record instead,
+    ``<project_dir>/.rlsbl-monorepo/lineage.jsonl``, for a fact about the
+    repository rather than about one releasable (see the module docstring).
+    With neither, it is the standalone home,
+    ``<project_dir>/.rlsbl/lineage.jsonl`` -- which is also where a standalone
+    successor produced by an extract finds its own record.
+
+    The two selectors are mutually exclusive: a record is either a
+    releasable's or the workspace's, and asking for both names no file.
 
     The file may or may not exist: an absent record means no surgery has been
     recorded, which is the normal state for a repository that has never been
     converted.
     """
+    if releasable_dir and workspace:
+        raise ValueError(
+            "a lineage record is either a releasable's or the workspace's; "
+            "pass releasable_dir or workspace=True, never both"
+        )
     if releasable_dir:
         return os.path.join(releasable_dir, LINEAGE_FILENAME)
+    if workspace:
+        return os.path.join(project_dir, WORKSPACE_DIR, LINEAGE_FILENAME)
     return os.path.join(project_dir, ".rlsbl", LINEAGE_FILENAME)
 
 

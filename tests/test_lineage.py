@@ -235,6 +235,32 @@ class TestLocation:
             "lineage.jsonl",
         )
 
+    def test_workspace_location(self, tmp_path):
+        """A repository-scoped fact goes beside workspace.toml, not in .rlsbl/.
+
+        A workspace has no ``<root>/.rlsbl/`` at all (root-rlsbl-conflict
+        refuses one), so a fact about the repository -- a departure -- needs a
+        home of its own.
+        """
+        path = get_lineage_path(str(tmp_path), workspace=True)
+        assert path == os.path.join(
+            str(tmp_path), ".rlsbl-monorepo", "lineage.jsonl",
+        )
+
+    def test_the_two_selectors_are_mutually_exclusive(self, tmp_path):
+        with pytest.raises(ValueError, match="never both"):
+            get_lineage_path(
+                str(tmp_path),
+                releasable_dir=get_releasable_dir(str(tmp_path), "widget"),
+                workspace=True,
+            )
+
+    def test_workspace_location_round_trips(self, tmp_path):
+        path = get_lineage_path(str(tmp_path), workspace=True)
+        written = append_event(path, make_departed_globs())
+        assert os.path.isfile(path)
+        assert read_events(path) == [written]
+
     def test_standalone_location_round_trips(self, tmp_path):
         path = get_lineage_path(str(tmp_path))
         written = append_event(path, make_conversion())
