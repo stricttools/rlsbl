@@ -528,9 +528,13 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
         content = "".join(lines)
 
         with writable_jsonl(filepath):
-            # file_mode pins what the mkstemp-based hand-rolled write left
-            # here; writable_jsonl relocks released files on exit regardless.
-            effects.atomic_write_text(filepath, content, file_mode=0o600)
+            # preserve_mode: a remap rewrites a file that already exists, and
+            # rewriting it must not change what it is. Pinning 0o600 here (the
+            # mode the hand-rolled mkstemp write happened to leave) turned an
+            # ordinary 644 changelog into an owner-only one every time a
+            # rewrite touched it. writable_jsonl relocks released files on exit
+            # regardless.
+            effects.atomic_write_text(filepath, content, preserve_mode=True)
 
         results.append(RemapResult(
             path=filepath,

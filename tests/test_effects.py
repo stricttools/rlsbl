@@ -63,6 +63,39 @@ def run_in_preview(fn):
     return box.get("value"), result
 
 
+def run_with_handle(fn):
+    """Run *fn* inside a real LIVE dispatch; return (value, result).
+
+    The same throwaway app as :func:`run_in_preview`, dispatched without
+    ``--dry-run``: the effects handle is live, so writes really happen. Every
+    rlsbl command runs this way, and the handle takes a different branch inside
+    :func:`effects.atomic_write_text` from the handle-less one the tests above
+    exercise -- a permission rule that only holds on the handle-less branch
+    holds for no real command.
+    """
+    import rlsbl
+
+    box = {}
+    app = strictcli.App(
+        name=f"liveprobe{next(_probe_seq)}",
+        version="0.0.0",
+        help="Throwaway app that mints a real live effects handle for tests.",
+        proc_observe_allowlist=list(rlsbl.app.proc_observe_allowlist),
+    )
+
+    @app.command(
+        name="probe",
+        help="Run the callable under test inside a real live dispatch.",
+        effect="mutating",
+    )
+    @effects.handler
+    def _probe(ctx):
+        box["value"] = fn()
+
+    result = app.test(["probe"])
+    return box.get("value"), result
+
+
 def _mode(path):
     return stat.S_IMODE(os.stat(path).st_mode)
 
@@ -147,6 +180,41 @@ class TestAtomicWriteText:
         os.chmod(target, 0o644)
         effects.atomic_write_text(str(target), "{}", file_mode=0o600)
         assert _mode(str(target)) == 0o600
+
+    def test_preserve_mode_holds_under_a_live_effects_handle(self, tmp_path):
+        """Every real command writes through the handle branch.
+
+        That branch applied ``file_mode`` and ignored ``preserve_mode``
+        entirely, so a 644 file rewritten by a running command came out 600 --
+        the handle's own write mode -- while the same call outside a command
+        preserved it. A changelog JSONL rewritten mid-conversion arrived in the
+        new repository readable only by its owner because of exactly this.
+        """
+        target = tmp_path / "0.1.0.jsonl"
+        target.write_text("x")
+        os.chmod(target, 0o644)
+
+        _value, result = run_with_handle(
+            lambda: effects.atomic_write_text(str(target), "y", preserve_mode=True)
+        )
+
+        assert result.exit_code == 0, result.stderr
+        assert target.read_text() == "y"
+        assert _mode(str(target)) == 0o644
+
+    def test_preserve_mode_keeps_a_locked_target_locked_under_a_handle(
+        self, tmp_path,
+    ):
+        target = tmp_path / "locked.jsonl"
+        target.write_text("x")
+        os.chmod(target, 0o444)
+
+        _value, result = run_with_handle(
+            lambda: effects.atomic_write_text(str(target), "y", preserve_mode=True)
+        )
+
+        assert result.exit_code == 0, result.stderr
+        assert _mode(str(target)) == 0o444
 
     def test_file_mode_and_preserve_mode_together_are_rejected(self, tmp_path):
         with pytest.raises(ValueError, match="not both"):

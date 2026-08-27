@@ -721,6 +721,76 @@ class TestApplyMultiMember:
         assert (ns.root / "pkgA").is_dir()
         assert gitout(ns.root, "status", "--porcelain") == ""
 
+    def test_the_pruned_unreleased_jsonl_keeps_the_mode_it_arrived_with(
+        self, tmp_path,
+    ):
+        """Rewriting a file must not change what it is.
+
+        The prune rewrite pinned 0600, so an unreleased.jsonl that lost an
+        entry arrived in the new repository readable only by its owner while
+        every other changelog file beside it stayed 644.
+        """
+        ns = make_source(tmp_path)
+        # A commit that touches only pkgC: it does not survive core's filter,
+        # so core's entry over it is dropped and the file gets rewritten.
+        stray = _commit(ns.root, {"pkgC/notes.txt": "c\n"}, "extras-only work")
+        changes = os.path.join(get_releasable_dir(str(ns.root), "core"), "changes")
+        unreleased = os.path.join(changes, "unreleased.jsonl")
+        write_jsonl(unreleased, [
+            ChangelogEntry(
+                commits=[ns.core_sha], user_facing=True,
+                description="Core work", type="feature",
+            ),
+            ChangelogEntry(
+                commits=[stray], user_facing=True,
+                description="Work the filter prunes", type="fix",
+            ),
+        ])
+        run_git(ns.root, "add", WORKSPACE_DIR)
+        run_git(ns.root, "commit", "-q", "-m", "an entry the filter will prune")
+        source_mode = os.stat(unreleased).st_mode & 0o777
+
+        target = tmp_path / "core_out"
+        cmd_extract(str(ns.root), "core", str(target))
+
+        moved = os.path.join(
+            get_releasable_dir(str(target), "core"), "changes", "unreleased.jsonl",
+        )
+        entries = parse_jsonl(moved)
+        assert [e.description for e in entries] == ["Core work"]
+        assert os.stat(moved).st_mode & 0o777 == source_mode
+
+    def test_a_released_version_whose_entries_all_pruned_stays_coherent(
+        self, tmp_path, capsys,
+    ):
+        """A released JSONL and its .md must agree after the filter.
+
+        The fixture's 0.1.0 entry names the repository's initial commit, which
+        touches no member path -- so the filter prunes it and the entry is
+        dropped. The versioned JSONL then holds nothing while its .md still
+        listed the entry, and the next `changelog generate` would have erased
+        that section without anybody deciding to. The .md is regenerated from
+        the empty JSONL plus the archive that travelled with it, so the
+        description survives and the section says what is true.
+        """
+        ns = make_source(tmp_path)
+        target = tmp_path / "core_out"
+
+        cmd_extract(str(ns.root), "core", str(target))
+
+        changes = os.path.join(get_releasable_dir(str(target), "core"), "changes")
+        version = ns.initial_version
+        assert parse_jsonl(os.path.join(changes, f"{version}.jsonl")) == []
+        md = pathlib.Path(changes, f"{version}.md").read_text()
+        assert "No user-facing changes" in md
+        assert "Initial core release" not in md
+        # The archive travels, so its description is still the section's.
+        assert "Test release" in md
+        # And the operator is told which versions lost entries.
+        out = capsys.readouterr()
+        assert version in out.out + out.err
+        assert "dropped" in (out.out + out.err)
+
     def test_lineage_record_explains_the_conversion(self, tmp_path):
         ns = make_source(tmp_path)
         target = tmp_path / "core_out"

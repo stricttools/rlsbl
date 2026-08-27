@@ -142,11 +142,14 @@ def _prune_dangling_entries(changes_dir, repo_root):
     - An entry whose EVERY commit fails to resolve is DROPPED entirely, with a
       loud log line -- never left dangling with a null/stale hash.
 
-    Returns the number of entries dropped.
+    Returns ``{jsonl filename: entries dropped}``, naming only the files that
+    LOST entries. A dropped entry changes what the version's generated markdown
+    should say, so the caller regenerates exactly those files' ``.md``; a
+    narrowed entry does not (the markdown carries descriptions, not hashes).
     """
     if not os.path.isdir(changes_dir):
-        return 0
-    dropped = 0
+        return {}
+    dropped = {}
     for name in sorted(os.listdir(changes_dir)):
         if not name.endswith(".jsonl"):
             continue
@@ -158,7 +161,7 @@ def _prune_dangling_entries(changes_dir, repo_root):
             surviving = [h for h in entry.commits if _commit_resolves(repo_root, h)]
             if not surviving:
                 changed = True
-                dropped += 1
+                dropped[name] = dropped.get(name, 0) + 1
                 desc = entry.description or "(non-user-facing)"
                 print(
                     f"note: dropping changelog entry '{desc}' from {name} -- "
@@ -182,9 +185,11 @@ def _prune_dangling_entries(changes_dir, repo_root):
             continue
         content = "".join(serialize_entry(e) + "\n" for e in new_entries)
         with writable_jsonl(filepath):
-            # file_mode pins what the mkstemp-based hand-rolled write left
-            # here; writable_jsonl relocks released files on exit regardless.
-            effects.atomic_write_text(filepath, content, file_mode=0o600)
+            # preserve_mode keeps the file the mode it already had: the
+            # unreleased JSONL is an ordinary 644 working file, and pinning a
+            # mode here made it 600 on the way through. A released file's lock
+            # is writable_jsonl's business, and it relocks on exit regardless.
+            effects.atomic_write_text(filepath, content, preserve_mode=True)
     return dropped
 
 

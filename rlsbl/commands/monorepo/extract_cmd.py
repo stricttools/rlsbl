@@ -232,6 +232,9 @@ class Applied:
     tag_mappings: list = field(default_factory=list)
     anchor_mappings: list = field(default_factory=list)
     unremapped_anchors: list = field(default_factory=list)
+    #: (version, entries dropped) for every RELEASED version the filter emptied
+    #: or thinned, whose markdown was re-rendered from what survived.
+    pruned_versions: list = field(default_factory=list)
     state_commit: str = ""
     stack: ExitStack | None = None
 
@@ -1387,8 +1390,47 @@ def _remap_changelog(dep, run):
     dropped = _prune_dangling_entries(changes_dir, dep.target_path)
     if dropped:
         print(
-            f"  changelog: dropped {dropped} entry/entries whose commits the "
-            f"filter pruned.",
+            f"  changelog: dropped {sum(dropped.values())} entry/entries whose "
+            f"commits the filter pruned.",
+            file=sys.stderr,
+        )
+    _regenerate_pruned_markdown(dep, run, changes_dir, dropped)
+
+
+def _regenerate_pruned_markdown(dep, run, changes_dir, dropped):
+    """Re-render the ``.md`` of every released version that lost entries.
+
+    A released version is a JSONL and a generated markdown that describe the
+    same thing. Dropping entries from the JSONL without re-rendering left the
+    pair disagreeing -- in the extreme, an empty JSONL beside a markdown still
+    listing the entries -- and the next ``changelog generate`` would have
+    erased that section with nobody deciding to.
+
+    The description and context come from the version's archived release file,
+    which travels with the conversion, so an emptied version still renders its
+    own heading and description over "No user-facing changes."
+    """
+    from ...changelog.generate import (
+        _read_release_metadata_full,
+        generate_version_file,
+    )
+
+    releases_dir = os.path.join(dep.dest_state_dir, "releases")
+    for name in sorted(dropped):
+        version = name[: -len(".jsonl")]
+        if version == "unreleased":
+            continue  # no archive and no .md: nothing to re-render
+        description, context, bump = _read_release_metadata_full(
+            dep.target_path, version, releases_dir=releases_dir,
+        )
+        generate_version_file(
+            changes_dir, version,
+            description=description, context=context, bump_type=bump or None,
+        )
+        run.pruned_versions.append((version, dropped[name]))
+        print(
+            f"  changelog: {version}.md regenerated -- {dropped[name]} "
+            f"entry/entries dropped from {name}.",
             file=sys.stderr,
         )
 
@@ -1851,7 +1893,19 @@ def _apply_next_steps(dep, item, run):
         for name, sha in run.unremapped_anchors:
             print(f"  - {name}: {sha[:12]}", file=sys.stderr)
     print("\nNext steps (rlsbl never administers an external system):")
-    for step in _next_steps(dep):
+    steps = list(_next_steps(dep))
+    if run.pruned_versions:
+        named = ", ".join(
+            f"{version} ({count} entry/entries)"
+            for version, count in run.pruned_versions
+        )
+        steps.append(
+            f"review the changelog of {named}: every commit those entries "
+            f"referenced was pruned by the filter, so the entries were dropped "
+            f"and each version's .md was regenerated from what survived plus "
+            f"its archived release file"
+        )
+    for step in steps:
         print(f"  - {step}")
 
 
