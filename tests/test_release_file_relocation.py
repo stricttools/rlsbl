@@ -571,9 +571,24 @@ class TestExemptionCoversReleasableReleaseFiles:
         ".rlsbl-monorepo/releasables/alpha/releases/unreleased.toml",
         ".rlsbl-monorepo/releasables/alpha/releases/v1.0.1.toml",
         ".rlsbl-monorepo/releasables/alpha/releases/v1.0.1.md",
-        "sub/.rlsbl-monorepo/releasables/alpha/releases/unreleased.toml",
     ])
     def test_release_file_paths_are_exempt(self, path):
         from rlsbl.changelog.exemptions import is_changelog_path
 
         assert is_changelog_path(path)
+
+    @pytest.mark.parametrize("path", [
+        "sub/.rlsbl-monorepo/releasables/alpha/releases/unreleased.toml",
+        "docs/.rlsbl-monorepo/releasables/alpha/releases/v1.0.1.toml",
+    ])
+    def test_a_nested_spelling_is_not_exempt(self, path):
+        """The workspace directory is anchored at the repository root.
+
+        Exemption only ever judges ``git diff-tree`` output, which is
+        repository-root-relative, and rlsbl writes one ``.rlsbl-monorepo/`` per
+        repository -- at that root. A path carrying the name deeper in the tree
+        is somebody's own file and keeps its owner and its changelog coverage.
+        """
+        from rlsbl.changelog.exemptions import is_changelog_path
+
+        assert not is_changelog_path(path)

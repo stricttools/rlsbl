@@ -546,7 +546,20 @@ class TestExemptionCoversReleasableStatePath:
         assert is_changelog_path(
             ".rlsbl-monorepo/releasables/alpha/releases/in-progress.json"
         )
-        # Also with a monorepo prefix
-        assert is_changelog_path(
+
+    def test_a_nested_spelling_is_not_exempt(self):
+        """``.rlsbl-monorepo/`` is anchored at the repository root, on purpose.
+
+        Every path the exemption ever judges comes from ``git diff-tree``, which
+        prints repository-root-relative paths, and rlsbl writes exactly one
+        ``.rlsbl-monorepo/`` per repository -- at that root. So a path carrying
+        the directory name deeper in the tree is somebody's own file (a
+        hand-written ``docs/.rlsbl-monorepo/...``, a fixture, a vendored copy)
+        and needs an owner and changelog coverage like any other. This
+        assertion used to read the other way, from before the anchoring.
+        """
+        from rlsbl.changelog.exemptions import is_changelog_path
+
+        assert not is_changelog_path(
             "sub/.rlsbl-monorepo/releasables/alpha/releases/in-progress.json"
         )
