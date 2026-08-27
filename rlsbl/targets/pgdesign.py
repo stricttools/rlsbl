@@ -13,7 +13,9 @@ from .. import effects
 class PgdesignTarget(BaseTarget):
     """Release target for pgdesign database schema projects.
 
-    Detects pgdesign.toml in the project root or schema/ subdirectory.
+    Detects pgdesign.toml in the directory being scanned. A project whose
+    schema lives in a subdirectory declares that subdirectory as the target
+    path in .rlsbl/config.json -- detection never walks down looking for it.
     Version is stored in [project] version within pgdesign.toml.
     On release, validates the schema and generates migrations if configured.
     """
@@ -28,31 +30,32 @@ class PgdesignTarget(BaseTarget):
         return "pgdesign"
 
     def detect(self, dir_path):
-        """True if pgdesign.toml exists in root or schema/ subdir."""
-        return (
-            os.path.exists(os.path.join(dir_path, "pgdesign.toml"))
-            or os.path.exists(os.path.join(dir_path, "schema", "pgdesign.toml"))
-        )
+        """True if pgdesign.toml exists in *dir_path* itself."""
+        return os.path.exists(os.path.join(dir_path, "pgdesign.toml"))
 
     def _toml_path(self, dir_path):
-        """Resolve the actual path to pgdesign.toml."""
-        root_path = os.path.join(dir_path, "pgdesign.toml")
-        if os.path.exists(root_path):
-            return root_path
-        schema_path = os.path.join(dir_path, "schema", "pgdesign.toml")
-        if os.path.exists(schema_path):
-            return schema_path
-        return root_path  # default to root for creation
+        """The pgdesign.toml path for *dir_path*; existence is not checked."""
+        return os.path.join(dir_path, "pgdesign.toml")
 
-    def _schema_dir(self, dir_path):
-        """Resolve the directory containing pgdesign.toml."""
-        root_path = os.path.join(dir_path, "pgdesign.toml")
-        if os.path.exists(root_path):
-            return dir_path
-        schema_path = os.path.join(dir_path, "schema", "pgdesign.toml")
-        if os.path.exists(schema_path):
-            return os.path.join(dir_path, "schema")
-        return dir_path
+    def _require_toml_path(self, dir_path):
+        """Return the pgdesign.toml path, or raise naming the remedy.
+
+        The error fires here, in resolution, rather than in detection:
+        detection runs over every directory in a repository, so a schema
+        subdirectory nobody declared must be invisible to it. Once a pgdesign
+        target IS declared, the file it names has to exist, and the remedy
+        for a schema in a subdirectory is the explicit target path.
+        """
+        path = self._toml_path(dir_path)
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"No pgdesign.toml in {dir_path}. Create one with a [project] "
+                f"section, or -- if the schema lives in a subdirectory -- "
+                f"declare that subdirectory as the target path in "
+                f'.rlsbl/config.json: "targets": '
+                f'[{{"name": "pgdesign", "path": "schema"}}]'
+            )
+        return path
 
     def read_name(self, dir_path, ctx):
         """Return the directory name as the project name."""
@@ -64,11 +67,7 @@ class PgdesignTarget(BaseTarget):
 
     def read_version(self, dir_path):
         """Read version from pgdesign.toml [project].version."""
-        path = self._toml_path(dir_path)
-        if not os.path.exists(path):
-            raise FileNotFoundError(
-                "No pgdesign.toml found. Create one with a [project] section."
-            )
+        path = self._require_toml_path(dir_path)
         with open(path, "r", encoding="utf-8") as f:
             doc = tomlkit.parse(f.read())
         project = doc.get("project")
@@ -84,7 +83,7 @@ class PgdesignTarget(BaseTarget):
         Returns a list of relative file paths (relative to dir_path) that
         were modified.
         """
-        path = self._toml_path(dir_path)
+        path = self._require_toml_path(dir_path)
         with open(path, "r", encoding="utf-8") as f:
             doc = tomlkit.parse(f.read())
         if "project" not in doc:
@@ -104,8 +103,8 @@ class PgdesignTarget(BaseTarget):
         it resolves the project from the process working directory (its check
         context root is the cwd, and config discovery only walks UP from
         there). The schema directory the old positional argument carried is
-        therefore expressed as cwd -- which matters when pgdesign.toml lives in
-        a schema/ subdir, since discovery would never find it from dir_path.
+        therefore expressed as cwd -- and that directory is *dir_path*, which
+        for a schema in a subdirectory is the declared target path.
 
         `--ignore-warnings` is always passed: pgdesign's check framework exits
         nonzero on warn-severity results, and warnings are advisory under its
@@ -113,10 +112,10 @@ class PgdesignTarget(BaseTarget):
         never abort a release.
         """
         timeout = self._resolve_build_timeout(config)
-        schema_dir = self._schema_dir(dir_path)
+        self._require_toml_path(dir_path)
         result = effects.run(
             ["pgdesign", "check", "--tag", "validation", "--ignore-warnings"],
-            cwd=schema_dir,
+            cwd=dir_path,
             capture_output=True,
             text=True,
             timeout=timeout,

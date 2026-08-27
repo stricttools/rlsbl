@@ -43,7 +43,7 @@ class TestPgdesignTargetProtocol:
 
 
 class TestPgdesignTargetDetect:
-    """Detection: pgdesign.toml in root or schema/ subdir."""
+    """Detection: pgdesign.toml in the directory being scanned, and nowhere else."""
 
     def test_detect_true_root(self):
         target = PgdesignTarget()
@@ -52,14 +52,52 @@ class TestPgdesignTargetDetect:
                 f.write(MINIMAL_TOML)
             assert target.detect(d) is True
 
-    def test_detect_true_schema_subdir(self):
+    def test_detect_false_undeclared_schema_subdir(self):
+        """A schema subdirectory is not scanned: detection never walks down.
+
+        A project whose schema lives in a subdirectory declares that
+        subdirectory as the target path; detection only looks at the
+        directory it was handed.
+        """
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
             schema_dir = os.path.join(d, "schema")
             os.makedirs(schema_dir)
             with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
                 f.write(MINIMAL_TOML)
-            assert target.detect(d) is True
+            assert target.detect(d) is False
+
+    def test_detect_targets_ignores_undeclared_schema_subdir(self):
+        """An undeclared schema subdir detects nothing and errors nowhere."""
+        from rlsbl.targets import detect_targets
+
+        with tempfile.TemporaryDirectory() as d:
+            schema_dir = os.path.join(d, "schema")
+            os.makedirs(schema_dir)
+            with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            assert detect_targets(d) == []
+
+    def test_detect_targets_honors_declared_schema_path(self):
+        """A declared path puts the target on the schema subdirectory."""
+        import json
+
+        from rlsbl.targets import detect_targets
+
+        with tempfile.TemporaryDirectory() as d:
+            schema_dir = os.path.join(d, "schema")
+            os.makedirs(schema_dir)
+            with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            os.makedirs(os.path.join(d, ".rlsbl"))
+            with open(os.path.join(d, ".rlsbl", "config.json"), "w") as f:
+                json.dump(
+                    {"targets": [{"name": "pgdesign", "path": "schema"}]}, f
+                )
+            entries = detect_targets(d)
+            assert [e.name for e in entries] == ["pgdesign"]
+            assert entries[0].path == schema_dir
+            assert PgdesignTarget().read_version(entries[0].path) == "1.2.3"
 
     def test_detect_false_empty_dir(self):
         target = PgdesignTarget()
@@ -84,14 +122,20 @@ class TestPgdesignTargetReadVersion:
                 f.write(MINIMAL_TOML)
             assert target.read_version(d) == "1.2.3"
 
-    def test_read_version_schema_subdir(self):
+    def test_read_version_schema_subdir_errors_with_remedy(self):
+        """Resolution is where the undeclared-subdir story is told."""
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
             schema_dir = os.path.join(d, "schema")
             os.makedirs(schema_dir)
             with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
                 f.write(MINIMAL_TOML)
-            assert target.read_version(d) == "1.2.3"
+            with pytest.raises(FileNotFoundError) as exc:
+                target.read_version(d)
+            msg = str(exc.value)
+            assert "path" in msg
+            assert "pgdesign" in msg
+            assert "config.json" in msg
 
     def test_read_version_raises_no_file(self):
         target = PgdesignTarget()
@@ -113,8 +157,8 @@ class TestPgdesignTargetReadVersion:
             except VersionError:
                 pass
 
-    def test_read_version_prefers_root(self):
-        """When pgdesign.toml exists in both root and schema/, root wins."""
+    def test_read_version_reads_only_the_given_dir(self):
+        """A pgdesign.toml in a subdirectory never shadows the one handed in."""
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "pgdesign.toml"), "w") as f:
@@ -153,7 +197,8 @@ class TestPgdesignTargetWriteVersion:
             assert doc["project"]["schemas"] == ["auth.toml"]
             assert doc["project"]["migrations_dir"] == "migrations"
 
-    def test_write_version_schema_subdir(self):
+    def test_write_version_schema_subdir_errors_with_remedy(self):
+        """Writing to an undeclared schema subdir is a hard error, not a guess."""
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
             schema_dir = os.path.join(d, "schema")
@@ -161,8 +206,24 @@ class TestPgdesignTargetWriteVersion:
             path = os.path.join(schema_dir, "pgdesign.toml")
             with open(path, "w") as f:
                 f.write(MINIMAL_TOML)
-            result = target.write_version(d, "4.0.0", ctx=make_ctx(d))
-            assert result == [os.path.join("schema", "pgdesign.toml")]
+            with pytest.raises(FileNotFoundError) as exc:
+                target.write_version(d, "4.0.0", ctx=make_ctx(d))
+            assert "path" in str(exc.value)
+            with open(path, "r") as f:
+                doc = tomlkit.parse(f.read())
+            assert str(doc["project"]["version"]) == "1.2.3"
+
+    def test_write_version_declared_schema_path(self):
+        """With the path declared, the target dir IS the schema dir."""
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            schema_dir = os.path.join(d, "schema")
+            os.makedirs(schema_dir)
+            path = os.path.join(schema_dir, "pgdesign.toml")
+            with open(path, "w") as f:
+                f.write(MINIMAL_TOML)
+            result = target.write_version(schema_dir, "4.0.0", ctx=make_ctx(d))
+            assert result == ["pgdesign.toml"]
             with open(path, "r") as f:
                 doc = tomlkit.parse(f.read())
             assert str(doc["project"]["version"]) == "4.0.0"
@@ -211,24 +272,35 @@ class TestPgdesignTargetTemplateVars:
             assert vars["version"] == "0.0.0"
 
 
-class TestPgdesignTargetSchemaDir:
-    """Internal _schema_dir resolution."""
+class TestPgdesignTargetTomlResolution:
+    """Internal pgdesign.toml resolution: the given dir, or a hard error."""
 
-    def test_schema_dir_root(self):
+    def test_require_toml_path_in_given_dir(self):
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
+            path = os.path.join(d, "pgdesign.toml")
+            with open(path, "w") as f:
                 f.write(MINIMAL_TOML)
-            assert target._schema_dir(d) == d
+            assert target._require_toml_path(d) == path
 
-    def test_schema_dir_subdir(self):
+    def test_require_toml_path_subdir_errors_with_remedy(self):
+        """The remedy names the explicit target path declaration."""
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
             schema_dir = os.path.join(d, "schema")
             os.makedirs(schema_dir)
             with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
                 f.write(MINIMAL_TOML)
-            assert target._schema_dir(d) == schema_dir
+            with pytest.raises(FileNotFoundError) as exc:
+                target._require_toml_path(d)
+            msg = str(exc.value)
+            assert '"path"' in msg
+            assert '"pgdesign"' in msg
+            assert ".rlsbl/config.json" in msg
+
+    def test_schema_dir_helper_is_gone(self):
+        """The subdirectory-scanning helper is deleted, not kept as a shim."""
+        assert not hasattr(PgdesignTarget, "_schema_dir")
 
 
 class TestPgdesignTargetBuild:
@@ -296,8 +368,8 @@ class TestPgdesignTargetBuild:
             target.build(d, "1.2.3")
             assert calls[0][1]["cwd"] == d
 
-    def test_build_passes_schema_subdir_as_cwd(self, monkeypatch):
-        """A schema/ subdir must become cwd -- config discovery never walks down."""
+    def test_build_declared_schema_path_is_cwd(self, monkeypatch):
+        """The declared target path is the dir, so it becomes cwd."""
         calls = self._capture(monkeypatch)
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
@@ -305,8 +377,22 @@ class TestPgdesignTargetBuild:
             os.makedirs(schema_dir)
             with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
                 f.write(MINIMAL_TOML)
-            target.build(d, "1.2.3")
+            target.build(schema_dir, "1.2.3")
             assert calls[0][1]["cwd"] == schema_dir
+
+    def test_build_undeclared_schema_subdir_errors_with_remedy(self, monkeypatch):
+        """build never scans down; it refuses and names the remedy."""
+        calls = self._capture(monkeypatch)
+        target = PgdesignTarget()
+        with tempfile.TemporaryDirectory() as d:
+            schema_dir = os.path.join(d, "schema")
+            os.makedirs(schema_dir)
+            with open(os.path.join(schema_dir, "pgdesign.toml"), "w") as f:
+                f.write(MINIMAL_TOML)
+            with pytest.raises(FileNotFoundError) as exc:
+                target.build(d, "1.2.3")
+            assert "path" in str(exc.value)
+            assert calls == []
 
     def test_build_no_positional_path_argument(self, monkeypatch):
         """`pgdesign check` accepts no positional path; passing one would abort."""
