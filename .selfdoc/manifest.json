@@ -4080,6 +4080,11 @@
         },
         {
           "level": 3,
+          "text": "`_matrix_drift_details`",
+          "anchor": "_matrix_drift_details"
+        },
+        {
+          "level": 3,
           "text": "`_launcher_target_subdir_from_config`",
           "anchor": "_launcher_target_subdir_from_config"
         },
@@ -10349,11 +10354,6 @@
         },
         {
           "level": 3,
-          "text": "`ScannedImports`",
-          "anchor": "scannedimports"
-        },
-        {
-          "level": 3,
           "text": "`_detect_languages`",
           "anchor": "_detect_languages"
         },
@@ -10364,18 +10364,8 @@
         },
         {
           "level": 3,
-          "text": "`_create_import_scanner`",
-          "anchor": "_create_import_scanner"
-        },
-        {
-          "level": 3,
           "text": "`lint_library`",
           "anchor": "lint_library"
-        },
-        {
-          "level": 3,
-          "text": "`scan_imports`",
-          "anchor": "scan_imports"
         }
       ]
     },
@@ -12615,6 +12605,21 @@
         },
         {
           "level": 4,
+          "text": "`supports_version_query`",
+          "anchor": "supports_version_query"
+        },
+        {
+          "level": 4,
+          "text": "`supports_name_claim`",
+          "anchor": "supports_name_claim"
+        },
+        {
+          "level": 4,
+          "text": "`supports_yank`",
+          "anchor": "supports_yank"
+        },
+        {
+          "level": 4,
           "text": "`has_builtin_test_runner`",
           "anchor": "has_builtin_test_runner"
         },
@@ -13174,6 +13179,36 @@
         },
         {
           "level": 3,
+          "text": "`TargetAxis`",
+          "anchor": "targetaxis"
+        },
+        {
+          "level": 3,
+          "text": "`_prop`",
+          "anchor": "_prop"
+        },
+        {
+          "level": 3,
+          "text": "`declared_support_surfaces`",
+          "anchor": "declared_support_surfaces"
+        },
+        {
+          "level": 3,
+          "text": "`assert_axis_inventory_is_complete`",
+          "anchor": "assert_axis_inventory_is_complete"
+        },
+        {
+          "level": 3,
+          "text": "`target_axis_answers`",
+          "anchor": "target_axis_answers"
+        },
+        {
+          "level": 3,
+          "text": "`assert_every_target_answers_every_axis`",
+          "anchor": "assert_every_target_answers_every_axis"
+        },
+        {
+          "level": 3,
           "text": "`_format_dev_install`",
           "anchor": "_format_dev_install"
         },
@@ -13181,6 +13216,31 @@
           "level": 3,
           "text": "`generate_target_table_data`",
           "anchor": "generate_target_table_data"
+        },
+        {
+          "level": 3,
+          "text": "`_check_scopes`",
+          "anchor": "_check_scopes"
+        },
+        {
+          "level": 3,
+          "text": "`build_matrix`",
+          "anchor": "build_matrix"
+        },
+        {
+          "level": 3,
+          "text": "`render_matrix`",
+          "anchor": "render_matrix"
+        },
+        {
+          "level": 3,
+          "text": "`matrix_path`",
+          "anchor": "matrix_path"
+        },
+        {
+          "level": 3,
+          "text": "`write_matrix`",
+          "anchor": "write_matrix"
         }
       ]
     },
@@ -13892,6 +13952,36 @@
         },
         {
           "level": 4,
+          "text": "`supports_import_analysis`",
+          "anchor": "supports_import_analysis"
+        },
+        {
+          "level": 4,
+          "text": "`supports_circular_dep_analysis`",
+          "anchor": "supports_circular_dep_analysis"
+        },
+        {
+          "level": 4,
+          "text": "`has_builtin_test_runner`",
+          "anchor": "has_builtin_test_runner"
+        },
+        {
+          "level": 4,
+          "text": "`supports_version_query`",
+          "anchor": "supports_version_query"
+        },
+        {
+          "level": 4,
+          "text": "`supports_name_claim`",
+          "anchor": "supports_name_claim"
+        },
+        {
+          "level": 4,
+          "text": "`supports_yank`",
+          "anchor": "supports_yank"
+        },
+        {
+          "level": 4,
           "text": "`detect`",
           "anchor": "detect"
         },
@@ -13934,6 +14024,36 @@
           "level": 4,
           "text": "`monorepo_tag_glob`",
           "anchor": "monorepo_tag_glob"
+        },
+        {
+          "level": 4,
+          "text": "`companion_tags`",
+          "anchor": "companion_tags"
+        },
+        {
+          "level": 4,
+          "text": "`format_version`",
+          "anchor": "format_version"
+        },
+        {
+          "level": 4,
+          "text": "`normalize_package_name`",
+          "anchor": "normalize_package_name"
+        },
+        {
+          "level": 4,
+          "text": "`query_latest_version`",
+          "anchor": "query_latest_version"
+        },
+        {
+          "level": 4,
+          "text": "`claim_placeholder`",
+          "anchor": "claim_placeholder"
+        },
+        {
+          "level": 4,
+          "text": "`registry_display_name`",
+          "anchor": "registry_display_name"
         },
         {
           "level": 4,
@@ -13984,6 +14104,26 @@
           "level": 4,
           "text": "`dev_install_command`",
           "anchor": "dev_install_command"
+        },
+        {
+          "level": 4,
+          "text": "`find_dead_modules`",
+          "anchor": "find_dead_modules"
+        },
+        {
+          "level": 4,
+          "text": "`find_circular_dependencies`",
+          "anchor": "find_circular_dependencies"
+        },
+        {
+          "level": 4,
+          "text": "`run_tests`",
+          "anchor": "run_tests"
+        },
+        {
+          "level": 4,
+          "text": "`yank`",
+          "anchor": "yank"
         }
       ]
     },
@@ -16036,6 +16176,36 @@
         },
         {
           "level": 4,
+          "text": "`supports_import_analysis`",
+          "anchor": "supports_import_analysis"
+        },
+        {
+          "level": 4,
+          "text": "`supports_circular_dep_analysis`",
+          "anchor": "supports_circular_dep_analysis"
+        },
+        {
+          "level": 4,
+          "text": "`has_builtin_test_runner`",
+          "anchor": "has_builtin_test_runner"
+        },
+        {
+          "level": 4,
+          "text": "`supports_version_query`",
+          "anchor": "supports_version_query"
+        },
+        {
+          "level": 4,
+          "text": "`supports_name_claim`",
+          "anchor": "supports_name_claim"
+        },
+        {
+          "level": 4,
+          "text": "`supports_yank`",
+          "anchor": "supports_yank"
+        },
+        {
+          "level": 4,
           "text": "`detect`",
           "anchor": "detect"
         },
@@ -16078,6 +16248,36 @@
           "level": 4,
           "text": "`monorepo_tag_glob`",
           "anchor": "monorepo_tag_glob"
+        },
+        {
+          "level": 4,
+          "text": "`companion_tags`",
+          "anchor": "companion_tags"
+        },
+        {
+          "level": 4,
+          "text": "`format_version`",
+          "anchor": "format_version"
+        },
+        {
+          "level": 4,
+          "text": "`normalize_package_name`",
+          "anchor": "normalize_package_name"
+        },
+        {
+          "level": 4,
+          "text": "`query_latest_version`",
+          "anchor": "query_latest_version"
+        },
+        {
+          "level": 4,
+          "text": "`claim_placeholder`",
+          "anchor": "claim_placeholder"
+        },
+        {
+          "level": 4,
+          "text": "`registry_display_name`",
+          "anchor": "registry_display_name"
         },
         {
           "level": 4,
@@ -16128,6 +16328,26 @@
           "level": 4,
           "text": "`dev_install_command`",
           "anchor": "dev_install_command"
+        },
+        {
+          "level": 4,
+          "text": "`find_dead_modules`",
+          "anchor": "find_dead_modules"
+        },
+        {
+          "level": 4,
+          "text": "`find_circular_dependencies`",
+          "anchor": "find_circular_dependencies"
+        },
+        {
+          "level": 4,
+          "text": "`run_tests`",
+          "anchor": "run_tests"
+        },
+        {
+          "level": 4,
+          "text": "`yank`",
+          "anchor": "yank"
         },
         {
           "level": 2,
@@ -16252,32 +16472,32 @@
         {
           "level": 4,
           "text": "`companion_tags`",
-          "anchor": "companion_tags"
+          "anchor": "companion_tags-1"
         },
         {
           "level": 4,
           "text": "`normalize_package_name`",
-          "anchor": "normalize_package_name"
+          "anchor": "normalize_package_name-1"
         },
         {
           "level": 4,
           "text": "`query_latest_version`",
-          "anchor": "query_latest_version"
+          "anchor": "query_latest_version-1"
         },
         {
           "level": 4,
           "text": "`claim_placeholder`",
-          "anchor": "claim_placeholder"
+          "anchor": "claim_placeholder-1"
         },
         {
           "level": 4,
           "text": "`registry_display_name`",
-          "anchor": "registry_display_name"
+          "anchor": "registry_display_name-1"
         },
         {
           "level": 4,
           "text": "`format_version`",
-          "anchor": "format_version"
+          "anchor": "format_version-1"
         },
         {
           "level": 4,
@@ -16322,37 +16542,52 @@
         {
           "level": 4,
           "text": "`supports_import_analysis`",
-          "anchor": "supports_import_analysis"
+          "anchor": "supports_import_analysis-1"
         },
         {
           "level": 4,
           "text": "`supports_circular_dep_analysis`",
-          "anchor": "supports_circular_dep_analysis"
+          "anchor": "supports_circular_dep_analysis-1"
         },
         {
           "level": 4,
           "text": "`find_dead_modules`",
-          "anchor": "find_dead_modules"
+          "anchor": "find_dead_modules-1"
         },
         {
           "level": 4,
           "text": "`find_circular_dependencies`",
-          "anchor": "find_circular_dependencies"
+          "anchor": "find_circular_dependencies-1"
+        },
+        {
+          "level": 4,
+          "text": "`supports_version_query`",
+          "anchor": "supports_version_query-1"
+        },
+        {
+          "level": 4,
+          "text": "`supports_name_claim`",
+          "anchor": "supports_name_claim-1"
+        },
+        {
+          "level": 4,
+          "text": "`supports_yank`",
+          "anchor": "supports_yank-1"
         },
         {
           "level": 4,
           "text": "`has_builtin_test_runner`",
-          "anchor": "has_builtin_test_runner"
+          "anchor": "has_builtin_test_runner-1"
         },
         {
           "level": 4,
           "text": "`run_tests`",
-          "anchor": "run_tests"
+          "anchor": "run_tests-1"
         },
         {
           "level": 4,
           "text": "`yank`",
-          "anchor": "yank"
+          "anchor": "yank-1"
         },
         {
           "level": 2,
@@ -16577,32 +16812,32 @@
         {
           "level": 4,
           "text": "`companion_tags`",
-          "anchor": "companion_tags-1"
+          "anchor": "companion_tags-2"
         },
         {
           "level": 4,
           "text": "`normalize_package_name`",
-          "anchor": "normalize_package_name-1"
+          "anchor": "normalize_package_name-2"
         },
         {
           "level": 4,
           "text": "`query_latest_version`",
-          "anchor": "query_latest_version-1"
+          "anchor": "query_latest_version-2"
         },
         {
           "level": 4,
           "text": "`claim_placeholder`",
-          "anchor": "claim_placeholder-1"
+          "anchor": "claim_placeholder-2"
         },
         {
           "level": 4,
           "text": "`registry_display_name`",
-          "anchor": "registry_display_name-1"
+          "anchor": "registry_display_name-2"
         },
         {
           "level": 4,
           "text": "`format_version`",
-          "anchor": "format_version-1"
+          "anchor": "format_version-2"
         },
         {
           "level": 4,
@@ -16647,37 +16882,52 @@
         {
           "level": 4,
           "text": "`supports_import_analysis`",
-          "anchor": "supports_import_analysis-1"
+          "anchor": "supports_import_analysis-2"
         },
         {
           "level": 4,
           "text": "`supports_circular_dep_analysis`",
-          "anchor": "supports_circular_dep_analysis-1"
+          "anchor": "supports_circular_dep_analysis-2"
         },
         {
           "level": 4,
           "text": "`find_dead_modules`",
-          "anchor": "find_dead_modules-1"
+          "anchor": "find_dead_modules-2"
         },
         {
           "level": 4,
           "text": "`find_circular_dependencies`",
-          "anchor": "find_circular_dependencies-1"
+          "anchor": "find_circular_dependencies-2"
+        },
+        {
+          "level": 4,
+          "text": "`supports_version_query`",
+          "anchor": "supports_version_query-2"
+        },
+        {
+          "level": 4,
+          "text": "`supports_name_claim`",
+          "anchor": "supports_name_claim-2"
+        },
+        {
+          "level": 4,
+          "text": "`supports_yank`",
+          "anchor": "supports_yank-2"
         },
         {
           "level": 4,
           "text": "`has_builtin_test_runner`",
-          "anchor": "has_builtin_test_runner-1"
+          "anchor": "has_builtin_test_runner-2"
         },
         {
           "level": 4,
           "text": "`run_tests`",
-          "anchor": "run_tests-1"
+          "anchor": "run_tests-2"
         },
         {
           "level": 4,
           "text": "`yank`",
-          "anchor": "yank-1"
+          "anchor": "yank-2"
         }
       ]
     },
@@ -16836,6 +17086,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-27T15:31:54.887373+00:00",
+  "last_gen": "2026-08-27T16:53:24.657049+00:00",
   "theme": "minimal"
 }
