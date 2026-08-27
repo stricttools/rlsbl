@@ -31,7 +31,8 @@ import os
 import sys
 from dataclasses import dataclass, field
 
-from ...git_util import validate_subtree_remote_ssh_host
+from ...git_util import Ancestry, ancestry, validate_subtree_remote_ssh_host
+from ...preview_apply import Reconciler, VerdictItem, reconcile, single
 from ...workspace import find_workspace_root, load_workspace
 from ... import effects
 
@@ -150,15 +151,16 @@ def _git_ok(args, cwd=None, timeout=180):
     return r.stdout.strip()
 
 
-def is_ancestor(ancestor, descendant, cwd):
-    """True iff ``ancestor`` is an ancestor of (or equal to) ``descendant``.
+def in_split_lineage(commit, split_sha, cwd):
+    """True iff ``commit`` is the current split commit or one of its ancestors.
 
-    Returns False when either object is unknown to the repo at ``cwd`` (git
-    exits non-zero), which is exactly the "not part of our lineage" signal the
-    tripwire needs.
+    The tripwire's fail-closed direction is "not lineage": when git cannot
+    answer -- an object the monorepo does not have, a truncated history -- the
+    commit is treated as foreign, which makes the reconciler refuse and touch
+    nothing.  Guessing "lineage" instead would force-push over a commit whose
+    origin was never established.
     """
-    r = _git(["merge-base", "--is-ancestor", ancestor, descendant], cwd=cwd)
-    return r.returncode == 0
+    return ancestry(commit, split_sha, cwd=cwd, timeout=180) is Ancestry.TRUE
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +311,7 @@ def observe(remote, root, project_path):
         boundary = None
         above = []  # commits above the boundary, newest first
         for commit in chain:
-            if is_ancestor(commit, split_sha, cwd=root):
+            if in_split_lineage(commit, split_sha, cwd=root):
                 boundary = commit
                 break
             above.append(commit)
@@ -405,34 +407,67 @@ def _remediation(plan, project_path):
     )
 
 
-def print_plan(plan, remote, project_path):
-    """Print a human-readable plan for ``--dry-run`` (zero writes)."""
+def verdict_item(plan, remote, project_path, project_name):
+    """The mirror's :class:`VerdictItem` -- one subject, one whole repository.
+
+    The shared renderer prints the headline, then the facts, then the actions,
+    then the free-form detail block; the strings below are what it composes.
+    """
+    common = dict(key=project_name, state=plan.state, data=plan)
+
     if plan.state == "converged":
-        print(f"converged: mirror is up to date (split {plan.split_sha[:12]}, "
-              f"scaffold layer present).")
-    elif plan.state == "behind":
-        print(f"behind: a new split is available.")
-        print(f"  old split: {plan.split_lineage_sha[:12]}")
-        print(f"  new split: {plan.split_sha[:12]}")
-        print("  apply would force-push the new split (with lease) and re-scaffold.")
-    elif plan.state == "scaffold_missing":
+        return VerdictItem(
+            summary=(f"mirror is up to date (split {plan.split_sha[:12]}, "
+                     f"scaffold layer present)."),
+            **common,
+        )
+    if plan.state == "behind":
+        return VerdictItem(
+            summary="a new split is available.",
+            facts=(
+                f"old split: {plan.split_lineage_sha[:12]}",
+                f"new split: {plan.split_sha[:12]}",
+            ),
+            actions=(
+                "apply would force-push the new split (with lease) and re-scaffold.",
+            ),
+            **common,
+        )
+    if plan.state == "scaffold_missing":
         if plan.behind:
-            print(f"scaffold-missing (and behind): tip is a bare split commit "
-                  f"{plan.split_lineage_sha[:12]}, older than current split "
-                  f"{plan.split_sha[:12]}.")
-            print("  apply would force-push the new split (with lease) and scaffold.")
-        else:
-            print(f"scaffold-missing: tip is the current bare split commit "
-                  f"{plan.split_sha[:12]} with no scaffold layer.")
-            print("  apply would add the scaffold commit and push.")
-    elif plan.state == "contract_violated":
-        print("contract-violated: foreign commit(s) detected on the mirror.")
-        print(_remediation(plan, project_path))
-    elif plan.state == "virgin":
-        print(f"remote-missing-or-empty: mirror at {remote} is virgin.")
-        print(f"  apply would push split {plan.split_sha[:12]} and scaffold CI.")
-    else:  # pragma: no cover - defensive
-        print(f"unknown state: {plan.state}")
+            return VerdictItem(
+                label="scaffold-missing (and behind)",
+                summary=(f"tip is a bare split commit "
+                         f"{plan.split_lineage_sha[:12]}, older than current "
+                         f"split {plan.split_sha[:12]}."),
+                actions=(
+                    "apply would force-push the new split (with lease) and scaffold.",
+                ),
+                **common,
+            )
+        return VerdictItem(
+            summary=(f"tip is the current bare split commit "
+                     f"{plan.split_sha[:12]} with no scaffold layer."),
+            actions=("apply would add the scaffold commit and push.",),
+            **common,
+        )
+    if plan.state == "contract_violated":
+        return VerdictItem(
+            summary="foreign commit(s) detected on the mirror.",
+            detail=_remediation(plan, project_path),
+            **common,
+        )
+    if plan.state == "virgin":
+        return VerdictItem(
+            label="remote-missing-or-empty",
+            summary=f"mirror at {remote} is virgin.",
+            actions=(
+                f"apply would push split {plan.split_sha[:12]} and scaffold CI.",
+            ),
+            **common,
+        )
+    # Defensive: a state the builder does not know still renders honestly.
+    return VerdictItem(label="unknown state", summary=plan.state, **common)
 
 
 # ---------------------------------------------------------------------------
@@ -592,29 +627,33 @@ def _cmd_mirror(flags, project_root):
     project_path = project.path
     sub_config_path = os.path.join(root, project_path, ".rlsbl", "config.json")
 
-    try:
-        plan = observe(subtree_remote, root, project_path)
-    except MirrorError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+    def _observe():
+        return single(
+            verdict_item(
+                observe(subtree_remote, root, project_path),
+                subtree_remote,
+                project_path,
+                project_name,
+            )
+        )
 
-    if dry_run:
-        print_plan(plan, subtree_remote, project_path)
-        return
-
-    # Apply.
-    if plan.state == "contract_violated":
-        print("Error: contract-violated -- the mirror has foreign commit(s); "
-              "nothing was touched.", file=sys.stderr)
-        print(_remediation(plan, project_path), file=sys.stderr)
-        sys.exit(1)
-
-    if plan.state == "converged":
-        print(f"Already converged: {subtree_remote}")
-        return
-
-    try:
+    def _apply(item):
+        plan = item.data
+        if plan.state == "contract_violated":
+            print("Error: contract-violated -- the mirror has foreign commit(s); "
+                  "nothing was touched.", file=sys.stderr)
+            print(_remediation(plan, project_path), file=sys.stderr)
+            sys.exit(1)
+        if plan.state == "converged":
+            print(f"Already converged: {subtree_remote}")
+            return
         _converge(plan, subtree_remote, root, project_path, sub_config_path)
+
+    # One subject (this project's whole mirror), so the preview is the
+    # one-item case of the shared list shape and its key is not printed.
+    reconciler = Reconciler(observe=_observe, apply_item=_apply, show_keys=False)
+    try:
+        reconcile(reconciler, dry_run=dry_run)
     except MirrorError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
