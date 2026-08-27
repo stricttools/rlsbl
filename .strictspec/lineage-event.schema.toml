@@ -1,0 +1,524 @@
+# strictspec schema for one rlsbl LINEAGE RECORD line.
+# Source of truth: rlsbl/lineage.py (the event dataclasses and read_events).
+# One document = one JSONL line = one lineage event.
+#
+# WHAT A LINEAGE RECORD IS: a committed, append-only log of repository-surgery
+# FACTS -- what a conversion did, which tags were renamed, which commits a
+# history rewrite moved. It is written once by the operation that performed the
+# surgery and read afterwards by anything that needs to explain how the
+# repository got to its current shape. It records history; it never drives it.
+#
+# SCOPE: strictspec owns the raw DOCUMENT SHAPE -- the per-line format_version
+# gate, the `kind` discriminator and its arm set, field types, enums, required
+# fields, and unknown-key rejection. rlsbl keeps everything strictspec cannot
+# see native: whether a recorded SHA still resolves in this repository, whether
+# a recorded tag still exists, and any cross-event correlation (`related_to`
+# pointing at an event id in the same or another file).
+
+name = "rlsbl-lineage-event"
+meta_version = 1
+format_version = 1
+document_syntax = "jsonl"
+role = "schema"
+root = "LineageEvent"
+targets = ["python"]
+description = "One JSONL lineage line: a single repository-surgery fact, discriminated by `kind`."
+
+# ---------------------------------------------------------------------------
+# Shared scalar refinements
+# ---------------------------------------------------------------------------
+
+[types.GitSha]
+type = "string"
+regex = "^[0-9a-f]{7,40}$"
+description = "A git commit hash, abbreviated (>= 7) or full (40). Lineage writers always record the FULL 40-character form; the shorter bound exists so a hand-written record is readable rather than rejected. Resolution against the object database is rlsbl-native, not a shape check."
+
+# ---------------------------------------------------------------------------
+# Shared records
+# ---------------------------------------------------------------------------
+
+[types.LineageEndpoint]
+type = "record"
+description = "One side of a conversion: which repository, and which slice of it."
+
+[types.LineageEndpoint.fields.repo]
+type = "string"
+required = true
+non_empty = true
+description = "Repository identity. A remote URL for a repository other than the one holding this record, or \".\" for this repository itself."
+
+[types.LineageEndpoint.fields.path]
+type = "string"
+required = false
+description = "Repo-relative subtree path of this endpoint. Absent means the repository root (a standalone repo). Present means a monorepo sub-project directory."
+
+[types.LineageEndpoint.fields.project]
+type = "string"
+required = false
+non_empty = true
+description = "Workspace project name at this endpoint, when the endpoint is inside an rlsbl workspace."
+
+[types.LineageEndpoint.fields.releasable]
+type = "string"
+required = false
+non_empty = true
+description = "Releasable group name at this endpoint, when the endpoint's versioning is owned by a releasable."
+
+[types.LineageEndpoint.fields.tag_format]
+type = "string"
+required = false
+non_empty = true
+description = "The tag format in effect at this endpoint (e.g. \"v{version}\" standalone, \"{name}@v{version}\" in a workspace). Recorded because a conversion is exactly where it changes."
+
+[types.TagMapping]
+type = "record"
+description = "One old-tag -> new-tag correspondence."
+
+[types.TagMapping.fields.old_tag]
+type = "string"
+required = true
+non_empty = true
+description = "The tag name as it existed before the conversion."
+
+[types.TagMapping.fields.new_tag]
+type = "string"
+required = true
+non_empty = true
+description = "The tag name after the conversion."
+
+[types.TagMapping.fields.old_commit]
+type = "GitSha"
+required = false
+description = "The commit the old tag pointed at, in the PRE-rewrite object graph. Absent when the pre-rewrite graph is not available to the writer (e.g. tags imported from a remote that was never fetched in full)."
+
+[types.TagMapping.fields.new_commit]
+type = "GitSha"
+required = true
+description = "The commit the new tag points at, in THIS repository's object graph."
+
+[types.AnchorMapping]
+type = "record"
+description = "One old-SHA -> new-SHA correspondence produced by a history rewrite."
+
+[types.AnchorMapping.fields.old_sha]
+type = "GitSha"
+required = true
+description = "The commit hash before the rewrite. Typically unresolvable in this repository afterwards -- that is the point of recording it."
+
+[types.AnchorMapping.fields.new_sha]
+type = "GitSha"
+required = true
+description = "The commit hash after the rewrite."
+
+[types.BoundaryAlias]
+type = "record"
+description = "One alias tag created at a conversion point so a pre-conversion version stays addressable under the post-conversion naming."
+
+[types.BoundaryAlias.fields.alias_tag]
+type = "string"
+required = true
+non_empty = true
+description = "The alias tag name created (in the post-conversion tag format)."
+
+[types.BoundaryAlias.fields.aliased_tag]
+type = "string"
+required = true
+non_empty = true
+description = "The pre-existing tag the alias duplicates (in the pre-conversion tag format)."
+
+[types.BoundaryAlias.fields.commit]
+type = "GitSha"
+required = true
+description = "The commit both tags point at."
+
+[types.SplitMapping]
+type = "record"
+description = "One monorepo-commit -> subtree-split-commit correspondence."
+
+[types.SplitMapping.fields.source_sha]
+type = "GitSha"
+required = true
+description = "The commit in the monorepo's own history."
+
+[types.SplitMapping.fields.split_sha]
+type = "GitSha"
+required = true
+description = "The corresponding commit in the deterministic subtree split pushed to the mirror."
+
+# ---------------------------------------------------------------------------
+# Event arms
+#
+# Every arm repeats the four common fields (format_version, id, recorded_at,
+# kind) plus the optional `related_to`. They are repeated rather than factored
+# into a wrapper because `kind` is the discriminator and must sit at the
+# document root for the union to select an arm without an extra nesting level.
+# ---------------------------------------------------------------------------
+
+[types.ConversionEvent]
+type = "record"
+description = "A repository conversion: a sub-project extracted out of a workspace, or an external repository absorbed into one."
+
+[types.ConversionEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.ConversionEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file. Other events reference it via `related_to`."
+
+[types.ConversionEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.ConversionEvent.fields.kind]
+type = "literal"
+value = "conversion"
+required = true
+
+[types.ConversionEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of an earlier event this one elaborates. Absent on a standalone event."
+
+[types.ConversionEvent.fields.direction]
+type = "enum"
+required = true
+values = ["extract", "absorb"]
+description = "\"extract\" moved a sub-project out of a workspace into its own repository; \"absorb\" moved an external repository in as a sub-project."
+
+[types.ConversionEvent.fields.source]
+type = "LineageEndpoint"
+required = true
+description = "Where the code came from."
+
+[types.ConversionEvent.fields.destination]
+type = "LineageEndpoint"
+required = true
+description = "Where the code went."
+
+[types.ConversionEvent.fields.commit]
+type = "GitSha"
+required = true
+description = "The commit in THIS repository at which the conversion took effect -- the merge/rewrite commit for an absorb, the last pre-removal commit for an extract."
+
+[types.TagMapEvent]
+type = "record"
+description = "The tag renames a conversion performed. Split from the conversion event because a conversion may rename hundreds of tags and the mapping is read on its own."
+
+[types.TagMapEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.TagMapEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.TagMapEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.TagMapEvent.fields.kind]
+type = "literal"
+value = "tag-map"
+required = true
+
+[types.TagMapEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of the conversion event whose tags these are."
+
+[types.TagMapEvent.fields.mappings]
+type = "array"
+required = true
+min_len = 1
+description = "The tag renames. A tag-map event with no mappings is not a fact worth recording, so the array is non-empty."
+[types.TagMapEvent.fields.mappings.item]
+type = "TagMapping"
+
+[types.AnchorRemapEvent]
+type = "record"
+description = "The commit correspondence a history rewrite produced. \"Anchor\" is any SHA another rlsbl record points at -- a changelog entry's commits, a tag's target, an earlier lineage event's commit -- which the rewrite invalidated."
+
+[types.AnchorRemapEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.AnchorRemapEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.AnchorRemapEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.AnchorRemapEvent.fields.kind]
+type = "literal"
+value = "anchor-remap"
+required = true
+
+[types.AnchorRemapEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of the conversion event whose rewrite produced this mapping."
+
+[types.AnchorRemapEvent.fields.rewrite]
+type = "string"
+required = true
+non_empty = true
+description = "What performed the rewrite, in the writer's own words (e.g. \"git-filter-repo --to-subdirectory-filter\"). Free text: it explains the mapping to a human, it is never dispatched on."
+
+[types.AnchorRemapEvent.fields.mappings]
+type = "array"
+required = true
+min_len = 1
+description = "The old-SHA -> new-SHA pairs. Non-empty: a rewrite that moved nothing is not recorded."
+[types.AnchorRemapEvent.fields.mappings.item]
+type = "AnchorMapping"
+
+[types.DepartedGlobsEvent]
+type = "record"
+description = "Tag globs that stopped belonging to this repository because the sub-project they named was extracted. A reader that still sees tags matching a departed glob knows they are residue, not live releases."
+
+[types.DepartedGlobsEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.DepartedGlobsEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.DepartedGlobsEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.DepartedGlobsEvent.fields.kind]
+type = "literal"
+value = "departed-globs"
+required = true
+
+[types.DepartedGlobsEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of the conversion event that made these globs depart."
+
+[types.DepartedGlobsEvent.fields.globs]
+type = "array"
+required = true
+min_len = 1
+description = "The tag globs (in the same syntax rlsbl's tag_glob matching uses) that left."
+[types.DepartedGlobsEvent.fields.globs.item]
+type = "string"
+non_empty = true
+
+[types.DepartedGlobsEvent.fields.destination]
+type = "LineageEndpoint"
+required = true
+description = "The repository the globs went to, so a reader can follow them."
+
+[types.BoundaryAliasEvent]
+type = "record"
+description = "Alias tags created at a conversion point. Historical releases keep their original tag names; the aliases make the version immediately before the conversion addressable under the new naming too."
+
+[types.BoundaryAliasEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.BoundaryAliasEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.BoundaryAliasEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.BoundaryAliasEvent.fields.kind]
+type = "literal"
+value = "boundary-alias"
+required = true
+
+[types.BoundaryAliasEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of the conversion event these aliases mark the boundary of."
+
+[types.BoundaryAliasEvent.fields.aliases]
+type = "array"
+required = true
+min_len = 1
+description = "The alias tags created. Non-empty: an event recording no alias records nothing."
+[types.BoundaryAliasEvent.fields.aliases.item]
+type = "BoundaryAlias"
+
+[types.IdentityTransitionEvent]
+type = "record"
+description = "A change to a published identity of the project -- the string consumers use to depend on it -- effective from a stated version. A Go module path change is the archetype."
+
+[types.IdentityTransitionEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.IdentityTransitionEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.IdentityTransitionEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.IdentityTransitionEvent.fields.kind]
+type = "literal"
+value = "identity-transition"
+required = true
+
+[types.IdentityTransitionEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of the conversion event that forced the transition, when one did."
+
+[types.IdentityTransitionEvent.fields.facet]
+type = "enum"
+required = true
+values = ["go-module-path", "package-name", "releasable-name", "project-name", "tag-format", "repository-url"]
+description = "WHICH identity changed. A closed set on purpose: every arm names something a consumer or a tool resolves by, and adding a facet is a deliberate schema change, not an accident of free text."
+
+[types.IdentityTransitionEvent.fields.old]
+type = "string"
+required = true
+non_empty = true
+description = "The identity before the transition."
+
+[types.IdentityTransitionEvent.fields.new]
+type = "string"
+required = true
+non_empty = true
+description = "The identity after the transition."
+
+[types.IdentityTransitionEvent.fields.effective_version]
+type = "string"
+required = true
+non_empty = true
+description = "The project version from which the new identity is in effect. Releases at and after this version use `new`; releases before it use `old`."
+
+[types.PromotionSplitMapEvent]
+type = "record"
+description = "The subtree-split correspondence persisted when a mirror is promoted. Recorded because the split is deterministic but expensive to recompute, and a later reader needs to map a monorepo commit to the mirror commit that carries it."
+
+[types.PromotionSplitMapEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.PromotionSplitMapEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.PromotionSplitMapEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.PromotionSplitMapEvent.fields.kind]
+type = "literal"
+value = "promotion-split-map"
+required = true
+
+[types.PromotionSplitMapEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of a related event, when the promotion accompanies a conversion."
+
+[types.PromotionSplitMapEvent.fields.subtree_path]
+type = "string"
+required = true
+non_empty = true
+description = "The repo-relative path that was split out."
+
+[types.PromotionSplitMapEvent.fields.mirror_remote]
+type = "string"
+required = true
+non_empty = true
+description = "The remote URL the split was pushed to."
+
+[types.PromotionSplitMapEvent.fields.promoted_version]
+type = "string"
+required = false
+non_empty = true
+description = "The project version at which the promotion happened, when the promotion was tied to a release."
+
+[types.PromotionSplitMapEvent.fields.mappings]
+type = "array"
+required = true
+min_len = 1
+description = "The source-commit -> split-commit pairs. Non-empty: an empty split map records nothing."
+[types.PromotionSplitMapEvent.fields.mappings.item]
+type = "SplitMapping"
+
+# ---------------------------------------------------------------------------
+# The document root: one line is exactly one event, selected by `kind`.
+# ---------------------------------------------------------------------------
+
+[types.LineageEvent]
+type = "discriminated-union"
+discriminator = "kind"
+description = "One lineage line. The `kind` field selects the arm; an unrecognized kind is a hard error, never a skipped line."
+
+[types.LineageEvent.arms.conversion]
+type = "ConversionEvent"
+
+[types.LineageEvent.arms.tag-map]
+type = "TagMapEvent"
+
+[types.LineageEvent.arms.anchor-remap]
+type = "AnchorRemapEvent"
+
+[types.LineageEvent.arms.departed-globs]
+type = "DepartedGlobsEvent"
+
+[types.LineageEvent.arms.boundary-alias]
+type = "BoundaryAliasEvent"
+
+[types.LineageEvent.arms.identity-transition]
+type = "IdentityTransitionEvent"
+
+[types.LineageEvent.arms.promotion-split-map]
+type = "PromotionSplitMapEvent"
