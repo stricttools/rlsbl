@@ -47,8 +47,8 @@ This is the interface that low-level AST linters implement. The workspace-level 
 File discovery utility shared by both the workspace-level scanners and the file-level graph builders. It walks the project directory tree, filters by file extension, and excludes non-source directories to produce the set of files that should be scanned for imports. Key features:
 
 - Extension matching (e.g., `(".py",)`, `(".go",)`, `(".js", ".ts", ".mjs", ".cjs", ".tsx")`)
-- Built-in exclusion of common non-source directories: `.venv`, `node_modules`, `__pycache__`, `.git`, `build`, `dist`, `.selfdoc`, `_build`, `static`, `public`, `assets`
-- Automatic `.egg-info` directory exclusion
+- Default exclusion of common non-source directories, named by `LINTER_EXCLUDED_DIRS`: `.venv`, `node_modules`, `__pycache__`, `.git`, `build`, `dist`, `.selfdoc`, `_build`, `static`, `public`, `assets`, and any `*.egg-info` directory (entries containing glob characters are fnmatch patterns)
+- `excluded_dir_names` parameter to REPLACE that default set. It is the linters' judgement, not a universal truth: `build`, `dist`, `static`, `public` and `assets` are all legal Go package directories, so a caller that rewrites a tree rather than linting it passes its own set — `rlsbl rewrite go-module-path` passes `{vendor, .git}` and visits everything else
 - `exclude_patterns` parameter for fnmatch-style glob filtering
 - `exclude_dirs` parameter for preventing scans of sibling workspace project directories (critical for root-path monorepo projects where sibling project dirs are immediate children)
 
