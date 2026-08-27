@@ -15,7 +15,7 @@ import subprocess
 
 import pytest
 
-from conftest import DEFAULT_RELEASE_FILE, make_releasable_monorepo, make_releasable_state, with_root_member, workspace_toml, make_workspace
+from conftest import DEFAULT_RELEASE_FILE, declared_members, make_releasable_monorepo, make_releasable_state, with_root_member, workspace_toml, make_workspace
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
 from rlsbl.commands.monorepo.extract import (
     ExtractError,
@@ -139,10 +139,12 @@ def _setup_monorepo(tmp_path):
 [[projects]]
 path = "pkgA"
 name = "pkgA"
+releasable = false
 
 [[projects]]
 path = "pkgB"
 name = "pkgB"
+releasable = false
 """)
 
     # Create package files and commit
@@ -436,25 +438,23 @@ class TestMigrateChangelogToNewRepo:
 class TestRemoveProjectFromWorkspace:
     def test_removes_project(self, tmp_path):
         """Removing a project updates workspace.toml."""
-        projects = [
+        projects = with_root_member([
             WorkspaceProject({"path": "a", "name": "alpha"}),
             WorkspaceProject({"path": "b", "name": "beta"}),
-        ]
+        ])
         make_workspace(str(tmp_path), projects)
 
         updated = _remove_project_from_workspace(str(tmp_path), "alpha", projects)
-        assert len(updated) == 1
-        assert updated[0].name == "beta"
+        assert [p.name for p in declared_members(updated)] == ["beta"]
 
         # Verify file on disk
-        reloaded = load_workspace(str(tmp_path))
-        assert len(reloaded) == 1
-        assert reloaded[0].name == "beta"
+        reloaded = declared_members(load_workspace(str(tmp_path)))
+        assert [p.name for p in reloaded] == ["beta"]
 
     def test_raises_for_nonexistent_project(self, tmp_path):
-        projects = [
+        projects = with_root_member([
             WorkspaceProject({"path": "a", "name": "alpha"}),
-        ]
+        ])
         make_workspace(str(tmp_path), projects)
 
         with pytest.raises(ExtractError, match="not found"):
@@ -478,7 +478,7 @@ class TestValidateExtractPreconditions:
         target = tmp_path / "output"
         projs, proj = validate_extract_preconditions(str(root), "pkg", str(target))
         assert proj.name == "pkg"
-        assert len(projs) == 1
+        assert len(declared_members(projs)) == 1
 
     def test_target_exists_error(self, tmp_path, monkeypatch):
         """Error when target path already exists."""
@@ -543,7 +543,7 @@ class TestValidateAbsorbPreconditions:
         source = _clean_source(tmp_path)
 
         projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
-        assert len(projs) == 1
+        assert len(declared_members(projs)) == 1
 
     def test_no_filter_repo(self, tmp_path, monkeypatch):
         """Error when git-filter-repo is not installed."""
@@ -1561,7 +1561,7 @@ class TestBrokenTargetDeclarationGuard:
         source = _clean_source(tmp_path)  # no .rlsbl at all
 
         projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
-        assert len(projs) == 1
+        assert len(declared_members(projs)) == 1
 
     def test_absorb_broken_config_hard_errors_pre_mutation(self, tmp_path, monkeypatch):
         """End-to-end: a broken source config aborts before the monorepo is
@@ -1593,7 +1593,12 @@ class TestBrokenTargetDeclarationGuard:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "mono"
         root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
+        # The guard only applies to a member outside every releasable: a
+        # releasable member derives its tag scheme from the releasable.
+        make_workspace(
+            str(root),
+            [WorkspaceProject({"path": "pkg", "name": "pkg", "releasable": False})],
+        )
         pkg_rlsbl = root / "pkg" / ".rlsbl"
         os.makedirs(str(pkg_rlsbl), exist_ok=True)
         (pkg_rlsbl / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
