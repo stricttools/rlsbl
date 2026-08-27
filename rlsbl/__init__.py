@@ -2306,7 +2306,7 @@ rewrite = app.group("rewrite", help="Sweeping rewrites of the current working tr
 
 
 @rewrite.command(name="go-module-path", help="Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-anchored. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.", effect="mutating")
-@strictcli.flag(name="from-module", type=str, presence="required", help="The Go module path being renamed away from (must be declared by a go.mod in this repository)")
+@strictcli.flag(name="from-module", type=str, presence="required", help="The Go module path being renamed away from. It need not be DECLARED here: a repository that only references the module is a consumer following an upstream move, and the plan reports that as a fact while rewriting the references. What is required is that something references it -- a path with zero occurrences anywhere in the repository is a hard error, because the overwhelmingly likely cause is a typo.")
 @strictcli.flag(name="to-module", type=str, presence="required", help="The Go module path to rename to")
 @effects.handler
 def cmd_rewrite_go_module_path(ctx, from_module, to_module):
