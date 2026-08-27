@@ -4,6 +4,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "ac2ff0191c5e7e8b3ecffff6fac004457515e93a"
+description = "`edit-release`, `undo` and `yank` become subcommands of the `release` group, `release retry` becomes file-driven via retry.toml, and monorepo changelog coverage narrows to the commits touching the package's own files."
 
 [tree_hashes]
 "." = "a84ec70f6acf8920007b7be75965de302fada009"

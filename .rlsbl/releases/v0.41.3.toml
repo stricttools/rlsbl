@@ -4,6 +4,7 @@ bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "7ed8d93dfc1a1287c3ca6a71dacc5ec5a82588ef"
+description = "The docs target becomes versioned: it reads and writes its version from selfdoc.json and takes part in the version-consistency check instead of being skipped."
 
 [tree_hashes]
 "." = "d940753d2164ef45eb4ed41d1defcaa4e7471e03"

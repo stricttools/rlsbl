@@ -4,6 +4,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "7e7d738fe9aca2ffb07b25c4fefa6ba676d71aee"
+description = "Directory scoping and target-specific tag patterns now apply consistently to monorepo changelog validation during a release, and `push_timeout` must be set explicitly instead of falling back to an implicit 120 seconds."
 
 [tree_hashes]
 "." = "836c53ebff84b83709570660ffbad0b3c8d3c0bd"

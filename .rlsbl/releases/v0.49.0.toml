@@ -5,6 +5,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "e78ff8ca74f956ed9d4a994c1423cb796d25729f"
+description = "Commands receive a `ProjectContext` carrying config read once at startup, instead of a bare project root re-read from disk at every call."
 
 [tree_hashes]
 "." = "1f6768f02a7009a2b6d45461a2dfdb1081939824"

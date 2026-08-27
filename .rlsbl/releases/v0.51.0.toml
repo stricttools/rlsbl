@@ -5,6 +5,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "9149f03eaac1a72c9d5878f5816d807366f3673b"
+description = "`ProjectContext` becomes the single context object: the separate check context is deleted, every target method takes the context, and `monorepo_root` is renamed `workspace_root`."
 
 [tree_hashes]
 "." = "79d420e62b6f5663b877784f35857f7f39c5c002"

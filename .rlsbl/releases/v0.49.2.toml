@@ -5,6 +5,7 @@ bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "e63ba631ded5046d0c72182e2140e0577884e994"
+description = "Raises the npm name-check timeout to reduce CI flakiness, makes changelog finalization use git-relative paths consistently, and adds release integration tests that run against real git repositories rather than mocked subprocesses."
 
 [tree_hashes]
 "." = "f1f1c2e65d0d2b3bd6aea314d1d02e970cc2b08c"

@@ -5,6 +5,7 @@ bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "8d79287263aa0d785b9e634b4df8afca7390dde2"
+description = "Lockfile changes made by the version bump are no longer mistaken for a concurrent modification during the release."
 
 [tree_hashes]
 "." = "7c1f5cf1db5e3a94fc5862ae98d0b3091a80a657"

@@ -5,6 +5,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "ea7e02d4ccbdd2a01e830da5a940a941b12e16c5"
+description = "Every internal API takes an explicit `project_root` instead of falling back to the current directory, and an aborted release reverts its version-bumped files instead of leaving the working tree dirty."
 
 [tree_hashes]
 "." = "541c5dbfce0dbc4a3790c0980be4bc198a1e8ef5"

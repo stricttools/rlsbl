@@ -4,6 +4,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "de6d0baaf64e166d4dfb1c39e30c94d3baa995d4"
+description = "The `--update` flag is removed. Bare `rlsbl scaffold` is idempotent: it creates what is missing and three-way merges what already exists, so it is safe to run at any time."
 
 [tree_hashes]
 "." = "6f7bc9c1773d0cfefa508632b9994560be511ec4"

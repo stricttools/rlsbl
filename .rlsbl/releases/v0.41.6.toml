@@ -4,6 +4,7 @@ bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "1d62c7aa19eb3ce04ad8b123fda6b00ed4704c96"
+description = "`selfdoc gen` runs before `selfdoc check` during a release, so the docs are regenerated from source before they are validated, and a check failure prints a clean error instead of a traceback."
 
 [tree_hashes]
 "." = "53ff580cabd5abcf4703ef51fafb3f669e7e1ab1"

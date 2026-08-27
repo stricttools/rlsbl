@@ -4,6 +4,7 @@ bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "4be887725070b67e1bf9b8013769dafc4e83b18c"
+description = "Updates the CI workflow for the `check` to `check-name` rename."
 
 [tree_hashes]
 "." = "f8f9187771e52bec00b5e4d61a24ff8afa5f7a7d"

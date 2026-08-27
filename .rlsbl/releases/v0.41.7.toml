@@ -4,6 +4,7 @@ bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "cf892f16476dea1ce57ce13d7b0db8a31935c4b8"
+description = "A release with no user-facing changelog entries is blocked, `changelog add` and `changelog amend` detect duplicate commits, and the docs target keeps selfdoc.json's `versions` array in sync."
 
 [tree_hashes]
 "." = "48e99d3506a06f71031b494a8c4517e2a8319396"

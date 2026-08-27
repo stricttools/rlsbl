@@ -5,6 +5,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "98cb430d4d9eb8ddcc8c6b14243e48941028cadf"
+description = "Adds the `internal = true` workspace flag exempting a project from changelog enforcement, teaches `deps-unused` to read JS/TS imports via tree-sitter, and fixes Go cmd-layout projects being misdetected as libraries."
 
 [tree_hashes]
 "." = "5551ac136780d2bb9c206fb24a3adfd05c4f0cf6"

@@ -4,6 +4,7 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = ["docs"]
 candidate_sha = "677d6a7f7fe6696ad41be590ec793fc9194dbf9f"
+description = "File-based releases: bump type and target selection move from CLI arguments into `.rlsbl/releases/unreleased.toml`. A unified `check` framework replaces `doctor`, `monorepo lint` and `changelog validate`; Dart and Flutter targets arrive alongside `monorepo graph`, `snapshot` and `impact`, architectural layer rules, dependency-import validation, and coordinated multi-package releases."
 
 [tree_hashes]
 "." = "5715b1d0ab245bb2179b5f115c8eb56d48b68373"

@@ -5,6 +5,7 @@ bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "fc4356a312b59a02fd6710a8ccbe61ae09aae8e6"
+description = "Renames the `internal` workspace flag to `changelog_exempt` so the name describes the behavior it produces, and gives dependency edges a scope (runtime, dev, peer, explicit) that the reverse graph can filter on."
 
 [tree_hashes]
 "." = "debef2df5431f6e5f8d18eb711b5a178e0492d67"

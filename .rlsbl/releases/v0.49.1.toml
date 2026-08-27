@@ -5,6 +5,7 @@ bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
 candidate_sha = "8697f6e57c14dd22f035c3347bc496dea8c64576"
+description = "Monorepo release commits name their version-bumped files by the correct relative paths."
 
 [tree_hashes]
 "." = "d4f72203e9e8cff766b1aa95d8c7ea2432be41f7"
