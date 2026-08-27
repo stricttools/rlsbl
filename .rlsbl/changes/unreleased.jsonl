@@ -96,3 +96,4 @@
 {"format_version":1,"id":"18cfc1f7d6d98c7989f080f2c81b4df6b4fe4a521183d14e","commits":["8a033c1a35cf3b5771e3306c05c2ed8ab2427d91"],"user_facing":false}
 {"format_version":1,"id":"18cfc2007a2b65bdc9d0eab98bf74154b2f1ebb27efed72e","commits":["8c4de1e3b087337e1504c81ba91f61fb03e50009"],"user_facing":true,"description":"**A broken `workspace.toml` now surfaces its loader error instead of looking like a repository with no releasables.** Releasable-config resolution swallowed every exception and answered \"no releasable\", so a workspace the loader had refused produced a generated publish router with unrendered template variables and no explanation.","type":"fix"}
 {"format_version":1,"id":"18cfc2008e462a53f6a36ef757b340a888b85c9c9118eb37","commits":["fc62e87e60c8f440f163daff980f9ec061fe2fae"],"user_facing":false}
+{"format_version":1,"id":"18cfc21355c2c07f456e40b0ab094cff8c76360ddba89d53","commits":["db7a524a18840d8ead8364867ceba8d8174cb910"],"user_facing":false}
