@@ -447,3 +447,55 @@ class GoTarget(BaseTarget):
             # in GOPATH/pkg/mod. Nothing meaningful to do for --target venv.
             "venv": None,
         }
+
+    def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
+        """Add a ``retract`` directive for a version to go.mod.
+
+        The module proxy is permanent -- a published version can never be
+        removed, only retracted, and the retraction itself only takes effect
+        once a LATER version carrying the directive is published.
+        """
+        from .outcomes import YankOutcome, YankStatus
+
+        module_path = read_go_module_path(project_dir)
+        if not module_path:
+            return YankOutcome(
+                status=YankStatus.INCOMPLETE,
+                message="go: cannot determine module path, skipping",
+            )
+
+        if dry_run:
+            return YankOutcome(
+                status=YankStatus.DONE,
+                message=(
+                    f"go: would add retract directive for v{version} to go.mod\n"
+                    f"  go: would require a new release to publish the retraction"
+                ),
+            )
+
+        go_mod = os.path.join(project_dir, "go.mod")
+        try:
+            with open(go_mod, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            retract_line = f"retract v{version}"
+            if retract_line in content:
+                return YankOutcome(
+                    status=YankStatus.DONE,
+                    message=f"go: retract directive for v{version} already present",
+                )
+            content = content.rstrip() + f"\n\n{retract_line}\n"
+            with effects.open_write(go_mod, "w", encoding="utf-8") as f:
+                f.write(content)
+        except OSError as e:
+            return YankOutcome(
+                status=YankStatus.INCOMPLETE,
+                message=f"go: failed to update go.mod: {e}",
+            )
+        return YankOutcome(
+            status=YankStatus.DONE,
+            message=(
+                f"go: added retract directive for v{version} to go.mod\n"
+                f"  go: commit and release a new version to publish the retraction"
+            ),
+        )

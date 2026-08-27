@@ -264,3 +264,49 @@ class NpmTarget(BaseTarget):
                 "uninstall_args_template": None,
             },
         }
+
+    def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
+        """Deprecate a published version on the npm registry.
+
+        npm has no delete; ``npm deprecate`` attaches a warning that every
+        install of that exact version prints.
+        """
+        import subprocess
+
+        from .outcomes import YankOutcome, YankStatus
+
+        pkg_name = self.read_name(project_dir, None)
+        if not pkg_name:
+            return YankOutcome(
+                status=YankStatus.INCOMPLETE,
+                message="npm: cannot determine package name, skipping",
+            )
+
+        deprecation_msg = reason or "This version has been yanked."
+        spec = f"{pkg_name}@{version}"
+
+        if dry_run:
+            return YankOutcome(
+                status=YankStatus.DONE,
+                message=f'npm: would run: npm deprecate {spec} "{deprecation_msg}"',
+            )
+
+        try:
+            effects.run(
+                ["npm", "deprecate", spec, deprecation_msg],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except subprocess.CalledProcessError as e:
+            return YankOutcome(
+                status=YankStatus.INCOMPLETE,
+                message=f"npm: deprecation failed: {(e.stderr or '').strip()}",
+            )
+        except FileNotFoundError:
+            return YankOutcome(
+                status=YankStatus.INCOMPLETE,
+                message="npm: npm CLI not found",
+            )
+        return YankOutcome(status=YankStatus.DONE, message=f"npm: deprecated {spec}")

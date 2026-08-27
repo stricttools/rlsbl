@@ -179,107 +179,25 @@ def run_cmd(args, flags, project_root):
 
 
 def _yank_target(target, project_dir, version, tag, reason, dry_run):
-    """Execute registry-specific yank for a single target."""
-    name = target.name
-    if name == "npm":
-        _yank_npm(target, project_dir, version, reason, dry_run)
-    elif name == "go":
-        _yank_go(target, project_dir, version, tag, dry_run)
-    elif name == "pypi":
-        _yank_pypi(target, project_dir, version, dry_run)
+    """Execute the target's own registry-removal action and print its outcome.
+
+    The dispatch is the target protocol: every target answers ``yank()``, and a
+    target with no registry-removal action answers UNSUPPORTED naming itself.
+    There is no name comparison here and no fallthrough that could pass over a
+    target in silence.
+    """
+    from ..targets.outcomes import YankStatus
+
+    outcome = target.yank(
+        project_dir, version, tag, reason=reason, dry_run=dry_run,
+    )
+    if outcome.status is YankStatus.DONE:
+        print(f"  {outcome.message}")
+    elif outcome.status is YankStatus.UNSUPPORTED:
+        print(f"  {target.name}: no yank implementation (skipping)", file=sys.stderr)
     else:
-        print(f"  {name}: no yank implementation (skipping)", file=sys.stderr)
-
-
-def _yank_npm(target, project_dir, version, reason, dry_run):
-    """Deprecate a version on npm."""
-    pkg_name = target.read_name(project_dir, None)
-    if not pkg_name:
-        print("  npm: cannot determine package name, skipping", file=sys.stderr)
-        return
-
-    deprecation_msg = reason or "This version has been yanked."
-    spec = f"{pkg_name}@{version}"
-
-    if dry_run:
-        print(f"  npm: would run: npm deprecate {spec} \"{deprecation_msg}\"")
-        return
-
-    import subprocess
-    try:
-        effects.run(
-            ["npm", "deprecate", spec, deprecation_msg],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        print(f"  npm: deprecated {spec}")
-    except subprocess.CalledProcessError as e:
-        print(f"  npm: deprecation failed: {e.stderr.strip()}", file=sys.stderr)
-    except FileNotFoundError:
-        print("  npm: npm CLI not found", file=sys.stderr)
-
-
-def _yank_go(target, project_dir, version, tag, dry_run):
-    """Retract a version in Go (add retract directive to go.mod)."""
-    from ..utils import read_go_module_path
-    module_path = read_go_module_path(project_dir)
-    if not module_path:
-        print("  go: cannot determine module path, skipping", file=sys.stderr)
-        return
-
-    if dry_run:
-        print(f"  go: would add retract directive for v{version} to go.mod")
-        print(f"  go: would require a new release to publish the retraction")
-        return
-
-    # Add retract directive to go.mod
-    go_mod = os.path.join(project_dir, "go.mod")
-    try:
-        with open(go_mod, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        retract_line = f"retract v{version}"
-        if retract_line not in content:
-            content = content.rstrip() + f"\n\n{retract_line}\n"
-            with effects.open_write(go_mod, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"  go: added retract directive for v{version} to go.mod")
-            print(f"  go: commit and release a new version to publish the retraction")
-        else:
-            print(f"  go: retract directive for v{version} already present")
-    except Exception as e:
-        print(f"  go: failed to update go.mod: {e}", file=sys.stderr)
-
-
-def _yank_pypi(target, project_dir, version, dry_run):
-    """PyPI has no yank API -- print manual steps and wait for confirmation."""
-    pkg_name = target.read_name(project_dir, None)
-    if not pkg_name:
-        print("  pypi: cannot determine package name, skipping", file=sys.stderr)
-        return
-
-    pep440_version = target.format_version(version)
-
-    print(f"\n  PyPI does not have a yank API. Manual steps required:")
-    print(f"  1. Go to https://pypi.org/project/{pkg_name}/{pep440_version}/")
-    print(f"  2. Click 'Options' -> 'Yank release'")
-    print(f"  3. Enter a reason and confirm")
-    print(f"  4. The version will be hidden from default pip installs")
-
-    if dry_run:
-        print(f"  pypi: would wait for interactive confirmation")
-        return
-
-    try:
-        answer = input(f"\n  Have you completed the PyPI yank for {pkg_name}=={pep440_version}? [y/N] ").strip().lower()
-        if answer == "y":
-            print(f"  pypi: confirmed yanked {pkg_name}=={pep440_version}")
-        else:
-            print(f"  pypi: skipped -- remember to yank manually on PyPI")
-    except (EOFError, KeyboardInterrupt):
-        print(f"\n  pypi: skipped -- remember to yank manually on PyPI")
+        print(f"  {outcome.message}", file=sys.stderr)
+    return outcome
 
 
 def _mark_github_release(tag, reason, use, dry_run):

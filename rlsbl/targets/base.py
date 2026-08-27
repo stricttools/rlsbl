@@ -243,3 +243,20 @@ class BaseTarget:
         Default returns {"global": None, "venv": None} (unsupported).
         """
         return {"global": None, "venv": None}
+
+    def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
+        """Remove a published version from this target's registry.
+
+        Targets whose registry offers a removal action (npm's ``deprecate``,
+        Go's ``retract`` directive, PyPI's manual yank) override this. The
+        default answers UNSUPPORTED naming the target, so ``rlsbl release
+        yank`` reports a target it cannot act on instead of passing over it.
+
+        Returns a :class:`~.outcomes.YankOutcome`.
+        """
+        from .outcomes import YankOutcome, YankStatus
+
+        return YankOutcome(
+            status=YankStatus.UNSUPPORTED,
+            message=f"target '{self.name}' has no registry-removal action",
+        )

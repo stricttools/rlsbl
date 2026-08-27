@@ -499,3 +499,53 @@ class PypiTarget(BaseTarget):
                 "uninstall_args_template": None,
             },
         }
+
+    def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
+        """Walk the operator through PyPI's manual yank.
+
+        PyPI exposes no yank API, so this target prints the steps and waits for
+        the operator to confirm they performed them. The confirmation is the
+        only honest answer available: nothing here can verify the yank.
+        """
+        from .outcomes import YankOutcome, YankStatus
+
+        pkg_name = self.read_name(project_dir, None)
+        if not pkg_name:
+            return YankOutcome(
+                status=YankStatus.INCOMPLETE,
+                message="pypi: cannot determine package name, skipping",
+            )
+
+        pep440_version = self.format_version(version)
+
+        print("\n  PyPI does not have a yank API. Manual steps required:")
+        print(f"  1. Go to https://pypi.org/project/{pkg_name}/{pep440_version}/")
+        print("  2. Click 'Options' -> 'Yank release'")
+        print("  3. Enter a reason and confirm")
+        print("  4. The version will be hidden from default pip installs")
+
+        if dry_run:
+            return YankOutcome(
+                status=YankStatus.DONE,
+                message="pypi: would wait for interactive confirmation",
+            )
+
+        try:
+            answer = input(
+                f"\n  Have you completed the PyPI yank for "
+                f"{pkg_name}=={pep440_version}? [y/N] "
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return YankOutcome(
+                status=YankStatus.INCOMPLETE,
+                message="\n  pypi: skipped -- remember to yank manually on PyPI",
+            )
+        if answer == "y":
+            return YankOutcome(
+                status=YankStatus.DONE,
+                message=f"pypi: confirmed yanked {pkg_name}=={pep440_version}",
+            )
+        return YankOutcome(
+            status=YankStatus.INCOMPLETE,
+            message="pypi: skipped -- remember to yank manually on PyPI",
+        )
