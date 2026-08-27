@@ -122,6 +122,51 @@ class TestClaimSelection:
         )
 
 
+class TestNameConsistencyNamesTheSilentTargets:
+    """The check reports non-answering targets on BOTH of its branches.
+
+    A target that returned no name is not evidence of agreement and not
+    evidence of disagreement. Dropping it from the mismatch report made the
+    output claim the listed targets were the whole detected set.
+    """
+
+    def _run(self, tmp_path, names):
+        from unittest.mock import MagicMock, patch
+
+        from conftest import make_ctx
+        from rlsbl import app
+        from rlsbl.targets import TargetEntry
+
+        entries = [TargetEntry(name, str(tmp_path)) for name in names]
+        targets = {}
+        for name, value in names.items():
+            target = MagicMock()
+            if value is None:
+                target.read_name.return_value = None
+            else:
+                target.read_name.return_value = value
+            target.normalize_package_name.side_effect = lambda raw: raw.lower()
+            targets[name] = target
+
+        ctx = make_ctx(tmp_path, config={})
+        with (
+            patch("rlsbl.targets.detect_targets", return_value=entries),
+            patch("rlsbl.targets.TARGETS", targets),
+        ):
+            return app._check_defs["name-consistency"].impl(ctx)
+
+    def test_the_pass_branch_names_them(self, tmp_path):
+        result = self._run(tmp_path, {"pypi": "mylib", "npm": "mylib", "go": None})
+        assert result.status == "pass"
+        assert "no name from: go" in result.message
+
+    def test_the_mismatch_branch_names_them_too(self, tmp_path):
+        result = self._run(tmp_path, {"pypi": "alpha", "npm": "beta", "go": None})
+        assert result.status == "warn"
+        assert "mismatch" in result.message
+        assert "no name from: go" in result.message
+
+
 class TestRegistryDisplayNames:
     """The display table is asked of the targets, plus one declared non-target."""
 

@@ -414,19 +414,23 @@ def register_project_checks(app):
             return reporter.skipped("no targets reported a name")
 
         missing = [k for k, v in names.items() if v is None]
+        # A target that answered nothing is neither agreement nor
+        # disagreement, so it is named on BOTH branches. Dropping it from the
+        # mismatch report made the detail read as the whole detected set.
+        missing_note = f" (no name from: {', '.join(missing)})" if missing else ""
         normalized = {k: _normalize_name(k, v) for k, v in have_name.items()}
         unique = set(normalized.values())
 
         if len(unique) == 1:
             raw_name = next(iter(have_name.values()))
-            msg = f"{raw_name} across {len(target_entries)} target(s)"
-            if missing:
-                msg += f" (no name from: {', '.join(missing)})"
-            return reporter.passed(msg)
+            return reporter.passed(
+                f"{raw_name} across {len(target_entries)} target(s){missing_note}"
+            )
 
         detail = ", ".join(f"{k}={v}" for k, v in have_name.items())
-        reporter.warn(f"name mismatch: {detail}")
-        return reporter.found(f"name mismatch: {detail}")
+        message = f"name mismatch: {detail}{missing_note}"
+        reporter.warn(message)
+        return reporter.found(message)
 
     @app.warn_check("license-consistency")
     def check_license_consistency(ctx, reporter):
