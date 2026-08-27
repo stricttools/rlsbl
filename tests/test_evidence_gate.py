@@ -260,12 +260,19 @@ class TestWriteUndoAudit:
         # A half-written array (an interrupted previous write) is the realistic
         # shape of the corruption, and it must not cost the records it holds.
         audit_path = os.path.join(str(tmp_path), "undo-audit.json")
+        truncated = '[{"version": "0.9.0", "tag": "v0.9.0"}'
         with open(audit_path, "w") as f:
-            f.write('[{"version": "0.9.0", "tag": "v0.9.0"}')
+            f.write(truncated)
 
         gate = GateResult(Verdict.CLEARED, [], "test")
         with pytest.raises(RlsblError):
             write_undo_audit(str(tmp_path), "1.0.0", "v1.0.0", gate)
+
+        # The half-written file is left byte-for-byte as found: the records it
+        # still holds are recoverable by hand, which is the whole point of
+        # refusing rather than rewriting.
+        with open(audit_path) as f:
+            assert f.read() == truncated
 
     def test_non_list_existing_record_is_wrapped_not_refused(self, tmp_path):
         # Valid JSON that is a single record (an older single-object file) is
