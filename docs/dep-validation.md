@@ -1,5 +1,5 @@
 ---
-description: "Dependency validation: unused/undeclared deps, dead modules with reason-gated exclusions, and circular dependency detection across workspaces and files."
+description: "Dependency validation: unused/undeclared deps, dead modules with reason-gated exclusions, circular dependency detection, and which language ecosystems each covers."
 ---
 
 # Dependency validation

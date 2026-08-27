@@ -1,5 +1,5 @@
 ---
-description: "Reference for rlsbl checks across 6 tags: metadata, severity, purity (which checks a preview runs), target applicability, overlay-preserving test runs, and the path-capable built-ins."
+description: "Reference for every rlsbl check: metadata, severity, purity (which checks a preview runs), target applicability, overlay-preserving test runs, and the path-capable built-ins."
 ---
 
 # Check system
