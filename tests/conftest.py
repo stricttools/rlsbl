@@ -964,6 +964,13 @@ DEFAULT_RELEASE_FILE = (
 )
 
 
+# The config every releasable carries when a fixture does not state one.
+# ``publish_mode`` is a required key in a real releasable config, so ``{}`` is
+# a shape rlsbl never produces; ``"none"`` is the stance a test wants, since it
+# suppresses publishing to every public registry.
+DEFAULT_RELEASABLE_CONFIG = {"publish_mode": "none"}
+
+
 def jsonl_line(entry):
     """Render one changelog entry as a single JSONL line (no trailing newline).
 
@@ -1046,7 +1053,8 @@ def make_releasable_state(
         root: the monorepo root (str or Path).
         name: releasable name.
         version: value for the ``version`` file.
-        config: dict written to ``config.json`` (default ``{}``).
+        config: dict written to ``config.json``. Defaults to
+            ``DEFAULT_RELEASABLE_CONFIG``; an explicitly empty dict is honored.
         unreleased_entries: entries for ``changes/unreleased.jsonl``
             (ChangelogEntry, dict or raw-line str -- see ``jsonl_line``).
         versioned_entries: dict mapping version string to its entry list,
@@ -1135,7 +1143,10 @@ def make_releasable_state(
         )
 
     with open(os.path.join(rel_dir, "config.json"), "w", encoding="utf-8") as f:
-        json.dump(config or {}, f, indent=2)
+        json.dump(
+            DEFAULT_RELEASABLE_CONFIG if config is None else config,
+            f, indent=2,
+        )
         f.write("\n")
 
     if hooks:
@@ -1188,7 +1199,8 @@ def _create_multi_releasable_monorepo(
         projects: list of project dicts with at least path, name, releasable
             (defaults to 2 alpha members + 2 beta members + 1 dev_only).
         releasable_configs: dict mapping releasable name to config dict,
-            written to ``<releasable_dir>/config.json``.
+            written to ``<releasable_dir>/config.json``. A releasable not named
+            here gets ``DEFAULT_RELEASABLE_CONFIG``.
         hook_configs: dict mapping releasable name to hook config dict,
             written to ``<releasable_dir>/hooks/`` directory files.
         releasable_changes: dict mapping releasable name to its changelog
@@ -1284,7 +1296,7 @@ def _create_multi_releasable_monorepo(
             tmp_path,
             rel.name,
             version=initial_version,
-            config=releasable_configs.get(rel.name, {}),
+            config=releasable_configs.get(rel.name),
             unreleased_entries=changes.get("unreleased"),
             versioned_entries=versions or None,
             release_file=releases.get("unreleased"),

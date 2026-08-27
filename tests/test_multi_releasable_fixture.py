@@ -89,7 +89,10 @@ class TestMultiReleasableFixtureDefaults:
             assert os.path.isfile(config_path)
             with open(config_path) as f:
                 config = json.load(f)
-            assert isinstance(config, dict)
+            # A real releasable config is never the empty object: publish_mode
+            # is required, and "none" is the test-safe stance (no publishing to
+            # any public registry).
+            assert config == {"publish_mode": "none"}
 
     def test_project_directories_created(self, multi_releasable_monorepo):
         ns = multi_releasable_monorepo
@@ -229,6 +232,27 @@ class TestMultiReleasableFactory:
         with open(config_path) as f:
             config = json.load(f)
         assert config["batch_limits"]["max_commits_per_entry"] == 3
+        # A named releasable's config replaces the default outright.
+        assert "publish_mode" not in config
+        # An unnamed one keeps the default.
+        beta_config = os.path.join(get_releasable_dir(str(ns.root), "beta"),
+                                   "config.json")
+        with open(beta_config) as f:
+            assert json.load(f) == {"publish_mode": "none"}
+
+    def test_make_releasable_state_default_config(self, tmp_path):
+        """make_releasable_state's own default is the same minimal config, so
+        the standalone helper and the factory agree."""
+        rel_dir = make_releasable_state(tmp_path, "core")
+        assert json.loads((rel_dir / "config.json").read_text()) == {
+            "publish_mode": "none",
+        }
+
+    def test_explicit_empty_config_is_honored(self, tmp_path):
+        """An explicitly empty config is still written empty -- the default
+        applies to absence, never overriding what a caller stated."""
+        rel_dir = make_releasable_state(tmp_path, "core", config={})
+        assert json.loads((rel_dir / "config.json").read_text()) == {}
 
     def test_custom_hook_config(self, multi_releasable_monorepo_factory):
         ns = multi_releasable_monorepo_factory(
