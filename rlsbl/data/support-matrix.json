@@ -1157,6 +1157,126 @@
   "generated_by": "rlsbl.targets.introspect.build_matrix",
   "regenerate_with": "uv run python scripts/generate_support_matrix.py",
   "tables": {
+    "axes": {
+      "headers": [
+        "Axis",
+        "What it says about a target"
+      ],
+      "rows": [
+        [
+          "ecosystem",
+          "Ecosystem label shown in listings."
+        ],
+        [
+          "auto_detectable",
+          "Whether detection runs without configuration: yes, no, or conditional."
+        ],
+        [
+          "detection_files",
+          "Filenames whose presence in a directory declares this target."
+        ],
+        [
+          "content_based_detection",
+          "Whether detection inspects file content (the target overrides detect)."
+        ],
+        [
+          "version_file",
+          "File that holds the version, or null when the target inherits one."
+        ],
+        [
+          "tag_format",
+          "Standalone release tag pattern."
+        ],
+        [
+          "monorepo_tag_format",
+          "Monorepo release tag pattern."
+        ],
+        [
+          "monorepo_tag_glob",
+          "Glob matching every monorepo version tag for a package."
+        ],
+        [
+          "companion_tags",
+          "Extra tags created alongside the primary release tag."
+        ],
+        [
+          "format_version",
+          "How the ecosystem spells the semver version 1.2.3-rc.1."
+        ],
+        [
+          "registry_display_name",
+          "How this target's registry is spelled in user-facing output."
+        ],
+        [
+          "build_timeout_default",
+          "Seconds allowed for this target's build before it is a timeout."
+        ],
+        [
+          "supports_read_name",
+          "Reads a package name from its manifest (overrides read_name)."
+        ],
+        [
+          "supports_read_metadata",
+          "Reads license and description from its manifest (overrides read_metadata)."
+        ],
+        [
+          "supports_publication_probe",
+          "Can ask its registry whether a version is published."
+        ],
+        [
+          "supports_version_query",
+          "Its registry answers a latest-version query."
+        ],
+        [
+          "supports_name_claim",
+          "A name can be claimed on its registry by publishing a placeholder."
+        ],
+        [
+          "claim_token_env_vars",
+          "Environment variables, any one of which authenticates a name claim."
+        ],
+        [
+          "supports_yank",
+          "Its registry offers a removal action for a published version."
+        ],
+        [
+          "provides_ci_templates",
+          "Ships ci.yml.tpl, so scaffold can generate a CI workflow."
+        ],
+        [
+          "supports_dev_install",
+          "rlsbl dev install has something to run for this target."
+        ],
+        [
+          "dev_install_command",
+          "The local-install specs, keyed by mode (global, venv)."
+        ],
+        [
+          "supports_import_analysis",
+          "rlsbl can read its sources to follow imports (overrides find_dead_modules)."
+        ],
+        [
+          "supports_circular_dep_analysis",
+          "Import-cycle detection is meaningful for this ecosystem."
+        ],
+        [
+          "supports_dep_floors",
+          "Its manifest states dependency floors a lockfile can resolve ahead of."
+        ],
+        [
+          "lint_language",
+          "Which library-lint language its sources are written in, or null."
+        ],
+        [
+          "has_builtin_test_runner",
+          "Ships a built-in test runner (overrides run_tests)."
+        ],
+        [
+          "shares_workspace_environment",
+          "Workspace members of this target resolve into ONE shared environment."
+        ]
+      ]
+    },
     "feature_matrix": {
       "headers": [
         "Check",
