@@ -51,11 +51,12 @@ command dispatch; there is no handle to mint on there.
 handler carries ``@effects.handler``, so a bound path is never missed by
 accident.
 
-The three operations that execute in every mode
------------------------------------------------
+The operations that execute in every mode
+-----------------------------------------
 
 Each is declared by name, has a reason that is about the operation rather
-than about convenience, and touches nothing a preview reports on:
+than about convenience, and touches nothing a preview reports on.  The list
+below is the whole set:
 
 * :func:`lock_makedirs` / :func:`lock_open` / :func:`lock_remove` /
   :func:`lock_rmdir` -- the advisory lock is process infrastructure.  A
@@ -68,11 +69,13 @@ than about convenience, and touches nothing a preview reports on:
   rather than about the project.
 * :func:`tcp_connect` -- a connect-and-close probe is a network read, and
   reads execute in every mode here (see :func:`urlopen`).
+* :func:`mkdtemp` and the matching :func:`rmtree`, but ONLY inside
+  :func:`observe_scratch_dirs` -- same reason as ``observe_scratch_files``,
+  for the directory an allowlisted observe writes into rather than for the
+  files it reads.  Outside that block both record as usual.
 
-Everything else, including :func:`mkdtemp` and :func:`temp_file`, records --
-with one scoped exception, :func:`observe_scratch_dirs`, described on that
-function: inside an observation block a scratch directory is created and
-removed for real, because the observe that reads it really runs.
+Everything else, including :func:`mkdtemp` and :func:`temp_file` in every
+other context, records.
 """
 
 import functools
@@ -758,11 +761,11 @@ def copytree(src, dst, *, dirs_exist_ok=False, ignore=None, symlinks=False):
 # The lock file is scratch owned by the running process -- created on acquire,
 # deleted on release, never part of the project state a preview reports on --
 # so executing these in preview mode records nothing and leaves nothing
-# behind.  It is one of the two filesystem exceptions in the module -- the
-# other is :func:`observe_scratch_files`, whose files are operands of an
-# allowlisted observe (see the module docstring's list) -- and like it, this
-# one is declared by name rather than inferred: nothing here ever tries the
-# handle first and falls back.
+# behind.  It is one of the module's filesystem exceptions; the others serve
+# an allowlisted observe (:func:`observe_scratch_files` for the files it reads,
+# :func:`observe_scratch_dirs` for the directory it writes into).  The module
+# docstring lists them all, and like them, this one is declared by name rather
+# than inferred: nothing here ever tries the handle first and falls back.
 # ---------------------------------------------------------------------------
 
 
