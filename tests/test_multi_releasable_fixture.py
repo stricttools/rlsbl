@@ -258,6 +258,86 @@ class TestMakeReleasableState:
         assert json.loads((rel_dir / "config.json").read_text())["publish_mode"] == "ci"
         assert os.access(str(rel_dir / "hooks" / "pre-checks.sh"), os.X_OK)
 
+    def test_version_md_is_the_generator_s_own_output(self, tmp_path):
+        """The per-version .md is produced by the production generator over the
+        just-written JSONL plus the archive -- not a fixed stub.
+
+        A fixture that hand-rolls the .md drifts from what a real release
+        writes the moment the generator's format changes, so the fixture calls
+        the generator instead of imitating it.
+        """
+        from rlsbl.changelog.generate import generate_version_section
+
+        entries = [
+            ChangelogEntry(
+                commits=["cafebabe"], user_facing=True,
+                description="Shipped the thing", type="feature",
+            ),
+            ChangelogEntry(
+                commits=["deadbeef"], user_facing=True,
+                description="Stopped the crash", type="fix",
+            ),
+        ]
+        rel_dir = make_releasable_state(
+            tmp_path, "core", versioned_entries={"0.2.0": entries},
+        )
+        md = (rel_dir / "changes" / "0.2.0.md").read_text()
+
+        # Byte-for-byte what the generator produces for these entries plus the
+        # archive's description ("Test release", from DEFAULT_RELEASE_FILE).
+        expected = generate_version_section(
+            "0.2.0", parse_jsonl(str(rel_dir / "changes" / "0.2.0.jsonl")),
+            description="Test release", context="", bump_type="patch",
+        )
+        assert md == expected
+        assert "### Features" in md
+        assert "- Shipped the thing" in md
+        assert "### Fixes" in md
+        assert "- Stopped the crash" in md
+        assert "Test release" in md
+        assert "No user-facing changes" not in md
+
+    def test_version_md_reflects_a_custom_archive(self, tmp_path):
+        """The archive's description and context reach the .md, because the
+        generator reads them from the archive the fixture just wrote."""
+        rel_dir = make_releasable_state(
+            tmp_path,
+            "core",
+            versioned_entries={"0.3.0": []},
+            archived_releases={
+                "0.3.0": (
+                    "format_version = 1\n"
+                    'bump = "minor"\n'
+                    'description = "The custom description"\n'
+                    'context = "Why it happened"\n'
+                ),
+            },
+        )
+        md = (rel_dir / "changes" / "0.3.0.md").read_text()
+        assert "The custom description" in md
+        assert "<summary>Context</summary>" in md
+        assert "Why it happened" in md
+
+    def test_version_md_is_writable_like_production(self, tmp_path):
+        """rlsbl locks the released .jsonl (0444) but leaves the .md writable.
+
+        The .md is a regenerated derivative; the release regenerates it on every
+        changelog pass, so a fixture that locks it models a state the tools
+        never produce.
+        """
+        rel_dir = make_releasable_state(
+            tmp_path, "core", versioned_entries={"0.1.0": []},
+        )
+        md_path = rel_dir / "changes" / "0.1.0.md"
+        jsonl_path = rel_dir / "changes" / "0.1.0.jsonl"
+
+        current_umask = os.umask(0)
+        os.umask(current_umask)
+        assert (md_path.stat().st_mode & 0o777) == (0o666 & ~current_umask)
+        assert os.access(str(md_path), os.W_OK)
+        # The JSONL beside it stays locked, as rlsbl locks it.
+        assert not os.access(str(jsonl_path), os.W_OK)
+
     def test_explicit_archive_overrides_default(self, tmp_path):
         rel_dir = make_releasable_state(
             tmp_path,

@@ -1014,7 +1014,10 @@ def make_releasable_state(
 
     - ``version``                      -- the releasable's current version
     - ``changes/unreleased.jsonl``     -- always created (empty by default)
-    - ``changes/<v>.jsonl`` + ``.md``  -- one pair per ``versioned_entries`` key
+    - ``changes/<v>.jsonl`` + ``.md``  -- one pair per ``versioned_entries``
+      key. The ``.md`` is rendered by rlsbl's own ``generate_version_file``
+      over that JSONL plus the version's archived release file, so its content
+      and its 644 mode are exactly what a real release leaves behind.
     - ``releases/``                    -- always created; holds ``unreleased.toml``
       when ``release_file`` is given and ``v<version>.toml`` archives
     - ``config.json``                  -- releasable-level config
@@ -1037,7 +1040,9 @@ def make_releasable_state(
             released version always has one); entries here add to or override
             those defaults.
         hooks: dict mapping hook file name to script content (chmod 755).
-        lock_versioned: chmod 444 the versioned changelog files, as rlsbl does.
+        lock_versioned: chmod 444 the versioned ``.jsonl`` files, as rlsbl
+            locks them at finalization. The generated ``.md`` siblings stay
+            writable either way -- rlsbl never locks those.
 
     Returns:
         Path to the releasable's state directory.
@@ -1055,19 +1060,17 @@ def make_releasable_state(
     )
 
     versioned_entries = versioned_entries or {}
+    releases_dir = os.path.join(rel_dir, "releases")
+    archives = {ver: DEFAULT_RELEASE_FILE for ver in versioned_entries}
+    archives.update(archived_releases or {})
+
     for ver, entries in versioned_entries.items():
         write_jsonl(
             os.path.join(changes_dir, f"{ver}.jsonl"),
             entries,
             lock=lock_versioned,
         )
-        md_path = os.path.join(changes_dir, f"{ver}.md")
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(f"## {ver}\n\n- No user-facing changes.\n")
-        if lock_versioned:
-            os.chmod(md_path, 0o444)
 
-    releases_dir = os.path.join(rel_dir, "releases")
     os.makedirs(releases_dir, exist_ok=True)
     if release_file is not None:
         with open(
@@ -1075,13 +1078,32 @@ def make_releasable_state(
         ) as f:
             f.write(release_file)
 
-    archives = {ver: DEFAULT_RELEASE_FILE for ver in versioned_entries}
-    archives.update(archived_releases or {})
     for ver, body in archives.items():
         archive_path = os.path.join(releases_dir, f"v{ver}.toml")
         with open(archive_path, "w", encoding="utf-8") as f:
             f.write(body)
         os.chmod(archive_path, 0o444)
+
+    # The per-version .md is the GENERATOR's output over the JSONL and the
+    # archive that were just written -- never a hand-rolled stub, which would
+    # drift from the real format the moment the generator changes. Runs after
+    # the archives, because the description/context/bump come from them.
+    # generate_version_file creates a brand-new .md with the umask-derived
+    # mode (644), which is what production leaves behind: the .md is a
+    # regenerated derivative, not a locked record like the .jsonl.
+    from rlsbl.changelog.generate import (
+        _read_release_metadata_full,
+        generate_version_file,
+    )
+
+    for ver in versioned_entries:
+        ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+            root, ver, releases_dir=releases_dir,
+        )
+        generate_version_file(
+            changes_dir, ver,
+            description=ver_desc, context=ver_ctx, bump_type=ver_bump or None,
+        )
 
     with open(os.path.join(rel_dir, "config.json"), "w", encoding="utf-8") as f:
         json.dump(config or {}, f, indent=2)
