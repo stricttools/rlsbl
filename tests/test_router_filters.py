@@ -523,6 +523,47 @@ class TestRouterFiltersFreshCheck:
         outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
         assert outcome.status == "fail"
 
+    def test_a_deleted_entry_fails(self, router_workspace):
+        """A member whose entry was deleted by hand is filtered by nothing.
+
+        The comparison used to walk the COMMITTED entries only, so an entry
+        that stopped existing was compared against nothing and the check
+        passed. The router still routes that member's jobs -- its ``detect``
+        job declares an output for it -- and the paths-filter step now defines
+        no filter of that name, so the job's ``if`` is never true and its CI
+        silently stops running.
+        """
+        router = router_workspace / ".github" / "workflows" / "ci-router.yml"
+        kept, dropping = [], False
+        for line in router.read_text().splitlines(keepends=True):
+            if line.strip() == "cli:":
+                dropping = True
+                continue
+            if dropping:
+                if line.strip().startswith("- '"):
+                    continue
+                dropping = False
+            kept.append(line)
+        router.write_text("".join(kept), encoding="utf-8")
+
+        outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
+        assert outcome.status == "fail", outcome
+        assert any("cli" in p.text for p in outcome.problems), outcome
+
+    def test_an_extra_entry_fails(self, router_workspace):
+        """An entry for a member the router routes no jobs for is drift too."""
+        router = router_workspace / ".github" / "workflows" / "ci-router.yml"
+        router.write_text(
+            router.read_text().replace(
+                "          cli:\n",
+                "          ghost:\n            - 'packages/ghost/**'\n          cli:\n",
+            ),
+            encoding="utf-8",
+        )
+        outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
+        assert outcome.status == "fail", outcome
+        assert any("ghost" in p.text for p in outcome.problems), outcome
+
     def test_an_unreadable_manifest_fails_instead_of_passing(self, router_workspace):
         """The check cannot re-derive from a scan that failed.
 

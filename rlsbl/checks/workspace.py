@@ -44,11 +44,17 @@ def _is_manifestless_root_member(ctx, proj):
 
 
 def _committed_router_filters(router_path):
-    """Return ``(filters_by_member, quantifier)`` from a generated router.
+    """Return ``(filters_by_member, quantifier, routed_members)`` from a router.
 
     *filters_by_member* maps each member name the router's paths-filter step
     declares to its pattern list (a lone string is normalized to a one-element
-    list).  Raises on anything it cannot read: a router whose filter block is
+    list).  *routed_members* is the set of members the router routes jobs for,
+    read off the ``detect`` job's ``outputs`` -- the router's own second
+    statement of the same member set, which is what makes a DELETED filter
+    entry visible: the output stays, the filter it reads stops existing, and
+    the member's ``if`` is never true again.
+
+    Raises on anything it cannot read: a router whose filter block is
     unparseable is not a router whose filters can be called fresh.
     """
     from ruamel.yaml import YAML
@@ -57,7 +63,9 @@ def _committed_router_filters(router_path):
     with open(router_path, "r", encoding="utf-8") as f:
         router = yaml.load(f)
 
-    steps = ((router or {}).get("jobs") or {}).get("detect", {}).get("steps") or []
+    detect = ((router or {}).get("jobs") or {}).get("detect", {})
+    routed = set((detect.get("outputs") or {}).keys())
+    steps = detect.get("steps") or []
     for step in steps:
         with_block = step.get("with") or {}
         if "filters" not in with_block:
@@ -67,8 +75,44 @@ def _committed_router_filters(router_path):
             name: [value] if isinstance(value, str) else list(value)
             for name, value in declared.items()
         }
-        return by_member, with_block.get("predicate-quantifier")
+        return by_member, with_block.get("predicate-quantifier"), routed
     raise ValueError("no dorny/paths-filter step with a `filters:` block")
+
+
+def _router_filter_drift(committed, fresh, routed):
+    """Name every difference between a committed filters block and a fresh one.
+
+    A wholesale comparison of the two blocks, not a walk of the committed
+    entries: an entry deleted by hand is compared against nothing by such a
+    walk, so the one drift that stops a member's CI outright was the one drift
+    the check could not see.
+
+    *routed* restricts the "should exist" side to the members the router
+    actually routes jobs for -- a member with no CI workflow gets no filter
+    entry from ``monorepo sync``, and demanding one would report every such
+    workspace as stale.
+    """
+    details = []
+    expected = {name for name in routed if name in fresh}
+    for name in sorted(set(committed) | expected):
+        if name not in committed:
+            details.append(
+                f"{name}: the router routes its jobs but the filters block has "
+                f"no entry for it, so nothing can ever set its `detect` output "
+                f"and its CI never runs"
+            )
+        elif name not in fresh:
+            details.append(f"{name}: no longer a workspace member")
+        elif name not in expected:
+            details.append(
+                f"{name}: the filters block declares an entry the router routes "
+                f"no jobs for; `rlsbl monorepo sync` would not write it"
+            )
+        elif committed[name] != fresh[name]:
+            details.append(
+                f"{name}: committed {committed[name]} != derived {fresh[name]}"
+            )
+    return details
 
 
 def register_workspace_checks(app):
@@ -103,7 +147,7 @@ def register_workspace_checks(app):
             )
 
         try:
-            committed, quantifier = _committed_router_filters(router_path)
+            committed, quantifier, routed = _committed_router_filters(router_path)
         except Exception as e:
             reporter.error(f"cannot read the router's filters block: {e}")
             return reporter.found("ci-router.yml filters block is unreadable")
@@ -131,15 +175,7 @@ def register_workspace_checks(app):
             for proj in projects
         }
 
-        drifted = []
-        for name, patterns in committed.items():
-            if name not in fresh:
-                # A filter for a member the workspace no longer declares.
-                drifted.append(f"{name}: no longer a workspace member")
-            elif patterns != fresh[name]:
-                drifted.append(
-                    f"{name}: committed {patterns} != derived {fresh[name]}"
-                )
+        drifted = _router_filter_drift(committed, fresh, routed)
         if quantifier != PREDICATE_QUANTIFIER:
             drifted.append(
                 f"predicate-quantifier is {quantifier!r}, must be "
