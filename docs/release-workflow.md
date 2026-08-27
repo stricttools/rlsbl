@@ -222,6 +222,21 @@ Both fields are written by the flow and by nothing else. The editable `unrelease
 
 Archives written before anchoring existed carry neither field; readers treat absence as absence and never substitute a value.
 
+#### Backfilling an existing repository
+
+`scripts/backfill_release_anchors.py` anchors a repository's history in one reviewed pass. For every archived version it resolves the version's tag under the repository's own tag spellings (`v{version}` standalone, the releasable's `tag_format` in a workspace), takes that tag's commit as `candidate_sha`, and records the tree of every released path at that commit. It also stamps the strictspec `format_version` gate onto archives written before the gate existed, and materializes an archive for a released version that never got one — recovering the description from the GitHub Release notes, then from the CHANGELOG.md section, and otherwise writing a placeholder that names the recovery obligation.
+
+Two cases do not resolve to a tag, and neither is passed over silently:
+
+| Case | What the pass does |
+| --- | --- |
+| A released version with **no tag** | Looks for the version-bump commit (whose whole message is the tag string) and anchors from it, recording that it did. Only when that also fails does the archive get `unanchorable = true` — a permanent record that the commit is unrecoverable, not a temporary gap. |
+| A **tag matching no released version** that still parses under a recognized scheme | Reported as operator input, with the tag name and every spelling that was probed, and the pass exits non-zero. It never guesses which version such a tag belongs to. |
+
+Tags that parse under no recognized scheme are listed and left alone. The pass is idempotent: an archive that already carries the anchor (or the marker) and the gate is proposed for no change.
+
+`unanchorable` is written by the backfill and by nothing else — a flow that is releasing always knows its own candidate — and `rlsbl release undo` strips it alongside the anchor when it restores an archive as the editable release file.
+
 ### The CI gate
 
 The gate blocks the irreversible half of the release until the repository's own CI has spoken about the candidate commit, and it distinguishes four outcomes rather than collapsing them into pass/fail. The distinction matters because the right operator response differs sharply between a definite failure, an unfinished wait, and a repository that simply has no CI to wait for:
