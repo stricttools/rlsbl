@@ -501,6 +501,11 @@
     "description": "d7ad7d10555f83bd472c5bdbc0abcbe10eed7ee25207c39e62ce748f184916b2",
     "source_docstring": "9ef5aa9d82904a2c883814cb04a1823c376e81ea27ec074bb84b72edba7a1bf6"
   },
+  "en/rlsbl-commands-rewrite-abort.md": {
+    "content": "317f8eba877fa04c859fdaf609d8c43d7ba081b06e82210b695c175105f3b794",
+    "description": "ad6cde3dfab499d75a73e66e45e38e5465272edbd84d32e5975eb900701ad920",
+    "seed_hash": "ad6cde3dfab499d75a73e66e45e38e5465272edbd84d32e5975eb900701ad920"
+  },
   "en/rlsbl-commands-rewrite-go_module_path.md": {
     "content": "930d66dd4ad1ad8e1348427ec6429f2e9f7c6c25c944ea268144d175edc82550",
     "description": "0b107dc78c8c85242aa1dd2093f61f76bfe310dd43cbf91d688a12211bac4ac0",
@@ -655,6 +660,11 @@
     "description": "5a0f0cecdfebc9da2256523df104047099921c4462247d6b5742edde582fcb06",
     "source_docstring": "5a0f0cecdfebc9da2256523df104047099921c4462247d6b5742edde582fcb06"
   },
+  "en/rlsbl-lint-languages.md": {
+    "content": "245975e7463f7ea293b28c1eed4098c2ddfbccdb2705fa5f556cb56a9a829c9d",
+    "description": "cbba8410d5a59c48d82aaabd4a9141044d9cd4585376a8c71b3a0dcb7e952cb2",
+    "seed_hash": "cbba8410d5a59c48d82aaabd4a9141044d9cd4585376a8c71b3a0dcb7e952cb2"
+  },
   "en/rlsbl-lint-maven.md": {
     "content": "2b063ed135d5cba568ccfa5a2ea11f3943a98c0792505aa415c4ab011049bc6f",
     "description": "2c3fd5e3705aa8ddb1b092739abd2110e4918ace4b46df0b9a2f86bf610e6b87",
@@ -734,6 +744,11 @@
     "content": "5e138fb19b9c4d2c7d0d19ddcf0cd0553b61f06dfcc5a8a56cb5e68b0ee82da9",
     "description": "02fe8adc92590596ab54477a5138a525cad6d0c353a96d93d5e240453e5ebb7e",
     "source_docstring": "737c3cd947be79dc2ec3b6ea8c3d5076f5a425fd62096cad461afed2ee317cd4"
+  },
+  "en/rlsbl-ownership.md": {
+    "content": "7f3331aa33ec5a56671c783ccf4a8b11c3b110186f06043ec079682ed2573eb0",
+    "description": "e95c1160458359a086a148fbbe129c366ccc062dcf50cee03d186d0e62e07b2b",
+    "seed_hash": "e95c1160458359a086a148fbbe129c366ccc062dcf50cee03d186d0e62e07b2b"
   },
   "en/rlsbl-pipelines-base.md": {
     "content": "eebe18746f145b494b9070ad7013191bb52d87dfb430d1dae0d23ad1497e6243",
@@ -969,6 +984,11 @@
     "content": "52f2665a288d732f2946c2ff964d1ec199fd9d9f422b9f0889b3827efa002858",
     "description": "9478b42d97cf69c9143a073ebef680fc6df172558013163f7c161e3a04b8a6c5",
     "source_docstring": "9478b42d97cf69c9143a073ebef680fc6df172558013163f7c161e3a04b8a6c5"
+  },
+  "en/rlsbl-targets-outcomes.md": {
+    "content": "536769356407018316f0d211f4f1b2cd8de4549ac177ad98e6e0209137785c00",
+    "description": "9d7873ed44ae3e5d700a4974664331cebd50d47a8f950263d5c28b80b1861140",
+    "seed_hash": "9d7873ed44ae3e5d700a4974664331cebd50d47a8f950263d5c28b80b1861140"
   },
   "en/rlsbl-targets-pgdesign.md": {
     "content": "8f8b6816f196a8b2bf59ab3b7f8162abad49c5cf8594dc8db56aa959d281e506",

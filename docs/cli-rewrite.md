@@ -22,7 +22,7 @@ Rename a Go module path across the repository. Rewrites the module-path tokens i
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--from-module` |  | str | required |  | The Go module path being renamed away from (must be declared by a go.mod in this repository) |
+| `--from-module` |  | str | required |  | The Go module path being renamed away from. It need not be DECLARED here: a repository that only references the module is a consumer following an upstream move, and the plan reports that as a fact while rewriting the references. What is required is that something references it -- a path with zero occurrences anywhere in the repository is a hard error, because the overwhelmingly likely cause is a typo. |
 | `--to-module` |  | str | required |  | The Go module path to rename to |
 
 ## rewrite uv-path-sources

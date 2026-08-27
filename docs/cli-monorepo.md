@@ -13,7 +13,7 @@ Manage monorepo workspaces with multiple independently-versioned projects. Initi
 
 ## monorepo init
 
-Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.
+Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, in explicit mode, carrying the mandatory root member whose kind you declare. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.
 
 **Effect:** mutating
 
@@ -23,6 +23,10 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
+| `root-member` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--root-dev-node`, `--root-releasable`. What kind of member owns the repository root. Every workspace has exactly one root member, and it owns every tracked file no other member claims; whether those files need changelog coverage is a per-repository decision with no default. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--root-dev-node` |  |  | required |  | Elects `root-member` = `root-dev-node`. The root member is a dev node: files at the repository root that no other member claims need no changelog coverage. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--root-releasable` |  | str | required |  | Elects `root-member` = `root-releasable`. The root member belongs to a named releasable: files at the repository root that no other member claims get changelog coverage under it. Its value: name of the releasable the root member belongs to; it is created in [[releasables]] |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--tag-format` |  | str | required |  | Only with `--root-releasable`. tag format for that releasable, e.g. "v{version}" for bare version tags or "{name}@v{version}" for the workspace scheme; a root releasable never inherits a default |
 | `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed) |
 
 ## monorepo add
