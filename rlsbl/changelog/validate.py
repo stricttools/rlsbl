@@ -16,7 +16,12 @@ from .files import list_versioned_files, read_unreleased
 from .resolve import resolve_hash, resolve_hashes, _git_log_hashes, _unreleased_range
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
-from ..git_util import filter_commits_for_project, filter_commits_for_releasable
+from ..git_util import (
+    Ancestry,
+    ancestry,
+    filter_commits_for_project,
+    filter_commits_for_releasable,
+)
 from ..errors import ChangelogError, ConfigError
 from ..utils import commit_files_if_changed
 from .. import effects
@@ -124,20 +129,6 @@ def filter_exempt_commits(commits: list[str]) -> tuple[list[str], ExemptionStats
     return registry.filter_commits(commits)
 
 
-def _is_ancestor(ancestor: str, descendant: str) -> bool:
-    """Check if ancestor is an ancestor of descendant."""
-    try:
-        result = effects.run(
-            ["git", "merge-base", "--is-ancestor", ancestor, descendant],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return False
-
-
 # ---------------------------------------------------------------------------
 # Validation cache
 # ---------------------------------------------------------------------------
@@ -178,6 +169,12 @@ def _is_cache_valid(changes_dir: str) -> bool:
     - .validated exists and contains a 40-char SHA
     - That SHA is an ancestor of (or equal to) HEAD
     - unreleased.jsonl's mtime is older than .validated's mtime
+
+    The one place in rlsbl where an unanswerable ancestry question is NOT a
+    hard error: this is a cache, and the safe answer to "I cannot tell whether
+    the cached commit is still on this branch" is to re-run the validation,
+    not to refuse.  Nothing is skipped and nothing is trusted -- the cost is
+    one recomputation.
     """
     cached_sha = _read_cache(changes_dir)
     if cached_sha is None:
@@ -187,8 +184,9 @@ def _is_cache_valid(changes_dir: str) -> bool:
     if head is None:
         return False
 
-    # Check ancestor relationship (equal counts as ancestor)
-    if cached_sha != head and not _is_ancestor(cached_sha, head):
+    # Check ancestor relationship (equal counts as ancestor).
+    # INDETERMINABLE -> cache miss (recompute), never an error.
+    if cached_sha != head and ancestry(cached_sha, head) is not Ancestry.TRUE:
         return False
 
     # Check mtimes

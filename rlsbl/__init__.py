@@ -259,6 +259,26 @@ def _read_config_for_cwd():
     return read_project_config(os.getcwd())
 
 
+def _abort_unless_head_descends(pre_release_sha):
+    """Refuse to resume unless HEAD provably descends from *pre_release_sha*.
+
+    Fail-closed on both non-TRUE outcomes: "HEAD is somewhere else" and "git
+    cannot tell where HEAD is relative to the pre-release commit" are equally
+    good reasons not to re-enter a half-finished release.
+    """
+    from .git_util import Ancestry, ancestry
+
+    if ancestry(pre_release_sha, "HEAD") is Ancestry.TRUE:
+        return
+    print(
+        f"Error: HEAD is not a descendant of the pre-release commit "
+        f"({pre_release_sha[:10]}). The release state may be stale. "
+        f"Use `rlsbl release undo` to roll back.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 app.set_check_context(_check_context_factory)
 
 # Register the external check provider (lazily reads config per cwd).
@@ -508,15 +528,7 @@ def cmd_release_resume(ctx, watch, push_timeout, ci_timeout, check_timeout, hook
     pre_release_sha = saved.get("pre_release_sha", "").strip()
     if pre_release_sha:
         try:
-            from .git_util import is_ancestor
-            if not is_ancestor(pre_release_sha, "HEAD"):
-                print(
-                    f"Error: HEAD is not a descendant of the pre-release commit "
-                    f"({pre_release_sha[:10]}). The release state may be stale. "
-                    f"Use `rlsbl release undo` to roll back.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+            _abort_unless_head_descends(pre_release_sha)
         except Exception as e:
             print(f"Error: could not verify commit ancestry: {e}", file=sys.stderr)
             sys.exit(1)

@@ -1,12 +1,16 @@
-"""Shared path-filtering utilities for matching commits to projects.
+"""Shared git utilities: commit ancestry, and path-filtering for projects.
 
-Provides functions to retrieve files changed by a commit, check whether
+Holds :func:`ancestry`, the single implementation of the "is A an ancestor of
+B?" question every part of rlsbl asks (the mirror tripwire, the changelog
+validation cache, the release candidate check, the resume check), plus
+functions to retrieve files changed by a commit, check whether
 a file belongs to a project (by path prefix or watch globs), filter
 a set of commits to those touching a specific project's files,
 validate SSH host consistency between origin and subtree remotes,
 and detect manual pushes to release branches.
 """
 
+import enum
 import fnmatch
 import re
 import subprocess
@@ -14,8 +18,35 @@ import sys
 from . import effects
 
 
-def is_ancestor(ancestor: str, descendant: str, cwd: str | None = None) -> bool:
-    """True when *ancestor* is reachable from *descendant* in git history.
+class Ancestry(enum.Enum):
+    """The outcome of an ancestry question, with "cannot tell" spelled out.
+
+    ``git merge-base --is-ancestor`` answers with three exit codes, not two:
+    0 means yes, 1 means no, and anything else (128, typically) means git could
+    not answer -- an object the repository does not have, a shallow clone whose
+    history is truncated, a broken object store.  Collapsing that third case
+    into ``False`` makes "we do not know" indistinguishable from "we checked,
+    and no", which is how a truncated history quietly turns into a wrong
+    decision.  Every caller maps :attr:`INDETERMINABLE` explicitly.
+    """
+
+    TRUE = "true"
+    FALSE = "false"
+    INDETERMINABLE = "indeterminable"
+
+
+def ancestry(
+    ancestor: str,
+    descendant: str,
+    cwd: str | None = None,
+    *,
+    timeout: int | None = 10,
+) -> Ancestry:
+    """Is *ancestor* reachable from *descendant*?  The one implementation.
+
+    A commit is its own ancestor, as git has it.  Never raises: a timeout or a
+    missing git binary is :attr:`Ancestry.INDETERMINABLE`, same as git's own
+    "I cannot answer" exit code.
 
     Lives here rather than in a command handler because strictcli's
     effects-bypass lint reads a handler's own body: a ``ctx.effects`` call made
@@ -24,12 +55,21 @@ def is_ancestor(ancestor: str, descendant: str, cwd: str | None = None) -> bool:
     module is the shape the lint is asking for, and it is where this belongs
     anyway.
     """
-    result = effects.run(
-        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
-        capture_output=True,
-        cwd=cwd,
-    )
-    return result.returncode == 0
+    try:
+        result = effects.run(
+            ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return Ancestry.INDETERMINABLE
+    if result.returncode == 0:
+        return Ancestry.TRUE
+    if result.returncode == 1:
+        return Ancestry.FALSE
+    return Ancestry.INDETERMINABLE
 
 
 def get_commit_files(sha):

@@ -11,6 +11,7 @@ import time
 
 from ...ci_checks import RUN_ALL_REMEDY
 from ...errors import RlsblError
+from ...git_util import Ancestry, ancestry
 
 from .release_state import (
     get_state_path,
@@ -1087,11 +1088,9 @@ def require_recorded_candidate(state_path, cwd=None, *, version):
             f"({recorded[:12]}) does not resolve in this repository."
             + remedy
         )
-    ancestry = effects.run(
-        ["git", "merge-base", "--is-ancestor", resolved, "HEAD"],
-        capture_output=True, text=True, cwd=cwd,
-    )
-    if ancestry.returncode != 0:
+    # Fail closed: FALSE and INDETERMINABLE both refuse.  A release may not
+    # claim CI verification for a commit it cannot prove is on this branch.
+    if ancestry(resolved, "HEAD", cwd=cwd) is not Ancestry.TRUE:
         raise UnverifiedCandidateError(
             f"the CI-verified candidate recorded for {version} "
             f"({resolved[:12]}) is not an ancestor of HEAD, so the current "
