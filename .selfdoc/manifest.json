@@ -1070,6 +1070,33 @@
       ]
     },
     {
+      "path": "cli-rewrite.md",
+      "title": "rlsbl rewrite",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl rewrite",
+          "anchor": "rlsbl-rewrite"
+        },
+        {
+          "level": 2,
+          "text": "rewrite go-module-path",
+          "anchor": "rewrite-go-module-path"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags"
+        },
+        {
+          "level": 2,
+          "text": "rewrite uv-path-sources",
+          "anchor": "rewrite-uv-path-sources"
+        }
+      ]
+    },
+    {
       "path": "cli-scaffold.md",
       "title": "rlsbl scaffold",
       "type": "doc",
@@ -7546,6 +7573,192 @@
       ]
     },
     {
+      "path": "rlsbl-commands-rewrite-go_module_path.md",
+      "title": "rlsbl.commands.rewrite.go_module_path",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.rewrite.go_module_path",
+          "anchor": "rlsblcommandsrewritego_module_path"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.rewrite.go_module_path`",
+          "anchor": "rlsblcommandsrewritego_module_path"
+        },
+        {
+          "level": 3,
+          "text": "`GoModuleRewriteError`",
+          "anchor": "gomodulerewriteerror"
+        },
+        {
+          "level": 3,
+          "text": "`FileRewrite`",
+          "anchor": "filerewrite"
+        },
+        {
+          "level": 3,
+          "text": "`validate_module_paths`",
+          "anchor": "validate_module_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_excluded`",
+          "anchor": "_excluded"
+        },
+        {
+          "level": 3,
+          "text": "`find_go_mod_files`",
+          "anchor": "find_go_mod_files"
+        },
+        {
+          "level": 3,
+          "text": "`rewrite_go_mod_text`",
+          "anchor": "rewrite_go_mod_text"
+        },
+        {
+          "level": 3,
+          "text": "`_token_at`",
+          "anchor": "_token_at"
+        },
+        {
+          "level": 3,
+          "text": "`declared_modules`",
+          "anchor": "declared_modules"
+        },
+        {
+          "level": 3,
+          "text": "`rewrite_go_source_text`",
+          "anchor": "rewrite_go_source_text"
+        },
+        {
+          "level": 3,
+          "text": "`scan_go_source`",
+          "anchor": "scan_go_source"
+        },
+        {
+          "level": 3,
+          "text": "`observe_file`",
+          "anchor": "observe_file"
+        },
+        {
+          "level": 3,
+          "text": "`recompute`",
+          "anchor": "recompute"
+        },
+        {
+          "level": 3,
+          "text": "`observe`",
+          "anchor": "observe"
+        },
+        {
+          "level": 3,
+          "text": "`apply_item`",
+          "anchor": "apply_item"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_go_module_path`",
+          "anchor": "cmd_go_module_path"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-commands-rewrite-uv_path_sources.md",
+      "title": "rlsbl.commands.rewrite.uv_path_sources",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.rewrite.uv_path_sources",
+          "anchor": "rlsblcommandsrewriteuv_path_sources"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.rewrite.uv_path_sources`",
+          "anchor": "rlsblcommandsrewriteuv_path_sources"
+        },
+        {
+          "level": 3,
+          "text": "`UvPathSourceError`",
+          "anchor": "uvpathsourceerror"
+        },
+        {
+          "level": 3,
+          "text": "`Conversion`",
+          "anchor": "conversion"
+        },
+        {
+          "level": 4,
+          "text": "`occurrences`",
+          "anchor": "occurrences"
+        },
+        {
+          "level": 4,
+          "text": "`constraint`",
+          "anchor": "constraint"
+        },
+        {
+          "level": 3,
+          "text": "`path_sourced_names`",
+          "anchor": "path_sourced_names"
+        },
+        {
+          "level": 3,
+          "text": "`count_entries`",
+          "anchor": "count_entries"
+        },
+        {
+          "level": 3,
+          "text": "`collect_conversions`",
+          "anchor": "collect_conversions"
+        },
+        {
+          "level": 3,
+          "text": "`probe_published`",
+          "anchor": "probe_published"
+        },
+        {
+          "level": 3,
+          "text": "`observe`",
+          "anchor": "observe"
+        },
+        {
+          "level": 3,
+          "text": "`apply_item`",
+          "anchor": "apply_item"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_config`",
+          "anchor": "_apply_config"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_uv_path_sources`",
+          "anchor": "cmd_uv_path_sources"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-commands-rewrite.md",
+      "title": "rlsbl.commands.rewrite",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.rewrite",
+          "anchor": "rlsblcommandsrewrite"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.rewrite`",
+          "anchor": "rlsblcommandsrewrite"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-commands-status.md",
       "title": "rlsbl.commands.status",
       "type": "doc",
@@ -8284,6 +8497,51 @@
         },
         {
           "level": 3,
+          "text": "`iter_dep_arrays`",
+          "anchor": "iter_dep_arrays"
+        },
+        {
+          "level": 3,
+          "text": "`detect_path_deps_in`",
+          "anchor": "detect_path_deps_in"
+        },
+        {
+          "level": 3,
+          "text": "`rewrite_dep_arrays`",
+          "anchor": "rewrite_dep_arrays"
+        },
+        {
+          "level": 3,
+          "text": "`_split_requirement_parts`",
+          "anchor": "_split_requirement_parts"
+        },
+        {
+          "level": 3,
+          "text": "`find_dep_entries`",
+          "anchor": "find_dep_entries"
+        },
+        {
+          "level": 3,
+          "text": "`floor_dep_entries`",
+          "anchor": "floor_dep_entries"
+        },
+        {
+          "level": 3,
+          "text": "`_normalize`",
+          "anchor": "_normalize"
+        },
+        {
+          "level": 3,
+          "text": "`detect_uv_path_sources`",
+          "anchor": "detect_uv_path_sources"
+        },
+        {
+          "level": 3,
+          "text": "`remove_uv_sources`",
+          "anchor": "remove_uv_sources"
+        },
+        {
+          "level": 3,
           "text": "`detect_path_deps`",
           "anchor": "detect_path_deps"
         },
@@ -8291,11 +8549,6 @@
           "level": 3,
           "text": "`rewrite_pyproject_deps`",
           "anchor": "rewrite_pyproject_deps"
-        },
-        {
-          "level": 3,
-          "text": "`_rewrite_dep_array`",
-          "anchor": "_rewrite_dep_array"
         },
         {
           "level": 3,
@@ -10174,6 +10427,43 @@
       ]
     },
     {
+      "path": "rlsbl-module_paths.md",
+      "title": "rlsbl.module_paths",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.module_paths",
+          "anchor": "rlsblmodule_paths"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.module_paths`",
+          "anchor": "rlsblmodule_paths"
+        },
+        {
+          "level": 3,
+          "text": "`under_module_prefix`",
+          "anchor": "under_module_prefix"
+        },
+        {
+          "level": 3,
+          "text": "`go_import_under_module`",
+          "anchor": "go_import_under_module"
+        },
+        {
+          "level": 3,
+          "text": "`dotted_under_module`",
+          "anchor": "dotted_under_module"
+        },
+        {
+          "level": 3,
+          "text": "`rewrite_module_prefix`",
+          "anchor": "rewrite_module_prefix"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-npm_wrapper.md",
       "title": "rlsbl.npm_wrapper",
       "type": "doc",
@@ -11207,6 +11497,11 @@
           "level": 3,
           "text": "`query_pypi_version`",
           "anchor": "query_pypi_version"
+        },
+        {
+          "level": 3,
+          "text": "`query_pypi_release`",
+          "anchor": "query_pypi_release"
         },
         {
           "level": 3,
@@ -13005,8 +13300,8 @@
         },
         {
           "level": 4,
-          "text": "`_schema_dir`",
-          "anchor": "_schema_dir"
+          "text": "`_require_toml_path`",
+          "anchor": "_require_toml_path"
         },
         {
           "level": 4,
@@ -14974,6 +15269,16 @@
         },
         {
           "level": 3,
+          "text": "`cmd_rewrite_go_module_path`",
+          "anchor": "cmd_rewrite_go_module_path"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_rewrite_uv_path_sources`",
+          "anchor": "cmd_rewrite_uv_path_sources"
+        },
+        {
+          "level": 3,
           "text": "`_count_leaf_commands`",
           "anchor": "_count_leaf_commands"
         },
@@ -15793,6 +16098,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-27T14:32:01.279165+00:00",
+  "last_gen": "2026-08-27T15:01:05.358823+00:00",
   "theme": "minimal"
 }
