@@ -16,7 +16,6 @@ silently ignored. Both halves are pinned here.
 import pytest
 
 from rlsbl.lint import (
-    ScannedImports,
     _create_import_scanner,
     _create_linter,
     _detect_languages,
@@ -86,28 +85,29 @@ class TestNoSilentFallthrough:
         for name in LANGUAGES_BY_NAME:
             assert name in str(exc.value)
 
-    def test_scan_imports_reports_a_language_it_could_not_scan(self, tmp_path):
-        """A Go project's scan no longer looks like a project with no imports."""
-        (tmp_path / "go.mod").write_text("module example.com/foo\n\ngo 1.22\n")
-        result = scan_imports(str(tmp_path))
-        assert isinstance(result, ScannedImports)
-        assert result == set()
-        assert [lang for lang, _reason in result.skipped_languages] == ["go"]
-        assert all(reason for _lang, reason in result.skipped_languages)
+    def test_scan_imports_contributes_nothing_for_a_language_with_no_scanner(
+        self, tmp_path,
+    ):
+        """Go declares no project-wide scanner; dep_validation scans it per file.
 
-    def test_scan_imports_reports_nothing_skipped_for_a_scannable_project(self, tmp_path):
+        Which ecosystems the import-analysis checks cover is not decided here
+        at all -- it is the targets' answer (``supports_import_analysis``), and
+        an ecosystem out of scope is named in the check's own skip line.
+        """
+        (tmp_path / "go.mod").write_text("module example.com/foo\n\ngo 1.22\n")
+        assert LANGUAGES_BY_NAME["go"].import_scanner is None
+        assert scan_imports(str(tmp_path)) == set()
+
+    def test_scan_imports_collects_from_a_scannable_project(self, tmp_path):
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "x"\nversion = "0.1.0"\n'
         )
         (tmp_path / "lib.py").write_text("import os\n")
         result = scan_imports(str(tmp_path))
-        assert result.skipped_languages == ()
         assert {r.top_level for r in result} == {"os"}
 
     def test_scan_imports_of_an_empty_directory_is_still_a_set(self, tmp_path):
-        result = scan_imports(str(tmp_path))
-        assert result == set()
-        assert result.skipped_languages == ()
+        assert scan_imports(str(tmp_path)) == set()
 
 
 class TestTargetSideBridge:

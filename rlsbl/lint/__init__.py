@@ -15,22 +15,7 @@ from .config import (
 from .languages import LANGUAGES, get_language
 from .result import LintResult
 
-__all__ = ["lint_library", "scan_imports", "ScannedImports"]
-
-
-class ScannedImports(set):
-    """The imports a scan collected, plus the languages it could not scan.
-
-    ``scan_imports`` used to return a plain set and drop the fact that a
-    detected language had no import scanner, so a Go project's scan looked
-    exactly like a project with no imports. This is still a set -- every
-    existing caller and comparison keeps working -- but it now carries the
-    skips as ``skipped_languages``, a tuple of ``(language, reason)`` pairs.
-    """
-
-    def __init__(self, *args, skipped_languages=()):
-        super().__init__(*args)
-        self.skipped_languages = tuple(skipped_languages)
+__all__ = ["lint_library", "scan_imports"]
 
 
 def _detect_languages(project_path: str) -> list[str]:
@@ -126,7 +111,7 @@ def lint_library(
     return results
 
 
-def scan_imports(project_path: str) -> ScannedImports:
+def scan_imports(project_path: str) -> set:
     """Collect all imports from source files in a project.
 
     Detects languages present and uses AST-based scanners to extract
@@ -135,26 +120,27 @@ def scan_imports(project_path: str) -> ScannedImports:
     Args:
         project_path: path to the project root directory.
 
-    Returns a :class:`ScannedImports` -- a set of import records that also
-    reports which detected languages contributed nothing because they declare
-    no project-wide scanner. Python imports are ImportRecord dataclasses
-    (top_level, full_path, filepath, line, guarded, type_checking); npm
-    imports are (package_name, file_path, line_number, guarded) tuples.
+    Returns a set of import records. Python imports are ImportRecord
+    dataclasses (top_level, full_path, filepath, line, guarded,
+    type_checking); npm imports are (package_name, file_path, line_number,
+    guarded) tuples.
 
-    The skip list is the point: a Go project scanned here yields no imports,
-    and without ``skipped_languages`` that is indistinguishable from a project
-    that imports nothing.
+    A detected language that declares no project-wide scanner contributes
+    nothing here -- Go is scanned per file by ``dep_validation``, and JVM
+    sources rlsbl never parses at all (each language states its reason in
+    ``LANGUAGES``). That is not a silent skip a user can be misled by: the
+    checks built on import analysis take their scope from the targets that
+    implement the matching protocol method, so an ecosystem out of scope is
+    named in the check's own skip line.
     """
     project_path = os.path.abspath(project_path)
     languages = _detect_languages(project_path)
 
     all_imports: set = set()
-    skipped: list[tuple[str, str]] = []
     for language in languages:
         scanner = _create_import_scanner(language)
         if scanner is None:
-            skipped.append((language, get_language(language).scanner_absent_reason))
             continue
         all_imports.update(scanner.scan_imports(project_path))
 
-    return ScannedImports(all_imports, skipped_languages=skipped)
+    return all_imports
