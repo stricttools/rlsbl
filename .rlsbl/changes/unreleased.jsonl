@@ -123,3 +123,4 @@
 {"format_version":1,"id":"18cfc8b3f30b77a5e280bdb60ec94a908bdd6ecfccb1dbad","commits":["8161079b8f54ed4d916cf0c0047e33849f80e13a"],"user_facing":false}
 {"format_version":1,"id":"18cfc8e623fcc290243d5a37acac426b81410d5bf26964a3","commits":["aed15904984e550b85ea8b05011fd42bb7ca21ad"],"user_facing":true,"description":"**Release-file errors name the file.** A schema or validation failure on a release file now says which file failed (`<path>: <diagnostic>`) instead of reporting only the field, for both single-project and batch release files.","type":"fix"}
 {"format_version":1,"id":"18cfc907de5f7fc064c43edd61e14c558cd5d400b9c18c41","commits":["4bc9ca51bae0485fbf9cf8ccf3bb0b53a0f70853"],"user_facing":false}
+{"format_version":1,"id":"18cfc95d680820458674e9d167504a66859fcae461ce9a99","commits":["0f951a79931ba8ed13b95b599a1565f50849ace9"],"user_facing":false}
