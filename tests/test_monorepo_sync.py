@@ -809,7 +809,8 @@ class TestDotPathSelfReference:
             )
         with open(os.path.join(mono, "workspace.toml"), "w") as f:
             f.write(
-                '[[releasables]]\nname = "orxtra"\n\n'
+                '[[releasables]]\nname = "orxtra"\n'
+                'tag_format = "v{version}"\n\n'
                 '[[projects]]\npath = "."\nreleasable = "orxtra"\n'
             )
         subprocess.run(["git", "add", "-A"], cwd=str(mock_git_repo), check=True)
@@ -1102,7 +1103,8 @@ class TestRootPublisherSync:
 
         with open(os.path.join(mono, "workspace.toml"), "w") as f:
             f.write(
-                '[[releasables]]\nname = "orxtra"\n\n'
+                '[[releasables]]\nname = "orxtra"\n'
+                'tag_format = "v{version}"\n\n'
                 '[[projects]]\npath = "."\nreleasable = "orxtra"\n'
             )
         subprocess.run(["git", "add", "-A"], cwd=root, check=True)

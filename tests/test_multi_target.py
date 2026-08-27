@@ -208,6 +208,17 @@ class TestGraphMultiTarget:
 # ---------------------------------------------------------------------------
 
 
+def _member_row(out, name):
+    """The per-member table row for *name*.
+
+    `monorepo status` renders the per-releasable summary first and the
+    per-member table after it; the target columns are in the second table.
+    """
+    lines = [line for line in out.strip().split("\n") if line.strip()]
+    start = next(i for i, line in enumerate(lines) if line.startswith("Project"))
+    return next(line for line in lines[start + 1:] if line.split()[0] == name)
+
+
 class TestStatusMultiTarget:
     """Verify monorepo status shows all targets for multi-target projects."""
 
@@ -227,9 +238,7 @@ class TestStatusMultiTarget:
         captured = capsys.readouterr()
 
         # The Target column should contain both targets
-        lines = captured.out.strip().split("\n")
-        assert len(lines) >= 2  # header + at least one data row
-        data_line = lines[1]
+        data_line = _member_row(captured.out, "dual")
         # Both target names should appear in the row (comma-separated)
         assert "pypi" in data_line
         assert "npm" in data_line
@@ -248,6 +257,5 @@ class TestStatusMultiTarget:
         _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
 
-        lines = captured.out.strip().split("\n")
-        data_line = lines[1]
+        data_line = _member_row(captured.out, "solo")
         assert "npm" in data_line

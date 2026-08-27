@@ -200,7 +200,6 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
     make_workspace(str(repo), [{
         "path": project_path,
         "name": name,
-        "target": "npm",
         "subtree_remote": "https://github.com/example/mylib.git",
     }])
     _git(repo, "add", "-A")
@@ -208,7 +207,11 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
     tag = f"{name}@v{version}"
     _git(repo, "tag", tag)
 
-    state_path = get_state_path(str(proj_dir))
+    from rlsbl.commands.release.release_state import resolve_releasable_dir
+    state_path = get_state_path(
+        str(proj_dir),
+        releasable_dir=resolve_releasable_dir(str(proj_dir), str(repo)),
+    )
     save_release_state(state_path, {
         "new_version": version,
         "tag": tag,
@@ -222,7 +225,8 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
         "failed_steps": {},
         "companion_tags": [],
         "monorepo_name": name,
-        "releasable_name": None,
+        # make_workspace derives one releasable per member, named after it.
+        "releasable_name": name,
         "commit_msg": tag,
         "description": "test release",
         "context": "",
@@ -569,7 +573,11 @@ class TestNonFatalFailures:
         release exit 0. It is a tracked step now: nonzero exit, marker
         recorded, state preserved."""
         project_dir = _setup_subtree_monorepo(mock_git_repo)
-        state_path = get_state_path(project_dir)
+        from rlsbl.commands.release.release_state import resolve_releasable_dir
+        state_path = get_state_path(
+            project_dir,
+            releasable_dir=resolve_releasable_dir(project_dir, str(mock_git_repo)),
+        )
 
         def failing_subtree_run(cmd, args=None, timeout=120, env=None, cwd=None):
             if cmd == "git" and args and args[0] == "subtree":
@@ -604,7 +612,11 @@ class TestNonFatalFailures:
     ):
         """Same for the mirror GitHub Release: a warning is not an outcome."""
         project_dir = _setup_subtree_monorepo(mock_git_repo)
-        state_path = get_state_path(project_dir)
+        from rlsbl.commands.release.release_state import resolve_releasable_dir
+        state_path = get_state_path(
+            project_dir,
+            releasable_dir=resolve_releasable_dir(project_dir, str(mock_git_repo)),
+        )
 
         def failing_mirror(*args, **kwargs):
             raise RuntimeError("mirror repo not found")
