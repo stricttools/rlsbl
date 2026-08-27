@@ -56,6 +56,8 @@ DECLARED_BEFORE_DELETION = {
     "zig": {"ci_templates", "dev_install", "read_name"},
 }
 
+# The one definition of the axis -> property map. tests/test_targets.py used to
+# carry a second copy under a different name; it imports this one now.
 AXIS_PROPERTIES = {
     "read_name": "supports_read_name",
     "read_metadata": "supports_read_metadata",
