@@ -12,3 +12,4 @@
 {"format_version":1,"id":"18cfad9fe6c6ef3e1b00edad013740848354c5c82d229438","commits":["aacc7c3fb3402a83248c94329fa78da9da507b4d"],"user_facing":false}
 {"format_version":1,"id":"18cfada93db528daec512eae9a1f48abb3cc5e608df351da","commits":["a3f80df19c3869124db1671975ee260fcf4dd6c5"],"user_facing":true,"description":"**strictspec floor corrected.** Installing rlsbl could resolve a `strictspec` older than its generated validators require, making every rlsbl command fail at import with a runtime-version error. The declared floor now matches what the validators call for.","type":"fix"}
 {"format_version":1,"id":"18cfadb42b8bc3857ce5ae4eb9434ac19513b4de0169c1a9","commits":["54a2490e725aa3f38ee81bacb0eeedcca319b22b"],"user_facing":false}
+{"format_version":1,"id":"18cfadc9dbc626eaf781468b4f934bbd8373f0c149933a70","commits":["16ea45e00c35a38eea104dfe3a6a75377fb06fe3"],"user_facing":false}
