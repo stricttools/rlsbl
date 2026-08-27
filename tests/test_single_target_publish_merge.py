@@ -234,10 +234,12 @@ def _setup_root_publisher_subdir(root, *, name, sub, gate_regex):
         json.dump(cfg, f)
     with open(os.path.join(mono, "workspace.toml"), "w") as f:
         f.write(
-            f'[[releasables]]\nname = "{name}"\n\n'
-            f'[[projects]]\npath = "."\nreleasable = "{name}"\n'
+            f'[[releasables]]\nname = "{name}"\n'
+            'tag_format = "v{version}"\n\n'
+            f'[[projects]]\npath = "."\nname = "root"\n'
+            f'releasable = "{name}"\n'
         )
-    return {"name": name, "path": ".", "releasable": name, "_root_publisher": True}
+    return {"name": "root", "path": ".", "releasable": name, "_root_publisher": True}
 
 
 class TestRootPublisherSubdirTarget:
@@ -256,7 +258,7 @@ class TestRootPublisherSubdirTarget:
         data = _load(result)
         jobs = data["jobs"]
         assert "gate" in jobs
-        pub_keys = [k for k in jobs if k.startswith("orxtra-")]
+        pub_keys = [k for k in jobs if k.startswith("root-")]
         assert pub_keys, f"no root publish jobs: {list(jobs)}"
         # The publish job runs in the target's subdirectory. project_path is "."
         # (root publisher), composed with the target subdir "npm" -> "npm".
@@ -285,15 +287,17 @@ class TestRootPublisherSubdirTarget:
             )
         with open(os.path.join(mono, "workspace.toml"), "w") as f:
             f.write(
-                f'[[releasables]]\nname = "{name}"\n\n'
-                f'[[projects]]\npath = "."\nreleasable = "{name}"\n'
+                    f'[[releasables]]\nname = "{name}"\n'
+                'tag_format = "v{version}"\n\n'
+                f'[[projects]]\npath = "."\nname = "root"\n'
+                f'releasable = "{name}"\n'
             )
-        proj = {"name": name, "path": ".", "releasable": name, "_root_publisher": True}
+        proj = {"name": "root", "path": ".", "releasable": name, "_root_publisher": True}
         with patch(
             "rlsbl.commands.monorepo.publish_inline._get_monorepo_tag_prefix",
             return_value="orxtra@v",
         ):
             result = generate_inline_publish_router([proj], root)
         data = _load(result)
-        for k in [k for k in data["jobs"] if k.startswith("orxtra-")]:
+        for k in [k for k in data["jobs"] if k.startswith("root-")]:
             assert data["jobs"][k]["defaults"]["run"]["working-directory"] == "."

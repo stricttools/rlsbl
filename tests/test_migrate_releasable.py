@@ -474,18 +474,31 @@ class TestMigrateReleasableFullFlow:
         assert result["changelogs"]["entries_merged"] == 2
         assert result["versions"]["status"] == "ok"
 
-    def test_migration_rejects_non_explicit_mode(self, tmp_project):
-        """Migration raises WorkspaceError if workspace is not in explicit mode."""
+    def test_migration_rejects_a_workspace_with_no_releasables_section(
+        self, tmp_project,
+    ):
+        """Migration refuses a workspace file with no releasables section."""
         _init_git(tmp_project)
         _make_pypi_project(tmp_project, "a", "0.1.0")
-        _write_workspace(tmp_project, """\
+        _write_workspace(
+            tmp_project,
+            """\
+[[projects]]
+path = "."
+name = "root"
+dev_only = true
+releasable = false
+
 [[projects]]
 path = "a"
 name = "a"
-""")
+""",
+            root_member="",
+            releasables=None,
+        )
 
         from rlsbl.errors import WorkspaceError
-        with pytest.raises(WorkspaceError, match="not in explicit mode"):
+        with pytest.raises(WorkspaceError, match="no \\[\\[releasables\\]\\] section"):
             cmd_migrate_releasable(str(tmp_project), "core", dry_run=False)
 
     def test_migration_rejects_unknown_releasable(self, tmp_project):

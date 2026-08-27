@@ -724,9 +724,13 @@ class TestCmdMonoInit:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_init")
     def test_delegates(self, mock_init, _):
-        rlsbl.cmd_mono_init(cli_ctx(), auto_commit=False)
+        rlsbl.cmd_mono_init(
+            cli_ctx(), root_member=rlsbl.RootDevNode(), auto_commit=False,
+        )
         mock_init.assert_called_once()
-        assert mock_init.call_args[0][0]["auto-commit"] is False
+        flags = mock_init.call_args[0][0]
+        assert flags["auto-commit"] is False
+        assert flags["root-dev-node"] is True
 
 
 class TestCmdMonoAdd:

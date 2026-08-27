@@ -1125,7 +1125,7 @@ class TestRootPublisherSync:
         doc = parse_ci_workflow(content)
         jobs = doc["jobs"]
         assert "gate" in jobs
-        assert any(k.startswith("orxtra-") for k in jobs)
+        assert any(k.startswith("root-") for k in jobs)
         # The mandatory configured gate regex is baked into the router.
         assert regex in content
         # Generated router is read-only.

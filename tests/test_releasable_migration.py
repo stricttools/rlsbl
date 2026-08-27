@@ -165,15 +165,32 @@ releasable = "core"
 class TestDetectMigrationStateImplicit:
     """detect_migration_state in implicit mode (no [[releasables]])."""
 
-    def test_implicit_mode_detected(self, tmp_project):
+    def test_no_releasables_is_not_explicit_mode(self, tmp_project):
+        """A workspace file with no releasables section reports non-explicit.
+
+        The loader refuses to read such a file, so migration detection is the
+        one caller that still sees the shape -- and names it.
+        """
         _make_pypi_project(tmp_project, "a", "0.1.0")
-        _write_workspace(tmp_project, """\
+        _write_workspace(
+            tmp_project,
+            """\
+[[projects]]
+path = "."
+name = "root"
+dev_only = true
+releasable = false
+
 [[projects]]
 path = "a"
 name = "a"
-""")
-        result = detect_migration_state(str(tmp_project))
-        assert result["explicit_mode"] is False
+""",
+            root_member="",
+            releasables=None,
+        )
+        from rlsbl.errors import WorkspaceError
+        with pytest.raises(WorkspaceError, match="no \\[\\[releasables\\]\\] section"):
+            detect_migration_state(str(tmp_project))
 
     def test_reports_project_version(self, tmp_project):
         _make_pypi_project(tmp_project, "a", "1.2.3")

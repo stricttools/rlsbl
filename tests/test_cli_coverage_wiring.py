@@ -357,9 +357,31 @@ class TestStandaloneWiring:
 class TestMonorepoDirectWiring:
 
     def test_init(self):
-        result, m = _dispatch(["monorepo", "init"], "rlsbl.commands.monorepo._cmd_init")
+        result, m = _dispatch(
+            ["monorepo", "init", "--root-dev-node"],
+            "rlsbl.commands.monorepo._cmd_init",
+        )
         assert result.exit_code == 0, result.stderr
-        assert _flags(m) == {"auto-commit": True}
+        assert _flags(m) == {"auto-commit": True, "root-dev-node": True}
+
+    def test_init_requires_the_root_members_kind(self):
+        result, _m = _dispatch(["monorepo", "init"], "rlsbl.commands.monorepo._cmd_init")
+        assert result.exit_code == 1
+        assert "--root-dev-node" in result.stderr
+        assert "--root-releasable" in result.stderr
+
+    def test_init_root_releasable_carries_its_tag_format(self):
+        result, m = _dispatch(
+            ["monorepo", "init", "--root-releasable", "core",
+             "--tag-format", "v{version}"],
+            "rlsbl.commands.monorepo._cmd_init",
+        )
+        assert result.exit_code == 0, result.stderr
+        assert _flags(m) == {
+            "auto-commit": True,
+            "root-releasable": "core",
+            "root-tag-format": "v{version}",
+        }
 
     def test_add(self):
         result, m = _dispatch(

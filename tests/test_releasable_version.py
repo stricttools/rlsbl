@@ -247,11 +247,20 @@ releasable = "core"
         assert is_explicit_mode(str(tmp_path)) is True
 
     def test_no_releasables_section(self, tmp_path):
-        _write_workspace(tmp_path, """\
+        """A workspace file with no releasables section at all is not explicit.
+
+        The loader refuses such a file, so it never reaches a reader -- but
+        the detection itself still answers honestly.
+        """
+        _write_workspace(
+            tmp_path,
+            """\
 [[projects]]
 path = "a"
 name = "a"
-""")
+""",
+            releasables=None,
+        )
         assert is_explicit_mode(str(tmp_path)) is False
 
     def test_no_workspace_file(self, tmp_path):
