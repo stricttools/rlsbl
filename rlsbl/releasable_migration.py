@@ -147,6 +147,10 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
     gains a ``packages`` field listing which member packages are affected
     (derived from commit file paths via project path/watch matching).
 
+    Entries already present in the releasable's own ``unreleased.jsonl`` are
+    kept and written first, ahead of the member contributions -- consolidation
+    adds to that file, it never replaces it.
+
     Cross-package dedup: entries from different packages that reference the
     exact same set of commits are merged into a single entry, combining
     their ``packages`` lists. This prevents the same commit from appearing
@@ -176,7 +180,9 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
 
     Returns:
         A dict with:
-            - ``entries_merged`` (int): total entries written
+            - ``entries_merged`` (int): total entries written -- the
+              releasable's pre-existing unreleased entries plus the member
+              contributions, after dedup
             - ``source_projects`` (list[str]): projects that had entries
             - ``dest_path`` (str): path to the releasable's unreleased.jsonl
             - ``duplicates_merged`` (int): entries merged due to identical commits
@@ -187,7 +193,13 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
     effects.makedirs(dest_changes_dir, exist_ok=True)
     dest_path = os.path.join(dest_changes_dir, "unreleased.jsonl")
 
-    all_entries = []
+    # Consolidation ADDS the members' entries to the releasable's changelog; it
+    # never replaces it. The destination file is rewritten wholesale below, so
+    # its own pre-existing unreleased entries have to be read first or they
+    # would be destroyed. (_validate_no_changelog_collisions rejects the
+    # both-sides-populated case before a migration reaches this point, so a
+    # member entry cannot be duplicated here.)
+    all_entries = list(read_unreleased(dest_changes_dir))
     source_projects = []
 
     for proj in member_projects:

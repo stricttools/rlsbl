@@ -860,6 +860,38 @@ releasable = "core"
 
     @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
     @patch("rlsbl.releasable_cleanup._saferm_dir", side_effect=_mock_saferm_dir)
+    def test_releasable_own_unreleased_entries_survive(self, mock_dir, mock_file,
+                                                       tmp_project):
+        """Releasable has unreleased entries and no member does -> they survive.
+
+        Validation only rejects the case where BOTH sides have entries, so this
+        combination reaches consolidation. The releasable's own entries must not
+        be overwritten by the (empty) member contribution.
+        """
+        setup = _setup_migration_monorepo(tmp_project, entries_a=[], entries_b=[])
+        root = str(setup["root"])
+
+        rel_changes = get_releasable_changes_dir(root, "core")
+        os.makedirs(rel_changes, exist_ok=True)
+        existing = [
+            ChangelogEntry(commits=["ddd4444"], user_facing=True,
+                           description="Pre-existing releasable feature",
+                           type="feature", id="id-preexisting-1"),
+            ChangelogEntry(commits=["eee5555"], user_facing=False,
+                           id="id-preexisting-2"),
+        ]
+        with open(os.path.join(rel_changes, "unreleased.jsonl"), "w") as f:
+            f.writelines(serialize_entry(e) + "\n" for e in existing)
+
+        result = cmd_migrate_releasable(root, "core", dry_run=False)
+
+        entries = parse_jsonl(os.path.join(rel_changes, "unreleased.jsonl"))
+        assert [e.id for e in entries] == ["id-preexisting-1", "id-preexisting-2"]
+        assert entries[0].description == "Pre-existing releasable feature"
+        assert result["changelogs"]["entries_merged"] == 2
+
+    @patch("rlsbl.releasable_cleanup._saferm_file", side_effect=_mock_saferm_file)
+    @patch("rlsbl.releasable_cleanup._saferm_dir", side_effect=_mock_saferm_dir)
     def test_no_releasable_changes_dir_proceeds(self, mock_dir, mock_file, tmp_project):
         """No releasable changes dir at all -> proceeds normally."""
         setup = _setup_migration_monorepo(tmp_project)
