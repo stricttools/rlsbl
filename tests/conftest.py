@@ -108,7 +108,6 @@ from rlsbl.context import ProjectContext
 from rlsbl.workspace import (
     DEFAULT_TAG_FORMAT,
     WORKSPACE_DIR,
-    WORKSPACE_FILE,
     Releasable,
     save_workspace,
     write_releasable_version,
