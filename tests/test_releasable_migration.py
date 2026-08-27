@@ -605,6 +605,135 @@ class TestConsolidateChangelogsVersionedFiles:
 
 
 # ---------------------------------------------------------------------------
+# consolidate_changelogs: entry id preservation
+# ---------------------------------------------------------------------------
+
+
+class TestConsolidateChangelogsPreservesEntryIds:
+    """Consolidation must carry each entry's stable id through unchanged.
+
+    The id is what ``rlsbl changelog amend --id`` / ``changelog edit --id``
+    use to address an entry; dropping it during migration makes every
+    migrated entry unaddressable.
+    """
+
+    def test_unreleased_entry_ids_preserved(self, tmp_project):
+        proj_a = _make_pypi_project(tmp_project, "a", "0.1.0")
+        proj_b = _make_pypi_project(tmp_project, "b", "0.1.0")
+
+        _write_unreleased_jsonl(proj_a, [
+            ChangelogEntry(commits=["aaa1111"], user_facing=True,
+                           description="Fix in a", type="fix",
+                           id="id-a-0001"),
+        ])
+        _write_unreleased_jsonl(proj_b, [
+            ChangelogEntry(commits=["bbb2222"], user_facing=False,
+                           id="id-b-0002"),
+        ])
+
+        members = [
+            WorkspaceProject({"name": "a", "path": "a"}),
+            WorkspaceProject({"name": "b", "path": "b"}),
+        ]
+
+        result = consolidate_changelogs(str(tmp_project), "core", members)
+
+        from rlsbl.changelog.schema import parse_jsonl
+        entries = parse_jsonl(result["dest_path"])
+        assert {e.id for e in entries} == {"id-a-0001", "id-b-0002"}
+
+    def test_versioned_entry_ids_preserved(self, tmp_project):
+        proj_a = _make_pypi_project(tmp_project, "a", "0.2.0")
+        proj_b = _make_pypi_project(tmp_project, "b", "0.2.0")
+
+        _write_versioned_jsonl(proj_a, "0.1.0", [
+            ChangelogEntry(commits=["aaa1111"], user_facing=True,
+                           description="Released fix in a", type="fix",
+                           id="id-hist-a"),
+        ])
+        _write_versioned_jsonl(proj_b, "0.1.0", [
+            ChangelogEntry(commits=["bbb2222"], user_facing=True,
+                           description="Released feature in b", type="feature",
+                           id="id-hist-b"),
+        ])
+        _write_unreleased_jsonl(proj_a, [])
+        _write_unreleased_jsonl(proj_b, [])
+
+        members = [
+            WorkspaceProject({"name": "a", "path": "a"}),
+            WorkspaceProject({"name": "b", "path": "b"}),
+        ]
+
+        consolidate_changelogs(str(tmp_project), "core", members)
+
+        from rlsbl.changelog.schema import parse_jsonl
+        dest_changes = get_releasable_changes_dir(str(tmp_project), "core")
+        entries = parse_jsonl(os.path.join(dest_changes, "0.1.0.jsonl"))
+        assert {e.id for e in entries} == {"id-hist-a", "id-hist-b"}
+
+    def test_dedup_keeps_first_seen_id(self, tmp_project):
+        """Two members describing the same commits merge into one entry that
+        keeps the surviving (first user-facing) entry's id."""
+        proj_a = _make_pypi_project(tmp_project, "a", "0.1.0")
+        proj_b = _make_pypi_project(tmp_project, "b", "0.1.0")
+
+        _write_unreleased_jsonl(proj_a, [
+            ChangelogEntry(commits=["ccc3333"], user_facing=True,
+                           description="Shared change", type="feature",
+                           id="id-first"),
+        ])
+        _write_unreleased_jsonl(proj_b, [
+            ChangelogEntry(commits=["ccc3333"], user_facing=True,
+                           description="Shared change", type="feature",
+                           id="id-second"),
+        ])
+
+        members = [
+            WorkspaceProject({"name": "a", "path": "a"}),
+            WorkspaceProject({"name": "b", "path": "b"}),
+        ]
+
+        result = consolidate_changelogs(str(tmp_project), "core", members)
+        assert result["duplicates_merged"] == 1
+
+        from rlsbl.changelog.schema import parse_jsonl
+        entries = parse_jsonl(result["dest_path"])
+        assert len(entries) == 1
+        assert entries[0].id == "id-first"
+
+    def test_dedup_falls_back_to_any_available_id(self, tmp_project):
+        """When the surviving base entry has no id, an id from the group is
+        still carried through rather than dropped."""
+        proj_a = _make_pypi_project(tmp_project, "a", "0.1.0")
+        proj_b = _make_pypi_project(tmp_project, "b", "0.1.0")
+
+        # a's entry is non-user-facing and carries no id; b's user-facing
+        # entry becomes the merge base but also has no id -- the only id in
+        # the group belongs to a third, non-user-facing entry.
+        _write_unreleased_jsonl(proj_a, [
+            ChangelogEntry(commits=["ddd4444"], user_facing=False,
+                           id="id-only-one"),
+        ])
+        _write_unreleased_jsonl(proj_b, [
+            ChangelogEntry(commits=["ddd4444"], user_facing=True,
+                           description="Shared change", type="feature"),
+        ])
+
+        members = [
+            WorkspaceProject({"name": "a", "path": "a"}),
+            WorkspaceProject({"name": "b", "path": "b"}),
+        ]
+
+        result = consolidate_changelogs(str(tmp_project), "core", members)
+
+        from rlsbl.changelog.schema import parse_jsonl
+        entries = parse_jsonl(result["dest_path"])
+        assert len(entries) == 1
+        assert entries[0].description == "Shared change"
+        assert entries[0].id == "id-only-one"
+
+
+# ---------------------------------------------------------------------------
 # _derive_packages_for_entry (unit tests)
 # ---------------------------------------------------------------------------
 

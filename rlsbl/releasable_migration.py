@@ -207,6 +207,7 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
                     description=entry.description,
                     type=entry.type,
                     release_type=entry.release_type,
+                    id=entry.id,
                     packages=packages if packages else None,
                 )
                 all_entries.append(merged)
@@ -298,6 +299,12 @@ def _dedup_entries(entries):
     When merging, the first user-facing entry's description and type win
     (non-user-facing entries contribute only their packages).
 
+    The merged entry keeps the surviving base entry's stable ``id`` so it
+    stays addressable by ``changelog amend --id`` / ``changelog edit --id``.
+    If the base entry has no id (historical entries predate ids), the first
+    id present anywhere in the group is used, so an existing id is never
+    dropped.
+
     Returns ``(deduped_entries, count_of_merges)`` where count_of_merges is
     the number of entries that were folded into another (i.e.,
     ``len(original) - len(deduped)``).
@@ -330,12 +337,20 @@ def _dedup_entries(entries):
         if base is None:
             base = group[0]
 
+        merged_id = base.id
+        if merged_id is None:
+            for entry in group:
+                if entry.id is not None:
+                    merged_id = entry.id
+                    break
+
         merged = ChangelogEntry(
             commits=base.commits,
             user_facing=base.user_facing,
             description=base.description,
             type=base.type,
             release_type=base.release_type,
+            id=merged_id,
             packages=sorted(combined_packages) if combined_packages else base.packages,
         )
         deduped.append(merged)
@@ -382,6 +397,7 @@ def _merge_versioned_files(workspace_root, releasable_name, member_projects,
                 description=entry.description,
                 type=entry.type,
                 release_type=entry.release_type,
+                id=entry.id,
                 packages=packages,
             ))
 
