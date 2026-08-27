@@ -121,6 +121,76 @@ def _require_sub_project_root(workspace_root_guidance=None):
     return root
 
 
+def _at_workspace_root(workspace_root):
+    """Is the current directory the workspace root itself?
+
+    Distinguishes the two questions cwd resolution answers.  Every directory
+    inside a workspace resolves to some member -- the root member owns
+    whatever no one else claims -- so "which member am I in?" can no longer
+    say "none".  Standing at the root is therefore not an unresolvable
+    position; it is the position that names the *workspace*, and commands
+    that act on one releasable have to be told which.
+    """
+    return Path(workspace_root).resolve() == Path.cwd().resolve()
+
+
+def _releasable_representative(workspace_root, releasable):
+    """The member whose directory stands in for *releasable*, or exit.
+
+    A releasable is released by running the flow from one of its members; the
+    first declared member is that one.  Which member it is has no effect on
+    the release: version, changelog and release state all belong to the
+    releasable, not to the member.
+    """
+    from .workspace import load_releasables, load_workspace, members_of
+
+    projects = load_workspace(workspace_root)
+    releasables = load_releasables(workspace_root, projects)
+    names = sorted(rel.name for rel in releasables)
+
+    if releasable is None:
+        print(
+            "Error: `rlsbl release run` at the workspace root must say which "
+            "releasable to release -- the root directory names the whole "
+            "workspace, not one of them.",
+            file=sys.stderr,
+        )
+        if names:
+            print("Declared releasables:", file=sys.stderr)
+            for name in names:
+                print(f"  rlsbl release run --releasable {name} ...", file=sys.stderr)
+        else:
+            print(
+                "This workspace declares none, so there is nothing to "
+                "release from here.",
+                file=sys.stderr,
+            )
+        print(
+            "Use `rlsbl monorepo release run` to release several at once.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if releasable not in names:
+        print(
+            f"Error: no releasable named {releasable!r} in this workspace.",
+            file=sys.stderr,
+        )
+        if names:
+            print(f"Declared: {', '.join(names)}", file=sys.stderr)
+        sys.exit(1)
+
+    members = members_of(releasable, projects)
+    if not members:
+        print(
+            f"Error: releasable {releasable!r} has no member projects, so "
+            f"there is no directory to run its release from.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return members[0]
+
+
 def _opt_default(value, fallback):
     """Resolve an optional flag's absence to the fallback its help declares.
 
@@ -319,18 +389,13 @@ release_group = app.group("release", help="Release orchestration commands coveri
 @strictcli.flag(name="bump", type=str, presence="optional", help="Bump type: patch, minor, major, infra, prerelease. Skips the release file.")
 @strictcli.flag(name="description", type=str, presence="optional", help="Short release description summarizing the changes (required with --bump)")
 @strictcli.flag(name="preid", type=str, presence="optional", help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.")
+@strictcli.flag(name="releasable", type=str, presence="optional", help="Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it.")
 @effects.handler
-def cmd_release_run(ctx, allow_dirty, watch, bump, description, preid, push_timeout, ci_timeout, check_timeout, hook_timeout):
+def cmd_release_run(ctx, allow_dirty, watch, bump, description, preid, releasable, push_timeout, ci_timeout, check_timeout, hook_timeout):
     """Execute the release flow: validate, bump, test, commit, tag, push, and create GitHub Release."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl release run` must run inside a sub-project, not "
-            "at the monorepo workspace root. cd into the sub-project you "
-            "want to release."
-        )
-    )
+    root = _require_sub_project_root()
 
     from .release_file import read_release_file, get_release_file_path, ReleaseConfig, VALID_BUMP_TYPES
     from .workspace import find_workspace_root, resolve_project
@@ -338,18 +403,36 @@ def cmd_release_run(ctx, allow_dirty, watch, bump, description, preid, push_time
     # In monorepo mode, the release file lives in the package's directory
     project_dir = "."
     monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
     if monorepo_root:
-        project = resolve_project(monorepo_root, ".")
-        if project is None:
-            print(
-                "Error: cannot release from monorepo root. "
-                "Use `rlsbl monorepo release run` for batch releases, "
-                "or cd to a package directory.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        if _at_workspace_root(monorepo_root):
+            # The workspace root is the root member's directory, so standing
+            # there names the whole workspace and not one releasable. Rather
+            # than guess (the old behaviour refused outright, then silently
+            # released whatever the root member belonged to), the invocation
+            # has to say which one.
+            project = _releasable_representative(monorepo_root, releasable)
+            root = Path(monorepo_root) / project["path"]
+        else:
+            if releasable is not None:
+                print(
+                    "Error: --releasable is only accepted at the workspace "
+                    "root. Here the directory already names what is being "
+                    "released; drop the flag, or run from the workspace root "
+                    "to choose.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            project = resolve_project(monorepo_root, ".")
         project_dir = os.path.join(monorepo_root, project["path"])
+    elif releasable is not None:
+        print(
+            "Error: --releasable is a monorepo selector and this is a "
+            "standalone repository, which has exactly one thing to release.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
 
     # Releasable releases keep their release file under the releasable's
     # own dir (.rlsbl-monorepo/releasables/<name>/releases/), never under

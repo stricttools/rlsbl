@@ -30,6 +30,7 @@ _BASE_KWARGS = dict(
     check_timeout=0,
     hook_timeout=0,
     preid="",
+    releasable=None,
 )
 
 
