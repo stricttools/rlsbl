@@ -187,7 +187,7 @@ def compute_batch_plan(workspace_root, batch_config, projects):
                 target, primary_path, rc.bump,
                 None, None, _noop_log,
                 workspace_root=workspace_root, releasable_name=name,
-                releasable_tag_fmt=rel.tag_format, preid=rc.preid,
+                releasable_tag_fmt=rel.effective_tag_format, preid=rc.preid,
             )
             items[name] = PlanItem(
                 name=name, base_version=current, target_version=new,

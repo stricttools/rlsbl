@@ -212,7 +212,7 @@ def _find_latest_tag(uc):
     if uc.releasable_name and uc.ws_root:
         from ..commands.release.validate import _releasable_tag_glob
         rel = next(r for r in uc.releasables if r.name == uc.releasable_name)
-        match_pattern = _releasable_tag_glob(rel.tag_format, uc.releasable_name)
+        match_pattern = _releasable_tag_glob(rel.effective_tag_format, uc.releasable_name)
     elif uc.monorepo_name:
         abs_project_dir = os.path.join(uc.ws_root, uc.monorepo_project_path)
         target_entries = detect_targets(abs_project_dir)
@@ -255,9 +255,9 @@ def _build_tag_from_version(uc, version):
         if _ie(uc.ws_root):
             _rels = _lr(uc.ws_root, _lw(uc.ws_root))
             _rel = next((r for r in _rels if r.name == uc.releasable_name), None)
-            if _rel and _rel.tag_format:
+            if _rel and _rel.effective_tag_format:
                 from .release.validate import _format_releasable_tag
-                return _format_releasable_tag(_rel.tag_format, uc.releasable_name, version)
+                return _format_releasable_tag(_rel.effective_tag_format, uc.releasable_name, version)
         return target_obj.monorepo_tag_format(uc.monorepo_name, version, path=uc.monorepo_project_path)
     if uc.monorepo_name:
         return target_obj.monorepo_tag_format(uc.monorepo_name, version, path=uc.monorepo_project_path)

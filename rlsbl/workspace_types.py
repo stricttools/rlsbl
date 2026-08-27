@@ -89,19 +89,55 @@ def get_releasable_hook_path(workspace_root, releasable_name, hook_name):
     return os.path.join(get_releasable_dir(str(workspace_root), releasable_name), "hooks", hook_name)
 
 
+#: What ``tag_format`` holds when a releasable declared none.
+#:
+#: Absence is a real state, distinct from declaring :data:`DEFAULT_TAG_FORMAT`
+#: on purpose.  A releasable that owns the repository root must declare its
+#: format (the loader refuses one that does not), and ``save_workspace`` writes
+#: the key only for the releasables that actually stated it -- neither is
+#: decidable if absence has already been folded into the default at load time.
+TAG_FORMAT_ABSENT = None
+
+
 @dataclass
 class Releasable:
     """A named unit of versioning: a group of packages sharing version, changelog, and release.
 
     Releasables are defined via ``[[releasables]]`` in workspace.toml.
+
+    ``tag_format`` is the DECLARED format and may be
+    :data:`TAG_FORMAT_ABSENT`.  Anything that needs a format to work with reads
+    :attr:`effective_tag_format`, which resolves absence to
+    :data:`DEFAULT_TAG_FORMAT`.  The split is the point: the declared value
+    answers "what does workspace.toml say", the effective value answers "what
+    do this releasable's tags look like", and only the first can tell a
+    workspace that meant the default from one that never thought about it.
     """
 
     name: str
-    tag_format: str = field(default=DEFAULT_TAG_FORMAT)
+    tag_format: str | None = field(default=TAG_FORMAT_ABSENT)
 
     def __post_init__(self):
         if not self.name:
             raise WorkspaceError("releasable name must be a non-empty string")
+
+    @property
+    def declares_tag_format(self) -> bool:
+        """Did workspace.toml state a ``tag_format`` for this releasable?"""
+        return self.tag_format is not TAG_FORMAT_ABSENT
+
+    @property
+    def effective_tag_format(self) -> str:
+        """The format this releasable's tags actually use.
+
+        :data:`DEFAULT_TAG_FORMAT` when none was declared -- the workspace
+        scheme, which is right for every releasable except one that owns the
+        repository root, and the loader refuses that case outright rather than
+        letting it reach here.
+        """
+        if self.tag_format is TAG_FORMAT_ABSENT:
+            return DEFAULT_TAG_FORMAT
+        return self.tag_format
 
 
 class WorkspaceProject:

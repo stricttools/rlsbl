@@ -345,7 +345,7 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
             releasables = load_releasables(monorepo_root, ws_projects)
             releasable_obj = next((r for r in releasables if r.name == releasable_name), None)
             if releasable_obj:
-                releasable_tag_fmt = releasable_obj.tag_format
+                releasable_tag_fmt = releasable_obj.effective_tag_format
                 member_projs = members_of(releasable_name, ws_projects)
                 member_package_paths = [p["path"] for p in member_projs]
         except Exception:
@@ -631,7 +631,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         releasables = load_releasables(monorepo_root, ws_projects)
         releasable_obj = next((r for r in releasables if r.name == releasable_name), None)
         if releasable_obj:
-            releasable_tag_fmt = releasable_obj.tag_format
+            releasable_tag_fmt = releasable_obj.effective_tag_format
             member_projs = members_of(releasable_name, ws_projects)
             member_package_paths = [p["path"] for p in member_projs]
             log(f"Releasable: {releasable_name} ({len(member_package_paths)} member(s))")

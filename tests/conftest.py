@@ -1532,7 +1532,7 @@ def _create_multi_releasable_monorepo(
 
     # Tag each releasable at the initial version
     for rel in releasables:
-        tag = rel.tag_format.format(name=rel.name, version=initial_version)
+        tag = rel.effective_tag_format.format(name=rel.name, version=initial_version)
         run_git(tmp_path, "tag", tag)
 
     # Make a post-tag commit so there is an unreleased range

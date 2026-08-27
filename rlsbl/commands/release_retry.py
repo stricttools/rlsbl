@@ -165,7 +165,7 @@ def run_cmd(retry_config, flags, project_root):
                 rel = resolve_releasable_for_project(project, releasables)
                 if rel:
                     releasable_name = rel.name
-                    releasable_tag_fmt = rel.tag_format
+                    releasable_tag_fmt = rel.effective_tag_format
 
     # Project directory: project_root is already resolved to the sub-project
     # in monorepo mode (via _require_sub_project_root).

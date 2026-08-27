@@ -85,7 +85,7 @@ def _setup_releasable_monorepo(
 
     # Tag each releasable
     for rel in releasables:
-        tag = rel.tag_format.format(name=rel.name, version=initial_version)
+        tag = rel.effective_tag_format.format(name=rel.name, version=initial_version)
         run_git(repo, "tag", tag)
 
     return releasables, projects

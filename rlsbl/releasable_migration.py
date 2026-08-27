@@ -1106,7 +1106,7 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False):
         # In dry-run mode, report what would happen without side effects
         member_names = [p.name for p in member_projects]
         result["members"] = member_names
-        result["tag_format"] = target_releasable.tag_format
+        result["tag_format"] = target_releasable.effective_tag_format
         return result
 
     # Announcement, not a gate.  The migration is local: it rewrites workspace
@@ -1140,7 +1140,7 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False):
     consolidated_version = version_result["version"]
     changelog_result = consolidate_changelogs(
         workspace_root, releasable_name, member_projects,
-        tag_format=target_releasable.tag_format,
+        tag_format=target_releasable.effective_tag_format,
         version=consolidated_version,
         all_projects=projects,
     )
@@ -1149,7 +1149,7 @@ def cmd_migrate_releasable(workspace_root, releasable_name, *, dry_run=False):
     # Step 4: create migration tag
     tag_result = create_migration_tag(
         workspace_root, releasable_name,
-        target_releasable.tag_format, member_projects,
+        target_releasable.effective_tag_format, member_projects,
     )
     result["tag"] = tag_result
 

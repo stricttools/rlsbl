@@ -118,7 +118,7 @@ class TestMultiReleasableFixtureDefaults:
         )
         tags = set(result.stdout.strip().split("\n"))
         for rel in ns.releasables:
-            expected_tag = rel.tag_format.format(
+            expected_tag = rel.effective_tag_format.format(
                 name=rel.name, version=ns.initial_version
             )
             assert expected_tag in tags, f"tag {expected_tag} not found in {tags}"

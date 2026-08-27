@@ -391,7 +391,7 @@ def _other_member_globs(
     for rel in releasables:
         if rel.name in exclude_releasable_names:
             continue
-        globs.add(releasable_tag_glob(rel.tag_format, rel.name))
+        globs.add(releasable_tag_glob(rel.effective_tag_format, rel.name))
     return globs
 
 
@@ -1175,7 +1175,7 @@ def cmd_extract_releasable(
         }
 
     # The releasable's tag glob (e.g. "core@v*") is the same for every member.
-    own_glob = releasable_tag_glob(target_releasable.tag_format, releasable_name)
+    own_glob = releasable_tag_glob(target_releasable.effective_tag_format, releasable_name)
 
     # Resolve the other live members'/releasables' globs from the SOURCE
     # workspace (before it is mutated). These decide which scheme tags are

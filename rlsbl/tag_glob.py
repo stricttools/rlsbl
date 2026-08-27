@@ -160,7 +160,7 @@ def resolve_monorepo_tag_glob(project, workspace_root, releasable=None) -> str:
             its ``tag_format`` drives the glob.
     """
     if releasable is not None:
-        return releasable_tag_glob(releasable.tag_format, releasable.name)
+        return releasable_tag_glob(releasable.effective_tag_format, releasable.name)
 
     from .targets import TARGETS, detect_targets, resolve_releasable_config_dir
 

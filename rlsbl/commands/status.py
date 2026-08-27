@@ -272,7 +272,7 @@ def run_cmd(registry, args, flags, ctx):
                             rel_ver = read_releasable_version(ws_root, rel.name)
                         except Exception:
                             rel_ver = None
-                        releasable_info = (rel.name, rel.tag_format, rel_ver)
+                        releasable_info = (rel.name, rel.effective_tag_format, rel_ver)
                         # A releasable member's JSONL lives under the
                         # releasable, and its commit scope spans every member.
                         from ..workspace import get_releasable_changes_dir, members_of

@@ -87,7 +87,7 @@ def _resolve_version_and_tag(ctx):
                     except Exception:
                         version = None
                     if version:
-                        tag = rel.tag_format.replace("{version}", version).replace("{name}", rel.name)
+                        tag = rel.effective_tag_format.replace("{version}", version).replace("{name}", rel.name)
                     else:
                         tag = None
                     return version, tag
@@ -169,7 +169,7 @@ def _get_changelog_context(ctx):
         if not os.path.isdir(changes_dir):
             return None
         # tag_glob from releasable's tag_format: replace {version} with *
-        tag_glob = rel.tag_format.replace("{version}", "*").replace("{name}", rel.name)
+        tag_glob = rel.effective_tag_format.replace("{version}", "*").replace("{name}", rel.name)
         # All member projects of this releasable for commit scoping
         member_projects = members_of(rel.name, ctx.projects)
         scope = OwnershipScope.for_members(ctx.projects, member_projects)
@@ -259,7 +259,7 @@ def _get_all_changelog_contexts(ctx):
         changes_dir = get_releasable_changes_dir(ws_root, rel.name)
         if not os.path.isdir(changes_dir):
             continue
-        tag_glob = rel.tag_format.replace("{version}", "*").replace("{name}", rel.name)
+        tag_glob = rel.effective_tag_format.replace("{version}", "*").replace("{name}", rel.name)
         member_projects = members_of(rel.name, ctx.projects)
         scope = OwnershipScope.for_members(ctx.projects, member_projects)
         entries = read_unreleased(changes_dir)

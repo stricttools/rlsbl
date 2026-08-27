@@ -20,6 +20,7 @@ from conftest import workspace_toml, with_root_member, make_workspace
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
     DEFAULT_TAG_FORMAT,
+    TAG_FORMAT_ABSENT,
     Releasable,
     WorkspaceProject,
     load_releasables,
@@ -94,12 +95,26 @@ class TestReleasableDataclass:
     def test_basic_construction(self):
         r = Releasable(name="core")
         assert r.name == "core"
-        assert r.tag_format == DEFAULT_TAG_FORMAT
+        # Absence is carried, not resolved: the declared value stays absent
+        # and only the effective one falls back to the workspace scheme.
+        assert r.tag_format is TAG_FORMAT_ABSENT
+        assert not r.declares_tag_format
+        assert r.effective_tag_format == DEFAULT_TAG_FORMAT
 
     def test_custom_tag_format(self):
         r = Releasable(name="www", tag_format="v{version}")
         assert r.name == "www"
         assert r.tag_format == "v{version}"
+        assert r.declares_tag_format
+        assert r.effective_tag_format == "v{version}"
+
+    def test_declaring_the_default_is_not_the_same_as_declaring_nothing(self):
+        """Both tag the same way; only one wrote a line in workspace.toml."""
+        declared = Releasable(name="core", tag_format=DEFAULT_TAG_FORMAT)
+        absent = Releasable(name="core")
+        assert declared.effective_tag_format == absent.effective_tag_format
+        assert declared.declares_tag_format
+        assert not absent.declares_tag_format
 
     def test_default_tag_format_value(self):
         assert DEFAULT_TAG_FORMAT == "{name}@v{version}"
@@ -191,7 +206,8 @@ releasable = "core"
         releasables = load_releasables(str(tmp_project))
         assert len(releasables) == 1
         assert releasables[0].name == "core"
-        assert releasables[0].tag_format == DEFAULT_TAG_FORMAT
+        assert not releasables[0].declares_tag_format
+        assert releasables[0].effective_tag_format == DEFAULT_TAG_FORMAT
 
     def test_multiple_releasables(self, tmp_project):
         _write_workspace(tmp_project, """\
@@ -606,9 +622,10 @@ releasable = "core"
         content = ws_file.read_text()
         assert "tag_format" not in content
 
-        # But loading still gives the default
+        # ...and loading reports absence, with the default still in effect
         releasables = load_releasables(str(tmp_project))
-        assert releasables[0].tag_format == DEFAULT_TAG_FORMAT
+        assert not releasables[0].declares_tag_format
+        assert releasables[0].effective_tag_format == DEFAULT_TAG_FORMAT
 
     def test_empty_releasables_list_writes_an_empty_section(self, tmp_project):
         """Passing releasables=[] writes `releasables = []`, not nothing.
@@ -655,7 +672,8 @@ releasable = "core"
         assert len(loaded_releasables) == 2
         core = [r for r in loaded_releasables if r.name == "core"][0]
         www = [r for r in loaded_releasables if r.name == "www"][0]
-        assert core.tag_format == DEFAULT_TAG_FORMAT
+        assert not core.declares_tag_format
+        assert core.effective_tag_format == DEFAULT_TAG_FORMAT
         assert www.tag_format == "v{version}"
 
         assert loaded_projects[0].releasable == "core"

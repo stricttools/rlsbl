@@ -59,7 +59,7 @@ def run_cmd(args, flags, project_root):
                 rel = resolve_releasable_for_project(project, releasables)
                 if rel:
                     releasable_name = rel.name
-                    releasable_tag_fmt = rel.tag_format
+                    releasable_tag_fmt = rel.effective_tag_format
 
     if is_non_releasable:
         print(

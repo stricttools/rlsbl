@@ -312,7 +312,7 @@ def _get_monorepo_tag_prefix(project, root, releasables=None):
             for rel in releasables:
                 if rel.name == rel_name:
                     # Format with empty version to get the prefix
-                    return rel.tag_format.format(name=rel.name, version="")
+                    return rel.effective_tag_format.format(name=rel.name, version="")
 
     rel_dir = resolve_releasable_config_dir(project, root)
     target_entries = detect_targets(os.path.join(root, project["path"]), releasable_config_dir=rel_dir)

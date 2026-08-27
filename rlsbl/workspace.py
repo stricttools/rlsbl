@@ -17,6 +17,7 @@ from .workspace_types import (  # noqa: F401
     RELEASABLES_DIR,
     DEFAULT_TAG_FORMAT,
     STANDALONE_TAG_FORMAT,
+    TAG_FORMAT_ABSENT,
     Releasable,
     WorkspaceProject,
     get_releasable_dir,
@@ -440,8 +441,12 @@ def _load_explicit_releasables(raw_releasables, projects):
             raise WorkspaceError(f"duplicate releasable name: '{name}'")
         seen_names.add(name)
 
-        tag_format = raw.get("tag_format", DEFAULT_TAG_FORMAT)
-        if not isinstance(tag_format, str):
+        # Absence is carried, not folded into the default: a releasable that
+        # owns the repository root must DECLARE its format, and save_workspace
+        # writes the key back only for the ones that stated it. Both questions
+        # become unanswerable the moment absence is resolved here.
+        tag_format = raw.get("tag_format", TAG_FORMAT_ABSENT)
+        if tag_format is not TAG_FORMAT_ABSENT and not isinstance(tag_format, str):
             raise WorkspaceError(
                 f"releasables[{i}] ('{{name}}'): tag_format must be a string"
                 .format(name=name)
@@ -651,21 +656,18 @@ def save_workspace(root, projects, releasables=None):
 
     # --- releasables section ---
     if releasables is not None:
-        # Preserve an explicit ``tag_format`` key that already exists in the
-        # file even when it equals the default -- omitting it would silently
-        # delete an operator-written line. New releasables still omit the
-        # default for clean output.
+        # ``tag_format`` round-trips on the value's own terms: a releasable
+        # that declared one keeps it (even when it equals the default, which
+        # is an operator-written line and not ours to delete), and one that
+        # declared none stays without the key. The Releasable itself carries
+        # that distinction (:data:`rlsbl.workspace_types.TAG_FORMAT_ABSENT`),
+        # so nothing here has to re-read the file to guess which it was.
         existing_rels = doc.get("releasables")
-        explicit_tf_names = set()
-        if isinstance(existing_rels, AoT):
-            for t in existing_rels:
-                if "tag_format" in t:
-                    explicit_tf_names.add(t["name"])
 
         desired_rels = []
         for rel in releasables:
             d = {"name": rel.name}
-            if rel.tag_format != DEFAULT_TAG_FORMAT or rel.name in explicit_tf_names:
+            if rel.declares_tag_format:
                 d["tag_format"] = rel.tag_format
             desired_rels.append(d)
 

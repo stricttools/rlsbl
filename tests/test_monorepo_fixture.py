@@ -70,9 +70,14 @@ class TestMakeWorkspaceReleasables:
         )
         releasables = load_releasables(str(tmp_path))
         by_name = {r.name: r for r in releasables}
-        assert by_name["one"].tag_format == "{name}@v{version}"
+        # Only the dict form declared a format; the instance and the bare
+        # name declared none, so their effective format is the workspace
+        # scheme while their declared value stays absent.
+        assert not by_name["one"].declares_tag_format
+        assert by_name["one"].effective_tag_format == "{name}@v{version}"
         assert by_name["two"].tag_format == "{name}/v{version}"
-        assert by_name["three"].tag_format == "{name}@v{version}"
+        assert not by_name["three"].declares_tag_format
+        assert by_name["three"].effective_tag_format == "{name}@v{version}"
 
     def test_releasables_are_derived_without_the_argument(self, tmp_path):
         """Omitting the argument derives one releasable per releasable member.

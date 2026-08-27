@@ -81,6 +81,23 @@ Each `[[projects]]` block declares the project's identity, release target, inter
 | `registry_name` | no | string | Override package name on the registry (e.g., scoped npm name) |
 | `description` | no | string | Short project description for documentation |
 
+### Releasables section
+
+`[[releasables]]` names the units of versioning. Each entry has a `name` and an optional `tag_format`:
+
+```toml
+[[releasables]]
+name = "core"
+
+[[releasables]]
+name = "app"
+tag_format = "v{version}"
+```
+
+`tag_format` is **explicit or absent**, never implicitly filled in. An entry that omits it tags with the workspace scheme, `{name}@v{version}`; an entry that declares it tags with what it declared. Absence is carried through loading and saving, so a rewrite of `workspace.toml` neither invents the key nor deletes a line an operator wrote — including one that spells out the default.
+
+The distinction is not cosmetic. **A releasable that owns the root member (`path = "."`) must declare `tag_format`, and the loader refuses one that does not.** A repository root's releases are commonly tagged `v1.2.3` because the repository used to be a standalone one, and inheriting `{name}@v{version}` there would silently orphan every existing tag. Only the operator knows which scheme the repository's history already uses, so `rlsbl monorepo init --root-releasable <name>` requires `--tag-format` alongside it.
+
 ### Layers section
 
 The optional `[layers]` section enforces architectural dependency direction by grouping projects into ordered layers and blocking imports that violate the hierarchy. Higher layers may depend on lower layers, but not vice versa. See [layers.md](layers.md) for full configuration reference.

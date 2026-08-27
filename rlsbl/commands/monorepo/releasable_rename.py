@@ -352,7 +352,7 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
     #      committed BEFORE the alias tag is ever pushed. ----
     if new_present and not old_present and dir_moved:
         target_rel = next(r for r in releasables if r.name == new_name)
-        tag_format = target_rel.tag_format
+        tag_format = target_rel.effective_tag_format
         version = read_releasable_version(root, new_name)
         name_in_format = "{name}" in tag_format
         old_tag = tag_format.format(name=old_name, version=version)
@@ -426,7 +426,7 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
     _check_no_inflight(root, releasables)
 
     target_rel = next(r for r in releasables if r.name == old_name)
-    tag_format = target_rel.tag_format
+    tag_format = target_rel.effective_tag_format
     version = read_releasable_version(root, old_name)
     name_in_format = "{name}" in tag_format
     members = members_of(old_name, projects)

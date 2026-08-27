@@ -96,7 +96,7 @@ def _resolve_scope(root_str):
 
         if rel is not None:
             from ..commands.release.validate import _releasable_tag_glob
-            tag_glob = _releasable_tag_glob(rel.tag_format, rel.name)
+            tag_glob = _releasable_tag_glob(rel.effective_tag_format, rel.name)
             changes_dir = get_releasable_changes_dir(ws_root, rel.name)
             scope = OwnershipScope.for_members(
                 ws_projects, members_of(rel.name, ws_projects),
