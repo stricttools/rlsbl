@@ -474,9 +474,30 @@ name = "alpha"
             load_releasables(str(tmp_project))
 
     def test_empty_workspace_raises(self, tmp_project):
-        """An empty workspace has no root member, which is refused first."""
+        """An empty workspace is broken twice over; implicit mode is reported first.
+
+        ``projects = []`` with no ``[[releasables]]`` section fails both the
+        implicit-mode condition and the mandatory-root-member one.
+        ``validate_workspace_model`` reports implicit mode first, deliberately:
+        every other remedy it can print is written for an explicit-mode
+        workspace, so telling an operator to add a root member to a workspace
+        that rlsbl will refuse to read at all is the less actionable answer.
+        This assertion used to pin the opposite order.
+        """
         _write_workspace(
             tmp_project, "projects = []\n", root_member="", releasables=None,
+        )
+        with pytest.raises(WorkspaceError, match=r"no \[\[releasables\]\] section"):
+            load_releasables(str(tmp_project))
+
+    def test_empty_explicit_workspace_reports_the_missing_root_member(self, tmp_project):
+        """With the implicit-mode condition satisfied, the next one is reached.
+
+        The root-member refusal is not gone, it is second: a workspace that
+        declares ``releasables = []`` and no members gets it.
+        """
+        _write_workspace(
+            tmp_project, "projects = []\n", root_member="", releasables=(),
         )
         with pytest.raises(WorkspaceError, match="declares no root member"):
             load_releasables(str(tmp_project))
