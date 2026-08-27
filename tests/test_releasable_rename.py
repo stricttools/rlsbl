@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import with_root_member
+
 from githarness import git as _git
 from rlsbl.workspace import (
     Releasable,
@@ -92,7 +94,7 @@ def _build_monorepo(root, *, tag_format="{name}@v{version}", version="0.1.0",
         {"path": "libs/beta-api", "name": "beta-api", "releasable": "beta"},
         {"path": "apps/beta-cli", "name": "beta-cli", "releasable": "beta"},
     ]
-    save_workspace(str(root), projects, releasables=releasables)
+    save_workspace(str(root), with_root_member(projects), releasables=releasables)
 
     for p in projects:
         _write_member(root, p["path"], p["name"], "beta", version)

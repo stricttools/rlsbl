@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import git_head, make_commit, run_git
+from conftest import git_head, make_commit, run_git, workspace_toml
 from rlsbl import app
 from rlsbl.changelog.files import append_entry
 from rlsbl.changelog.schema import ChangelogEntry
@@ -59,7 +59,7 @@ def _write_workspace_explicit(root, releasables, projects):
             elif isinstance(val, str):
                 lines.append(f'releasable = "{val}"')
         lines.append("")
-    (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml("\n".join(lines)))
 
 
 def _setup_releasable_changes(root, releasable_name):

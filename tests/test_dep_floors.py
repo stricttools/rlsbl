@@ -24,7 +24,7 @@ from rlsbl.dep_floors import (
     workspace_package_names,
 )
 
-from conftest import make_ctx
+from conftest import make_ctx, workspace_toml
 
 
 # ---------------------------------------------------------------------------
@@ -385,14 +385,14 @@ class TestInternalNames:
         ws = tmp_path / ".rlsbl-monorepo"
         ws.mkdir()
         (ws / "workspace.toml").write_text(
-            "[[projects]]\n"
+            workspace_toml("[[projects]]\n"
             'name = "core"\n'
             'path = "packages/core"\n'
             "\n"
             "[[projects]]\n"
             'name = "cli"\n'
             'path = "packages/cli"\n'
-            'registry_name = "my-cli"\n'
+            'registry_name = "my-cli"\n')
         )
         assert workspace_package_names(tmp_path) == {"core", "my-cli"}
 
@@ -406,9 +406,9 @@ class TestInternalNames:
         ws = tmp_path / ".rlsbl-monorepo"
         ws.mkdir()
         (ws / "workspace.toml").write_text(
-            "[[projects]]\n"
+            workspace_toml("[[projects]]\n"
             'name = "core"\n'
-            'path = "packages/core"\n'
+            'path = "packages/core"\n')
         )
         _pyproject(pkg, ["core"])
         _uv_lock(pkg, {"core": "0.4.0"})

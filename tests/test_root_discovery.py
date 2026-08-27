@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import make_workspace, run_git
+from conftest import make_workspace, run_git, workspace_toml
 from rlsbl.utils import find_project_root
 from rlsbl.workspace import WORKSPACE_DIR
 
@@ -326,7 +326,7 @@ class TestSymlinkPathNormalization:
         real_dir.mkdir()
         ws_dir = real_dir / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text('[[projects]]\npath = "pkg"\nname = "pkg"\n')
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml('[[projects]]\npath = "pkg"\nname = "pkg"\n'))
 
         link = tmp_path / "link_to_monorepo"
         link.symlink_to(real_dir, target_is_directory=True)
@@ -343,7 +343,7 @@ class TestSymlinkPathNormalization:
         (real_dir / ".rlsbl").mkdir()
         ws_dir = real_dir / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text('[[projects]]\npath = "."\nname = "root"\n')
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml('[[projects]]\npath = "."\nname = "root"\n'))
 
         link = tmp_path / "link_to_project"
         link.symlink_to(real_dir, target_is_directory=True)

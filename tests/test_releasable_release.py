@@ -16,7 +16,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import sync_member_versions
+from conftest import sync_member_versions, workspace_toml, with_root_member
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import (
     _format_releasable_tag,
@@ -50,11 +50,15 @@ def _write_toml(path, content):
         f.write(content)
 
 
-def _write_workspace(tmp_path, content):
-    """Write raw TOML content to workspace.toml in a temp directory."""
+def _write_workspace(tmp_path, content, **kwargs):
+    """Write a workspace.toml body, supplying the root member and explicit mode.
+
+    ``workspace_toml`` prepends whatever the body does not already declare
+    (see conftest); pass ``root_member=""`` to write a body without one.
+    """
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir(exist_ok=True)
-    (ws_dir / WORKSPACE_FILE).write_text(content)
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(content, **kwargs))
 
 
 def _make_pypi_project(base_path, subdir, version="0.1.0"):
@@ -273,7 +277,7 @@ class TestReleasableReleaseOrder:
         ]
 
         # Write workspace so WorkspaceGraph can load
-        save_workspace(ws_root, projects)
+        save_workspace(ws_root, with_root_member(projects))
 
         graph = WorkspaceGraph(ws_root, projects)
         batch_names = {"core", "www"}
@@ -531,7 +535,7 @@ class TestBatchReleaseInitReleasable:
         projects = [
             WorkspaceProject({"name": "lib-a", "path": "lib-a"}),
         ]
-        save_workspace(ws_root, projects)
+        save_workspace(ws_root, with_root_member(projects))
 
         batch_path = os.path.join(ws_root, ".rlsbl-monorepo", "releases", "unreleased.toml")
 

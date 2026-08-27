@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.release import _run_cmd_inner
 from rlsbl.commands.release_init import run_cmd as release_init_run_cmd
 from rlsbl.context import ProjectContext
@@ -235,7 +237,7 @@ def _setup_batch_packages(ws, names, base_version="0.1.0", pretag=True):
     Returns the batch file path.
     """
     projects = [{"path": n, "name": n} for n in names]
-    save_workspace(str(ws), projects)
+    save_workspace(str(ws), with_root_member(projects))
     for n in names:
         _write_pyproject(os.path.join(str(ws), n), n, base_version)
         if pretag:

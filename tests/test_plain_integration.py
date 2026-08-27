@@ -13,6 +13,8 @@ import textwrap
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.monorepo import (
     _cmd_init,
     _cmd_add,
@@ -103,7 +105,7 @@ def _init_workspace(base_path, projects):
     """Initialize a workspace and save the given project list directly."""
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
-    save_workspace(str(base_path), projects)
+    save_workspace(str(base_path), with_root_member(projects))
 
 
 def _commit_all(base_path, message="setup"):
@@ -123,13 +125,13 @@ class TestSyncSkipsPlain:
 
     def _setup_mixed_workspace(self, mock_git_repo):
         """Set up a workspace with one npm project and one plain project."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "web-app", ci=True, publish=True)
         _make_plain_project(mock_git_repo, "shared-config", version="1.0.0")
 
         # Add projects via _cmd_add
-        _cmd_add(["web-app"], {}, project_root=".")
-        _cmd_add(["shared-config"], {"target": "plain"}, project_root=".")
+        _cmd_add(["web-app"], {"releasable": "false"}, project_root=".")
+        _cmd_add(["shared-config"], {"releasable": "false", "target": "plain"}, project_root=".")
         _commit_all(mock_git_repo, "setup mixed workspace")
 
     def test_no_ci_workflow_for_plain(self, mock_git_repo, capsys):
@@ -217,9 +219,9 @@ class TestStatusShowsPlain:
 
     def test_status_shows_plain_project(self, mock_git_repo, capsys):
         """Plain project appears in status output with correct target and version."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_plain_project(mock_git_repo, "my-config", version="1.2.3")
-        _cmd_add(["my-config"], {"target": "plain"}, project_root=".")
+        _cmd_add(["my-config"], {"releasable": "false", "target": "plain"}, project_root=".")
         capsys.readouterr()
 
         _cmd_status({}, project_root=".")
@@ -237,11 +239,11 @@ class TestStatusShowsPlain:
 
     def test_status_plain_and_npm_mixed(self, mock_git_repo, capsys):
         """Both plain and npm projects show up in status with correct targets."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "webapp", version="2.0.0", ci=False)
         _make_plain_project(mock_git_repo, "specs", version="0.5.0")
-        _cmd_add(["webapp"], {}, project_root=".")
-        _cmd_add(["specs"], {"target": "plain"}, project_root=".")
+        _cmd_add(["webapp"], {"releasable": "false"}, project_root=".")
+        _cmd_add(["specs"], {"releasable": "false", "target": "plain"}, project_root=".")
         capsys.readouterr()
 
         _cmd_status({}, project_root=".")

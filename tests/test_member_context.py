@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from conftest import run_git, sync_member_versions
+from conftest import run_git, sync_member_versions, workspace_toml
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.member_context import MemberContext, resolve_member_context
 from rlsbl.commands.release.execute import (
@@ -59,7 +59,7 @@ def _make_go_member_monorepo(tmp_path, member_config, releasable_config):
 
     ws_dir = repo / ".rlsbl-monorepo"
     ws_dir.mkdir()
-    (ws_dir / "workspace.toml").write_text("")
+    (ws_dir / "workspace.toml").write_text(workspace_toml(""))
     write_releasable_version(str(repo), "myrel", "1.0.0")
     rel_dir = get_releasable_dir(str(repo), "myrel")
     with open(os.path.join(rel_dir, "config.json"), "w", encoding="utf-8") as f:

@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from conftest import sync_member_versions
+from conftest import sync_member_versions, with_root_member
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import validate_pipeline_config
 from rlsbl.member_context import resolve_member_context
@@ -73,7 +73,7 @@ def _make_releasable_monorepo(
     subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=tmp_path, check=True)
 
     # Write workspace
-    save_workspace(str(tmp_path), projects, releasables=releasables)
+    save_workspace(str(tmp_path), with_root_member(projects), releasables=releasables)
 
     # Default member configs
     default_member_cfgs = {

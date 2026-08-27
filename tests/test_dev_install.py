@@ -8,6 +8,8 @@ import pytest
 
 from rlsbl.commands.dev import run_install
 
+from conftest import workspace_toml
+
 
 def _make_pypi(dir_path, name="mypkg"):
     """Create a minimal pyproject.toml so the pypi target is detected."""
@@ -343,9 +345,9 @@ def _make_monorepo(root):
     ws_dir = root / ".rlsbl-monorepo"
     ws_dir.mkdir()
     (ws_dir / "workspace.toml").write_text(
-        '[[projects]]\npath = "py"\nname = "pyproj"\n\n'
+        workspace_toml('[[projects]]\npath = "py"\nname = "pyproj"\n\n'
         '[[projects]]\npath = "node"\nname = "nodeproj"\n\n'
-        '[[projects]]\npath = "gocode"\nname = "goproj"\n'
+        '[[projects]]\npath = "gocode"\nname = "goproj"\n')
     )
     _make_pypi(str(root / "py"), name="pyproj")
     _make_npm(str(root / "node"), name="nodeproj")
@@ -754,7 +756,7 @@ def test_cli_workspace_root_gives_cd_guidance(tmp_path, monkeypatch):
 
     ws_dir = tmp_path / ".rlsbl-monorepo"
     ws_dir.mkdir()
-    (ws_dir / "workspace.toml").write_text('[[projects]]\npath = "py"\nname = "py"\n')
+    (ws_dir / "workspace.toml").write_text(workspace_toml('[[projects]]\npath = "py"\nname = "py"\n'))
     (tmp_path / "py").mkdir()
     monkeypatch.chdir(tmp_path)
 

@@ -8,6 +8,8 @@ from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.commands.init_cmd import _is_workspace_root, run_cmd, run_cmd_multi
 
+from conftest import workspace_toml
+
 
 # ---------------------------------------------------------------------------
 # 4a: root-rlsbl-conflict check
@@ -22,7 +24,7 @@ class TestRootRlsblConflictCheck:
         (mock_git_repo / ".rlsbl").mkdir()
         monorepo_dir = mock_git_repo / ".rlsbl-monorepo"
         monorepo_dir.mkdir()
-        (monorepo_dir / "workspace.toml").write_text("[[packages]]\n")
+        (monorepo_dir / "workspace.toml").write_text(workspace_toml("[[packages]]\n"))
 
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
@@ -40,7 +42,7 @@ class TestRootRlsblConflictCheck:
         """Only .rlsbl-monorepo/ exists -> pass."""
         monorepo_dir = mock_git_repo / ".rlsbl-monorepo"
         monorepo_dir.mkdir()
-        (monorepo_dir / "workspace.toml").write_text("[[packages]]\n")
+        (monorepo_dir / "workspace.toml").write_text(workspace_toml("[[packages]]\n"))
 
         ctx = WorkspaceCheckContext(
             project_root=mock_git_repo,
@@ -104,7 +106,7 @@ class TestScaffoldWorkspaceRootGuard:
         # Set up workspace root marker
         monorepo_dir = mock_git_repo / ".rlsbl-monorepo"
         monorepo_dir.mkdir()
-        (monorepo_dir / "workspace.toml").write_text("[[packages]]\n")
+        (monorepo_dir / "workspace.toml").write_text(workspace_toml("[[packages]]\n"))
 
         # Create a package.json so the target detection would find something
         (mock_git_repo / "package.json").write_text('{"name":"test","version":"1.0.0"}')
@@ -124,7 +126,7 @@ class TestScaffoldWorkspaceRootGuard:
         # Set up workspace root marker
         monorepo_dir = mock_git_repo / ".rlsbl-monorepo"
         monorepo_dir.mkdir()
-        (monorepo_dir / "workspace.toml").write_text("[[packages]]\n")
+        (monorepo_dir / "workspace.toml").write_text(workspace_toml("[[packages]]\n"))
 
         # Create project files
         (mock_git_repo / "package.json").write_text('{"name":"test","version":"1.0.0"}')

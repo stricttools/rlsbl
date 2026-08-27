@@ -38,7 +38,7 @@ from rlsbl.workspace import (
     is_explicit_mode,
     load_workspace,
 )
-from conftest import make_workspace
+from conftest import make_workspace, workspace_toml
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ def _make_explicit_workspace(root, releasables, projects):
             lines.append(f'tag_format = "{rel["tag_format"]}"')
         lines.append("")
 
-    (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml("\n".join(lines)))
 
 
 # ---------------------------------------------------------------------------

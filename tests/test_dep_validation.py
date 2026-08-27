@@ -24,6 +24,8 @@ from rlsbl.dep_validation import (
 from rlsbl.lint.utils import walk_source_files
 from rlsbl.workspace import WORKSPACE_DIR
 
+from conftest import workspace_toml
+
 
 def _capture_all_checks():
     """Register all rlsbl checks on a mock app and return a dict of {name: fn(ctx)}.
@@ -1831,8 +1833,8 @@ class TestRootProjectDepScan:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "."\nname = "root-app"\n\n'
-            '[[projects]]\npath = "sibling"\nname = "sibling-lib"\n'
+            workspace_toml('[[projects]]\npath = "."\nname = "root-app"\n\n'
+            '[[projects]]\npath = "sibling"\nname = "sibling-lib"\n')
         )
 
         # Root project imports os (not a workspace member)
@@ -1924,8 +1926,8 @@ class TestDepsChecksIntegration:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "auth"\nname = "auth"\n'
+            workspace_toml('[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "auth"\nname = "auth"\n')
         )
 
         # App depends on auth and imports it
@@ -1968,8 +1970,8 @@ class TestDepsChecksIntegration:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "auth"\nname = "auth"\n'
+            workspace_toml('[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "auth"\nname = "auth"\n')
         )
 
         app_dir = tmp_path / "app"
@@ -2012,8 +2014,8 @@ class TestDepsChecksIntegration:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "auth"\nname = "auth"\n'
+            workspace_toml('[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "auth"\nname = "auth"\n')
         )
 
         # App imports auth but does not declare it as dependency
@@ -2087,8 +2089,8 @@ class TestDepsChecksIntegration:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "auth"\nname = "auth"\n'
+            workspace_toml('[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "auth"\nname = "auth"\n')
         )
 
         # App declares auth as runtime dep but only imports it in tests
@@ -2133,8 +2135,8 @@ class TestDepsChecksIntegration:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "testutils"\nname = "testutils"\n'
+            workspace_toml('[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "testutils"\nname = "testutils"\n')
         )
 
         # App declares testutils as dev dep but imports it in production code
@@ -2603,8 +2605,8 @@ class TestDeadWorkspacePackagesCheck:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "auth"\nname = "auth"\nlibrary = true\n'
+            workspace_toml('[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "auth"\nname = "auth"\nlibrary = true\n')
         )
 
         app_dir = tmp_path / "app"
@@ -2644,8 +2646,8 @@ class TestDeadWorkspacePackagesCheck:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "orphan"\nname = "orphan"\nlibrary = true\n'
+            workspace_toml('[[projects]]\npath = "app"\nname = "app"\n\n'
+            '[[projects]]\npath = "orphan"\nname = "orphan"\nlibrary = true\n')
         )
 
         app_dir = tmp_path / "app"

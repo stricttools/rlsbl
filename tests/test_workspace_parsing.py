@@ -9,6 +9,8 @@ import os
 
 import pytest
 
+from conftest import with_root_member, workspace_toml
+
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
     WorkspaceProject,
@@ -240,7 +242,7 @@ class TestLoadWorkspaceValidation:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            "[[projects]]\npath = 123\nname = \"foo\"\n"
+            workspace_toml("[[projects]]\npath = 123\nname = \"foo\"\n")
         )
         with pytest.raises(WorkspaceError, match="missing required 'path' string"):
             load_workspace(str(tmp_project))
@@ -249,7 +251,7 @@ class TestLoadWorkspaceValidation:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            "[[projects]]\npath = true\nname = \"foo\"\n"
+            workspace_toml("[[projects]]\npath = true\nname = \"foo\"\n")
         )
         with pytest.raises(WorkspaceError, match="missing required 'path' string"):
             load_workspace(str(tmp_project))
@@ -263,16 +265,26 @@ class TestLoadWorkspaceValidation:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         # A TOML array of strings instead of tables
-        (ws_dir / WORKSPACE_FILE).write_text('projects = ["a", "b"]\n')
+        (ws_dir / WORKSPACE_FILE).write_text(
+            workspace_toml('projects = ["a", "b"]\n', root_member="")
+        )
         with pytest.raises(WorkspaceError):
             load_workspace(str(tmp_project))
 
-    def test_empty_projects_list_ok(self, tmp_project):
+    def test_empty_projects_list_is_refused(self, tmp_project):
+        """A workspace with no members has no root member, which is illegal.
+
+        Every workspace declares the repository root as a member, so the empty
+        project list that used to load as ``[]`` is now a refusal naming the
+        member it lacks.
+        """
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text("projects = []\n")
-        result = load_workspace(str(tmp_project))
-        assert result == []
+        (ws_dir / WORKSPACE_FILE).write_text(
+            workspace_toml("projects = []\n", root_member="")
+        )
+        with pytest.raises(WorkspaceError, match="declares no root member"):
+            load_workspace(str(tmp_project))
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +299,7 @@ class TestLoadWorkspaceNormalization:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "packages/foo///"\nname = "foo"\n'
+            workspace_toml('[[projects]]\npath = "packages/foo///"\nname = "foo"\n')
         )
         result = load_workspace(str(tmp_project))
         assert result[0].path == "packages/foo"
@@ -296,7 +308,7 @@ class TestLoadWorkspaceNormalization:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "deeply/nested/my-lib"\n'
+            workspace_toml('[[projects]]\npath = "deeply/nested/my-lib"\n')
         )
         result = load_workspace(str(tmp_project))
         assert result[0].name == "my-lib"
@@ -305,7 +317,7 @@ class TestLoadWorkspaceNormalization:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "packages/foo"\nname = ""\n'
+            workspace_toml('[[projects]]\npath = "packages/foo"\nname = ""\n')
         )
         result = load_workspace(str(tmp_project))
         assert result[0].name == "foo"
@@ -314,7 +326,7 @@ class TestLoadWorkspaceNormalization:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "pkg"\nname = "pkg"\n'
+            workspace_toml('[[projects]]\npath = "pkg"\nname = "pkg"\n')
         )
         result = load_workspace(str(tmp_project))
         assert isinstance(result[0], WorkspaceProject)
@@ -325,6 +337,13 @@ class TestLoadWorkspaceNormalization:
 # ---------------------------------------------------------------------------
 
 
+def _member(projects, name):
+    """The one member named *name* (the supplied root member is not it)."""
+    matches = [p for p in projects if p["name"] == name]
+    assert len(matches) == 1, [p["name"] for p in projects]
+    return matches[0]
+
+
 class TestLoadWorkspaceUnknownFields:
     """Extra/unknown fields in project entries survive load_workspace()."""
 
@@ -332,37 +351,37 @@ class TestLoadWorkspaceUnknownFields:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "p"\nname = "p"\ncustom_field = "hello"\n'
+            workspace_toml('[[projects]]\npath = "p"\nname = "p"\ncustom_field = "hello"\n')
         )
-        result = load_workspace(str(tmp_project))
-        assert result[0]["custom_field"] == "hello"
+        result = _member(load_workspace(str(tmp_project)), "p")
+        assert result["custom_field"] == "hello"
 
     def test_unknown_list_field_preserved(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "p"\nname = "p"\ntags = ["a", "b"]\n'
+            workspace_toml('[[projects]]\npath = "p"\nname = "p"\ntags = ["a", "b"]\n')
         )
-        result = load_workspace(str(tmp_project))
-        assert result[0]["tags"] == ["a", "b"]
+        result = _member(load_workspace(str(tmp_project)), "p")
+        assert result["tags"] == ["a", "b"]
 
     def test_unknown_bool_field_preserved(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "p"\nname = "p"\nexperimental = true\n'
+            workspace_toml('[[projects]]\npath = "p"\nname = "p"\nexperimental = true\n')
         )
-        result = load_workspace(str(tmp_project))
-        assert result[0]["experimental"] is True
+        result = _member(load_workspace(str(tmp_project)), "p")
+        assert result["experimental"] is True
 
     def test_unknown_fields_accessible_via_get(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "p"\nname = "p"\nowner = "alice"\n'
+            workspace_toml('[[projects]]\npath = "p"\nname = "p"\nowner = "alice"\n')
         )
-        result = load_workspace(str(tmp_project))
-        assert result[0].get("owner") == "alice"
+        result = _member(load_workspace(str(tmp_project)), "p")
+        assert result.get("owner") == "alice"
 
 
 # ---------------------------------------------------------------------------
@@ -377,23 +396,23 @@ class TestSaveWorkspaceRoundTrip:
         data = {
             "path": "libs/core",
             "name": "core",
-            "watch": ["src/**"],
             "library": True,
             "dev_node": False,
             "depends_on": ["util"],
             "registry_name": "my-core",
+            "import_name": "core_pkg",
         }
         wp = WorkspaceProject(data)
-        save_workspace(str(tmp_project), [wp])
+        save_workspace(str(tmp_project), with_root_member([wp]))
         loaded = load_workspace(str(tmp_project))
-        assert len(loaded) == 1
-        assert loaded[0].name == "core"
-        assert loaded[0].path == "libs/core"
-        assert loaded[0].watch == ["src/**"]
-        assert loaded[0].library is True
-        assert loaded[0].dev_node is False
-        assert loaded[0].depends_on == ["util"]
-        assert loaded[0].registry_name == "my-core"
+        core = _member(loaded, "core")
+        assert core.name == "core"
+        assert core.path == "libs/core"
+        assert core.library is True
+        assert core.dev_node is False
+        assert core.depends_on == ["util"]
+        assert core.registry_name == "my-core"
+        assert core.import_name == "core_pkg"
 
     def test_roundtrip_preserves_unknown_fields(self, tmp_project):
         data = {
@@ -404,11 +423,11 @@ class TestSaveWorkspaceRoundTrip:
             "custom_list": [1, 2, 3],
         }
         wp = WorkspaceProject(data)
-        save_workspace(str(tmp_project), [wp])
-        loaded = load_workspace(str(tmp_project))
-        assert loaded[0]["custom_string"] == "hello"
-        assert loaded[0]["custom_int"] == 42
-        assert loaded[0]["custom_list"] == [1, 2, 3]
+        save_workspace(str(tmp_project), with_root_member([wp]))
+        loaded = _member(load_workspace(str(tmp_project)), "pkg")
+        assert loaded["custom_string"] == "hello"
+        assert loaded["custom_int"] == 42
+        assert loaded["custom_list"] == [1, 2, 3]
 
     def test_roundtrip_multiple_projects(self, tmp_project):
         projects = [
@@ -416,9 +435,10 @@ class TestSaveWorkspaceRoundTrip:
             WorkspaceProject({"path": "b/c", "name": "charlie", "dev_node": True}),
             WorkspaceProject({"path": "d", "name": "delta", "depends_on": ["alpha"]}),
         ]
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         loaded = load_workspace(str(tmp_project))
-        assert len(loaded) == 3
+        # The three declared members, plus the supplied root member.
+        assert len(loaded) == 4
         assert loaded[0].name == "alpha"
         assert loaded[0].library is True
         assert loaded[1].name == "charlie"
@@ -431,16 +451,18 @@ class TestSaveWorkspaceRoundTrip:
             WorkspaceProject({"path": "a", "name": "a"}),
             {"path": "b", "name": "b"},
         ]
-        save_workspace(str(tmp_project), mixed)
+        save_workspace(str(tmp_project), with_root_member(mixed))
         loaded = load_workspace(str(tmp_project))
-        assert len(loaded) == 2
+        # The two declared members, plus the supplied root member.
+        assert len(loaded) == 3
         assert loaded[0].name == "a"
         assert loaded[1].name == "b"
 
-    def test_empty_projects_roundtrip(self, tmp_project):
+    def test_empty_projects_roundtrip_is_unloadable(self, tmp_project):
+        """A workspace with no members cannot be read back: it has no root member."""
         save_workspace(str(tmp_project), [])
-        loaded = load_workspace(str(tmp_project))
-        assert loaded == []
+        with pytest.raises(WorkspaceError, match="declares no root member"):
+            load_workspace(str(tmp_project))
 
 
 # ---------------------------------------------------------------------------
@@ -455,7 +477,7 @@ class TestResolveProjectExtended:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "pkg"\nname = "pkg"\n'
+            workspace_toml('[[projects]]\npath = "pkg"\nname = "pkg"\n')
         )
         pkg = tmp_project / "pkg"
         pkg.mkdir()
@@ -467,8 +489,8 @@ class TestResolveProjectExtended:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "mono"\nname = "mono"\n\n'
-            '[[projects]]\npath = "mono/sub"\nname = "sub"\n'
+            workspace_toml('[[projects]]\npath = "mono"\nname = "mono"\n\n'
+            '[[projects]]\npath = "mono/sub"\nname = "sub"\n')
         )
         (tmp_project / "mono" / "sub").mkdir(parents=True)
         result = resolve_project(str(tmp_project), str(tmp_project / "mono" / "sub"))
@@ -478,8 +500,8 @@ class TestResolveProjectExtended:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "mono"\nname = "mono"\n\n'
-            '[[projects]]\npath = "mono/sub"\nname = "sub"\n'
+            workspace_toml('[[projects]]\npath = "mono"\nname = "mono"\n\n'
+            '[[projects]]\npath = "mono/sub"\nname = "sub"\n')
         )
         (tmp_project / "mono" / "other").mkdir(parents=True)
         result = resolve_project(str(tmp_project), str(tmp_project / "mono" / "other"))
@@ -489,7 +511,7 @@ class TestResolveProjectExtended:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "pkg"\nname = "pkg"\n'
+            workspace_toml('[[projects]]\npath = "pkg"\nname = "pkg"\n')
         )
         (tmp_project / "unrelated").mkdir()
         result = resolve_project(str(tmp_project), str(tmp_project / "unrelated"))
@@ -499,7 +521,7 @@ class TestResolveProjectExtended:
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "pkg"\nname = "pkg"\nlibrary = true\n'
+            workspace_toml('[[projects]]\npath = "pkg"\nname = "pkg"\nlibrary = true\n')
         )
         pkg = tmp_project / "pkg"
         pkg.mkdir()
@@ -526,7 +548,9 @@ class TestFindWorkspaceRootExtended:
         # Workspace at root
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text("projects = []\n")
+        (ws_dir / WORKSPACE_FILE).write_text(
+            workspace_toml("projects = []\n", root_member="")
+        )
         # Check from a child directory
         child = tmp_project / "some" / "deep" / "dir"
         child.mkdir(parents=True)
@@ -543,7 +567,9 @@ class TestFindWorkspaceRootExtended:
         # Create real workspace
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text("projects = []\n")
+        (ws_dir / WORKSPACE_FILE).write_text(
+            workspace_toml("projects = []\n", root_member="")
+        )
         # Create a symlink to a child dir
         real_dir = tmp_project / "real"
         real_dir.mkdir()

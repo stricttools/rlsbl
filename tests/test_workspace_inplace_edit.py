@@ -6,6 +6,7 @@ item must leave every other byte of the file untouched -- intra-table
 comments and deliberate key order included.
 """
 
+from conftest import with_root_member, workspace_toml
 from rlsbl.workspace import (
     Releasable,
     WorkspaceProject,
@@ -53,7 +54,7 @@ releasable = "beta"
 def _write_ws(root, text):
     ws_dir = root / WORKSPACE_DIR
     ws_dir.mkdir(exist_ok=True)
-    (ws_dir / WORKSPACE_FILE).write_text(text)
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(text))
 
 
 def _read_ws(root):
@@ -72,7 +73,7 @@ class TestFieldEditPreservesRest:
             if p["path"] == "apps/alpha-web":
                 p["library"] = True
 
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         out = _read_ws(tmp_project)
 
         # Everything that was there is still there, verbatim.
@@ -87,7 +88,7 @@ class TestFieldEditPreservesRest:
     def test_untouched_save_is_byte_identical(self, tmp_project):
         _write_ws(tmp_project, COMMENTED_TOML)
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         # A no-op save must not perturb a single byte.
         assert _read_ws(tmp_project) == COMMENTED_TOML
 
@@ -103,7 +104,7 @@ class TestAddPreservesRest:
                 {"path": "apps/beta-cli", "name": "beta-cli", "releasable": "beta"}
             )
         )
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         out = _read_ws(tmp_project)
 
         # The original content is a prefix-preserved subset: every original
@@ -122,7 +123,7 @@ class TestRemovePreservesRest:
         _write_ws(tmp_project, COMMENTED_TOML)
         projects = load_workspace(str(tmp_project))
         remaining = [p for p in projects if p["path"] != "apps/alpha-web"]
-        save_workspace(str(tmp_project), remaining)
+        save_workspace(str(tmp_project), with_root_member(remaining))
         out = _read_ws(tmp_project)
 
         # The removed table is gone.
@@ -152,7 +153,7 @@ class TestReleasableFieldEdit:
             else:
                 new_rels.append(r)
 
-        save_workspace(str(tmp_project), projects, releasables=new_rels)
+        save_workspace(str(tmp_project), with_root_member(projects), releasables=new_rels)
         out = _read_ws(tmp_project)
 
         # alpha's inline comment and its explicit tag_format survive.
@@ -174,7 +175,7 @@ class TestRoundTripStillLoads:
                 {"path": "apps/new", "name": "new", "releasable": "alpha"}
             )
         )
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
 
         reloaded = load_workspace(str(tmp_project))
         paths = {p["path"] for p in reloaded}

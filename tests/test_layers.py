@@ -2,6 +2,8 @@
 
 import pytest
 
+from conftest import workspace_toml
+
 from rlsbl.errors import WorkspaceError
 from rlsbl.layers import (
     LayerConfig,
@@ -54,11 +56,15 @@ def _capture_checks():
     return captured
 
 
-def _write_workspace(tmp_project, content):
-    """Write workspace.toml with the given TOML content."""
+def _write_workspace(tmp_project, content, **kwargs):
+    """Write a workspace.toml body, supplying the root member and explicit mode.
+
+    ``workspace_toml`` prepends whatever the body does not already declare
+    (see conftest); pass ``root_member=""`` to write a body without one.
+    """
     ws_dir = tmp_project / WORKSPACE_DIR
     ws_dir.mkdir(exist_ok=True)
-    (ws_dir / WORKSPACE_FILE).write_text(content)
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(content, **kwargs))
 
 
 FULL_CONFIG = """\
@@ -475,13 +481,13 @@ class TestLayersViolationsCheck:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "schema"\nname = "schema"\n\n'
+            workspace_toml('[[projects]]\npath = "schema"\nname = "schema"\n\n'
             '[[projects]]\npath = "app"\nname = "app"\n\n'
             "[layers]\n"
             'order = ["foundation", "app"]\n\n'
             "[layers.assignments]\n"
             'foundation = ["schema"]\n'
-            'app = ["app"]\n'
+            'app = ["app"]\n')
         )
         (tmp_path / "schema").mkdir()
         (tmp_path / "app").mkdir()
@@ -526,7 +532,7 @@ class TestLayersViolationsCheck:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "a"\nname = "a"\n'
+            workspace_toml('[[projects]]\npath = "a"\nname = "a"\n')
         )
         (tmp_path / "a").mkdir()
 
@@ -555,13 +561,13 @@ class TestLayersViolationsCheck:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "schema"\nname = "schema"\n\n'
+            workspace_toml('[[projects]]\npath = "schema"\nname = "schema"\n\n'
             '[[projects]]\npath = "app"\nname = "app"\n\n'
             "[layers]\n"
             'order = ["foundation", "app"]\n\n'
             "[layers.assignments]\n"
             'foundation = ["schema"]\n'
-            'app = ["app"]\n'
+            'app = ["app"]\n')
         )
         (tmp_path / "schema").mkdir()
         (tmp_path / "app").mkdir()
@@ -600,14 +606,14 @@ class TestLayersViolationsCheck:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "schema"\nname = "schema"\n\n'
+            workspace_toml('[[projects]]\npath = "schema"\nname = "schema"\n\n'
             '[[projects]]\npath = "app"\nname = "app"\n\n'
             '[[projects]]\npath = "loadtest"\nname = "loadtest"\ndev_node = true\n\n'
             "[layers]\n"
             'order = ["foundation", "app"]\n\n'
             "[layers.assignments]\n"
             'foundation = ["schema"]\n'
-            'app = ["app"]\n'
+            'app = ["app"]\n')
         )
         (tmp_path / "schema").mkdir()
         (tmp_path / "app").mkdir()
@@ -645,14 +651,14 @@ class TestLayersViolationsCheck:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "schema"\nname = "schema"\n\n'
+            workspace_toml('[[projects]]\npath = "schema"\nname = "schema"\n\n'
             '[[projects]]\npath = "app"\nname = "app"\n\n'
             '[[projects]]\npath = "stray"\nname = "stray"\n\n'
             "[layers]\n"
             'order = ["foundation", "app"]\n\n'
             "[layers.assignments]\n"
             'foundation = ["schema"]\n'
-            'app = ["app"]\n'
+            'app = ["app"]\n')
         )
         (tmp_path / "schema").mkdir()
         (tmp_path / "app").mkdir()

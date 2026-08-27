@@ -8,6 +8,8 @@ import pytest
 
 from rlsbl.targets.pypi import PypiTarget
 
+from conftest import workspace_toml
+
 
 @pytest.fixture
 def target():
@@ -33,7 +35,7 @@ def _make_workspace(tmp_path):
     workspace.mkdir()
     mono_dir = workspace / ".rlsbl-monorepo"
     mono_dir.mkdir()
-    (mono_dir / "workspace.toml").write_text(textwrap.dedent("""\
+    (mono_dir / "workspace.toml").write_text(workspace_toml(textwrap.dedent("""\
         [[projects]]
         path = "packages/app"
         name = "app"
@@ -41,7 +43,7 @@ def _make_workspace(tmp_path):
         [[projects]]
         path = "packages/lib"
         name = "lib"
-    """))
+    """)))
 
     app_dir = workspace / "packages" / "app"
     app_dir.mkdir(parents=True)

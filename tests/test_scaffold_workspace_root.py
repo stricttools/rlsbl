@@ -21,7 +21,7 @@ from rlsbl.commands.init_cmd import (
 )
 from rlsbl.context import ProjectContext
 
-from conftest import make_workspace
+from conftest import make_workspace, workspace_toml
 
 
 def _ctx(root="."):
@@ -37,7 +37,7 @@ class TestIsWorkspaceRoot:
     def test_returns_true_when_workspace_toml_exists(self, tmp_path):
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
-        (ws_dir / "workspace.toml").write_text("[[projects]]\n")
+        (ws_dir / "workspace.toml").write_text(workspace_toml("[[projects]]\n"))
         assert _is_workspace_root(tmp_path) is True
 
     def test_returns_false_when_no_workspace_dir(self, tmp_path):
@@ -54,7 +54,7 @@ class TestIsWorkspaceRoot:
         """A sub-project directory that is NOT the workspace root."""
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
-        (ws_dir / "workspace.toml").write_text("[[projects]]\n")
+        (ws_dir / "workspace.toml").write_text(workspace_toml("[[projects]]\n"))
         sub = tmp_path / "packages" / "core"
         sub.mkdir(parents=True)
         # The sub-project itself does not have .rlsbl-monorepo/workspace.toml

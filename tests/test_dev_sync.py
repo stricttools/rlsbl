@@ -14,6 +14,8 @@ import pytest
 
 from rlsbl.commands.dev_sync import OVERRIDES_FILENAME, run_sync
 
+from conftest import workspace_toml
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -446,7 +448,7 @@ def test_workspace_root_invocation_is_hard_error(
     root); invoking it at the monorepo workspace root errors with guidance."""
     ws_dir = tmp_project / ".rlsbl-monorepo"
     ws_dir.mkdir()
-    (ws_dir / "workspace.toml").write_text('[[projects]]\npath = "py"\nname = "py"\n')
+    (ws_dir / "workspace.toml").write_text(workspace_toml('[[projects]]\npath = "py"\nname = "py"\n'))
     rc = run_sync(str(tmp_project))
     assert rc == 1
     assert fake_run.calls == []
@@ -463,7 +465,7 @@ def test_cli_workspace_root_gives_cd_guidance(tmp_project, monkeypatch):
 
     ws_dir = tmp_project / ".rlsbl-monorepo"
     ws_dir.mkdir()
-    (ws_dir / "workspace.toml").write_text('[[projects]]\npath = "py"\nname = "py"\n')
+    (ws_dir / "workspace.toml").write_text(workspace_toml('[[projects]]\npath = "py"\nname = "py"\n'))
     (tmp_project / "py").mkdir()
     monkeypatch.setenv("UV_NO_SYNC", "1")
 

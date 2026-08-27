@@ -98,12 +98,12 @@ class TestPerTargetCIFiles:
 
     def test_sync_per_target_ci_files(self, mock_git_repo, capsys):
         """Sub-project with ci-pypi.yml and ci-go.yml (no ci.yml) inlines both."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
             {"ci-pypi.yml": CI_PYPI_WORKFLOW, "ci-go.yml": CI_GO_WORKFLOW},
         )
-        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         # Remove the scaffold-generated ci.yml so only per-target files remain
         scaffold_ci = mock_git_repo / "tooling" / ".github" / "workflows" / "ci.yml"
         if scaffold_ci.exists():
@@ -130,12 +130,12 @@ class TestPerTargetCIFiles:
 
     def test_per_target_jobs_gated_on_detect(self, mock_git_repo, capsys):
         """Inlined per-target jobs are gated on the project's detect output."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
             {"ci-pypi.yml": CI_PYPI_WORKFLOW},
         )
-        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         # Remove scaffold-generated ci.yml
         scaffold_ci = mock_git_repo / "tooling" / ".github" / "workflows" / "ci.yml"
         if scaffold_ci.exists():
@@ -159,12 +159,12 @@ class TestPerTargetCIFiles:
     def test_per_target_check_run_names(self, mock_git_repo, capsys):
         """Inlined jobs keep the reusable-workflow-era check-run naming
         ('{prefix} / {job}') so publish gate regexes keep matching."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
             {"ci-pypi.yml": CI_PYPI_WORKFLOW},
         )
-        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         scaffold_ci = mock_git_repo / "tooling" / ".github" / "workflows" / "ci.yml"
         if scaffold_ci.exists():
             scaffold_ci.unlink()
@@ -183,12 +183,12 @@ class TestPerTargetCIFiles:
 
     def test_router_read_only(self, mock_git_repo, capsys):
         """The generated router is written as read-only."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
             {"ci-go.yml": CI_GO_WORKFLOW},
         )
-        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         scaffold_ci = mock_git_repo / "tooling" / ".github" / "workflows" / "ci.yml"
         if scaffold_ci.exists():
             scaffold_ci.unlink()
@@ -207,12 +207,12 @@ class TestPerTargetCIFiles:
 
     def test_per_target_working_directory_injected(self, mock_git_repo, capsys):
         """Inlined per-target jobs get working-directory injected."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
             {"ci-pypi.yml": CI_PYPI_WORKFLOW},
         )
-        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         scaffold_ci = mock_git_repo / "tooling" / ".github" / "workflows" / "ci.yml"
         if scaffold_ci.exists():
             scaffold_ci.unlink()
@@ -235,12 +235,12 @@ class TestSingleCIInline:
 
     def test_single_ci_yml_inlined(self, mock_git_repo, capsys):
         """Sub-project with only ci.yml produces {name}-ci-{job} router jobs."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "core",
             {"ci.yml": CI_WORKFLOW},
         )
-        _cmd_add(["core"], {}, project_root=".")
+        _cmd_add(["core"], {"releasable": "false"}, project_root=".")
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -258,12 +258,12 @@ class TestSingleCIInline:
 
     def test_mixed_single_and_per_target(self, mock_git_repo, capsys):
         """Project with ci.yml AND ci-pypi.yml inlines jobs from both files."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "hybrid",
             {"ci.yml": CI_WORKFLOW, "ci-pypi.yml": CI_PYPI_WORKFLOW},
         )
-        _cmd_add(["hybrid"], {}, project_root=".")
+        _cmd_add(["hybrid"], {"releasable": "false"}, project_root=".")
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -384,12 +384,12 @@ class TestCleanupPerTargetCI:
 
     def test_cleanup_removes_legacy_per_target_ci(self, mock_git_repo, capsys):
         """Legacy {name}-ci-{target}.yml root copies are removed on sync."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "core",
             {"ci.yml": CI_WORKFLOW},
         )
-        _cmd_add(["core"], {}, project_root=".")
+        _cmd_add(["core"], {"releasable": "false"}, project_root=".")
         # Plant legacy root copies (as older rlsbl versions wrote them)
         wf_dir = mock_git_repo / ".github" / "workflows"
         wf_dir.mkdir(parents=True, exist_ok=True)
@@ -413,12 +413,12 @@ class TestCleanupPerTargetCI:
 
     def test_sync_idempotent(self, mock_git_repo, capsys):
         """A second sync leaves the router intact and adds no stray files."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_project_with_ci_files(
             mock_git_repo, "tooling",
             {"ci-pypi.yml": CI_PYPI_WORKFLOW, "ci-go.yml": CI_GO_WORKFLOW},
         )
-        _cmd_add(["tooling"], {}, project_root=".")
+        _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         scaffold_ci = mock_git_repo / "tooling" / ".github" / "workflows" / "ci.yml"
         if scaffold_ci.exists():
             scaffold_ci.unlink()

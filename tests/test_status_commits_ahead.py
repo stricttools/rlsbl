@@ -205,12 +205,12 @@ class TestStatusCommitsAheadMonorepo:
     def test_monorepo_warning_uses_scoped_tag(self, mock_git_repo, monkeypatch, capsys):
         """Inside a monorepo project, warning references the scoped tag."""
         # Two projects: core (tagged) and tools (also tagged later)
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         core_dir = mock_git_repo / "core"
         core_dir.mkdir()
         with open(core_dir / "package.json", "w") as f:
             json.dump({"name": "core", "version": "1.0.0"}, f)
-        _cmd_add(["core"], {}, project_root=".")
+        _cmd_add(["core"], {"releasable": "false"}, project_root=".")
 
         # Tag core
         subprocess.run(["git", "tag", "core@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -231,12 +231,12 @@ class TestStatusCommitsAheadMonorepo:
 
     def test_monorepo_project_with_no_unreleased_no_warning(self, mock_git_repo, monkeypatch, capsys):
         """A monorepo project at its tagged version (no commits ahead) prints no warning."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         proj_dir = mock_git_repo / "alpha"
         proj_dir.mkdir()
         with open(proj_dir / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
 
         capsys.readouterr()
@@ -255,19 +255,19 @@ class TestStatusCommitsAheadMonorepo:
         beta's files. alpha should show 0 commits ahead (no warning),
         not count beta's commits.
         """
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
 
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
 
         beta = mock_git_repo / "beta"
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
-        _cmd_add(["beta"], {}, project_root=".")
+        _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         # Tag both at the same commit
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -301,19 +301,19 @@ class TestStatusCommitsAheadMonorepo:
 
     def test_monorepo_directory_filtering_json(self, mock_git_repo, monkeypatch, capsys):
         """JSON output reflects directory-filtered commit counts."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
 
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
 
         beta = mock_git_repo / "beta"
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
-        _cmd_add(["beta"], {}, project_root=".")
+        _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -343,13 +343,13 @@ class TestStatusCommitsAheadMonorepo:
         whose tag is older has commits ahead. Directory filtering ensures
         only commits touching the project's files are counted.
         """
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         # alpha: older tag, will have unreleased commits
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
-        _cmd_add(["alpha"], {}, project_root=".")
+        _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
 
         # Tag alpha now, before more commits
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
@@ -363,7 +363,7 @@ class TestStatusCommitsAheadMonorepo:
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
-        _cmd_add(["beta"], {}, project_root=".")
+        _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
         # Tag beta at current HEAD (after all commits)
         subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
 

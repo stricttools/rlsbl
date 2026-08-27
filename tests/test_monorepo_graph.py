@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.monorepo import _cmd_graph, _cmd_init
 from rlsbl.workspace import save_workspace, WORKSPACE_DIR
 
@@ -24,7 +26,7 @@ def _init_workspace(base_path, projects):
     """Initialize a workspace with the given project list."""
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
-    save_workspace(str(base_path), projects)
+    save_workspace(str(base_path), with_root_member(projects))
 
 
 class TestGraphPayload:
@@ -47,7 +49,7 @@ class TestGraphPayload:
 
         assert "packages" in data
         assert "edges" in data
-        assert set(data["packages"].keys()) == {"models", "schema", "app"}
+        assert set(data["packages"].keys()) == {"models", "schema", "app", "root"}
 
         # Check models package
         models = data["packages"]["models"]
@@ -89,7 +91,7 @@ class TestGraphPayload:
 
         data = _cmd_graph({"json": True}, project_root=".")
 
-        assert set(data["packages"].keys()) == {"alpha", "beta"}
+        assert set(data["packages"].keys()) == {"alpha", "beta", "root"}
         assert data["edges"] == []
         assert data["packages"]["alpha"]["deps"] == []
         assert data["packages"]["beta"]["deps"] == []
@@ -198,7 +200,8 @@ class TestGraphText:
         lines = [l for l in captured.out.strip().split("\n") if l.strip()]
 
         # Both are leaves (no dependents)
-        assert lines == ["alpha [leaf]", "zeta [leaf]"]
+        # The root member is a leaf too, and marked as the dev node it is.
+        assert lines == ["alpha [leaf]", "root [dev] [leaf]", "zeta [leaf]"]
 
 
 class TestGraphRootFilter:
@@ -327,7 +330,7 @@ class TestGraphOutputFile:
         assert "X" in content
         assert "Y" in content
         # The payload is produced regardless of which rendering was written.
-        assert set(data["packages"].keys()) == {"X", "Y"}
+        assert set(data["packages"].keys()) == {"X", "Y", "root"}
 
         captured = capsys.readouterr()
         assert "Wrote graph to" in captured.out
@@ -356,14 +359,20 @@ class TestGraphOutputFile:
 class TestGraphEdgeCases:
     """Edge cases for the graph command."""
 
-    def test_empty_workspace(self, mock_git_repo, capsys):
-        """Empty workspace prints message and returns."""
-        _cmd_init({}, project_root=".")
+    def test_freshly_initialized_workspace_graphs_its_root_member(
+        self, mock_git_repo, capsys,
+    ):
+        """A new workspace is never empty: it has its root member.
+
+        This used to assert the no-projects message, which a workspace can no
+        longer reach -- ``monorepo init`` writes the root member.
+        """
+        _cmd_init({"root-dev-node": True}, project_root=".")
         capsys.readouterr()
 
-        assert _cmd_graph({"json": True}, project_root=".") is None
-        captured = capsys.readouterr()
-        assert "No projects in workspace." in captured.out
+        data = _cmd_graph({"json": True}, project_root=".")
+        assert set(data["packages"].keys()) == {"root"}
+        assert data["edges"] == []
 
     def test_no_workspace(self, mock_git_repo):
         """No workspace should error and exit 1."""

@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.monorepo import _cmd_release_order, _cmd_init
 from rlsbl.workspace import save_workspace, WORKSPACE_DIR
 
@@ -24,7 +26,7 @@ def _init_workspace(base_path, projects):
     """Initialize a workspace with the given project list."""
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
-    save_workspace(str(base_path), projects)
+    save_workspace(str(base_path), with_root_member(projects))
 
 
 class TestReleaseOrderWithDeps:
@@ -136,7 +138,7 @@ class TestReleaseOrderEdgeCases:
 
     def test_empty_workspace(self, mock_git_repo, capsys):
         """Empty workspace prints a message and returns."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         capsys.readouterr()
 
         _cmd_release_order({}, project_root=".")

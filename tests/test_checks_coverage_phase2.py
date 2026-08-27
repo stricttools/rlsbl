@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
+from conftest import git_head, make_commit, make_ctx, make_workspace, run_git, workspace_toml
 
 from strictcli import SkipCheck
 
@@ -200,9 +200,9 @@ class TestPrepushExplicitReleasableMode:
 
         # workspace.toml with [[releasables]]
         (ws_dir / "workspace.toml").write_text(
-            '[[releasables]]\nname = "my-rel"\n\n'
+            workspace_toml('[[releasables]]\nname = "my-rel"\n\n'
             '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
-            'releasable = "my-rel"\n'
+            'releasable = "my-rel"\n')
         )
 
         run_git(repo, "add", ".")
@@ -258,9 +258,9 @@ class TestPrepushExplicitReleasableMode:
         (rel_changes / "unreleased.jsonl").write_text("")
 
         (ws_dir / "workspace.toml").write_text(
-            '[[releasables]]\nname = "my-rel"\n\n'
+            workspace_toml('[[releasables]]\nname = "my-rel"\n\n'
             '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
-            'releasable = "my-rel"\n'
+            'releasable = "my-rel"\n')
         )
 
         run_git(repo, "add", ".")
@@ -398,9 +398,9 @@ class TestPrepushGitignoreGuardExplicitMode:
         (rel_changes / "unreleased.jsonl").write_text("")
 
         (ws_dir / "workspace.toml").write_text(
-            '[[releasables]]\nname = "my-rel"\n\n'
+            workspace_toml('[[releasables]]\nname = "my-rel"\n\n'
             '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
-            'releasable = "my-rel"\n'
+            'releasable = "my-rel"\n')
         )
 
         run_git(repo, "add", ".")

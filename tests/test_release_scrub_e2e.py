@@ -29,6 +29,8 @@ from githarness import (
     snapshot_remote_refs as _snapshot_remote_refs,
 )
 
+from conftest import workspace_toml
+
 MOD = "rlsbl.commands.release_scrub"
 
 SECRET = "SECRETTOKEN123"
@@ -112,7 +114,7 @@ class TestMatchModeFullFlowE2E:
         # unversioned but has its own (standalone-style) changelog tree.
         (ws / ".rlsbl-monorepo").mkdir()
         (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
-            "[[projects]]\n"
+            workspace_toml("[[projects]]\n"
             'path = "packages/alpha"\n'
             'name = "alpha"\n'
             'releasable = "core"\n'
@@ -121,7 +123,7 @@ class TestMatchModeFullFlowE2E:
             'name = "beta"\n'
             "releasable = false\n"
             "[[releasables]]\n"
-            'name = "core"\n'
+            'name = "core"\n')
         )
         _git(ws, "add", ".rlsbl-monorepo/workspace.toml")
         _git(ws, "commit", "-q", "-m", "workspace")

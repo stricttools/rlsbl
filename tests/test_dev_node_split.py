@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from conftest import make_commit, make_workspace, run_git
+from conftest import make_commit, make_workspace, run_git, workspace_toml
 from rlsbl.workspace import WorkspaceProject, WORKSPACE_DIR
 
 
@@ -129,7 +129,7 @@ def split_monorepo(tmp_path, monkeypatch):
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir(exist_ok=True)
     (ws_dir / "workspace.toml").write_text(
-        '[[projects]]\n'
+        workspace_toml('[[projects]]\n'
         'path = "dev-rel"\n'
         'name = "dev-rel"\n'
         'dev_only = true\n'
@@ -149,7 +149,7 @@ def split_monorepo(tmp_path, monkeypatch):
         '[[projects]]\n'
         'path = "regular"\n'
         'name = "regular"\n'
-        '\n'
+        '\n')
     )
 
     # Create project directories with minimal structure
@@ -291,7 +291,7 @@ class TestBoundaryCheckUsesDevOnly:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\n'
+            workspace_toml('[[projects]]\n'
             'path = "app"\n'
             'name = "app"\n'
             '\n'
@@ -299,7 +299,7 @@ class TestBoundaryCheckUsesDevOnly:
             'path = "testlib"\n'
             'name = "testlib"\n'
             'dev_only = true\n'
-            '\n'
+            '\n')
         )
 
         # Create pyproject.toml with app depending on testlib
@@ -352,7 +352,7 @@ class TestBoundaryCheckUsesDevOnly:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\n'
+            workspace_toml('[[projects]]\n'
             'path = "app"\n'
             'name = "app"\n'
             '\n'
@@ -360,7 +360,7 @@ class TestBoundaryCheckUsesDevOnly:
             'path = "util"\n'
             'name = "util"\n'
             'releasable = false\n'
-            '\n'
+            '\n')
         )
 
         _make_pypi_project(tmp_path, "app", deps=["util"])

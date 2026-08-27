@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from conftest import (
+    with_root_member,
     git_head,
     make_commit,
     make_workspace,
@@ -55,7 +56,7 @@ def _setup_releasable_monorepo(
     run_git(repo, "commit", "-q", "-m", "initial")
 
     # Write workspace.toml with releasables
-    save_workspace(str(repo), projects, releasables=releasables)
+    save_workspace(str(repo), with_root_member(projects), releasables=releasables)
 
     # Create per-project directories with minimal project files
     for proj in projects:

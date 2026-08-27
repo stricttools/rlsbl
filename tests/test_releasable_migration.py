@@ -16,6 +16,8 @@ import subprocess
 
 import pytest
 
+from conftest import workspace_toml
+
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry
 from rlsbl.releasable_migration import (
     _dedup_entries,
@@ -42,11 +44,15 @@ from rlsbl.workspace import (
 # ---------------------------------------------------------------------------
 
 
-def _write_workspace(tmp_path, content):
-    """Write raw TOML content to workspace.toml."""
+def _write_workspace(tmp_path, content, **kwargs):
+    """Write a workspace.toml body, supplying the root member and explicit mode.
+
+    ``workspace_toml`` prepends whatever the body does not already declare
+    (see conftest); pass ``root_member=""`` to write a body without one.
+    """
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir(parents=True, exist_ok=True)
-    (ws_dir / WORKSPACE_FILE).write_text(content)
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(content, **kwargs))
 
 
 def _make_pypi_project(base, name, version="0.1.0"):

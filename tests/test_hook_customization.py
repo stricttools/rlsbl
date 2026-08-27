@@ -21,6 +21,8 @@ from rlsbl.commands.release.hooks import (
 )
 from rlsbl.commands.release.validate import parse_porcelain_paths
 
+from conftest import workspace_toml
+
 # The V1 scaffold template content (matches a known template hash).
 _V1_TEMPLATE = (
     "#!/usr/bin/env bash\n"
@@ -59,7 +61,7 @@ def _make_releasable_workspace(tmp_path, releasable_name, members):
             lines.append(f'releasable = "{m["releasable"]}"\n')
         lines.append("\n")
     lines.append(f'[[releasables]]\nname = "{releasable_name}"\n')
-    (ws_dir / "workspace.toml").write_text("".join(lines))
+    (ws_dir / "workspace.toml").write_text(workspace_toml("".join(lines)))
     return rel_dir
 
 

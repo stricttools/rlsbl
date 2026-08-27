@@ -514,7 +514,6 @@ def _normalize_member_path(path):
 _WORKSPACE_PROJECT_KEYS = frozenset({
     "path",
     "name",
-    "watch",
     "library",
     "dev_node",
     "dev_only",
@@ -526,6 +525,131 @@ _WORKSPACE_PROJECT_KEYS = frozenset({
 })
 
 
+#: The root member this helper supplies when a test does not declare one.
+#: Every workspace has one (the loader refuses a workspace without it) and its
+#: kind is a real decision, so the default is the conservative one: a dev node,
+#: whose residual files need no changelog coverage. A test that cares declares
+#: its own root member instead.
+DEFAULT_ROOT_MEMBER = {
+    "path": ".",
+    "name": "root",
+    "dev_only": True,
+    "releasable": False,
+}
+
+
+def declared_members(projects):
+    """The members a test declared: everything but the root member.
+
+    Every workspace carries a root member, supplied by ``make_workspace`` /
+    ``with_root_member`` when the test does not declare one. A test asserting
+    on the members IT set up filters it out with this.
+    """
+    return [p for p in projects if _normalize_member_path(p["path"]) != "."]
+
+
+def with_root_member(projects, *, releasable=False):
+    """Return *projects* as a member list a loaded workspace will accept.
+
+    For tests that call ``save_workspace`` directly, which the loader now holds
+    to the full model:
+
+    - the default root member is appended when none is declared (appending,
+      rather than prepending, keeps every positional assertion about the
+      caller's own members valid);
+    - a member with no ``releasable`` key gets *releasable* (``False`` by
+      default -- a bare ``save_workspace`` writes no releasables, so standing
+      outside every releasable is the only consistent answer).
+    """
+    from rlsbl.workspace import WorkspaceProject as _WP
+
+    prepared = []
+    has_root = False
+    for proj in projects:
+        if _normalize_member_path(proj["path"]) == ".":
+            has_root = True
+        if "releasable" not in proj:
+            data = dict(proj.to_dict() if isinstance(proj, _WP) else proj)
+            data["releasable"] = releasable
+            proj = _WP(data) if isinstance(proj, _WP) else data
+        prepared.append(proj)
+
+    if has_root:
+        return prepared
+    root = dict(DEFAULT_ROOT_MEMBER)
+    if prepared and isinstance(prepared[0], _WP):
+        root = _WP(root)
+    return [*prepared, root]
+
+
+#: A hand-written root-member block, for tests that build workspace.toml as raw
+#: TOML text rather than through ``make_workspace``.
+ROOT_MEMBER_TOML = (
+    '[[projects]]\n'
+    'path = "."\n'
+    'name = "root"\n'
+    'dev_only = true\n'
+    'releasable = false\n'
+)
+
+
+def workspace_toml(body="", *, releasables=(), root_member=ROOT_MEMBER_TOML):
+    """Assemble a loadable workspace.toml body around a hand-written *body*.
+
+    The loader refuses a workspace with no root member and one with no
+    ``[[releasables]]`` section, and almost no test that writes raw TOML is
+    about either. This supplies both around whatever the test actually wants to
+    say.
+
+    Args:
+        body: the test's own TOML (typically ``[[projects]]`` blocks).
+        releasables: the releasables to declare. Each item is a name string or
+            a ``{"name": ..., "tag_format": ...}`` dict. Empty (the default)
+            writes ``releasables = []`` -- an explicit-mode workspace with no
+            releasables yet.
+        root_member: the root-member block to prepend, or ``""`` for none
+            (which is what a test asserting the no-root-member error wants).
+
+    A *body* that already declares its own releasables section or its own root
+    member keeps it: neither is added twice, so this can be applied to every
+    hand-written workspace body in the suite without reading each one.
+    """
+    declares_releasables = "[[releasables]]" in body or "releasables =" in body
+    declares_root = 'path = "."' in body or "path = '.'" in body
+    if declares_root:
+        root_member = ""
+
+    parts = []
+    if declares_releasables:
+        pass
+    elif releasables:
+        for rel in releasables:
+            if isinstance(rel, str):
+                rel = {"name": rel}
+            block = f'[[releasables]]\nname = "{rel["name"]}"\n'
+            if rel.get("tag_format"):
+                block += f'tag_format = "{rel["tag_format"]}"\n'
+            parts.append(block)
+    else:
+        parts.append("releasables = []\n")
+    if root_member:
+        parts.append(root_member)
+    if body:
+        parts.append(body if body.endswith("\n") else body + "\n")
+    return "\n".join(parts)
+
+
+def _member_is_releasable(entry):
+    """Would rlsbl consider this member entry releasable?"""
+    if entry.get("releasable") is False:
+        return False
+    if entry.get("dev_node"):
+        return False
+    if entry.get("dev_only") and not isinstance(entry.get("releasable"), str):
+        return False
+    return True
+
+
 def make_workspace(root, projects, releasables=None):
     """Create a .rlsbl-monorepo/workspace.toml with the given project list.
 
@@ -533,22 +657,34 @@ def make_workspace(root, projects, releasables=None):
     byte-identical to what the tools write and no key can be recognized here
     but dropped there (or the reverse).
 
+    Two parts of the workspace model are supplied when a test omits them,
+    because the loader refuses a workspace that lacks either and almost no
+    test is about them:
+
+    - **the root member.** When no member declares ``path = "."``, the
+      :data:`DEFAULT_ROOT_MEMBER` dev node is prepended. Declare your own root
+      member to override it.
+    - **explicit mode.** When ``releasables`` is omitted, one releasable per
+      releasable-eligible member is derived, named after the member, and the
+      member gets the matching ``releasable`` key. Pass ``releasables``
+      (possibly ``[]``) to say exactly which ones exist.
+
     Args:
         root: repository root (Path).
         projects: list of project dicts. Every key ``save_workspace``
-            serializes is accepted -- ``path``, ``name``, ``watch``,
-            ``library``, ``dev_node``, ``dev_only``, ``releasable``,
-            ``depends_on``, ``import_name``, ``registry_name`` and
-            ``subtree_remote`` -- and any other key is a ``ValueError``.
-            A project may declare the repository root itself as a member with
-            ``path = "."`` (``""`` and ``"./"`` are accepted spellings of it);
-            at most one root member is allowed.
-        releasables: when given, an explicit-mode ``[[releasables]]`` section is
-            emitted ahead of the projects. Each item may be a ``Releasable``, a
-            dict (``{"name": ..., "tag_format": ...}``) or a bare name string.
+            serializes is accepted -- ``path``, ``name``, ``library``,
+            ``dev_node``, ``dev_only``, ``releasable``, ``depends_on``,
+            ``import_name``, ``registry_name`` and ``subtree_remote`` -- and any
+            other key is a ``ValueError``. A project may declare the repository
+            root itself as a member with ``path = "."`` (``""`` and ``"./"``
+            are accepted spellings of it); at most one root member is allowed.
+        releasables: an explicit-mode ``[[releasables]]`` section, emitted ahead
+            of the projects. Each item may be a ``Releasable``, a dict
+            (``{"name": ..., "tag_format": ...}``) or a bare name string.
             ``tag_format`` is written only when it differs from the default.
+            Omit it to have one derived per releasable member.
 
-    In explicit mode every non-``dev_only`` project must carry a ``releasable``
+    In explicit mode every releasable project must carry a ``releasable``
     key (a name, or ``False`` to stand outside every releasable) -- that is
     rlsbl's rule, not this helper's, and ``load_releasables`` enforces it.
     """
@@ -588,6 +724,23 @@ def make_workspace(root, projects, releasables=None):
         entry = dict(proj)
         entry["path"] = _normalize_member_path(proj["path"])
         prepared.append(entry)
+
+    if not root_members:
+        prepared.insert(0, dict(DEFAULT_ROOT_MEMBER))
+
+    if rels is None:
+        rels = []
+        seen = set()
+        for entry in prepared:
+            if not _member_is_releasable(entry):
+                continue
+            name = entry.get("releasable")
+            if not isinstance(name, str):
+                name = entry["name"]
+                entry["releasable"] = name
+            if name not in seen:
+                seen.add(name)
+                rels.append(Releasable(name=name))
 
     save_workspace(str(root), prepared, releasables=rels)
 
@@ -927,6 +1080,12 @@ _DEFAULT_RELEASABLES = [
 
 _DEFAULT_PROJECTS = [
     {
+        "path": ".",
+        "name": "root",
+        "dev_only": True,
+        "releasable": False,
+    },
+    {
         "path": "libs/alpha-core",
         "name": "alpha-core",
         "releasable": "alpha",
@@ -1245,6 +1404,10 @@ def _create_multi_releasable_monorepo(
         releasables = list(_DEFAULT_RELEASABLES)
     if projects is None:
         projects = [dict(p) for p in _DEFAULT_PROJECTS]
+    elif not any(_normalize_member_path(p["path"]) == "." for p in projects):
+        # Every workspace has a root member; supply the default dev node when
+        # the caller did not declare one (see make_workspace).
+        projects = [dict(DEFAULT_ROOT_MEMBER), *projects]
     if releasable_configs is None:
         releasable_configs = {}
     if hook_configs is None:
@@ -1268,9 +1431,14 @@ def _create_multi_releasable_monorepo(
     # Write workspace.toml via save_workspace (handles releasables + projects)
     save_workspace(str(tmp_path), projects, releasables=releasables)
 
-    # Create per-project directories with minimal project files
+    # Create per-project directories with minimal project files. The root
+    # member is skipped: it owns the repository root, which already exists and
+    # must not be given a package manifest or a .rlsbl/ of its own.
     project_dirs = {}
     for proj in projects:
+        if _normalize_member_path(proj["path"]) == ".":
+            project_dirs[proj["name"]] = tmp_path
+            continue
         proj_dir = tmp_path / proj["path"]
         proj_dir.mkdir(parents=True, exist_ok=True)
         # Create a minimal pyproject.toml for each project
@@ -1321,6 +1489,8 @@ def _create_multi_releasable_monorepo(
     # Commit all workspace and project files
     run_git(tmp_path, "add", WORKSPACE_DIR)
     for proj in projects:
+        if _normalize_member_path(proj["path"]) == ".":
+            continue
         run_git(tmp_path, "add", proj["path"])
     run_git(tmp_path, "commit", "-q", "-m", "add multi-releasable monorepo")
 

@@ -17,6 +17,8 @@ from rlsbl.external_checks import (
     validate_external_checks,
 )
 
+from conftest import workspace_toml
+
 
 def _freeform(**overrides):
     """A minimal valid freeform entry."""
@@ -1040,14 +1042,14 @@ class TestReleaseContextEnvWorkspace:
         """An explicit-mode workspace with one releasable named `alpha`."""
         (repo / ".rlsbl-monorepo").mkdir(exist_ok=True)
         (repo / ".rlsbl-monorepo" / "workspace.toml").write_text(
-            '[[projects]]\n'
+            workspace_toml('[[projects]]\n'
             'name = "alpha"\n'
             'path = "alpha"\n'
             'releasable = "alpha"\n'
             '\n'
             '[[releasables]]\n'
             'name = "alpha"\n'
-            'tag_format = "{name}@v{version}"\n'
+            'tag_format = "{name}@v{version}"\n')
         )
         changes = repo / ".rlsbl-monorepo" / "releasables" / "alpha" / "changes"
         changes.mkdir(parents=True, exist_ok=True)

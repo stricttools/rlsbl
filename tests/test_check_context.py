@@ -7,7 +7,7 @@ from rlsbl.context import ProjectContext
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.workspace_graph import WorkspaceGraph
 
-from conftest import make_workspace, run_git
+from conftest import make_workspace, run_git, workspace_toml
 
 
 def test_project_context_has_project_root():
@@ -49,8 +49,8 @@ def test_check_context_factory_passes_workspace_root(tmp_path, monkeypatch):
     ws_dir = tmp_path / ".rlsbl-monorepo"
     ws_dir.mkdir()
     (ws_dir / "workspace.toml").write_text(
-        '[[releasables]]\nname = "subproj"\n\n'
-        '[[projects]]\npath = "sub"\nname = "subproj"\nreleasable = "subproj"\n'
+        workspace_toml('[[releasables]]\nname = "subproj"\n\n'
+        '[[projects]]\npath = "sub"\nname = "subproj"\nreleasable = "subproj"\n')
     )
 
     # Create the subproject directory so WorkspaceGraph can scan it

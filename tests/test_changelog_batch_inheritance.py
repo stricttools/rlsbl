@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from conftest import run_git as _run_git, make_commit as _make_commit
+from conftest import make_commit, run_git, workspace_toml
 from rlsbl.changelog.files import get_changes_dir, read_unreleased
 from rlsbl.commands.changelog_cmd import cmd_add
 from rlsbl.workspace import (
@@ -52,7 +52,7 @@ def _make_explicit_workspace(root, releasables, projects):
             lines.append("dev_only = true")
         lines.append("")
 
-    (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml("\n".join(lines)))
 
 
 def _setup_releasable_repo(tmp_path, monkeypatch, *, batch_limit=3):

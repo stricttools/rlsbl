@@ -39,7 +39,7 @@ class TestMonorepoInitBootstrap:
         assert not (tmp_path / WORKSPACE_DIR).exists()
 
         # _cmd_init should create the workspace
-        _cmd_init({"auto-commit": False}, project_root=tmp_path)
+        _cmd_init({"auto-commit": False, "root-dev-node": True}, project_root=tmp_path)
 
         # workspace.toml should now exist
         ws_file = tmp_path / WORKSPACE_DIR / WORKSPACE_FILE
@@ -60,7 +60,7 @@ class TestMonorepoInitBootstrap:
         save_workspace(str(tmp_path), [])
 
         with pytest.raises(SystemExit):
-            _cmd_init({"auto-commit": False}, project_root=tmp_path)
+            _cmd_init({"auto-commit": False, "root-dev-node": True}, project_root=tmp_path)
 
     def test_init_from_subdir_of_standalone_project_errors(self, tmp_path, monkeypatch):
         """monorepo init from a subdir of a standalone .rlsbl/ project errors."""
@@ -97,7 +97,7 @@ class TestMonorepoInitBootstrap:
         monkeypatch.chdir(tmp_path)
 
         # _cmd_init should work -- converting standalone to monorepo
-        _cmd_init({"auto-commit": False}, project_root=tmp_path)
+        _cmd_init({"auto-commit": False, "root-dev-node": True}, project_root=tmp_path)
 
         ws_file = tmp_path / WORKSPACE_DIR / WORKSPACE_FILE
         assert ws_file.exists()

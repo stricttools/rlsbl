@@ -16,6 +16,8 @@ from rlsbl.targets.base import BaseTarget
 
 from githarness import write_covered_unreleased
 
+from conftest import workspace_toml
+
 
 def _rc(bump="patch", include=None, exclude=None):
     """Shorthand for creating a ReleaseConfig with sensible defaults."""
@@ -59,7 +61,7 @@ class TestMonorepoRelease:
         ws_dir = repo_root / ".rlsbl-monorepo"
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            f'[[projects]]\npath = "{project_path}"\nname = "{project_name}"\n'
+            workspace_toml(f'[[projects]]\npath = "{project_path}"\nname = "{project_name}"\n')
         )
 
         # Project subdir with version file and changelog
@@ -229,7 +231,7 @@ class TestMonorepoRelease:
         ws_dir = mock_git_repo / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "packages/foo"\nname = "foo"\n'
+            workspace_toml('[[projects]]\npath = "packages/foo"\nname = "foo"\n')
         )
         proj_dir = mock_git_repo / "packages" / "foo"
         proj_dir.mkdir(parents=True)
@@ -398,7 +400,7 @@ class TestSubtreePublish:
         )
         if subtree_remote:
             ws_content += f'subtree_remote = "{subtree_remote}"\n'
-        (ws_dir / "workspace.toml").write_text(ws_content)
+        (ws_dir / "workspace.toml").write_text(workspace_toml(ws_content))
 
         proj_dir = repo_root / project_path
         proj_dir.mkdir(parents=True, exist_ok=True)

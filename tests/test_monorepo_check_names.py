@@ -7,6 +7,8 @@ from unittest.mock import patch, call
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.monorepo import _cmd_check_names, _cmd_init, _cmd_add
 from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE, load_workspace, save_workspace
 
@@ -22,10 +24,10 @@ def _make_npm_project(base_path, subdir):
 
 def _setup_workspace(mock_git_repo, project_names):
     """Initialize workspace and add projects with the given names."""
-    _cmd_init({}, project_root=".")
+    _cmd_init({"root-dev-node": True}, project_root=".")
     for name in project_names:
         _make_npm_project(mock_git_repo, name)
-        _cmd_add([name], {}, project_root=".")
+        _cmd_add([name], {"releasable": "false"}, project_root=".")
 
 
 class TestMissingTarget:
@@ -165,7 +167,7 @@ def _set_registry_name(root, project_name, registry_name):
     for proj in projects:
         if proj["name"] == project_name:
             proj["registry_name"] = registry_name
-    save_workspace(root, projects)
+    save_workspace(root, with_root_member(projects))
 
 
 class TestRegistryName:

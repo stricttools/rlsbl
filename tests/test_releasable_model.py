@@ -15,6 +15,8 @@ import os
 
 import pytest
 
+from conftest import workspace_toml, with_root_member
+
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
     DEFAULT_TAG_FORMAT,
@@ -35,11 +37,15 @@ from rlsbl.workspace_graph import WorkspaceGraph
 # ---------------------------------------------------------------------------
 
 
-def _write_workspace(tmp_path, content):
-    """Write raw TOML content to workspace.toml in a temp directory."""
+def _write_workspace(tmp_path, content, **kwargs):
+    """Write a workspace.toml body, supplying the root member and explicit mode.
+
+    ``workspace_toml`` prepends whatever the body does not already declare
+    (see conftest); pass ``root_member=""`` to write a body without one.
+    """
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir(exist_ok=True)
-    (ws_dir / WORKSPACE_FILE).write_text(content)
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(content, **kwargs))
 
 
 def _make_workspace_with_targets(tmp_path, project_defs):
@@ -529,7 +535,7 @@ class TestSaveWorkspaceReleasablesRoundTrip:
             WorkspaceProject({"path": "b", "name": "b", "releasable": False}),
             WorkspaceProject({"path": "c", "name": "c"}),
         ]
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         loaded = load_workspace(str(tmp_project))
         assert loaded[0].releasable == "core"
         assert loaded[1].releasable is False
@@ -549,7 +555,7 @@ releasable = "core"
 """)
         projects = load_workspace(str(tmp_project))
         # Save without touching releasables
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         # Re-load and verify releasables section survived
         releasables = load_releasables(str(tmp_project))
         assert len(releasables) == 1
@@ -562,7 +568,7 @@ releasable = "core"
             WorkspaceProject({"path": "a", "name": "a", "releasable": "core"}),
         ]
         rels = [Releasable(name="core", tag_format="v{version}")]
-        save_workspace(str(tmp_project), projects, releasables=rels)
+        save_workspace(str(tmp_project), with_root_member(projects), releasables=rels)
 
         releasables = load_releasables(str(tmp_project))
         assert len(releasables) == 1
@@ -575,7 +581,7 @@ releasable = "core"
             WorkspaceProject({"path": "a", "name": "a", "releasable": "core"}),
         ]
         rels = [Releasable(name="core")]
-        save_workspace(str(tmp_project), projects, releasables=rels)
+        save_workspace(str(tmp_project), with_root_member(projects), releasables=rels)
 
         # Read raw TOML to verify tag_format not written
         ws_file = tmp_project / WORKSPACE_DIR / WORKSPACE_FILE
@@ -598,7 +604,7 @@ name = "a"
 releasable = "core"
 """)
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects, releasables=[])
+        save_workspace(str(tmp_project), with_root_member(projects), releasables=[])
 
         # Without [[releasables]], load_releasables raises
         with pytest.raises(WorkspaceError, match=r"\[\[releasables\]\] section required"):
@@ -617,7 +623,7 @@ releasable = "core"
             WorkspaceProject({"path": "d", "name": "d", "releasable": False}),
             WorkspaceProject({"path": "tests", "name": "tests", "dev_node": True}),
         ]
-        save_workspace(str(tmp_project), projects, releasables=rels)
+        save_workspace(str(tmp_project), with_root_member(projects), releasables=rels)
 
         loaded_projects = load_workspace(str(tmp_project))
         loaded_releasables = load_releasables(str(tmp_project), projects=loaded_projects)
@@ -641,7 +647,7 @@ releasable = "core"
             WorkspaceProject({"path": "a", "name": "a", "releasable": "core"}),
         ]
         for _ in range(3):
-            save_workspace(str(tmp_project), projects, releasables=rels)
+            save_workspace(str(tmp_project), with_root_member(projects), releasables=rels)
             projects = load_workspace(str(tmp_project))
             loaded_rels = load_releasables(str(tmp_project), projects=projects)
             assert len(loaded_rels) == 1

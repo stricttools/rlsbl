@@ -18,6 +18,8 @@ from rlsbl.commands.release.hooks import (
 from rlsbl.commands.release.validate import HookError
 from rlsbl.workspace import WORKSPACE_DIR
 
+from conftest import workspace_toml
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -51,7 +53,7 @@ def _make_releasable_workspace(root, releasable_name, projects):
             lines.append("library = true")
         lines.append("")
 
-    (ws_dir / "workspace.toml").write_text("\n".join(lines))
+    (ws_dir / "workspace.toml").write_text(workspace_toml("\n".join(lines)))
 
     # Create releasable directory structure
     rel_dir = ws_dir / "releasables" / releasable_name

@@ -12,7 +12,7 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
-from conftest import make_workspace, run_git, make_commit, git_head
+from conftest import git_head, make_commit, make_workspace, run_git, workspace_toml
 
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.errors import ConfigError
@@ -36,8 +36,8 @@ class TestResolveVersionAndTagReleasable:
         ws_dir = ws_root / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[releasables]]\nname = "myrel"\ntag_format = "{name}@v{version}"\n\n'
-            '[[projects]]\nname = "pkg-a"\npath = "pkg-a"\nreleasable = "myrel"\n'
+            workspace_toml('[[releasables]]\nname = "myrel"\ntag_format = "{name}@v{version}"\n\n'
+            '[[projects]]\nname = "pkg-a"\npath = "pkg-a"\nreleasable = "myrel"\n')
         )
 
         # Create releasable version file
@@ -99,8 +99,8 @@ class TestResolveVersionAndTagReleasable:
         ws_dir = ws_root / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[releasables]]\nname = "myrel"\ntag_format = "{name}@v{version}"\n\n'
-            '[[projects]]\nname = "pkg-a"\npath = "pkg-a"\nreleasable = "myrel"\n'
+            workspace_toml('[[releasables]]\nname = "myrel"\ntag_format = "{name}@v{version}"\n\n'
+            '[[projects]]\nname = "pkg-a"\npath = "pkg-a"\nreleasable = "myrel"\n')
         )
         # No version file created
 

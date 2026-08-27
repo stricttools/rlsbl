@@ -6,6 +6,8 @@ import subprocess
 import tomlkit
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.monorepo import _cmd_init, _sync_import_names
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE, WorkspaceProject
 
@@ -55,9 +57,9 @@ def _init_workspace_manual(root, project_specs):
 
     project_specs: list of dicts with at least 'path' and 'name'.
     """
-    _cmd_init({}, project_root=".")
+    _cmd_init({"root-dev-node": True}, project_root=".")
     projects = [WorkspaceProject(spec) for spec in project_specs]
-    save_workspace(str(root), projects)
+    save_workspace(str(root), with_root_member(projects))
     subprocess.run(["git", "add", "."], cwd=str(root), check=True)
     subprocess.run(["git", "commit", "-q", "-m", "setup"], cwd=str(root), check=True)
 

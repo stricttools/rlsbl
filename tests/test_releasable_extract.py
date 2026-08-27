@@ -15,11 +15,7 @@ import subprocess
 
 import pytest
 
-from conftest import (
-    DEFAULT_RELEASE_FILE,
-    make_releasable_monorepo,
-    make_releasable_state,
-)
+from conftest import DEFAULT_RELEASE_FILE, make_releasable_monorepo, make_releasable_state, with_root_member, workspace_toml
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
 from rlsbl.commands.monorepo.extract import (
     ExtractError,
@@ -112,7 +108,7 @@ def _write_workspace(tmp_path, projects_toml, releasables_toml=""):
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir(exist_ok=True)
     content = releasables_toml + "\n" + projects_toml
-    (ws_dir / WORKSPACE_FILE).write_text(content)
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(content))
 
 
 def _write_changelog_entry(changes_dir, filename, entries):
@@ -444,7 +440,7 @@ class TestRemoveProjectFromWorkspace:
             WorkspaceProject({"path": "a", "name": "alpha"}),
             WorkspaceProject({"path": "b", "name": "beta"}),
         ]
-        save_workspace(str(tmp_path), projects)
+        save_workspace(str(tmp_path), with_root_member(projects))
 
         updated = _remove_project_from_workspace(str(tmp_path), "alpha", projects)
         assert len(updated) == 1
@@ -459,7 +455,7 @@ class TestRemoveProjectFromWorkspace:
         projects = [
             WorkspaceProject({"path": "a", "name": "alpha"}),
         ]
-        save_workspace(str(tmp_path), projects)
+        save_workspace(str(tmp_path), with_root_member(projects))
 
         with pytest.raises(ExtractError, match="not found"):
             _remove_project_from_workspace(str(tmp_path), "nonexistent", projects)
@@ -477,7 +473,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), projects)
+        save_workspace(str(root), with_root_member(projects))
 
         target = tmp_path / "output"
         projs, proj = validate_extract_preconditions(str(root), "pkg", str(target))
@@ -490,7 +486,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), projects)
+        save_workspace(str(root), with_root_member(projects))
 
         target = tmp_path / "output"
         target.mkdir()
@@ -504,7 +500,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), projects)
+        save_workspace(str(root), with_root_member(projects))
 
         target = tmp_path / "output"
         with pytest.raises(ExtractError, match="not found"):
@@ -516,7 +512,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), projects)
+        save_workspace(str(root), with_root_member(projects))
 
         target = tmp_path / "output"
         with pytest.raises(ExtractError, match="git-filter-repo is not installed"):

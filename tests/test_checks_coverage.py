@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import git_head, make_commit, make_ctx, make_workspace, run_git
+from conftest import git_head, make_commit, make_ctx, make_workspace, run_git, workspace_toml
 
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
@@ -896,10 +896,10 @@ class TestReleasableReleaseOrder:
         ws_dir = repo / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[releasables]]\nname = "rel-a"\n\n'
+            workspace_toml('[[releasables]]\nname = "rel-a"\n\n'
             '[[releasables]]\nname = "rel-b"\n\n'
             '[[projects]]\npath = "a"\nname = "a"\nreleasable = "rel-a"\n\n'
-            '[[projects]]\npath = "b"\nname = "b"\nreleasable = "rel-b"\ndeps = ["a"]\n'
+            '[[projects]]\npath = "b"\nname = "b"\nreleasable = "rel-b"\ndeps = ["a"]\n')
         )
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "setup")

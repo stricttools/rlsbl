@@ -27,6 +27,8 @@ import pytest
 import rlsbl
 from rlsbl.commands.monorepo import extract as extract_mod
 
+from conftest import workspace_toml
+
 
 @pytest.fixture(autouse=True)
 def _filter_repo_present(monkeypatch):
@@ -90,7 +92,7 @@ def _make_monorepo(tmp_path):
     ws = root / ".rlsbl-monorepo"
     ws.mkdir()
     (ws / "workspace.toml").write_text(
-        '[[projects]]\npath = "existing"\nname = "existing"\n'
+        workspace_toml('[[projects]]\npath = "existing"\nname = "existing"\n')
     )
     _commit(root, "existing/keep.txt", "keep\n", "add existing")
     _git(root, "add", ".rlsbl-monorepo/workspace.toml")

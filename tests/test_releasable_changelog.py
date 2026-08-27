@@ -52,7 +52,7 @@ from rlsbl.workspace import (
     WORKSPACE_FILE,
 )
 
-from conftest import make_commit, make_workspace, run_git
+from conftest import make_commit, make_workspace, run_git, workspace_toml
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ def _write_workspace_explicit(tmp_path, releasables, projects):
         if proj.get("dev_node"):
             lines.append("dev_node = true")
         lines.append("")
-    (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml("\n".join(lines)))
 
 
 def _setup_releasable_changes(tmp_path, releasable_name, entries=None):

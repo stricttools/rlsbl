@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import git_head, run_git, make_commit, make_workspace
+from conftest import git_head, make_commit, make_workspace, run_git, workspace_toml
 from rlsbl.commands.changelog_cmd import cmd_add
 from rlsbl.workspace import WORKSPACE_DIR
 
@@ -191,14 +191,14 @@ def fresh_releasable_monorepo(tmp_path, monkeypatch):
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir()
     (ws_dir / "workspace.toml").write_text(
-        '[[projects]]\n'
+        workspace_toml('[[projects]]\n'
         'path = "python"\n'
         'name = "pylib"\n'
         'releasable = "core"\n'
         '\n'
         '[[releasables]]\n'
         'name = "core"\n'
-        'tag_format = "{name}@v{version}"\n'
+        'tag_format = "{name}@v{version}"\n')
     )
     rel_changes = ws_dir / "releasables" / "core" / "changes"
     rel_changes.mkdir(parents=True)

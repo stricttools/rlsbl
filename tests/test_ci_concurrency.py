@@ -243,7 +243,7 @@ class TestSyncInlineConcurrency:
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WITH_CONCURRENCY)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         save_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(

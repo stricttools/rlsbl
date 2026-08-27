@@ -1,5 +1,6 @@
 """Tests for save_workspace() preserving top-level TOML sections."""
 
+from conftest import with_root_member, workspace_toml
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 
 
@@ -36,10 +37,10 @@ class TestPreservesTopLevelSections:
     def test_layers_section_survives_roundtrip(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(TOML_WITH_LAYERS)
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "[layers.core]" in content
@@ -50,10 +51,10 @@ class TestPreservesTopLevelSections:
     def test_check_section_survives_roundtrip(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(TOML_WITH_LAYERS)
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "[check]" in content
@@ -63,10 +64,10 @@ class TestPreservesTopLevelSections:
     def test_comments_survive_roundtrip(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(TOML_WITH_LAYERS)
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "# Monorepo configuration" in content
@@ -82,10 +83,10 @@ name = "pkg"
 """
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(toml_text)
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert 'custom_key = "hello"' in content
@@ -106,10 +107,10 @@ library = true
 """
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(toml_text)
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
 
         reloaded = load_workspace(str(tmp_project))
         assert reloaded[0]["watch"] == ["src/**"]
@@ -119,10 +120,10 @@ library = true
     def test_project_data_matches_after_roundtrip(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(TOML_WITH_LAYERS)
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         reloaded = load_workspace(str(tmp_project))
 
         assert reloaded == projects
@@ -133,7 +134,7 @@ class TestNewFileCreation:
 
     def test_creates_file_when_missing(self, tmp_project):
         projects = [{"path": "pkg/a", "name": "a"}]
-        save_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
 
         ws_file = tmp_project / WORKSPACE_DIR / WORKSPACE_FILE
         assert ws_file.exists()

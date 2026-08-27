@@ -151,11 +151,11 @@ class TestUnreleasedMonorepo:
 
     def test_monorepo_uses_scoped_tag(self, mock_git_repo, monkeypatch, capsys):
         """In a monorepo project, unreleased uses the project's scoped tag."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
         _make_npm_project(mock_git_repo, "beta", version="1.0.0")
-        _cmd_add(["alpha"], {}, project_root=".")
-        _cmd_add(["beta"], {}, project_root=".")
+        _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
+        _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         # Set up JSONL changelog for alpha
         changes_dir = mock_git_repo / "alpha" / ".rlsbl" / "changes"
@@ -176,11 +176,11 @@ class TestUnreleasedMonorepo:
 
     def test_monorepo_filters_commits_by_directory(self, mock_git_repo, monkeypatch, capsys):
         """Commits touching only another project's files are excluded."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
         _make_npm_project(mock_git_repo, "beta", version="1.0.0")
-        _cmd_add(["alpha"], {}, project_root=".")
-        _cmd_add(["beta"], {}, project_root=".")
+        _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
+        _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         # Set up JSONL changelogs for both
         for proj in ["alpha", "beta"]:
@@ -211,11 +211,11 @@ class TestUnreleasedMonorepo:
 
     def test_monorepo_no_commits_for_project(self, mock_git_repo, monkeypatch, capsys):
         """When all commits touch other projects, shows no unreleased commits."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "alpha", version="1.0.0")
         _make_npm_project(mock_git_repo, "beta", version="1.0.0")
-        _cmd_add(["alpha"], {}, project_root=".")
-        _cmd_add(["beta"], {}, project_root=".")
+        _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
+        _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         # Tag both
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)

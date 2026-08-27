@@ -9,7 +9,7 @@ import tomlkit
 
 from rlsbl.errors import ReleaseFileError
 from rlsbl.targets import TargetEntry
-from conftest import cli_ctx
+from conftest import cli_ctx, workspace_toml
 
 
 def _read_scaffolded_toml(path):
@@ -436,7 +436,7 @@ class TestReleaseInitMonorepo:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            '[[projects]]\npath = "python"\nname = "mylib"\n'
+            workspace_toml('[[projects]]\npath = "python"\nname = "mylib"\n')
         )
 
         # Create package directory with .rlsbl/ (scaffold creates this)

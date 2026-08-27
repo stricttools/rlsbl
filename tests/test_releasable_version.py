@@ -17,6 +17,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from conftest import workspace_toml
+
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
     RELEASABLES_DIR,
@@ -36,11 +38,15 @@ from rlsbl.workspace import (
 # ---------------------------------------------------------------------------
 
 
-def _write_workspace(tmp_path, content):
-    """Write raw TOML content to workspace.toml."""
+def _write_workspace(tmp_path, content, **kwargs):
+    """Write a workspace.toml body, supplying the root member and explicit mode.
+
+    ``workspace_toml`` prepends whatever the body does not already declare
+    (see conftest); pass ``root_member=""`` to write a body without one.
+    """
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir(exist_ok=True)
-    (ws_dir / WORKSPACE_FILE).write_text(content)
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(content, **kwargs))
 
 
 def _init_git(tmp_path):

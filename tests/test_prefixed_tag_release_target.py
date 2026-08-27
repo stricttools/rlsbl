@@ -23,6 +23,8 @@ import pytest
 
 from rlsbl.commands.init_cmd import process_template, resolve_tag_prefix
 
+from conftest import workspace_toml
+
 
 def _templates_root():
     return os.path.join(
@@ -169,14 +171,14 @@ class TestResolveTagPrefix:
     def test_releasable_member_gets_the_releasable_prefix(self, mock_git_repo):
         (mock_git_repo / ".rlsbl-monorepo").mkdir(exist_ok=True)
         (mock_git_repo / ".rlsbl-monorepo" / "workspace.toml").write_text(
-            '[[projects]]\n'
+            workspace_toml('[[projects]]\n'
             'name = "core"\n'
             'path = "core"\n'
             'releasable = "alpha"\n'
             '\n'
             '[[releasables]]\n'
             'name = "alpha"\n'
-            'tag_format = "{name}@v{version}"\n'
+            'tag_format = "{name}@v{version}"\n')
         )
         pkg = mock_git_repo / "core"
         pkg.mkdir(exist_ok=True)
@@ -282,14 +284,14 @@ class TestMergedPublishFeedsTheLauncherVars:
         )
         (root / ".rlsbl-monorepo").mkdir(exist_ok=True)
         (root / ".rlsbl-monorepo" / "workspace.toml").write_text(
-            '[[projects]]\n'
+            workspace_toml('[[projects]]\n'
             'name = "alpha"\n'
             'path = "."\n'
             'releasable = "alpha"\n'
             '\n'
             '[[releasables]]\n'
             'name = "alpha"\n'
-            'tag_format = "{name}@v{version}"\n'
+            'tag_format = "{name}@v{version}"\n')
         )
         rlsbl_dir = root / ".rlsbl"
         rlsbl_dir.mkdir(exist_ok=True)

@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.monorepo import (
     _cmd_init,
     _cmd_add,
@@ -85,12 +87,12 @@ def _init_workspace_with_projects(base_path, project_specs):
     project_specs: list of (subdir, kwargs_dict) tuples.
     Returns list of project names.
     """
-    _cmd_init({}, project_root=".")
+    _cmd_init({"root-dev-node": True}, project_root=".")
     names = []
     for subdir, kwargs in project_specs:
         _make_project(base_path, subdir, **kwargs)
         name = kwargs.get("name") or os.path.basename(subdir)
-        flags = {}
+        flags = {"releasable": "false"}
         if "name" in kwargs:
             flags["name"] = kwargs["name"]
         _cmd_add([subdir], flags, project_root=".")
@@ -471,7 +473,7 @@ class TestSwiftSubtreeWarning:
 
     def test_warns_swift_without_subtree_remote(self, mock_git_repo, capsys):
         """Sync warns when a Swift project lacks subtree_remote."""
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         # Create a Swift project (Package.swift triggers swift target detection)
         proj_dir = os.path.join(str(mock_git_repo), "swiftpkg")
         os.makedirs(proj_dir, exist_ok=True)
@@ -485,7 +487,7 @@ class TestSwiftSubtreeWarning:
         os.makedirs(wf_dir, exist_ok=True)
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WORKFLOW)
-        _cmd_add(["swiftpkg"], {}, project_root=".")
+        _cmd_add(["swiftpkg"], {"releasable": "false"}, project_root=".")
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup swift project"],
@@ -608,10 +610,10 @@ class TestTrailingSlashStripped:
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WORKFLOW)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         # Manually add with trailing-slash path in workspace
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": "python/", "name": "mypkg"}])
+        save_workspace(".", with_root_member([{"path": "python/", "name": "mypkg"}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -635,9 +637,9 @@ class TestTrailingSlashStripped:
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WORKFLOW)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": "lib/", "name": "mylib"}])
+        save_workspace(".", with_root_member([{"path": "lib/", "name": "mylib"}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -697,9 +699,9 @@ class TestVersionFileRewrite:
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(GO_CI_WORKFLOW)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": "gomod", "name": "gomod"}])
+        save_workspace(".", with_root_member([{"path": "gomod", "name": "gomod"}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -755,9 +757,9 @@ class TestPackagesDirInjection:
         with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
             f.write(PYPI_PUBLISH_WORKFLOW)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
+        save_workspace(".", with_root_member([{"path": "mypylib", "name": "mypylib"}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -792,7 +794,7 @@ class TestDotPathSelfReference:
         with open(os.path.join(str(mock_git_repo), "pyproject.toml"), "w") as f:
             f.write('[project]\nname = "orxtra"\nversion = "1.2.3"\n')
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         mono = os.path.join(str(mock_git_repo), ".rlsbl-monorepo")
         rel_dir = os.path.join(mono, "releasables", "orxtra")
         os.makedirs(rel_dir, exist_ok=True)
@@ -847,11 +849,11 @@ class TestDotPathSelfReference:
             f.write(CI_WORKFLOW)
 
         with open(os.path.join(str(mock_git_repo), "package.json"), "w") as f:
-            json.dump({"name": "rootpkg", "version": "0.1.0"}, f)
+            json.dump({"name": "root", "version": "0.1.0"}, f)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": ".", "name": "rootpkg"}])
+        save_workspace(".", with_root_member([{"path": ".", "name": "root", "releasable": False}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -863,9 +865,9 @@ class TestDotPathSelfReference:
         router = mock_git_repo / ".github" / "workflows" / "ci-router.yml"
         content = router.read_text()
         doc = parse_ci_workflow(content)
-        assert "rootpkg-ci-test" in doc["jobs"]
+        assert "root-ci-test" in doc["jobs"]
         # No root-level reusable copy is written
-        assert not (mock_git_repo / ".github" / "workflows" / "rootpkg-ci.yml").exists()
+        assert not (mock_git_repo / ".github" / "workflows" / "root-ci.yml").exists()
 
 
 PYPI_CI_WITH_TEMPLATE_VARS = """\
@@ -925,9 +927,9 @@ class TestTemplateVarResolution:
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(PYPI_CI_WITH_TEMPLATE_VARS)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
+        save_workspace(".", with_root_member([{"path": "mypylib", "name": "mypylib"}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -956,9 +958,9 @@ class TestTemplateVarResolution:
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(GO_CI_WITH_TEMPLATE_VARS)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": "mygomod", "name": "mygomod"}])
+        save_workspace(".", with_root_member([{"path": "mygomod", "name": "mygomod"}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -1015,9 +1017,9 @@ jobs:
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(ci_content)
 
-        _cmd_init({}, project_root=".")
+        _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
+        save_workspace(".", with_root_member([{"path": "mypylib", "name": "mypylib"}]))
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],

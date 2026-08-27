@@ -13,6 +13,8 @@ import pytest
 
 from rlsbl.commands.monorepo.batch_release import _run_root_selfdoc
 
+from conftest import workspace_toml
+
 
 class TestRunRootSelfdoc:
     """Unit tests for _run_root_selfdoc."""
@@ -168,7 +170,7 @@ class TestBatchReleaseRootSelfdocIntegration:
         ws_dir = tmp_path / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "pkg"\nname = "pkg"\n'
+            workspace_toml('[[projects]]\npath = "pkg"\nname = "pkg"\n')
         )
 
         # Create batch release file (needed so the path check passes)

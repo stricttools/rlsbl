@@ -17,6 +17,8 @@ from rlsbl.context import ProjectContext
 from rlsbl.lock import acquire_lock, release_lock, rlsbl_lock
 from rlsbl.release_file import ReleaseConfig
 
+from conftest import workspace_toml
+
 
 @pytest.fixture(autouse=True)
 def _reset_lock_fd(monkeypatch):
@@ -100,7 +102,7 @@ class TestMonorepoReleaseLockPlacement:
         ws_dir = repo_root / ".rlsbl-monorepo"
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            f'[[projects]]\npath = "{project_path}"\nname = "{project_name}"\n'
+            workspace_toml(f'[[projects]]\npath = "{project_path}"\nname = "{project_name}"\n')
         )
 
         proj_dir = repo_root / project_path

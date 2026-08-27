@@ -14,6 +14,8 @@ from rlsbl.commands.monorepo.impact import (
 from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
 from rlsbl.workspace_graph import WorkspaceGraph
 
+from conftest import workspace_toml
+
 
 def _make_impact_workspace(root):
     """Create a workspace with a dependency chain for impact testing.
@@ -49,7 +51,7 @@ def _make_impact_workspace(root):
             deps_str = ", ".join(f'"{d}"' for d in proj["depends_on"])
             lines.append(f"depends_on = [{deps_str}]")
         lines.append("")
-    (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml("\n".join(lines)))
 
     # Create package.json for each project so detect_targets works
     for proj in projects:

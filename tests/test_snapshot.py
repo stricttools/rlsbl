@@ -14,6 +14,8 @@ from rlsbl.snapshot import (
 from rlsbl.workspace import WORKSPACE_DIR
 from rlsbl.workspace_graph import WorkspaceGraph
 
+from conftest import workspace_toml
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -322,7 +324,7 @@ class TestCmdSnapshot:
                 deps = ", ".join(f'"{d}"' for d in p["depends_on"])
                 lines.append(f"depends_on = [{deps}]")
             lines.append("")
-        (ws_dir / "workspace.toml").write_text("\n".join(lines))
+        (ws_dir / "workspace.toml").write_text(workspace_toml("\n".join(lines)))
 
         monkeypatch.chdir(tmp_path)
 
@@ -355,7 +357,7 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
         )
 
         monkeypatch.chdir(tmp_path)
@@ -378,7 +380,7 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
         )
 
         monkeypatch.chdir(tmp_path)
@@ -416,7 +418,7 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
         )
         monkeypatch.chdir(tmp_path)
 
@@ -446,7 +448,7 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
         )
         monkeypatch.chdir(tmp_path)
 
@@ -473,7 +475,7 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
         )
         monkeypatch.chdir(tmp_path)
         graph = WorkspaceGraph(root, projects)

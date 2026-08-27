@@ -24,7 +24,7 @@ from rlsbl.workspace import (
     WORKSPACE_FILE,
     get_releasable_dir,
 )
-from conftest import make_workspace
+from conftest import make_workspace, workspace_toml
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ def _make_explicit_workspace(root, releasables, projects):
             lines.append(f'tag_format = "{rel["tag_format"]}"')
         lines.append("")
 
-    (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
+    (ws_dir / WORKSPACE_FILE).write_text(workspace_toml("\n".join(lines)))
 
 
 def _setup_releasable(root, releasable_name, config=None):
