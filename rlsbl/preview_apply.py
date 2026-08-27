@@ -29,19 +29,34 @@ enough to read in one glance: observation runs first, inside :func:`no_writes`,
 and every write happens after the ``dry_run`` branch.  Observation is not
 merely *documented* as read-only -- for the duration of the observe call this
 module swaps rlsbl's mutation entry points (:mod:`rlsbl.effects`) for versions
-that raise :class:`ObserveWriteError`, and screens ``effects.run`` argv for
-mutating git subcommands.  A reconciler whose "observation" quietly pushes a
-branch fails loudly at the attempt instead of silently making ``--dry-run`` a
-lie.
+that raise :class:`ObserveWriteError`, and screens every ``effects.run`` argv
+against :data:`rlsbl.observe_allowlist.OBSERVE_ALLOWLIST`.  A reconciler whose
+"observation" quietly pushes a branch fails loudly at the attempt instead of
+silently making ``--dry-run`` a lie.
+
+**One authority, not two.**  The screen is an allowlist because the question
+"may this program run while we are only looking?" already has an answer, and it
+is the observe allowlist -- the same list strictcli consults to decide which
+argv really executes under ``--dry-run``.  This guard used to carry a private
+denylist of mutating git subcommands instead, and an opposite-polarity second
+authority answers the same question differently the moment either side moves:
+``git subtree push``, ``git clean -fdx``, ``git config --global``, ``git remote
+add``, ``git fetch --prune``, ``git init`` and any non-git argv at all were all
+absent from that denylist and therefore ran.
 
 What the guard does NOT cover, stated plainly so nobody assumes otherwise:
 
-* **Scratch space.**  ``effects.mkdtemp`` and ``effects.rmtree`` stay live:
-  observing a remote means cloning it somewhere, and the clone has to be
-  cleaned up.  Those touch a temp directory this process created, never the
-  project.
-* **``effects.gh``.**  Distinguishing a GitHub read from a GitHub write needs a
-  verb list of its own; until a consumer needs one, gh calls are unscreened.
+* **Scratch directories.**  ``effects.mkdtemp`` stays live and, inside
+  :func:`effects.observe_scratch_dirs` (which :func:`no_writes` enters),
+  creates a REAL directory even under a preview -- observing a remote means
+  cloning it somewhere, and an allowlisted clone that really runs needs a
+  parent that really exists.  ``effects.rmtree`` is restricted to those tracked
+  paths: deleting anything else during observation raises.
+* **``effects.gh``.**  gh calls go through ``effects.run`` and are screened by
+  the same prefixes, so a gh verb absent from the allowlist is refused rather
+  than allowed.  What is still missing is a real read/write classification of
+  gh's verbs; until the publication reconciler needs one, the allowlist's
+  handful of gh reads is the whole vocabulary an observation may use.
 * **Grandchildren.**  Only the argv rlsbl itself launches is screened.  A
   command like ``git subtree split`` spawns its own git processes, which the
   screen never sees (and does not need to: it writes no refs).
@@ -51,10 +66,11 @@ what makes them previewable and recordable under strictcli's effects regime.
 """
 
 import sys
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 
 from . import effects
+from .observe_allowlist import OBSERVE_ALLOWLIST
 
 
 class ObserveWriteError(RuntimeError):
@@ -191,9 +207,11 @@ def render_preview(preview: Preview, *, show_keys: bool, out=None) -> None:
 # ---------------------------------------------------------------------------
 
 # Mutation entry points on rlsbl.effects that observation may not call.
-# ``mkdtemp``/``rmtree``/``temp_file``/``observe_scratch_files`` are absent on
-# purpose: they touch scratch space this process owns, which observing a remote
-# genuinely needs.  The lock helpers are absent for the same reason.
+# ``mkdtemp``/``temp_file``/``observe_scratch_files`` are absent on purpose:
+# they touch scratch space this process owns, which observing a remote genuinely
+# needs.  The lock helpers are absent for the same reason.  ``rmtree`` is
+# absent from this list but NOT unguarded: it is wrapped separately so it can
+# delete tracked scratch and nothing else.
 FORBIDDEN_DURING_OBSERVE = (
     "open_write",
     "open_exclusive",
@@ -213,36 +231,6 @@ FORBIDDEN_DURING_OBSERVE = (
     "copytree",
     "spawn",
 )
-
-# git subcommands that write refs, the index, or the working tree.  Anything
-# not listed here (ls-remote, rev-list, diff, show, log, clone, subtree split,
-# merge-base) reads, or writes only into scratch space.
-MUTATING_GIT_SUBCOMMANDS = frozenset({
-    "add",
-    "am",
-    "apply",
-    "branch",
-    "checkout",
-    "cherry-pick",
-    "commit",
-    "filter-branch",
-    "filter-repo",
-    "gc",
-    "merge",
-    "mv",
-    "prune",
-    "push",
-    "rebase",
-    "reset",
-    "restore",
-    "revert",
-    "rm",
-    "stash",
-    "switch",
-    "tag",
-    "update-ref",
-    "worktree",
-})
 
 # git global options that take a separate value token, so the scan does not
 # mistake the value for the subcommand.
@@ -272,6 +260,40 @@ def git_subcommand(argv) -> str | None:
     return None
 
 
+def observe_allowed(argv) -> bool:
+    """True when *argv* matches an observe-allowlist prefix.
+
+    Element-wise string equality against each entry's prefix -- exactly how
+    strictcli matches its ``proc_observe_allowlist``, so "runs during
+    observation" and "really executes under --dry-run" are the same set.
+    A shell string (``shell=True``) matches nothing: the allowlist is about
+    argv, and a shell line is not one.
+    """
+    if isinstance(argv, str) or not argv:
+        return False
+    tokens = [str(t) for t in argv]
+    for entry in OBSERVE_ALLOWLIST:
+        n = len(entry.argv)
+        if len(tokens) >= n and tuple(tokens[:n]) == entry.argv:
+            return True
+    return False
+
+
+def _run_refusal(argv):
+    sub = git_subcommand(argv)
+    if sub is not None:
+        what = f"`git {sub}`"
+    elif isinstance(argv, str):
+        what = f"the shell command {argv!r}"
+    else:
+        what = f"`{' '.join(str(t) for t in argv)}`"
+    return ObserveWriteError(
+        f"{what} was run during observation: only argv on rlsbl's observe "
+        f"allowlist (rlsbl/observe_allowlist.py) may run above the no-writes "
+        f"line, and every write belongs after the preview/apply branch point."
+    )
+
+
 def _refusal(name):
     def refuse(*args, **kwargs):
         raise ObserveWriteError(
@@ -287,33 +309,44 @@ def _refusal(name):
 def no_writes():
     """Refuse rlsbl's mutation entry points for the length of the block.
 
-    Swaps the names in :data:`FORBIDDEN_DURING_OBSERVE` on
-    :mod:`rlsbl.effects` for raisers and screens ``effects.run`` argv against
-    :data:`MUTATING_GIT_SUBCOMMANDS`, restoring everything on the way out
-    (including when the block raises).
+    Three things, restored on the way out (including when the block raises):
+
+    * the names in :data:`FORBIDDEN_DURING_OBSERVE` become raisers;
+    * ``effects.run`` is screened by :func:`observe_allowed`, so an argv that
+      is not on the observe allowlist raises instead of running;
+    * ``effects.rmtree`` is restricted to scratch this block's own
+      ``effects.mkdtemp`` created, which is also what makes those directories
+      real under a preview (see :func:`effects.observe_scratch_dirs`).
     """
     saved = {name: getattr(effects, name) for name in FORBIDDEN_DURING_OBSERVE}
     real_run = effects.run
+    real_rmtree = effects.rmtree
 
     def guarded_run(argv, **kwargs):
-        sub = git_subcommand(argv)
-        if sub in MUTATING_GIT_SUBCOMMANDS:
-            raise ObserveWriteError(
-                f"`git {sub}` was run during observation: observation is "
-                f"read-only, and every write belongs after the preview/apply "
-                f"branch point."
-            )
+        if not observe_allowed(argv):
+            raise _run_refusal(argv)
         return real_run(argv, **kwargs)
 
-    for name, fn in saved.items():
+    def guarded_rmtree(path, **kwargs):
+        if not effects.observe_scratch_owns(path):
+            raise ObserveWriteError(
+                f"effects.rmtree({path!r}) was called during observation: an "
+                f"observation may delete only the scratch directories it "
+                f"created itself, and every other deletion belongs after the "
+                f"preview/apply branch point."
+            )
+        return real_rmtree(path, **kwargs)
+
+    for name in saved:
         setattr(effects, name, _refusal(name))
     effects.run = guarded_run
-    try:
+    effects.rmtree = guarded_rmtree
+    with ExitStack() as stack:
+        stack.callback(lambda: [setattr(effects, n, f) for n, f in saved.items()])
+        stack.callback(lambda: setattr(effects, "rmtree", real_rmtree))
+        stack.callback(lambda: setattr(effects, "run", real_run))
+        stack.enter_context(effects.observe_scratch_dirs())
         yield
-    finally:
-        effects.run = real_run
-        for name, fn in saved.items():
-            setattr(effects, name, fn)
 
 
 # ---------------------------------------------------------------------------

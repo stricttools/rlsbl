@@ -150,11 +150,63 @@ class TestGitSubcommandScan:
         assert git_subcommand(argv) == expected
 
 
+# Every argv below escaped the private denylist the guard used to carry: it
+# knew a fixed set of mutating GIT SUBCOMMANDS, so a mutating git verb it had
+# never heard of, a mutating git verb spelled as a subcommand's option, and any
+# non-git program at all all ran during "observation".  Screening against the
+# observe allowlist instead makes the list of things that may run the only
+# authority, and these are simply not on it.
+DENYLIST_ESCAPES = [
+    ["git", "subtree", "push", "--prefix=pkg", "origin", "main"],
+    ["git", "clean", "-fdx"],
+    ["git", "config", "--global", "user.email", "evil@example.com"],
+    ["git", "remote", "add", "origin", "git@example:x/y"],
+    ["git", "fetch", "--prune"],
+    ["git", "init"],
+    ["python", "-c", "open('escaped.txt', 'w').write('written')"],
+    ["/bin/sh", "-c", "rm -rf ~"],
+    ["npm", "publish"],
+    ["gh", "release", "create", "v1.0.0"],
+]
+
+
 class TestNoWrites:
     def test_mutating_git_is_refused(self):
         with pytest.raises(ObserveWriteError, match="git push"):
             with no_writes():
                 effects.run(["git", "push", "origin", "main"], capture_output=True)
+
+    @pytest.mark.parametrize("argv", DENYLIST_ESCAPES, ids=" ".join)
+    def test_argv_off_the_allowlist_is_refused(self, argv, tmp_path):
+        with pytest.raises(ObserveWriteError):
+            with no_writes():
+                effects.run(argv, capture_output=True, cwd=str(tmp_path))
+
+    def test_a_shell_string_is_refused(self, tmp_path):
+        with pytest.raises(ObserveWriteError, match="shell command"):
+            with no_writes():
+                effects.run("touch escaped.txt", shell=True, cwd=str(tmp_path))
+
+    @pytest.mark.parametrize("argv", [
+        ["git", "subtree", "split", "--prefix", "pkg"],
+        ["git", "clone", "--quiet", "--single-branch", "--branch", "main",
+         "/nonexistent-remote.git", "/nonexistent-scratch/mirror"],
+        ["git", "ls-remote", "origin"],
+        ["git", "merge-base", "--is-ancestor", "a", "b"],
+    ], ids=" ".join)
+    def test_the_observation_argv_the_mirror_needs_is_allowed(self, argv, tmp_path):
+        """These reach the real runner: the guard raises before running."""
+        with no_writes():
+            effects.run(argv, capture_output=True, text=True, cwd=str(tmp_path))
+
+    def test_rmtree_outside_the_observation_scratch_is_refused(self, tmp_path):
+        victim = tmp_path / "not-scratch"
+        (victim / "sub").mkdir(parents=True)
+        (victim / "sub" / "keep.txt").write_text("precious\n")
+        with pytest.raises(ObserveWriteError, match="rmtree"):
+            with no_writes():
+                effects.rmtree(str(victim), ignore_errors=True)
+        assert (victim / "sub" / "keep.txt").exists()
 
     def test_reading_git_still_runs(self, tmp_path):
         with no_writes():
@@ -173,6 +225,26 @@ class TestNoWrites:
         with no_writes():
             d = effects.mkdtemp(prefix="rlsbl-preview-apply-test-")
             effects.rmtree(d, ignore_errors=True)
+
+    def test_observation_scratch_is_real_and_is_cleaned_up(self):
+        """The clone an observation runs needs a parent that really exists."""
+        import os
+
+        with no_writes():
+            d = effects.mkdtemp(prefix="rlsbl-preview-apply-test-")
+            assert os.path.isdir(d), (
+                "observation's scratch directory must be REAL: an allowlisted "
+                "`git clone` aimed at a synthetic path fails on a missing "
+                "parent and the preview reports that instead of a verdict"
+            )
+            effects.rmtree(d, ignore_errors=True)
+            assert not os.path.exists(d)
+
+    def test_scratch_tracking_ends_with_the_block(self, tmp_path):
+        with no_writes():
+            d = effects.mkdtemp(prefix="rlsbl-preview-apply-test-")
+        assert not effects.observe_scratch_owns(d)
+        effects.rmtree(d, ignore_errors=True)
 
     def test_everything_is_restored_after_the_block(self, tmp_path):
         before_run = effects.run
