@@ -683,6 +683,44 @@ class TestApplyMultiMember:
             assert actual == tree
         assert not os.access(archive, os.W_OK), "the archive must stay locked"
 
+    def test_a_recorded_tree_the_filter_disagrees_with_is_a_hard_error(
+        self, tmp_path,
+    ):
+        """The anchors are the only record of what HISTORICAL releases shipped.
+
+        A tree hash is content-addressed, so a faithful filter recomputes each
+        one identically. Overwriting the recorded value without comparing threw
+        that check away; a disagreement is now a hard error naming both hashes,
+        and the source is untouched when it fires.
+        """
+        ns = make_source(tmp_path)
+        archive = os.path.join(
+            get_releasable_dir(str(ns.root), "core"), "releases",
+            f"v{ns.initial_version}.toml",
+        )
+        config = read_release_file(archive)
+        tampered = dict(config.tree_hashes)
+        tampered["pkgA"] = "0" * 40
+        os.chmod(archive, 0o644)
+        write_release_anchor(
+            archive, candidate_sha=config.candidate_sha, tree_hashes=tampered,
+        )
+        os.chmod(archive, 0o444)
+        run_git(ns.root, "add", WORKSPACE_DIR)
+        run_git(ns.root, "commit", "-q", "-m", "tamper with a recorded tree")
+
+        target = tmp_path / "core_out"
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(ns.root), "core", str(target))
+        message = str(exc.value)
+        assert f"v{ns.initial_version}.toml" in message
+        assert "pkgA" in message
+        assert "0" * 40 in message
+        # The source keeps its members: the failure fires before any source-side
+        # edit.
+        assert (ns.root / "pkgA").is_dir()
+        assert gitout(ns.root, "status", "--porcelain") == ""
+
     def test_lineage_record_explains_the_conversion(self, tmp_path):
         ns = make_source(tmp_path)
         target = tmp_path / "core_out"

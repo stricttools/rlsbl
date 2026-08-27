@@ -1416,6 +1416,14 @@ def _remap_anchors(dep, run):
     on stderr. Rewriting it to nothing would be worse (the fields are the record
     of what shipped), and aborting mid-conversion would leave a half-converted
     pair of repositories -- the lineage record is what explains the stale value.
+
+    A tree that DOES resolve is checked rather than merely rewritten. Tree
+    hashes are content-addressed, so a faithful filter recomputes the recorded
+    value exactly; a disagreement means the content of a historical release
+    changed under the rewrite, and this is the only place that fact is
+    observable. It is a hard error -- at this point the source is still
+    untouched (the source-side edit is a later step), so the destination can be
+    deleted and nothing is lost.
     """
     releases_dir = os.path.join(dep.dest_state_dir, "releases")
     if not os.path.isdir(releases_dir):
@@ -1436,15 +1444,28 @@ def _remap_anchors(dep, run):
             continue
         trees = {}
         failed = None
-        for old_path in config.tree_hashes:
+        for old_path, recorded in config.tree_hashes.items():
             new_path = _dest_anchor_path(dep, old_path)
             try:
-                trees[new_path] = _tree_hash(
+                recomputed = _tree_hash(
                     dep.target_path, new_path, rev=new_sha,
                 )
             except subprocess.CalledProcessError:
                 failed = old_path
                 break
+            if recomputed != recorded:
+                raise ExtractError(
+                    f"release anchor {name} does not survive the filter: it "
+                    f"records tree {recorded} for '{old_path}', but "
+                    f"'{new_path or '<repo root>'}' at the rewritten commit "
+                    f"{new_sha} is {recomputed}. A tree hash is "
+                    f"content-addressed, so a faithful rewrite reproduces it "
+                    f"exactly -- the content of that released version is not "
+                    f"the content that left. Nothing has been written to the "
+                    f"source; delete {dep.target_path} and investigate before "
+                    f"re-running."
+                )
+            trees[new_path] = recomputed
         if failed is not None:
             run.unremapped_anchors.append((name, config.candidate_sha))
             print(
