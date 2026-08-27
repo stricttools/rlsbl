@@ -552,13 +552,26 @@ class TestReleasableMembersAreAllVerified:
         assert [f.label for f in filters] == ["core"]
         assert filters[0].regex == r"^(core\-ci\-npm) / "
 
-    def test_batch_rejects_a_directory_outside_every_project(self, tmp_project):
+    def test_a_directory_no_member_declares_is_the_root_members(self, tmp_project):
+        """Inside a workspace, every directory belongs to some member.
+
+        A directory no declared member claims used to be rejected as outside
+        every project; the root member owns the residual, so it answers.
+        """
         from rlsbl.ci_checks import workspace_check_filters
-        from rlsbl.workspace import save_workspace
 
         make_workspace(str(tmp_project), [{"path": "packages/core", "name": "core"}])
+        filters = workspace_check_filters(
+            str(tmp_project), [str(tmp_project / "packages" / "ghost")]
+        )
+        assert filters is not None
+
+    def test_batch_rejects_a_directory_outside_the_workspace(self, tmp_project):
+        from rlsbl.ci_checks import workspace_check_filters
+
+        make_workspace(str(tmp_project), [{"path": "packages/core", "name": "core"}])
+        outside = tmp_project.parent / "outside-the-workspace"
+        outside.mkdir(exist_ok=True)
         with pytest.raises(ProjectCINotRunError) as exc:
-            workspace_check_filters(
-                str(tmp_project), [str(tmp_project / "packages" / "ghost")]
-            )
+            workspace_check_filters(str(tmp_project), [str(outside)])
         assert "not inside any project registered in the workspace" in str(exc.value)
