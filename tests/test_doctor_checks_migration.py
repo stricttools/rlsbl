@@ -44,6 +44,7 @@ EXPECTED_CHECKS = [
     "changelog-format-version",
     "changelog-format-version-gate",
     # Workspace checks
+    "router-filters-fresh",
     "workspace-ci-router",
     "workspace-ci-synced",
     "workspace-targets",

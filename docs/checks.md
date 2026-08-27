@@ -41,11 +41,11 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `project` | Project-level metadata, config schema, version consistency | 22 |
 | `release` | Git tag and GitHub Release validation | 5 |
 | `changelog` | JSONL changelog validation and structure | 11 |
-| `workspace` | Monorepo workspace integrity and dependency rules | 17 |
+| `workspace` | Monorepo workspace integrity and dependency rules | 18 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 16 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
-Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (15 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`, `dep-floors`, `target-matrix-fresh`, and the six path-capable tool checks `lint`, `lint-scope-guard`, `format`, `format-scope-guard`, `type-check`, `type-check-scope-guard`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
+Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (16 checks: `library-lint`, `test-suite`, `dev-overlay-drift`, `maven-central-metadata`, `wrapper-producer`, `strictspec-certificate-gate`, `stricttest-floor`, `dep-floors`, `target-matrix-fresh`, `router-filters-fresh`, and the six path-capable tool checks `lint`, `lint-scope-guard`, `format`, `format-scope-guard`, `type-check`, `type-check-scope-guard`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry` and `changelog-format-version`). The `maven` tag groups `maven-central-metadata`.
 
 ## Project checks
 
@@ -107,6 +107,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 
 | Check | Severity | Description |
 | --- | --- | --- |
+| `router-filters-fresh` | error | The `filters:` block of the generated `ci-router.yml` matches a fresh derivation from the workspace: each member's own territory, the territories of everything it depends on (transitively, every scope), the workspace-root manifests and lockfiles, the tool's own machinery, and -- for the root member -- `**` narrowed by negated excludes of every other territory. Also verifies the step declares `predicate-quantifier: some-with-excludes`, without which those excludes match exactly what they exclude. Skips outside a workspace or when no router exists |
 | `workspace-ci-router` | error | The generated `ci-router.yml` exists at the repo root (it holds every project's inlined jobs; per-project coverage is `workspace-ci-synced`) |
 | `workspace-ci-synced` | error | Each in-scope project's CI jobs are inlined into the shared `ci-router.yml` |
 | `workspace-targets` | error | Each project's declared target matches its actual manifest files |

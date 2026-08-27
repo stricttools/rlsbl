@@ -231,6 +231,28 @@ depends_on = []
 # Workspace checks (from doctor.py ad-hoc + monorepo lint)
 # ---------------------------------------------------------------------------
 
+# router-filters-fresh: the generated ci-router.yml's paths filters are derived
+# from the workspace (each member's territory, the territories of everything it
+# depends on transitively in every scope, the workspace-root manifests and
+# lockfiles, the tool's own machinery, and -- for the root member -- negated
+# excludes of every other territory). A committed block that no longer matches
+# that derivation under-triggers or over-triggers member CI, and an
+# under-triggered member's job concludes `skipped` on the very commit a release
+# tags, which the publish gate refuses. Regenerates in memory and compares, so
+# it is pure (workspace.toml + manifests + the router YAML; no subprocess or
+# network). In "preflight" so a stale router blocks the release it would break.
+# Loads the workspace itself rather than trusting ctx.projects: the releasable
+# preflight context carries one member, and a partial member list derives the
+# wrong excludes.
+[checks.router-filters-fresh]
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
 [checks.workspace-ci-router]
 tags = ["workspace"]
 severity = "error"

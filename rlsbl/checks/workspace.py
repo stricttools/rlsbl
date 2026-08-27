@@ -1,6 +1,6 @@
 """Workspace checks (tag: workspace) validating monorepo CI routing, project registration, dev-only boundaries, and inter-project dependency declarations.
 
-Checks: workspace-ci-router, workspace-ci-synced, workspace-targets,
+Checks: router-filters-fresh, workspace-ci-router, workspace-ci-synced, workspace-targets,
 workspace-unregistered, workspace-stale-entries, dev-only-boundary,
 unversioned-boundary, dead-workspace-packages, subtree-remote-reachable,
 workspace-unbuildable, layers-violations, deps-unused, deps-undeclared,
@@ -43,8 +43,100 @@ def _is_manifestless_root_member(ctx, proj):
     )
 
 
+def _committed_router_filters(router_path):
+    """Return ``(filters_by_member, quantifier)`` from a generated router.
+
+    *filters_by_member* maps each member name the router's paths-filter step
+    declares to its pattern list (a lone string is normalized to a one-element
+    list).  Raises on anything it cannot read: a router whose filter block is
+    unparseable is not a router whose filters can be called fresh.
+    """
+    from ruamel.yaml import YAML
+
+    yaml = YAML(typ="safe")
+    with open(router_path, "r", encoding="utf-8") as f:
+        router = yaml.load(f)
+
+    steps = ((router or {}).get("jobs") or {}).get("detect", {}).get("steps") or []
+    for step in steps:
+        with_block = step.get("with") or {}
+        if "filters" not in with_block:
+            continue
+        declared = yaml.load(with_block["filters"]) or {}
+        by_member = {
+            name: [value] if isinstance(value, str) else list(value)
+            for name, value in declared.items()
+        }
+        return by_member, with_block.get("predicate-quantifier")
+    raise ValueError("no dorny/paths-filter step with a `filters:` block")
+
+
 def register_workspace_checks(app):
     """Register workspace-tag checks on *app*."""
+
+    @app.error_check("router-filters-fresh")
+    def check_router_filters_fresh(ctx, reporter):
+        """The router's paths filters must match a fresh derivation from the workspace."""
+        from ..router_filters import PREDICATE_QUANTIFIER, RouterFilters
+        from ..workspace import is_explicit_mode, load_releasables, load_workspace
+
+        if ctx.workspace_root is None:
+            return reporter.skipped("not a workspace")
+        root = str(ctx.workspace_root)
+        router_path = os.path.join(root, ".github", "workflows", "ci-router.yml")
+        if not os.path.isfile(router_path):
+            # workspace-ci-router already reports a missing router; saying it
+            # twice would just double the noise.
+            return reporter.skipped("no ci-router.yml to compare")
+
+        try:
+            committed, quantifier = _committed_router_filters(router_path)
+        except Exception as e:
+            reporter.error(f"cannot read the router's filters block: {e}")
+            return reporter.found("ci-router.yml filters block is unreadable")
+
+        # Deliberately NOT ctx.projects: a member's filter is derived from
+        # territories it does not own, and some contexts (the releasable
+        # preflight) carry a single member. Deriving from a partial list would
+        # report a fresh router as stale.
+        projects = load_workspace(root)
+        releasables = load_releasables(root, projects) if is_explicit_mode(root) else None
+        filters = RouterFilters(root, projects, releasables)
+        fresh = {
+            proj["name"]: filters.patterns_for(proj)
+            for proj in projects
+        }
+
+        drifted = []
+        for name, patterns in committed.items():
+            if name not in fresh:
+                # A filter for a member the workspace no longer declares.
+                drifted.append(f"{name}: no longer a workspace member")
+            elif patterns != fresh[name]:
+                drifted.append(
+                    f"{name}: committed {patterns} != derived {fresh[name]}"
+                )
+        if quantifier != PREDICATE_QUANTIFIER:
+            drifted.append(
+                f"predicate-quantifier is {quantifier!r}, must be "
+                f"{PREDICATE_QUANTIFIER!r} -- under the action's default the "
+                f"root member's negated excludes match everything they exclude"
+            )
+
+        if drifted:
+            for detail in drifted:
+                reporter.error(detail)
+            reporter.error(
+                "the filters block no longer matches the workspace it is "
+                "derived from; regenerate it with `rlsbl monorepo sync` and "
+                "commit the result"
+            )
+            return reporter.found(
+                f"{len(drifted)} stale entry/entries in ci-router.yml filters"
+            )
+        return reporter.passed(
+            f"{len(committed)} router filter(s) match the workspace"
+        )
 
     @app.error_check("workspace-ci-router")
     def check_workspace_ci_router(ctx, reporter):

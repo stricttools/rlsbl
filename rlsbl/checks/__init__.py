@@ -86,6 +86,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "changelog-format-version": None,
     "changelog-format-version-gate": None,
     # --- workspace tag (workspace-only, target-agnostic) ---
+    "router-filters-fresh": "workspace",
     "workspace-ci-router": "workspace",
     "workspace-ci-synced": "workspace",
     "workspace-targets": "workspace",
