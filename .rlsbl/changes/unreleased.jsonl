@@ -120,3 +120,4 @@
 {"format_version":1,"id":"18cfc81fc3688439da5aa0450b34422285a0a8f9a94c11ce","commits":["c5c200abcbecd040715387f9f9157bdaa51689a0"],"user_facing":false}
 {"format_version":1,"id":"18cfc83c7cc418420f88de153a5d4b20ba0e3b2aa4e5985a","commits":["e5bcc3c291ffd2d12ad049067bf6f6f806311b78"],"user_facing":false}
 {"format_version":1,"id":"18cfc8b045b44f28e47d346a803948fabf65f0d38a62fd5a","commits":["d354bdc8773feca6116944afa27c19bd93eb0a39"],"user_facing":true,"description":"**Undo refuses without its audit record.** `rlsbl release undo` no longer deletes the GitHub Release, the tags and the release commits when its `undo-audit.json` cannot be written -- an unwritable or malformed audit file now refuses the whole operation before anything is destroyed, naming the file and the repair.","type":"fix"}
+{"format_version":1,"id":"18cfc8b3f30b77a5e280bdb60ec94a908bdd6ecfccb1dbad","commits":["8161079b8f54ed4d916cf0c0047e33849f80e13a"],"user_facing":false}
