@@ -195,6 +195,39 @@ class TestAuthoredAnchorRefused:
         with pytest.raises(ReleaseValidationError, match="tree_hashes"):
             validate_no_authored_anchors(cfg)
 
+    def test_unanchorable_marker_in_editable_file_refused(self):
+        # `unanchorable` is written by the backfill pass onto an ARCHIVE whose
+        # commit could not be recovered. On an editable release file it is a
+        # hand-authored claim about a version that has not shipped -- refused
+        # for the same reason the anchor fields are.
+        cfg = ReleaseConfig(
+            bump="patch", include=[], exclude=[], description="x",
+            unanchorable=True,
+        )
+        with pytest.raises(ReleaseValidationError, match="unanchorable"):
+            validate_no_authored_anchors(cfg)
+
+    def test_unanchorable_false_is_still_an_authored_marker(self):
+        # Absence is None; an explicitly written `unanchorable = false` is a
+        # present field and just as much the flow's to author.
+        cfg = ReleaseConfig(
+            bump="patch", include=[], exclude=[], description="x",
+            unanchorable=False,
+        )
+        with pytest.raises(ReleaseValidationError, match="unanchorable"):
+            validate_no_authored_anchors(cfg)
+
+    def test_unanchorable_named_alongside_the_anchor_fields(self):
+        cfg = ReleaseConfig(
+            bump="patch", include=[], exclude=[], description="x",
+            candidate_sha=_SHA, tree_hashes={".": _TREE}, unanchorable=True,
+        )
+        with pytest.raises(ReleaseValidationError) as exc:
+            validate_no_authored_anchors(cfg)
+        assert "candidate_sha" in str(exc.value)
+        assert "tree_hashes" in str(exc.value)
+        assert "unanchorable" in str(exc.value)
+
 
 # --------------------------------------------------------------------------- #
 # Writing and stripping

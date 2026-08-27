@@ -105,19 +105,27 @@ def validate_no_authored_anchors(release_config):
     and the archive is read-only from that instant. There is no path by which a
     pre-release file can know either value: the candidate does not exist yet.
 
-    So an anchor in ``unreleased.toml`` is either a hand-authored claim about a
-    commit that has not happened, or an archive that was copied back without
-    being un-finalized properly. Both would make the archive assert something
-    the release never verified, which is the one thing the anchor exists to
-    prevent -- hence a hard error rather than an overwrite. (``release undo``
-    strips the fields when it restores an archive, so its output passes here.)
+    ``unanchorable`` is refused on the same ground from the other direction: it
+    is the backfill pass's permanent record that an ALREADY SHIPPED version's
+    commit could not be recovered. A file describing the NEXT release cannot
+    make that statement -- the candidate has not been created, let alone lost --
+    so a marker there is either hand-authored or an archive restored without
+    being un-finalized.
 
-    Raises ReleaseValidationError naming every anchor field present.
+    So a marker or anchor in ``unreleased.toml`` is either a hand-authored claim
+    about a commit that has not happened, or an archive that was copied back
+    without being un-finalized properly. Both would make the archive assert
+    something the release never verified, which is the one thing the anchor
+    exists to prevent -- hence a hard error rather than an overwrite.
+    (``release undo`` strips all three fields when it restores an archive, so
+    its output passes here.)
+
+    Raises ReleaseValidationError naming every flow-owned field present.
     """
-    from ...release_file import ANCHOR_FIELDS
+    from ...release_file import ANCHOR_FIELDS, UNANCHORABLE_FIELD
 
     present = [
-        name for name in ANCHOR_FIELDS
+        name for name in (*ANCHOR_FIELDS, UNANCHORABLE_FIELD)
         if getattr(release_config, name, None) is not None
     ]
     if not present:
@@ -126,9 +134,11 @@ def validate_no_authored_anchors(release_config):
         f"the release file carries release-anchor field(s) "
         f"{', '.join(present)}, which only the release flow may write. The "
         f"anchor records the commit CI verified and the tree each released "
-        f"path shipped -- neither exists before the release runs -- and it is "
-        f"written into the archived v{{version}}.toml, never into "
-        f"unreleased.toml. Remove {'them' if len(present) > 1 else 'it'} from "
+        f"path shipped -- neither exists before the release runs -- and "
+        f"{UNANCHORABLE_FIELD} records that a SHIPPED version's commit could "
+        f"not be recovered. Both belong in the archived v{{version}}.toml, "
+        f"never in unreleased.toml. Remove "
+        f"{'them' if len(present) > 1 else 'it'} from "
         f"the release file and re-run."
     )
 
