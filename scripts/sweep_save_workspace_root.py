@@ -20,6 +20,9 @@ import difflib
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sweep_conftest_import import ensure_conftest_import  # noqa: E402
+
 WRAPPER = "with_root_member"
 
 
@@ -54,32 +57,8 @@ def _plan(source: str) -> list[tuple[int, int, str]]:
 
 
 def _ensure_import(source: str) -> str:
-    tree = ast.parse(source)
-    lines = source.splitlines(keepends=True)
-    starts = [0]
-    for line in lines:
-        starts.append(starts[-1] + len(line))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "conftest":
-            names = [a.name for a in node.names]
-            if WRAPPER in names:
-                return source
-            names.append(WRAPPER)
-            start = starts[node.lineno - 1]
-            end = starts[node.end_lineno - 1] + len(lines[node.end_lineno - 1])
-            return (
-                source[:start]
-                + f"from conftest import {', '.join(sorted(names))}\n"
-                + source[end:]
-            )
-    last = None
-    for node in tree.body:
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            last = node
-    if last is None:
-        return f"from conftest import {WRAPPER}\n\n" + source
-    end = starts[last.end_lineno - 1] + len(lines[last.end_lineno - 1])
-    return source[:end] + f"\nfrom conftest import {WRAPPER}\n" + source[end:]
+    """Add the wrapper to the module's conftest import."""
+    return ensure_conftest_import(source, WRAPPER)
 
 
 def sweep(path: Path, apply: bool) -> bool:
