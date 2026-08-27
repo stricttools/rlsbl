@@ -78,7 +78,7 @@ from dataclasses import dataclass, field
 
 from ...changelog.files import load_filter_repo_commit_map
 from ...config import read_json_config
-from ...errors import ConfigError
+from ...errors import ConfigError, WorkspaceError
 from ...lineage import (
     AnchorMapping,
     AnchorRemapEvent,
@@ -659,7 +659,22 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
     is_multi = len(members) > 1
     own_format = releasable.effective_tag_format
     dest_format = own_format if is_multi else STANDALONE_TAG_FORMAT
-    version = read_releasable_version(workspace_root, releasable_name)
+    # The version is read from the releasable's state directory, which is also
+    # the directory the conversion transplants. A workspace that declares
+    # [[releasables]] but keeps its release state per package has not finished
+    # migrating to the releasable model, and there is nothing to carry over --
+    # so this is where that is said, before any history is rewritten.
+    try:
+        version = read_releasable_version(workspace_root, releasable_name)
+    except WorkspaceError as exc:
+        raise ExtractError(
+            f"releasable '{releasable_name}' has no release state to carry "
+            f"over: {exc}. Its state directory "
+            f"({get_releasable_dir(workspace_root, releasable_name)}) holds the "
+            f"version, changelog and release archives the conversion moves. Run "
+            f"`rlsbl monorepo migrate-releasable {releasable_name}` first if "
+            f"this workspace still keeps that state per package."
+        ) from exc
 
     own_glob = releasable_tag_glob(own_format, releasable_name)
     foreign_globs = _other_member_globs(

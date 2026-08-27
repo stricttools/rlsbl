@@ -1999,38 +1999,32 @@ def cmd_mono_release_order(ctx):
     _cmd_release_order({}, project_root=root)
 
 
-# NOT consequential: the filter-repo rewrite runs on a throwaway clone at
-# target_path, so nothing anyone has ever pulled is rewritten. Nothing is
-# pushed, no registry or public artifact is touched, and the only mutation to
-# the repo you are standing in is one removed workspace.toml entry. Everything
-# it does is local and trivially undone.
-@mono.command(name="extract", help="Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.", effect="mutating")
+# Consequential: it deletes the extracted members and the releasable's whole
+# release state from the repository you are standing in, and commits that.
+# The old classification rested on the claim that the source is barely touched
+# -- true of the previous implementation, which only dropped a workspace.toml
+# entry, and false of this one, which completes the move.
+@mono.command(name="extract", help="Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their anchors, config and hooks -- is transplanted, the anchors and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. Refuses a mirrored releasable, one owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
 # Positional order is declaration order (top decorator first) since strictcli
 # 0.41 fixed the stacked-@arg binding; these stacks used to be written
 # bottom-up to compensate for the old reversal.
-@strictcli.arg(name="package_name", help="Name of the package as defined in workspace.toml to extract into a standalone repo", presence="required")
-@strictcli.arg(name="target_path", help="Filesystem path where the new standalone repository will be created", presence="required")
+@strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract, with every member it owns", presence="required")
+@strictcli.arg(name="target_path", help="Filesystem path where the new repository will be created (must not exist)", presence="required")
+@strictcli.flag(name="delete-with-rm", type=bool, presence="optional", help="Delete the departed members' directories with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.")
 @effects.handler
-def cmd_mono_extract(ctx, package_name, target_path):
-    """Extract a package from the monorepo into a new standalone repository."""
-    dry_run = ctx.dry_run
+def cmd_mono_extract(ctx, releasable_name, target_path, delete_with_rm):
+    """Extract a releasable out of the monorepo into its own repository."""
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    ws_root = find_workspace_root(str(root))
-    if ws_root is None:
-        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
-        sys.exit(1)
-    from .commands.monorepo import cmd_extract
-    try:
-        result = cmd_extract(ws_root, package_name, target_path, dry_run=dry_run)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    if dry_run:
-        print(f"Would extract '{result['package_name']}' (path: {result['package_path']}) to {result['target_path']}")
-    else:
-        print(f"Extracted '{result['package_name']}' to {result['target_path']}")
-        print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
+    from .commands.monorepo.extract_cmd import _cmd_extract
+    _cmd_extract(
+        {
+            "releasable": releasable_name,
+            "target-path": target_path,
+            "dry-run": ctx.dry_run,
+            "delete-with-rm": bool(delete_with_rm),
+        },
+        project_root=root,
+    )
 
 
 @mono.command(name="absorb", help="Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.", effect="mutating", consequential=True)  # rewrites another repo's history and merges it in
@@ -2072,41 +2066,6 @@ def cmd_mono_absorb(ctx, name, registry_name, releasable, source_repo, dest_path
         skipped = result.get("skipped_tags") or []
         if skipped:
             print(f"  Skipped {len(skipped)} non-version tag(s): {', '.join(skipped)}")
-
-
-# NOT consequential, for the same reason as `monorepo extract`: the rewrite is
-# confined to a throwaway clone, nothing is pushed, and the source workspace
-# loses only the extracted members' workspace.toml entries.
-@mono.command(name="extract-releasable", help="Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.", effect="mutating")
-@strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract", presence="required")
-@strictcli.arg(name="target_path", help="Filesystem path where the new repository will be created", presence="required")
-@effects.handler
-def cmd_mono_extract_releasable(ctx, releasable_name, target_path):
-    """Extract all member packages of a releasable into a new repository."""
-    dry_run = ctx.dry_run
-    root = _require_project_root()
-    from .workspace import find_workspace_root
-    ws_root = find_workspace_root(str(root))
-    if ws_root is None:
-        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
-        sys.exit(1)
-    from .commands.monorepo import cmd_extract_releasable
-    try:
-        result = cmd_extract_releasable(ws_root, releasable_name, target_path, dry_run=dry_run)
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    if dry_run:
-        members = ", ".join(result["member_packages"])
-        kind = "monorepo" if result["is_monorepo"] else "single-project repo"
-        print(f"Would extract releasable '{result['releasable_name']}' ({kind}) to {result['target_path']}")
-        print(f"  Members: {members}")
-    else:
-        members = ", ".join(result["member_packages"])
-        kind = "monorepo" if result["is_monorepo"] else "single-project repo"
-        print(f"Extracted releasable '{result['releasable_name']}' ({kind}) to {result['target_path']}")
-        print(f"  Members: {members}")
-        print(f"  Changelog: {result['entries_migrated']} entries in {result['files_written']} files")
 
 
 @mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.", effect="mutating")

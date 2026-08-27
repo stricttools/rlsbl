@@ -1,4 +1,4 @@
-"""Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, check-names, graph, impact, and batch release (release run/init/order subgroup)."""
+"""Monorepo workspace management commands: init, add, remove, list, sync, status, outdated, check-names, graph, impact, extract/absorb conversions, and batch release (release run/init/order subgroup)."""
 
 from .commands import (
     _cmd_init,
@@ -27,13 +27,12 @@ from .snapshot_cmd import _cmd_snapshot, _cmd_snapshot_check
 
 from .extract import (
     require_filter_repo,
-    cmd_extract,
     cmd_absorb,
-    cmd_extract_releasable,
     ExtractError,
-    validate_extract_preconditions,
     validate_absorb_preconditions,
 )
+
+from .extract_cmd import cmd_extract, resolve_departure
 
 from .sync import (
     _cmd_sync,
@@ -71,10 +70,9 @@ __all__ = [
     # extract/absorb
     "require_filter_repo",
     "cmd_extract",
+    "resolve_departure",
     "cmd_absorb",
-    "cmd_extract_releasable",
     "ExtractError",
-    "validate_extract_preconditions",
     "validate_absorb_preconditions",
     "_evaluate_constraint",
     "_parse_version_tuple",

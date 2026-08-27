@@ -1,11 +1,16 @@
-"""Tests for monorepo extract and absorb operations.
+"""Tests for the monorepo absorb and extract conversions.
 
 Covers:
 - require_filter_repo (installed vs not)
-- Extract: basic package extraction, changelog migration, workspace.toml update
-- Absorb: basic absorption, workspace.toml update
-- Releasable-level extract
-- Validation: precondition checks for both operations
+- Absorb: basic absorption, history rewrite, tag import, workspace.toml update
+- Extract: the releasable-level conversion, reworked from the two commands it
+  replaced. Scenarios that the collapse removed -- extracting one package, and
+  the per-package changelog machinery the old code carried -- are pinned here as
+  refusals and absences, so the retired shapes cannot quietly come back.
+
+The extract conversion's own behavior is covered in
+``tests/test_extract_conversion.py``; what stays here is the reworked form of
+what these tests originally asserted.
 """
 
 import json
@@ -17,20 +22,15 @@ import pytest
 
 from conftest import DEFAULT_RELEASE_FILE, declared_members, make_releasable_monorepo, make_releasable_state, with_root_member, workspace_toml, make_workspace
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
+from rlsbl.commands.monorepo import extract as extract_mod
 from rlsbl.commands.monorepo.extract import (
     ExtractError,
     require_filter_repo,
-    cmd_extract,
     cmd_absorb,
-    cmd_extract_releasable,
-    validate_extract_preconditions,
     validate_absorb_preconditions,
-    _filter_changelog_entries,
-    _migrate_changelog_to_new_repo,
-    _remove_project_from_workspace,
-    _find_project,
     _run_git,
 )
+from rlsbl.commands.monorepo.extract_cmd import cmd_extract
 from rlsbl.changelog.schema import parse_jsonl as _parse_jsonl_hashes
 from rlsbl.workspace import (
     get_releasable_changes_dir,
@@ -255,268 +255,73 @@ class TestRequireFilterRepo:
 
 
 # ---------------------------------------------------------------------------
-# _find_project
+# The package-level extract machinery, and its absence
 # ---------------------------------------------------------------------------
 
 
-class TestFindProject:
-    def test_finds_existing_project(self):
-        projects = [
-            WorkspaceProject({"path": "a", "name": "alpha"}),
-            WorkspaceProject({"path": "b", "name": "beta"}),
-        ]
-        result = _find_project(projects, "beta")
-        assert result.name == "beta"
+class TestPackageLevelExtractMachineryIsGone:
+    """The helpers a package-level extract needed no longer exist.
 
-    def test_raises_for_missing_project(self):
-        projects = [
-            WorkspaceProject({"path": "a", "name": "alpha"}),
-        ]
-        with pytest.raises(ExtractError, match="not found in workspace"):
-            _find_project(projects, "nonexistent")
+    Extraction operates on a RELEASABLE now, and a releasable owns its version,
+    its changelog and its release archives as whole directories. That removed
+    three jobs the old code did by hand, and each one is pinned absent here so
+    it cannot be reintroduced piecemeal:
 
-    def test_error_lists_available(self):
-        projects = [
-            WorkspaceProject({"path": "a", "name": "alpha"}),
-            WorkspaceProject({"path": "b", "name": "beta"}),
-        ]
-        with pytest.raises(ExtractError, match="alpha.*beta"):
-            _find_project(projects, "gamma")
+    * finding the PROJECT to extract (``_find_project``) -- the command resolves
+      a releasable, and an unknown name is refused by name in
+      ``test_extract_conversion.py``;
+    * filtering changelog entries down to the ones "relevant to a package"
+      (``_filter_changelog_entries``) -- a heuristic over ``packages`` fields
+      and per-commit path lookups, replaced by moving the releasable's whole
+      ``changes/`` directory;
+    * copying those filtered entries into a new repository
+      (``_migrate_changelog_to_new_repo``) and removing one project from
+      workspace.toml (``_remove_project_from_workspace``) -- both subsumed by
+      the state transplant and the single workspace edit the conversion commits.
+    """
 
+    @pytest.mark.parametrize("name", [
+        "_find_project",
+        "_filter_changelog_entries",
+        "_migrate_changelog_to_new_repo",
+        "_remove_project_from_workspace",
+        "_create_rlsbl_config",
+        "validate_extract_preconditions",
+        "cmd_extract_releasable",
+    ])
+    def test_helper_is_gone(self, name):
+        assert not hasattr(extract_mod, name)
 
-# ---------------------------------------------------------------------------
-# _filter_changelog_entries
-# ---------------------------------------------------------------------------
+    def test_extract_is_no_longer_exported_from_the_absorb_module(self):
+        """``cmd_extract`` lives with the conversion it belongs to."""
+        assert not hasattr(extract_mod, "cmd_extract")
 
+    def test_a_package_outside_every_releasable_cannot_be_extracted(
+        self, tmp_path, monkeypatch,
+    ):
+        """The old command took a package name; the new one takes a releasable.
 
-class TestFilterChangelogEntries:
-    def test_filters_by_packages_field(self):
-        """Entries with packages field are filtered by package name."""
-        entries = [
-            ChangelogEntry(
-                commits=["abc"],
-                user_facing=True,
-                description="For A",
-                type="feature",
-                packages=["pkgA"],
-            ),
-            ChangelogEntry(
-                commits=["def"],
-                user_facing=True,
-                description="For B",
-                type="feature",
-                packages=["pkgB"],
-            ),
-        ]
-        result = _filter_changelog_entries(entries, "pkgA", None)
-        assert len(result) == 1
-        assert result[0].description == "For A"
-
-    def test_no_packages_field_no_repo_includes_all(self):
-        """Without packages field and no repo root, all entries are included."""
-        entries = [
-            ChangelogEntry(commits=["abc"], user_facing=False),
-            ChangelogEntry(commits=["def"], user_facing=False),
-        ]
-        result = _filter_changelog_entries(entries, "pkgA", None)
-        assert len(result) == 2
-
-    def test_packages_field_with_path(self):
-        """Entries with packages field matching the path basename."""
-        entries = [
-            ChangelogEntry(
-                commits=["abc"],
-                user_facing=True,
-                description="For nested",
-                type="feature",
-                packages=["nested"],
-            ),
-        ]
-        result = _filter_changelog_entries(entries, "path/to/nested", None)
-        assert len(result) == 1
-
-    def test_empty_entries_returns_empty(self):
-        result = _filter_changelog_entries([], "pkgA", None)
-        assert result == []
-
-
-# ---------------------------------------------------------------------------
-# _migrate_changelog_to_new_repo
-# ---------------------------------------------------------------------------
-
-
-class TestMigrateChangelogToNewRepo:
-    def test_migrates_unreleased_entries(self, tmp_path):
-        """Unreleased entries relevant to the package are migrated."""
-        source_changes = tmp_path / "source_changes"
-        source_changes.mkdir()
-        target_changes = tmp_path / "target_changes"
-
-        _write_changelog_entry(source_changes, "unreleased.jsonl", [
-            ChangelogEntry(
-                commits=["abc"],
-                user_facing=True,
-                description="Feature A",
-                type="feature",
-                packages=["pkgA"],
-            ),
-            ChangelogEntry(
-                commits=["def"],
-                user_facing=True,
-                description="Feature B",
-                type="feature",
-                packages=["pkgB"],
-            ),
-        ])
-
-        fw, em = _migrate_changelog_to_new_repo(
-            str(source_changes), str(target_changes), "pkgA", None
-        )
-        assert em == 1
-        assert fw >= 1
-
-        # Verify the target has only pkgA's entry
-        entries = parse_jsonl(str(target_changes / "unreleased.jsonl"))
-        assert len(entries) == 1
-        assert entries[0].description == "Feature A"
-
-    def test_creates_empty_unreleased_when_no_entries(self, tmp_path):
-        """An empty unreleased.jsonl is created even if no entries match."""
-        source_changes = tmp_path / "source_changes"
-        source_changes.mkdir()
-        target_changes = tmp_path / "target_changes"
-
-        # Write entries that won't match
-        _write_changelog_entry(source_changes, "unreleased.jsonl", [
-            ChangelogEntry(
-                commits=["abc"],
-                user_facing=True,
-                description="Feature B",
-                type="feature",
-                packages=["pkgB"],
-            ),
-        ])
-
-        _migrate_changelog_to_new_repo(
-            str(source_changes), str(target_changes), "pkgA", None
-        )
-
-        # unreleased.jsonl should exist (even if empty)
-        assert os.path.isfile(str(target_changes / "unreleased.jsonl"))
-
-    def test_migrates_versioned_entries(self, tmp_path):
-        """Versioned JSONL files are migrated too."""
-        source_changes = tmp_path / "source_changes"
-        source_changes.mkdir()
-        target_changes = tmp_path / "target_changes"
-
-        # No unreleased
-        (source_changes / "unreleased.jsonl").write_text("")
-
-        _write_changelog_entry(source_changes, "1.0.0.jsonl", [
-            ChangelogEntry(
-                commits=["abc"],
-                user_facing=True,
-                description="v1 Feature A",
-                type="feature",
-                packages=["pkgA"],
-            ),
-        ])
-
-        fw, em = _migrate_changelog_to_new_repo(
-            str(source_changes), str(target_changes), "pkgA", None
-        )
-        assert em == 1
-        assert os.path.isfile(str(target_changes / "1.0.0.jsonl"))
-
-
-# ---------------------------------------------------------------------------
-# _remove_project_from_workspace
-# ---------------------------------------------------------------------------
-
-
-class TestRemoveProjectFromWorkspace:
-    def test_removes_project(self, tmp_path):
-        """Removing a project updates workspace.toml."""
-        projects = with_root_member([
-            WorkspaceProject({"path": "a", "name": "alpha"}),
-            WorkspaceProject({"path": "b", "name": "beta"}),
-        ])
-        make_workspace(str(tmp_path), projects)
-
-        updated = _remove_project_from_workspace(str(tmp_path), "alpha", projects)
-        assert [p.name for p in declared_members(updated)] == ["beta"]
-
-        # Verify file on disk
-        reloaded = declared_members(load_workspace(str(tmp_path)))
-        assert [p.name for p in reloaded] == ["beta"]
-
-    def test_raises_for_nonexistent_project(self, tmp_path):
-        projects = with_root_member([
-            WorkspaceProject({"path": "a", "name": "alpha"}),
-        ])
-        make_workspace(str(tmp_path), projects)
-
-        with pytest.raises(ExtractError, match="not found"):
-            _remove_project_from_workspace(str(tmp_path), "nonexistent", projects)
-
-
-# ---------------------------------------------------------------------------
-# validate_extract_preconditions
-# ---------------------------------------------------------------------------
-
-
-class TestValidateExtractPreconditions:
-    def test_valid_preconditions(self, tmp_path, monkeypatch):
-        """Happy path: package exists, target does not, filter-repo installed."""
+        ``_setup_monorepo``'s members declare ``releasable = false``, which is
+        exactly the shape the package-level command used to serve. Naming one of
+        them now is naming something that is not a releasable, and the refusal
+        says so and lists what is available.
+        """
         monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/git-filter-repo")
+        root, _ = _setup_monorepo(tmp_path)
 
-        root = tmp_path
-        projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        make_workspace(str(root), projects)
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(root), "pkgA", str(tmp_path / "out"), dry_run=True)
+        assert "not found in this workspace" in str(exc.value)
 
-        target = tmp_path / "output"
-        projs, proj = validate_extract_preconditions(str(root), "pkg", str(target))
-        assert proj.name == "pkg"
-        assert len(declared_members(projs)) == 1
-
-    def test_target_exists_error(self, tmp_path, monkeypatch):
-        """Error when target path already exists."""
+    def test_target_exists_is_still_refused(self, tmp_path, monkeypatch):
+        """The precondition survived the collapse, on the new command."""
         monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/git-filter-repo")
-
-        root = tmp_path
-        projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        make_workspace(str(root), projects)
-
+        root, _ = _setup_monorepo_with_releasables(tmp_path)
         target = tmp_path / "output"
         target.mkdir()
 
         with pytest.raises(ExtractError, match="target path already exists"):
-            validate_extract_preconditions(str(root), "pkg", str(target))
-
-    def test_package_not_found_error(self, tmp_path, monkeypatch):
-        """Error when package does not exist in workspace."""
-        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/git-filter-repo")
-
-        root = tmp_path
-        projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        make_workspace(str(root), projects)
-
-        target = tmp_path / "output"
-        with pytest.raises(ExtractError, match="not found"):
-            validate_extract_preconditions(str(root), "nonexistent", str(target))
-
-    def test_no_filter_repo_error(self, tmp_path, monkeypatch):
-        """Error when git-filter-repo is not installed."""
-        monkeypatch.setattr(shutil, "which", lambda name: None)
-
-        root = tmp_path
-        projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        make_workspace(str(root), projects)
-
-        target = tmp_path / "output"
-        with pytest.raises(ExtractError, match="git-filter-repo is not installed"):
-            validate_extract_preconditions(str(root), "pkg", str(target))
+            cmd_extract(str(root), "core", str(target), dry_run=True)
 
 
 # ---------------------------------------------------------------------------
@@ -612,53 +417,59 @@ class TestValidateAbsorbPreconditions:
 
 
 # ---------------------------------------------------------------------------
-# cmd_extract (integration tests requiring git-filter-repo)
+# The reworked extract scenarios (integration; need git-filter-repo)
 # ---------------------------------------------------------------------------
 
 
 @skip_no_filter_repo
-class TestCmdExtract:
-    def test_dry_run(self, tmp_path):
-        """Dry run validates but does not create the target repo."""
-        root, hashes = _setup_monorepo(tmp_path)
+class TestExtractOnTheSingleMemberCase:
+    """What the package-level tests asserted, on the command that replaced them.
+
+    A single-member releasable is the shape the old ``monorepo extract
+    <package>`` served: one directory hoisted to the root of a flat repository.
+    Each assertion below is its predecessor's, re-aimed.
+    """
+
+    def test_dry_run_creates_nothing(self, tmp_path):
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted"
 
-        result = cmd_extract(str(root), "pkgA", str(target), dry_run=True)
-        assert result["dry_run"] is True
-        assert result["package_name"] == "pkgA"
+        preview = cmd_extract(str(root), "extras", str(target), dry_run=True)
+
+        assert preview.by_key("releasable").state == "extract_to_standalone"
         assert not target.exists()
 
-    def test_basic_extraction(self, tmp_path):
-        """Extract a package and verify the new repo structure."""
-        root, hashes = _setup_monorepo(tmp_path)
+    def test_the_member_is_hoisted_to_the_repository_root(self, tmp_path):
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted"
 
-        result = cmd_extract(str(root), "pkgA", str(target))
-        assert result["package_name"] == "pkgA"
-        assert os.path.isdir(str(target))
+        cmd_extract(str(root), "extras", str(target))
+
         assert os.path.isdir(str(target / ".git"))
-
-        # The extracted repo should have the package files at root
         assert os.path.isfile(str(target / "main.py"))
+        assert not (target / "pkgC").exists()
 
-    def test_changelog_migration(self, tmp_path):
-        """Changelog entries are migrated to the new repo."""
-        root, hashes = _setup_monorepo(tmp_path)
+    def test_the_changelog_arrives_in_the_standalone_home(self, tmp_path):
+        """The whole ``changes/`` directory moves, not a filtered subset."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted"
 
-        result = cmd_extract(str(root), "pkgA", str(target))
+        cmd_extract(str(root), "extras", str(target))
 
-        # Check that .rlsbl/changes exists in the new repo
         changes_dir = target / ".rlsbl" / "changes"
         assert changes_dir.is_dir()
         assert (changes_dir / "unreleased.jsonl").is_file()
+        # The released version's locked JSONL and its generated markdown came
+        # along too -- the old per-package migration carried neither.
+        assert (changes_dir / "0.1.0.jsonl").is_file()
+        assert (changes_dir / "0.1.0.md").is_file()
 
-    def test_config_creation(self, tmp_path):
-        """A .rlsbl/config.json is created in the new repo."""
-        root, hashes = _setup_monorepo(tmp_path)
+    def test_the_config_is_the_releasables_own(self, tmp_path):
+        """No config is synthesized: the releasable's own config moves."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted"
 
-        cmd_extract(str(root), "pkgA", str(target))
+        cmd_extract(str(root), "extras", str(target))
 
         config_path = target / ".rlsbl" / "config.json"
         assert config_path.is_file()
@@ -666,56 +477,48 @@ class TestCmdExtract:
         assert "publish_mode" in config
         assert "private" not in config
 
-    def test_workspace_updated(self, tmp_path):
-        """The source monorepo's workspace.toml no longer lists the extracted package."""
-        root, hashes = _setup_monorepo(tmp_path)
+    def test_source_workspace_loses_the_releasable_and_its_member(self, tmp_path):
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted"
 
-        cmd_extract(str(root), "pkgA", str(target))
+        cmd_extract(str(root), "extras", str(target))
 
         projects = load_workspace(str(root))
         names = [p.name for p in projects]
-        assert "pkgA" not in names
-        assert "pkgB" in names
+        assert "pkgC" not in names
+        assert "pkgA" in names and "pkgB" in names
+        assert [r.name for r in load_releasables(str(root), projects)] == ["core"]
 
     def test_target_exists_error(self, tmp_path):
-        """Error when target path already exists."""
-        root, hashes = _setup_monorepo(tmp_path)
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted"
         target.mkdir()
 
         with pytest.raises(ExtractError, match="target path already exists"):
-            cmd_extract(str(root), "pkgA", str(target))
+            cmd_extract(str(root), "extras", str(target))
 
     def test_foreign_tag_pruned_orphan_scheme_tag_kept(self, tmp_path):
         """Only tags matching another CURRENT member's glob are pruned; a
-        scheme-parsing tag matching no live member (e.g. this package's own
-        pre-rename history under an old prefix) is KEPT, never destroyed.
+        scheme-parsing tag matching no live member (e.g. this releasable's own
+        history under an old prefix) is KEPT, never destroyed.
 
-        Both tags are planted at a commit that touches pkgA so they survive the
+        Both tags are planted at a commit that touches pkgC so they survive the
         filter-repo path filter and reach the translation step:
-        - ``pkgB@v1.0.0`` matches the live member pkgB's glob -> pruned.
-        - ``oldpkgA@v0.5.0`` matches no live member glob (the pre-rename shape)
-          -> kept.
+        - ``core@v1.0.0`` matches the live releasable core's glob -> pruned.
+        - ``oldextras@v0.5.0`` matches no live member glob (the pre-rename
+          shape) -> kept.
         """
-        root, hashes = _setup_monorepo(tmp_path)
-        pkga_commit = hashes["pkgA"][0]
-        # Foreign live-member tag -- must be pruned.
-        _git_tag(root, "pkgB@v1.0.0", ref=pkga_commit)
-        # Orphan scheme tag matching no current member (pre-rename history of
-        # pkgA itself) -- must be KEPT under the conservative rule.
-        _git_tag(root, "oldpkgA@v0.5.0", ref=pkga_commit)
+        root, hashes = _setup_monorepo_with_releasable_state(tmp_path)
+        pkgc_commit = hashes["pkgC"][0]
+        _git_tag(root, "core@v1.0.0", ref=pkgc_commit)
+        _git_tag(root, "oldextras@v0.5.0", ref=pkgc_commit)
 
         target = tmp_path / "extracted"
-        result = cmd_extract(str(root), "pkgA", str(target))
+        cmd_extract(str(root), "extras", str(target))
 
         tags = _run_git(str(target), "tag", "-l").split()
-        # Foreign live-member tag pruned.
-        assert "pkgB@v1.0.0" not in tags
-        assert "pkgB@v1.0.0" in result["tags_deleted"]
-        # Orphan scheme tag kept -- not destroyed.
-        assert "oldpkgA@v0.5.0" in tags
-        assert "oldpkgA@v0.5.0" not in result["tags_deleted"]
+        assert "core@v1.0.0" not in tags
+        assert "oldextras@v0.5.0" in tags
 
 
 # ---------------------------------------------------------------------------
@@ -812,7 +615,11 @@ def _setup_released_source_repo(tmp_path):
 
 
 def _setup_plain_monorepo(tmp_path):
-    """A minimal committed monorepo (no pre-existing package conflicts)."""
+    """A minimal committed monorepo (no pre-existing package conflicts).
+
+    ``existing`` stands outside every releasable: the loader requires each
+    member to say which releasable it belongs to, and this one belongs to none.
+    """
     root = tmp_path / "mono"
     root.mkdir()
     _init_git_repo(root)
@@ -821,6 +628,7 @@ def _setup_plain_monorepo(tmp_path):
 [[projects]]
 path = "existing"
 name = "existing"
+releasable = false
 """)
     _make_commit(root, "existing/keep.txt", "keep\n", "add existing")
     subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
@@ -926,6 +734,7 @@ class TestAbsorbHistoryRewrite:
         cmd_absorb(str(root), str(source), "packages/widget")
 
         from rlsbl.changelog.validate import check_coverage
+        from rlsbl.ownership import OwnershipScope
         from rlsbl.targets import TARGETS, detect_targets
 
         dest_full = os.path.join(str(root), "packages", "widget")
@@ -933,17 +742,22 @@ class TestAbsorbHistoryRewrite:
         target = TARGETS[entry_t.name]
         tag_glob = target.monorepo_tag_glob("widget", path="packages/widget")
 
-        proj = None
-        for p in load_workspace(str(root)):
-            if p.name == "widget":
-                proj = p
+        members = load_workspace(str(root))
+        proj = next((p for p in members if p.name == "widget"), None)
         assert proj is not None
 
         changes_dir = root / "packages" / "widget" / ".rlsbl" / "changes"
         entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
 
         monkeypatch.chdir(str(root))
-        ok, details = check_coverage(entries, tag_glob=tag_glob, project=proj.to_dict())
+        # Coverage is asked of one member, and attribution needs the whole
+        # member list to answer at all -- hence the scope object rather than a
+        # bare project dict.
+        ok, details = check_coverage(
+            entries,
+            tag_glob=tag_glob,
+            scope=OwnershipScope.for_member(members, proj),
+        )
         assert ok, details
 
     def test_working_tree_clean_after_absorb(self, tmp_path):
@@ -1191,30 +1005,32 @@ def _setup_monorepo_with_releasable_state(tmp_path):
 
 
 @skip_no_filter_repo
-class TestCmdExtractReleasableOnReleasableState:
-    """The extract-releasable cases re-expressed on the real releasable-state
-    layout (state under ``.rlsbl-monorepo/releasables/<name>/``, no per-package
-    ``.rlsbl/changes/``).
+class TestExtractOnTheReleasableStateLayout:
+    """The extract cases on the REAL releasable-state layout.
 
-    These assert what the code does TODAY, including where that is a gap: the
-    extract implementation reads only per-package ``.rlsbl/changes/``, so on
-    this layout it migrates nothing and the extracted repo carries no release
-    state. The structural half of the extract (filter, workspace.toml, tags)
-    behaves the same as on the per-package layout.
+    State under ``.rlsbl-monorepo/releasables/<name>/``, no per-package
+    ``.rlsbl/changes/`` -- which is where the releasable model actually keeps a
+    releasable's version, changelog and release archives.
+
+    These used to pin a gap: the old implementation read per-package
+    ``.rlsbl/changes/`` only, so on this layout it migrated NOTHING, the
+    extracted repository carried no release state at all, and the source was
+    left holding an orphaned state directory for a releasable it no longer
+    declared. Each of those assertions is now its opposite -- the state is
+    transplanted whole and the source's copy is removed -- which is the point
+    of the rebuild.
     """
 
-    def test_dry_run(self, tmp_path):
-        """Dry run returns member info without modifying anything."""
+    def test_dry_run_reports_the_plan_without_modifying_anything(self, tmp_path):
         root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted_rel"
 
-        result = cmd_extract_releasable(
-            str(root), "core", str(target), dry_run=True
-        )
-        assert result["dry_run"] is True
-        assert result["releasable_name"] == "core"
-        assert set(result["member_packages"]) == {"pkgA", "pkgB"}
-        assert result["is_monorepo"] is True
+        preview = cmd_extract(str(root), "core", str(target), dry_run=True)
+
+        item = preview.by_key("releasable")
+        assert item.state == "extract_to_workspace"
+        assert "pkgA" in "\n".join(item.facts)
+        assert "pkgB" in "\n".join(item.facts)
         assert not target.exists()
 
     def test_multi_member_creates_monorepo(self, tmp_path):
@@ -1223,8 +1039,7 @@ class TestCmdExtractReleasableOnReleasableState:
         root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted_rel"
 
-        result = cmd_extract_releasable(str(root), "core", str(target))
-        assert result["is_monorepo"] is True
+        cmd_extract(str(root), "core", str(target))
 
         ws_file = target / WORKSPACE_DIR / WORKSPACE_FILE
         assert ws_file.is_file()
@@ -1239,33 +1054,41 @@ class TestCmdExtractReleasableOnReleasableState:
         assert (target / "pkgA" / "main.py").is_file()
         assert (target / "pkgB" / "main.py").is_file()
 
-    def test_releasable_changelog_is_not_migrated(self, tmp_path):
-        """CURRENT BEHAVIOR: extract reads per-package .rlsbl/changes/ only, so
-        a releasable whose entries live in its own changes dir migrates zero
-        entries and the extracted repo gets no changelog at all."""
+    def test_the_releasable_state_is_transplanted_whole(self, tmp_path):
+        """FLIPPED: the releasable's own state directory moves with it.
+
+        The old behavior migrated zero entries here, because it looked only in
+        per-package ``.rlsbl/changes/`` directories this layout does not have.
+        """
         root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted_rel"
 
-        result = cmd_extract_releasable(str(root), "core", str(target))
+        cmd_extract(str(root), "core", str(target))
 
-        assert result["entries_migrated"] == 0
-        assert result["files_written"] == 0
-        # No changes dir is created for either member...
+        state = target / WORKSPACE_DIR / "releasables" / "core"
+        assert state.is_dir()
+        assert (state / "version").is_file()
+        assert (state / "config.json").is_file()
+        assert (state / "changes" / "unreleased.jsonl").is_file()
+        assert (state / "changes" / "0.1.0.jsonl").is_file()
+        assert (state / "releases" / "v0.1.0.toml").is_file()
+        # The entries came with it: pkgA's and pkgB's unreleased work.
+        entries = parse_jsonl(str(state / "changes" / "unreleased.jsonl"))
+        assert {e.description for e in entries} == {"Feature A", "Feature B"}
+        # And no per-package changes directory is invented for either member.
         assert not (target / "pkgA" / ".rlsbl" / "changes").exists()
         assert not (target / "pkgB" / ".rlsbl" / "changes").exists()
-        # ...and the source's releasable state dir is not carried over: it sits
-        # outside every member path, so the filter drops it.
-        assert not (
-            target / WORKSPACE_DIR / "releasables" / "core"
-        ).exists()
 
-    def test_source_releasable_state_left_behind(self, tmp_path):
-        """CURRENT BEHAVIOR: the source keeps the extracted releasable's state
-        directory even though workspace.toml no longer declares it."""
+    def test_source_releasable_state_is_removed(self, tmp_path):
+        """FLIPPED: the source no longer keeps an orphaned state directory.
+
+        It used to survive in the source with its changelog intact, describing a
+        releasable workspace.toml no longer declared.
+        """
         root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted_rel"
 
-        cmd_extract_releasable(str(root), "core", str(target))
+        cmd_extract(str(root), "core", str(target))
 
         projects = load_workspace(str(root))
         names = [p.name for p in projects]
@@ -1274,37 +1097,44 @@ class TestCmdExtractReleasableOnReleasableState:
         assert "pkgC" in names
         assert [r.name for r in load_releasables(str(root), projects)] == ["extras"]
 
-        # The orphaned state dir survives in the source monorepo.
-        assert os.path.isdir(get_releasable_dir(str(root), "core"))
-        assert os.path.isfile(
+        assert not os.path.isdir(get_releasable_dir(str(root), "core"))
+        assert not os.path.exists(
             os.path.join(get_releasable_changes_dir(str(root), "core"),
                          "unreleased.jsonl")
         )
+        # The member directories went with it, and the edit is committed.
+        assert not (root / "pkgA").exists()
+        assert not (root / "pkgB").exists()
+        assert _run_git(str(root), "status", "--porcelain") == ""
 
-    def test_single_member_creates_flat_repo(self, tmp_path):
-        """Extracting a single-member releasable hoists it to the repo root."""
+    def test_single_member_creates_flat_repo_with_its_state(self, tmp_path):
+        """FLIPPED: the flat repo carries the releasable's changelog too.
+
+        It used to get a synthesized ``.rlsbl/config.json`` and nothing else --
+        no ``changes/`` directory at all on this layout.
+        """
         root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         target = tmp_path / "extracted_extras"
 
-        result = cmd_extract_releasable(str(root), "extras", str(target))
-        assert result["is_monorepo"] is False
+        cmd_extract(str(root), "extras", str(target))
 
         assert os.path.isfile(str(target / "main.py"))
         assert os.path.isfile(str(target / "pyproject.toml"))
-        # A flat repo gets a .rlsbl/config.json, but an empty unreleased.jsonl
-        # is written only when a source changes dir was found -- and there is
-        # none on this layout.
         assert os.path.isfile(str(target / ".rlsbl" / "config.json"))
-        assert not (target / ".rlsbl" / "changes").exists()
+        assert (target / ".rlsbl" / "changes" / "unreleased.jsonl").is_file()
+        assert (target / ".rlsbl" / "releases" / "v0.1.0.toml").is_file()
+        entries = parse_jsonl(
+            str(target / ".rlsbl" / "changes" / "unreleased.jsonl")
+        )
+        assert [e.description for e in entries] == ["Feature C"]
 
     def test_tags_are_kept_for_multi_member(self, tmp_path):
-        """The releasable-scheme tag is kept and foreign tags pruned, exactly as
-        on the per-package layout."""
+        """The releasable-scheme tag is kept and foreign tags pruned."""
         root, _ = _setup_monorepo_with_releasable_state(tmp_path)
         _git_tag(root, "extras@v0.3.0")  # foreign -- must be pruned
 
         target = tmp_path / "extracted_rel"
-        cmd_extract_releasable(str(root), "core", str(target))
+        cmd_extract(str(root), "core", str(target))
 
         tags = _run_git(str(target), "tag", "-l").split()
         # make_releasable_monorepo tags each releasable at its initial version.
@@ -1314,32 +1144,78 @@ class TestCmdExtractReleasableOnReleasableState:
         assert _run_git(str(target), "status", "--porcelain") == ""
 
 
+def _absorb_into_releasable(tmp_path, name="widget"):
+    """Absorb a released standalone repo as the sole member of a releasable.
+
+    The releasable is declared up front (a member must name one that exists) and
+    its version file is written afterwards, because absorb routes the changelog
+    into the releasable's state directory but does not decide its version.
+    Returns ``(root, source)``.
+    """
+    root = tmp_path / "mono"
+    root.mkdir()
+    _init_git_repo(root)
+    (root / "existing").mkdir()
+    _write_workspace(root, f"""
+[[projects]]
+path = "existing"
+name = "existing"
+releasable = false
+""", releasables_toml=f"""
+[[releasables]]
+name = "{name}"
+""")
+    _make_commit(root, "existing/keep.txt", "keep\n", "add existing")
+    subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-q", "-m", "workspace"], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+
+    source, _ = _setup_released_source_repo(tmp_path)
+    cmd_absorb(str(root), str(source), f"packages/{name}", releasable_name=name)
+
+    version_path = os.path.join(get_releasable_dir(str(root), name), "version")
+    os.makedirs(os.path.dirname(version_path), exist_ok=True)
+    with open(version_path, "w", encoding="utf-8") as f:
+        f.write("0.2.0\n")
+    subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-q", "-m", "releasable version"],
+                   cwd=str(root), check=True, capture_output=True, text=True)
+    return root, source
+
+
 @skip_no_filter_repo
 class TestExtractRoundTrip:
-    """Absorb a released standalone repo into a monorepo, then extract it back
-    out, and assert the extracted repo is coherent: standalone tags restored,
-    zero foreign/mono-scheme tags, all changelog hashes resolve, coverage
-    passes, working tree committed and clean."""
+    """Absorb a released repo into a monorepo, then extract it back out.
+
+    The round trip is the coherence test: the standalone tags come back, the
+    changelog hashes resolve in the new object graph, coverage passes, and the
+    working tree is committed and clean. Reworked from the package-level form:
+    the repo is absorbed as the sole member of a releasable, which is the unit
+    the extract now takes back out.
+    """
 
     def test_absorb_then_extract_is_coherent(self, tmp_path):
-        root = _setup_plain_monorepo(tmp_path)
-        source, _ = _setup_released_source_repo(tmp_path)
-
-        cmd_absorb(str(root), str(source), "packages/widget")
+        root, _ = _absorb_into_releasable(tmp_path)
 
         out = tmp_path / "widget_out"
-        result = cmd_extract(str(root), "widget", str(out))
-        assert result["package_name"] == "widget"
+        preview = cmd_extract(str(root), "widget", str(out))
+        assert preview.by_key("releasable").state == "extract_to_standalone"
 
         # 1. Standalone anchor tags restored at the right commits.
         tags = _run_git(str(out), "tag", "-l").split()
         assert "v0.1.0" in tags
         assert "v0.2.0" in tags
 
-        # 2. Zero foreign / monorepo-scheme tags survive.
+        # 2. The only monorepo-scheme tag left is the boundary alias at the
+        #    current version, which is deliberate: a consumer that knows the
+        #    pre-conversion name still resolves it.
         assert "widget@v0.1.0" not in tags
-        assert "widget@v0.2.0" not in tags
-        assert not any("@v" in t or t.endswith("/v0.1.0") for t in tags)
+        assert "widget@v0.2.0" in tags
+        assert _run_git(str(out), "rev-list", "-n", "1", "widget@v0.2.0") == (
+            _run_git(str(out), "rev-list", "-n", "1", "v0.2.0")
+        )
 
         # 3. The v0.2.0 anchor is the newest reachable tag.
         desc = _run_git(str(out), "describe", "--tags", "--match", "v*")
@@ -1376,127 +1252,59 @@ class TestExtractRoundTrip:
     def test_extract_translation_collision_is_hard_error(self, tmp_path):
         """A pre-existing standalone tag colliding with a translated tag aborts
         the extract with a clear error naming both tags."""
-        root = _setup_plain_monorepo(tmp_path)
-        source, _ = _setup_released_source_repo(tmp_path)
+        root, _ = _absorb_into_releasable(tmp_path)
         # Plant a standalone v0.2.0 in the monorepo -- it will be cloned into
         # the extracted repo and collide with the widget@v0.2.0 translation.
-        cmd_absorb(str(root), str(source), "packages/widget")
         _git_tag(root, "v0.2.0")
 
         out = tmp_path / "widget_out"
         with pytest.raises(ExtractError, match="collision"):
             cmd_extract(str(root), "widget", str(out))
+        assert not out.exists()
 
 
 @skip_no_filter_repo
-class TestCmdExtractReleasable:
-    def test_dry_run(self, tmp_path):
-        """Dry run returns member info without modifying anything."""
+class TestExtractOnTheHalfMigratedLayout:
+    """A workspace that declares releasables but keeps release state per package.
+
+    ``_setup_monorepo_with_releasables`` is that shape: ``[[releasables]]`` in
+    workspace.toml, changelog entries under ``pkgA/.rlsbl/changes/``, and no
+    releasable state directories at all. It is a workspace mid-migration, and
+    the old command extracted it anyway -- producing a repository with a
+    releasable grouping and no version, changelog or release archives behind it.
+
+    The rebuilt conversion moves the releasable's state directory, so it refuses
+    a releasable that has none and names the migration that creates it. Every
+    structural assertion this class used to make (the new workspace.toml, the
+    kept and translated tags, the emptied source) is made in
+    ``TestExtractOnTheReleasableStateLayout`` against the layout where the state
+    exists.
+    """
+
+    def test_a_releasable_with_no_state_is_refused_with_the_migration(
+        self, tmp_path,
+    ):
         root, _ = _setup_monorepo_with_releasables(tmp_path)
         target = tmp_path / "extracted_rel"
 
-        result = cmd_extract_releasable(
-            str(root), "core", str(target), dry_run=True
-        )
-        assert result["dry_run"] is True
-        assert result["releasable_name"] == "core"
-        assert set(result["member_packages"]) == {"pkgA", "pkgB"}
-        assert result["is_monorepo"] is True
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(root), "core", str(target), dry_run=True)
+        message = str(exc.value)
+        assert "no release state to carry over" in message
+        assert "rlsbl monorepo migrate-releasable core" in message
+
+    def test_the_refusal_writes_nothing(self, tmp_path):
+        root, _ = _setup_monorepo_with_releasables(tmp_path)
+        head_before = _run_git(str(root), "rev-parse", "HEAD")
+        target = tmp_path / "extracted_rel"
+
+        with pytest.raises(ExtractError):
+            cmd_extract(str(root), "core", str(target))
+
         assert not target.exists()
-
-    def test_multi_member_creates_monorepo(self, tmp_path):
-        """Extracting a multi-member releasable creates a new monorepo."""
-        root, _ = _setup_monorepo_with_releasables(tmp_path)
-        target = tmp_path / "extracted_rel"
-
-        result = cmd_extract_releasable(str(root), "core", str(target))
-        assert result["is_monorepo"] is True
-
-        # Should have workspace.toml
-        ws_file = target / WORKSPACE_DIR / WORKSPACE_FILE
-        assert ws_file.is_file()
-
-        # Both packages should be in the new workspace
-        new_projects = load_workspace(str(target))
-        names = [p.name for p in new_projects]
-        assert "pkgA" in names
-        assert "pkgB" in names
-
-    def test_single_member_creates_flat_repo(self, tmp_path):
-        """Extracting a single-member releasable creates a flat repo."""
-        root, _ = _setup_monorepo_with_releasables(tmp_path)
-        target = tmp_path / "extracted_extras"
-
-        result = cmd_extract_releasable(str(root), "extras", str(target))
-        assert result["is_monorepo"] is False
-
-        # Should have files at root, not in pkgC/
-        assert os.path.isfile(str(target / "main.py"))
-
-    def test_source_workspace_updated(self, tmp_path):
-        """Source monorepo removes extracted releasable and its members."""
-        root, _ = _setup_monorepo_with_releasables(tmp_path)
-        target = tmp_path / "extracted_rel"
-
-        cmd_extract_releasable(str(root), "core", str(target))
-
-        # Source should still have pkgC but not pkgA or pkgB
-        projects = load_workspace(str(root))
-        names = [p.name for p in projects]
-        assert "pkgA" not in names
-        assert "pkgB" not in names
-        assert "pkgC" in names
-
-        # The "core" releasable should be removed, "extras" should remain
-        releasables = load_releasables(str(root), projects)
-        rel_names = [r.name for r in releasables]
-        assert "core" not in rel_names
-        assert "extras" in rel_names
-
-    def test_multi_member_recreates_releasable_and_keeps_tags(self, tmp_path):
-        """A multi-member extract recreates the [[releasables]] grouping and
-        KEEPS the releasable-scheme tags (translates nothing)."""
-        root, _ = _setup_monorepo_with_releasables(tmp_path)
-        # Tag the core releasable (shared scheme across pkgA/pkgB) plus a
-        # foreign extras tag that must be pruned.
-        _git_tag(root, "core@v0.1.0")
-        _git_tag(root, "extras@v0.3.0")
-        subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
-                       check=True, capture_output=True, text=True)
-
-        target = tmp_path / "extracted_rel"
-        cmd_extract_releasable(str(root), "core", str(target))
-
-        # Releasable grouping recreated: load_releasables validates membership.
-        new_projects = load_workspace(str(target))
-        new_releasables = load_releasables(str(target), new_projects)
-        assert [r.name for r in new_releasables] == ["core"]
-        for p in new_projects:
-            assert p.releasable == "core"
-
-        tags = _run_git(str(target), "tag", "-l").split()
-        # Releasable-scheme tag kept unchanged; foreign extras tag pruned.
-        assert "core@v0.1.0" in tags
-        assert "extras@v0.3.0" not in tags
-
-        # Self-committed, clean tree.
-        assert _run_git(str(target), "status", "--porcelain") == ""
-
-    def test_single_member_translates_releasable_tags(self, tmp_path):
-        """A single-member extract translates the releasable-scheme tags to
-        standalone v{version} and prunes foreign tags."""
-        root, _ = _setup_monorepo_with_releasables(tmp_path)
-        _git_tag(root, "extras@v0.3.0")  # the single-member releasable's tag
-        _git_tag(root, "core@v0.1.0")    # foreign -- must be pruned
-
-        target = tmp_path / "extracted_extras"
-        cmd_extract_releasable(str(root), "extras", str(target))
-
-        tags = _run_git(str(target), "tag", "-l").split()
-        assert "v0.3.0" in tags
-        assert "extras@v0.3.0" not in tags
-        assert "core@v0.1.0" not in tags
-        assert _run_git(str(target), "status", "--porcelain") == ""
+        assert _run_git(str(root), "rev-parse", "HEAD") == head_before
+        assert "pkgA" in [p.name for p in load_workspace(str(root))]
+        assert (root / "pkgA" / ".rlsbl" / "changes").is_dir()
 
     def test_nonexistent_releasable_error(self, tmp_path):
         """Error when the releasable does not exist."""
@@ -1504,7 +1312,7 @@ class TestCmdExtractReleasable:
         target = tmp_path / "extracted"
 
         with pytest.raises(ExtractError, match="not found"):
-            cmd_extract_releasable(str(root), "nonexistent", str(target))
+            cmd_extract(str(root), "nonexistent", str(target))
 
     def test_target_exists_error(self, tmp_path):
         """Error when target path already exists."""
@@ -1513,7 +1321,7 @@ class TestCmdExtractReleasable:
         target.mkdir()
 
         with pytest.raises(ExtractError, match="target path already exists"):
-            cmd_extract_releasable(str(root), "core", str(target))
+            cmd_extract(str(root), "core", str(target))
 
 
 # ---------------------------------------------------------------------------
@@ -1587,49 +1395,69 @@ class TestBrokenTargetDeclarationGuard:
         assert not (root / "packages" / "widget").exists()
         assert "widget" not in [p.name for p in load_workspace(str(root))]
 
-    # --- extract: validation level (no filter-repo needed) ---
+    # --- extract: the guard moved, and what it guards moved with it ---
+    #
+    # These three go through the conversion itself, which refuses a missing
+    # git-filter-repo during observation -- so unlike the absorb cases above,
+    # which validate without it, they carry the skip marker.
 
-    def test_validate_extract_broken_config_rejected(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "mono"
-        root.mkdir()
-        # The guard only applies to a member outside every releasable: a
-        # releasable member derives its tag scheme from the releasable.
-        make_workspace(
-            str(root),
-            [WorkspaceProject({"path": "pkg", "name": "pkg", "releasable": False})],
-        )
-        pkg_rlsbl = root / "pkg" / ".rlsbl"
-        os.makedirs(str(pkg_rlsbl), exist_ok=True)
-        (pkg_rlsbl / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
+    @skip_no_filter_repo
+    def test_the_extracted_units_own_config_no_longer_reaches_detection(
+        self, tmp_path,
+    ):
+        """A releasable member's tag scheme comes from the releasable.
 
-        with pytest.raises(ExtractError, match="broken target declaration"):
-            validate_extract_preconditions(str(root), "pkg", str(tmp_path / "out"))
-
-    def test_validate_extract_no_config_ok(self, tmp_path, monkeypatch):
-        """A package with no .rlsbl/config.json auto-detects and passes."""
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "mono"
-        root.mkdir()
-        (root / "pkg").mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
-
-        projs, proj = validate_extract_preconditions(str(root), "pkg", str(tmp_path / "out"))
-        assert proj.name == "pkg"
-
-    def test_extract_broken_config_hard_errors_pre_mutation(self, tmp_path, monkeypatch):
-        """End-to-end: a broken package config aborts before the target repo is
-        created and before the source workspace is edited."""
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root, _ = _setup_monorepo(tmp_path)
-        # Break pkgA's declaration: config exists but declares no targets.
-        (root / "pkgA" / ".rlsbl" / "config.json").write_text(
+        The old guard existed because a package-level extract derived the
+        extracted package's tag glob from its own detected targets, so a
+        ``.rlsbl/config.json`` with no ``targets`` key silently produced the
+        wrong scheme. The unit is a releasable now and its scheme is its
+        declared ``tag_format``, so a member's broken config cannot mis-scheme
+        anything -- and the conversion proceeds.
+        """
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        (root / "pkgC" / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci"}) + "\n"
         )
+        _commit_all(root, "break pkgC's own target declaration")
+
+        preview = cmd_extract(
+            str(root), "extras", str(tmp_path / "out"), dry_run=True,
+        )
+        assert preview.by_key("releasable").state == "extract_to_standalone"
+
+    @skip_no_filter_repo
+    def test_a_remaining_member_with_a_broken_config_is_still_a_hard_error(
+        self, tmp_path,
+    ):
+        """Where the guard still bites: a member OUTSIDE every releasable.
+
+        Its tag glob is derived from its targets, and that glob is what decides
+        which tags in the extracted clone are foreign. An undecidable glob would
+        prune on a guess, so it is refused before any history is rewritten. The
+        repository root is such a member here.
+        """
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        root_rlsbl = root / ".rlsbl"
+        root_rlsbl.mkdir(exist_ok=True)
+        (root_rlsbl / "config.json").write_text(
+            json.dumps({"publish_mode": "none"}) + "\n"
+        )
+        _commit_all(root, "root config without targets")
         target = tmp_path / "extracted"
 
         with pytest.raises(ExtractError, match="broken target declaration"):
-            cmd_extract(str(root), "pkgA", str(target))
+            cmd_extract(str(root), "core", str(target))
 
         assert not target.exists()
         assert "pkgA" in [p.name for p in load_workspace(str(root))]
+
+    @skip_no_filter_repo
+    def test_no_config_at_all_is_still_the_legitimate_auto_detect_path(
+        self, tmp_path,
+    ):
+        """A member with no ``.rlsbl/config.json`` auto-detects and passes."""
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        preview = cmd_extract(
+            str(root), "core", str(tmp_path / "out"), dry_run=True,
+        )
+        assert preview.by_key("releasable").state == "extract_to_workspace"

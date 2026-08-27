@@ -880,40 +880,53 @@ class TestCmdMonoReleaseInit:
 
 
 class TestCmdMonoExtract:
+    """The handler forwards to the conversion and turns failures into exit 1."""
+
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.monorepo.extract_cmd.find_workspace_root", return_value=None)
     def test_exits_when_no_workspace(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract(cli_ctx(), package_name="pkg", target_path="/out")
+            rlsbl.cmd_mono_extract(
+                cli_ctx(), releasable_name="core", target_path="/out",
+                delete_with_rm=False,
+            )
         assert exc.value.code == 1
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_extract")
+    @patch("rlsbl.commands.monorepo.extract_cmd.find_workspace_root", return_value="/repo")
+    @patch("rlsbl.commands.monorepo.extract_cmd.cmd_extract")
     def test_dry_run(self, mock_extract, *_):
-        mock_extract.return_value = {
-            "package_name": "pkg", "package_path": "packages/pkg",
-            "target_path": "/out",
-        }
-        rlsbl.cmd_mono_extract(cli_ctx(dry_run=True), package_name="pkg", target_path="/out")
+        rlsbl.cmd_mono_extract(
+            cli_ctx(dry_run=True), releasable_name="core", target_path="/out",
+            delete_with_rm=False,
+        )
         mock_extract.assert_called_once()
+        assert mock_extract.call_args[0] == ("/repo", "core", "/out")
+        assert mock_extract.call_args.kwargs["dry_run"] is True
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_extract")
-    def test_real_run(self, mock_extract, *_):
-        mock_extract.return_value = {
-            "package_name": "pkg", "package_path": "packages/pkg",
-            "target_path": "/out", "entries_migrated": 5, "files_written": 2,
-        }
-        rlsbl.cmd_mono_extract(cli_ctx(), package_name="pkg", target_path="/out")
+    @patch("rlsbl.commands.monorepo.extract_cmd.find_workspace_root", return_value="/repo")
+    @patch("rlsbl.commands.monorepo.extract_cmd.cmd_extract")
+    def test_real_run_forwards_the_deletion_choice(self, mock_extract, *_):
+        rlsbl.cmd_mono_extract(
+            cli_ctx(), releasable_name="core", target_path="/out",
+            delete_with_rm=True,
+        )
+        assert mock_extract.call_args.kwargs["delete_with_rm"] is True
+        assert mock_extract.call_args.kwargs["dry_run"] is False
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_extract", side_effect=ValueError("bad"))
+    @patch("rlsbl.commands.monorepo.extract_cmd.find_workspace_root", return_value="/repo")
+    @patch(
+        "rlsbl.commands.monorepo.extract_cmd.cmd_extract",
+        side_effect=ValueError("bad"),
+    )
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract(cli_ctx(), package_name="pkg", target_path="/out")
+            rlsbl.cmd_mono_extract(
+                cli_ctx(), releasable_name="core", target_path="/out",
+                delete_with_rm=False,
+            )
         assert exc.value.code == 1
 
 
@@ -967,42 +980,15 @@ class TestCmdMonoAbsorb:
         assert exc.value.code == 1
 
 
-class TestCmdMonoExtractReleasable:
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value=None)
-    def test_exits_when_no_workspace(self, *_):
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract_releasable(cli_ctx(), releasable_name="core", target_path="/out")
-        assert exc.value.code == 1
+class TestCmdMonoExtractReleasableIsGone:
+    """The releasable-level handler collapsed into ``cmd_mono_extract``.
 
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_extract_releasable")
-    def test_dry_run(self, mock_extract, *_):
-        mock_extract.return_value = {
-            "releasable_name": "core", "is_monorepo": True,
-            "target_path": "/out", "member_packages": ["pkg-a", "pkg-b"],
-        }
-        rlsbl.cmd_mono_extract_releasable(cli_ctx(dry_run=True), releasable_name="core", target_path="/out")
+    A retired handler that still exists is a second way to reach a conversion
+    that no longer works the way it did, so its absence is pinned here.
+    """
 
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_extract_releasable")
-    def test_real_run(self, mock_extract, *_):
-        mock_extract.return_value = {
-            "releasable_name": "core", "is_monorepo": False,
-            "target_path": "/out", "member_packages": ["pkg-a"],
-            "entries_migrated": 5, "files_written": 2,
-        }
-        rlsbl.cmd_mono_extract_releasable(cli_ctx(), releasable_name="core", target_path="/out")
-
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_extract_releasable", side_effect=ValueError("bad"))
-    def test_error_exits(self, *_):
-        with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_extract_releasable(cli_ctx(), releasable_name="core", target_path="/out")
-        assert exc.value.code == 1
+    def test_the_handler_no_longer_exists(self):
+        assert not hasattr(rlsbl, "cmd_mono_extract_releasable")
 
 
 # ============================================================================

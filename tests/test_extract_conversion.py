@@ -59,6 +59,12 @@ skip_no_filter_repo = pytest.mark.skipif(
     reason="git-filter-repo not installed",
 )
 
+# The WHOLE module, not just the apply half: the conversion refuses a missing
+# git-filter-repo during observation, so even the plan and the refusals need it
+# on PATH. The sandbox runner cannot resolve it, so this file is exercised by a
+# bare scoped run.
+pytestmark = skip_no_filter_repo
+
 
 # ---------------------------------------------------------------------------
 # Fixture: a releasable monorepo with real releasable state

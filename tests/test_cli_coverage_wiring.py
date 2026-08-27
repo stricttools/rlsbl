@@ -548,20 +548,33 @@ _FAKE_WS = "/fake/workspace"
 
 class TestMonorepoWorkspaceGatedWiring:
 
+    _EXTRACT_WS = {
+        "rlsbl.commands.monorepo.extract_cmd.find_workspace_root": _FAKE_WS,
+    }
+
     def test_extract(self):
         result, m = _dispatch(
             ["--dry-run", "monorepo", "extract", "posA", "posB"],
-            "rlsbl.commands.monorepo.cmd_extract",
-            ret={"package_name": "p", "package_path": "pp", "target_path": "tp"},
-            extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
+            "rlsbl.commands.monorepo.extract_cmd.cmd_extract",
+            extra=self._EXTRACT_WS,
         )
         assert result.exit_code == 0, result.stderr
-        # cmd_extract(ws_root, package_name, target_path, dry_run=...)
-        # Documented order: `extract <package_name> <target_path>`.
-        assert m.call_args[0][0] == _FAKE_WS
-        assert m.call_args[0][1] == "posA"  # package_name (first token)
+        # cmd_extract(ws_root, releasable_name, target_path, dry_run=...,
+        # delete_with_rm=...). Documented order:
+        # `extract <releasable_name> <target_path>`.
+        assert m.call_args[0][1] == "posA"  # releasable_name (first token)
         assert m.call_args[0][2] == "posB"  # target_path (second token)
         assert m.call_args.kwargs["dry_run"] is True
+        assert m.call_args.kwargs["delete_with_rm"] is False
+
+    def test_extract_delete_with_rm(self):
+        result, m = _dispatch(
+            ["--dry-run", "monorepo", "extract", "--delete-with-rm", "posA", "posB"],
+            "rlsbl.commands.monorepo.extract_cmd.cmd_extract",
+            extra=self._EXTRACT_WS,
+        )
+        assert result.exit_code == 0, result.stderr
+        assert m.call_args.kwargs["delete_with_rm"] is True
 
     def test_absorb(self):
         result, m = _dispatch(
@@ -579,21 +592,16 @@ class TestMonorepoWorkspaceGatedWiring:
         assert m.call_args[0][2] == "posB"  # dest_path (second token)
         assert m.call_args.kwargs["dry_run"] is True
 
-    def test_extract_releasable(self):
-        result, m = _dispatch(
-            ["--dry-run", "monorepo", "extract-releasable", "posA", "posB"],
-            "rlsbl.commands.monorepo.cmd_extract_releasable",
-            ret={"member_packages": ["m"], "is_monorepo": False,
-                 "releasable_name": "r", "target_path": "t"},
-            extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
-        )
-        assert result.exit_code == 0, result.stderr
-        # cmd_extract_releasable(ws_root, releasable_name, target_path, dry_run=...)
-        # Documented order: `extract-releasable <releasable_name> <target_path>`.
-        assert m.call_args[0][0] == _FAKE_WS
-        assert m.call_args[0][1] == "posA"  # releasable_name (first token)
-        assert m.call_args[0][2] == "posB"  # target_path (second token)
-        assert m.call_args.kwargs["dry_run"] is True
+    def test_extract_releasable_is_gone(self):
+        """The package-level and releasable-level commands collapsed into one.
+
+        ``monorepo extract`` now takes the releasable name that
+        ``extract-releasable`` used to take, so the retired spelling must not
+        quietly keep working under a different handler.
+        """
+        assert "extract-releasable" not in app._groups["monorepo"].commands
+        result = app.test(["monorepo", "extract-releasable", "core", "/out"])
+        assert result.exit_code != 0
 
     def test_cleanup(self):
         result, m = _dispatch(

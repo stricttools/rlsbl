@@ -39,19 +39,19 @@ CONSEQUENTIAL = {
     "release reconcile":          "force-pushes tags and recreates their Releases",
     "monorepo mirror":            "force-pushes the mirror remote",
     "monorepo absorb":            "rewrites another repo's history and merges it in",
+    "monorepo extract":           "deletes the extracted members and the releasable's release state from this repository, and commits that",
     "monorepo release run":       "release run, once per package, in one sweep",
 }
 
 # Everyday commands that must NEVER prompt. These are the ones the old
 # inferred rule caught, and catching them is what hollowed the guardrail out.
 #
-# `monorepo extract` and `monorepo extract-releasable` are here deliberately.
-# They read as dangerous -- a git filter-repo history rewrite -- but the
-# rewrite happens on a throwaway clone the command itself just made at
-# target_path. Nothing that anyone has ever pulled is rewritten, nothing is
-# pushed, no registry or public artifact is touched, and the source monorepo
-# loses only the extracted entries from workspace.toml. The bar is
-# unrecoverability, not how heavy the machinery sounds.
+# `monorepo extract` used to be here, on the reasoning that the filter-repo
+# rewrite happens on a throwaway clone and the source only loses a
+# workspace.toml entry. The rebuilt command completes the move: it deletes the
+# extracted members' directories and the releasable's whole release state from
+# the repository you are standing in and commits that, so it earns the prompt.
+# The bar is still unrecoverability, not how heavy the machinery sounds.
 MUST_NOT_PROMPT = [
     "commit", "scaffold", "check", "status", "targets", "deploy",
     "changelog add", "changelog generate", "changelog amend", "changelog edit",
@@ -59,7 +59,6 @@ MUST_NOT_PROMPT = [
     "monorepo init", "monorepo add", "monorepo sync", "monorepo snapshot",
     "monorepo cleanup", "monorepo migrate-releasable",
     "monorepo rename-releasable", "monorepo release init",
-    "monorepo extract", "monorepo extract-releasable",
     "dev install", "dev sync", "dev status",
     # The rewrite group sweeps the working tree and nothing else. Both
     # commands preview the whole plan under --dry-run, refuse to apply when a
