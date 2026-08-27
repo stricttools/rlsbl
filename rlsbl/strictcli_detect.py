@@ -7,6 +7,7 @@ import os
 import tomlkit
 
 from .errors import RlsblError
+from .module_paths import go_import_under_module
 
 
 _STRICTCLI_GO_MODULE = "github.com/smm-h/strictcli"
@@ -133,9 +134,7 @@ def _is_strictcli_module_path(path: str) -> bool:
     """Return True if a Go module path is strictcli or a sub-path of it
     (e.g. github.com/smm-h/strictcli/go), not a mere string prefix
     (e.g. github.com/smm-h/strictcli-extras)."""
-    return path == _STRICTCLI_GO_MODULE or path.startswith(
-        _STRICTCLI_GO_MODULE + "/"
-    )
+    return go_import_under_module(path, _STRICTCLI_GO_MODULE)
 
 
 def _go_mod_has_strictcli(project_dir: str) -> bool:
@@ -185,11 +184,17 @@ def _go_file_imports_strictcli(filepath: str) -> bool:
     """Return True if a Go source file imports a strictcli package.
 
     Uses tree-sitter via lint/go_ast.scan_imports for accurate parsing.
+
+    The containment question is the shared one (:mod:`rlsbl.module_paths`),
+    not a bare ``startswith``: this used to read an import of an unrelated
+    ``github.com/smm-h/strictcli-extras/...`` as an import of strictcli, and
+    this function is the tie-breaker that picks a repo's CLI entry point when
+    several main packages exist.
     """
     from .lint.go_ast import scan_imports
 
     for import_path, _, _ in scan_imports(filepath):
-        if import_path.startswith(_STRICTCLI_GO_MODULE):
+        if _is_strictcli_module_path(import_path):
             return True
     return False
 

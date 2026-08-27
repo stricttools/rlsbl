@@ -25,6 +25,7 @@ from .import_scanners import (
 )
 from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.utils import walk_source_files
+from .module_paths import dotted_under_module, go_import_under_module
 from .utils import read_go_module_path
 from .workspace import WORKSPACE_DIR, project_is_dev_only as _is_dev_only
 
@@ -606,9 +607,11 @@ def find_dead_modules(
         # "from foo.bar import baz" or "import foo.bar.sub"
         is_referenced = False
         for imp in all_imports:
-            # imp references mod_name if imp starts with mod_name
-            # or mod_name starts with imp (importing a parent pulls in child)
-            if imp == mod_name or imp.startswith(mod_name + ".") or mod_name.startswith(imp + "."):
+            # imp references mod_name if imp is inside mod_name, or mod_name is
+            # inside imp (importing a parent pulls in its children). Both
+            # directions go through the shared dotted-boundary rule, so
+            # "pkg.module" never counts as a reference to "pkg.mod".
+            if dotted_under_module(imp, mod_name) or dotted_under_module(mod_name, imp):
                 is_referenced = True
                 break
 
@@ -721,7 +724,7 @@ def find_dead_go_packages(
             if file_pkg_dir == pkg_dir:
                 continue  # same package -- doesn't count
             for imp in imports:
-                if imp == import_path or imp.startswith(import_path + "/"):
+                if go_import_under_module(imp, import_path):
                     is_referenced = True
                     break
             if is_referenced:

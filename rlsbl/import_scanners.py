@@ -14,6 +14,7 @@ from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.npm_ast import NpmAstLinter
 from .lint.python_ast import PythonAstLinter
 from .lint.utils import walk_source_files
+from .module_paths import dotted_under_module, go_import_under_module
 from .targets.utils import detect_python_package_root, normalize_pypi
 from .utils import read_go_module_path
 
@@ -246,14 +247,14 @@ class PythonImportScanner:
             # 2. Check import_name overrides: if full_path starts with any import_name
             if matched_name is None and import_name_lookup:
                 for imp_name, proj_name in import_name_lookup.items():
-                    if full_path == imp_name or full_path.startswith(imp_name + "."):
+                    if dotted_under_module(full_path, imp_name):
                         matched_name = proj_name
                         break
 
             # 3. Longest-prefix match against namespace_map using full_path
             if matched_name is None and ns_keys_sorted:
                 for ns_key in ns_keys_sorted:
-                    if full_path == ns_key or full_path.startswith(ns_key + "."):
+                    if dotted_under_module(full_path, ns_key):
                         matched_name = namespace_map[ns_key]
                         break
 
@@ -542,11 +543,11 @@ class GoImportScanner:
     ) -> str | None:
         """Check if an import path belongs to a workspace sibling.
 
-        An import matches a workspace module if the import path equals
-        the module path or starts with it followed by '/'.
+        Containment is the shared rule (:mod:`rlsbl.module_paths`): the import
+        path equals the module path or continues past it at a '/' boundary.
         """
         for mod_path, ws_name in module_to_name.items():
-            if import_path == mod_path or import_path.startswith(mod_path + "/"):
+            if go_import_under_module(import_path, mod_path):
                 return ws_name
         return None
 
@@ -708,7 +709,7 @@ class _JvmImportScannerBase:
                 # Longest-prefix match against package_map
                 matched_name = None
                 for prefix in prefixes_sorted:
-                    if clean_path == prefix or clean_path.startswith(prefix + "."):
+                    if dotted_under_module(clean_path, prefix):
                         matched_name = package_map[prefix]
                         break
 
