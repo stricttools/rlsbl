@@ -18,6 +18,7 @@ The properties under test are the batch mirror of the standalone ones:
 
 import fnmatch
 import json
+from pathlib import Path
 import os
 import subprocess
 from unittest.mock import patch
@@ -43,7 +44,7 @@ from rlsbl.workspace import (
     write_releasable_version,
 )
 
-from conftest import with_root_member, make_workspace
+from conftest import declared_members, make_releasable_state, make_workspace, with_root_member
 
 
 BATCH_TOML = (
@@ -85,6 +86,9 @@ def _setup_batch_workspace(root):
         {"path": "alpha", "name": "alpha"},
         {"path": "beta", "name": "beta"},
     ])
+    # make_workspace derives one releasable per member; each needs its state.
+    for name in ("alpha", "beta"):
+        make_releasable_state(root, name, version="1.0.0")
     _write_batch_file(root)
 
     git(root, "add", "-A")
@@ -98,14 +102,17 @@ def _setup_batch_workspace(root):
         git(root, "add", f"{name}/feature.txt")
         git(root, "commit", "-q", "-m", f"{name}: add feature")
         sha = git(root, "rev-parse", "HEAD")
-        jsonl = root / name / ".rlsbl" / "changes" / "unreleased.jsonl"
-        jsonl.write_text(json.dumps({
+        entry = json.dumps({
             "commits": [sha],
             "user_facing": True,
             "description": f"**{name} feature.** It works.",
             "type": "feature",
-        }) + "\n")
-        git(root, "add", f"{name}/.rlsbl/changes/unreleased.jsonl")
+        }) + "\n"
+        (root / name / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(entry)
+        Path(
+            get_releasable_changes_dir(str(root), name), "unreleased.jsonl",
+        ).write_text(entry)
+        git(root, "add", "-A")
         git(root, "commit", "-q", "-m", f"changelog: {name} feature")
 
 
@@ -282,7 +289,8 @@ class TestBatchCandidateGate:
 
         # Both changelogs finalized, both state files cleared.
         for name in ("alpha", "beta"):
-            changes = tmp_project / name / ".rlsbl" / "changes"
+            # A member's finalized changelog lands under its releasable.
+            changes = Path(get_releasable_changes_dir(str(tmp_project), name))
             assert (changes / "1.0.1.jsonl").exists()
             assert load_release_state(
                 get_state_path(str(tmp_project / name))
@@ -304,13 +312,16 @@ class TestBatchCandidateGate:
         )
 
         for name in ("alpha", "beta"):
-            changes = tmp_project / name / ".rlsbl" / "changes"
+            changes = Path(get_releasable_changes_dir(str(tmp_project), name))
             assert not (changes / "1.0.1.jsonl").exists(), (
                 f"{name}'s changelog must not be finalized while CI is red"
             )
             assert os.path.getsize(changes / "unreleased.jsonl") > 0
             # Resumable at the same version -- no number was burnt.
-            state = load_release_state(get_state_path(str(tmp_project / name)))
+            state = load_release_state(get_state_path(
+                str(tmp_project / name),
+                releasable_dir=get_releasable_dir(str(tmp_project), name),
+            ))
             assert state is not None and state["new_version"] == "1.0.1"
 
         # The batch file is not archived while the batch is incomplete.
@@ -562,7 +573,10 @@ class TestBatchSingleCandidatePush:
 
         window = recorder.window_ending_at(gate["sha"])
         paths = recorder.paths_in(window)
-        projects = load_workspace(str(tmp_project))
+        # The root member's router filter is derived from its residual
+        # territory, which is a separate matter from what a candidate push
+        # must touch for each declared member's CI job to run.
+        projects = declared_members(load_workspace(str(tmp_project)))
         for project in projects:
             patterns = router_filter_patterns(project)
             assert _covers(paths, patterns), (
@@ -589,7 +603,7 @@ class TestBatchSingleCandidatePush:
         paths = recorder.paths_in(window)
         projects = load_workspace(str(tmp_project))
         releasables = load_releasables(str(tmp_project), projects)
-        for project in projects:
+        for project in declared_members(projects):
             patterns = router_filter_patterns(project, releasables)
             assert _covers(paths, patterns), (
                 f"the CI-gated push does not touch anything matching "

@@ -1109,8 +1109,16 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                 if dry_run:
                     released.append(pkg_name)
                 else:
-                    from ..release.release_state import get_state_path as _gsp
-                    _sp = _gsp(project_dir)
+                    from ..release.release_state import (
+                        get_state_path as _gsp,
+                        resolve_releasable_dir as _rrd,
+                    )
+                    # A member's release state lives under its releasable, not
+                    # under the package -- every member belongs to one.
+                    _sp = _gsp(
+                        project_dir,
+                        releasable_dir=_rrd(project_dir, workspace_root),
+                    )
                     if os.path.exists(_sp):
                         pending.append((pkg_name, project_dir, _sp))
                     else:
@@ -1133,10 +1141,17 @@ def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
                         file=sys.stderr,
                     )
                     raise
-                from ..release.release_state import get_state_path as _gsp0
+                from ..release.release_state import (
+                    get_state_path as _gsp0,
+                    resolve_releasable_dir as _rrd0,
+                )
                 _absorb_member_exit_zero(
-                    pkg_name, project_dir, _gsp0(project_dir), pending,
-                    dry_run=dry_run, kind="package",
+                    pkg_name, project_dir,
+                    _gsp0(
+                        project_dir,
+                        releasable_dir=_rrd0(project_dir, workspace_root),
+                    ),
+                    pending, dry_run=dry_run, kind="package",
                 )
 
             log("")
@@ -1339,7 +1354,7 @@ def _plan_item_state_paths(plan, workspace_root, projects):
     gate, the completed-plan abort and the pass-1 resume seeding all address
     the same file.
     """
-    from ..release.release_state import get_state_path
+    from ..release.release_state import get_state_path, resolve_releasable_dir
     from ...workspace_types import get_releasable_dir
 
     project_by_name = {p["name"]: p for p in projects}
@@ -1352,7 +1367,10 @@ def _plan_item_state_paths(plan, workspace_root, projects):
             if project is None:
                 continue
             project_dir = os.path.join(workspace_root, project["path"])
-            yield name, get_state_path(project_dir)
+            yield name, get_state_path(
+                project_dir,
+                releasable_dir=resolve_releasable_dir(project_dir, workspace_root),
+            )
 
 
 def _plan_items_in_progress(plan, workspace_root, projects):
