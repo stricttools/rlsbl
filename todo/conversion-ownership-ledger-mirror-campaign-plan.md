@@ -293,13 +293,15 @@ together or the suite is red mid-phase. Build 3.7's function first.
 
 ### 3.2 Root member, reserved identity, loader errors, fixture sweep
 
-- THE loader-error enumeration (authoritative; the phase 10 script's
-  scope follows it): no root member; a root member named anything but
-  `root` (auto-applied when omitted); a non-root member named `root`;
-  a watch key; an implicit-mode workspace; a root-member releasable
-  without explicit tag_format. Mechanical-remedy errors name the
-  migration script; the two operator-decision errors (name collision,
-  tag format) state the decision.
+- THE loader-error enumeration (authoritative; the phase 10 script
+  remedies its mechanical subset): no root member; a root member named
+  anything but `root` (auto-applied when omitted); a non-root member
+  named `root`; a watch key; an implicit-mode workspace; a root-member
+  releasable without explicit tag_format. Three remedy classes in the
+  error texts: the migration script for the mechanical errors; the
+  pinned patch release and filed-todo path for implicit mode; the
+  stated decision for the two operator-decision errors (name
+  collision, tag format).
 - `monorepo init` requires the root-member kind declaration (dev node,
   or member of a named releasable); absence is a hard error explaining
   both. Init scaffolds explicit mode with an empty releasables
@@ -468,7 +470,8 @@ Effort: extra large.
   path-scheme rules; the collector is deleted), and recorded aliases
   from lineage/rename records. The release tag step consumes it. The
   three shipped warn-severity tag/Release checks are deleted as
-  superseded. Protocol axis: matrix regenerated.
+  superseded. (A protocol axis — the matrix-regeneration obligation is
+  owned by the shared-file assignment paragraph.)
 - The unpublished-refs standing check renders it: three distinct
   errors (missing-locally, missing-remotely, wrong-commit);
   inconclusive probe is an error; every error names release reconcile.
