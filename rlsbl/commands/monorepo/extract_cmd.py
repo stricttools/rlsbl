@@ -252,6 +252,67 @@ def _tree_hash(repo, path, rev="HEAD"):
     return _run_git(repo, "rev-parse", spec)
 
 
+#: The git file mode of a gitlink -- the entry a submodule occupies in a tree.
+GITLINK_MODE = "160000"
+
+
+def _tracked_entries(repo, path):
+    """``(mode, relative path)`` for everything tracked under ``path`` at HEAD.
+
+    ``-z`` because the paths are read, not displayed: git's default output
+    C-quotes any path outside plain ASCII, and a member with a non-ASCII file
+    under it would be judged on an escaped spelling of its own contents.
+    """
+    out = _run_git(repo, "ls-tree", "-r", "-z", "HEAD", "--", path)
+    entries = []
+    for record in out.split("\0"):
+        if not record:
+            continue
+        meta, _, entry_path = record.partition("\t")
+        fields = meta.split()
+        if not fields or not entry_path:
+            continue
+        entries.append((fields[0], entry_path))
+    return entries
+
+
+def _check_member_contents(workspace_root, members):
+    """Refuse a member the conversion could not carry, before anything is done.
+
+    Two shapes, both fatal at observation:
+
+    * **a gitlink** (a submodule) under a member. The source-side edit is
+      committed by naming the paths the working tree reports, and the commit
+      tool refuses a gitlink path -- so an extract that reached that commit
+      would already have deleted the member and would leave the source
+      half-mutated with nothing recorded. Refusing here costs nothing.
+    * **nothing tracked at all** at the member's path. Its tree object is what
+      the conversion verifies identity with, and a path with no tree raises a
+      raw ``git rev-parse`` failure deep in observation instead of saying which
+      member is empty.
+    """
+    for member in members:
+        entries = _tracked_entries(workspace_root, member.path)
+        if not entries:
+            raise ExtractError(
+                f"member '{member.name}' has nothing tracked at {member.path}/ "
+                f"in HEAD, so there is no tree for the conversion to carry or "
+                f"verify. Commit the member's files, or remove it from the "
+                f"releasable, before extracting."
+            )
+        gitlinks = [p for mode, p in entries if mode == GITLINK_MODE]
+        if gitlinks:
+            raise ExtractError(
+                f"member '{member.name}' contains a submodule: "
+                f"{', '.join(sorted(gitlinks))}. The conversion commits the "
+                f"source-side removal by naming the paths the working tree "
+                f"reports, and the commit tool refuses a gitlink path -- so "
+                f"this extract would delete the member and then fail to record "
+                f"it, leaving the source half-mutated. Remove the submodule, or "
+                f"absorb its content into this repository, and re-run."
+            )
+
+
 def _git_tag_names(repo, pattern=None):
     """The tag names in ``repo``, optionally filtered by a glob."""
     args = ["tag", "-l"]
@@ -805,6 +866,8 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
             f"Move the root member into a releasable that stays, or give the "
             f"repository root a member of its own, before extracting."
         )
+
+    _check_member_contents(workspace_root, members)
 
     mirrored = [m.name for m in members if m.subtree_remote]
     if mirrored:

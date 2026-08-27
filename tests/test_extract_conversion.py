@@ -301,6 +301,57 @@ class TestRefusals:
         with pytest.raises(ExtractError, match="collision"):
             cmd_extract(str(ns.root), "extras", str(tmp_path / "out"))
 
+    def test_a_submodule_under_a_departing_member(self, tmp_path):
+        """A gitlink under a departing member is refused BEFORE any mutation.
+
+        The source-side commit names the paths the working tree reports, and
+        the commit tool refuses a gitlink path -- so an extract that got as far
+        as removing the member would leave the source half-mutated with no
+        commit. The honest answer is a refusal at preview naming the submodule.
+        """
+        ns = make_source(tmp_path)
+        inner = tmp_path / "inner_repo"
+        inner.mkdir()
+        (inner / "f.txt").write_text("inner\n")
+        run_git(inner, "init", "-q", "-b", "main")
+        run_git(inner, "config", "user.email", "test@test.local")
+        run_git(inner, "config", "user.name", "Test")
+        run_git(inner, "add", "f.txt")
+        run_git(inner, "commit", "-q", "-m", "inner")
+        run_git(
+            ns.root, "-c", "protocol.file.allow=always", "submodule", "add",
+            "-q", str(inner), "pkgA/vendored",
+        )
+        run_git(ns.root, "commit", "-q", "-m", "vendor a submodule under pkgA")
+
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(ns.root), "core", str(tmp_path / "out"))
+        message = str(exc.value)
+        assert "pkgA/vendored" in message
+        assert "submodule" in message
+        assert "pkgA" in message
+
+    def test_a_member_with_nothing_tracked_at_its_path(self, tmp_path):
+        """An empty member directory is a refusal, not a raw git traceback."""
+        ns = make_source(
+            tmp_path,
+            projects=[
+                {"path": "pkgA", "name": "pkgA", "releasable": "core"},
+                {"path": "pkgEmpty", "name": "pkgEmpty", "releasable": "core"},
+                {"path": "pkgC", "name": "pkgC", "releasable": "extras"},
+            ],
+        )
+        # The fixture writes a manifest for every member; drop pkgEmpty's so
+        # its path holds nothing git tracks.
+        run_git(ns.root, "rm", "-r", "-q", "pkgEmpty")
+        run_git(ns.root, "commit", "-q", "-m", "pkgEmpty holds nothing tracked")
+
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(ns.root), "core", str(tmp_path / "out"))
+        message = str(exc.value)
+        assert "pkgEmpty" in message
+        assert "nothing" in message
+
     def test_inbound_dependency_names_the_rewrite_command(self, tmp_path):
         ns = make_source(tmp_path)
         # pkgC stays behind and depends on pkgA, which would leave.
