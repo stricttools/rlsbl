@@ -1311,8 +1311,13 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
             result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
         assert result.status == "skip"
 
-    def test_no_affected_projects_passes(self, tmp_path, monkeypatch):
-        """Commits not touching any project pass."""
+    def test_root_level_commit_affects_the_root_member(self, tmp_path, monkeypatch):
+        """A commit outside every declared member is the root member's.
+
+        It used to affect no project at all; the root member owns the
+        residual, so the check reports on it -- and it has no changelog of
+        its own, so the push is covered.
+        """
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -1357,4 +1362,5 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
 
         result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
         assert result.status == "pass"
-        assert "no affected" in result.message
+        assert result.status == "pass"
+        assert "affected project(s) covered" in result.message

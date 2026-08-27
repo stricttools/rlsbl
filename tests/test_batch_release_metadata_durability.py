@@ -15,6 +15,7 @@ later release regenerates every version's file).
 
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -33,8 +34,13 @@ from test_batch_main_as_candidate import (  # noqa: E402
 
 
 def _member_release_archive(root, member, version):
+    """A member's release archive: under its releasable, not the package."""
     return os.path.join(
-        get_releases_dir(str(root / member)), f"v{version}.toml",
+        get_releases_dir(
+            str(root / member),
+            releasable_dir=get_releasable_dir(str(root), member),
+        ),
+        f"v{version}.toml",
     )
 
 
@@ -54,20 +60,32 @@ class TestBatchReleaseMetadataSurvivesRegeneration:
         _run_batch(tmp_project, ci_return=("green", []))
 
         member = tmp_project / "alpha"
-        md_path = member / ".rlsbl" / "changes" / "1.0.1.md"
+        md_path = Path(
+            get_releasable_changes_dir(str(tmp_project), "alpha")
+        ) / "1.0.1.md"
         assert "Alpha patch" in md_path.read_text(), (
             "precondition: the release itself renders the batch description"
         )
 
         # Any later regeneration -- the next release does this for every
-        # version -- must not strip it.
-        generate_changelog(str(member))
+        # version -- must not strip it. The member's changelog home is its
+        # releasable's, so that is what regeneration reads and writes.
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        canonical = Path(rel_dir) / "CHANGELOG.md"
+        generate_changelog(
+            str(member),
+            changes_dir_override=str(
+                get_releasable_changes_dir(str(tmp_project), "alpha")
+            ),
+            changelog_output_path=str(canonical),
+            releases_dir_override=get_releases_dir(releasable_dir=rel_dir),
+        )
 
         assert "Alpha patch" in md_path.read_text(), (
             "the batch release's description must survive regeneration of "
             "the per-version .md"
         )
-        assert "Alpha patch" in (member / "CHANGELOG.md").read_text(), (
+        assert "Alpha patch" in canonical.read_text(), (
             "and must survive in CHANGELOG.md too"
         )
 

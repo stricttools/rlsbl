@@ -249,9 +249,14 @@ class TestStatusShowsPlain:
         _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
 
-        lines = captured.out.strip().split("\n")
-        # Header + 2 project rows
-        assert len(lines) == 3
+        # The per-member table follows the per-releasable summary.
+        all_lines = [l for l in captured.out.strip().split("\n") if l.strip()]
+        start = next(
+            i for i, line in enumerate(all_lines) if line.startswith("Project")
+        )
+        lines = all_lines[start:]
+        # Header + the root member + 2 project rows
+        assert len(lines) == 4
 
         # Find each project's line
         webapp_line = [l for l in lines if "webapp" in l][0]

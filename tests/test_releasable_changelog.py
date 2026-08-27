@@ -232,7 +232,9 @@ class TestGetChangelogContextExplicitMode:
         # workspace member list attribution is resolved against
         assert isinstance(scope, OwnershipScope)
         assert scope.owned == {"a", "b"}
-        assert {p.name for p in scope.members} == {"a", "b"}
+        # The whole member list, root member included -- attribution is
+        # resolved against every member, not just the ones in scope.
+        assert {p.name for p in scope.members} == {"a", "b", "root"}
         assert {p.name for p in scope.owned_members()} == {"a", "b"}
 
     def test_no_releasables_returns_per_project_changes_dir(self, tmp_path, monkeypatch):

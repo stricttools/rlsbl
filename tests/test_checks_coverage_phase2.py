@@ -1528,7 +1528,7 @@ class TestGetReleasableVersionForProject:
         repo.mkdir()
         monkeypatch.chdir(repo)
         _init_repo(repo)
-        make_workspace(repo, [{"path": ".", "name": "test"}])
+        make_workspace(repo, [{"path": ".", "name": "root"}])
 
         ctx = ProjectContext(
             project_root=Path(str(repo)),
@@ -3407,7 +3407,7 @@ class TestReclassifiedLabels:
             project_root=tmp_path,
             workspace_root=tmp_path,
             config={},
-            projects=[{"name": "lib", "path": "."}],
+            projects=[{"name": "root", "path": "."}],
             graph=None,
         )
         ctx.projects[0]["library"] = True
@@ -3433,7 +3433,7 @@ class TestReclassifiedLabels:
             project_root=tmp_path,
             workspace_root=tmp_path,
             config={},
-            projects=[{"name": "lib", "path": "."}],
+            projects=[{"name": "root", "path": "."}],
             graph=None,
         )
         ctx.projects[0]["library"] = True

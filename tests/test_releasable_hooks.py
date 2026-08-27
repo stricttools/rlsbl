@@ -37,6 +37,8 @@ def _make_releasable_workspace(root, releasable_name, projects):
     lines = [
         "[[releasables]]",
         f'name = "{releasable_name}"',
+        # A releasable that owns the root member must name its tag format.
+        'tag_format = "v{version}"',
         "",
     ]
     for proj in projects:
@@ -608,7 +610,7 @@ class TestPrivateHookStaleCheck:
         """Legacy content in releasable-level hook is detected."""
         # Set up workspace with explicit releasable
         _make_releasable_workspace(tmp_path, "www", [
-            {"name": "myapp", "path": ".", "releasable": "www"},
+            {"name": "root", "path": ".", "releasable": "www"},
         ])
 
         # Add legacy content to releasable hook

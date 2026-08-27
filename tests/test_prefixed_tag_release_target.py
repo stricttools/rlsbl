@@ -285,7 +285,7 @@ class TestMergedPublishFeedsTheLauncherVars:
         (root / ".rlsbl-monorepo").mkdir(exist_ok=True)
         (root / ".rlsbl-monorepo" / "workspace.toml").write_text(
             workspace_toml('[[projects]]\n'
-            'name = "alpha"\n'
+            'name = "root"\n'
             'path = "."\n'
             'releasable = "alpha"\n'
             '\n'
