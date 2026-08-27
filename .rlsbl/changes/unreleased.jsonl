@@ -38,3 +38,4 @@
 {"format_version":1,"id":"18cfb1dbcf4972a7924218f3024548469f87490741e66864","commits":["1d2af3616cb8cc3d5708684acba80a06c3073f5c"],"user_facing":true,"description":"**`rlsbl release yank` no longer passes over a target in silence.** A target with no registry-removal action is now reported explicitly by name instead of relying on a fallthrough in the command's name-based dispatch.","type":"fix"}
 {"format_version":1,"id":"18cfb20061f8f0c821535c4693e444d3a6590066e346c044","commits":["a389556d4c5b0d326d4a76b72e54bc203b0e69f3"],"user_facing":false}
 {"format_version":1,"id":"18cfb2314d2aa213fb3040e3281142308071f65c3c8bd842","commits":["9940d1b27fc4dd25c25daa7b00546fa7a3b3f484"],"user_facing":false}
+{"format_version":1,"id":"18cfb25d43857f0d584d6b8d6fc248f08d1603bef24b01f8","commits":["edcbe3ee777a92a5bf23d7ce25cbe135237f521e"],"user_facing":false}
