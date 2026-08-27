@@ -32,13 +32,28 @@ On-disk format and the append pattern
 One JSON object per line, each stamped with ``format_version`` as its leading
 key -- the same shape and the same append mechanics as the JSONL changelog
 (:func:`rlsbl.changelog.files._append_entry_to_file`): create the parent through
-the effect seam, then one ``effects.append_text`` of one line. A pure append has
-no read-modify-write window, so two writers can never lose each other's event
-the way the whole-file rewrite in
-:func:`rlsbl.evidence_gate.write_undo_audit` can. That audit trail is where the
-append-record idea comes from; the line-per-event carrier is what lets a
-malformed record be reported by FILE AND LINE, and is the only carrier the
-strictspec per-line ``format_version`` gate applies to.
+the effect seam, then one ``effects.append_text`` carrying the whole batch.
+
+What the append actually guarantees, stated precisely:
+
+- one append-mode write per :func:`append_events` call, so the batch reaches the
+  file in one operation and prior content is never read back and rewritten --
+  unlike the whole-file rewrite in :func:`rlsbl.evidence_gate.write_undo_audit`,
+  where two writers can lose each other's record;
+- an event already on disk is therefore never modified or truncated by a later
+  append, whichever process performs it;
+- a torn last line (an interrupted write, a hand edit) cannot swallow the new
+  event: the existing file's final byte is inspected first and a separating
+  newline is written when one is missing. The damaged line stays damaged and
+  :func:`read_events` names it -- but only it.
+
+What it does NOT guarantee: durability across a machine crash. There is no
+``fsync``, so an append that returned may still be in the page cache. The record
+explains history; it is not a transaction log.
+
+That audit trail is where the append-record idea comes from; the line-per-event
+carrier is what lets a malformed record be reported by FILE AND LINE, and is the
+only carrier the strictspec per-line ``format_version`` gate applies to.
 
 Validation and where errors fire
 --------------------------------
@@ -60,6 +75,15 @@ record is read FOR USE. Detection code that merely asks whether a repository has
 a lineage record calls :func:`lineage_file_exists`, which touches only the
 filesystem and can never raise on content -- so a malformed record breaks the
 one command that consumes it, never every command that walks the tree.
+
+Two whole-file properties strictspec cannot see are enforced there too, because
+:func:`read_events` is the only place that sees every line at once: bytes that
+are not UTF-8 at all (reported as a record error naming the file and line, never
+as a bare :class:`UnicodeDecodeError`), and the id uniqueness the schema
+promises. Uniqueness is a READ-time check on purpose -- checking it at append
+time would mean reading the file before writing, which is exactly the
+read-modify-write window the append pattern exists to avoid, and it would still
+lose to a concurrent writer.
 """
 
 from __future__ import annotations
@@ -463,14 +487,28 @@ def append_events(path: str, events) -> list:
 
     Each event is stamped with an ``id`` and a ``recorded_at`` when it does not
     carry them, validated, and written as one line. The stamped copies are
-    returned -- the caller's objects are left alone, and a caller that needs the
-    ids it just wrote (to reference them from a later event's ``related_to``)
-    reads them off the return value.
+    returned, and a caller that needs the ids it just wrote (to reference them
+    from a later event's ``related_to``) reads them off the return value.
 
-    The write is one append per line through the effect seam, creating the
-    parent directory when missing. Appending never reads the existing file, so a
-    concurrent writer cannot be clobbered and an already-written event is never
-    rewritten.
+    COPY SEMANTICS, exactly: each returned object is a TOP-LEVEL copy
+    (``dataclasses.replace``), so stamping never touches the caller's own
+    objects -- but nested values are SHARED, not copied. ``source``,
+    ``destination`` and the ``mappings`` lists (with the mapping objects inside
+    them) are the very objects the caller passed. Deep-copying them is not worth
+    the cost on an anchor remap that can carry thousands of mappings, so the
+    contract is: do not mutate a nested value after appending it, because the
+    written line no longer reflects it and the returned copy will follow the
+    mutation.
+
+    The write is one append through the effect seam, carrying the whole batch,
+    creating the parent directory when missing. Prior content is never read back
+    and rewritten, so a concurrent writer cannot be clobbered and an
+    already-written event is never modified. The one thing read first is the
+    existing file's final byte: when the file is non-empty and does not end in a
+    newline -- an interrupted write, a hand edit -- a separating newline leads
+    the append so the new event starts its own line instead of being
+    concatenated onto the damaged one. The damaged line stays damaged;
+    :func:`read_events` will name it.
 
     Every event is validated BEFORE anything is written, so an invalid event in
     the batch aborts the whole append rather than leaving a partial record.
@@ -495,8 +533,28 @@ def append_events(path: str, events) -> list:
     parent = os.path.dirname(path)
     if parent:
         effects.makedirs(parent, exist_ok=True)
-    effects.append_text(path, "".join(line + "\n" for line in lines))
+    body = _newline_separator(path) + "".join(line + "\n" for line in lines)
+    effects.append_text(path, body)
     return stamped
+
+
+def _newline_separator(path: str) -> str:
+    """``"\\n"`` when ``path`` holds content not ending in a newline, else ``""``.
+
+    Reading one byte is legal in every effects mode -- it observes the world
+    without changing it -- and it is what keeps a new event out of a torn last
+    line.
+    """
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return ""
+    if size == 0:
+        return ""
+    with open(path, "rb") as f:
+        f.seek(-1, os.SEEK_END)
+        last = f.read(1)
+    return "" if last == b"\n" else "\n"
 
 
 def append_event(path: str, event):
@@ -509,6 +567,30 @@ def append_event(path: str, event):
 # ---------------------------------------------------------------------------
 
 
+def _undecodable_bytes_error(path: str, exc: UnicodeDecodeError) -> LineageError:
+    """Turn a raw decode failure into a record error that names the file.
+
+    The offsets on a :class:`UnicodeDecodeError` raised by a text-mode read
+    address the decoder's current buffer, not the file, so the offending line is
+    located by one pass over the raw bytes. That pass only ever happens on the
+    error path, which already ends the read. A line the pass cannot pin down
+    still yields a named error -- the file, without a line number -- rather than
+    letting a bare decode traceback out.
+    """
+    detail = f"invalid UTF-8 in lineage record: {exc.reason}"
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError:
+        return LineageError(f"{path}: {detail}")
+    for line_num, raw in enumerate(data.splitlines(), start=1):
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return LineageError(f"{path}:{line_num}: {detail}")
+    return LineageError(f"{path}: {detail}")
+
+
 def read_events(path: str, *, kinds=None) -> list:
     """Read the lineage record at ``path`` and return its events in order.
 
@@ -516,26 +598,41 @@ def read_events(path: str, *, kinds=None) -> list:
     recorded, which is the normal state.
 
     THIS IS THE READ-FOR-USE SITE, so this is where malformed content is a hard
-    error. Any unreadable line -- bad JSON, unknown ``kind``, missing required
-    field, wrong ``format_version`` -- raises :class:`LineageError` naming the
-    file and the line number. ``kinds`` filters the RESULT, never the
-    validation: a malformed line of a kind the caller did not ask for still
-    stops the read, because a record that cannot be read in full cannot be
-    trusted in part.
+    error. Any unreadable line -- bytes that are not UTF-8, bad JSON, unknown
+    ``kind``, missing required field, wrong ``format_version`` -- raises
+    :class:`LineageError` naming the file and the line number. So does an ``id``
+    that repeats one already used in the file: the schema calls the id unique
+    within the file, and this is the only place that sees the whole file.
+    ``kinds`` filters the RESULT, never the validation: a malformed or duplicate
+    line of a kind the caller did not ask for still stops the read, because a
+    record that cannot be read in full cannot be trusted in part.
     """
     if not os.path.isfile(path):
         return []
 
     events = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line_num, raw in enumerate(f, start=1):
-            stripped = raw.strip()
-            if not stripped:
-                continue
-            try:
-                events.append(parse_event(stripped))
-            except LineageError as exc:
-                raise LineageError(f"{path}:{line_num}: {exc}") from exc
+    ids_seen: dict[str, int] = {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line_num, raw in enumerate(f, start=1):
+                stripped = raw.strip()
+                if not stripped:
+                    continue
+                try:
+                    event = parse_event(stripped)
+                except LineageError as exc:
+                    raise LineageError(f"{path}:{line_num}: {exc}") from exc
+                first_line = ids_seen.get(event.id)
+                if first_line is not None:
+                    raise LineageError(
+                        f"{path}:{line_num}: duplicate event id {event.id!r} -- "
+                        f"already used on line {first_line} of the same file; "
+                        "ids must be unique within a lineage record"
+                    )
+                ids_seen[event.id] = line_num
+                events.append(event)
+    except UnicodeDecodeError as exc:
+        raise _undecodable_bytes_error(path, exc) from exc
 
     if kinds is None:
         return events

@@ -1,14 +1,18 @@
 """Tests for committed lineage records -- the append-only log of repository-surgery facts.
 
-Covers the four things the storage layer promises:
+Covers what the storage layer promises:
 
 - every event kind survives an append -> read round-trip unchanged;
 - the location resolver picks the releasable state directory in a monorepo
   workspace and ``.rlsbl/`` in a standalone repo (including a standalone
   successor produced by an extract), and both hold the same format;
 - every malformed-record variant is a hard error at the read-for-use site,
-  naming the file and the line;
-- appends accumulate in order across separate calls.
+  naming the file and the line -- including undecodable bytes and a duplicate
+  event id;
+- appends accumulate in order across separate calls, and a new event survives a
+  torn (newline-less) last line;
+- the stamped copies :func:`append_events` returns are top-level copies whose
+  nested values are shared with the caller.
 """
 
 import json
@@ -343,6 +347,37 @@ class TestDurability:
 
         assert read_events(path) == [written]
 
+    def test_append_onto_a_file_missing_its_final_newline(self, tmp_path):
+        # An interrupted write or a hand edit can leave the file without its
+        # trailing newline. A blind append would concatenate the new event onto
+        # that line and destroy BOTH.
+        path = get_lineage_path(str(tmp_path))
+        first = append_event(path, make_conversion())
+        with open(path, encoding="utf-8") as f:
+            body = f.read()
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(body.rstrip("\n"))
+
+        second = append_event(path, make_tag_map())
+
+        assert read_events(path) == [first, second]
+
+    def test_append_after_a_torn_last_line_isolates_the_new_event(self, tmp_path):
+        # The damaged line stays damaged -- read_events will name it, which is
+        # the point. What must not happen is the NEW event being swallowed by it.
+        path = get_lineage_path(str(tmp_path))
+        append_event(path, make_conversion())
+        torn = '{"format_version":1,"kind":"tag-m'
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(torn)
+
+        written = append_event(path, make_tag_map())
+
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        assert lines[1] == torn
+        assert json.loads(lines[2])["id"] == written.id
+
     def test_kinds_filter_selects_without_relaxing_validation(self, tmp_path):
         path = get_lineage_path(str(tmp_path))
         append_events(path, [make_conversion(), make_tag_map(), make_anchor_remap()])
@@ -465,9 +500,12 @@ class TestMalformedRecordsAreHardErrors:
 
     def test_error_names_the_offending_line_number(self, tmp_path):
         path = get_lineage_path(str(tmp_path))
+        # Distinct ids: repeating one would trip the uniqueness check on line 2
+        # before the read ever reached the malformed line this test is about.
         good = json.dumps(valid_payload())
-        bad = json.dumps({**valid_payload(), "kind": "teleportation"})
-        write_raw(path, good, good, bad)
+        also_good = json.dumps({**valid_payload(), "id": "e2"})
+        bad = json.dumps({**valid_payload(), "id": "e3", "kind": "teleportation"})
+        write_raw(path, good, also_good, bad)
 
         with pytest.raises(LineageError) as exc:
             read_events(path)
@@ -482,6 +520,130 @@ class TestMalformedRecordsAreHardErrors:
 
         with pytest.raises(LineageError):
             read_events(path, kinds=["conversion"])
+
+
+class TestUndecodableBytes:
+    """Byte corruption is a named record error, never a bare decode traceback."""
+
+    def _write_bytes(self, tmp_path, data: bytes) -> str:
+        path = get_lineage_path(str(tmp_path))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(data)
+        return path
+
+    def test_invalid_utf8_names_the_file_and_line(self, tmp_path):
+        good = json.dumps(valid_payload()).encode("utf-8")
+        path = self._write_bytes(
+            tmp_path, good + b"\n" + b'{"format_version":1,"kind":"\xff\xfe"}\n'
+        )
+
+        with pytest.raises(LineageError) as exc:
+            read_events(path)
+
+        message = str(exc.value)
+        assert message.startswith(f"{path}:2: "), message
+        assert "UTF-8" in message, message
+
+    def test_invalid_utf8_on_the_first_line(self, tmp_path):
+        path = self._write_bytes(tmp_path, b"\xff\xfe not text at all\n")
+
+        with pytest.raises(LineageError) as exc:
+            read_events(path)
+
+        assert str(exc.value).startswith(f"{path}:1: ")
+
+
+class TestDuplicateIds:
+    """The schema promises ids are unique within the file; the reader enforces it."""
+
+    def test_duplicate_id_is_a_hard_error(self, tmp_path):
+        path = get_lineage_path(str(tmp_path))
+        line = json.dumps(valid_payload())
+        write_raw(path, line, line)
+
+        with pytest.raises(LineageError) as exc:
+            read_events(path)
+
+        message = str(exc.value)
+        assert message.startswith(f"{path}:2: "), message
+        assert "e1" in message, message
+        assert "line 1" in message, message
+
+    def test_duplicate_id_across_different_kinds_is_still_an_error(self, tmp_path):
+        path = get_lineage_path(str(tmp_path))
+        conversion = json.dumps(valid_payload())
+        tag_map = json.dumps(
+            {
+                "format_version": 1,
+                "kind": "tag-map",
+                "id": "e1",
+                "recorded_at": "2026-01-02T03:04:05+00:00",
+                "mappings": [
+                    {"old_tag": "widget@v0.3.0", "new_tag": "v0.3.0", "new_commit": SHA_B}
+                ],
+            }
+        )
+        write_raw(path, conversion, tag_map)
+
+        with pytest.raises(LineageError) as exc:
+            read_events(path)
+
+        assert "e1" in str(exc.value)
+
+    def test_duplicate_check_ignores_the_kinds_filter(self, tmp_path):
+        # Same reason a malformed line of an unwanted kind stops the read: a
+        # record that cannot be read in full cannot be trusted in part.
+        path = get_lineage_path(str(tmp_path))
+        line = json.dumps(valid_payload())
+        write_raw(path, line, line)
+
+        with pytest.raises(LineageError):
+            read_events(path, kinds=["tag-map"])
+
+    def test_distinct_ids_read_fine(self, tmp_path):
+        path = get_lineage_path(str(tmp_path))
+        first = json.dumps(valid_payload())
+        second = json.dumps({**valid_payload(), "id": "e2"})
+        write_raw(path, first, second)
+
+        assert [e.id for e in read_events(path)] == ["e1", "e2"]
+
+
+class TestCopySemantics:
+    """The stamped return value is a TOP-LEVEL copy; nested values are shared.
+
+    Pinned deliberately: the module documents exactly this, and deep-copying
+    anchor-remap mapping lists (which can hold thousands of entries) is not
+    worth the cost. The test exists so the docs cannot drift away from the code.
+    """
+
+    def test_stamp_does_not_touch_the_callers_object(self, tmp_path):
+        path = get_lineage_path(str(tmp_path))
+        event = make_conversion()
+
+        written = append_event(path, event)
+
+        assert written is not event
+        assert event.id is None
+
+    def test_nested_value_objects_are_shared_with_the_caller(self, tmp_path):
+        path = get_lineage_path(str(tmp_path))
+        event = make_conversion()
+
+        written = append_event(path, event)
+
+        assert written.source is event.source
+        assert written.destination is event.destination
+
+    def test_nested_mapping_lists_are_shared_with_the_caller(self, tmp_path):
+        path = get_lineage_path(str(tmp_path))
+        event = make_anchor_remap()
+
+        written = append_event(path, event)
+
+        assert written.mappings is event.mappings
+        assert written.mappings[0] is event.mappings[0]
 
 
 class TestModuleSurface:
