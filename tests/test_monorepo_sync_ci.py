@@ -12,9 +12,9 @@ from rlsbl.commands.monorepo import (
     _cmd_init,
     _cmd_add,
     _cmd_sync,
-    _generate_router,
     parse_ci_workflow,
 )
+from routerharness import generate_router
 
 
 CI_WORKFLOW = """\
@@ -298,7 +298,7 @@ class TestRouterMultipleCIFiles:
             {"name": "core", "path": "core",
              "_ci_docs": [("core-ci", self._doc("test"))]},
         ]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         doc = parse_ci_workflow(content)
         assert "core-ci-test" in doc["jobs"]
         assert "uses" not in doc["jobs"]["core-ci-test"]
@@ -315,7 +315,7 @@ class TestRouterMultipleCIFiles:
                 ],
             },
         ]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         doc = parse_ci_workflow(content)
         assert "tooling-ci-pypi-test" in doc["jobs"]
         assert "tooling-ci-go-test" in doc["jobs"]
@@ -336,7 +336,7 @@ class TestRouterMultipleCIFiles:
                 ],
             },
         ]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         doc = parse_ci_workflow(content)
         assert "core-ci-test" in doc["jobs"]
         assert "tooling-ci-pypi-test" in doc["jobs"]
@@ -357,7 +357,7 @@ class TestRouterMultipleCIFiles:
         projects = [
             {"name": "core", "path": "core", "_ci_docs": [("core-ci", ci_doc)]},
         ]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         doc = parse_ci_workflow(content)
         assert list(doc["jobs"]["core-ci-test"]["needs"]) == ["detect", "core-ci-build"]
         assert list(doc["jobs"]["core-ci-build"]["needs"]) == ["detect"]
@@ -376,7 +376,7 @@ class TestRouterMultipleCIFiles:
             },
         ]
         with pytest.raises(ConfigError, match="collision"):
-            _generate_router(projects)
+            generate_router(projects)
 
 
 class TestCleanupPerTargetCI:

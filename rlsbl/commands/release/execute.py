@@ -1,7 +1,6 @@
 """Release execution: version bump, commit, tag, push, GitHub Release creation, JSONL changelog finalization, and post-release hook invocation."""
 
 import dataclasses
-import fnmatch
 import json
 import os
 import re
@@ -12,6 +11,7 @@ import time
 from ...ci_checks import RUN_ALL_REMEDY
 from ...errors import RlsblError
 from ...git_util import Ancestry, ancestry
+from ...router_filters import any_path_matches
 
 from .release_state import (
     get_state_path,
@@ -429,9 +429,12 @@ def _empty_candidate_window_message(*, version, tag, branch, candidate_sha,
         f"number is NOT burnt. Make the candidate contain a commit this "
         f"project's CI runs on:\n"
         f"  1. Commit a change under one of the paths above on {branch}\n"
-        f"     (they are the project's `path` and `watch` patterns, which feed\n"
-        f"      the `filters:` block of .github/workflows/ci-router.yml --\n"
-        f"      record the commit with `rlsbl changelog add` as usual), or\n"
+        f"     (they are derived from the workspace -- the project's own\n"
+        f"      territory, the territories of everything it depends on, the\n"
+        f"      workspace-root manifests and the tool's own machinery -- and\n"
+        f"      they feed the `filters:` block of\n"
+        f"      .github/workflows/ci-router.yml. Record the commit with\n"
+        f"      `rlsbl changelog add` as usual), or\n"
         f"     release this project together with the commits that touch it.\n"
         f"  2. rlsbl release resume\n"
         f"     -- re-pushes the new tip as the candidate and completes the SAME\n"
@@ -441,43 +444,35 @@ def _empty_candidate_window_message(*, version, tag, branch, candidate_sha,
     )
 
 
-def _router_pattern_matches(path, pattern):
-    """Does repo-relative *path* match one dorny/paths-filter pattern?
-
-    The router emits two shapes: a directory globstar (``packages/core/**``,
-    from the project's ``path``) and arbitrary globs (from ``watch``, plus the
-    releasable's CHANGELOG artifact). The globstar is a prefix test -- picomatch
-    matches direct children as well as nested ones -- and everything else goes
-    through ``fnmatch``, which approximates picomatch for the remaining globs.
-    """
-    if pattern.endswith("/**"):
-        prefix = pattern[: -len("/**")].rstrip("/")
-        return path == prefix or path.startswith(prefix + "/")
-    return fnmatch.fnmatch(path, pattern)
-
-
-def _release_router_patterns(monorepo_root, monorepo_name, releasable_name):
-    """Router filter patterns for every project the release's tag publishes.
+def _release_router_filters(monorepo_root, monorepo_name, releasable_name):
+    """Each project the release's tag publishes, with its router filter.
 
     The same set :func:`rlsbl.ci_checks.release_check_filters` builds for the
     CI gate: the releasing project, plus every member of its releasable in
     explicit mode. One tag publishes all of them, so every one of their CI
     jobs has to have run on the candidate.
-    """
-    from ...workspace import load_releasables, load_workspace, members_of
-    from ..monorepo.sync import router_filter_patterns
 
-    projects = load_workspace(str(monorepo_root))
-    releasables = load_releasables(str(monorepo_root), projects)
+    Returned per project rather than as one flat pattern list, because a
+    filter is not a set of independent patterns: the root member's carries
+    negated excludes, and pooling those with another member's includes would
+    let one member's exclude answer for another member's territory.
+    """
+    from ...router_filters import RouterFilters
+    from ...workspace import load_releasables, load_workspace, members_of
+
+    root = str(monorepo_root)
+    projects = load_workspace(root)
+    releasables = load_releasables(root, projects)
     wanted = {monorepo_name}
     if releasable_name:
         wanted |= {m["name"] for m in members_of(releasable_name, projects)}
 
-    patterns = []
-    for project in projects:
-        if project["name"] in wanted:
-            patterns.extend(router_filter_patterns(project, releasables))
-    return patterns
+    filters = RouterFilters(root, projects, releasables)
+    return [
+        (project["name"], filters.patterns_for(project))
+        for project in projects
+        if project["name"] in wanted
+    ]
 
 
 def _git_read(args, *, cwd):
@@ -636,11 +631,12 @@ def _guard_empty_candidate_window(*, candidate_sha, remote_head, needs_push,
     if not remote_head:
         return None
 
-    patterns = _release_router_patterns(
+    per_project = _release_router_filters(
         monorepo_root, monorepo_name, releasable_name,
     )
-    if not patterns:
+    if not per_project:
         return None
+    patterns = [p for _name, patterns in per_project for p in patterns]
 
     base_sha = remote_head
     if not needs_push:
@@ -661,10 +657,10 @@ def _guard_empty_candidate_window(*, candidate_sha, remote_head, needs_push,
             file=sys.stderr,
         )
         return None
-    if any(
-        _router_pattern_matches(path, pattern)
-        for path in changed for pattern in patterns
-    ):
+    # Each project's filter is asked as a whole -- includes and excludes
+    # together, the way dorny/paths-filter asks it -- and the window is fine
+    # as soon as ONE of the published projects would be triggered by it.
+    if any(any_path_matches(changed, filt) for _name, filt in per_project):
         return None
 
     from ..watch import router_workflow_path

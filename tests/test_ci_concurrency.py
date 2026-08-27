@@ -31,9 +31,9 @@ import pytest
 from rlsbl.commands.monorepo import (
     _cmd_init,
     _cmd_sync,
-    _generate_router,
     parse_ci_workflow,
 )
+from routerharness import generate_router
 from rlsbl.workspace import save_workspace
 
 from conftest import with_root_member, make_workspace
@@ -116,7 +116,7 @@ class TestRouterConcurrency:
 
     def test_router_has_per_sha_concurrency(self):
         projects = [{"name": "core", "path": "core"}]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         doc = parse_ci_workflow(content)
         assert "concurrency" in doc
         assert doc["concurrency"]["group"] == ROUTER_EXPECTED_GROUP
@@ -125,7 +125,7 @@ class TestRouterConcurrency:
     def test_router_concurrency_before_jobs(self):
         """Concurrency sits at workflow top level, not inside jobs."""
         projects = [{"name": "core", "path": "core"}]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         conc_idx = content.index("\nconcurrency:")
         jobs_idx = content.index("\njobs:")
         assert conc_idx < jobs_idx
@@ -174,7 +174,7 @@ class TestInlineDropsWorkflowConcurrency:
     def test_workflow_concurrency_not_inlined(self):
         doc = parse_ci_workflow(CI_WITH_CONCURRENCY)
         projects = [{"name": "core", "path": "core", "_ci_docs": [("core-ci", doc)]}]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         router_doc = parse_ci_workflow(content)
         # Only the router's own per-SHA block exists
         assert router_doc["concurrency"]["group"] == ROUTER_EXPECTED_GROUP
@@ -185,7 +185,7 @@ class TestInlineDropsWorkflowConcurrency:
         doc = parse_ci_workflow(CI_WITH_CONCURRENCY)
         doc["jobs"]["test"]["concurrency"] = {"group": "job-scope"}
         projects = [{"name": "core", "path": "core", "_ci_docs": [("core-ci", doc)]}]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         router_doc = parse_ci_workflow(content)
         job = router_doc["jobs"]["core-ci-test"]
         assert job["concurrency"] == {"group": "job-scope"}

@@ -9,13 +9,13 @@ from unittest.mock import patch
 import pytest
 
 from conftest import with_root_member, make_workspace
+from routerharness import generate_router
 
 from rlsbl.commands.monorepo import (
     _cmd_init,
     _cmd_add,
     _build_project_template_vars,
     _cmd_sync,
-    _generate_router,
     _inject_packages_dir,
     _inject_working_directory,
     _rewrite_version_file_inputs,
@@ -23,6 +23,20 @@ from rlsbl.commands.monorepo import (
     emit_ci_workflow,
 )
 from rlsbl.workspace import load_workspace, WORKSPACE_DIR, WORKSPACE_FILE
+
+
+def _member_filter(router_content, member):
+    """The pattern list the router declares for one member."""
+    from ruamel.yaml import YAML
+
+    yaml = YAML(typ="safe")
+    parsed = yaml.load(router_content)
+    for step in parsed["jobs"]["detect"]["steps"]:
+        with_block = step.get("with") or {}
+        if "filters" in with_block:
+            declared = yaml.load(with_block["filters"])[member]
+            return [declared] if isinstance(declared, str) else list(declared)
+    raise AssertionError("no paths-filter step in the generated router")
 
 
 CI_WORKFLOW = """\
@@ -195,8 +209,11 @@ class TestRouterGeneration:
         _cmd_sync({}, project_root=".")
         router = mock_git_repo / ".github" / "workflows" / "ci-router.yml"
         content = router.read_text()
-        assert "tooling: 'tooling/**'" in content
-        assert "core: 'core/**'" in content
+        assert "- 'tooling/**'" in content
+        assert "- 'core/**'" in content
+        # Only members with CI jobs get a filter; the root member of this
+        # fixture carries no CI workflow, so it contributes no entry.
+        assert "root:" not in content
 
     def test_router_has_conditional_jobs(self, mock_git_repo, capsys):
         _init_workspace_with_projects(mock_git_repo, [
@@ -424,48 +441,52 @@ class TestInjectWorkingDirectory:
         assert "working-directory: myproject/" not in result
 
 
-class TestRouterWatchPaths:
-    """Tests for watch path support in CI router generation."""
+class TestRouterDerivedFilters:
+    """Filters are derived from the workspace, never declared per project.
 
-    def test_router_without_watch_paths(self):
-        """Projects without watch key use single-line filter format."""
+    These slots used to pin the ``watch`` key: a member listed extra globs in
+    ``workspace.toml`` and the router copied them through. The key is gone, and
+    the same reactions now come out of the workspace's own structure -- a
+    member's territory, and the territories of everything it depends on.
+    """
+
+    def test_a_member_reacts_to_its_own_territory(self):
         projects = [
             {"name": "tooling", "path": "tooling"},
             {"name": "core", "path": "core"},
         ]
-        content = _generate_router(projects)
-        assert "tooling: 'tooling/**'" in content
-        assert "core: 'core/**'" in content
-
-    def test_router_with_watch_paths(self):
-        """Projects with watch key use multi-line list filter format."""
-        projects = [
-            {"name": "tooling", "path": "tooling", "watch": ["Package.swift", "shared/**"]},
-        ]
-        content = _generate_router(projects)
-        # The filters block is a literal string inside the YAML; check content
-        # without assuming exact outer indentation
-        assert "tooling:" in content
+        content = generate_router(projects)
         assert "- 'tooling/**'" in content
-        assert "- 'Package.swift'" in content
-        assert "- 'shared/**'" in content
-        # Must NOT have single-line format
-        assert "tooling: 'tooling/**'" not in content
+        assert "- 'core/**'" in content
 
-    def test_router_mixed_watch_and_no_watch(self):
-        """Mixed projects: watch uses multi-line, no-watch uses single-line."""
+    def test_a_member_reacts_to_a_dependency_territory(self):
         projects = [
-            {"name": "tooling", "path": "tooling", "watch": ["Package.swift", "shared/**"]},
+            {"name": "tooling", "path": "tooling", "depends_on": ["core"]},
             {"name": "core", "path": "core"},
         ]
-        content = _generate_router(projects)
-        # tooling: multi-line (inside literal string filters block)
-        assert "tooling:" in content
-        assert "- 'tooling/**'" in content
-        assert "- 'Package.swift'" in content
-        assert "- 'shared/**'" in content
-        # core: single-line
-        assert "core: 'core/**'" in content
+        content = generate_router(projects)
+        tooling = _member_filter(content, "tooling")
+        assert "tooling/**" in tooling
+        assert "core/**" in tooling
+        # ...and not the other way round: core does not react to its dependent.
+        assert "tooling/**" not in _member_filter(content, "core")
+
+    def test_dependency_territories_are_transitive(self):
+        projects = [
+            {"name": "app", "path": "app", "depends_on": ["tooling"]},
+            {"name": "tooling", "path": "tooling", "depends_on": ["core"]},
+            {"name": "core", "path": "core"},
+        ]
+        content = generate_router(projects)
+        assert "core/**" in _member_filter(content, "app")
+
+    def test_no_member_declares_its_own_globs(self):
+        """A leftover ``watch`` list in workspace.toml contributes nothing."""
+        projects = [
+            {"name": "tooling", "path": "tooling", "watch": ["Package.swift"]},
+        ]
+        content = generate_router(projects)
+        assert "Package.swift" not in content
 
 
 class TestSwiftSubtreeWarning:
@@ -585,18 +606,19 @@ class TestTrailingSlashStripped:
         projects = [
             {"name": "mypkg", "path": "python/"},
         ]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         assert "//" not in content
         assert "'python/**'" in content
 
-    def test_router_watch_no_double_slash(self):
-        """Trailing slash with watch paths does not produce //."""
+    def test_router_dependency_territory_no_double_slash(self):
+        """A trailing-slash path stays normalized when it lands in a dependent's filter."""
         projects = [
-            {"name": "mypkg", "path": "python/", "watch": ["shared/**"]},
+            {"name": "mypkg", "path": "python/", "depends_on": ["shared"]},
+            {"name": "shared", "path": "shared/"},
         ]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         assert "//" not in content
-        assert "'python/**'" in content
+        assert "shared/**" in _member_filter(content, "mypkg")
 
     def test_router_working_directory_no_double_slash(self, mock_git_repo, capsys):
         """Inlined router jobs do not contain // from trailing slash."""

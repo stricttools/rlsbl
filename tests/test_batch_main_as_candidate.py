@@ -16,7 +16,6 @@ The properties under test are the batch mirror of the standalone ones:
   any member, so no version number is burnt.
 """
 
-import fnmatch
 import json
 from pathlib import Path
 import os
@@ -29,7 +28,7 @@ from githarness import git
 
 from rlsbl.commands.monorepo import batch_release
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
-from rlsbl.commands.monorepo.sync import router_filter_patterns
+from rlsbl.router_filters import RouterFilters, any_path_matches
 from rlsbl.commands.release.release_state import get_state_path, load_release_state
 from rlsbl.release_file import get_batch_release_file_path
 from rlsbl.utils import run as real_run
@@ -475,20 +474,15 @@ class TestBatchNoCiNotice:
         )
 
 
-def _path_matches(path, pattern):
-    """Approximate dorny/paths-filter (picomatch) matching for one pattern.
-
-    Only the shapes rlsbl's router generates are modelled: a ``dir/**``
-    prefix, a literal repo-relative path, and plain globs from ``watch``.
-    """
-    if pattern.endswith("/**"):
-        prefix = pattern[:-3]
-        return path == prefix or path.startswith(prefix + "/")
-    return fnmatch.fnmatch(path, pattern.replace("**", "*"))
-
-
 def _covers(paths, patterns):
-    return any(_path_matches(p, pat) for p in paths for pat in patterns)
+    """Would a push touching *paths* trigger a job filtered by *patterns*?
+
+    Deliberately the production matcher, not a local approximation: this file
+    used to carry its own, which could agree with the router generator while
+    both disagreed with the action. Conformance to the real action is proved
+    once, in tests/test_router_filters.py, against captured verdicts.
+    """
+    return any_path_matches(paths, patterns)
 
 
 class _PushRecorder:
@@ -576,9 +570,10 @@ class TestBatchSingleCandidatePush:
         # The root member's router filter is derived from its residual
         # territory, which is a separate matter from what a candidate push
         # must touch for each declared member's CI job to run.
-        projects = declared_members(load_workspace(str(tmp_project)))
-        for project in projects:
-            patterns = router_filter_patterns(project)
+        all_members = load_workspace(str(tmp_project))
+        filters = RouterFilters(str(tmp_project), all_members)
+        for project in declared_members(all_members):
+            patterns = filters.patterns_for(project)
             assert _covers(paths, patterns), (
                 f"the CI-gated push does not touch anything matching "
                 f"{project['name']}'s router filter {patterns}; its CI job "
@@ -603,8 +598,9 @@ class TestBatchSingleCandidatePush:
         paths = recorder.paths_in(window)
         projects = load_workspace(str(tmp_project))
         releasables = load_releasables(str(tmp_project), projects)
+        filters = RouterFilters(str(tmp_project), projects, releasables)
         for project in declared_members(projects):
-            patterns = router_filter_patterns(project, releasables)
+            patterns = filters.patterns_for(project)
             assert _covers(paths, patterns), (
                 f"the CI-gated push does not touch anything matching "
                 f"{project['name']}'s router filter {patterns}. "

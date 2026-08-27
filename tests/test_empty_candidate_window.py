@@ -19,10 +19,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from rlsbl.commands.release.execute import (
-    _router_pattern_matches,
-    _release_router_patterns,
-)
+from rlsbl.commands.release.execute import _release_router_filters
+from rlsbl.router_filters import matches_filter, matches_pattern
 from rlsbl.commands.release.release_state import (
     get_state_path,
     load_release_state,
@@ -40,7 +38,12 @@ from test_representative_write_elimination import (  # noqa: E402
 
 
 class TestRouterPatternMatching:
-    """The two shapes the router emits, matched the way picomatch does."""
+    """The shapes the router emits, matched the way picomatch does.
+
+    The exhaustive conformance evidence is tests/test_router_filters.py, which
+    replays verdicts captured from the real action. These are the cases the
+    guard itself depends on.
+    """
 
     @pytest.mark.parametrize("path,expected", [
         ("packages/core/package.json", True),
@@ -50,7 +53,7 @@ class TestRouterPatternMatching:
         ("packages/other/package.json", False),
     ])
     def test_directory_globstar(self, path, expected):
-        assert _router_pattern_matches(path, "packages/core/**") is expected
+        assert matches_pattern(path, "packages/core/**") is expected
 
     @pytest.mark.parametrize("path,expected", [
         (".rlsbl-monorepo/releasables/alpha/CHANGELOG.md", True),
@@ -58,21 +61,36 @@ class TestRouterPatternMatching:
     ])
     def test_exact_artifact_path(self, path, expected):
         pattern = ".rlsbl-monorepo/releasables/alpha/CHANGELOG.md"
-        assert _router_pattern_matches(path, pattern) is expected
+        assert matches_pattern(path, pattern) is expected
 
-    def test_watch_glob(self):
-        assert _router_pattern_matches("shared/proto/a.proto", "shared/**/*.proto")
-        assert not _router_pattern_matches("shared/proto/a.txt", "shared/**/*.proto")
+    def test_the_root_members_excludes_are_honoured(self):
+        """A filter read as a whole, not as independent patterns.
+
+        Reading each pattern on its own and OR-ing the results is how the
+        simulation used to answer, and it reports a match for exactly the
+        paths the action excludes.
+        """
+        patterns = ["**", "!packages/core/**"]
+        assert matches_filter("README.md", patterns)
+        assert not matches_filter("packages/core/src/index.ts", patterns)
 
 
-class TestReleaseRouterPatterns:
+class TestReleaseRouterFilters:
     """The guard asks for the same project set the CI gate demands."""
 
     def test_releasable_members_and_finalize_artifact(self, tmp_project):
         _setup_releasable_workspace(tmp_project)
-        patterns = _release_router_patterns(str(tmp_project), "core", "alpha")
+        per_project = _release_router_filters(str(tmp_project), "core", "alpha")
+        patterns = {p for _name, filt in per_project for p in filt}
         assert "packages/core/**" in patterns
         assert ".rlsbl-monorepo/releasables/alpha/CHANGELOG.md" in patterns
+
+    def test_each_project_keeps_its_own_filter(self, tmp_project):
+        """Filters are returned per project so one member's excludes cannot
+        answer for another member's territory."""
+        _setup_releasable_workspace(tmp_project)
+        per_project = _release_router_filters(str(tmp_project), "core", "alpha")
+        assert all(isinstance(name, str) and filt for name, filt in per_project)
 
 
 def _prepare_resumable_candidate(root, core, unrelated_path="docs/notes.md",

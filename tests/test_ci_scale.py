@@ -19,10 +19,10 @@ import pytest
 from ruamel.yaml import YAML
 
 from rlsbl.commands.monorepo import (
-    _generate_router,
     count_reusable_workflow_calls,
     validate_router_reusable_calls,
 )
+from routerharness import generate_router
 from rlsbl.commands.monorepo.sync import GITHUB_MAX_REUSABLE_CALLS
 from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router
 from rlsbl.errors import ConfigError
@@ -69,17 +69,40 @@ def _make_ci_doc():
     }
 
 
-def _make_projects(count, *, watch=False, ci_docs=True):
-    """Build a list of synthetic project dicts."""
+def _make_projects(count, *, depends_on_shared=False, ci_docs=True):
+    """Build a list of synthetic project dicts.
+
+    With *depends_on_shared* every project declares a dependency on an extra
+    ``shared`` member, so each one's derived filter carries that member's
+    territory as well as its own.
+    """
     projects = []
     for i in range(1, count + 1):
         proj = {"name": f"project-{i}", "path": f"packages/project-{i}"}
-        if watch:
-            proj["watch"] = [f"shared/lib-{i}/**"]
+        if depends_on_shared:
+            proj["depends_on"] = ["shared"]
         if ci_docs:
             proj["_ci_docs"] = [(f"project-{i}-ci", _make_ci_doc())]
         projects.append(proj)
+    if depends_on_shared:
+        shared = {"name": "shared", "path": "packages/shared"}
+        if ci_docs:
+            shared["_ci_docs"] = [("shared-ci", _make_ci_doc())]
+        projects.append(shared)
     return projects
+
+
+def _filters_block(parsed_router):
+    """The paths-filter step's declared filters, as ``{member: [patterns]}``."""
+    for step in parsed_router["jobs"]["detect"]["steps"]:
+        with_block = step.get("with") or {}
+        if "filters" in with_block:
+            declared = YAML(typ="safe").load(with_block["filters"])
+            return {
+                name: [value] if isinstance(value, str) else list(value)
+                for name, value in declared.items()
+            }
+    raise AssertionError("router has no paths-filter step")
 
 
 def _make_projects_on_disk(root, count):
@@ -103,14 +126,14 @@ class TestCIRouterScale:
     def test_syntactic_validity(self):
         """Generated ci-router.yml parses as valid YAML."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_router(projects)
+        content = generate_router(projects)
         parsed = _safe_load(content)
         assert isinstance(parsed, dict)
 
     def test_job_count(self):
         """ci-router has exactly 30 inlined project jobs + 1 detect job = 31 total."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_router(projects)
+        content = generate_router(projects)
         parsed = _safe_load(content)
         jobs = parsed["jobs"]
         assert len(jobs) == PROJECT_COUNT + 1  # 30 projects + detect
@@ -119,16 +142,22 @@ class TestCIRouterScale:
     def test_path_filter_entries(self):
         """The dorny/paths-filter filters block has 30 entries."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_router(projects)
+        content = generate_router(projects)
+        parsed = _safe_load(content)
+        declared = _filters_block(parsed)
+        assert len(declared) == PROJECT_COUNT
         for i in range(1, PROJECT_COUNT + 1):
             name = f"project-{i}"
             path = f"packages/project-{i}"
-            assert f"{name}: '{path}/**'" in content
+            assert declared[name] == [
+                f"{path}/**",
+                ".github/workflows/ci-router.yml",
+            ]
 
     def test_no_duplicate_job_names(self):
         """All job names in ci-router are unique."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_router(projects)
+        content = generate_router(projects)
         parsed = _safe_load(content)
         job_names = list(parsed["jobs"].keys())
         assert len(job_names) == len(set(job_names))
@@ -136,7 +165,7 @@ class TestCIRouterScale:
     def test_jobs_inlined_not_reusable(self):
         """No job carries a reusable-workflow 'uses:' -- all jobs are inlined."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_router(projects)
+        content = generate_router(projects)
         parsed = _safe_load(content)
         assert count_reusable_workflow_calls(parsed["jobs"]) == 0
         for proj in projects:
@@ -149,7 +178,7 @@ class TestCIRouterScale:
     def test_detect_outputs(self):
         """The detect job declares an output for every project."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_router(projects)
+        content = generate_router(projects)
         parsed = _safe_load(content)
         detect = parsed["jobs"]["detect"]
         outputs = detect["outputs"]
@@ -159,7 +188,7 @@ class TestCIRouterScale:
     def test_conditional_expressions(self):
         """Each inlined project job has the correct if-condition on detect output."""
         projects = _make_projects(PROJECT_COUNT)
-        content = _generate_router(projects)
+        content = generate_router(projects)
         parsed = _safe_load(content)
         for proj in projects:
             name = proj["name"]
@@ -168,18 +197,23 @@ class TestCIRouterScale:
                 f"(needs.detect.outputs.{name} == 'true' || inputs.run_all)"
             )
 
-    def test_with_watch_paths(self):
-        """Router with watch paths uses multi-line filter format for all 30 projects."""
-        projects = _make_projects(PROJECT_COUNT, watch=True)
-        content = _generate_router(projects)
+    def test_with_dependency_territories(self):
+        """A dependency's territory joins every dependent's filter, at scale."""
+        projects = _make_projects(PROJECT_COUNT, depends_on_shared=True)
+        content = generate_router(projects)
         parsed = _safe_load(content)
-        # Still valid YAML and correct job count
-        assert len(parsed["jobs"]) == PROJECT_COUNT + 1
-        # Each project's path and watch glob appear in the content
+        # Still valid YAML and correct job count (30 projects + shared + detect)
+        assert len(parsed["jobs"]) == PROJECT_COUNT + 2
+        declared = _filters_block(parsed)
         for proj in projects:
-            assert f"- '{proj['path']}/**'" in content
-            for w in proj["watch"]:
-                assert f"- '{w}'" in content
+            patterns = declared[proj["name"]]
+            assert f"{proj['path']}/**" in patterns
+            if proj["name"] != "shared":
+                assert "packages/shared/**" in patterns
+        # The dependency itself does not inherit its dependents' territories.
+        assert not any(
+            p.startswith("packages/project-") for p in declared["shared"]
+        )
 
 
 class TestReusableCallGuard:
@@ -221,7 +255,7 @@ class TestReusableCallGuard:
     def test_generated_ci_router_has_zero_reusable_calls(self):
         """Even a 100-project workspace produces a router with zero calls."""
         projects = _make_projects(100)
-        content = _generate_router(projects)
+        content = generate_router(projects)
         parsed = _safe_load(content)
         assert count_reusable_workflow_calls(parsed["jobs"]) == 0
 

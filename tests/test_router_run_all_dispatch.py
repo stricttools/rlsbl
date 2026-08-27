@@ -29,10 +29,8 @@ from rlsbl.ci_checks import (
     RUN_ALL_REMEDY,
     verify_project_ci_ran,
 )
-from rlsbl.commands.monorepo.sync import (
-    RUN_ALL_INPUT,
-    _generate_router,
-)
+from rlsbl.commands.monorepo.sync import RUN_ALL_INPUT
+from routerharness import generate_router
 
 
 def _safe_load(text):
@@ -64,7 +62,7 @@ class TestRunAllInputDeclaration:
     """The dispatch input exists, is a boolean, and defaults to off."""
 
     def test_workflow_dispatch_declares_a_boolean_run_all_input(self):
-        parsed = _safe_load(_generate_router(_projects()))
+        parsed = _safe_load(generate_router(_projects()))
         dispatch = parsed["on"]["workflow_dispatch"]
         assert dispatch is not None, "workflow_dispatch must carry inputs"
         run_all = dispatch["inputs"]["run_all"]
@@ -74,7 +72,7 @@ class TestRunAllInputDeclaration:
         assert "filter" in run_all["description"].lower()
 
     def test_push_and_pull_request_triggers_survive(self):
-        parsed = _safe_load(_generate_router(_projects()))
+        parsed = _safe_load(generate_router(_projects()))
         on = parsed["on"]
         assert on["push"] == {"branches": ["main"]}
         assert "pull_request" in on
@@ -84,7 +82,7 @@ class TestRunAllShortCircuitsTheFilter:
     """Every inlined job runs when dispatched with ``run_all``."""
 
     def test_each_project_job_is_gated_on_the_filter_or_run_all(self):
-        parsed = _safe_load(_generate_router(_projects()))
+        parsed = _safe_load(generate_router(_projects()))
         for i in range(1, 4):
             job = parsed["jobs"][f"project-{i}-ci-test"]
             assert job["if"] == (
@@ -95,7 +93,7 @@ class TestRunAllShortCircuitsTheFilter:
     def test_a_job_s_own_condition_is_preserved_and_anded(self):
         """run_all overrides the paths filter, never the job's own condition."""
         parsed = _safe_load(
-            _generate_router(_projects(1, job_if="github.event_name == 'push'"))
+            generate_router(_projects(1, job_if="github.event_name == 'push'"))
         )
         job = parsed["jobs"]["project-1-ci-test"]
         assert job["if"] == (
@@ -105,12 +103,12 @@ class TestRunAllShortCircuitsTheFilter:
 
     def test_the_detect_job_stays_unconditional(self):
         """detect must still run: the jobs need it even when run_all is set."""
-        parsed = _safe_load(_generate_router(_projects()))
+        parsed = _safe_load(generate_router(_projects()))
         assert "if" not in parsed["jobs"]["detect"]
 
     def test_every_project_job_carries_the_short_circuit(self):
         """No inlined job may be reachable only through the paths filter."""
-        parsed = _safe_load(_generate_router(_projects(5)))
+        parsed = _safe_load(generate_router(_projects(5)))
         for key, job in parsed["jobs"].items():
             if key == "detect":
                 continue
@@ -127,7 +125,7 @@ class TestRunAllDoesNotCancelThePushRun:
     """
 
     def test_concurrency_group_distinguishes_a_run_all_dispatch(self):
-        parsed = _safe_load(_generate_router(_projects()))
+        parsed = _safe_load(generate_router(_projects()))
         group = parsed["concurrency"]["group"]
         assert "github.sha" in group
         assert "inputs.run_all" in group

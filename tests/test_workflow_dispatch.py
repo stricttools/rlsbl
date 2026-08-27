@@ -8,7 +8,7 @@ from unittest.mock import patch
 from ruamel.yaml import YAML
 
 from rlsbl.commands.init_cmd import _generate_merged_publish
-from rlsbl.commands.monorepo import _generate_router
+from routerharness import generate_router
 from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "rlsbl" / "templates"
@@ -57,7 +57,7 @@ class TestMonorepoRouterWorkflowDispatch:
         projects = [
             {"name": "project-a", "path": "packages/project-a"},
         ]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         assert "workflow_dispatch:" in content
 
     def test_publish_router_has_workflow_dispatch(self, tmp_path):

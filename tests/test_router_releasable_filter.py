@@ -15,7 +15,7 @@ and must not spend CI minutes per entry.
 
 from ruamel.yaml import YAML
 
-from rlsbl.commands.monorepo.sync import _generate_router
+from routerharness import generate_router
 from rlsbl.workspace_types import Releasable, WorkspaceProject
 
 
@@ -23,12 +23,12 @@ def _releasable(name):
     return Releasable(name=name, tag_format="{name}@v{version}")
 
 
-def _project(name, path, releasable=None, watch=None):
+def _project(name, path, releasable=None, depends_on=None):
     data = {"name": name, "path": path, "_ci_docs": []}
     if releasable is not None:
         data["releasable"] = releasable
-    if watch is not None:
-        data["watch"] = watch
+    if depends_on is not None:
+        data["depends_on"] = depends_on
     return WorkspaceProject(data)
 
 
@@ -46,7 +46,7 @@ ARTIFACT = ".rlsbl-monorepo/releasables/alpha/CHANGELOG.md"
 
 class TestReleasableFinalizeArtifactInFilter:
     def test_member_filter_carries_the_artifact(self):
-        content = _generate_router(
+        content = generate_router(
             [_project("core", "core", releasable="alpha")],
             releasables=[_releasable("alpha")],
         )
@@ -55,9 +55,14 @@ class TestReleasableFinalizeArtifactInFilter:
         assert f"- '{ARTIFACT}'" in filters
         assert "- 'core/**'" in filters
 
-    def test_artifact_is_added_alongside_watch_patterns(self):
-        content = _generate_router(
-            [_project("core", "core", releasable="alpha", watch=["shared/**"])],
+    def test_artifact_is_added_alongside_derived_territories(self):
+        """The artifact joins a filter that already carries a dependency's territory."""
+        content = generate_router(
+            [
+                _project("core", "core", releasable="alpha",
+                         depends_on=["shared"]),
+                _project("shared", "shared", releasable="alpha"),
+            ],
             releasables=[_releasable("alpha")],
         )
         filters = _filters(content)
@@ -66,7 +71,7 @@ class TestReleasableFinalizeArtifactInFilter:
         assert f"- '{ARTIFACT}'" in filters
 
     def test_every_member_of_the_releasable_gets_it(self):
-        content = _generate_router(
+        content = generate_router(
             [
                 _project("core", "core", releasable="alpha"),
                 _project("cli", "cli", releasable="alpha"),
@@ -78,25 +83,28 @@ class TestReleasableFinalizeArtifactInFilter:
 
     def test_changes_jsonl_is_not_in_the_filter(self):
         """changelog add must not trigger CI on every entry."""
-        content = _generate_router(
+        content = generate_router(
             [_project("core", "core", releasable="alpha")],
             releasables=[_releasable("alpha")],
         )
         assert "changes/unreleased.jsonl" not in _filters(content)
         assert "releasables/alpha/**" not in _filters(content)
 
-    def test_non_releasable_member_is_unaffected(self):
-        """releasable = false -> plain single-pattern filter, as before."""
-        content = _generate_router(
+    def test_non_releasable_member_gets_no_artifact(self):
+        """releasable = false -> territory and machinery only, no artifact."""
+        content = generate_router(
             [_project("docs", "docs", releasable=False)],
             releasables=[_releasable("alpha")],
         )
-        assert "docs: 'docs/**'" in _filters(content)
+        filters = _filters(content)
+        assert "- 'docs/**'" in filters
+        assert ARTIFACT not in filters
 
-    def test_implicit_mode_is_unaffected(self):
-        """No releasables (implicit monorepo) -> plain single-pattern filter."""
-        content = _generate_router([_project("core", "core")], releasables=None)
-        assert "core: 'core/**'" in _filters(content)
+    def test_implicit_mode_gets_no_artifact(self):
+        """No releasables (implicit monorepo) -> no finalize artifact to anchor on."""
+        filters = _filters(generate_router([_project("core", "core")], releasables=None))
+        assert "- 'core/**'" in filters
+        assert ".rlsbl-monorepo/" not in filters
 
 
 class TestFirstReleaseTriggersCI:
@@ -128,9 +136,9 @@ class TestFirstReleaseTriggersCI:
         return patterns
 
     def test_release_commit_matches_the_project_filter(self):
-        import fnmatch
+        from rlsbl.router_filters import matches_filter
 
-        content = _generate_router(
+        content = generate_router(
             [_project("core", "core", releasable="alpha")],
             releasables=[_releasable("alpha")],
         )
@@ -139,6 +147,6 @@ class TestFirstReleaseTriggersCI:
 
         matched = [
             f for f in self.FIRST_RELEASE_CHANGED_FILES
-            if any(fnmatch.fnmatch(f, p) for p in patterns)
+            if matches_filter(f, patterns)
         ]
         assert matched == [".rlsbl-monorepo/releasables/alpha/CHANGELOG.md"], matched

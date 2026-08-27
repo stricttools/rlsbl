@@ -17,6 +17,7 @@ from ...ci_yaml import (
 from ...commands.init_cmd import check_unreplaced_vars, process_template
 from ...context import create_context
 from ...errors import ConfigError
+from ...router_filters import PREDICATE_QUANTIFIER, RouterFilters
 from ...targets.utils import detect_python_package_root
 from ...utils import commit_files_if_changed
 from ...workspace import find_workspace_root, load_workspace, WORKSPACE_DIR, WORKSPACE_FILE
@@ -98,86 +99,6 @@ def _strip_expression_wrapper(expr):
     return expr
 
 
-def _releasable_finalize_artifact(project, releasables):
-    """Repo-relative path of the releasable artifact a release commit writes.
-
-    In explicit releasable mode a release finalizes the releasable's
-    ``CHANGELOG.md`` under ``.rlsbl-monorepo/releasables/<name>/``. That file
-    is part of the project's own change surface: a release commit IS a change
-    to the released project, so it must satisfy the router's paths filter.
-
-    **This entry is a deliberate run-everything hook, not an accident.**
-
-    Mechanism: the finalize artifact is one path shared by every member of the
-    releasable, and it is appended to *each* member's filter. A commit that
-    touches it therefore matches all of their filters at once and triggers all
-    of their CI jobs. The release commit always touches it -- the version-bump
-    commit regenerates and commits the releasable ``CHANGELOG.md`` (it gains
-    the new version's heading) before the candidate push.
-
-    Why it exists: a release push can touch nothing under a member's own path.
-    That is inevitable on a FIRST release, where the version write is a no-op,
-    and it is possible on any release whose per-member writes all land outside
-    the member's directory. The member's CI job would then conclude ``skipped``
-    on the very commit its tag points at, and the publish gate deliberately
-    refuses to treat ``skipped`` as passing (:mod:`rlsbl.publish_gate`) -- a
-    skipped check proves nothing about the commit. The result is a deadlock
-    with no re-runnable recovery: re-running CI on that commit skips the job
-    again, for the same reason it skipped the first time. Anchoring every
-    member's filter on the one file a release always writes makes the gated
-    commit verifiable for all of them.
-
-    The cost, accepted knowingly: **any release of a releasable runs the full
-    CI job set of every one of its members**, including members whose own code
-    did not change, because the finalize artifact matches all of their filters.
-    That is the intended trade -- CI minutes in exchange for never tagging a
-    commit the gate cannot read a verdict for. Relaxing the gate to accept
-    ``skipped`` would be the cheaper fix and is rejected: it would let a
-    release publish on a commit nothing actually verified.
-
-    Deliberately the finalize artifact only, NOT the whole releasable
-    directory: ``rlsbl changelog add`` writes the JSONL between releases and
-    must not spend CI minutes on every entry.
-
-    Returns None outside explicit releasable mode or for a non-releasable
-    project.
-    """
-    if not releasables:
-        return None
-    from ...workspace import resolve_releasable_for_project
-    from ...workspace_types import RELEASABLES_DIR, WORKSPACE_DIR
-
-    rel = resolve_releasable_for_project(project, releasables)
-    if rel is None:
-        return None
-    return f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{rel.name}/CHANGELOG.md"
-
-
-def router_filter_patterns(project, releasables=None):
-    """The dorny/paths-filter patterns the router emits for one project.
-
-    A push whose diff matches none of these patterns leaves that project's CI
-    job ``skipped`` on the pushed commit -- and the publish gate refuses to
-    treat a skipped check as passing. The release engine therefore has to
-    guarantee that the commit it tags rode in on a push whose diff matches
-    every participating project's patterns, which is why this list is a
-    published function rather than a local in :func:`_generate_router`.
-
-    In explicit releasable mode the list ends with the releasable's finalize
-    artifact (see :func:`_releasable_finalize_artifact`), a path shared by
-    every member of the releasable. Any commit touching it matches all of
-    their filters at once, so a release of the releasable runs every member's
-    CI jobs. That breadth is the point, not a leak in the filter.
-    """
-    clean_path = project['path'].rstrip('/')
-    patterns = [f"{clean_path}/**"]
-    patterns.extend(project.get("watch", []))
-    finalize_artifact = _releasable_finalize_artifact(project, releasables)
-    if finalize_artifact:
-        patterns.append(finalize_artifact)
-    return patterns
-
-
 # The router's ``workflow_dispatch`` input that short-circuits the paths
 # filter, and the expression every inlined job ORs into its ``if``.
 #
@@ -213,13 +134,19 @@ RUN_ALL_INPUT_SPEC = {
 }
 
 
-def _generate_router(projects, releasables=None):
+def _generate_router(projects, filters):
     """Generate ci-router.yml content with every project's CI jobs inlined.
 
     Each project dict must carry ``_ci_docs``: a list of ``(job_prefix, doc)``
     pairs where *doc* is a parsed CI workflow (working-directory already
     injected) and *job_prefix* is the per-file key (``{name}-ci`` or
     ``{name}-ci-{target}``).
+
+    *filters* is a :class:`rlsbl.router_filters.RouterFilters` built over the
+    WHOLE workspace, not just *projects*: a member's filter is derived from
+    territories it does not own (its dependencies', and -- for the root member
+    -- every other member's), so the derivation cannot be done from the
+    CI-carrying subset alone.
 
     GitHub rejects workflow files with 20+ reusable-workflow calls, so the
     router inlines every project's CI jobs directly instead of ``uses:``
@@ -235,15 +162,7 @@ def _generate_router(projects, releasables=None):
     - keeps intra-workflow ``needs:`` (rewritten to the prefixed keys).
     """
     # Build the filters block as a multi-line string (dorny/paths-filter format)
-    filter_lines = []
-    for p in projects:
-        patterns = router_filter_patterns(p, releasables)
-        if len(patterns) == 1:
-            filter_lines.append(f"{p['name']}: '{patterns[0]}'")
-        else:
-            filter_lines.append(f"{p['name']}:")
-            filter_lines.extend(f"  - '{pattern}'" for pattern in patterns)
-    filters_str = LiteralScalarString("\n".join(filter_lines) + "\n")
+    filters_str = LiteralScalarString(filters.filters_block(projects))
 
     # detect job
     detect_outputs = {}
@@ -258,7 +177,15 @@ def _generate_router(projects, releasables=None):
             {
                 'uses': format_action('dorny/paths-filter'),
                 'id': 'changes',
-                'with': {'filters': filters_str},
+                'with': {
+                    'filters': filters_str,
+                    # Without this the action's default quantifier is `some`,
+                    # under which a negated pattern matches everything OUTSIDE
+                    # itself -- so the root member's `**` + `!other/**` block
+                    # would match every file including the excluded ones. See
+                    # rlsbl.router_filters.
+                    'predicate-quantifier': PREDICATE_QUANTIFIER,
+                },
             },
         ],
     }
@@ -817,12 +744,21 @@ def _cmd_sync(flags, project_root):
 
     releasables = load_releasables(root, projects) if is_explicit_mode(root) else None
 
+    # Derive every member's paths filter from the workspace itself: ownership
+    # territories, dependency territories, root-level manifests and the tool's
+    # own machinery. Building the dependency graph can fail (a `depends_on`
+    # naming a project that does not exist), and that failure is NOT caught:
+    # a router generated as if the edge were absent silently under-triggers
+    # the dependent's CI, which is exactly the deadlock this derivation exists
+    # to prevent.
+    filters = RouterFilters(root, projects, releasables)
+
     # Generate CI router (only for projects that have CI workflows)
     router_path = os.path.join(workflows_dir, "ci-router.yml")
     if os.path.isfile(router_path):
         effects.chmod(router_path, 0o644)
     with effects.open_write(router_path, "w", encoding="utf-8") as f:
-        f.write(_generate_router(projects_with_ci, releasables=releasables))
+        f.write(_generate_router(projects_with_ci, filters))
     effects.chmod(router_path, 0o444)
     written_files.append(router_path)
 

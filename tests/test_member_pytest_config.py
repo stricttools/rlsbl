@@ -33,7 +33,8 @@ class TestPytestRootdirPin:
 
     def test_inlined_router_preserves_rootdir_pin(self):
         """A member CI whose pytest step is pinned keeps the pin after inlining."""
-        from rlsbl.commands.monorepo import _generate_router, parse_ci_workflow
+        from rlsbl.commands.monorepo import parse_ci_workflow
+        from routerharness import generate_router
 
         ci = (
             "name: CI\n"
@@ -51,7 +52,7 @@ class TestPytestRootdirPin:
             "_ci_docs": [("mypkg-ci", doc)],
             "_ci_files": ["mypkg-ci.yml"],
         }]
-        content = _generate_router(projects)
+        content = generate_router(projects)
         assert "uv run pytest --rootdir ." in content
 
 

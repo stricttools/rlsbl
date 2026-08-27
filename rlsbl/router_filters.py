@@ -1,0 +1,379 @@
+"""The generated CI router's path filters: how they are derived, and how they are read.
+
+One module answers both halves of a single question, because the two halves
+have to agree exactly:
+
+1. **Which patterns does the router emit for a member?**
+   :class:`RouterFilters` derives them from the workspace itself -- ownership
+   territories, dependency territories, a small set of built-ins, and (for the
+   root member) negated excludes.  Nothing is hand-declared in
+   ``workspace.toml``: the workspace's own structure states what a member's CI
+   must react to.
+
+2. **Would a given diff match them?**  :func:`matches_filter` answers with the
+   same semantics ``dorny/paths-filter`` applies at run time, so the release
+   flow's pre-push simulation and the action agree about whether a candidate
+   push can trigger a member's job.
+
+Keeping the emitter and the reader apart is what let them drift: a simulation
+that ORs every pattern together is right until the first negated pattern, at
+which point it says "matched" for exactly the files the action excludes.
+
+**The predicate quantifier is part of the contract.**  ``dorny/paths-filter``
+defaults to ``some``: a file matches a filter when *any* pattern matches it,
+and a negated pattern under that rule matches everything outside itself, so
+``['**', '!pkg/**']`` matches every file including the ones under ``pkg/``.
+The router therefore declares ``predicate-quantifier: some-with-excludes``
+(:data:`PREDICATE_QUANTIFIER`), under which a file matches when at least one
+non-negated pattern matches it and no negated pattern does.  Exclusion is
+final and order-independent -- an excluded file cannot be included back by a
+later pattern.  For a member whose pattern list carries no negation the two
+quantifiers agree exactly, so only the root member's filter changes meaning.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+
+from .ownership import is_root_member, member_name, member_path
+
+#: The ``dorny/paths-filter`` quantifier the generated router declares.  See
+#: the module docstring: the default ``some`` makes negated patterns useless.
+PREDICATE_QUANTIFIER = "some-with-excludes"
+
+#: The pattern that matches every path in the repository.
+MATCH_EVERYTHING = "**"
+
+#: The generated router itself.  A change to it changes what every member's
+#: job is and when it runs, so every member reacts to it.
+ROUTER_WORKFLOW_PATH = ".github/workflows/ci-router.yml"
+
+# Lockfiles that sit at a workspace root.  Unlike manifests there is no
+# registry to derive these from -- no target declares its lockfile -- so the
+# list is written out, and a missing entry only costs an under-trigger for a
+# root-level lockfile nobody has yet.
+_ROOT_LOCKFILES = (
+    "Cargo.lock",
+    "deno.lock",
+    "go.sum",
+    "go.work",
+    "go.work.sum",
+    "mix.lock",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "pubspec.lock",
+    "uv.lock",
+    "yarn.lock",
+)
+
+
+def _target_manifest_names() -> tuple[str, ...]:
+    """Every filename a registered target detects itself by.
+
+    Derived from the target registry rather than restated, so a new target's
+    manifest joins the root-trigger set the moment the target is registered.
+    Imported lazily: :mod:`rlsbl.targets` pulls in most of the package, and
+    this module is imported by parts of it.
+    """
+    from .targets import TARGETS
+
+    names: set[str] = set()
+    for target_cls in TARGETS.values():
+        names.update(target_cls.detection_files)
+    return tuple(sorted(names))
+
+
+def root_trigger_files(root) -> list[str]:
+    """Workspace-root manifests and lockfiles, restricted to the ones present.
+
+    A manifest or lockfile at the workspace root describes the build of the
+    repository as a whole -- a dependency bump there can change what every
+    member compiles against -- so a change to one triggers every member's CI,
+    including members whose own directory the diff never touched.
+
+    Only files that actually exist are emitted.  A filter listing paths that
+    can never appear would be dead weight in every member's block, and the
+    freshness check re-derives from the same tree, so adding a root lockfile
+    makes the committed router stale (correctly: it now needs the entry).
+    """
+    present = []
+    for name in (*_target_manifest_names(), *_ROOT_LOCKFILES):
+        if os.path.isfile(os.path.join(str(root), name)):
+            present.append(name)
+    return sorted(set(present))
+
+
+def territory_pattern(member) -> str:
+    """The glob covering everything a member owns.
+
+    ``**`` for the root member, whose territory is the residual -- every path
+    no other member claims.  The residual cannot be written as a positive
+    glob, so it is expressed as ``**`` narrowed by negated excludes, which
+    only :meth:`RouterFilters.patterns_for` can build (it needs the other
+    members).  A caller that just wants "the root member's area" gets the
+    over-broad ``**`` and must live with it.
+    """
+    path = member_path(member)
+    return MATCH_EVERYTHING if not path else f"{path}/**"
+
+
+def _finalize_artifact(project, releasables):
+    """Repo-relative path of the releasable artifact a release commit writes.
+
+    In explicit releasable mode a release finalizes the releasable's
+    ``CHANGELOG.md`` under ``.rlsbl-monorepo/releasables/<name>/``.  That file
+    is part of the project's own change surface: a release commit IS a change
+    to the released project, so it must satisfy the router's paths filter.
+
+    **This entry is a deliberate run-everything hook, not an accident.**
+
+    Mechanism: the finalize artifact is one path shared by every member of the
+    releasable, and it is appended to *each* member's filter.  A commit that
+    touches it therefore matches all of their filters at once and triggers all
+    of their CI jobs.  The release commit always touches it -- the version-bump
+    commit regenerates and commits the releasable ``CHANGELOG.md`` (it gains
+    the new version's heading) before the candidate push.
+
+    Why it exists: a release push can touch nothing under a member's own path.
+    That is inevitable on a FIRST release, where the version write is a no-op,
+    and it is possible on any release whose per-member writes all land outside
+    the member's directory.  The member's CI job would then conclude
+    ``skipped`` on the very commit its tag points at, and the publish gate
+    deliberately refuses to treat ``skipped`` as passing
+    (:mod:`rlsbl.publish_gate`) -- a skipped check proves nothing about the
+    commit.  The result is a deadlock with no re-runnable recovery: re-running
+    CI on that commit skips the job again, for the same reason it skipped the
+    first time.  Anchoring every member's filter on the one file a release
+    always writes makes the verified commit readable for all of them.
+
+    The cost, accepted knowingly: **any release of a releasable runs the full
+    CI job set of every one of its members**, including members whose own code
+    did not change.  That is the intended trade -- CI minutes in exchange for
+    never tagging a commit the gate cannot read a verdict for.
+
+    Deliberately the finalize artifact only, NOT the whole releasable
+    directory: ``rlsbl changelog add`` writes the JSONL between releases and
+    must not spend CI minutes on every entry.
+
+    Returns None outside explicit releasable mode or for a non-releasable
+    project.
+    """
+    if not releasables:
+        return None
+    from .workspace import resolve_releasable_for_project
+    from .workspace_types import RELEASABLES_DIR, WORKSPACE_DIR
+
+    rel = resolve_releasable_for_project(project, releasables)
+    if rel is None:
+        return None
+    return f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{rel.name}/CHANGELOG.md"
+
+
+class RouterFilters:
+    """Derives every member's router path filters from the workspace.
+
+    Construction builds the workspace dependency graph.  Its failures are not
+    caught here and must not be caught by callers: a workspace whose
+    ``depends_on`` names a project that does not exist has no derivable filter
+    set, and a router generated as if the edge were absent would silently
+    under-trigger the dependent's CI.  The command reports the error instead.
+    """
+
+    def __init__(self, root, projects, releasables=None):
+        from .workspace_graph import WorkspaceGraph
+
+        self.root = str(root)
+        self.projects = list(projects)
+        self.releasables = releasables
+        self.graph = WorkspaceGraph(self.root, self.projects)
+        self._by_name = {member_name(p): p for p in self.projects}
+        self._root_triggers = root_trigger_files(self.root)
+
+    def _dependency_members(self, project):
+        """Every workspace member *project* depends on, transitively, any scope.
+
+        All four scopes participate (``runtime``, ``dev``, ``peer``,
+        ``explicit``): a change to a dev-scoped dependency breaks the
+        dependent's *tests*, which is precisely what its CI job runs.  Nothing
+        here filters by scope, and nothing should -- the boundary checks that
+        care about scope are a different question.
+        """
+        name = member_name(project)
+        try:
+            dep_names = self.graph.transitive_deps(name)
+        except KeyError:
+            return []
+        return [self._by_name[d] for d in dep_names if d in self._by_name]
+
+    def patterns_for(self, project) -> list[str]:
+        """The dorny/paths-filter patterns the router emits for one member.
+
+        A push whose diff matches none of these leaves that member's CI job
+        ``skipped`` on the pushed commit -- and the publish gate refuses to
+        treat a skipped check as passing.  The release engine therefore has to
+        guarantee that the commit it tags rode in on a push whose diff matches
+        every participating member's patterns, which is why this is a shared,
+        published derivation rather than a local detail of the generator.
+
+        The list is deterministic: own territory, then dependency territories,
+        then root triggers, then tool machinery, then excludes -- each group
+        sorted.  The freshness check compares text, so a stable order is part
+        of the contract.
+        """
+        includes: list[str] = []
+        excludes: list[str] = []
+        dep_members = self._dependency_members(project)
+        dep_names = {member_name(m) for m in dep_members}
+
+        if is_root_member(project):
+            # The root member owns the residual, so its filter starts from
+            # everything and subtracts the territories that belong to someone
+            # else. A member the root DEPENDS on is not subtracted: a change
+            # there is a change to the root member's own build.
+            includes.append(MATCH_EVERYTHING)
+            for other in self.projects:
+                if member_name(other) == member_name(project):
+                    continue
+                path = member_path(other)
+                if not path or member_name(other) in dep_names:
+                    continue
+                excludes.append(f"!{path}/**")
+            excludes = sorted(set(excludes))
+        else:
+            includes.append(territory_pattern(project))
+            # A dependency on the ROOT member contributes plain ``**``, not
+            # the root's own narrowed filter: excludes are final and
+            # order-independent, so importing the root's ``!pkg/**`` entries
+            # would cancel this member's own territory. Over-triggering is
+            # safe; under-triggering deadlocks a release on a skipped job.
+            includes.extend(sorted({territory_pattern(m) for m in dep_members}))
+            includes.extend(self._root_triggers)
+
+        machinery = {ROUTER_WORKFLOW_PATH}
+        artifact = _finalize_artifact(project, self.releasables)
+        if artifact:
+            machinery.add(artifact)
+        if is_root_member(project):
+            # ``**`` already covers them, and none sits under another member's
+            # territory, so no exclude can take them away.
+            machinery = set()
+        includes.extend(sorted(machinery))
+
+        seen: set[str] = set()
+        ordered = []
+        for pattern in [*includes, *excludes]:
+            if pattern not in seen:
+                seen.add(pattern)
+                ordered.append(pattern)
+        return ordered
+
+    def filters_block(self, projects=None) -> str:
+        """The ``filters:`` value the router's paths-filter step carries.
+
+        *projects* selects and orders the members that appear; it defaults to
+        every member of the workspace.  The generator passes the members that
+        actually contribute CI jobs.
+        """
+        members = self.projects if projects is None else projects
+        lines: list[str] = []
+        for member in members:
+            patterns = self.patterns_for(member)
+            name = member_name(member)
+            if len(patterns) == 1:
+                lines.append(f"{name}: '{patterns[0]}'")
+            else:
+                lines.append(f"{name}:")
+                lines.extend(f"  - '{pattern}'" for pattern in patterns)
+        return "\n".join(lines) + "\n" if lines else ""
+
+
+# ---------------------------------------------------------------------------
+# Reading what the generator emitted
+# ---------------------------------------------------------------------------
+
+
+def _glob_to_regex(pattern: str) -> re.Pattern:
+    """Translate one non-globstar-suffixed glob the way picomatch would.
+
+    ``*`` stops at a path separator, ``**`` crosses them, ``?`` matches one
+    non-separator character.  Everything else is literal.  The router emits
+    exact paths and directory globstars, so this branch mostly handles exact
+    paths; it is written generally so a corpus case with an interior globstar
+    gets a real answer rather than an accident of :mod:`fnmatch`, whose ``*``
+    happily crosses ``/``.
+    """
+    out = []
+    i = 0
+    while i < len(pattern):
+        char = pattern[i]
+        if char == "*":
+            if pattern.startswith("**/", i):
+                out.append("(?:.*/)?")
+                i += 3
+                continue
+            if pattern.startswith("**", i):
+                out.append(".*")
+                i += 2
+                continue
+            out.append("[^/]*")
+            i += 1
+            continue
+        if char == "?":
+            out.append("[^/]")
+            i += 1
+            continue
+        out.append(re.escape(char))
+        i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+
+def matches_pattern(path: str, pattern: str) -> bool:
+    """Does one repo-relative *path* match one (non-negated) *pattern*?
+
+    ``!`` is not handled here: negation is a property of the pattern *list*
+    (see :func:`matches_filter`), and a single pattern read in isolation
+    cannot say whether a file is in or out.
+    """
+    if pattern == MATCH_EVERYTHING:
+        return True
+    if pattern.endswith("/**"):
+        prefix = pattern[: -len("/**")].rstrip("/")
+        # picomatch's ``a/**`` matches the directory entry ``a`` as well as
+        # everything under it.
+        return path == prefix or path.startswith(prefix + "/")
+    return bool(_glob_to_regex(pattern).match(path))
+
+
+def matches_filter(path: str, patterns) -> bool:
+    """Does *path* match a whole filter, negation and all?
+
+    The ``some-with-excludes`` rule the router declares
+    (:data:`PREDICATE_QUANTIFIER`): at least one non-negated pattern matches
+    and no negated pattern does.  Exclusion is final -- a file an exclude
+    removes cannot be brought back by another include -- so the result does
+    not depend on the order the patterns appear in.
+
+    A filter of negated patterns only never matches anything: there is no
+    pattern that could include a file in the first place.
+    """
+    included = False
+    for pattern in patterns:
+        if pattern.startswith("!"):
+            if matches_pattern(path, pattern[1:]):
+                return False
+        elif not included and matches_pattern(path, pattern):
+            included = True
+    return included
+
+
+def any_path_matches(paths, patterns) -> bool:
+    """Would a diff touching *paths* trigger a job filtered by *patterns*?
+
+    The whole-filter question asked per path.  Never ``any(matches_pattern(p,
+    pat) for p in paths for pat in patterns)``: that cross product treats an
+    exclude as an independent way to match and reports a trigger for exactly
+    the diffs the action drops.
+    """
+    return any(matches_filter(path, patterns) for path in paths)
