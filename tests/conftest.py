@@ -106,6 +106,7 @@ def _guard_repo_root_litter():
 from githarness import git as _git
 from rlsbl.context import ProjectContext
 from rlsbl.workspace import (
+    DEFAULT_TAG_FORMAT,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
     Releasable,
@@ -494,14 +495,69 @@ def safegit_bin(tmp_path_factory):
     return binary
 
 
-def make_workspace(root, projects):
-    """Create a .rlsbl-monorepo/workspace.toml with the given project list."""
+def _normalize_member_path(path):
+    """Normalize a workspace member path, mapping the root spellings to ".".
+
+    A workspace may declare the repository root itself as a member
+    (``path = "."``). ``""``, ``"."`` and ``"./"`` all mean that member, so
+    they are folded to the single spelling rlsbl's loaders expect.
+    """
+    stripped = str(path).strip()
+    if stripped in ("", ".", "./"):
+        return "."
+    return stripped.rstrip("/")
+
+
+def make_workspace(root, projects, releasables=None):
+    """Create a .rlsbl-monorepo/workspace.toml with the given project list.
+
+    Args:
+        root: repository root (Path).
+        projects: list of project dicts. Recognized keys: ``path``, ``name``,
+            ``watch``, ``library``, ``dev_node``, ``dev_only``, ``releasable``.
+            A project may declare the repository root itself as a member with
+            ``path = "."`` (``""`` and ``"./"`` are accepted spellings of it);
+            at most one root member is allowed.
+        releasables: when given, an explicit-mode ``[[releasables]]`` section is
+            emitted ahead of the projects. Each item may be a ``Releasable``, a
+            dict (``{"name": ..., "tag_format": ...}``) or a bare name string.
+            ``tag_format`` is written only when it differs from the default, so
+            the file matches what ``save_workspace`` produces.
+
+    In explicit mode every non-``dev_only`` project must carry a ``releasable``
+    key (a name, or ``False`` to stand outside every releasable) -- that is
+    rlsbl's rule, not this helper's, and ``load_releasables`` enforces it.
+    """
     ws_dir = root / WORKSPACE_DIR
-    ws_dir.mkdir(exist_ok=True)
+    ws_dir.mkdir(parents=True, exist_ok=True)
     lines = []
+
+    for rel in releasables or []:
+        if isinstance(rel, str):
+            rel_name, tag_format = rel, DEFAULT_TAG_FORMAT
+        elif isinstance(rel, dict):
+            rel_name = rel["name"]
+            tag_format = rel.get("tag_format", DEFAULT_TAG_FORMAT)
+        else:
+            rel_name, tag_format = rel.name, rel.tag_format
+        lines.append("[[releasables]]")
+        lines.append(f'name = "{rel_name}"')
+        if tag_format != DEFAULT_TAG_FORMAT:
+            lines.append(f'tag_format = "{tag_format}"')
+        lines.append("")
+
+    root_members = [
+        p for p in projects if _normalize_member_path(p["path"]) == "."
+    ]
+    if len(root_members) > 1:
+        raise ValueError(
+            "at most one workspace member may be the repository root "
+            f"(path \".\"); got {[p['name'] for p in root_members]}"
+        )
+
     for proj in projects:
         lines.append("[[projects]]")
-        lines.append(f'path = "{proj["path"]}"')
+        lines.append(f'path = "{_normalize_member_path(proj["path"])}"')
         lines.append(f'name = "{proj["name"]}"')
         if "watch" in proj:
             watch_items = ", ".join(f'"{w}"' for w in proj["watch"])
