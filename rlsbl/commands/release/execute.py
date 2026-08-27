@@ -1608,6 +1608,64 @@ def archive_blog_body(releases_dir, version):
     return None
 
 
+_ANCHOR_READ_TIMEOUT = 30
+
+
+def release_anchor_tree_hashes(verified_sha, *, run, git_root,
+                               member_package_paths=None,
+                               monorepo_project_path=None):
+    """The tree object of every path this release ships, keyed by that path.
+
+    The anchor's content half. Which paths a release ships depends on what is
+    being released:
+
+    * a **standalone repository** ships everything, so the single key is
+      ``"."`` and its value is the root tree of the verified commit;
+    * a **workspace releasable** ships its member directories, so there is one
+      entry per member path. No single git object covers a SET of subtrees, so
+      a per-member table is the honest record -- a synthesized hash over the
+      members would be an rlsbl invention that no git command can reproduce;
+    * an **implicit-mode monorepo package** ships one directory, so it gets the
+      single entry for that path (the degenerate one-member case).
+
+    A member path of ``"."`` (a workspace whose root is itself a member)
+    resolves to the root tree, exactly like the standalone case.
+
+    ``run`` is the release flow's own git runner, so the read happens on the
+    same seam as every other git call the release makes. A rev-parse that
+    cannot answer is a hard error naming what was asked: an archive that
+    claims content it could not resolve would be worse than no archive.
+    """
+    if member_package_paths:
+        paths = list(dict.fromkeys(member_package_paths))
+    elif monorepo_project_path and monorepo_project_path not in (".", ""):
+        paths = [monorepo_project_path]
+    else:
+        paths = ["."]
+
+    # Late-bound through the package namespace, like every other name here, so
+    # a test patching rlsbl.commands.release.subprocess sees the same module.
+    from . import subprocess
+
+    trees = {}
+    for path in paths:
+        rev = (
+            f"{verified_sha}^{{tree}}" if path in (".", "")
+            else f"{verified_sha}:{path}"
+        )
+        try:
+            trees[path] = run(
+                "git", ["rev-parse", rev],
+                timeout=_ANCHOR_READ_TIMEOUT, cwd=git_root,
+            ).strip()
+        except subprocess.CalledProcessError as exc:
+            raise RlsblError(
+                f"could not resolve the git tree for {rev!r}, so the release "
+                f"anchor for this version cannot be written: {exc}"
+            )
+    return trees
+
+
 def collect_companion_tags(member_package_paths, workspace_root, version,
                            primary_tag, releasable_config_dir=None):
     """Collect companion tags from all publishing member packages.
@@ -2718,6 +2776,20 @@ def _run_release_mutating(state: ReleaseState):
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
             ]
+            # The anchor: the commit CI verified, and the tree of every path
+            # this release ships as of that commit. Written INTO the archive,
+            # which is the authoritative record of what the version shipped
+            # from; the rlsbl-ci-sha marker put on the GitHub Release further
+            # down is this record's projection for CI to parse, not a second
+            # source. Resolved here, from the same verified_sha the tag is
+            # about to be created on, so archive and tag cannot disagree.
+            _anchor_trees = release_anchor_tree_hashes(
+                verified_sha,
+                run=run,
+                git_root=_git_root,
+                member_package_paths=member_package_paths,
+                monorepo_project_path=monorepo_project_path,
+            )
             if _synthesize_archive:
                 from ...release_file import write_archived_release_file
                 write_archived_release_file(
@@ -2729,9 +2801,19 @@ def _run_release_mutating(state: ReleaseState):
                     context=(context or "").strip(),
                     preid=state.preid,
                     blog=state.blog,
+                    candidate_sha=verified_sha,
+                    tree_hashes=_anchor_trees,
                 )
             else:
+                from ...release_file import write_release_anchor
                 effects.rename(release_file_path, versioned_release)
+                # Anchor BEFORE the lock: the archive is never observable as a
+                # writable anchored file, nor as a locked unanchored one.
+                write_release_anchor(
+                    versioned_release,
+                    candidate_sha=verified_sha,
+                    tree_hashes=_anchor_trees,
+                )
                 effects.chmod(versioned_release, 0o444)
                 release_finalize_files.append(
                     _rel_to_git_root(release_file_path, _git_root)

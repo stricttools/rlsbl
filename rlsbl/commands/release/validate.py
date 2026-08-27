@@ -96,6 +96,43 @@ def validate_release_targets(release_config, project_root, *,
     return registry
 
 
+def validate_no_authored_anchors(release_config):
+    """Refuse a release whose editable release file already carries an anchor.
+
+    ``candidate_sha`` and ``tree_hashes`` record which commit and tree a version
+    shipped from. The release flow writes them into the ARCHIVED
+    ``v{X.Y.Z}.toml`` at the archive step, from the commit its own CI verified,
+    and the archive is read-only from that instant. There is no path by which a
+    pre-release file can know either value: the candidate does not exist yet.
+
+    So an anchor in ``unreleased.toml`` is either a hand-authored claim about a
+    commit that has not happened, or an archive that was copied back without
+    being un-finalized properly. Both would make the archive assert something
+    the release never verified, which is the one thing the anchor exists to
+    prevent -- hence a hard error rather than an overwrite. (``release undo``
+    strips the fields when it restores an archive, so its output passes here.)
+
+    Raises ReleaseValidationError naming every anchor field present.
+    """
+    from ...release_file import ANCHOR_FIELDS
+
+    present = [
+        name for name in ANCHOR_FIELDS
+        if getattr(release_config, name, None) is not None
+    ]
+    if not present:
+        return
+    raise ReleaseValidationError(
+        f"the release file carries release-anchor field(s) "
+        f"{', '.join(present)}, which only the release flow may write. The "
+        f"anchor records the commit CI verified and the tree each released "
+        f"path shipped -- neither exists before the release runs -- and it is "
+        f"written into the archived v{{version}}.toml, never into "
+        f"unreleased.toml. Remove {'them' if len(present) > 1 else 'it'} from "
+        f"the release file and re-run."
+    )
+
+
 def validate_ota_mode(release_config, project_root, config):
     """Validate Flutter OTA mode: check for native changes since last build release.
 

@@ -60,6 +60,8 @@ For pre-stable projects (0.x.x), breaking changes are a minor bump. Never bump t
 - **description** (mandatory): A short summary of the release. Appears as a paragraph under the version heading in CHANGELOG.md and as the GitHub Release title suffix.
 - **context** (optional): Multiline explanation of design decisions, rename rationale, or migration notes. Renders as a collapsible `<details>` block in CHANGELOG.md.
 
+Both survive the release: at step 18 the file is archived as `.rlsbl/releases/v{version}.toml` (read-only), and every later changelog regeneration reads the description and context back out of that archive. The archive also gains the two anchor fields the flow writes there — see [the release anchor](#the-release-anchor). Those two are the flow's alone; writing either into `unreleased.toml` by hand aborts the release.
+
 ### Per-target configuration sections
 
 Some targets require additional configuration in the release file via `[targets.<name>]` sections, providing target-specific metadata that cannot be inferred from the project's manifest. Currently, this applies only to the Flutter target, which needs a deployment mode declaration to distinguish OTA updates from full app store builds.
@@ -186,7 +188,7 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 15 | **Push the version-bump commit to the release branch UNTAGGED** — this is the release candidate | Yes |
 | 16 | **CI gate**: wait in-process for the repository's own push-triggered CI to conclude on that exact commit | Yes (nothing is tagged, finalized or published while it is not green) |
 | 17 | Finalize JSONL: rename `unreleased.jsonl` to `x.y.z.jsonl` (chmod 444), create fresh `unreleased.jsonl`, regenerate CHANGELOG.md, generate `x.y.z.md`, commit | Yes (state preserved, resumable) |
-| 18 | Archive the release file to `v{version}.toml` and regenerate `x.y.z.md` from the archived metadata | Yes (state preserved, resumable) |
+| 18 | Archive the release file to `v{version}.toml`, **anchored to the CI-verified commit and the released trees**, and regenerate `x.y.z.md` from the archived metadata | Yes (state preserved, resumable) |
 | 19 | Tag the **CI-verified commit** (plus Go companion tags in releasable mode) | Yes (state preserved, resumable) |
 | 20 | Push the finalization commits and the tags | Yes (state preserved, resumable) |
 | 21 | Create GitHub Release with the version's changelog section as notes | Yes (state preserved, resumable) |
@@ -198,6 +200,27 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 27 | Print `Watch CI: rlsbl watch <sha>` | -- |
 
 The tag at step 19 is placed on the commit CI verified at step 16, **not** on HEAD: the finalization commits from steps 17-18 land on top of it and are pushed alongside it at step 20. This is what makes "the tag points at a CI-green tree" true rather than approximately true.
+
+### The release anchor
+
+Step 18 does more than preserve the release prose. Before the archive is locked read-only, the flow writes two fields into it that record *what the version actually shipped from*:
+
+| Field | What it records |
+| --- | --- |
+| `candidate_sha` | The commit CI concluded green on at step 16 — the same commit step 19 tags. Never HEAD, which by then carries the finalization commits. |
+| `tree_hashes` | The git tree object of every released path as of `candidate_sha`, keyed by repo-relative path. |
+
+**The archive is the authoritative record.** The `<!-- rlsbl-ci-sha: ... -->` marker written into the GitHub Release body at step 21 — the marker the scaffolded publish workflow's check parses to decide which commit's CI it must confirm — is a **projection** of `candidate_sha` for a consumer that cannot read the repository. It restates the anchor; it never outranks it. When the two disagree, the archive is right and the Release body is stale.
+
+`tree_hashes` is a table rather than a single hash because what a release ships depends on the shape of the repository:
+
+- a **standalone repository** ships everything, so the table has the single `"."` entry carrying the root tree of `candidate_sha`;
+- a **workspace releasable** ships its member directories, so there is one entry per member path. No single git object covers a *set* of subtrees, so one tree hash per member is the honest record — a synthesized hash over the members would be an rlsbl invention that no git command could reproduce or check;
+- an **implicit-mode monorepo package** ships one directory and gets the single entry for that path.
+
+Both fields are written by the flow and by nothing else. The editable `unreleased.toml` never carries them: neither value exists before the release runs, so one found there is either a claim about a commit that has not happened or an archive copied back without being un-finalized — and it aborts the release at validation, before any mutation. `rlsbl release undo` strips both fields when it restores an archive as the editable release file, so the freed version can be released again.
+
+Archives written before anchoring existed carry neither field; readers treat absence as absence and never substitute a value.
 
 ### The CI gate
 

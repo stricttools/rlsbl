@@ -888,6 +888,11 @@ class TestReleaseEnvFile:
         release_config.description = "test"
         release_config.context = ""
         release_config.blog = False
+        # A pre-release file carries no anchor -- the release flow writes those
+        # into the archive. A MagicMock answers every attribute, so the two
+        # anchor fields are pinned to their absent value explicitly.
+        release_config.candidate_sha = None
+        release_config.tree_hashes = None
 
         # Patch load_env_file to actually set the env var
         monkeypatch.setenv("CF_ACCOUNT_ID", "test123")

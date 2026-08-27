@@ -1,8 +1,25 @@
-# strictspec schema for the rlsbl release file (.rlsbl/releases/unreleased.toml).
+# strictspec schema for the rlsbl release file (.rlsbl/releases/unreleased.toml
+# while it is editable, .rlsbl/releases/v{X.Y.Z}.toml once archived).
 # Source of truth: rlsbl/release_file.py (ReleaseConfig, _validate_release_config).
 # This validates the raw DOCUMENT SHAPE at read time; rlsbl keeps a small set of
 # consumer-native refinements (whitespace-only description, the flutter
 # required-mode gate) as native checks -- see rlsbl/release_file.py.
+#
+# AUTHORITY. The archived release file is the authoritative record of WHICH
+# COMMIT AND TREE a version shipped from: the `candidate_sha` and `tree_hashes`
+# anchor fields are written by the release flow at the archive step, from the
+# commit its own CI verified, and the archive is read-only from that instant.
+# The `<!-- rlsbl-ci-sha: ... -->` marker in the GitHub Release body is a
+# PROJECTION of `candidate_sha` for CI's publish check to parse -- it restates
+# the anchor for a consumer that cannot read the repository, and it never
+# outranks it. When the two disagree, the archive is right and the Release body
+# is stale.
+#
+# The anchor fields are optional in the SHAPE because they only exist once the
+# flow has authored them: the editable pre-release file never carries them (a
+# hand-authored anchor is refused natively at release validation, see
+# rlsbl/commands/release/validate.py), and archives written before anchoring
+# existed carry neither.
 
 name = "rlsbl-release-file"
 meta_version = 1
@@ -65,6 +82,19 @@ type = "boolean"
 required = false
 description = "Whether to generate a blog post for this release."
 
+[types.ReleaseConfig.fields.candidate_sha]
+type = "GitObjectHash"
+required = false
+description = "AUTHORITATIVE: the commit this version shipped from -- the release candidate whose CI concluded green, which is also the commit the version tag points at. Written by the release flow into the archived v{X.Y.Z}.toml before the archive is locked read-only; never authored by hand, and absent from the editable unreleased.toml (release validation refuses one that carries it). The rlsbl-ci-sha marker in the GitHub Release body is this field's projection for CI to parse, not a second source."
+
+[types.ReleaseConfig.fields.tree_hashes]
+type = "map"
+required = false
+key_pattern = "^(\\.|[A-Za-z0-9._][A-Za-z0-9._/-]*)$"
+description = "AUTHORITATIVE: the released content, one git tree object per released path, keyed by the repo-relative path (\".\" for a whole standalone repository). A standalone release has the single \".\" entry carrying the root tree of candidate_sha; a workspace releasable has one entry per member directory, because no single git object covers a set of member subtrees -- a per-member table is therefore the honest representation rather than a synthesized hash. Written by the release flow alongside candidate_sha and read-only from the same instant."
+[types.ReleaseConfig.fields.tree_hashes.value]
+type = "GitObjectHash"
+
 # NOTE: the preid couplings (preid == "stable" requires bump == "prerelease";
 # bump == "infra" forbids preid) are consumer-native, not schema constraints:
 # rlsbl treats preid = "" / whitespace as UNSET, so a present-but-empty preid
@@ -85,6 +115,13 @@ left = "include"
 right = "exclude"
 normalization = "none"
 description = "No element appears in both include and exclude."
+
+# GitObjectHash -- a git object name, commit or tree. Same shape as the lineage
+# schema's GitSha, and for the same reason.
+[types.GitObjectHash]
+type = "string"
+regex = "^[0-9a-f]{7,40}$"
+description = "A git object hash, commit or tree, abbreviated (>= 7) or full (40). The release flow records whatever `git rev-parse` answered, which is the full form; the shorter bound exists so a record made from an abbreviation is readable rather than rejected. Resolution against the object database is rlsbl-native, not a shape check."
 
 # TargetConfig -- per-target overrides (only mode is recognized today).
 [types.TargetConfig]

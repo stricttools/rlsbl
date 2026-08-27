@@ -6,6 +6,7 @@ This module reads and validates that file's internal consistency.
 """
 
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 
@@ -21,6 +22,22 @@ VALID_PREIDS = ("alpha", "beta", "rc", "stable")
 
 VALID_TARGET_MODES = ("ota", "build")
 
+# The anchor: the fields the release flow itself writes into the ARCHIVED
+# release file (v{X.Y.Z}.toml) at the archive step, recording which commit and
+# which tree the version shipped from. Authored by the flow and by nothing
+# else -- the editable unreleased.toml carrying one is refused at release
+# validation, and `release undo` strips them when it restores an archive as the
+# editable file. This tuple is the one place the field names are stated; the
+# refusal, the strip and the writer all read it.
+ANCHOR_FIELDS = ("candidate_sha", "tree_hashes")
+
+# A git object name (commit or tree). The same shape the schema's
+# GitObjectHash refinement states -- and the same the lineage schema's GitSha
+# states -- restated here because the writer refuses a malformed anchor BEFORE
+# it reaches the file, rather than producing an archive the reader will later
+# reject.
+_GIT_OBJECT_HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
+
 
 # Project identification: "slug" is the machine identifier (URL-safe, lowercase,
 # hyphens) used in config keys and paths; "name" is the human-readable display
@@ -35,6 +52,12 @@ class ReleaseConfig:
     context: str = ""  # optional context explaining why these changes were made
     preid: str = ""  # pre-release identifier: "alpha", "beta", "rc", or "stable"
     blog: bool = False
+    # --- the anchor (archived files only; None means the field is ABSENT) ---
+    # Absence is None rather than "" / {}: a release file that carries no
+    # anchor and one that carries an empty anchor are different documents, and
+    # only the second is a hand-authored anchor the flow must refuse.
+    candidate_sha: str | None = None  # the commit CI verified for this version
+    tree_hashes: dict[str, str] | None = None  # released path -> git tree object
 
 
 def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
@@ -364,6 +387,16 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
 
     blog = data.get("blog", False)
 
+    # The anchor: bound only when the document actually carries it. `in` rather
+    # than `.get(..., default)` so an absent field arrives as None and an empty
+    # one (candidate_sha = "", [tree_hashes] with no entries) arrives as itself
+    # -- the refusal at release validation must be able to tell them apart.
+    candidate_sha = data["candidate_sha"] if "candidate_sha" in data else None
+    if "tree_hashes" in data:
+        tree_hashes = {str(k): str(v) for k, v in data["tree_hashes"].items()}
+    else:
+        tree_hashes = None
+
     return ReleaseConfig(
         bump=bump,
         include=include,
@@ -373,6 +406,8 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
         context=context.strip(),
         preid=preid,
         blog=blog,
+        candidate_sha=candidate_sha,
+        tree_hashes=tree_hashes,
     )
 
 
@@ -407,6 +442,8 @@ def write_archived_release_file(
     context: str = "",
     preid: str = "",
     blog: bool = False,
+    candidate_sha: str,
+    tree_hashes: dict,
 ) -> str:
     """Write ``v{version}.toml`` for a release that had no ``unreleased.toml``.
 
@@ -425,8 +462,15 @@ def write_archived_release_file(
     accepts it, which matters because ``rlsbl release undo`` restores it as
     ``unreleased.toml``), and read-only like every other archived release file.
 
+    ``candidate_sha`` and ``tree_hashes`` are the anchor, and they are mandatory
+    here for the same reason they are mandatory on the renamed archive: an
+    archive that does not say which commit and tree the version shipped from is
+    not a record of the release. They are written with the file, so the archive
+    is anchored from the instant it exists.
+
     Returns the path written.
     """
+    _check_anchor(candidate_sha, tree_hashes)
     doc = tomlkit.document()
     doc.add(tomlkit.comment(
         "Archived by rlsbl at release time. This release had no unreleased.toml"
@@ -450,6 +494,8 @@ def write_archived_release_file(
         doc.add("preid", preid)
     if blog:
         doc.add("blog", True)
+    doc.add("candidate_sha", candidate_sha)
+    doc.add("tree_hashes", _anchor_tree_table(tree_hashes))
 
     effects.makedirs(releases_dir, exist_ok=True)
     path = os.path.join(releases_dir, f"v{version}.toml")
@@ -457,6 +503,87 @@ def write_archived_release_file(
     # instant it exists, exactly like the renamed-and-chmodded standalone one.
     effects.atomic_write_text(path, tomlkit.dumps(doc), file_mode=0o444)
     return path
+
+
+def _check_anchor(candidate_sha: str, tree_hashes: dict) -> None:
+    """Refuse a malformed anchor before it reaches a file.
+
+    The schema rejects one on the way back IN; this rejects it on the way OUT,
+    so a release never produces a read-only archive its own reader refuses.
+    """
+    if not isinstance(candidate_sha, str) or not _GIT_OBJECT_HASH_RE.match(candidate_sha):
+        raise ReleaseFileError(
+            f"release anchor candidate_sha must be a git commit hash "
+            f"(7 to 40 hex characters), got {candidate_sha!r}"
+        )
+    if not isinstance(tree_hashes, dict) or not tree_hashes:
+        raise ReleaseFileError(
+            "release anchor tree_hashes must name at least one released path "
+            "(\".\" for a standalone repository, one entry per member "
+            f"directory for a releasable), got {tree_hashes!r}"
+        )
+    for path, tree in tree_hashes.items():
+        if not isinstance(tree, str) or not _GIT_OBJECT_HASH_RE.match(tree):
+            raise ReleaseFileError(
+                f"release anchor tree_hashes[{path!r}] must be a git tree hash "
+                f"(7 to 40 hex characters), got {tree!r}"
+            )
+
+
+def _anchor_tree_table(tree_hashes: dict):
+    """Render the tree-hash map as a TOML table with quoted path keys."""
+    table = tomlkit.table()
+    for path in sorted(tree_hashes):
+        table.add(tomlkit.key(path), tree_hashes[path])
+    return table
+
+
+def write_release_anchor(path: str, *, candidate_sha: str, tree_hashes: dict) -> None:
+    """Author the release anchor into an already-written release file.
+
+    Used on the finalization path, where the archive is the operator's own
+    ``unreleased.toml`` renamed to ``v{version}.toml``: the anchor is added
+    after the rename and BEFORE the file is chmodded read-only, so the archive
+    is never observable as a writable anchored file, and never as a locked
+    unanchored one.
+
+    The document is otherwise preserved as written -- tomlkit round-trips the
+    operator's comments, ordering and formatting -- so the archive still reads
+    as the file the operator authored, plus the two fields the flow owns.
+    """
+    _check_anchor(candidate_sha, tree_hashes)
+    with open(path, "r", encoding="utf-8") as f:
+        doc = tomlkit.loads(f.read())
+    for f_name in ANCHOR_FIELDS:
+        if f_name in doc:
+            del doc[f_name]
+    # No explanatory comment block: tomlkit appends comments after the last
+    # element, which in a file carrying a [targets.<name>] section reads as a
+    # comment ON that section. The anchor's meaning is stated where it belongs
+    # -- the schema field descriptions and docs/release-workflow.md.
+    doc.add("candidate_sha", candidate_sha)
+    doc.add("tree_hashes", _anchor_tree_table(tree_hashes))
+    effects.atomic_write_text(path, tomlkit.dumps(doc))
+
+
+def strip_release_anchor(path: str) -> bool:
+    """Remove the anchor fields from a release file. True if anything changed.
+
+    The inverse of :func:`write_release_anchor`, for ``release undo``: the
+    archive it restores as ``unreleased.toml`` must come back as an EDITABLE
+    release file, and an editable file carrying an anchor is refused at the
+    next release validation (the anchor is the flow's to author, never the
+    operator's).
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        doc = tomlkit.loads(f.read())
+    present = [name for name in ANCHOR_FIELDS if name in doc]
+    if not present:
+        return False
+    for name in present:
+        del doc[name]
+    effects.atomic_write_text(path, tomlkit.dumps(doc))
+    return True
 
 
 def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
@@ -469,7 +596,11 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
     2. If unreleased.toml exists with content that differs from the versioned
        file, warns on stderr and skips -- nothing is deleted.
     3. Otherwise removes any stale unreleased.toml, makes the versioned file
-       writable, and renames it back to unreleased.toml.
+       writable, renames it back to unreleased.toml, and STRIPS the anchor the
+       release wrote into it. The restored file is an editable pre-release file
+       again, and one carrying an anchor is refused at the next release
+       validation -- so leaving the anchor on would block the re-release of the
+       very version the undo just freed.
 
     Returns the list of changed file paths (for committing).
     """
@@ -497,6 +628,7 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
 
     effects.chmod(versioned, 0o644)
     effects.rename(versioned, unreleased)
+    strip_release_anchor(unreleased)
     changed = [unreleased, versioned]
 
     # Also reverse blog body file archival if present
