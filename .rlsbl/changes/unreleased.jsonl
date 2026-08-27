@@ -141,3 +141,4 @@
 {"format_version":1,"id":"18cfcc0623ea95f5240e65d3e565474c9a32c10ebd320b7d","commits":["5173eb1638d2a8069b0286b330502880afd04ce5"],"user_facing":false}
 {"format_version":1,"id":"18cfcc0f8a7c3a0a987aa823562349248c43457f71838677","commits":["bb8aab85e47798b4b0753822af7fe2492304bb64"],"user_facing":false}
 {"format_version":1,"id":"18cfcc3ee626552e4e97037af8184298977e931da80a6d50","commits":["c50083a6bd737984f9ba443c73723edde3eaac6c"],"user_facing":true,"description":"`rlsbl release run` now refuses an editable `unreleased.toml` carrying an `unanchorable` marker, alongside the existing refusal of hand-authored `candidate_sha`/`tree_hashes`.","type":"fix"}
+{"format_version":1,"id":"18cfcc84aa39afecf4b905a0b4dd4cf18cd7138941ccc48a","commits":["4f5f1b26461f8bd627bb9caf9db5c5413815a813"],"user_facing":false}
