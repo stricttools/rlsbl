@@ -153,7 +153,8 @@ def test_get_changelog_context_uses_target_specific_tag_glob(tmp_path, monkeypat
     from unittest.mock import patch
     captured = {}
 
-    def capture_check_in_range(entries, tag_glob=None, scope=None):
+    def capture_check_in_range(entries, releases_dir, tag_glob=None, scope=None):
+        captured["releases_dir"] = releases_dir
         captured["tag_glob"] = tag_glob
         captured["scope"] = scope
         return True, []

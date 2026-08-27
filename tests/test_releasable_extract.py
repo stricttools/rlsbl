@@ -749,12 +749,28 @@ class TestAbsorbHistoryRewrite:
         changes_dir = root / "packages" / "widget" / ".rlsbl" / "changes"
         entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
 
+        # The unreleased range is bounded by the package's LEDGER. `absorb`
+        # imports the source's version tags but does not (yet) write release
+        # archives for them, so the last released commit is recorded here from
+        # the tag absorb imported -- which is the same commit an archive would
+        # have named.
+        from conftest import archive_release
+
+        released_tag = target.monorepo_tag_format(
+            "widget", "0.2.0", path="packages/widget",
+        )
+        released_sha = _run_git(str(root), "rev-parse", released_tag + "^{commit}")
+        archive_release(
+            os.path.join(str(changes_dir.parent), "releases"), "0.2.0", released_sha,
+        )
+
         monkeypatch.chdir(str(root))
         # Coverage is asked of one member, and attribution needs the whole
         # member list to answer at all -- hence the scope object rather than a
         # bare project dict.
         ok, details = check_coverage(
             entries,
+            os.path.join(str(changes_dir.parent), "releases"),
             tag_glob=tag_glob,
             scope=OwnershipScope.for_member(members, proj),
         )
@@ -1231,14 +1247,30 @@ class TestExtractRoundTrip:
         for h in all_hashes:
             _run_git(str(out), "cat-file", "-e", h + "^{commit}")
 
-        # 5. Changelog coverage passes in the extracted repo.
+        # 5. Changelog coverage passes in the extracted repo. The range is
+        #    bounded by the LEDGER; this source repo predates release archives
+        #    entirely (absorb imported only its tags), so the released commit
+        #    is recorded here from the restored v0.2.0 tag -- the same commit
+        #    an archive would have named.
+        from conftest import archive_release
         from rlsbl.changelog.validate import check_coverage
 
+        archive_release(
+            os.path.join(str(changes_dir.parent), "releases"), "0.2.0",
+            _run_git(str(out), "rev-list", "-n", "1", "v0.2.0"),
+        )
+        # Committed, so the clean-tree assertion below still describes what
+        # the extraction produced rather than what this test added.
+        _run_git(str(out), "add", ".rlsbl/releases")
+        _run_git(str(out), "commit", "-q", "-m", "test: record the ledger")
         entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
         prev_cwd = os.getcwd()
         os.chdir(str(out))
         try:
-            ok, details = check_coverage(entries, tag_glob="v*")
+            ok, details = check_coverage(
+                entries, os.path.join(str(changes_dir.parent), "releases"),
+                tag_glob="v*",
+            )
         finally:
             os.chdir(prev_cwd)
         assert ok, details

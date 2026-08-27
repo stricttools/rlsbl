@@ -8,6 +8,7 @@ changelog-user-facing, changelog-batch-commits, changelog-batch-entries.
 import os
 
 from ..changelog.files import read_changelog_format_version_enforced
+from ..ledger import releases_dir_for_changes_dir
 from ._common import _resolve_version_and_tag, _get_all_changelog_contexts
 
 
@@ -180,8 +181,11 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, tag_glob, scope, entries in all_contexts:
-            passed, details = check_in_range(entries, tag_glob, scope=scope)
+        for changes_dir, tag_glob, scope, entries in all_contexts:
+            passed, details = check_in_range(
+                entries, releases_dir_for_changes_dir(changes_dir), tag_glob,
+                scope=scope,
+            )
             if not passed:
                 all_passed = False
                 all_details.extend(details)
@@ -204,12 +208,15 @@ def register_changelog_checks(app):
         all_details = []
         all_passed = True
         checked_any = False
-        for _changes_dir, tag_glob, scope, entries in all_contexts:
+        for changes_dir, tag_glob, scope, entries in all_contexts:
             if scope is not None and not _scope_is_releasable(scope):
                 continue
 
             checked_any = True
-            passed, details = check_coverage(entries, tag_glob, scope=scope)
+            passed, details = check_coverage(
+                entries, releases_dir_for_changes_dir(changes_dir), tag_glob,
+                scope=scope,
+            )
             if not passed:
                 all_passed = False
                 all_details.extend(details)
@@ -239,8 +246,11 @@ def register_changelog_checks(app):
 
         all_details = []
         all_passed = True
-        for _changes_dir, tag_glob, scope, entries in all_contexts:
-            passed, details = check_no_orphans(entries, tag_glob, scope=scope)
+        for changes_dir, tag_glob, scope, entries in all_contexts:
+            passed, details = check_no_orphans(
+                entries, releases_dir_for_changes_dir(changes_dir), tag_glob,
+                scope=scope,
+            )
             if not passed:
                 all_passed = False
                 all_details.extend(details)

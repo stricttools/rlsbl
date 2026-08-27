@@ -1,4 +1,4 @@
-"""Unreleased command that lists commits since the last tag and checks whether each one is covered by a corresponding changelog entry."""
+"""Unreleased command that lists the commits since the release the ledger anchors this checkout to, and checks whether each one is covered by a corresponding changelog entry."""
 
 import os
 import subprocess
@@ -8,21 +8,29 @@ from ..changelog import get_changes_dir, read_unreleased, resolve_hashes
 from ..changelog.validate import filter_exempt_commits
 from ..git_util import filter_commits_for_scope
 from ..targets import TARGETS, detect_targets
-from ..utils import get_last_version_tag
+from ..ledger import (
+    latest_release_fact,
+    range_anchor,
+    releases_dir_for_changes_dir,
+)
 from ..workspace import find_workspace_root, load_workspace, resolve_project
 from .. import effects
 
 
-def _get_commits_since(tag):
-    """Get commits since the given tag (or all commits if tag is None).
+def _get_commits_since(anchor_sha):
+    """Get commits since *anchor_sha* (or all commits when it is None).
+
+    *anchor_sha* is the released commit the ledger anchors this checkout to,
+    not a tag: a range expressed as a commit resolves even where the version's
+    tag was deleted or moved.
 
     Returns a list of dicts with keys: hash, subject, author, date.
     Uses NUL as field separator for safe parsing.
     """
     # Format: hash<NUL>subject<NUL>author<NUL>ISO-date
     fmt = "%H%x00%s%x00%an%x00%aI"
-    if tag:
-        range_spec = f"{tag}..HEAD"
+    if anchor_sha:
+        range_spec = f"{anchor_sha}..HEAD"
     else:
         range_spec = "HEAD"
 
@@ -128,8 +136,14 @@ def run_cmd(registry, args, flags, project_root):
 
     monorepo_project, tag_glob, changes_dir, scope = _resolve_scope(root_str)
 
-    tag = get_last_version_tag(tag_glob) if tag_glob else get_last_version_tag()
-    commits = _get_commits_since(tag)
+    ledger_dir = releases_dir_for_changes_dir(changes_dir)
+    anchor = range_anchor(ledger_dir, tag_glob=tag_glob, cwd=root_str)
+    # Two different questions, deliberately answered from two different
+    # places: the RANGE is bounded by the highest release this checkout
+    # contains, while the release the header names is the project's latest,
+    # annotated when this checkout does not contain it.
+    latest = latest_release_fact(ledger_dir, tag_glob=tag_glob, cwd=root_str)
+    commits = _get_commits_since(anchor.candidate_sha if anchor else None)
 
     # Scope to the project's (or the whole releasable's) files FIRST, then
     # apply the exemption filter -- the same order the authoritative coverage
@@ -146,7 +160,10 @@ def run_cmd(registry, args, flags, project_root):
         if not flags.get("json"):
             print("No unreleased commits.")
         return {
-            "tag": tag, "commits": [],
+            "latest_release": latest.version,
+            "latest_release_in_checkout": latest.in_checkout,
+            "range_anchor_version": anchor.version if anchor else None,
+            "commits": [],
             "coverage": {"covered": 0, "total": 0, "exempted": 0},
         }
 
@@ -156,7 +173,10 @@ def run_cmd(registry, args, flags, project_root):
         if not flags.get("json"):
             print(f"non-releasable -- no changelog ({len(commits)} unreleased commits)")
         return {
-            "tag": tag, "commits": len(commits),
+            "latest_release": latest.version,
+            "latest_release_in_checkout": latest.in_checkout,
+            "range_anchor_version": anchor.version if anchor else None,
+            "commits": len(commits),
             "non_releasable": True, "dev_only": monorepo_project.dev_only,
         }
 
@@ -191,8 +211,10 @@ def run_cmd(registry, args, flags, project_root):
     exempted = len(commits) - total
 
     if not flags.get("json"):
-        tag_display = tag or "(no tags)"
-        print(f"Unreleased commits since {tag_display} ({len(commits)} commits):\n")
+        since = anchor.version if anchor else "(no release in this history)"
+        print(f"Unreleased commits since {since} ({len(commits)} commits):\n")
+        if latest.version is not None and latest.in_checkout is False:
+            print(f"latest release: {latest.label()}\n")
         for commit in commits:
             short_hash = commit["hash"][:7]
             if commit["exempt"]:
@@ -208,7 +230,9 @@ def run_cmd(registry, args, flags, project_root):
         print(f"\nCoverage: {covered_count}/{total} commits covered{suffix}.")
 
     return {
-        "tag": tag,
+        "latest_release": latest.version,
+        "latest_release_in_checkout": latest.in_checkout,
+        "range_anchor_version": anchor.version if anchor else None,
         "commits": commits,
         "coverage": {
             "covered": covered_count, "total": total, "exempted": exempted,

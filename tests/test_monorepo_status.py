@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 
 from conftest import make_ctx, with_root_member, make_workspace
-from rlsbl.changelog.resolve import _unreleased_range
+from rlsbl.ledger import range_anchor as _range_anchor
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
@@ -491,10 +491,10 @@ class TestStatusMonorepoAware:
 
 
 class TestStatusTagScoping:
-    """Tests that status coverage uses monorepo-scoped tags via tag_glob."""
+    """Status coverage reads the project's own ledger, scoped by tag_glob."""
 
     def test_monorepo_passes_tag_glob(self, mock_git_repo, monkeypatch, capsys):
-        """In a monorepo project, _unreleased_range receives the computed tag_glob."""
+        """In a monorepo project, the ledger read receives the computed tag_glob."""
         from unittest.mock import patch
 
         _cmd_init({"root-dev-node": True}, project_root=".")
@@ -511,24 +511,23 @@ class TestStatusTagScoping:
         monkeypatch.chdir(str(mock_git_repo / "mylib"))
 
         captured_calls = []
-        original_unreleased_range = _unreleased_range
 
-        def spy_unreleased_range(tag_glob=None):
-            captured_calls.append(tag_glob)
-            return original_unreleased_range(tag_glob=tag_glob)
+        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+            captured_calls.append((releases_dir, tag_glob))
+            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status._unreleased_range",
-            side_effect=spy_unreleased_range,
+            "rlsbl.commands.status.range_anchor",
+            side_effect=spy_range_anchor,
         ):
             from rlsbl.commands.status import run_cmd
             run_cmd("npm", [], {}, ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
-        assert captured_calls[0] == "mylib@v*"
+        assert captured_calls[0][1] == "mylib@v*"
 
     def test_standalone_no_tag_glob(self, mock_git_repo, monkeypatch, capsys):
-        """In a standalone project, _unreleased_range receives no tag_glob."""
+        """In a standalone project, the ledger read receives no tag_glob."""
         from unittest.mock import patch
 
         # Create a standalone npm project (no monorepo init)
@@ -543,24 +542,23 @@ class TestStatusTagScoping:
         capsys.readouterr()
 
         captured_calls = []
-        original_unreleased_range = _unreleased_range
 
-        def spy_unreleased_range(tag_glob=None):
-            captured_calls.append(tag_glob)
-            return original_unreleased_range(tag_glob=tag_glob)
+        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+            captured_calls.append((releases_dir, tag_glob))
+            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status._unreleased_range",
-            side_effect=spy_unreleased_range,
+            "rlsbl.commands.status.range_anchor",
+            side_effect=spy_range_anchor,
         ):
             from rlsbl.commands.status import run_cmd
             run_cmd("npm", [], {}, ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
-        assert captured_calls[0] is None
+        assert captured_calls[0][1] is None
 
     def test_collect_status_forwards_tag_glob(self, mock_git_repo, capsys):
-        """_collect_status passes tag_glob through to _unreleased_range."""
+        """_collect_status passes tag_glob through to the ledger read."""
         from unittest.mock import patch
 
         with open(str(mock_git_repo / "package.json"), "w") as f:
@@ -572,21 +570,20 @@ class TestStatusTagScoping:
         (changes_dir / "unreleased.jsonl").write_text("")
 
         captured_calls = []
-        original_unreleased_range = _unreleased_range
 
-        def spy_unreleased_range(tag_glob=None):
-            captured_calls.append(tag_glob)
-            return original_unreleased_range(tag_glob=tag_glob)
+        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+            captured_calls.append((releases_dir, tag_glob))
+            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status._unreleased_range",
-            side_effect=spy_unreleased_range,
+            "rlsbl.commands.status.range_anchor",
+            side_effect=spy_range_anchor,
         ):
             from rlsbl.commands.status import _collect_status
             _collect_status("npm", ".", tag_glob="my-project@v*", ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
-        assert captured_calls[0] == "my-project@v*"
+        assert captured_calls[0][1] == "my-project@v*"
 
     def test_workspace_root_uses_the_root_members_tag_glob(
         self, mock_git_repo, monkeypatch, capsys,
@@ -611,21 +608,20 @@ class TestStatusTagScoping:
         capsys.readouterr()
 
         captured_calls = []
-        original_unreleased_range = _unreleased_range
 
-        def spy_unreleased_range(tag_glob=None):
-            captured_calls.append(tag_glob)
-            return original_unreleased_range(tag_glob=tag_glob)
+        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+            captured_calls.append((releases_dir, tag_glob))
+            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status._unreleased_range",
-            side_effect=spy_unreleased_range,
+            "rlsbl.commands.status.range_anchor",
+            side_effect=spy_range_anchor,
         ):
             from rlsbl.commands.status import run_cmd
             run_cmd("npm", [], {}, ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
-        assert captured_calls[0] == "root@v*"
+        assert captured_calls[0][1] == "root@v*"
 
 
 class TestMonorepoStatusWatch:

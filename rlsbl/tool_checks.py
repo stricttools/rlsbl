@@ -49,11 +49,9 @@ import tomllib
 from collections import namedtuple
 
 from . import effects
-from .errors import GitError
 from .utils import (
     detect_uv_workspace_root,
     get_check_timeout,
-    get_last_version_tag,
 )
 
 #: Config key holding the per-check blocks.
@@ -240,7 +238,7 @@ def compose_argv(check_name, paths, project_dir):
 
 
 #: Attribute the resolved release-context env is memoized on, so N checks in
-#: one run mean ONE `git describe`, not N.
+#: one run mean ONE ledger read, not N.
 _ENV_CACHE_ATTR = "_rlsbl_external_check_env"
 
 
@@ -251,12 +249,18 @@ def release_context_env(ctx):
 
     - ``RLSBL_PROJECT_ROOT`` -- the resolved project root. An entry with a
       ``cwd`` override otherwise has no way to find it.
-    - ``RLSBL_LAST_TAG`` -- the project's last release tag, resolved through
-      the same per-project tag glob the changelog layer uses (so it is
-      monorepo-correct). The EMPTY STRING when no tag exists, so a check can
-      tell "no baseline yet" from "not injected".
-    - ``RLSBL_UNRELEASED_RANGE`` -- ``<last_tag>..HEAD``, or ``HEAD`` on a
-      first release.
+    - ``RLSBL_LAST_TAG`` -- the tag name of the release the LEDGER anchors this
+      checkout to, translated into the project's own tag scheme (so it is
+      monorepo-correct). The EMPTY STRING when the ledger records no release
+      this checkout contains, so a check can tell "no baseline yet" from "not
+      injected".
+    - ``RLSBL_UNRELEASED_RANGE`` -- ``<candidate_sha>..HEAD``, or ``HEAD`` when
+      there is no such release.
+
+    The version is SELECTED from the ledger and only then translated into a
+    tag; the tag namespace no longer decides which release is the baseline.
+    The range is expressed as the anchor commit rather than the tag, so a check
+    receives a range that resolves even when the tag was deleted or moved.
 
     Computed once per check run and memoized on the context object.
     """
@@ -264,40 +268,30 @@ def release_context_env(ctx):
     if cached is not None:
         return cached
 
-    from .changelog.resolve import _unreleased_range
-    from .checks._common import _resolve_tag_glob
+    from .ledger import range_anchor, tag_for_version
+    from .checks._common import _resolve_ledger_dir, _resolve_tag_glob
 
     project_root = str(ctx.project_root)
     tag_glob = _resolve_tag_glob(ctx)
     # ``RLSBL_LAST_TAG=""`` is a SIGNAL, not a fallback: it states that this
-    # project has never been released, and a check reading it takes the
-    # first-release branch. So only the genuine no-tag case may produce it --
-    # and that case does not raise, it returns None.
-    #
-    # This used to be a bare ``except Exception`` that turned ANY failure into
-    # the same empty string, so a repo whose history was merely unreachable
-    # (a shallow clone) looked brand-new to every check. The one interpretable
-    # failure is that shallow clone, and rlsbl requires full history everywhere
-    # else too -- so it is named and hard-errored with the remedy. Anything
-    # else is a bug or a broken environment and propagates with its own
-    # traceback rather than being flattened into "no releases".
-    try:
-        last_tag = get_last_version_tag(tag_glob, cwd=project_root)
-    except GitError as exc:
-        raise GitError(
-            f"cannot resolve the last release tag for {project_root} "
-            f"(glob {tag_glob!r}): {exc}\n"
-            f"Checks receive RLSBL_LAST_TAG / RLSBL_UNRELEASED_RANGE, "
-            f"and an empty tag means 'never released' -- reporting that for a "
-            f"clone whose history is merely truncated would silently widen "
-            f"every check's range. Run `git fetch --unshallow` first."
-        ) from exc
-    unreleased_range = _unreleased_range(tag_glob, cwd=project_root)
+    # project has no release in this history, and a check reading it takes the
+    # first-release branch. Only the genuine no-release case may produce it --
+    # every other failure mode of the ledger read (a tag disagreeing with an
+    # anchor, an ancestry git cannot decide, an archive with no anchor) is a
+    # LedgerError that propagates. A truncated history used to be flattened
+    # into the empty string here, which made a shallow clone look brand-new to
+    # every check; the ledger refuses to answer instead.
+    anchor = range_anchor(_resolve_ledger_dir(ctx), tag_glob=tag_glob,
+                          cwd=project_root)
 
     env = dict(os.environ)
     env["RLSBL_PROJECT_ROOT"] = project_root
-    env["RLSBL_LAST_TAG"] = last_tag or ""
-    env["RLSBL_UNRELEASED_RANGE"] = unreleased_range
+    if anchor is None:
+        env["RLSBL_LAST_TAG"] = ""
+        env["RLSBL_UNRELEASED_RANGE"] = "HEAD"
+    else:
+        env["RLSBL_LAST_TAG"] = tag_for_version(tag_glob, anchor.version)
+        env["RLSBL_UNRELEASED_RANGE"] = f"{anchor.candidate_sha}..HEAD"
     try:
         setattr(ctx, _ENV_CACHE_ATTR, env)
     except AttributeError:

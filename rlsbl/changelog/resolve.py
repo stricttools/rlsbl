@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 
-from ..utils import get_last_version_tag
 from .. import effects
 
 
@@ -67,25 +66,3 @@ def _git_log_hashes(range_spec: str) -> list[str]:
         return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return []
-
-
-def _get_last_version_tag(tag_glob: str | None = None, *, cwd=None) -> str | None:
-    """Resolve the last version tag, accepting None for tag_glob.
-
-    None means the plain ``v*`` glob (standalone repos); monorepo callers pass
-    their project's glob. ``cwd`` selects the repository.
-    """
-    return get_last_version_tag(tag_glob if tag_glob else "v*", cwd=cwd)
-
-
-def _unreleased_range(tag_glob: str | None = None, *, cwd=None) -> str:
-    """Return the git log range spec for unreleased commits.
-
-    Uses <last_tag>..HEAD if a version tag exists, otherwise HEAD
-    (all commits, for first release). Passes tag_glob and cwd through to
-    _get_last_version_tag for monorepo-aware tag discovery.
-    """
-    tag = _get_last_version_tag(tag_glob, cwd=cwd)
-    if tag:
-        return f"{tag}..HEAD"
-    return "HEAD"

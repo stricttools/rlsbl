@@ -12,60 +12,81 @@ from rlsbl.commands.unreleased import (
     _get_commits_since,
     run_cmd,
 )
-from rlsbl.utils import get_last_version_tag
+from rlsbl.ledger import range_anchor
 
-from conftest import with_root_member, make_workspace, make_releasable_state
+from conftest import (
+    archive_release,
+    git_head,
+    ledger_dir,
+    make_releasable_state,
+    make_workspace,
+    with_root_member,
+)
 
 
-class TestGetLastTag:
-    """Tests for get_last_version_tag (consolidated from _get_last_tag)."""
+class TestBaselineReleaseSelection:
+    """Which release ``unreleased`` measures from.
 
-    def test_returns_tag_when_exists(self, mock_git_repo):
-        subprocess.run(
-            ["git", "tag", "v1.0.0"],
-            cwd=str(mock_git_repo), check=True,
-        )
-        assert get_last_version_tag() == "v1.0.0"
+    These pinned ``get_last_version_tag`` (a ``git describe`` walk) before the
+    release archives became the authority. The selection they describe --
+    newest release, or none -- is now made from the ledger, so it survives a
+    deleted tag and ignores a tag with no release behind it.
+    """
 
-    def test_returns_none_when_no_tags(self, mock_git_repo):
-        assert get_last_version_tag() is None
-
-    def test_returns_latest_tag(self, mock_git_repo):
+    def test_returns_the_archived_release(self, mock_git_repo):
+        sha = git_head(mock_git_repo)
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        # Make a new commit and tag it
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", sha)
+        assert range_anchor(ledger_dir(mock_git_repo)).version == "1.0.0"
+
+    def test_returns_none_when_nothing_released(self, mock_git_repo):
+        assert range_anchor(ledger_dir(mock_git_repo)) is None
+
+    def test_a_tag_with_no_archive_selects_nothing(self, mock_git_repo):
+        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
+        assert range_anchor(ledger_dir(mock_git_repo)) is None
+
+    def test_returns_the_highest_archived_release(self, mock_git_repo):
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
         (mock_git_repo / "file.txt").write_text("hello")
         subprocess.run(["git", "add", "file.txt"], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "second"],
             cwd=str(mock_git_repo), check=True,
         )
-        subprocess.run(["git", "tag", "v1.1.0"], cwd=str(mock_git_repo), check=True)
-        assert get_last_version_tag() == "v1.1.0"
+        archive_release(ledger_dir(mock_git_repo), "1.1.0", git_head(mock_git_repo))
+        assert range_anchor(ledger_dir(mock_git_repo)).version == "1.1.0"
+
+    def test_the_selection_survives_the_tag_being_deleted(self, mock_git_repo):
+        sha = git_head(mock_git_repo)
+        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", sha)
+        subprocess.run(["git", "tag", "-d", "v1.0.0"], cwd=str(mock_git_repo), check=True)
+        assert range_anchor(ledger_dir(mock_git_repo)).version == "1.0.0"
 
 
 class TestGetCommitsSince:
     """Tests for _get_commits_since."""
 
-    def test_returns_commits_since_tag(self, mock_git_repo):
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        # Add a commit after the tag. It goes through githarness so the repo's
-        # own configured identity is what lands in the author field -- the test
-        # floor exports an ambient GIT_AUTHOR_NAME that otherwise outranks it.
+    def test_returns_commits_since_the_anchor(self, mock_git_repo):
+        released = git_head(mock_git_repo)
+        # Add a commit after the release. It goes through githarness so the
+        # repo's own configured identity is what lands in the author field --
+        # the test floor exports an ambient GIT_AUTHOR_NAME that outranks it.
         commit_file(mock_git_repo, "new.txt", "new", "feat: add new feature")
-        commits = _get_commits_since("v1.0.0")
+        commits = _get_commits_since(released)
         assert len(commits) == 1
         assert commits[0]["subject"] == "feat: add new feature"
         assert len(commits[0]["hash"]) == 40
         assert commits[0]["author"] == "Test"
         assert commits[0]["date"]  # non-empty ISO date
 
-    def test_returns_empty_when_no_commits_since_tag(self, mock_git_repo):
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        commits = _get_commits_since("v1.0.0")
+    def test_returns_empty_when_no_commits_since_the_anchor(self, mock_git_repo):
+        commits = _get_commits_since(git_head(mock_git_repo))
         assert commits == []
 
-    def test_returns_all_commits_when_tag_is_none(self, mock_git_repo):
-        # When tag is None, should get HEAD (just one commit in our fixture)
+    def test_returns_all_commits_when_there_is_no_anchor(self, mock_git_repo):
+        # With no release to measure from, the range is HEAD (one commit here)
         commits = _get_commits_since(None)
         assert len(commits) == 1
         assert commits[0]["subject"] == "initial"
@@ -76,6 +97,7 @@ class TestRunCmd:
 
     def test_no_unreleased_commits(self, mock_git_repo, capsys):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
         run_cmd(None, [], {}, project_root=".")
         captured = capsys.readouterr()
         assert "No unreleased commits." in captured.out
@@ -97,8 +119,11 @@ class TestRunCmd:
 
     def test_json_output_no_commits(self, mock_git_repo, capsys):
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
         data = run_cmd(None, [], {"json": True}, project_root=".")
-        assert data["tag"] == "v1.0.0"
+        assert data["latest_release"] == "1.0.0"
+        assert data["latest_release_in_checkout"] is True
+        assert data["range_anchor_version"] == "1.0.0"
         assert data["commits"] == []
         assert data["coverage"] == {"covered": 0, "total": 0, "exempted": 0}
 
@@ -127,25 +152,31 @@ def _commit_file(repo, name, content="x\n", message="change"):
     ).stdout.strip()
 
 
-class TestGetLastTagWithGlob:
-    """Tests for get_last_version_tag with tag_glob parameter."""
+class TestPerProjectBaselineSelection:
+    """Scoping the baseline to one project in a shared repository.
 
-    def test_tag_glob_filters_tags(self, mock_git_repo):
-        """With tag_glob, only matching tags are returned."""
-        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
-        subprocess.run(["git", "tag", "beta@v2.0.0"], cwd=str(mock_git_repo), check=True)
-        assert get_last_version_tag(tag_glob="alpha@v*") == "alpha@v1.0.0"
-        assert get_last_version_tag(tag_glob="beta@v*") == "beta@v2.0.0"
+    A tag glob used to be the whole mechanism. Each project now keeps its own
+    archive directory, so the scoping is structural: reading alpha's ledger
+    cannot see beta's releases at all.
+    """
 
-    def test_tag_glob_no_match(self, mock_git_repo):
-        """When no tags match the glob, returns None."""
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        assert get_last_version_tag(tag_glob="nonexistent@v*") is None
+    def test_each_project_reads_its_own_archives(self, mock_git_repo):
+        sha = git_head(mock_git_repo)
+        archive_release(ledger_dir(mock_git_repo / "alpha"), "1.0.0", sha)
+        archive_release(ledger_dir(mock_git_repo / "beta"), "2.0.0", sha)
+        assert range_anchor(
+            ledger_dir(mock_git_repo / "alpha"), tag_glob="alpha@v*"
+        ).version == "1.0.0"
+        assert range_anchor(
+            ledger_dir(mock_git_repo / "beta"), tag_glob="beta@v*"
+        ).version == "2.0.0"
 
-    def test_no_tag_glob_returns_v_star(self, mock_git_repo):
-        """Without tag_glob, defaults to 'v*' and returns matching version tags."""
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        assert get_last_version_tag() == "v1.0.0"
+    def test_a_project_with_no_archives_has_no_baseline(self, mock_git_repo):
+        archive_release(ledger_dir(mock_git_repo / "alpha"), "1.0.0",
+                        git_head(mock_git_repo))
+        assert range_anchor(
+            ledger_dir(mock_git_repo / "nonexistent"), tag_glob="nonexistent@v*"
+        ) is None
 
 
 class TestUnreleasedMonorepo:
@@ -164,8 +195,10 @@ class TestUnreleasedMonorepo:
         changes_dir.mkdir(parents=True, exist_ok=True)
         (changes_dir / "unreleased.jsonl").write_text("")
 
-        # Tag alpha
+        # Tag alpha and record the release in alpha's own ledger
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        archive_release(ledger_dir(mock_git_repo / "alpha"), "1.0.0",
+                        git_head(mock_git_repo))
 
         # Add a commit touching alpha
         _commit_file(mock_git_repo, "alpha/new.txt", message="alpha feature")
@@ -173,8 +206,9 @@ class TestUnreleasedMonorepo:
         monkeypatch.chdir(str(mock_git_repo / "alpha"))
         capsys.readouterr()
         data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
-        # Should use scoped tag
-        assert data["tag"] == "alpha@v1.0.0"
+        # Scoped to alpha's own release archives
+        assert data["latest_release"] == "1.0.0"
+        assert data["range_anchor_version"] == "1.0.0"
 
     def test_monorepo_filters_commits_by_directory(self, mock_git_repo, monkeypatch, capsys):
         """Commits touching only another project's files are excluded."""
@@ -193,9 +227,17 @@ class TestUnreleasedMonorepo:
         for proj in ["alpha", "beta"]:
             make_releasable_state(mock_git_repo, proj, version="1.0.0")
 
-        # Tag both
+        # Tag both, and archive each release in its releasable's ledger
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tagged = git_head(mock_git_repo)
+        for proj in ["alpha", "beta"]:
+            archive_release(
+                ledger_dir(None, releasable_dir=(
+                    mock_git_repo / ".rlsbl-monorepo" / "releasables" / proj
+                )),
+                "1.0.0", _tagged,
+            )
 
         # Add commits: one for alpha, two for beta
         _commit_file(mock_git_repo, "alpha/a.txt", message="alpha change")
@@ -222,9 +264,12 @@ class TestUnreleasedMonorepo:
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
-        # Tag both
+        # Tag both, and archive each release in its project's ledger
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tagged = git_head(mock_git_repo)
+        for proj in ["alpha", "beta"]:
+            archive_release(ledger_dir(mock_git_repo / proj), "1.0.0", _tagged)
 
         # Add commits touching ONLY beta
         _commit_file(mock_git_repo, "beta/b.txt", message="beta only")
@@ -243,6 +288,7 @@ class TestUnreleasedMonorepo:
         subprocess.run(["git", "add", "package.json"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "commit", "-q", "-m", "add pkg"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
 
         # Set up JSONL changelog
         changes_dir = mock_git_repo / ".rlsbl" / "changes"
@@ -253,7 +299,7 @@ class TestUnreleasedMonorepo:
 
         capsys.readouterr()
         data = run_cmd("npm", [], {"json": True}, project_root=".")
-        assert data["tag"] == "v1.0.0"
+        assert data["latest_release"] == "1.0.0"
         assert data["coverage"]["total"] == 1
 
 
@@ -296,6 +342,7 @@ class TestUnreleasedExemptions:
         )
         subprocess.run(["git", "commit", "-q", "-m", "setup"], cwd=str(repo), check=True)
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(repo), check=True)
+        archive_release(ledger_dir(repo), "1.0.0", git_head(repo))
 
         tracked = _commit_file(repo, "src/main.js", message="feat: add main")
         # Changelog-only commit (only touches .rlsbl/changes/)
@@ -380,6 +427,10 @@ def _explicit_releasable_workspace(repo, *, member="pkg-a", releasable="alpha",
     subprocess.run(
         ["git", "tag", f"{releasable}@v{version}"], cwd=str(repo), check=True,
     )
+    archive_release(
+        os.path.join(os.path.dirname(changes_dir), "releases"),
+        version, git_head(repo),
+    )
     return changes_dir
 
 
@@ -402,7 +453,7 @@ class TestUnreleasedReleasableMember:
         capsys.readouterr()
         # Must not error with "JSONL changelog not set up".
         data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "pkg-a"))
-        assert data["tag"] == "alpha@v1.0.0"
+        assert data["latest_release"] == "1.0.0"
         assert data["coverage"]["total"] == 1
         assert data["coverage"]["covered"] == 0
         assert changes_dir  # the releasable dir, not pkg-a/.rlsbl/changes

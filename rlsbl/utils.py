@@ -207,43 +207,6 @@ def working_tree_paths(cwd=None):
     return paths
 
 
-def get_last_version_tag(tag_glob: str = "v*", *, cwd=None) -> str | None:
-    """Get the most recent version tag reachable from HEAD.
-
-    When tag_glob is set (e.g. ``mylib@v*`` in monorepo mode), uses it
-    as the ``--match`` pattern so each project resolves its own last
-    release tag.
-
-    ``cwd`` selects the repository the git commands run in; None means the
-    process cwd. Callers that resolve a tag for a specific project (external
-    checks, which may run with a ``cwd`` override) must pass it.
-
-    Returns the tag string on success. On failure, checks whether the
-    repo is a shallow clone:
-    - If shallow: raises GitError (shallow clones lack the history needed
-      for changelog validation).
-    - If not shallow: returns None (no tags exist -- genuine first release).
-    """
-    try:
-        return run(
-            "git", ["describe", "--tags", "--abbrev=0", "--match", tag_glob],
-            timeout=10, cwd=cwd,
-        )
-    except subprocess.CalledProcessError:
-        # git describe failed -- check if this is a shallow clone
-        try:
-            is_shallow = run("git", ["rev-parse", "--is-shallow-repository"], timeout=10, cwd=cwd)
-        except subprocess.CalledProcessError:
-            # Can't determine shallow status -- assume not shallow
-            return None
-        if is_shallow == "true":
-            raise GitError(
-                "Shallow clone detected — rlsbl requires full history for "
-                "changelog validation. Run 'git fetch --unshallow' first."
-            )
-        return None
-
-
 def get_current_branch(*, cwd):
     """Returns the current git branch name for the repo at ``cwd``.
 

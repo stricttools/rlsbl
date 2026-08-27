@@ -720,12 +720,13 @@ _STATUS_PAYLOAD_SCHEMA = {
         "version": {"type": ["string", "null"]},
         "target": {"type": "string"},
         "branch": {"type": ["string", "null"]},
-        "tag": {"type": ["string", "null"]},
+        "latest_release": {"type": ["string", "null"]},
+        "latest_release_in_checkout": {"type": ["boolean", "null"]},
         "clean": {"type": ["boolean", "null"]},
         "changelog": {"type": ["boolean", "null"]},
         "jsonl_coverage": {"type": "string"},
         "commits_ahead": {"type": ["integer", "null"]},
-        "commits_ahead_tag": {"type": ["string", "null"]},
+        "range_anchor_tag": {"type": ["string", "null"]},
         "ci": {"type": "array", "items": {"type": "string"}},
         "publish": {"type": "boolean"},
         "registry_version": {"type": ["string", "null"]},
@@ -738,15 +739,16 @@ _STATUS_PAYLOAD_SCHEMA = {
         },
     },
     "required": [
-        "name", "version", "target", "branch", "tag", "clean", "changelog",
-        "jsonl_coverage", "commits_ahead", "commits_ahead_tag", "ci",
+        "name", "version", "target", "branch", "latest_release",
+        "latest_release_in_checkout", "clean", "changelog",
+        "jsonl_coverage", "commits_ahead", "range_anchor_tag", "ci",
         "publish", "registry_version", "drift",
     ],
     "additionalProperties": False,
 }
 
 
-@app.command(name="status", help="Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.", effect="read_only", payload_schema=_STATUS_PAYLOAD_SCHEMA)
+@app.command(name="status", help="Display the current project version, branch, latest release, unreleased commit count, and changelog coverage. The latest release comes from the project's release archives and is annotated when this checkout does not contain it. Outputs plain text by default or structured JSON with the --json flag.", effect="read_only", payload_schema=_STATUS_PAYLOAD_SCHEMA)
 @strictcli.flag(name="target", type=str, presence="optional", help="Target a specific registry (auto-detected if omitted)")
 @strictcli.flag(name="registry", type=bool, default=False, help="Query the package registry for the latest published version")
 @effects.handler
@@ -1306,12 +1308,16 @@ def cmd_prs(ctx):
 # Three shapes, one declaration: the normal report carries the commit list and
 # its coverage counts; the empty report carries the same with an empty list;
 # a non-releasable project carries the commit COUNT instead of the list, plus
-# the two flags that say why it has no changelog. `tag` is null before the
-# project's first release tag.
+# the two flags that say why it has no changelog. `latest_release` is the
+# project's highest archived version and `range_anchor_version` the highest one
+# THIS checkout contains -- both null before the first release, and different
+# from each other exactly when the checkout predates a release.
 _UNRELEASED_PAYLOAD_SCHEMA = {
     "type": "object",
     "properties": {
-        "tag": {"type": ["string", "null"]},
+        "latest_release": {"type": ["string", "null"]},
+        "latest_release_in_checkout": {"type": ["boolean", "null"]},
+        "range_anchor_version": {"type": ["string", "null"]},
         "commits": {
             "type": ["array", "integer"],
             "items": {
@@ -1343,12 +1349,15 @@ _UNRELEASED_PAYLOAD_SCHEMA = {
         "non_releasable": {"type": "boolean"},
         "dev_only": {"type": "boolean"},
     },
-    "required": ["tag", "commits"],
+    "required": [
+        "latest_release", "latest_release_in_checkout",
+        "range_anchor_version", "commits",
+    ],
     "additionalProperties": False,
 }
 
 
-@app.command(name="unreleased", help="List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.", effect="read_only", payload_schema=_UNRELEASED_PAYLOAD_SCHEMA)
+@app.command(name="unreleased", help="List the commits between the release this checkout is anchored to and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.", effect="read_only", payload_schema=_UNRELEASED_PAYLOAD_SCHEMA)
 @effects.handler
 def cmd_unreleased(ctx):
     """List unreleased commits and their changelog coverage status."""

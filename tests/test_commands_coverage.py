@@ -27,6 +27,7 @@ from githarness import add_remote, git as _ghgit, init_repo
 from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION
 from rlsbl.context import ProjectContext
 from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
+from rlsbl.ledger import LatestReleaseFact
 
 
 def _undo_cleared_gate(*_a, **_k):
@@ -704,15 +705,16 @@ class TestStatusBranchException:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", side_effect=RuntimeError("boom")), \
-             patch(f"{MOD_STATUS}._get_last_version_tag", return_value=None), \
-             patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
+             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.latest_release_fact",
+                   return_value=LatestReleaseFact(version=None, in_checkout=None)), \
              patch(f"{MOD_STATUS}.run", side_effect=Exception("no tag")), \
              patch(f"{MOD_STATUS}.is_clean_tree", side_effect=Exception("no tree")):
             data = run_cmd("npm", [], {"json": True}, ctx=_ctx(root=tmp_path))
 
         captured = capsys.readouterr()
         assert data["branch"] is None
-        assert data["tag"] is None
+        assert data["latest_release"] is None
         assert data["clean"] is None
         assert "could not determine branch" in captured.err
 
@@ -746,8 +748,9 @@ class TestStatusNonReleasableProject:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {None: mock_target, "npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
-             patch(f"{MOD_STATUS}._get_last_version_tag", return_value=None), \
-             patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
+             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.latest_release_fact",
+                   return_value=LatestReleaseFact(version=None, in_checkout=None)), \
              patch(f"{MOD_STATUS}.run", return_value="v1.0.0"), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
             data = run_cmd("npm", [], {"json": True}, ctx=_ctx())
@@ -774,15 +777,16 @@ class TestStatusTextOutputPaths:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
-             patch(f"{MOD_STATUS}._get_last_version_tag", return_value=None), \
-             patch(f"{MOD_STATUS}._unreleased_range", return_value="HEAD"), \
+             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.latest_release_fact",
+                   return_value=LatestReleaseFact(version=None, in_checkout=None)), \
              patch(f"{MOD_STATUS}.run", side_effect=Exception("no tag")), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
             run_cmd("npm", [], {}, ctx=_ctx(root=tmp_path))
         out = capsys.readouterr().out
         # No CHANGELOG.md exists in tmp_path
         assert "Changelog: (not found)" in out
-        assert "Last tag:  (none)" in out
+        assert "Released:  (none)" in out
 
 
 # ============================================================================
@@ -805,7 +809,9 @@ class TestUnreleasedNonReleasable:
 
         with patch("rlsbl.commands.unreleased.find_workspace_root", return_value="/ws"), \
              patch("rlsbl.commands.unreleased.resolve_project", return_value=mock_proj), \
-             patch("rlsbl.commands.unreleased.get_last_version_tag", return_value="v1.0.0"), \
+             patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
+             patch("rlsbl.commands.unreleased.latest_release_fact",
+                   return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
              patch("rlsbl.commands.unreleased._get_commits_since", return_value=commits):
             data = run_cmd("npm", [], {"json": True}, project_root="/ws/devnode")
         assert data["non_releasable"] is True
@@ -822,7 +828,9 @@ class TestUnreleasedNonReleasable:
 
         with patch("rlsbl.commands.unreleased.find_workspace_root", return_value="/ws"), \
              patch("rlsbl.commands.unreleased.resolve_project", return_value=mock_proj), \
-             patch("rlsbl.commands.unreleased.get_last_version_tag", return_value="v1.0.0"), \
+             patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
+             patch("rlsbl.commands.unreleased.latest_release_fact",
+                   return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
              patch("rlsbl.commands.unreleased._get_commits_since", return_value=commits):
             run_cmd("npm", [], {}, project_root="/ws/devnode")
         assert "non-releasable" in capsys.readouterr().out
@@ -908,11 +916,12 @@ class TestReleaseEnvFile:
         release_config.description = "test"
         release_config.context = ""
         release_config.blog = False
-        # A pre-release file carries no anchor -- the release flow writes those
-        # into the archive. A MagicMock answers every attribute, so the two
-        # anchor fields are pinned to their absent value explicitly.
+        # A pre-release file carries no anchor and no unanchorable marker --
+        # the release flow writes those into the archive. A MagicMock answers
+        # every attribute, so all three are pinned to their absent value.
         release_config.candidate_sha = None
         release_config.tree_hashes = None
+        release_config.unanchorable = None
 
         # Patch load_env_file to actually set the env var
         monkeypatch.setenv("CF_ACCOUNT_ID", "test123")

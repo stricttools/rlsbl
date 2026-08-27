@@ -213,6 +213,25 @@ def _resolve_tag_glob(ctx):
     return tag_glob or "v*"
 
 
+def _resolve_ledger_dir(ctx):
+    """Return the release-archive directory that is *ctx*'s project's ledger.
+
+    Derived from the same context resolution :func:`_resolve_tag_glob` uses, so
+    the range a check computes and the archives it computes it from always
+    describe the same project. Falls back to the project's own
+    ``.rlsbl/releases/`` when there is no changelog context at all -- a project
+    with no changes dir still has a releases dir, and an empty one honestly
+    reports "nothing released here".
+    """
+    from ..ledger import releases_dir_for_changes_dir
+
+    resolved = _get_changelog_context(ctx)
+    if resolved is None:
+        return os.path.join(str(ctx.project_root), ".rlsbl", "releases")
+    changes_dir, _tag_glob, _project, _entries = resolved
+    return releases_dir_for_changes_dir(changes_dir)
+
+
 def _get_all_changelog_contexts(ctx):
     """Return changelog contexts for ALL releasables when CWD is the workspace root.
 

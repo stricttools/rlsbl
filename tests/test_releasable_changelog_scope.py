@@ -16,10 +16,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from conftest import make_commit, run_git
+from conftest import archive_release, git_head, ledger_dir, make_commit, run_git
 from rlsbl.changelog.validate import check_coverage
 from rlsbl.ownership import OwnershipScope
 from rlsbl.workspace import WorkspaceProject, get_releasable_changes_dir
+
+
+def _releases_dir(root, releasable_name):
+    """The ledger for a releasable: the sibling of its changes directory."""
+    return ledger_dir(
+        None,
+        releasable_dir=os.path.dirname(
+            get_releasable_changes_dir(str(root), releasable_name)
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -55,9 +65,13 @@ def two_releasable_repo(tmp_path, monkeypatch):
     run_git(tmp_path, "add", "README.md")
     run_git(tmp_path, "commit", "-q", "-m", "initial")
 
-    # Tag as v0.1.0 so there's a baseline for unreleased range
+    # Tag as v0.1.0 and archive it for each releasable: the unreleased range
+    # is bounded by the releasable's own LEDGER entry, not by the tag.
     run_git(tmp_path, "tag", "rel-a@v0.1.0")
     run_git(tmp_path, "tag", "rel-b@v0.1.0")
+    baseline = git_head(tmp_path)
+    for rel in ("rel-a", "rel-b"):
+        archive_release(_releases_dir(tmp_path, rel), "0.1.0", baseline)
 
     projects_a = [
         WorkspaceProject({"name": "a1", "path": "pkg-a1", "releasable": "rel-a"}),
@@ -100,7 +114,8 @@ class TestReleasableChangelogScope:
         # Coverage check for releasable B with its member projects
         # should pass because the commit is outside B's scope
         passed, details = check_coverage(
-            [], tag_glob="rel-b@v*", scope=scope_b,
+            [], _releases_dir(root, "rel-b"),
+            tag_glob="rel-b@v*", scope=scope_b,
         )
         assert passed, f"Expected pass (commit outside B's scope), got: {details}"
         # Verify the commit was explicitly skipped
@@ -117,7 +132,8 @@ class TestReleasableChangelogScope:
 
         # Coverage check for releasable B with no entries should fail
         passed, details = check_coverage(
-            [], tag_glob="rel-b@v*", scope=scope_b,
+            [], _releases_dir(root, "rel-b"),
+            tag_glob="rel-b@v*", scope=scope_b,
         )
         assert not passed, "Expected fail (commit in B's scope with no entry)"
         uncovered_msgs = [d for d in details if "not covered" in d]
@@ -144,7 +160,8 @@ class TestReleasableChangelogScope:
         # Coverage check for releasable A with no entries should fail
         # (the commit touches pkg-a1 which is in A)
         passed_a, details_a = check_coverage(
-            [], tag_glob="rel-a@v*", scope=scope_a,
+            [], _releases_dir(root, "rel-a"),
+            tag_glob="rel-a@v*", scope=scope_a,
         )
         assert not passed_a, "Expected fail for A (commit touches A's files)"
         uncovered_a = [d for d in details_a if "not covered" in d]
@@ -152,7 +169,8 @@ class TestReleasableChangelogScope:
 
         # Coverage check for releasable B with no entries should also fail
         passed_b, details_b = check_coverage(
-            [], tag_glob="rel-b@v*", scope=scope_b,
+            [], _releases_dir(root, "rel-b"),
+            tag_glob="rel-b@v*", scope=scope_b,
         )
         assert not passed_b, "Expected fail for B (commit touches B's files)"
         uncovered_b = [d for d in details_b if "not covered" in d]
@@ -168,13 +186,15 @@ class TestReleasableChangelogScope:
 
         # Coverage check for releasable A should pass (root commit outside scope)
         passed_a, details_a = check_coverage(
-            [], tag_glob="rel-a@v*", scope=scope_a,
+            [], _releases_dir(root, "rel-a"),
+            tag_glob="rel-a@v*", scope=scope_a,
         )
         assert passed_a, f"Expected pass for A, got: {details_a}"
 
         # Coverage check for releasable B should also pass
         passed_b, details_b = check_coverage(
-            [], tag_glob="rel-b@v*", scope=scope_b,
+            [], _releases_dir(root, "rel-b"),
+            tag_glob="rel-b@v*", scope=scope_b,
         )
         assert passed_b, f"Expected pass for B, got: {details_b}"
 

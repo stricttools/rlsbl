@@ -89,10 +89,11 @@ Legitimately still tag-based, with the reason:
 * ``rlsbl/commands/monorepo/extract*.py`` tag-decision reads -- DEFERRED, not
   examined here: those files were under concurrent edit.
 
-``rlsbl/utils.py`` ``get_last_version_tag`` is retained for the one caller
-whose output must be a tag REF for a consumer subprocess
-(``RLSBL_LAST_TAG``), and that caller now selects the version from the ledger
-and translates it, so the describe walk no longer decides anything.
+``rlsbl/utils.py`` ``get_last_version_tag`` -- the ``git describe`` primitive
+every one of those sites went through -- had no callers left after the
+migration and was DELETED.  Its last would-be consumer, ``RLSBL_LAST_TAG``,
+needs a tag REF for a consumer subprocess, and now selects the version from
+the ledger and translates it with ``tag_for_version``.
 """
 
 import os
