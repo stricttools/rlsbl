@@ -646,8 +646,11 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
 # ---------------------------------------------------------------------------
 
 
-def render_plan(plan: Plan, out=sys.stdout) -> None:
+def render_plan(plan: Plan, out=None) -> None:
     """Print the full plan: every scope, every bucket, every action."""
+    # Resolved at call time, never bound as a default: a default argument would
+    # capture whatever sys.stdout was at import.
+    out = sys.stdout if out is None else out
     print(f"Repository: {plan.repo}", file=out)
     for scope in plan.scopes:
         print(
@@ -774,7 +777,8 @@ def commit_message(plan: Plan, written: list[str]) -> str:
 # ---------------------------------------------------------------------------
 
 
-def run(repo: str, *, dry_run: bool, use_gh: bool, auto_commit: bool, out=sys.stdout) -> int:
+def run(repo: str, *, dry_run: bool, use_gh: bool, auto_commit: bool, out=None) -> int:
+    out = sys.stdout if out is None else out
     plan = build_plan(repo, use_gh=use_gh)
     render_plan(plan, out=out)
 

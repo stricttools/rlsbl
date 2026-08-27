@@ -76,7 +76,11 @@ def plan(repo: str, releases_dir: str, mapping: dict) -> tuple[list, list]:
     return changes, unchanged
 
 
-def render(changes: list, unchanged: list, out=sys.stdout) -> None:
+def render(changes: list, unchanged: list, out=None) -> None:
+    # Resolved at call time, never bound as a default: a default argument would
+    # capture whatever sys.stdout was at import, which is the wrong stream for
+    # any caller that redirects it.
+    out = sys.stdout if out is None else out
     print(f"{len(changes)} description(s) to rewrite, {len(unchanged)} already current.", file=out)
     for version, path, current, new in changes:
         print(f"\n  v{version}  ({os.path.basename(path)})", file=out)
