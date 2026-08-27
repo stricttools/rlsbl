@@ -287,8 +287,10 @@ Effort: medium.
 ### 0.0 Pin the install
 
 - Replace the machine-wide editable rlsbl install with a normal install
-  of the last released version; record the exact restore command in the
-  session notes for phase 10.
+  of the last released version; record the exact restore command, and
+  the list of fleet workspace paths for the final-phase sweep, in a
+  committed file alongside this plan (session notes do not survive to
+  the session that runs phase 10).
 - Verify: `rlsbl --version` reports the released version; the editable
   path is no longer on the import path.
 
@@ -906,6 +908,15 @@ Effort: large.
 ## Phase 10 — Docs, release, fleet sweep
 
 Effort: medium.
+
+Session conduct: run this phase as one dedicated, uninterrupted session —
+between the install restore and the end of the sweep, every fleet
+monorepo hard-errors on rlsbl commands, and a dead session leaves that
+state behind. The install-restore command and the fleet workspace list
+are read from the committed file phase 0.0 wrote, never from session
+memory. An interruption is recoverable per-repo: each workspace migrates
+independently and the migration script is idempotent — re-run it on the
+remaining workspaces.
 
 - Remaining docs: mirror chapter corrections, root-member and
   tag-format reference, the workspace field table made counts-free,
