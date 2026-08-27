@@ -1,10 +1,10 @@
 ---
-description: "All 17 rlsbl release targets including npm, PyPI, Go, Docker and Flutter, with auto-detection, the ReleaseTarget protocol, and per-axis support properties."
+description: "The rlsbl release targets including npm, PyPI, Go, Docker and Flutter, with auto-detection, the ReleaseTarget protocol, and per-axis support properties."
 ---
 
 # Release targets
 
-rlsbl supports 18 release targets. Each target handles version reading, writing, and tag formatting for a specific ecosystem. Targets do not handle publishing — that is the responsibility of [pipelines](pipelines.md).
+Each release target handles version reading, writing, and tag formatting for a specific ecosystem. Targets do not handle publishing — that is the responsibility of [pipelines](pipelines.md). The table below is the enumeration:
 
 :-: table-targets
 
@@ -50,7 +50,7 @@ When multiple targets could match the same manifest file (e.g., a project with b
 
 ## Detection files
 
-Each of the 18 target classes declares a `detection_files` ClassVar listing the filenames whose presence triggers detection. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. The table below shows each target's detection files:
+Each target class declares a `detection_files` ClassVar listing the filenames whose presence triggers detection. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. The table below shows each target's detection files:
 
 | Target | Detection files |
 | ------ | --------------- |
@@ -74,7 +74,7 @@ Each of the 18 target classes declares a `detection_files` ClassVar listing the 
 
 ## The ReleaseTarget protocol
 
-All 18 targets implement a runtime-checkable Protocol that defines the interface for version management, detection, tag formatting, and CI template generation. Each target provides concrete implementations for its ecosystem's conventions. The key methods:
+Every target implements a runtime-checkable Protocol that defines the interface for version management, detection, tag formatting, and CI template generation. Each target provides concrete implementations for its ecosystem's conventions. The key methods:
 
 | Method | Purpose |
 | ------ | ------- |
@@ -122,9 +122,16 @@ code that implements it:
 | `supports_publication_probe` | Target can ask its registry whether a version is published | The class overrides `publication_probe` |
 
 Each is consulted at the point of use. `rlsbl dev install` asks each target for
-its install specs and skips the ones that have none, naming them. The publication
-probe used by `rlsbl release yank`, the release's post-publish verification, and
-each pipeline's pre-publish check all read `supports_publication_probe`.
+its install specs and skips the ones that have none, naming them. Four sites
+decide whether to run a publication probe, and every one of them reads
+`supports_publication_probe` rather than defaulting the answer:
+
+| Site | What it decides |
+| ---- | --------------- |
+| Each pipeline's pre-publish check | whether to skip a version the registry already serves |
+| The release's post-publish verification | which targets belong in the verified set |
+| The undo evidence layer (`rlsbl release undo --version`) | whether a target can contribute registry evidence |
+| `rlsbl release yank` | each target's publication status before removal |
 
 The `name-consistency` check is not one of these: it asks every detected target
 for a name and compares the ones that answer, reporting the targets that returned
@@ -132,7 +139,7 @@ nothing alongside the result rather than skipping them silently.
 
 ## Ecosystem classification
 
-Each target has an `ecosystem` string used for display and grouping in commands like `rlsbl targets` and `rlsbl monorepo list`. The 18 targets map to 18 distinct ecosystem labels, providing human-readable names for each registry and platform:
+Each target has an `ecosystem` string used for display and grouping in commands like `rlsbl targets` and `rlsbl monorepo list`. Every target maps to a distinct ecosystem label, providing a human-readable name for each registry and platform:
 
 | Ecosystem | Targets |
 | --------- | ------- |
@@ -282,6 +289,6 @@ All checks not listed here are universal and run for every target.
 
 ## Target implementations
 
-The base target class defines the shared interface for version reading, version writing, detection, and version file location. All 18 concrete target implementations inherit from this base and override the methods relevant to their ecosystem's versioning conventions.
+The base target class defines the shared interface for version reading, version writing, detection, and version file location. Every concrete target implementation inherits from this base and override the methods relevant to their ecosystem's versioning conventions.
 
 :-: ref path="rlsbl.targets.base"
