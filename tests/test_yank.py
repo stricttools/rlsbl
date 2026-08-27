@@ -1,5 +1,6 @@
 """Tests for rlsbl.commands.yank -- registry-aware removal with publication probing."""
 
+import os
 import unittest
 from io import StringIO
 from pathlib import Path
@@ -316,6 +317,50 @@ class TestYankCommand:
         output = out.getvalue()
         assert "skipping" in output.lower()
 
+    @patch(f"{MOD}.check_gh_auth", return_value=True)
+    @patch(f"{MOD}.check_gh_installed", return_value=True)
+    @patch(f"{MOD}.run_gh")
+    @patch(f"{MOD}.find_workspace_root", return_value=None)
+    @patch(f"{MOD}.resolve_member_context")
+    def test_subdirectory_target_probed_and_yanked_at_its_own_path(
+        self, mock_member, _ws, mock_gh, _inst, _auth,
+    ):
+        """A target declared with a path is probed and yanked in THAT directory.
+
+        The project root holds no manifest for such a target, so probing there
+        reads the wrong package (or none) and reports its answer as this
+        target's publication status.
+        """
+        from rlsbl.targets import TargetEntry
+        from rlsbl.targets.outcomes import YankOutcome, YankStatus
+
+        target = MagicMock()
+        target.name = "npm"
+        target.supports_publication_probe = True
+        target.tag_format.return_value = "v1.0.0"
+        target.publication_probe.return_value = PublicationProbeResult(
+            PublicationStatus.PUBLISHED, "npm", "1.0.0", "sub-pkg@1.0.0 found"
+        )
+        target.yank.return_value = YankOutcome(
+            status=YankStatus.DONE, message="npm: deprecated sub-pkg@1.0.0",
+        )
+
+        entry_path = os.path.join("/repo", "packages", "api")
+        mock_member.return_value = MagicMock(targets=[TargetEntry("npm", entry_path)])
+
+        mock_gh.side_effect = [
+            "",         # release view
+            "v2.0.0",  # release list (latest)
+            "body",    # release view body
+        ]
+
+        with patch(f"{MOD}.TARGETS", {"npm": target}), \
+             patch("sys.stdout", new_callable=StringIO):
+            run_cmd(["1.0.0"], {"dry-run": True}, project_root="/repo")
+
+        assert target.publication_probe.call_args[0][0] == entry_path
+        assert target.yank.call_args[0][0] == entry_path
+
     def test_no_version_arg(self):
         with pytest.raises(SystemExit) as exc:
             run_cmd([], {}, project_root=Path("/fake"))
@@ -334,6 +379,42 @@ class TestYankCommand:
         with pytest.raises(SystemExit) as exc:
             run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
         assert exc.value.code == 1
+
+
+class TestPypiYankMessage:
+    """The PyPI target's manual-yank outcome messages."""
+
+    @patch("rlsbl.targets.pypi.PypiTarget.read_name", return_value="my-pkg")
+    def test_declined_and_interrupted_messages_are_identical(self, _):
+        """EOF/Ctrl-C must not smuggle a newline into the outcome message.
+
+        ``rlsbl release yank`` indents every outcome itself, so a message
+        starting with a newline printed a whitespace-only line before the text.
+        """
+        from rlsbl.targets.pypi import PypiTarget
+
+        t = PypiTarget()
+        with patch("builtins.input", return_value="n"), \
+             patch("sys.stdout", new_callable=StringIO):
+            declined = t.yank("/fake", "1.0.0", "v1.0.0")
+        with patch("builtins.input", side_effect=EOFError), \
+             patch("sys.stdout", new_callable=StringIO):
+            interrupted = t.yank("/fake", "1.0.0", "v1.0.0")
+
+        assert interrupted.message == declined.message
+        assert interrupted.message == interrupted.message.strip()
+
+    @patch("rlsbl.targets.pypi.PypiTarget.read_name", return_value="my-pkg")
+    def test_interrupted_prompt_line_is_closed(self, _):
+        """The unanswered prompt left the cursor mid-line; close it on stdout."""
+        from rlsbl.targets.pypi import PypiTarget
+
+        t = PypiTarget()
+        with patch("builtins.input", side_effect=KeyboardInterrupt), \
+             patch("sys.stdout", new_callable=StringIO) as out:
+            t.yank("/fake", "1.0.0", "v1.0.0")
+        # A blank line, i.e. the newline the abandoned prompt still owed.
+        assert out.getvalue().endswith("\n\n")
 
 
 class TestBuildYankNotice:

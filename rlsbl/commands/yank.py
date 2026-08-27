@@ -31,7 +31,9 @@ def run_cmd(args, flags, project_root):
 
     Args:
         args: Positional args; first element is the version to yank.
-        flags: dict with keys ``dry-run``, ``yes``, ``reason``, ``use``.
+        flags: dict with keys ``dry-run``, ``reason``, ``use``. There is no
+            confirmation key: ``release yank`` declares itself consequential,
+            so the framework owns the prompt and ``--approve-consequential``.
         project_root: Path to the project root directory, or None for cwd.
     """
     dry_run = flags.get("dry-run", False)
@@ -117,20 +119,20 @@ def run_cmd(args, flags, project_root):
         print("Cannot verify whether this is the latest release. Aborting for safety.", file=sys.stderr)
         sys.exit(1)
 
-    # Probe registries for publication status
+    # Probe registries for publication status. Each entry is probed in ITS OWN
+    # directory: a target declared with a ``path`` has its manifest there, and
+    # the project root either holds a different package or none at all.
     probe_results = []
-    target_objects = []
     if entries:
         for entry in entries:
             t = TARGETS[entry.name]
-            target_objects.append(t)
             if t.supports_publication_probe:
-                result = t.publication_probe(project_dir, version)
-                probe_results.append((t, result))
+                result = t.publication_probe(entry.path, version)
+                probe_results.append((t, entry.path, result))
             else:
-                # Target without probe capability: UNPROBEABLE
+                # Target without a registry probe: UNPROBEABLE
                 from ..publication_probe import PublicationProbeResult
-                probe_results.append((t, PublicationProbeResult(
+                probe_results.append((t, entry.path, PublicationProbeResult(
                     status=PublicationStatus.UNPROBEABLE,
                     registry=t.name,
                     version=version,
@@ -139,7 +141,7 @@ def run_cmd(args, flags, project_root):
 
     # Check for hard errors: any UNPROBEABLE with no other evidence
     unprobeable_targets = [
-        (t, r) for t, r in probe_results if r.status == PublicationStatus.UNPROBEABLE
+        (t, r) for t, _p, r in probe_results if r.status == PublicationStatus.UNPROBEABLE
     ]
     if unprobeable_targets:
         print("Error: cannot determine publication status for:", file=sys.stderr)
@@ -148,13 +150,19 @@ def run_cmd(args, flags, project_root):
         print("\nYank requires certainty about publication status. Cannot proceed.", file=sys.stderr)
         sys.exit(1)
 
-    published = [(t, r) for t, r in probe_results if r.status == PublicationStatus.PUBLISHED]
-    unpublished = [(t, r) for t, r in probe_results if r.status == PublicationStatus.UNPUBLISHED]
+    published = [
+        (t, p, r) for t, p, r in probe_results
+        if r.status == PublicationStatus.PUBLISHED
+    ]
+    unpublished = [
+        (t, r) for t, _p, r in probe_results
+        if r.status == PublicationStatus.UNPUBLISHED
+    ]
 
     # Display plan
     if published:
         print(f"Will yank {tag} from {len(published)} registry(ies):")
-        for t, r in published:
+        for t, _p, r in published:
             print(f"  {t.name}: {r.message}")
     if unpublished:
         for t, r in unpublished:
@@ -165,9 +173,10 @@ def run_cmd(args, flags, project_root):
     # it, with one prompt wording and one non-interactive error across every
     # rlsbl command.  The per-registry breakdown above is still printed.
 
-    # Execute registry-specific yank for each published target
-    for t, r in published:
-        _yank_target(t, project_dir, version, tag, reason, dry_run)
+    # Execute registry-specific yank for each published target, in the
+    # directory that target was detected in.
+    for t, target_path, r in published:
+        _yank_target(t, target_path, version, tag, reason, dry_run)
 
     # Mark GitHub release as pre-release with yank notice
     _mark_github_release(tag, reason, use, dry_run)
@@ -178,8 +187,12 @@ def run_cmd(args, flags, project_root):
         print(f"\nYanked {tag}.")
 
 
-def _yank_target(target, project_dir, version, tag, reason, dry_run):
+def _yank_target(target, target_dir, version, tag, reason, dry_run):
     """Execute the target's own registry-removal action and print its outcome.
+
+    *target_dir* is the directory this target was detected in, not the project
+    root: the two differ for a target declared with a ``path``, and the yank
+    action reads that target's manifest.
 
     The dispatch is the target protocol: every target answers ``yank()``, and a
     target with no registry-removal action answers UNSUPPORTED naming itself.
@@ -189,7 +202,7 @@ def _yank_target(target, project_dir, version, tag, reason, dry_run):
     from ..targets.outcomes import YankStatus
 
     outcome = target.yank(
-        project_dir, version, tag, reason=reason, dry_run=dry_run,
+        target_dir, version, tag, reason=reason, dry_run=dry_run,
     )
     if outcome.status is YankStatus.DONE:
         print(f"  {outcome.message}")
