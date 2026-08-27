@@ -37,12 +37,12 @@ for ``None`` at all -- they ask whether the directory IS the root.
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
 
 from conftest import make_workspace
+from rlsbl import app
 from rlsbl.ownership import ROOT_MEMBER_NAME, is_root_member
 from rlsbl.workspace import Releasable, resolve_project, write_releasable_version
 
@@ -180,49 +180,44 @@ class TestWorkspaceScopedSites:
 # ---------------------------------------------------------------------------
 
 
-def _run_release(root, *args, cwd=None):
-    """Invoke `rlsbl release run` as a subprocess, returning the CompletedProcess.
+def _run_release(monkeypatch, root, *args, cwd=None):
+    """Invoke `rlsbl release run` through the framework's own dispatch.
 
-    A subprocess rather than a direct call because the behaviour under test is
-    the command's own argument handling and its ``sys.exit`` paths.
+    Not a subprocess: the sandboxed runner has no ``rlsbl`` on PATH (HOME is a
+    throwaway tmpfs), and the behaviour under test is argument handling and
+    the command's ``sys.exit`` paths, which ``app.test`` reports faithfully.
     """
-    return subprocess.run(
-        ["rlsbl", "release", "run", *args],
-        cwd=str(cwd or root),
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    monkeypatch.chdir(str(cwd or root))
+    return app.test(["release", "run", *args])
 
 
-@pytest.mark.repo_cwd
 class TestReleaseRunSelector:
     """At a workspace root the invocation must name the releasable."""
 
-    def test_a_multi_releasable_root_demands_the_selector(self, tmp_path):
+    def test_a_multi_releasable_root_demands_the_selector(self, tmp_path, monkeypatch):
         _multi_releasable_workspace(tmp_path)
-        result = _run_release(tmp_path, "--no-allow-dirty", "--no-watch",
+        result = _run_release(monkeypatch, tmp_path, "--no-allow-dirty", "--no-watch",
                               "--approve-consequential")
-        assert result.returncode != 0
+        assert result.exit_code != 0
         assert "must say which releasable" in result.stderr
         assert "--releasable alpha" in result.stderr
         assert "--releasable beta" in result.stderr
 
-    def test_a_single_releasable_root_demands_it_too(self, tmp_path):
+    def test_a_single_releasable_root_demands_it_too(self, tmp_path, monkeypatch):
         """One candidate is not a licence to guess: naming it is the contract."""
         _single_releasable_workspace(tmp_path)
-        result = _run_release(tmp_path, "--no-allow-dirty", "--no-watch",
+        result = _run_release(monkeypatch, tmp_path, "--no-allow-dirty", "--no-watch",
                               "--approve-consequential")
-        assert result.returncode != 0
+        assert result.exit_code != 0
         assert "must say which releasable" in result.stderr
         assert "--releasable alpha" in result.stderr
 
-    def test_an_unknown_name_is_refused_with_the_declared_set(self, tmp_path):
+    def test_an_unknown_name_is_refused_with_the_declared_set(self, tmp_path, monkeypatch):
         _multi_releasable_workspace(tmp_path)
-        result = _run_release(tmp_path, "--releasable", "ghost",
+        result = _run_release(monkeypatch, tmp_path, "--releasable", "ghost",
                               "--no-allow-dirty", "--no-watch",
                               "--approve-consequential")
-        assert result.returncode != 0
+        assert result.exit_code != 0
         assert "no releasable named 'ghost'" in result.stderr
         assert "alpha, beta" in result.stderr
 
@@ -230,7 +225,7 @@ class TestReleaseRunSelector:
         (_single_releasable_workspace, "alpha"),
         (_multi_releasable_workspace, "beta"),
     ])
-    def test_the_selector_reaches_the_named_releasable(self, tmp_path, fixture, name):
+    def test_the_selector_reaches_the_named_releasable(self, tmp_path, monkeypatch, fixture, name):
         """The named releasable is what the run proceeds with.
 
         The run stops at the missing release file, which is the first thing
@@ -239,32 +234,32 @@ class TestReleaseRunSelector:
         performing a release.
         """
         fixture(tmp_path)
-        result = _run_release(tmp_path, "--releasable", name,
+        result = _run_release(monkeypatch, tmp_path, "--releasable", name,
                               "--no-allow-dirty", "--no-watch",
                               "--approve-consequential")
-        assert result.returncode != 0
+        assert result.exit_code != 0
         assert "No release file found" in result.stderr, result.stderr
         assert "must say which releasable" not in result.stderr
 
-    def test_a_member_directory_needs_no_selector(self, tmp_path):
+    def test_a_member_directory_needs_no_selector(self, tmp_path, monkeypatch):
         _multi_releasable_workspace(tmp_path)
-        result = _run_release(tmp_path, "--no-allow-dirty", "--no-watch",
+        result = _run_release(monkeypatch, tmp_path, "--no-allow-dirty", "--no-watch",
                               "--approve-consequential",
                               cwd=tmp_path / "packages" / "alpha")
         assert "must say which releasable" not in result.stderr
         assert "No release file found" in result.stderr, result.stderr
 
-    def test_a_member_directory_refuses_the_selector(self, tmp_path):
+    def test_a_member_directory_refuses_the_selector(self, tmp_path, monkeypatch):
         """The directory already names it; two answers must not disagree."""
         _multi_releasable_workspace(tmp_path)
-        result = _run_release(tmp_path, "--releasable", "beta",
+        result = _run_release(monkeypatch, tmp_path, "--releasable", "beta",
                               "--no-allow-dirty", "--no-watch",
                               "--approve-consequential",
                               cwd=tmp_path / "packages" / "alpha")
-        assert result.returncode != 0
+        assert result.exit_code != 0
         assert "only accepted at the workspace root" in result.stderr
 
-    def test_a_standalone_repository_refuses_the_selector(self, tmp_path):
+    def test_a_standalone_repository_refuses_the_selector(self, tmp_path, monkeypatch):
         (tmp_path / "package.json").write_text(
             json.dumps({"name": "solo", "version": "1.0.0"}) + "\n"
         )
@@ -272,8 +267,8 @@ class TestReleaseRunSelector:
         (tmp_path / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "none", "targets": ["npm"]}) + "\n"
         )
-        result = _run_release(tmp_path, "--releasable", "alpha",
+        result = _run_release(monkeypatch, tmp_path, "--releasable", "alpha",
                               "--no-allow-dirty", "--no-watch",
                               "--approve-consequential")
-        assert result.returncode != 0
+        assert result.exit_code != 0
         assert "standalone repository" in result.stderr
