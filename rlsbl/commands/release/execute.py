@@ -1090,7 +1090,22 @@ def require_recorded_candidate(state_path, cwd=None, *, version):
         )
     # Fail closed: FALSE and INDETERMINABLE both refuse.  A release may not
     # claim CI verification for a commit it cannot prove is on this branch.
-    if ancestry(resolved, "HEAD", cwd=cwd) is not Ancestry.TRUE:
+    # They are not the same refusal, though: "not an ancestor" is a finding,
+    # and an unanswerable question is not one -- it has its own cause (a
+    # pruned object, a shallow history) and its own remedy.
+    verdict = ancestry(resolved, "HEAD", cwd=cwd)
+    if verdict is Ancestry.INDETERMINABLE:
+        raise UnverifiedCandidateError(
+            f"git could not determine whether the CI-verified candidate "
+            f"recorded for {version} ({resolved[:12]}) is an ancestor of "
+            f"HEAD, so the release cannot prove this branch contains the "
+            f"commit CI verified. A pruned object or a shallow history "
+            f"leaves the question unanswerable: deepen the repository "
+            f"(`git fetch --unshallow`, or `git fetch --deepen=<n>`) and "
+            f"run `rlsbl release resume`."
+            + remedy
+        )
+    if verdict is not Ancestry.TRUE:
         raise UnverifiedCandidateError(
             f"the CI-verified candidate recorded for {version} "
             f"({resolved[:12]}) is not an ancestor of HEAD, so the current "

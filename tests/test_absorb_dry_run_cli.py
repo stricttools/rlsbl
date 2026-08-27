@@ -39,6 +39,12 @@ def _filter_repo_present(monkeypatch):
     sandbox runner (which does not put ``~/.local/bin`` on PATH, so a
     ``shutil.which``-driven skipif would silently take the regression out of
     CI).  Nothing else below the dispatch is replaced.
+
+    The limit of that stand-in, stated so nobody reads more coverage into
+    these tests than they carry: because the probe is answered "present"
+    unconditionally, a filter-repo call ADDED to the dry-run path later would
+    not be exercised here for the missing-binary case -- the preview would
+    walk straight past the refusal that a real absent binary produces.
     """
     monkeypatch.setattr(
         extract_mod, "require_filter_repo", lambda: "/stub/git-filter-repo"

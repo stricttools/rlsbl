@@ -416,6 +416,44 @@ class TestRecordedCandidateMapping:
                 self._state(tmp_path, first), cwd=str(repo), version="1.2.3"
             )
 
+    def test_indeterminable_says_so_instead_of_claiming_a_missing_ancestor(
+        self, tmp_path, monkeypatch
+    ):
+        """Both refuse, but they refuse for different reasons.
+
+        "is not an ancestor of HEAD" is a finding; an unanswerable question is
+        not one, and it has its own remedy (deepen the clone) that the
+        not-an-ancestor text sends nobody to.
+        """
+        from rlsbl.commands.release import execute
+
+        repo = tmp_path / "repo"
+        first, _ = _repo_with_two_commits(repo)
+        _stub_ancestry(monkeypatch, execute, Ancestry.INDETERMINABLE)
+        with pytest.raises(execute.UnverifiedCandidateError) as exc:
+            execute.require_recorded_candidate(
+                self._state(tmp_path, first), cwd=str(repo), version="1.2.3"
+            )
+        message = str(exc.value)
+        assert "could not determine" in message, message
+        assert "is not an ancestor of HEAD" not in message, message
+        assert "deepen" in message.lower(), (
+            f"the message must name the remedy for an unanswerable "
+            f"ancestry question: {message}"
+        )
+
+    def test_false_still_says_not_an_ancestor(self, tmp_path, monkeypatch):
+        from rlsbl.commands.release import execute
+
+        repo = tmp_path / "repo"
+        first, _ = _repo_with_two_commits(repo)
+        _stub_ancestry(monkeypatch, execute, Ancestry.FALSE)
+        with pytest.raises(execute.UnverifiedCandidateError) as exc:
+            execute.require_recorded_candidate(
+                self._state(tmp_path, first), cwd=str(repo), version="1.2.3"
+            )
+        assert "is not an ancestor of HEAD" in str(exc.value)
+
 
 # ---------------------------------------------------------------------------
 # Caller 4 -- `release resume`'s HEAD-descends-from-pre-release check
