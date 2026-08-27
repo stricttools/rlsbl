@@ -61,7 +61,7 @@ class TestNoRootMember:
             '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n',
         ))
         projects = load_workspace(str(tmp_path))
-        assert [p["name"] for p in projects] == [ROOT_MEMBER_NAME, "a"]
+        assert sorted(p["name"] for p in projects) == ["a", ROOT_MEMBER_NAME]
 
 
 # ---------------------------------------------------------------------------

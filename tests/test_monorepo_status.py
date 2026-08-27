@@ -351,7 +351,11 @@ def _unreleasable_member_workspace(repo, name="pkg-a", version="1.0.0",
     from rlsbl.workspace import save_workspace
 
     _make_npm_project(repo, name, version=version)
-    make_workspace(str(repo), [{"path": name, "name": name}])
+    make_workspace(
+        str(repo),
+        [{"path": name, "name": name, "releasable": False}],
+        releasables=[],
+    )
     changes_dir = os.path.join(str(repo), name, ".rlsbl", "changes")
     if with_changes_dir:
         os.makedirs(changes_dir, exist_ok=True)
@@ -461,8 +465,11 @@ class TestStatusMonorepoAware:
         assert "Package:" in captured.out
         assert "standalone" in captured.out
 
-    def test_status_monorepo_root_shows_hint_only(self, mock_git_repo, capsys):
-        """At monorepo root (not inside a project), show hint without scoped tag."""
+    def test_status_at_the_workspace_root_reports_the_root_member(
+        self, mock_git_repo, capsys,
+    ):
+        """The workspace root is the root member's directory, so status is
+        scoped to it -- and still says the repository is a monorepo."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "core", version="1.0.0")
         _cmd_add(["core"], {"releasable": "false"}, project_root=".")
@@ -477,8 +484,8 @@ class TestStatusMonorepoAware:
         captured = capsys.readouterr()
 
         assert "Part of monorepo" in captured.out
-        # Root is not a registered project, so no mono tag
-        assert "Mono tag" not in captured.out
+        # The root member IS a registered member, so its tag is scoped to it.
+        assert "Mono tag:  root@v0.0.1" in captured.out
 
 
 class TestStatusTagScoping:
@@ -579,8 +586,11 @@ class TestStatusTagScoping:
         assert len(captured_calls) == 1
         assert captured_calls[0] == "my-project@v*"
 
-    def test_monorepo_root_no_tag_glob(self, mock_git_repo, monkeypatch, capsys):
-        """At monorepo root (not a registered project), tag_glob is None."""
+    def test_workspace_root_uses_the_root_members_tag_glob(
+        self, mock_git_repo, monkeypatch, capsys,
+    ):
+        """The workspace root resolves to the root member, so its tag glob
+        scopes the unreleased range."""
         from unittest.mock import patch
 
         _cmd_init({"root-dev-node": True}, project_root=".")
@@ -613,8 +623,7 @@ class TestStatusTagScoping:
             run_cmd("npm", [], {}, ctx=make_ctx("."))
 
         assert len(captured_calls) == 1
-        # Root is not a project in the workspace, so no tag glob
-        assert captured_calls[0] is None
+        assert captured_calls[0] == "root@v*"
 
 
 class TestMonorepoStatusWatch:
@@ -629,7 +638,9 @@ class TestMonorepoStatusWatch:
         for p in projects:
             if p["name"] == "tooling":
                 p["watch"] = ["Package.swift", "shared/**"]
-        make_workspace(".", projects)
+        # save_workspace directly: make_workspace refuses the key outright,
+        # and the point here is that the LOADER refuses the file.
+        save_workspace(".", projects)
 
         capsys.readouterr()
         with pytest.raises(WorkspaceError, match="'watch' key is no longer supported"):
@@ -647,7 +658,7 @@ class TestMonorepoStatusWatch:
         for p in projects:
             if p["name"] == "tooling":
                 p["watch"] = ["Package.swift"]
-        make_workspace(".", projects)
+        save_workspace(".", projects)
 
         capsys.readouterr()
         with pytest.raises(WorkspaceError) as exc:

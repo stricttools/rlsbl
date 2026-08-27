@@ -65,7 +65,8 @@ def test_check_context_factory_passes_workspace_root(tmp_path, monkeypatch):
     assert isinstance(ctx, WorkspaceCheckContext)
     assert isinstance(ctx.graph, WorkspaceGraph)
     assert ctx.workspace_root == tmp_path.resolve()
-    assert len(ctx.projects) == 1
+    # The declared member, plus the mandatory root member.
+    assert len(ctx.projects) == 2
     assert ctx.projects[0]["name"] == "subproj"
 
 
@@ -152,9 +153,9 @@ def test_get_changelog_context_uses_target_specific_tag_glob(tmp_path, monkeypat
     from unittest.mock import patch
     captured = {}
 
-    def capture_check_in_range(entries, tag_glob, project=None):
+    def capture_check_in_range(entries, tag_glob=None, scope=None):
         captured["tag_glob"] = tag_glob
-        captured["project"] = project
+        captured["scope"] = scope
         return True, []
 
     monkeypatch.chdir(go_dir)

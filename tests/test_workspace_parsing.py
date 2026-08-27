@@ -403,7 +403,7 @@ class TestSaveWorkspaceRoundTrip:
             "import_name": "core_pkg",
         }
         wp = WorkspaceProject(data)
-        make_workspace(str(tmp_project), [wp])
+        save_workspace(str(tmp_project), with_root_member([wp]))
         loaded = load_workspace(str(tmp_project))
         core = _member(loaded, "core")
         assert core.name == "core"
@@ -423,7 +423,7 @@ class TestSaveWorkspaceRoundTrip:
             "custom_list": [1, 2, 3],
         }
         wp = WorkspaceProject(data)
-        make_workspace(str(tmp_project), [wp])
+        save_workspace(str(tmp_project), with_root_member([wp]))
         loaded = _member(load_workspace(str(tmp_project)), "pkg")
         assert loaded["custom_string"] == "hello"
         assert loaded["custom_int"] == 42
@@ -435,7 +435,7 @@ class TestSaveWorkspaceRoundTrip:
             WorkspaceProject({"path": "b/c", "name": "charlie", "dev_node": True}),
             WorkspaceProject({"path": "d", "name": "delta", "depends_on": ["alpha"]}),
         ]
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         loaded = load_workspace(str(tmp_project))
         # The three declared members, plus the supplied root member.
         assert len(loaded) == 4
@@ -451,7 +451,7 @@ class TestSaveWorkspaceRoundTrip:
             WorkspaceProject({"path": "a", "name": "a"}),
             {"path": "b", "name": "b"},
         ]
-        make_workspace(str(tmp_project), mixed)
+        save_workspace(str(tmp_project), with_root_member(mixed))
         loaded = load_workspace(str(tmp_project))
         # The two declared members, plus the supplied root member.
         assert len(loaded) == 3
@@ -460,7 +460,7 @@ class TestSaveWorkspaceRoundTrip:
 
     def test_empty_projects_roundtrip_is_unloadable(self, tmp_project):
         """A workspace with no members cannot be read back: it has no root member."""
-        make_workspace(str(tmp_project), [])
+        save_workspace(str(tmp_project), [])
         with pytest.raises(WorkspaceError, match="declares no root member"):
             load_workspace(str(tmp_project))
 
@@ -507,7 +507,8 @@ class TestResolveProjectExtended:
         result = resolve_project(str(tmp_project), str(tmp_project / "mono" / "other"))
         assert result.name == "mono"
 
-    def test_no_match_returns_none(self, tmp_project):
+    def test_no_declared_member_match_gives_the_root_member(self, tmp_project):
+        """A directory no declared member claims belongs to the root member."""
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
@@ -515,7 +516,7 @@ class TestResolveProjectExtended:
         )
         (tmp_project / "unrelated").mkdir()
         result = resolve_project(str(tmp_project), str(tmp_project / "unrelated"))
-        assert result is None
+        assert result["name"] == "root"
 
     def test_resolve_returns_workspace_project_instance(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
