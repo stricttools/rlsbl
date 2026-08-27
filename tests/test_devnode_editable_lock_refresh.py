@@ -27,6 +27,8 @@ from unittest.mock import patch
 from rlsbl.commands.release import phase_a
 from rlsbl.workspace import Releasable, save_workspace, write_releasable_version
 
+from conftest import with_root_member
+
 
 PYPROJECT = """\
 [project]
@@ -89,10 +91,10 @@ def _workspace(root, *, lock_target="../python", pinned="0.40.0",
         conformance["dev_node"] = True
     save_workspace(
         str(root),
-        [
+        with_root_member([
             {"path": "python", "name": "impl", "releasable": "alpha"},
             conformance,
-        ],
+        ]),
         releasables=[Releasable(name="alpha")],
     )
     write_releasable_version(str(root), "alpha", "0.40.0")

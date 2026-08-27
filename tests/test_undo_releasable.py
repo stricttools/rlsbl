@@ -30,6 +30,8 @@ from rlsbl.workspace import (
     write_releasable_version,
 )
 
+from conftest import with_root_member
+
 
 _ENTRY = {
     "commits": [],
@@ -102,7 +104,7 @@ def _setup_released_releasable_workspace(root):
 
     save_workspace(
         str(root),
-        [{"path": "packages/core", "name": "core", "releasable": "alpha"}],
+        with_root_member([{"path": "packages/core", "name": "core", "releasable": "alpha"}]),
         releasables=[Releasable(name="alpha")],
     )
     write_releasable_version(str(root), "alpha", "1.0.0")

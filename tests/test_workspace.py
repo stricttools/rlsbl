@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from conftest import with_root_member, workspace_toml
+from conftest import with_root_member, workspace_toml, make_workspace
 
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
@@ -120,12 +120,12 @@ class TestSaveWorkspace:
 
     def test_creates_file(self, tmp_project):
         projects = [{"path": "packages/foo", "name": "foo"}]
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         assert (tmp_project / ".rlsbl-monorepo" / "workspace.toml").exists()
 
     def test_creates_directory(self, tmp_project):
         assert not (tmp_project / ".rlsbl-monorepo").exists()
-        save_workspace(str(tmp_project), with_root_member([{"path": "x", "name": "x"}]))
+        make_workspace(str(tmp_project), [{"path": "x", "name": "x"}])
         assert (tmp_project / ".rlsbl-monorepo").is_dir()
 
     def test_roundtrips_with_load(self, tmp_project):
@@ -133,21 +133,21 @@ class TestSaveWorkspace:
             {"path": "packages/foo", "name": "foo"},
             {"path": "libs/bar", "name": "bar"},
         ]
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         loaded = declared(load_workspace(str(tmp_project)))
         assert [p.to_dict() for p in loaded] == [
             {**proj, "releasable": False} for proj in projects
         ]
 
     def test_atomic_write_no_leftover_tmp(self, tmp_project):
-        save_workspace(str(tmp_project), with_root_member([{"path": "x", "name": "x"}]))
+        make_workspace(str(tmp_project), [{"path": "x", "name": "x"}])
         ws_dir = tmp_project / ".rlsbl-monorepo"
         files = list(ws_dir.iterdir())
         assert all(not f.name.endswith(".tmp") for f in files)
 
     def test_overwrites_existing(self, tmp_project):
-        save_workspace(str(tmp_project), with_root_member([{"path": "a", "name": "a"}]))
-        save_workspace(str(tmp_project), with_root_member([{"path": "b", "name": "b"}]))
+        make_workspace(str(tmp_project), [{"path": "a", "name": "a"}])
+        make_workspace(str(tmp_project), [{"path": "b", "name": "b"}])
         loaded = declared(load_workspace(str(tmp_project)))
         assert [p.to_dict() for p in loaded] == [
             {"path": "b", "name": "b", "releasable": False},
@@ -196,7 +196,7 @@ class TestWorkspaceExtraKeys:
                 "owner": "platform-team",
             }
         ]
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         loaded = declared(load_workspace(str(tmp_project)))
         assert [p.to_dict() for p in loaded] == [
             {**proj, "releasable": False} for proj in projects
@@ -212,7 +212,7 @@ class TestWorkspaceExtraKeys:
                 "subtree_remote": "git@example.com:bar.git",
             }
         ]
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         toml_path = tmp_project / ".rlsbl-monorepo" / "workspace.toml"
         content = toml_path.read_text()
         # path must come before name, name before extras, extras sorted

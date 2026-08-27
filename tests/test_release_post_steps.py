@@ -33,6 +33,8 @@ from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 from rlsbl.utils import run as real_run
 
+from conftest import with_root_member, make_workspace
+
 
 # ---------------------------------------------------------------------------
 # Helpers (conventions follow tests/test_release_resume.py)
@@ -195,7 +197,7 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
     (proj_dir / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "none", "targets": ["npm"]}) + "\n"
     )
-    save_workspace(str(repo), [{
+    make_workspace(str(repo), [{
         "path": project_path,
         "name": name,
         "target": "npm",

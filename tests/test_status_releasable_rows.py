@@ -10,7 +10,7 @@ shown.
 import os
 import subprocess
 
-from conftest import make_ctx  # noqa: F401  (keeps fixture wiring consistent)
+from conftest import make_ctx, with_root_member
 
 from rlsbl.commands.monorepo import _cmd_status
 from rlsbl.tag_glob import resolve_monorepo_tag_glob, releasable_tag_glob
@@ -59,10 +59,10 @@ class TestPerReleasableStatusRows:
         _make_npm_project(mock_git_repo, "pkg-b", version="1.0.0")
         save_workspace(
             str(mock_git_repo),
-            [
+            with_root_member([
                 {"path": "pkg-a", "name": "pkg-a", "releasable": "alpha"},
                 {"path": "pkg-b", "name": "pkg-b", "releasable": "alpha"},
-            ],
+            ]),
             releasables=[Releasable(name="alpha")],
         )
         write_releasable_version(str(mock_git_repo), "alpha", "1.0.0")
@@ -91,10 +91,10 @@ class TestPerReleasableStatusRows:
         _make_npm_project(mock_git_repo, "tool", version="3.0.0")
         save_workspace(
             str(mock_git_repo),
-            [
+            with_root_member([
                 {"path": "lib", "name": "lib", "releasable": "alpha"},
                 {"path": "tool", "name": "tool", "releasable": False},
-            ],
+            ]),
             releasables=[Releasable(name="alpha")],
         )
         write_releasable_version(str(mock_git_repo), "alpha", "2.0.0")

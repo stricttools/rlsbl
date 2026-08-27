@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import with_root_member
+from conftest import with_root_member, make_workspace
 
 from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
@@ -57,7 +57,7 @@ def _init_workspace(base_path, projects):
     """Initialize a workspace with the given project list."""
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
-    save_workspace(str(base_path), with_root_member(projects))
+    make_workspace(str(base_path), projects)
 
 
 # ---------------------------------------------------------------------------

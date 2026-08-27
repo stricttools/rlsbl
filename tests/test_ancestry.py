@@ -36,6 +36,8 @@ import pytest
 from rlsbl import git_util
 from rlsbl.git_util import Ancestry, ancestry
 
+from conftest import with_root_member, make_workspace
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -228,10 +230,7 @@ class TestMirrorTripwireMapping:
         remote.mkdir()
         subprocess.run(["git", "init", "-q", "--bare"], cwd=str(remote), check=True)
         (root / WORKSPACE_DIR).mkdir(exist_ok=True)
-        save_workspace(
-            str(root),
-            [{"path": "mylib", "name": "mylib", "subtree_remote": str(remote)}],
-        )
+        make_workspace(str(root), [{"path": "mylib", "name": "mylib", "subtree_remote": str(remote)}])
         _git(root, "add", "-A")
         _git(root, "commit", "-q", "-m", "initial monorepo")
 

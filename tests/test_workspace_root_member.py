@@ -227,36 +227,27 @@ class TestRootReleasableTagFormat:
 
 
 class TestResolveProjectWithRootMember:
-    """Directory resolution is a different question from file attribution.
+    """Inside a workspace, some member always answers.
 
-    The root member owns the residual for files. It deliberately does not
-    answer "which project is this directory in?", because several commands act
-    on the answer "none of them, you are at the workspace root".
+    A member declared at ``path = "."`` always matched every directory under
+    the repository root; the root member being mandatory just makes that
+    universal.
     """
 
-    def test_repo_root_does_not_resolve_to_the_root_member(self, tmp_path):
+    def test_repo_root_resolves_to_the_root_member(self, tmp_path):
         write_raw(tmp_path, workspace_toml(
             '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n',
         ))
-        assert resolve_project(str(tmp_path), str(tmp_path)) is None
+        resolved = resolve_project(str(tmp_path), str(tmp_path))
+        assert resolved["name"] == ROOT_MEMBER_NAME
 
-    def test_unclaimed_subdirectory_does_not_resolve_either(self, tmp_path):
+    def test_unclaimed_subdirectory_resolves_to_the_root_member(self, tmp_path):
         write_raw(tmp_path, workspace_toml(
             '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n',
         ))
         (tmp_path / "docs").mkdir()
-        assert resolve_project(str(tmp_path), str(tmp_path / "docs")) is None
-
-    def test_the_root_member_still_owns_those_files(self, tmp_path):
-        """The same paths that resolve to no project are owned by the root member."""
-        from rlsbl.ownership import owner_name_of
-
-        write_raw(tmp_path, workspace_toml(
-            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n',
-        ))
-        members = load_workspace(str(tmp_path))
-        assert owner_name_of("docs/guide.md", members) == ROOT_MEMBER_NAME
-        assert owner_name_of("README.md", members) == ROOT_MEMBER_NAME
+        resolved = resolve_project(str(tmp_path), str(tmp_path / "docs"))
+        assert resolved["name"] == ROOT_MEMBER_NAME
 
     def test_member_directory_still_wins(self, tmp_path):
         write_raw(tmp_path, workspace_toml(

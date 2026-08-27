@@ -15,6 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl import app
 from rlsbl.changelog.home import (
     _strip_canonical_header,
@@ -133,15 +135,22 @@ def _setup_releasable_workspace(root, member_path="packages/core",
     project_entry = {
         "path": member_path, "name": "core", "releasable": releasable_name,
     }
+    members = [project_entry]
+    tag_format = None
     if member_path == ".":
-        # Root members can't rely on the path prefix for commit scoping
-        # (a "./" prefix never matches); real root-member workspaces use
-        # watch globs.
-        project_entry["watch"] = ["*", "**/*"]
+        # A root member owns every path no other member claims, so its scoping
+        # needs no help -- but its releasable must name its tag format.
+        project_entry["name"] = "root"
+        tag_format = "v{version}"
+    else:
+        members = with_root_member(members)
     save_workspace(
         str(root),
-        [project_entry],
-        releasables=[Releasable(name=releasable_name)],
+        with_root_member(members),
+        releasables=[
+            Releasable(name=releasable_name, tag_format=tag_format)
+            if tag_format else Releasable(name=releasable_name)
+        ],
     )
     write_releasable_version(str(root), releasable_name, "1.0.0")
     changes_dir = get_releasable_changes_dir(str(root), releasable_name)
@@ -222,10 +231,10 @@ class TestGenerateWorkspaceChangelog:
         root = tmp_project
         save_workspace(
             str(root),
-            [
+            with_root_member([
                 {"path": "packages/b", "name": "b", "releasable": "beta"},
                 {"path": "packages/a", "name": "a", "releasable": "alpha"},
-            ],
+            ]),
             releasables=[Releasable(name="beta"), Releasable(name="alpha")],
         )
         for name, version in (("beta", "2.0.0"), ("alpha", "1.0.0")):
@@ -257,7 +266,9 @@ class TestGenerateWorkspaceChangelog:
         root = tmp_project
         save_workspace(
             str(root),
-            [{"path": "packages/a", "name": "a", "releasable": "alpha"}],
+            with_root_member(
+                [{"path": "packages/a", "name": "a", "releasable": "alpha"}],
+            ),
             releasables=[Releasable(name="alpha")],
         )
         content = generate_workspace_changelog(str(root))
@@ -267,7 +278,9 @@ class TestGenerateWorkspaceChangelog:
         root = tmp_project
         save_workspace(
             str(root),
-            [{"path": "packages/a", "name": "a", "releasable": "alpha"}],
+            with_root_member(
+                [{"path": "packages/a", "name": "a", "releasable": "alpha"}],
+            ),
             releasables=[Releasable(name="alpha")],
         )
         rel_dir = get_releasable_dir(str(root), "alpha")

@@ -736,6 +736,13 @@ def make_workspace(root, projects, releasables=None):
                 continue
             name = entry.get("releasable")
             if not isinstance(name, str):
+                if _normalize_member_path(entry["path"]) == ".":
+                    # A root member's releasable can never inherit a tag format
+                    # (the loader refuses that), and the kind of the root member
+                    # is a real decision -- so an undeclared one is a dev node.
+                    entry["releasable"] = False
+                    entry.setdefault("dev_only", True)
+                    continue
                 name = entry["name"]
                 entry["releasable"] = name
             if name not in seen:

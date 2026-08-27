@@ -28,6 +28,8 @@ from rlsbl.config import load_env_file
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ConfigError
 
+from conftest import with_root_member, make_workspace
+
 
 _PROBE = "RLSBL_ENV_FILE_PROBE"
 
@@ -239,7 +241,7 @@ class TestBatchOrchestratorLoadsTheEnvFile:
         from rlsbl.release_file import get_batch_release_file_path
         from rlsbl.workspace import save_workspace
 
-        save_workspace(str(ws), [{"path": "alpha", "name": "alpha"}])
+        make_workspace(str(ws), [{"path": "alpha", "name": "alpha"}])
         (ws / "alpha").mkdir()
         (ws / "alpha" / "pyproject.toml").write_text(
             '[project]\nname = "alpha"\nversion = "0.1.0"\n'

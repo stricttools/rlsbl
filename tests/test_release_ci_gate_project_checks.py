@@ -62,6 +62,8 @@ from test_representative_write_elimination import (  # noqa: E402
     _setup_releasable_workspace,
 )
 
+from conftest import with_root_member, make_workspace
+
 
 TAG = "alpha@v1.0.1"
 VERSION = "1.0.1"
@@ -512,10 +514,10 @@ class TestReleasableMembersAreAllVerified:
             (wf / "ci-npm.yml").write_text("name: ci\non: push\n")
         save_workspace(
             str(tmp_project),
-            [
+            with_root_member([
                 {"path": "packages/core", "name": "core", "releasable": "alpha"},
                 {"path": "packages/extra", "name": "extra", "releasable": "alpha"},
-            ],
+            ]),
             releasables=[Releasable(name="alpha")],
         )
 
@@ -539,7 +541,7 @@ class TestReleasableMembersAreAllVerified:
         (wf / "ci-npm.yml").write_text("name: ci\non: push\n")
         # A workspace that lists nothing: the widening lookup finds no
         # siblings, and the releasing project must still be verified.
-        save_workspace(str(tmp_project), [])
+        make_workspace(str(tmp_project), [])
 
         filters = release_check_filters(
             config={}, registry="npm",
@@ -554,9 +556,7 @@ class TestReleasableMembersAreAllVerified:
         from rlsbl.ci_checks import workspace_check_filters
         from rlsbl.workspace import save_workspace
 
-        save_workspace(
-            str(tmp_project), [{"path": "packages/core", "name": "core"}]
-        )
+        make_workspace(str(tmp_project), [{"path": "packages/core", "name": "core"}])
         with pytest.raises(ProjectCINotRunError) as exc:
             workspace_check_filters(
                 str(tmp_project), [str(tmp_project / "packages" / "ghost")]

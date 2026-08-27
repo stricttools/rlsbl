@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-from conftest import make_ctx, with_root_member
+from conftest import make_ctx, with_root_member, make_workspace
 from rlsbl.changelog.resolve import _unreleased_range
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
 from rlsbl.errors import WorkspaceError
@@ -351,9 +351,7 @@ def _unreleasable_member_workspace(repo, name="pkg-a", version="1.0.0",
     from rlsbl.workspace import save_workspace
 
     _make_npm_project(repo, name, version=version)
-    save_workspace(
-        str(repo), with_root_member([{"path": name, "name": name}]),
-    )
+    make_workspace(str(repo), [{"path": name, "name": name}])
     changes_dir = os.path.join(str(repo), name, ".rlsbl", "changes")
     if with_changes_dir:
         os.makedirs(changes_dir, exist_ok=True)
@@ -631,7 +629,7 @@ class TestMonorepoStatusWatch:
         for p in projects:
             if p["name"] == "tooling":
                 p["watch"] = ["Package.swift", "shared/**"]
-        save_workspace(".", with_root_member(projects))
+        make_workspace(".", projects)
 
         capsys.readouterr()
         with pytest.raises(WorkspaceError, match="'watch' key is no longer supported"):
@@ -649,7 +647,7 @@ class TestMonorepoStatusWatch:
         for p in projects:
             if p["name"] == "tooling":
                 p["watch"] = ["Package.swift"]
-        save_workspace(".", with_root_member(projects))
+        make_workspace(".", projects)
 
         capsys.readouterr()
         with pytest.raises(WorkspaceError) as exc:
@@ -681,7 +679,7 @@ class TestMonorepoStatusRemote:
         for p in projects:
             if p["name"] == "tooling":
                 p["subtree_remote"] = "git@github.com:user/tooling.git"
-        save_workspace(".", with_root_member(projects))
+        make_workspace(".", projects)
 
         capsys.readouterr()
         _cmd_status({}, project_root=".")
@@ -702,7 +700,7 @@ class TestMonorepoStatusRemote:
         for p in projects:
             if p["name"] == "tooling":
                 p["subtree_remote"] = "git@github.com:user/tooling.git"
-        save_workspace(".", with_root_member(projects))
+        make_workspace(".", projects)
 
         capsys.readouterr()
         _cmd_status({}, project_root=".")
@@ -745,7 +743,7 @@ def _setup_workspace_with_deps(base_path):
         {"path": "lib-b", "name": "lib-b"},
         {"path": "lib-c", "name": "lib-c"},
     ]
-    save_workspace(str(base_path), with_root_member(projects))
+    make_workspace(str(base_path), projects)
     return projects
 
 
@@ -887,7 +885,7 @@ class TestMonorepoStatusDeps:
         for p in projects:
             if p["name"] == "lib-a":
                 p["subtree_remote"] = "git@github.com:user/lib-a.git"
-        save_workspace(".", with_root_member(projects))
+        make_workspace(".", projects)
 
         capsys.readouterr()
         _cmd_status({}, project_root=".")

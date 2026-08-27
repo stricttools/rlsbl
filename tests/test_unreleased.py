@@ -14,6 +14,8 @@ from rlsbl.commands.unreleased import (
 )
 from rlsbl.utils import get_last_version_tag
 
+from conftest import with_root_member
+
 
 class TestGetLastTag:
     """Tests for get_last_version_tag (consolidated from _get_last_tag)."""
@@ -360,7 +362,7 @@ def _explicit_releasable_workspace(repo, *, member="pkg-a", releasable="alpha",
     _make_npm_project(repo, member, version=version)
     save_workspace(
         str(repo),
-        [{"path": member, "name": member, "releasable": releasable}],
+        with_root_member([{"path": member, "name": member, "releasable": releasable}]),
         releasables=[Releasable(name=releasable)],
     )
     write_releasable_version(str(repo), releasable, version)

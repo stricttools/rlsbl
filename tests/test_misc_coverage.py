@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from conftest import FakeResponse, run_git, git_head, make_commit
+from conftest import FakeResponse, git_head, make_commit, run_git, with_root_member, make_workspace
 
 
 # ============================================================================
@@ -1044,7 +1044,7 @@ def _mirror_workspace(mock_git_repo, tmp_path):
 
     proj = {"path": "mylib", "name": "mylib", "subtree_remote": str(bare_repo)}
     (mock_git_repo / WORKSPACE_DIR).mkdir(exist_ok=True)
-    save_workspace(str(mock_git_repo), [proj])
+    make_workspace(str(mock_git_repo), [proj])
 
     run_git(mock_git_repo, "add", "mylib")
     run_git(mock_git_repo, "add", WORKSPACE_DIR)

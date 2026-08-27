@@ -26,6 +26,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from conftest import with_root_member
+
 from rlsbl.commands.release import resume_cmd, run_cmd
 from rlsbl.commands.release.release_state import (
     StateResolutionError,
@@ -107,7 +109,9 @@ def _setup_releasable_workspace(root):
 
     save_workspace(
         str(root),
-        [{"path": "packages/core", "name": "core", "releasable": "alpha"}],
+        with_root_member(
+            [{"path": "packages/core", "name": "core", "releasable": "alpha"}],
+        ),
         releasables=[Releasable(name="alpha")],
     )
     write_releasable_version(str(root), "alpha", "1.0.0")

@@ -1,6 +1,6 @@
 """Tests for description and test_only per-project fields in workspace.toml."""
 
-from conftest import with_root_member, workspace_toml
+from conftest import with_root_member, workspace_toml, make_workspace
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 
 
@@ -66,7 +66,7 @@ class TestDescriptionField:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_DESCRIPTION))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         reloaded = load_workspace(str(tmp_project))
 
         assert reloaded[0]["description"] == "Core models and shared utilities"
@@ -78,7 +78,7 @@ class TestDescriptionField:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_DESCRIPTION))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert 'description = "Core models and shared utilities"' in content
@@ -109,7 +109,7 @@ class TestTestOnlyField:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_TEST_ONLY))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         reloaded = load_workspace(str(tmp_project))
 
         assert reloaded[1]["test_only"] is True
@@ -121,7 +121,7 @@ class TestTestOnlyField:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_TEST_ONLY))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "test_only = true" in content
@@ -148,7 +148,7 @@ class TestBothFieldsTogether:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_BOTH))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         reloaded = load_workspace(str(tmp_project))
 
         assert reloaded == projects
@@ -159,7 +159,7 @@ class TestBothFieldsTogether:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_BOTH))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert 'description = "Core models and shared utilities"' in content
@@ -174,7 +174,7 @@ class TestBothFieldsTogether:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_BOTH))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         # description comes before test_only alphabetically

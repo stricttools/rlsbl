@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import with_root_member
+from conftest import with_root_member, make_workspace
 
 from rlsbl.commands.monorepo import (
     _cmd_init,
@@ -613,7 +613,7 @@ class TestTrailingSlashStripped:
         _cmd_init({"root-dev-node": True}, project_root=".")
         # Manually add with trailing-slash path in workspace
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": "python/", "name": "mypkg"}]))
+        make_workspace(".", [{"path": "python/", "name": "mypkg"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -639,7 +639,7 @@ class TestTrailingSlashStripped:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": "lib/", "name": "mylib"}]))
+        make_workspace(".", [{"path": "lib/", "name": "mylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -701,7 +701,7 @@ class TestVersionFileRewrite:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": "gomod", "name": "gomod"}]))
+        make_workspace(".", [{"path": "gomod", "name": "gomod"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -759,7 +759,7 @@ class TestPackagesDirInjection:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": "mypylib", "name": "mypylib"}]))
+        make_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -853,7 +853,7 @@ class TestDotPathSelfReference:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": ".", "name": "root", "releasable": False}]))
+        make_workspace(".", [{"path": ".", "name": "root", "releasable": False}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -929,7 +929,7 @@ class TestTemplateVarResolution:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": "mypylib", "name": "mypylib"}]))
+        make_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -960,7 +960,7 @@ class TestTemplateVarResolution:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": "mygomod", "name": "mygomod"}]))
+        make_workspace(".", [{"path": "mygomod", "name": "mygomod"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],
@@ -1019,7 +1019,7 @@ jobs:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         from rlsbl.workspace import save_workspace
-        save_workspace(".", with_root_member([{"path": "mypylib", "name": "mypylib"}]))
+        make_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],

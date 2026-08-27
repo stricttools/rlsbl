@@ -362,10 +362,10 @@ class TestMultipleReleasables:
 
 
 class TestImplicitModeNoCrash:
-    """Implicit-mode workspace (no [[releasables]]) doesn't crash."""
+    """A workspace whose members each have their own releasable still loads."""
 
-    def test_implicit_mode_context_factory_no_crash(self, tmp_path, monkeypatch):
-        """_check_context_factory doesn't crash for implicit-mode workspace."""
+    def test_context_factory_loads_the_derived_releasables(self, tmp_path, monkeypatch):
+        """_check_context_factory reads the releasables the workspace declares."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -392,12 +392,10 @@ class TestImplicitModeNoCrash:
         run_git(repo, "commit", "-q", "-m", "scaffold")
         run_git(repo, "tag", "alpha@v0.1.0")
 
-        # The factory should not crash even though there's no [[releasables]]
         from rlsbl import _check_context_factory
         ctx = _check_context_factory()
         assert ctx is not None
-        # releasables should be an empty list in implicit mode
-        assert ctx.releasables == []
+        assert [r.name for r in ctx.releasables] == ["alpha"]
 
     def test_implicit_mode_changelog_coverage_works(self, tmp_path, monkeypatch):
         """Changelog coverage check works in implicit mode at project dir."""
@@ -471,9 +469,9 @@ class TestWorkspaceRootWithDotProject:
         repo.mkdir()
         monkeypatch.chdir(repo)
 
-        releasables = [Releasable(name="main-rel")]
+        releasables = [Releasable(name="main-rel", tag_format="v{version}")]
         projects = [
-            {"path": ".", "name": "root-pkg", "releasable": "main-rel"},
+            {"path": ".", "name": "root", "releasable": "main-rel"},
         ]
         _setup_releasable_monorepo(repo, releasables=releasables, projects=projects)
 
@@ -500,8 +498,15 @@ class TestWorkspaceRootWithDotProject:
         result = app._check_defs["changelog-coverage"].impl(ctx)
         assert result.status == "pass"
 
-    def test_dot_path_project_implicit_mode(self, tmp_path, monkeypatch):
-        """Project with path='.' in implicit mode resolves correctly from root."""
+    def test_root_member_outside_every_releasable_has_no_changelog(
+        self, tmp_path, monkeypatch,
+    ):
+        """A root member outside every releasable is not covered by any changelog.
+
+        This used to be the implicit-mode shape, where the member kept its own
+        per-package JSONL. A member with ``releasable = false`` produces no
+        releases, so the coverage check has nothing to check and says so.
+        """
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -521,10 +526,10 @@ class TestWorkspaceRootWithDotProject:
         (changes / "unreleased.jsonl").write_text("")
         (repo / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci", "targets": ["npm"]}))
 
-        make_workspace(repo, [{"path": ".", "name": "root-pkg"}])
+        make_workspace(repo, [{"path": ".", "name": "root", "releasable": False}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "root-pkg@v0.1.0")
+        run_git(repo, "tag", "root@v0.1.0")
 
         # Make a commit and cover it
         (repo / "lib.js").write_text("module.exports = 1;\n")
@@ -552,4 +557,5 @@ class TestWorkspaceRootWithDotProject:
             releasables=[],
         )
         result = app._check_defs["changelog-coverage"].impl(ctx)
-        assert result.status == "pass"
+        assert result.status == "skip"
+        assert "non-releasable" in result.message

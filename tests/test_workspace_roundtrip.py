@@ -1,6 +1,6 @@
 """Tests for save_workspace() preserving top-level TOML sections."""
 
-from conftest import with_root_member, workspace_toml
+from conftest import with_root_member, workspace_toml, make_workspace
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 
 
@@ -40,7 +40,7 @@ class TestPreservesTopLevelSections:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "[layers.core]" in content
@@ -54,7 +54,7 @@ class TestPreservesTopLevelSections:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "[check]" in content
@@ -67,7 +67,7 @@ class TestPreservesTopLevelSections:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "# Monorepo configuration" in content
@@ -86,7 +86,7 @@ name = "pkg"
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert 'custom_key = "hello"' in content
@@ -110,7 +110,7 @@ library = true
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         reloaded = load_workspace(str(tmp_project))
         assert reloaded[0]["watch"] == ["src/**"]
@@ -123,7 +123,7 @@ library = true
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         reloaded = load_workspace(str(tmp_project))
 
         assert reloaded == projects
@@ -134,7 +134,7 @@ class TestNewFileCreation:
 
     def test_creates_file_when_missing(self, tmp_project):
         projects = [{"path": "pkg/a", "name": "a"}]
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
 
         ws_file = tmp_project / WORKSPACE_DIR / WORKSPACE_FILE
         assert ws_file.exists()
@@ -144,11 +144,11 @@ class TestNewFileCreation:
 
     def test_creates_directory_when_missing(self, tmp_project):
         assert not (tmp_project / WORKSPACE_DIR).exists()
-        save_workspace(str(tmp_project), [{"path": "x", "name": "x"}])
+        make_workspace(str(tmp_project), [{"path": "x", "name": "x"}])
         assert (tmp_project / WORKSPACE_DIR).is_dir()
 
     def test_empty_projects_new_file(self, tmp_project):
-        save_workspace(str(tmp_project), [])
+        make_workspace(str(tmp_project), [])
         ws_file = tmp_project / WORKSPACE_DIR / WORKSPACE_FILE
         assert ws_file.exists()
         content = ws_file.read_text()

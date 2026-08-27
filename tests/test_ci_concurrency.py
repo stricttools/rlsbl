@@ -36,6 +36,8 @@ from rlsbl.commands.monorepo import (
 )
 from rlsbl.workspace import save_workspace
 
+from conftest import with_root_member, make_workspace
+
 TEMPLATES_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "rlsbl", "templates"
 )
@@ -244,7 +246,7 @@ class TestSyncInlineConcurrency:
             f.write(CI_WITH_CONCURRENCY)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        save_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
+        make_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
             ["git", "commit", "-q", "-m", "setup"],

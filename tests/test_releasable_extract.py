@@ -15,7 +15,7 @@ import subprocess
 
 import pytest
 
-from conftest import DEFAULT_RELEASE_FILE, make_releasable_monorepo, make_releasable_state, with_root_member, workspace_toml
+from conftest import DEFAULT_RELEASE_FILE, make_releasable_monorepo, make_releasable_state, with_root_member, workspace_toml, make_workspace
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
 from rlsbl.commands.monorepo.extract import (
     ExtractError,
@@ -440,7 +440,7 @@ class TestRemoveProjectFromWorkspace:
             WorkspaceProject({"path": "a", "name": "alpha"}),
             WorkspaceProject({"path": "b", "name": "beta"}),
         ]
-        save_workspace(str(tmp_path), with_root_member(projects))
+        make_workspace(str(tmp_path), projects)
 
         updated = _remove_project_from_workspace(str(tmp_path), "alpha", projects)
         assert len(updated) == 1
@@ -455,7 +455,7 @@ class TestRemoveProjectFromWorkspace:
         projects = [
             WorkspaceProject({"path": "a", "name": "alpha"}),
         ]
-        save_workspace(str(tmp_path), with_root_member(projects))
+        make_workspace(str(tmp_path), projects)
 
         with pytest.raises(ExtractError, match="not found"):
             _remove_project_from_workspace(str(tmp_path), "nonexistent", projects)
@@ -473,7 +473,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), with_root_member(projects))
+        make_workspace(str(root), projects)
 
         target = tmp_path / "output"
         projs, proj = validate_extract_preconditions(str(root), "pkg", str(target))
@@ -486,7 +486,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), with_root_member(projects))
+        make_workspace(str(root), projects)
 
         target = tmp_path / "output"
         target.mkdir()
@@ -500,7 +500,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), with_root_member(projects))
+        make_workspace(str(root), projects)
 
         target = tmp_path / "output"
         with pytest.raises(ExtractError, match="not found"):
@@ -512,7 +512,7 @@ class TestValidateExtractPreconditions:
 
         root = tmp_path
         projects = [WorkspaceProject({"path": "pkg", "name": "pkg"})]
-        save_workspace(str(root), with_root_member(projects))
+        make_workspace(str(root), projects)
 
         target = tmp_path / "output"
         with pytest.raises(ExtractError, match="git-filter-repo is not installed"):
@@ -539,7 +539,7 @@ class TestValidateAbsorbPreconditions:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = _clean_source(tmp_path)
 
         projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
@@ -550,7 +550,7 @@ class TestValidateAbsorbPreconditions:
         monkeypatch.setattr(shutil, "which", lambda n: None)
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = _clean_source(tmp_path)
 
         with pytest.raises(ExtractError, match="git-filter-repo is not installed"):
@@ -560,7 +560,7 @@ class TestValidateAbsorbPreconditions:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
 
         with pytest.raises(ExtractError, match="does not exist"):
             validate_absorb_preconditions(
@@ -571,7 +571,7 @@ class TestValidateAbsorbPreconditions:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = tmp_path / "source"
         source.mkdir()
 
@@ -583,7 +583,7 @@ class TestValidateAbsorbPreconditions:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = _clean_source(tmp_path)
         (source / "uncommitted.txt").write_text("dirty\n")
 
@@ -594,7 +594,7 @@ class TestValidateAbsorbPreconditions:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = _clean_source(tmp_path)
 
         with pytest.raises(ExtractError, match="package 'existing' already exists"):
@@ -604,7 +604,7 @@ class TestValidateAbsorbPreconditions:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = _clean_source(tmp_path)
 
         with pytest.raises(ExtractError, match="path 'existing' already exists"):
@@ -1541,7 +1541,7 @@ class TestBrokenTargetDeclarationGuard:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = _clean_source(tmp_path, name="broken_src")
         os.makedirs(str(source / ".rlsbl"), exist_ok=True)
         (source / ".rlsbl" / "config.json").write_text(
@@ -1557,7 +1557,7 @@ class TestBrokenTargetDeclarationGuard:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "monorepo"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
         source = _clean_source(tmp_path)  # no .rlsbl at all
 
         projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
@@ -1593,7 +1593,7 @@ class TestBrokenTargetDeclarationGuard:
         monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
         root = tmp_path / "mono"
         root.mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
         pkg_rlsbl = root / "pkg" / ".rlsbl"
         os.makedirs(str(pkg_rlsbl), exist_ok=True)
         (pkg_rlsbl / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
@@ -1607,7 +1607,7 @@ class TestBrokenTargetDeclarationGuard:
         root = tmp_path / "mono"
         root.mkdir()
         (root / "pkg").mkdir()
-        save_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
+        make_workspace(str(root), [WorkspaceProject({"path": "pkg", "name": "pkg"})])
 
         projs, proj = validate_extract_preconditions(str(root), "pkg", str(tmp_path / "out"))
         assert proj.name == "pkg"

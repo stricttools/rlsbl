@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import with_root_member
+from conftest import with_root_member, make_workspace
 
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 from rlsbl.release_file import get_batch_release_file_path
@@ -32,7 +32,7 @@ def _make_npm_project(base_path, subdir, version="0.1.0", deps=None):
 def _init_workspace(base_path, projects):
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
-    save_workspace(str(base_path), with_root_member(projects))
+    make_workspace(str(base_path), projects)
 
 
 BATCH_TOML_3PKG = (

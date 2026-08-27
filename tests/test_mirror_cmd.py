@@ -20,7 +20,7 @@ from rlsbl.commands.monorepo.mirror_cmd import (
 )
 from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE, save_workspace
 
-from conftest import run_git
+from conftest import run_git, with_root_member, make_workspace
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ def _make_monorepo(root, subtree_remote=None, project_path="mylib", name="mylib"
     if subtree_remote:
         proj["subtree_remote"] = subtree_remote
     (root / WORKSPACE_DIR).mkdir(exist_ok=True)
-    save_workspace(str(root), [proj])
+    make_workspace(str(root), [proj])
 
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial monorepo")

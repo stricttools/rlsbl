@@ -11,7 +11,7 @@ import json
 import os
 import subprocess
 
-from conftest import make_ctx
+from conftest import make_ctx, with_root_member
 
 from rlsbl.commands.status import run_cmd
 from rlsbl.workspace import (
@@ -63,7 +63,7 @@ def _workspace_with_releasable(repo, members=("pkg-a", "pkg-b"), name="alpha",
         _make_npm_project(repo, member, version=version)
     save_workspace(
         str(repo),
-        [{"path": m, "name": m, "releasable": name} for m in members],
+        with_root_member([{"path": m, "name": m, "releasable": name} for m in members]),
         releasables=[Releasable(name=name)],
     )
     write_releasable_version(str(repo), name, version)

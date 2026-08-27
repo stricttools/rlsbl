@@ -79,8 +79,10 @@ class TestChangelogAddValidatesProjectScope:
         # Should succeed without error
         cmd_add(flags, project_root=alpha_dir)
 
-        from rlsbl.changelog.files import get_changes_dir, read_unreleased
-        entries = read_unreleased(get_changes_dir(str(alpha_dir)))
+        # A member's entries live under its releasable, not the package.
+        from rlsbl.changelog.files import read_unreleased
+        from rlsbl.workspace import get_releasable_changes_dir
+        entries = read_unreleased(get_releasable_changes_dir(str(root), "alpha"))
         assert len(entries) == 1
         assert entries[0].description == "Alpha feature"
 
@@ -127,7 +129,7 @@ class TestChangelogAddRejectsOutOfScopeCommit:
             cmd_add(flags, project_root=alpha_dir)
 
         captured = capsys.readouterr()
-        assert "does not touch files owned by project" in captured.err
+        assert "does not touch files owned by" in captured.err
         assert "'alpha'" in captured.err
         assert "workspace.toml" in captured.err
 

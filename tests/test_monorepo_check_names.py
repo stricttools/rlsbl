@@ -7,7 +7,7 @@ from unittest.mock import patch, call
 
 import pytest
 
-from conftest import with_root_member
+from conftest import with_root_member, make_workspace
 
 from rlsbl.commands.monorepo import _cmd_check_names, _cmd_init, _cmd_add
 from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE, load_workspace, save_workspace
@@ -167,7 +167,7 @@ def _set_registry_name(root, project_name, registry_name):
     for proj in projects:
         if proj["name"] == project_name:
             proj["registry_name"] = registry_name
-    save_workspace(root, with_root_member(projects))
+    make_workspace(root, projects)
 
 
 class TestRegistryName:

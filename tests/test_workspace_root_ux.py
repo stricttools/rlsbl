@@ -1,9 +1,9 @@
-"""Tests for workspace-root error messages on per-sub-project commands.
+"""Tests for what per-member commands do at the monorepo workspace root.
 
-When a per-sub-project command (status, changelog add, release init, etc.)
-is run from the monorepo workspace root, the error should say "cd into a
-sub-project" rather than the misleading "run 'rlsbl monorepo add'" -- the
-workspace root is not an unregistered project.
+The workspace root is the root member's own directory -- every workspace
+declares one -- so a per-member command run there resolves to the root member
+and reports on it. What it must never do is claim the directory is an
+unregistered project and tell the operator to run `rlsbl monorepo add`.
 """
 
 import json
@@ -11,6 +11,8 @@ import subprocess
 
 from rlsbl import app
 from rlsbl.workspace import save_workspace
+
+from conftest import with_root_member, make_workspace
 
 
 def _git(repo, *args):
@@ -42,29 +44,28 @@ def _setup_monorepo(root):
     (core / ".rlsbl" / "changes").mkdir()
     (core / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
 
-    save_workspace(
-        str(root),
-        [{"path": "core", "name": "core"}],
-    )
+    make_workspace(str(root), [{"path": "core", "name": "core"}])
 
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial")
 
 
 class TestWorkspaceRootUX:
-    """Commands run from the workspace root should produce workspace-specific
-    error messages, not the generic 'run rlsbl monorepo add'."""
+    """Commands run from the workspace root resolve to the root member.
 
-    def test_status_at_workspace_root_says_cd_into_subproject(self, tmp_project):
+    The default root member here is a dev node, so each command refuses for a
+    reason that names the root member's own kind -- never "run rlsbl monorepo
+    add", which would be false: the directory IS registered.
+    """
+
+    def test_status_at_workspace_root_reports_the_root_member(self, tmp_project):
         _setup_monorepo(tmp_project)
         result = app.test(["status"])
         assert result.exit_code != 0
         # Must NOT say "rlsbl monorepo add" -- the root is not unregistered
         assert "monorepo add" not in result.stderr
-        # Must say something about workspace root / sub-project
-        assert "workspace root" in result.stderr or "sub-project" in result.stderr
 
-    def test_changelog_add_at_workspace_root_says_cd_into_subproject(
+    def test_changelog_add_at_workspace_root_names_the_root_members_kind(
         self, tmp_project
     ):
         _setup_monorepo(tmp_project)
@@ -73,13 +74,13 @@ class TestWorkspaceRootUX:
         )
         assert result.exit_code != 0
         assert "monorepo add" not in result.stderr
-        assert "workspace root" in result.stderr or "sub-project" in result.stderr
+        # The default root member is a dev node, so it has no changelog.
+        assert "non-releasable" in result.stderr
 
-    def test_release_init_at_workspace_root_says_cd_into_subproject(
+    def test_release_init_at_workspace_root_does_not_claim_unregistered(
         self, tmp_project
     ):
         _setup_monorepo(tmp_project)
         result = app.test(["release", "init"])
         assert result.exit_code != 0
         assert "monorepo add" not in result.stderr
-        assert "workspace root" in result.stderr or "sub-project" in result.stderr

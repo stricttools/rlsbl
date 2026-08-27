@@ -16,7 +16,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import sync_member_versions, workspace_toml, with_root_member
+from conftest import sync_member_versions, workspace_toml, with_root_member, make_workspace
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import (
     _format_releasable_tag,
@@ -277,7 +277,7 @@ class TestReleasableReleaseOrder:
         ]
 
         # Write workspace so WorkspaceGraph can load
-        save_workspace(ws_root, with_root_member(projects))
+        make_workspace(ws_root, projects)
 
         graph = WorkspaceGraph(ws_root, projects)
         batch_names = {"core", "www"}
@@ -535,7 +535,7 @@ class TestBatchReleaseInitReleasable:
         projects = [
             WorkspaceProject({"name": "lib-a", "path": "lib-a"}),
         ]
-        save_workspace(ws_root, with_root_member(projects))
+        make_workspace(ws_root, projects)
 
         batch_path = os.path.join(ws_root, ".rlsbl-monorepo", "releases", "unreleased.toml")
 

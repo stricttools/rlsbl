@@ -38,7 +38,7 @@ from rlsbl.workspace import (
     is_explicit_mode,
     load_workspace,
 )
-from conftest import make_workspace, workspace_toml
+from conftest import make_workspace, with_root_member, workspace_toml
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +384,7 @@ class TestMonorepoAddReleasable:
     def test_add_without_releasable_flag(self, mock_git_repo):
         """--releasable is optional when adding a project."""
         from rlsbl.workspace import save_workspace
-        save_workspace(str(mock_git_repo), [])
+        make_workspace(str(mock_git_repo), [])
         self._make_project_dir(mock_git_repo, "lib")
 
         with patch("rlsbl.effects.run"):

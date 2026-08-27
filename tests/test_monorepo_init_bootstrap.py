@@ -17,7 +17,7 @@ from rlsbl.workspace import (
     WORKSPACE_FILE,
 )
 from rlsbl.commands.monorepo.commands import _cmd_init
-from conftest import cli_ctx
+from conftest import cli_ctx, with_root_member, make_workspace
 
 
 class TestMonorepoInitBootstrap:
@@ -57,7 +57,7 @@ class TestMonorepoInitBootstrap:
         monkeypatch.chdir(tmp_path)
 
         # Create workspace first
-        save_workspace(str(tmp_path), [])
+        make_workspace(str(tmp_path), [])
 
         with pytest.raises(SystemExit):
             _cmd_init({"auto-commit": False, "root-dev-node": True}, project_root=tmp_path)
@@ -108,7 +108,7 @@ class TestMonorepoInitBootstrap:
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
         subprocess.run(["git", "config", "user.email", "t@t.local"], cwd=tmp_path, check=True)
         subprocess.run(["git", "config", "user.name", "T"], cwd=tmp_path, check=True)
-        save_workspace(str(tmp_path), [])
+        make_workspace(str(tmp_path), [])
 
         # CWD inside the workspace
         sub_dir = tmp_path / "packages" / "core"

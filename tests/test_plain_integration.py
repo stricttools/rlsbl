@@ -13,7 +13,7 @@ import textwrap
 
 import pytest
 
-from conftest import with_root_member
+from conftest import with_root_member, make_workspace
 
 from rlsbl.commands.monorepo import (
     _cmd_init,
@@ -105,7 +105,7 @@ def _init_workspace(base_path, projects):
     """Initialize a workspace and save the given project list directly."""
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
-    save_workspace(str(base_path), with_root_member(projects))
+    make_workspace(str(base_path), projects)
 
 
 def _commit_all(base_path, message="setup"):

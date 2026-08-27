@@ -5,7 +5,7 @@ import subprocess
 import pytest
 import tomlkit
 
-from conftest import make_workspace
+from conftest import declared_members, make_workspace
 from rlsbl.workspace import Releasable, load_releasables, load_workspace, members_of
 
 
@@ -13,7 +13,9 @@ def test_workspace_toml_exists_with_two_projects(monorepo_fixture):
     ws_file = monorepo_fixture.root / ".rlsbl-monorepo" / "workspace.toml"
     assert ws_file.exists()
     data = tomlkit.loads(ws_file.read_text())
-    assert len(data["projects"]) == 2
+    # The two declared members, plus the mandatory root member.
+    assert len(data["projects"]) == 3
+    assert [p["name"] for p in data["projects"] if p["path"] == "."] == ["root"]
 
 
 def test_both_tags_exist(monorepo_fixture):
@@ -72,12 +74,20 @@ class TestMakeWorkspaceReleasables:
         assert by_name["two"].tag_format == "{name}/v{version}"
         assert by_name["three"].tag_format == "{name}@v{version}"
 
-    def test_no_releasables_section_without_the_argument(self, tmp_path):
+    def test_releasables_are_derived_without_the_argument(self, tmp_path):
+        """Omitting the argument derives one releasable per releasable member.
+
+        A workspace with no [[releasables]] section is implicit mode, which the
+        loader refuses, so the helper never writes one.
+        """
         make_workspace(tmp_path, [{"path": "a", "name": "a"}])
         data = tomlkit.loads(
             (tmp_path / ".rlsbl-monorepo" / "workspace.toml").read_text()
         )
-        assert "releasables" not in data
+        assert [r["name"] for r in data["releasables"]] == ["a"]
+        by_name = {p["name"]: p for p in data["projects"]}
+        assert by_name["a"]["releasable"] == "a"
+        assert by_name["root"]["releasable"] is False
 
     def test_project_outside_every_releasable(self, tmp_path):
         """``releasable = false`` stands a project outside every releasable in
@@ -121,7 +131,7 @@ class TestMakeWorkspaceProjectKeys:
             [{"path": "a", "name": "a",
               "subtree_remote": "git@github.com:o/a.git"}],
         )
-        assert load_workspace(str(tmp_path))[0].subtree_remote == (
+        assert declared_members(load_workspace(str(tmp_path)))[0].subtree_remote == (
             "git@github.com:o/a.git"
         )
 
@@ -131,23 +141,29 @@ class TestMakeWorkspaceProjectKeys:
             [{"path": "a", "name": "a",
               "registry_name": "a-on-pypi", "import_name": "a_pkg"}],
         )
-        proj = load_workspace(str(tmp_path))[0]
+        proj = declared_members(load_workspace(str(tmp_path)))[0]
         assert proj.registry_name == "a-on-pypi"
         assert proj.import_name == "a_pkg"
 
-    def test_watch_library_and_dev_flags_round_trip(self, tmp_path):
+    def test_library_and_dev_flags_round_trip(self, tmp_path):
         make_workspace(
             tmp_path,
             [
-                {"path": "a", "name": "a", "watch": ["a/**"], "library": True},
+                {"path": "a", "name": "a", "library": True},
                 {"path": "t", "name": "t", "dev_only": True, "dev_node": True},
             ],
         )
         by_name = {p.name: p for p in load_workspace(str(tmp_path))}
-        assert by_name["a"].watch == ["a/**"]
         assert by_name["a"].library is True
         assert by_name["t"].dev_only is True
         assert by_name["t"].dev_node is True
+
+    def test_watch_key_is_refused(self, tmp_path):
+        """The helper serializes only keys workspace.toml still carries."""
+        with pytest.raises(ValueError, match="watch"):
+            make_workspace(
+                tmp_path, [{"path": "a", "name": "a", "watch": ["a/**"]}],
+            )
 
     def test_unknown_key_is_refused(self, tmp_path):
         """A key make_workspace cannot serialize is a hard error naming it --
@@ -166,14 +182,14 @@ class TestMakeWorkspaceProjectKeys:
         make_workspace(
             tmp_path,
             [{
-                "path": "a", "name": "a", "watch": ["a/**"], "library": True,
+                "path": "a", "name": "a", "library": True,
                 "dev_only": False, "dev_node": False, "releasable": "core",
                 "depends_on": [], "subtree_remote": "", "registry_name": "a",
                 "import_name": "a",
             }],
             releasables=["core"],
         )
-        assert load_workspace(str(tmp_path))[0].name == "a"
+        assert declared_members(load_workspace(str(tmp_path)))[0].name == "a"
 
 
 class TestMakeWorkspaceRootMember:
@@ -183,31 +199,31 @@ class TestMakeWorkspaceRootMember:
         make_workspace(
             tmp_path,
             [
-                {"path": ".", "name": "root-pkg"},
+                {"path": ".", "name": "root"},
                 {"path": "pkgA", "name": "pkgA"},
             ],
         )
         projects = load_workspace(str(tmp_path))
         by_name = {p.name: p for p in projects}
-        assert by_name["root-pkg"].path == "."
+        assert by_name["root"].path == "."
 
     def test_root_member_of_a_releasable(self, tmp_path):
         make_workspace(
             tmp_path,
             [
-                {"path": ".", "name": "root-pkg", "releasable": "core"},
+                {"path": ".", "name": "root", "releasable": "core"},
                 {"path": "pkgA", "name": "pkgA", "releasable": "core"},
             ],
-            releasables=["core"],
+            releasables=[{"name": "core", "tag_format": "v{version}"}],
         )
         projects = load_workspace(str(tmp_path))
         members = members_of("core", projects)
-        assert {m.name for m in members} == {"root-pkg", "pkgA"}
+        assert {m.name for m in members} == {"root", "pkgA"}
         assert {m.path for m in members} == {".", "pkgA"}
 
     @pytest.mark.parametrize("spelling", ["", ".", "./"])
     def test_root_spellings_normalize(self, tmp_path, spelling):
-        make_workspace(tmp_path, [{"path": spelling, "name": "root-pkg"}])
+        make_workspace(tmp_path, [{"path": spelling, "name": "root"}])
         projects = load_workspace(str(tmp_path))
         assert projects[0].path == "."
 

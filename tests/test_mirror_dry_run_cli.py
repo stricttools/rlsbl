@@ -20,6 +20,7 @@ carries only genuinely planned mutations.
 import json
 import subprocess
 
+from conftest import with_root_member, make_workspace
 import rlsbl
 from rlsbl.workspace import WORKSPACE_DIR, save_workspace
 
@@ -53,10 +54,8 @@ def _make_monorepo(root, subtree_remote, project_path="mylib", name="mylib"):
         json.dumps({"targets": ["npm"], "publish_mode": "none"}, indent=2) + "\n"
     )
     (root / WORKSPACE_DIR).mkdir(exist_ok=True)
-    save_workspace(
-        str(root),
-        [{"path": project_path, "name": name, "subtree_remote": subtree_remote}],
-    )
+    make_workspace(str(root), [{"path": project_path, "name": name,
+              "subtree_remote": subtree_remote}])
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial monorepo")
     return root

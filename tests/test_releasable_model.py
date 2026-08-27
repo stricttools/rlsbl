@@ -15,7 +15,7 @@ import os
 
 import pytest
 
-from conftest import workspace_toml, with_root_member
+from conftest import workspace_toml, with_root_member, make_workspace
 
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
@@ -535,7 +535,7 @@ class TestSaveWorkspaceReleasablesRoundTrip:
             WorkspaceProject({"path": "b", "name": "b", "releasable": False}),
             WorkspaceProject({"path": "c", "name": "c"}),
         ]
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         loaded = load_workspace(str(tmp_project))
         assert loaded[0].releasable == "core"
         assert loaded[1].releasable is False
@@ -555,7 +555,7 @@ releasable = "core"
 """)
         projects = load_workspace(str(tmp_project))
         # Save without touching releasables
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         # Re-load and verify releasables section survived
         releasables = load_releasables(str(tmp_project))
         assert len(releasables) == 1

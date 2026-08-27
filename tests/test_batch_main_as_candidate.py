@@ -43,6 +43,8 @@ from rlsbl.workspace import (
     write_releasable_version,
 )
 
+from conftest import with_root_member, make_workspace
+
 
 BATCH_TOML = (
     '[packages.alpha]\n'
@@ -79,7 +81,7 @@ def _setup_batch_workspace(root):
 
     for name in ("alpha", "beta"):
         _make_pkg(root, name)
-    save_workspace(str(root), [
+    make_workspace(str(root), [
         {"path": "alpha", "name": "alpha"},
         {"path": "beta", "name": "beta"},
     ])
@@ -145,10 +147,10 @@ def _setup_releasable_batch_workspace(root):
 
     save_workspace(
         str(root),
-        [
+        with_root_member([
             {"path": "alpha", "name": "alpha-pkg", "releasable": "alpha"},
             {"path": "beta", "name": "beta-pkg", "releasable": "beta"},
-        ],
+        ]),
         releasables=[Releasable(name="alpha"), Releasable(name="beta")],
     )
 

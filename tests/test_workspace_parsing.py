@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from conftest import with_root_member, workspace_toml
+from conftest import with_root_member, workspace_toml, make_workspace
 
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
@@ -403,7 +403,7 @@ class TestSaveWorkspaceRoundTrip:
             "import_name": "core_pkg",
         }
         wp = WorkspaceProject(data)
-        save_workspace(str(tmp_project), with_root_member([wp]))
+        make_workspace(str(tmp_project), [wp])
         loaded = load_workspace(str(tmp_project))
         core = _member(loaded, "core")
         assert core.name == "core"
@@ -423,7 +423,7 @@ class TestSaveWorkspaceRoundTrip:
             "custom_list": [1, 2, 3],
         }
         wp = WorkspaceProject(data)
-        save_workspace(str(tmp_project), with_root_member([wp]))
+        make_workspace(str(tmp_project), [wp])
         loaded = _member(load_workspace(str(tmp_project)), "pkg")
         assert loaded["custom_string"] == "hello"
         assert loaded["custom_int"] == 42
@@ -435,7 +435,7 @@ class TestSaveWorkspaceRoundTrip:
             WorkspaceProject({"path": "b/c", "name": "charlie", "dev_node": True}),
             WorkspaceProject({"path": "d", "name": "delta", "depends_on": ["alpha"]}),
         ]
-        save_workspace(str(tmp_project), with_root_member(projects))
+        make_workspace(str(tmp_project), projects)
         loaded = load_workspace(str(tmp_project))
         # The three declared members, plus the supplied root member.
         assert len(loaded) == 4
@@ -451,7 +451,7 @@ class TestSaveWorkspaceRoundTrip:
             WorkspaceProject({"path": "a", "name": "a"}),
             {"path": "b", "name": "b"},
         ]
-        save_workspace(str(tmp_project), with_root_member(mixed))
+        make_workspace(str(tmp_project), mixed)
         loaded = load_workspace(str(tmp_project))
         # The two declared members, plus the supplied root member.
         assert len(loaded) == 3
@@ -460,7 +460,7 @@ class TestSaveWorkspaceRoundTrip:
 
     def test_empty_projects_roundtrip_is_unloadable(self, tmp_project):
         """A workspace with no members cannot be read back: it has no root member."""
-        save_workspace(str(tmp_project), [])
+        make_workspace(str(tmp_project), [])
         with pytest.raises(WorkspaceError, match="declares no root member"):
             load_workspace(str(tmp_project))
 
