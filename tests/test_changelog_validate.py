@@ -885,7 +885,6 @@ class TestIsChangelogPath:
         ".rlsbl-monorepo/releases/unreleased.toml",
         ".rlsbl-monorepo/workspace.toml",
         ".rlsbl-monorepo/snapshot.json",
-        "subproject/.rlsbl-monorepo/releases/foo.toml",
     ])
     def test_changelog_path_recognized(self, path):
         assert _is_changelog_path(path) is True
@@ -893,6 +892,11 @@ class TestIsChangelogPath:
     @pytest.mark.parametrize("path", [
         "src/foo.py",
         ".rlsbl/config.json",
+        # The workspace directory exists once, at the repository root: a
+        # directory of that name inside a subproject is somebody's own file
+        # and needs an owner (and therefore changelog coverage) like any
+        # other.
+        "subproject/.rlsbl-monorepo/releases/foo.toml",
     ])
     def test_non_changelog_path_rejected(self, path):
         assert _is_changelog_path(path) is False

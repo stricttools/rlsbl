@@ -68,9 +68,29 @@ class TestToolOwnedSet:
 
     @pytest.mark.parametrize("prefix", ["python", "packages/core", "a/b/c"])
     def test_rules_match_at_any_depth(self, prefix):
+        """A member root carries its own state directory and changelog."""
         assert is_tool_owned_path(f"{prefix}/.rlsbl/changes/unreleased.jsonl")
         assert is_tool_owned_path(f"{prefix}/CHANGELOG.md")
         assert is_tool_owned_path(f"{prefix}/.rlsbl/version")
+
+    @pytest.mark.parametrize("prefix", ["docs", "packages/core", "a/b/c"])
+    def test_repository_root_rules_do_not_match_deeper(self, prefix):
+        """The workspace directory and the router exist only at the root.
+
+        rlsbl writes exactly one ``.rlsbl-monorepo/`` and one
+        ``ci-router.yml``, both at the repository root, so a path of the same
+        name deeper in the tree is somebody's hand-written file and needs an
+        owner like any other.
+        """
+        nested_workspace = f"{prefix}/.rlsbl-monorepo/workspace.toml"
+        nested_router = f"{prefix}/.github/workflows/ci-router.yml"
+        assert is_tool_owned_path(nested_workspace) is False
+        assert is_tool_owned_path(nested_router) is False
+        assert owner_of(nested_workspace, [ROOT]) is ROOT
+        assert owner_of(nested_router, [ROOT]) is ROOT
+        # ...while the real ones, at the root, stay exempt.
+        assert is_tool_owned_path(".rlsbl-monorepo/workspace.toml") is True
+        assert is_tool_owned_path(".github/workflows/ci-router.yml") is True
 
     def test_rules_are_static(self):
         """No dynamic input: the same path answers the same way, always."""

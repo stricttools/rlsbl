@@ -47,25 +47,45 @@ _ROOT_PATH_SPELLINGS = ("", ".", "./")
 # The tool-owned exempt set (static path rules only)
 # ---------------------------------------------------------------------------
 
-# Directory trees rlsbl writes and rewrites in full.  Matched at any directory
-# depth, so a member's own state directory (``python/.rlsbl/changes/...``) is
-# recognised as readily as the repository root's.
+# Directory trees rlsbl writes and rewrites in full, at any directory depth: a
+# member's own state directory (``python/.rlsbl/changes/...``) is recognised as
+# readily as the repository root's, because every member root carries one.
 _TOOL_OWNED_TREES = (
     ".rlsbl/changes/",
     ".rlsbl/releases/",
     ".rlsbl/bases/",
     ".rlsbl/lint/",
-    ".rlsbl-monorepo/",
 )
 
-# Individual files rlsbl generates wholesale.  ``CHANGELOG.md`` is generated
-# from the JSONL corpus, ``.rlsbl/version`` records the scaffolding version,
-# and ``ci-router.yml`` is regenerated in full by ``rlsbl monorepo sync``
-# (unlike the other scaffolded workflows, which are three-way merged with
-# operator edits and therefore stay owned by whoever's territory they sit in).
+# Individual files rlsbl generates wholesale, at any depth.  ``CHANGELOG.md``
+# is generated from the JSONL corpus and ``.rlsbl/version`` records the
+# scaffolding version; both sit at every member root as well as the repository
+# root.
+#
+# ``CHANGELOG.md`` over-matches, knowingly: a hand-written file that happens to
+# be named ``CHANGELOG.md`` -- ``docs/CHANGELOG.md``, a vendored dependency's
+# changelog -- is exempt from ownership and therefore from changelog coverage,
+# even though rlsbl never wrote it.  Narrowing it would take a workspace lookup
+# (which member roots exist?), and these rules are deliberately static: the
+# same path answers the same way with no config read, no git call and no
+# member list.  The accepted cost is that a commit touching only such a file
+# needs no changelog entry.
 _TOOL_OWNED_FILES = (
     ".rlsbl/version",
     "CHANGELOG.md",
+)
+
+# Trees and files that exist exactly once, at the repository root, and are
+# therefore matched only there.  rlsbl writes one ``.rlsbl-monorepo/`` and one
+# ``ci-router.yml`` per repository; a path with the same name deeper in the
+# tree is somebody's own file and needs an owner like any other.  (The other
+# scaffolded workflows are three-way merged with operator edits, so they stay
+# owned by whoever's territory they sit in and are not listed here.)
+_ROOT_ONLY_TREES = (
+    ".rlsbl-monorepo/",
+)
+
+_ROOT_ONLY_FILES = (
     ".github/workflows/ci-router.yml",
 )
 
@@ -85,11 +105,18 @@ def tool_owned_rule(path) -> str | None:
 
     The returned string is the rule itself (``".rlsbl/changes/**"``,
     ``"CHANGELOG.md"``), suitable for putting in a message that has to explain
-    why a path needs no owner.
+    why a path needs no owner.  Root-anchored rules answer only for a path at
+    the repository root; the rest answer at any depth.
     """
     normalized = normalize_path(path)
     if not normalized:
         return None
+    for tree in _ROOT_ONLY_TREES:
+        if normalized.startswith(tree):
+            return tree + "**"
+    for name in _ROOT_ONLY_FILES:
+        if normalized == name:
+            return name
     parts = normalized.split("/")
     for i in range(len(parts)):
         tail = "/".join(parts[i:])
@@ -109,7 +136,12 @@ def is_tool_owned_path(path) -> bool:
 
 def tool_owned_rules() -> tuple[str, ...]:
     """Every static rule in the tool-owned set, for messages and tests."""
-    return tuple(tree + "**" for tree in _TOOL_OWNED_TREES) + _TOOL_OWNED_FILES
+    return (
+        tuple(tree + "**" for tree in _TOOL_OWNED_TREES)
+        + _TOOL_OWNED_FILES
+        + tuple(tree + "**" for tree in _ROOT_ONLY_TREES)
+        + _ROOT_ONLY_FILES
+    )
 
 
 # ---------------------------------------------------------------------------
