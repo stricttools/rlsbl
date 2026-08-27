@@ -65,7 +65,7 @@ MUST_NOT_PROMPT = [
     # commands preview the whole plan under --dry-run, refuse to apply when a
     # count moved, and leave every write revertible with git -- none of which
     # is a reason to interrupt an operator.
-    "rewrite go-module-path",
+    "rewrite go-module-path", "rewrite uv-path-sources",
 ]
 MUST_NOT_PROMPT = [c for c in MUST_NOT_PROMPT if c not in CONSEQUENTIAL]
 

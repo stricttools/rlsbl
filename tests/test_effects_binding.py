@@ -92,6 +92,7 @@ EXPECTED_EFFECTS = {
     # nothing else -- no push, no tag, no registry. Mutating, previewable,
     # and revertible with git, so neither is consequential.
     "rewrite.go-module-path": "mutating",
+    "rewrite.uv-path-sources": "mutating",
 }
 
 

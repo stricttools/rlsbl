@@ -14,9 +14,13 @@ allowlist the real app was built with are all the real ones:
 * the tree must be byte-identical afterwards;
 * an apply through the same dispatch must actually write.
 
-Nothing below the dispatch is replaced.
+The only stand-in below the dispatch is the PyPI publication probe in the
+uv-path-sources tests -- the suite has no network by construction (see the
+stricttest stances in pyproject.toml), and the probe is a seam the unit tests
+cover on its own terms.
 """
 
+import json
 import os
 import textwrap
 
@@ -125,3 +129,100 @@ class TestGoModulePathThroughTheCli:
         ])
         assert result.exit_code == 1
         assert "to-module" in result.stderr, result.stderr
+
+
+# ---------------------------------------------------------------------------
+# uv-path-sources
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def uv_project(tmp_path):
+    root = _make_project(tmp_path / "pyproj")
+    _write(root, "pyproject.toml", textwrap.dedent("""\
+        [project]
+        name = "app"
+        version = "0.1.0"
+        dependencies = [
+            "sibling",
+            "requests>=2.0",
+        ]
+
+        [tool.uv.sources]
+        sibling = { path = "../sibling", editable = true }
+    """))
+    _write(root, "uv.lock", textwrap.dedent("""\
+        version = 1
+
+        [[package]]
+        name = "sibling"
+        version = "0.4.2"
+
+        [[package]]
+        name = "requests"
+        version = "2.31.0"
+    """))
+    return root
+
+
+@pytest.fixture
+def published(monkeypatch):
+    """Answer the PyPI release probe without a network (the suite has none)."""
+    seen = []
+
+    def _probe(name, version):
+        seen.append((name, version))
+        return {"status": "found"}
+
+    monkeypatch.setattr(
+        "rlsbl.commands.rewrite.uv_path_sources.query_pypi_release", _probe
+    )
+    return seen
+
+
+class TestUvPathSourcesThroughTheCli:
+    def test_dry_run_renders_the_plan_and_writes_nothing(
+        self, uv_project, published, monkeypatch
+    ):
+        before = _snapshot(uv_project)
+        monkeypatch.chdir(uv_project)
+
+        result = rlsbl.app.test(["--dry-run", "rewrite", "uv-path-sources"])
+
+        assert result.exit_code == 0, result.stderr
+        assert "sibling: convert" in result.stdout, result.stdout
+        assert "sibling>=0.4.2" in result.stdout, result.stdout
+        assert ".rlsbl/config.json" in result.stdout, result.stdout
+        assert published == [("sibling", "0.4.2")]
+        assert _snapshot(uv_project) == before
+
+    def test_apply_through_the_same_dispatch_writes(
+        self, uv_project, published, monkeypatch
+    ):
+        monkeypatch.chdir(uv_project)
+        result = rlsbl.app.test(["rewrite", "uv-path-sources"])
+        assert result.exit_code == 0, result.stderr
+
+        manifest = (uv_project / "pyproject.toml").read_text()
+        assert '"sibling>=0.4.2"' in manifest
+        assert "tool.uv" not in manifest
+        assert '"requests>=2.0"' in manifest
+
+        config = json.loads((uv_project / ".rlsbl" / "config.json").read_text())
+        assert config["internal_dep_floors"] == ["sibling"]
+
+    def test_an_unpublished_floor_exits_one_and_writes_nothing(
+        self, uv_project, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "rlsbl.commands.rewrite.uv_path_sources.query_pypi_release",
+            lambda name, version: {"status": "not_found"},
+        )
+        before = _snapshot(uv_project)
+        monkeypatch.chdir(uv_project)
+
+        result = rlsbl.app.test(["rewrite", "uv-path-sources"])
+
+        assert result.exit_code == 1
+        assert "Release sibling first" in result.stderr, result.stderr
+        assert _snapshot(uv_project) == before

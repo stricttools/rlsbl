@@ -657,3 +657,19 @@ class TestRewriteWiring:
         )
         assert result.exit_code == 1
         assert "to-module" in result.stderr
+
+    def test_uv_path_sources(self):
+        result, m = _dispatch(
+            ["rewrite", "uv-path-sources"],
+            "rlsbl.commands.rewrite.uv_path_sources.cmd_uv_path_sources",
+        )
+        assert result.exit_code == 0, result.stderr
+        assert _flags(m) == {"dry-run": False}
+
+    def test_uv_path_sources_dry_run(self):
+        result, m = _dispatch(
+            ["--dry-run", "rewrite", "uv-path-sources"],
+            "rlsbl.commands.rewrite.uv_path_sources.cmd_uv_path_sources",
+        )
+        assert result.exit_code == 0, result.stderr
+        assert _flags(m) == {"dry-run": True}

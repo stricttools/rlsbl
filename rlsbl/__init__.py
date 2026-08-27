@@ -2323,6 +2323,15 @@ def cmd_rewrite_go_module_path(ctx, from_module, to_module):
     )
 
 
+@rewrite.command(name="uv-path-sources", help="Convert path- and workspace-sourced Python dependencies into registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra and every PEP 735 [dependency-groups] group, and deletes the matching [tool.uv.sources] entry so it stops overriding the new constraint. Each converted name is added to internal_dep_floors in .rlsbl/config.json. A locked version that is not published on PyPI is a hard error naming the remedy (release that dependency first), and so is a registry probe that fails to answer. Use --dry-run to print the per-dependency plan with entry counts.", effect="mutating")
+@effects.handler
+def cmd_rewrite_uv_path_sources(ctx):
+    """Turn path/workspace-sourced dependencies into locked registry floors."""
+    root = _require_project_root()
+    from .commands.rewrite.uv_path_sources import cmd_uv_path_sources
+    cmd_uv_path_sources({"dry-run": ctx.dry_run}, project_root=root)
+
+
 # ---------------------------------------------------------------------------
 # Derived help counts
 # ---------------------------------------------------------------------------
