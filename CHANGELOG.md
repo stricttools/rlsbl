@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 0.117.2
+
+Fixes two data-corrupting defects in releasable migration: changelog entries no longer lose their stable ids through consolidation, and a releasable's own unreleased entries are no longer destroyed when no member has entries.
+
+<details>
+<summary>Context</summary>
+
+This patch precedes a larger conversion-and-workspace campaign. Workspaces
+whose migration to the releasable model is deliberately deferred will pin
+this release, so the migration path they run must not corrupt changelog
+history. The two fixes make `monorepo migrate-releasable` safe for that:
+entry ids survive consolidation (keeping `changelog amend --id` and
+`changelog edit --id` addressable), and a releasable's pre-existing
+unreleased entries survive when members contribute none.
+
+</details>
+
+### Fixes
+
+- `rlsbl monorepo migrate-releasable` no longer strips the stable `id` from changelog entries it consolidates, so migrated entries stay addressable by `changelog amend --id` and `changelog edit --id`
+- `rlsbl monorepo migrate-releasable` no longer destroys unreleased changelog entries that already existed in the releasable's own `unreleased.jsonl` when no member package had any; they are now kept alongside the merged member entries
+- `monorepo migrate-releasable` no longer collapses distinct changelog entries that share a commit set -- a commit described by both a feature entry and a fix entry keeps both descriptions, types and ids through consolidation.
+- `monorepo migrate-releasable` now summarizes the consolidated changelog accurately: the entry count no longer implies member contributions it did not come from, and a migration where no member contributed prints a complete line instead of a dangling "entries from".
+
 ## 0.117.1
 
 The CI gate reads jobs through the attempt-scoped endpoint (repos with broken collection endpoints no longer abort a green gate), and a releasable target declared with a path no longer crashes the batch planner.
