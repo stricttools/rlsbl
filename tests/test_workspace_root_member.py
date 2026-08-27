@@ -55,6 +55,33 @@ class TestNoRootMember:
         assert "dev_only = true" in message
         assert "releasable =" in message
         assert "migration script" in message
+        # The dev-node snippet must be a workspace that actually loads: a
+        # member with no `releasable` key is refused by load_releasables.
+        dev_node_snippet = message.split("or, to give the root files")[0]
+        assert "releasable = false" in dev_node_snippet
+
+    def test_the_no_root_remedy_snippet_loads_verbatim(self, tmp_path):
+        """The remedy is copy-pasteable: pasting it produces a workspace."""
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n',
+            root_member="",
+        ))
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        snippet = "\n".join(
+            line.strip()
+            for line in str(exc.value).split("or, to give the root files")[0].splitlines()
+            if line.strip().startswith(("[[projects]]", "path =", "name =", "dev_only ="))
+            or line.strip().startswith("releasable =")
+        )
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n\n'
+            + snippet + "\n",
+            root_member="",
+        ))
+        projects = load_workspace(str(tmp_path))
+        assert sorted(p["name"] for p in projects) == ["a", ROOT_MEMBER_NAME]
+        assert load_releasables(str(tmp_path), projects) == []
 
     def test_a_root_member_makes_it_load(self, tmp_path):
         write_raw(tmp_path, workspace_toml(
@@ -82,6 +109,23 @@ class TestRootMemberName:
         assert "'monorepo'" in message
         assert f"'{ROOT_MEMBER_NAME}'" in message
         assert "migration script" in message
+
+    def test_two_root_members_are_an_error(self, tmp_path):
+        """Two members at `.` made ownership depend on declaration order."""
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
+            'releasable = false\n\n'
+            '[[projects]]\npath = "./"\nname = "root"\ndev_only = true\n'
+            'releasable = false\n',
+            root_member="",
+        ))
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        message = str(exc.value)
+        assert "projects[0]" in message
+        assert "projects[1]" in message
+        assert "exactly one root member" in message
+        assert "will not guess" in message
 
     def test_omitted_name_is_the_reserved_one(self, tmp_path):
         """A root member with no name gets `root`, not the basename of ""."""
@@ -123,6 +167,109 @@ class TestReservedNameCollision:
         # An operator decision, not something a script can mechanically fix.
         assert "your decision" in message
         assert "migration script" not in message
+        # The remedy cannot suggest simply adding a second root member: a
+        # workspace has exactly one, so the alternative is a replacement.
+        assert "replac" in message
+        assert "exactly one root member" in message
+
+
+# ---------------------------------------------------------------------------
+# Member path uniqueness
+# ---------------------------------------------------------------------------
+
+
+class TestMemberPathUniqueness:
+    """One owner per file requires one member per path.
+
+    Two members claiming the same path used to load, leaving attribution to
+    resolve to whichever member the declaration order happened to reach first.
+    """
+
+    def test_identical_paths_are_an_error(self, tmp_path):
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n\n'
+            '[[projects]]\npath = "a"\nname = "a-again"\nreleasable = false\n',
+        ))
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        message = str(exc.value)
+        assert "projects[0]" in message
+        assert "projects[1]" in message
+        assert "'a'" in message
+        assert "exactly one member per path" in message
+
+    def test_paths_differing_only_in_spelling_are_an_error(self, tmp_path):
+        """`a` and `./a` are the same territory, so they collide at load."""
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n\n'
+            '[[projects]]\npath = "./a"\nname = "dotted"\nreleasable = false\n',
+        ))
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        message = str(exc.value)
+        assert "exactly one member per path" in message
+        # Both spellings are named, so the operator can find the two lines.
+        assert "./a" in message
+
+    def test_declared_paths_are_normalized_at_load(self, tmp_path):
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "./a/"\nname = "a"\nreleasable = false\n',
+        ))
+        projects = load_workspace(str(tmp_path))
+        assert [p["path"] for p in projects if p["name"] == "a"] == ["a"]
+
+    def test_distinct_nested_paths_still_load(self, tmp_path):
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n\n'
+            '[[projects]]\npath = "a/inner"\nname = "inner"\nreleasable = false\n',
+        ))
+        projects = load_workspace(str(tmp_path))
+        assert sorted(p["path"] for p in projects) == [".", "a", "a/inner"]
+
+
+# ---------------------------------------------------------------------------
+# The order violations are reported in
+# ---------------------------------------------------------------------------
+
+
+class TestValidationOrder:
+    """The first error reported is the one whose remedy presumes nothing.
+
+    An implicit-mode workspace is told so first: every other remedy is
+    written for an explicit-mode workspace, so reporting them first sends the
+    operator to fix two things under an assumption that does not hold yet.
+    """
+
+    def test_implicit_mode_is_reported_before_anything_else(self, tmp_path):
+        # Three violations at once: a watch key, no root member, and no
+        # [[releasables]] section.
+        write_raw(
+            tmp_path,
+            '[[projects]]\npath = "a"\nname = "a"\nwatch = ["shared/**"]\n',
+        )
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        assert "implicit mode" in str(exc.value)
+
+    def test_the_missing_root_member_is_reported_before_key_errors(self, tmp_path):
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nwatch = ["shared/**"]\n'
+            'releasable = false\n',
+            root_member="",
+        ))
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        assert "declares no root member" in str(exc.value)
+
+    def test_duplicate_paths_are_reported_before_key_errors(self, tmp_path):
+        write_raw(tmp_path, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nwatch = ["shared/**"]\n'
+            'releasable = false\n\n'
+            '[[projects]]\npath = "a"\nname = "a-again"\nreleasable = false\n',
+        ))
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        assert "exactly one member per path" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------

@@ -26,7 +26,7 @@ from .workspace_types import (  # noqa: F401
     project_is_dev_only,
     project_is_releasable,
 )
-from .ownership import ROOT_MEMBER_NAME, ROOT_MEMBER_PATH  # noqa: F401
+from .ownership import ROOT_MEMBER_NAME, ROOT_MEMBER_PATH, normalize_path  # noqa: F401
 from . import effects
 
 
@@ -149,9 +149,10 @@ def load_workspace(root):
         if "path" not in proj or not isinstance(proj["path"], str):
             raise WorkspaceError(f"projects[{i}] missing required 'path' string")
         entry = dict(proj)
-        # Normalize: strip trailing slashes so stored paths are consistent.
-        # Belt-and-suspenders with target-level tag format defenses.
-        entry["path"] = entry["path"].rstrip("/")
+        # One normalization, the resolver's own (rlsbl.ownership): a member
+        # path is stored exactly as attribution will read it, so `a`, `./a`
+        # and `a/` are one territory here as well as there.
+        entry["path"] = normalize_path(entry["path"])
         if is_root_path(entry["path"]):
             # The repository root has one canonical spelling and one legal
             # name; an omitted name resolves to the reserved one rather than
@@ -184,21 +185,137 @@ _MIGRATION_NOTE = (
 )
 
 
+def _declared_paths(data, projects):
+    """The path spellings as written, aligned with *projects* by index."""
+    raw = data.get("projects")
+    spellings = []
+    for i, proj in enumerate(projects):
+        entry = raw[i] if isinstance(raw, list) and i < len(raw) else None
+        declared = entry.get("path") if isinstance(entry, dict) else None
+        spellings.append(declared if isinstance(declared, str) else proj["path"])
+    return spellings
+
+
+def _validate_member_paths(data, projects):
+    """Refuse a member list that does not give each path exactly one member.
+
+    Two members claiming one territory make ownership depend on declaration
+    order, so both spellings of the collision are refused at load: identical
+    paths, and paths that differ only in spelling (``a`` and ``./a`` are the
+    same directory, and normalize to the same member path).
+    """
+    declared = _declared_paths(data, projects)
+
+    root_indices = [
+        i for i, proj in enumerate(projects) if proj["path"] == ROOT_MEMBER_PATH
+    ]
+    if len(root_indices) > 1:
+        first, second = root_indices[0], root_indices[1]
+        raise WorkspaceError(
+            f"projects[{first}] ('{projects[first]['name']}', path "
+            f"'{declared[first]}') and projects[{second}] "
+            f"('{projects[second]['name']}', path '{declared[second]}') both "
+            f"declare the repository root. The root member owns every file no "
+            f"other member claims, and a file has exactly one owner, so a "
+            f"workspace has exactly one root member. Keep one of them and give "
+            f"the other a path of its own -- rlsbl will not guess which member "
+            f"owns the repository root."
+        )
+
+    seen = {}
+    for i, proj in enumerate(projects):
+        path = proj["path"]
+        if path in seen:
+            first = seen[path]
+            spellings = ""
+            if declared[first] != declared[i]:
+                spellings = (
+                    f" (spelled '{declared[first]}' and '{declared[i]}' -- the "
+                    f"same directory)"
+                )
+            raise WorkspaceError(
+                f"projects[{first}] ('{projects[first]['name']}') and "
+                f"projects[{i}] ('{proj['name']}') both declare the path "
+                f"'{path}'{spellings}. Every file has exactly one owner, which "
+                f"requires exactly one member per path: with two, the owner "
+                f"would be whichever member workspace.toml happens to declare "
+                f"first. Merge the two entries into one, or give one of them a "
+                f"path of its own."
+            )
+        seen[path] = i
+
+
 def validate_workspace_model(data, projects):
     """Enforce the workspace ownership model on a parsed workspace.toml.
 
-    Six conditions, each a hard error carrying its own remedy:
+    Eight conditions, each a hard error carrying its own remedy, reported in
+    the order an operator can act on them:
 
-    1. no root member;
-    2. a root member named anything but ``root``;
-    3. a non-root member named ``root``;
-    4. a ``watch`` key on any member;
-    5. an implicit-mode workspace (no ``[[releasables]]``);
-    6. a releasable owning the root member with no explicit ``tag_format``.
+    1. an implicit-mode workspace (no ``[[releasables]]``) -- first, because
+       every other remedy below is written for an explicit-mode workspace;
+    2. more than one root member;
+    3. two members whose paths normalize to the same territory;
+    4. no root member;
+    5. a ``watch`` key on any member;
+    6. a root member named anything but ``root``;
+    7. a non-root member named ``root``;
+    8. a releasable owning the root member with no explicit ``tag_format``.
 
-    *data* is the raw parsed document (needed for the releasables section),
-    *projects* the already-built :class:`WorkspaceProject` list.
+    Structural facts about the member list (2-4) precede per-member key
+    errors (5-7): a remedy for a stray key presumes the member list itself
+    is sound.
+
+    *data* is the raw parsed document (needed for the releasables section and
+    for the paths as the operator spelled them), *projects* the already-built
+    :class:`WorkspaceProject` list, whose paths are normalized.
     """
+    # -- (e) implicit mode ---------------------------------------------------
+    raw_releasables = data.get("releasables")
+    if raw_releasables is None:
+        raise WorkspaceError(
+            "workspace.toml has no [[releasables]] section: this is an "
+            "implicit-mode workspace, and implicit mode is no longer "
+            "supported. Every workspace declares its releasables explicitly. "
+            "Convert this one -- add a [[releasables]] section and give every "
+            "releasable member a `releasable = \"<name>\"` key (or "
+            "`releasable = false`) -- or, if the conversion cannot happen now, "
+            f"pin rlsbl to {LAST_IMPLICIT_MODE_VERSION}, the last version that "
+            "reads an implicit-mode workspace, and file a todo in this "
+            "repository to convert it."
+        )
+
+    # -- (g)/(h) one member per path, one root member ------------------------
+    _validate_member_paths(data, projects)
+
+    root_member = next(
+        (p for p in projects if p["path"] == ROOT_MEMBER_PATH), None
+    )
+
+    # -- (a) the mandatory root member --------------------------------------
+    if root_member is None:
+        raise WorkspaceError(
+            "workspace.toml declares no root member. Every workspace must "
+            "declare the repository root itself as a member; it owns every "
+            "tracked file no other member claims, so that no file is outside "
+            "the ownership model. Add one, choosing its kind:\n"
+            "\n"
+            "  [[projects]]\n"
+            "  path = \".\"\n"
+            f"  name = \"{ROOT_MEMBER_NAME}\"\n"
+            "  dev_only = true          # a dev node: its files need no "
+            "changelog coverage\n"
+            "  releasable = false       # ...and stands outside every "
+            "releasable\n"
+            "\n"
+            "or, to give the root files changelog coverage:\n"
+            "\n"
+            "  [[projects]]\n"
+            "  path = \".\"\n"
+            f"  name = \"{ROOT_MEMBER_NAME}\"\n"
+            "  releasable = \"<name of a [[releasables]] entry>\"\n"
+            "\n" + _MIGRATION_NOTE
+        )
+
     # -- (d) the watch key ---------------------------------------------------
     for i, proj in enumerate(projects):
         if "watch" in proj:
@@ -214,7 +331,6 @@ def validate_workspace_model(data, projects):
             )
 
     # -- (b)/(c) the reserved name ------------------------------------------
-    root_member = None
     for i, proj in enumerate(projects):
         if proj["path"] == ROOT_MEMBER_PATH:
             if proj["name"] != ROOT_MEMBER_NAME:
@@ -228,54 +344,18 @@ def validate_workspace_model(data, projects):
                     f"entirely -- it is applied automatically). "
                     + _MIGRATION_NOTE
                 )
-            root_member = proj
         elif proj["name"] == ROOT_MEMBER_NAME:
             raise WorkspaceError(
                 f"projects[{i}]: the member at path '{proj['path']}' is named "
                 f"'{ROOT_MEMBER_NAME}', which is reserved for the member that "
-                f"owns the repository root (path = \".\"). Rename this member, "
-                f"or make it the root member by giving it path = \".\". Which "
-                f"one it should be is your decision -- rlsbl will not guess "
-                f"which member owns the repository root."
+                f"owns the repository root (path = \".\"). A workspace has "
+                f"exactly one root member, and this workspace already declares "
+                f"one, so this member cannot become a second: either rename "
+                f"this member, or give it path = \".\" replacing the root "
+                f"member declared today. Which one it should be is your "
+                f"decision -- rlsbl will not guess which member owns the "
+                f"repository root."
             )
-
-    # -- (a) the mandatory root member --------------------------------------
-    if root_member is None:
-        raise WorkspaceError(
-            "workspace.toml declares no root member. Every workspace must "
-            "declare the repository root itself as a member; it owns every "
-            "tracked file no other member claims, so that no file is outside "
-            "the ownership model. Add one, choosing its kind:\n"
-            "\n"
-            "  [[projects]]\n"
-            "  path = \".\"\n"
-            f"  name = \"{ROOT_MEMBER_NAME}\"\n"
-            "  dev_only = true          # a dev node: its files need no "
-            "changelog coverage\n"
-            "\n"
-            "or, to give the root files changelog coverage:\n"
-            "\n"
-            "  [[projects]]\n"
-            "  path = \".\"\n"
-            f"  name = \"{ROOT_MEMBER_NAME}\"\n"
-            "  releasable = \"<name of a [[releasables]] entry>\"\n"
-            "\n" + _MIGRATION_NOTE
-        )
-
-    # -- (e) implicit mode ---------------------------------------------------
-    raw_releasables = data.get("releasables")
-    if raw_releasables is None:
-        raise WorkspaceError(
-            "workspace.toml has no [[releasables]] section: this is an "
-            "implicit-mode workspace, and implicit mode is no longer "
-            "supported. Every workspace declares its releasables explicitly. "
-            "Convert this one -- add a [[releasables]] section and give every "
-            "releasable member a `releasable = \"<name>\"` key (or "
-            "`releasable = false`) -- or, if the conversion cannot happen now, "
-            f"pin rlsbl to {LAST_IMPLICIT_MODE_VERSION}, the last version that "
-            "reads an implicit-mode workspace, and file a todo in this "
-            "repository to convert it."
-        )
 
     # -- (f) a root-member releasable needs an explicit tag format -----------
     root_releasable = _get_releasable_value(root_member)
