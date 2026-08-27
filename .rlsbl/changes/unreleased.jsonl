@@ -3,3 +3,4 @@
 {"format_version":1,"id":"18cfacba99b1addf0c7b4161daaa48db8b2f3d165ae47bf8","commits":["b1cbde48a21e76546f9a256a200e13e8f3640887"],"user_facing":true,"description":"`rlsbl monorepo absorb --dry-run` no longer aborts before it can preview anything: its source-repo precondition check read the worktree with a command the preview refused to run.","type":"fix"}
 {"format_version":1,"id":"18cfacc3485907ea7f3e95d6f47d438f80dd47d6d4fb3d51","commits":["20c68aeb38b1cfda8e80cd6c97eb919b5588ed46"],"user_facing":false}
 {"format_version":1,"id":"18cfacdf60b573a9b6989a0be3504138b3408cb0c97cb6f3","commits":["25513002f69a5f1ef480dc6bb3c1dff84776721a"],"user_facing":false}
+{"format_version":1,"id":"18cface18141052e481acdbe87844426943cb3b67319f377","commits":["c69634832209c2f4b25c5c0d2a65bf9d2d3b5673"],"user_facing":false}
