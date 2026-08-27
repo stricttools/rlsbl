@@ -80,18 +80,22 @@ def _require_project_root():
     return Path(root)
 
 
-def _require_sub_project_root(workspace_root_guidance=None):
+def _require_sub_project_root():
     """Find the project root, resolving to the sub-project in monorepo mode.
 
     In standalone mode: same as _require_project_root().
     In monorepo mode: uses resolve_project() to find which sub-project CWD is in,
     returns the sub-project path instead of the monorepo root.
 
-    ``workspace_root_guidance``: optional error message printed when CWD is
-    the monorepo workspace root itself. Per-sub-project commands (dev sync,
-    dev install) pass this so a workspace-root invocation says "cd into a
-    sub-project" instead of the misleading default "run 'rlsbl monorepo add'"
-    (the workspace root is not an unregistered project).
+    **Standing at the workspace root is not a failure.** It used to be: every
+    per-sub-project command passed a ``workspace_root_guidance`` message saying
+    "cd into a sub-project". Since the root member became mandatory,
+    ``resolve_project`` always answers inside a workspace -- the root member
+    owns every directory no other member claims, the workspace root included --
+    so the guidance branch became unreachable and the commands simply operate
+    on the root member, which is a real project with a real version and a real
+    changelog. The parameter is gone; a command that genuinely cannot act on
+    the root member refuses for itself (``rlsbl dev sync`` does).
 
     Side effect: sets module-level ``_resolved_project`` to the
     WorkspaceProject when in monorepo mode, or None in standalone mode.
@@ -108,12 +112,6 @@ def _require_sub_project_root(workspace_root_guidance=None):
             _resolved_project = project
             sub_path = Path(ws_root) / project["path"]
             return sub_path
-        if (
-            workspace_root_guidance is not None
-            and Path(ws_root).resolve() == Path.cwd().resolve()
-        ):
-            print(workspace_root_guidance, file=sys.stderr)
-            sys.exit(1)
         # CWD is inside the monorepo but not in any registered project
         print(f"Error: CWD is inside monorepo at {ws_root} but not inside any registered project.", file=sys.stderr)
         print("Run 'rlsbl monorepo add <path>' to register this project.", file=sys.stderr)
@@ -649,13 +647,7 @@ def cmd_release_resume(ctx, watch, push_timeout, ci_timeout, check_timeout, hook
 @effects.handler
 def cmd_release_init(ctx):
     """Scaffold unreleased.toml with auto-detected targets for the next release."""
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl release init` must run inside a sub-project, not "
-            "at the monorepo workspace root. cd into the sub-project you "
-            "want to release."
-        )
-    )
+    root = _require_sub_project_root()
     from .commands.release_init import run_cmd
     run_cmd(project_root=root)
 
@@ -674,13 +666,7 @@ def cmd_release_retry(ctx, watch):
     """Dispatch CI workflows for a completed release via gh workflow run."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl release retry` must run inside a sub-project, "
-            "not at the monorepo workspace root. cd into the sub-project "
-            "you want to retry."
-        )
-    )
+    root = _require_sub_project_root()
 
     from .release_file import get_retry_file_path, read_retry_file
 
@@ -769,13 +755,7 @@ def cmd_status(ctx, target, registry):
     # --json is framework-owned: strictcli reserves the name at every level and
     # delivers the value on the Context.
     json = ctx.json
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl status` must run inside a sub-project, not at "
-            "the monorepo workspace root. cd into a sub-project, or use "
-            "`rlsbl monorepo status` for workspace-wide status."
-        )
-    )
+    root = _require_sub_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
     # The project context is a different object from the dispatch context, so
@@ -1031,13 +1011,7 @@ def cmd_claim_name(ctx, target, force_publish):
 def cmd_release_edit(ctx, version=None):
     """Sync GitHub Release notes with the CHANGELOG.md entry for a version."""
     dry_run = ctx.dry_run
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl release edit` must run inside a sub-project, not "
-            "at the monorepo workspace root. cd into the sub-project whose "
-            "release notes you want to edit."
-        )
-    )
+    root = _require_sub_project_root()
     args = [version] if version else []
     flags = {"dry-run": dry_run}
     from .commands.edit_release import run_cmd
@@ -1076,13 +1050,7 @@ def cmd_release_undo(ctx, target, version):
 def cmd_release_deprecate(ctx, reason, use, version):
     """Mark a past release as deprecated on GitHub."""
     dry_run = ctx.dry_run
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl release deprecate` must run inside a sub-project, not "
-            "at the monorepo workspace root. cd into the sub-project whose "
-            "release you want to deprecate."
-        )
-    )
+    root = _require_sub_project_root()
     args = [version]
     flags = {
         "reason": reason,
@@ -1105,13 +1073,7 @@ def cmd_release_deprecate(ctx, reason, use, version):
 def cmd_release_yank(ctx, reason, use, version):
     """Remove a published version from package registries."""
     dry_run = ctx.dry_run
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl release yank` must run inside a sub-project, not "
-            "at the monorepo workspace root. cd into the sub-project whose "
-            "release you want to yank."
-        )
-    )
+    root = _require_sub_project_root()
     args = [version]
     flags = {
         "reason": reason,
@@ -1393,13 +1355,7 @@ def cmd_unreleased(ctx):
     # --json is framework-owned: strictcli reserves the name at every level and
     # delivers the value on the Context.
     json = ctx.json
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl unreleased` must run inside a sub-project, not "
-            "at the monorepo workspace root. cd into a sub-project, or use "
-            "`rlsbl monorepo status` for workspace-wide status."
-        )
-    )
+    root = _require_sub_project_root()
     flags = {"json": json}
     from .commands.unreleased import run_cmd
     ctx.payload(run_cmd(None, [], flags, project_root=root))
@@ -1413,12 +1369,7 @@ def cmd_unreleased(ctx):
 @effects.handler
 def cmd_targets(ctx):
     """List all release targets detected in the current project."""
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl targets` must run inside a sub-project, not at "
-            "the monorepo workspace root. cd into a sub-project."
-        )
-    )
+    root = _require_sub_project_root()
     from .commands.targets_cmd import run_cmd
     run_cmd(None, [], {}, project_root=root)
 
@@ -1434,13 +1385,7 @@ def cmd_targets(ctx):
 def cmd_deploy(ctx, target, target_name=None):
     """Run the configured deployment pipeline for the project."""
     dry_run = ctx.dry_run
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl deploy` must run inside a sub-project, not at "
-            "the monorepo workspace root. cd into the sub-project you want "
-            "to deploy."
-        )
-    )
+    root = _require_sub_project_root()
     ctx = create_context(root)
     args = [target_name] if target_name else []
     flags = {"dry-run": dry_run}
@@ -1501,13 +1446,7 @@ def cmd_chlog_add(ctx, commits, description, type, user_facing, auto_commit, all
     user_facing = _opt_default(user_facing, True)
     auto_commit = _opt_default(auto_commit, True)
     allow_batch = _opt_default(allow_batch, False)
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl changelog add` must run inside a sub-project, "
-            "not at the monorepo workspace root. cd into the sub-project "
-            "whose changelog you want to modify."
-        )
-    )
+    root = _require_sub_project_root()
     flags = {
         "commits": commits,
         "description": description,
@@ -1529,13 +1468,7 @@ def cmd_chlog_generate(ctx, auto_commit):
     """Generate CHANGELOG.md from all JSONL changelog files."""
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl changelog generate` must run inside a "
-            "sub-project, not at the monorepo workspace root. cd into the "
-            "sub-project whose changelog you want to generate."
-        )
-    )
+    root = _require_sub_project_root()
     flags = {"dry-run": dry_run, "auto-commit": auto_commit}
     from .commands.changelog_cmd import cmd_generate
     cmd_generate(flags, project_root=root)
@@ -1559,13 +1492,7 @@ def cmd_chlog_amend(ctx, version, commits, id, description, type, user_facing, v
     dry_run = ctx.dry_run
     user_facing = _opt_default(user_facing, True)
     validate_hashes = _opt_default(validate_hashes, True)
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl changelog amend` must run inside a sub-project, "
-            "not at the monorepo workspace root. cd into the sub-project "
-            "whose changelog you want to amend."
-        )
-    )
+    root = _require_sub_project_root()
     flags = {
         "version": version,
         "commits": commits,
@@ -1624,13 +1551,7 @@ def cmd_chlog_edit(ctx, commits, id, type, description, user_facing, auto_commit
     """Modify an existing changelog entry by commit hash or entry ID."""
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl changelog edit` must run inside a sub-project, "
-            "not at the monorepo workspace root. cd into the sub-project "
-            "whose changelog you want to edit."
-        )
-    )
+    root = _require_sub_project_root()
     flags = {
         "commits": commits,
         "id": id,
@@ -1670,13 +1591,7 @@ def cmd_chlog_edit(ctx, commits, id, type, description, user_facing, auto_commit
 def cmd_chlog_remap(ctx, map_file, from_journal, stdin):
     """Remap stale commit hashes in JSONL files using an old-to-new SHA mapping."""
     dry_run = ctx.dry_run
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl changelog remap` must run inside a sub-project, "
-            "not at the monorepo workspace root. cd into the sub-project "
-            "whose changelog you want to remap."
-        )
-    )
+    root = _require_sub_project_root()
     flags = {
         "map-file": map_file,
         "from-journal": bool(from_journal),
@@ -2352,14 +2267,7 @@ def cmd_dev_install(ctx, all, include, exclude, uninstall, target):
     """Install the project locally using the detected target's editable install."""
     all = _opt_default(all, False)
     uninstall = _opt_default(uninstall, False)
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl dev install` must run inside a sub-project, not "
-            "at the monorepo workspace root. cd into a sub-project and "
-            "re-run; from within any sub-project, --all/--include/--exclude "
-            "select which workspace projects to install."
-        )
-    )
+    root = _require_sub_project_root()
     flags = {
         "all": all,
         "include": include,
@@ -2377,14 +2285,8 @@ def cmd_dev_install(ctx, all, include, exclude, uninstall, target):
 @effects.handler
 def cmd_dev_sync(ctx):
     """Overlay local editable checkouts of sibling projects onto the locked environment."""
-    from .commands.dev_sync import OVERRIDES_FILENAME, run_sync
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl dev sync` must run inside a sub-project, not at "
-            "the monorepo workspace root. cd into the sub-project (its "
-            f"{OVERRIDES_FILENAME} lives at the sub-project root) and re-run."
-        )
-    )
+    from .commands.dev_sync import run_sync
+    root = _require_sub_project_root()
     rc = run_sync(root)
     if rc:
         sys.exit(rc)
@@ -2394,14 +2296,8 @@ def cmd_dev_sync(ctx):
 @effects.handler
 def cmd_dev_status(ctx):
     """Report the state of local dev-sync overlays and detect drift."""
-    from .commands.dev_sync import SENTINEL_FILENAME, run_status
-    root = _require_sub_project_root(
-        workspace_root_guidance=(
-            "Error: `rlsbl dev status` must run inside a sub-project, not at "
-            "the monorepo workspace root. cd into the sub-project (its "
-            f"{SENTINEL_FILENAME} lives at the sub-project root) and re-run."
-        )
-    )
+    from .commands.dev_sync import run_status
+    root = _require_sub_project_root()
     rc = run_status(root)
     if rc:
         sys.exit(rc)

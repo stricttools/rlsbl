@@ -424,6 +424,60 @@ class TestResolveProjectWithRootMember:
         assert resolve_project(str(repo), str(outside)) is None
 
 
+class TestPerSubProjectCommandsAtTheWorkspaceRoot:
+    """Standing at the workspace root is a position, not an error.
+
+    Every per-sub-project command used to hand ``_require_sub_project_root`` a
+    ``workspace_root_guidance`` message for the case where cwd is the workspace
+    root itself. Since the root member became mandatory that case cannot occur:
+    ``resolve_project`` always answers, and at the workspace root it answers
+    with the root member. The guidance parameter and its branch are gone, and
+    these pin what replaced them -- the command resolves to the root member and
+    runs.
+    """
+
+    def _workspace_root_project(self, tmp_project):
+        (tmp_project / ".rlsbl").mkdir()
+        (tmp_project / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "none", "targets": ["npm"]}) + "\n"
+        )
+        (tmp_project / "package.json").write_text(
+            json.dumps({"name": "root-pkg", "version": "1.0.0"}) + "\n"
+        )
+        write_raw(tmp_project, workspace_toml(
+            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n',
+        ))
+        (tmp_project / "a").mkdir()
+
+    def test_resolution_answers_with_the_root_member(self, tmp_project):
+        import rlsbl
+
+        self._workspace_root_project(tmp_project)
+        root = rlsbl._require_sub_project_root()
+        assert os.path.realpath(root) == os.path.realpath(tmp_project)
+        assert rlsbl._resolved_project["name"] == ROOT_MEMBER_NAME
+
+    def test_the_helper_takes_no_guidance_argument(self):
+        """The deleted parameter must not come back as a second spelling."""
+        import inspect
+
+        import rlsbl
+
+        assert list(
+            inspect.signature(rlsbl._require_sub_project_root).parameters
+        ) == []
+
+    def test_a_per_sub_project_command_runs_at_the_workspace_root(self, tmp_project):
+        from rlsbl import app
+
+        self._workspace_root_project(tmp_project)
+        result = app.test(["targets"])
+        assert result.exit_code == 0, result.stderr
+        assert "npm" in result.stdout
+        assert "monorepo add" not in result.stderr
+        assert "cd into" not in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # monorepo init: the root member's kind is declared, never defaulted
 # ---------------------------------------------------------------------------
