@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.117.1",
+  "version": "0.117.2",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -296,11 +296,6 @@
           "level": 3,
           "text": "`filter_exempt_commits`",
           "anchor": "filter_exempt_commits"
-        },
-        {
-          "level": 3,
-          "text": "`_is_ancestor`",
-          "anchor": "_is_ancestor"
         },
         {
           "level": 3,
@@ -3833,11 +3828,6 @@
         },
         {
           "level": 3,
-          "text": "`_is_ancestor`",
-          "anchor": "_is_ancestor"
-        },
-        {
-          "level": 3,
           "text": "`_cache_path`",
           "anchor": "_cache_path"
         },
@@ -5954,8 +5944,8 @@
         },
         {
           "level": 3,
-          "text": "`is_ancestor`",
-          "anchor": "is_ancestor"
+          "text": "`split_lineage_answer`",
+          "anchor": "split_lineage_answer"
         },
         {
           "level": 3,
@@ -5999,8 +5989,13 @@
         },
         {
           "level": 3,
-          "text": "`print_plan`",
-          "anchor": "print_plan"
+          "text": "`_undetermined_detail`",
+          "anchor": "_undetermined_detail"
+        },
+        {
+          "level": 3,
+          "text": "`verdict_item`",
+          "anchor": "verdict_item"
         },
         {
           "level": 3,
@@ -8690,6 +8685,16 @@
         },
         {
           "level": 3,
+          "text": "`observe_scratch_dirs`",
+          "anchor": "observe_scratch_dirs"
+        },
+        {
+          "level": 3,
+          "text": "`observe_scratch_owns`",
+          "anchor": "observe_scratch_owns"
+        },
+        {
+          "level": 3,
           "text": "`mkdtemp`",
           "anchor": "mkdtemp"
         },
@@ -8998,8 +9003,18 @@
         },
         {
           "level": 3,
-          "text": "`is_ancestor`",
-          "anchor": "is_ancestor"
+          "text": "`Ancestry`",
+          "anchor": "ancestry"
+        },
+        {
+          "level": 3,
+          "text": "`ancestry`",
+          "anchor": "ancestry-1"
+        },
+        {
+          "level": 3,
+          "text": "`_is_shallow`",
+          "anchor": "_is_shallow"
         },
         {
           "level": 3,
@@ -9303,6 +9318,168 @@
           "level": 3,
           "text": "`validate_layer_assignments`",
           "anchor": "validate_layer_assignments"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-lineage.md",
+      "title": "rlsbl.lineage",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.lineage",
+          "anchor": "rlsbllineage"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.lineage`",
+          "anchor": "rlsbllineage"
+        },
+        {
+          "level": 3,
+          "text": "`LineageError`",
+          "anchor": "lineageerror"
+        },
+        {
+          "level": 3,
+          "text": "`get_lineage_path`",
+          "anchor": "get_lineage_path"
+        },
+        {
+          "level": 3,
+          "text": "`lineage_file_exists`",
+          "anchor": "lineage_file_exists"
+        },
+        {
+          "level": 3,
+          "text": "`new_event_id`",
+          "anchor": "new_event_id"
+        },
+        {
+          "level": 3,
+          "text": "`now_timestamp`",
+          "anchor": "now_timestamp"
+        },
+        {
+          "level": 3,
+          "text": "`LineageEndpoint`",
+          "anchor": "lineageendpoint"
+        },
+        {
+          "level": 3,
+          "text": "`TagMapping`",
+          "anchor": "tagmapping"
+        },
+        {
+          "level": 3,
+          "text": "`AnchorMapping`",
+          "anchor": "anchormapping"
+        },
+        {
+          "level": 3,
+          "text": "`BoundaryAlias`",
+          "anchor": "boundaryalias"
+        },
+        {
+          "level": 3,
+          "text": "`SplitMapping`",
+          "anchor": "splitmapping"
+        },
+        {
+          "level": 3,
+          "text": "`_LineageEventBase`",
+          "anchor": "_lineageeventbase"
+        },
+        {
+          "level": 3,
+          "text": "`ConversionEvent`",
+          "anchor": "conversionevent"
+        },
+        {
+          "level": 3,
+          "text": "`TagMapEvent`",
+          "anchor": "tagmapevent"
+        },
+        {
+          "level": 3,
+          "text": "`AnchorRemapEvent`",
+          "anchor": "anchorremapevent"
+        },
+        {
+          "level": 3,
+          "text": "`DepartedGlobsEvent`",
+          "anchor": "departedglobsevent"
+        },
+        {
+          "level": 3,
+          "text": "`BoundaryAliasEvent`",
+          "anchor": "boundaryaliasevent"
+        },
+        {
+          "level": 3,
+          "text": "`IdentityTransitionEvent`",
+          "anchor": "identitytransitionevent"
+        },
+        {
+          "level": 3,
+          "text": "`PromotionSplitMapEvent`",
+          "anchor": "promotionsplitmapevent"
+        },
+        {
+          "level": 3,
+          "text": "`_plain`",
+          "anchor": "_plain"
+        },
+        {
+          "level": 3,
+          "text": "`serialize_event`",
+          "anchor": "serialize_event"
+        },
+        {
+          "level": 3,
+          "text": "`_build_nested`",
+          "anchor": "_build_nested"
+        },
+        {
+          "level": 3,
+          "text": "`parse_event`",
+          "anchor": "parse_event"
+        },
+        {
+          "level": 3,
+          "text": "`_gate_line`",
+          "anchor": "_gate_line"
+        },
+        {
+          "level": 3,
+          "text": "`_validate_line`",
+          "anchor": "_validate_line"
+        },
+        {
+          "level": 3,
+          "text": "`append_events`",
+          "anchor": "append_events"
+        },
+        {
+          "level": 3,
+          "text": "`_newline_separator`",
+          "anchor": "_newline_separator"
+        },
+        {
+          "level": 3,
+          "text": "`append_event`",
+          "anchor": "append_event"
+        },
+        {
+          "level": 3,
+          "text": "`_undecodable_bytes_error`",
+          "anchor": "_undecodable_bytes_error"
+        },
+        {
+          "level": 3,
+          "text": "`read_events`",
+          "anchor": "read_events"
         }
       ]
     },
@@ -10832,6 +11009,98 @@
           "level": 3,
           "text": "`_parse_stdin_refs`",
           "anchor": "_parse_stdin_refs"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-preview_apply.md",
+      "title": "rlsbl.preview_apply",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.preview_apply",
+          "anchor": "rlsblpreview_apply"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.preview_apply`",
+          "anchor": "rlsblpreview_apply"
+        },
+        {
+          "level": 3,
+          "text": "`ObserveWriteError`",
+          "anchor": "observewriteerror"
+        },
+        {
+          "level": 3,
+          "text": "`VerdictItem`",
+          "anchor": "verdictitem"
+        },
+        {
+          "level": 4,
+          "text": "`state_label`",
+          "anchor": "state_label"
+        },
+        {
+          "level": 3,
+          "text": "`Preview`",
+          "anchor": "preview"
+        },
+        {
+          "level": 4,
+          "text": "`keys`",
+          "anchor": "keys"
+        },
+        {
+          "level": 4,
+          "text": "`states`",
+          "anchor": "states"
+        },
+        {
+          "level": 4,
+          "text": "`by_key`",
+          "anchor": "by_key"
+        },
+        {
+          "level": 4,
+          "text": "`only`",
+          "anchor": "only"
+        },
+        {
+          "level": 3,
+          "text": "`single`",
+          "anchor": "single"
+        },
+        {
+          "level": 3,
+          "text": "`render_preview`",
+          "anchor": "render_preview"
+        },
+        {
+          "level": 3,
+          "text": "`git_subcommand`",
+          "anchor": "git_subcommand"
+        },
+        {
+          "level": 3,
+          "text": "`observe_allowed`",
+          "anchor": "observe_allowed"
+        },
+        {
+          "level": 3,
+          "text": "`no_writes`",
+          "anchor": "no_writes"
+        },
+        {
+          "level": 3,
+          "text": "`Reconciler`",
+          "anchor": "reconciler"
+        },
+        {
+          "level": 3,
+          "text": "`reconcile`",
+          "anchor": "reconcile"
         }
       ]
     },
@@ -14415,6 +14684,11 @@
         },
         {
           "level": 3,
+          "text": "`_abort_unless_head_descends`",
+          "anchor": "_abort_unless_head_descends"
+        },
+        {
+          "level": 3,
           "text": "`cmd_release_run`",
           "anchor": "cmd_release_run"
         },
@@ -15519,6 +15793,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-27T13:02:38.034976+00:00",
+  "last_gen": "2026-08-27T14:32:01.279165+00:00",
   "theme": "minimal"
 }
