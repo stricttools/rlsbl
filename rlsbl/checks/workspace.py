@@ -82,7 +82,7 @@ def register_workspace_checks(app):
 
         if ctx.workspace_root is None:
             return reporter.skipped("not a workspace")
-        from ..commands.monorepo.sync import ROUTER_HEADER, _is_generated_router
+        from ..router_filters import ROUTER_HEADER, is_generated_router
 
         root = str(ctx.workspace_root)
         router_path = os.path.join(root, ".github", "workflows", "ci-router.yml")
@@ -90,7 +90,7 @@ def register_workspace_checks(app):
             # workspace-ci-router already reports a missing router; saying it
             # twice would just double the noise.
             return reporter.skipped("no ci-router.yml to compare")
-        if not _is_generated_router(router_path):
+        if not is_generated_router(router_path):
             # Freshness is a statement about a GENERATED artifact: it compares
             # what sync wrote against what sync would write now. A router
             # without the header was not written by sync, so there is nothing

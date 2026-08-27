@@ -29,6 +29,7 @@ from rlsbl.checks import CHECK_TARGETS
 from rlsbl.router_filters import (
     MATCH_EVERYTHING,
     PREDICATE_QUANTIFIER,
+    ROUTER_HEADER,
     ROUTER_WORKFLOW_PATH,
     RouterFilters,
     any_path_matches,
@@ -442,7 +443,6 @@ class TestRouterFiltersFreshCheck:
 
     def test_a_generated_router_with_no_filters_block_fails(self, router_workspace):
         """It claims to be generated, so its filters block must be readable."""
-        from rlsbl.commands.monorepo.sync import ROUTER_HEADER
 
         router = router_workspace / ".github" / "workflows" / "ci-router.yml"
         router.write_text(
