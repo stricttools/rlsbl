@@ -17,7 +17,7 @@
       "name": "content_based_detection"
     },
     {
-      "doc": "File that holds the version, or null when the target inherits one.",
+      "doc": "File that holds the version, or null when the filename is per-project and cannot be stated statically.",
       "name": "version_file"
     },
     {
@@ -1181,7 +1181,7 @@
         ],
         [
           "version_file",
-          "File that holds the version, or null when the target inherits one."
+          "File that holds the version, or null when the filename is per-project and cannot be stated statically."
         ],
         [
           "tag_format",
