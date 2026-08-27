@@ -508,43 +508,64 @@ def _normalize_member_path(path):
     return stripped.rstrip("/")
 
 
+# The project keys workspace.toml carries, i.e. everything WorkspaceProject
+# reads back and save_workspace serializes. A key outside this set is a typo,
+# and a typo that serialized silently would produce a workspace not describing
+# what the test declared.
+_WORKSPACE_PROJECT_KEYS = frozenset({
+    "path",
+    "name",
+    "watch",
+    "library",
+    "dev_node",
+    "dev_only",
+    "releasable",
+    "depends_on",
+    "import_name",
+    "registry_name",
+    "subtree_remote",
+})
+
+
 def make_workspace(root, projects, releasables=None):
     """Create a .rlsbl-monorepo/workspace.toml with the given project list.
 
+    Serialization goes through rlsbl's own ``save_workspace``, so the file is
+    byte-identical to what the tools write and no key can be recognized here
+    but dropped there (or the reverse).
+
     Args:
         root: repository root (Path).
-        projects: list of project dicts. Recognized keys: ``path``, ``name``,
-            ``watch``, ``library``, ``dev_node``, ``dev_only``, ``releasable``.
+        projects: list of project dicts. Every key ``save_workspace``
+            serializes is accepted -- ``path``, ``name``, ``watch``,
+            ``library``, ``dev_node``, ``dev_only``, ``releasable``,
+            ``depends_on``, ``import_name``, ``registry_name`` and
+            ``subtree_remote`` -- and any other key is a ``ValueError``.
             A project may declare the repository root itself as a member with
             ``path = "."`` (``""`` and ``"./"`` are accepted spellings of it);
             at most one root member is allowed.
         releasables: when given, an explicit-mode ``[[releasables]]`` section is
             emitted ahead of the projects. Each item may be a ``Releasable``, a
             dict (``{"name": ..., "tag_format": ...}``) or a bare name string.
-            ``tag_format`` is written only when it differs from the default, so
-            the file matches what ``save_workspace`` produces.
+            ``tag_format`` is written only when it differs from the default.
 
     In explicit mode every non-``dev_only`` project must carry a ``releasable``
     key (a name, or ``False`` to stand outside every releasable) -- that is
     rlsbl's rule, not this helper's, and ``load_releasables`` enforces it.
     """
-    ws_dir = root / WORKSPACE_DIR
-    ws_dir.mkdir(parents=True, exist_ok=True)
-    lines = []
-
-    for rel in releasables or []:
-        if isinstance(rel, str):
-            rel_name, tag_format = rel, DEFAULT_TAG_FORMAT
-        elif isinstance(rel, dict):
-            rel_name = rel["name"]
-            tag_format = rel.get("tag_format", DEFAULT_TAG_FORMAT)
-        else:
-            rel_name, tag_format = rel.name, rel.tag_format
-        lines.append("[[releasables]]")
-        lines.append(f'name = "{rel_name}"')
-        if tag_format != DEFAULT_TAG_FORMAT:
-            lines.append(f'tag_format = "{tag_format}"')
-        lines.append("")
+    rels = None
+    if releasables is not None:
+        rels = []
+        for rel in releasables:
+            if isinstance(rel, str):
+                rels.append(Releasable(name=rel))
+            elif isinstance(rel, dict):
+                rels.append(Releasable(
+                    name=rel["name"],
+                    tag_format=rel.get("tag_format", DEFAULT_TAG_FORMAT),
+                ))
+            else:
+                rels.append(rel)
 
     root_members = [
         p for p in projects if _normalize_member_path(p["path"]) == "."
@@ -555,27 +576,21 @@ def make_workspace(root, projects, releasables=None):
             f"(path \".\"); got {[p['name'] for p in root_members]}"
         )
 
+    prepared = []
     for proj in projects:
-        lines.append("[[projects]]")
-        lines.append(f'path = "{_normalize_member_path(proj["path"])}"')
-        lines.append(f'name = "{proj["name"]}"')
-        if "watch" in proj:
-            watch_items = ", ".join(f'"{w}"' for w in proj["watch"])
-            lines.append(f"watch = [{watch_items}]")
-        if proj.get("library"):
-            lines.append("library = true")
-        if proj.get("dev_node"):
-            lines.append("dev_node = true")
-        if proj.get("dev_only"):
-            lines.append("dev_only = true")
-        if "releasable" in proj:
-            rel = proj["releasable"]
-            if rel is False:
-                lines.append("releasable = false")
-            elif isinstance(rel, str):
-                lines.append(f'releasable = "{rel}"')
-        lines.append("")
-    (ws_dir / WORKSPACE_FILE).write_text("\n".join(lines))
+        unknown = sorted(set(proj) - _WORKSPACE_PROJECT_KEYS)
+        if unknown:
+            raise ValueError(
+                f"project {proj.get('name')!r}: unknown workspace key(s) "
+                f"{', '.join(unknown)}. workspace.toml carries only "
+                f"{', '.join(sorted(_WORKSPACE_PROJECT_KEYS))}; a key outside "
+                f"that set would be written but never read back."
+            )
+        entry = dict(proj)
+        entry["path"] = _normalize_member_path(proj["path"])
+        prepared.append(entry)
+
+    save_workspace(str(root), prepared, releasables=rels)
 
 
 class FakeResponse:
