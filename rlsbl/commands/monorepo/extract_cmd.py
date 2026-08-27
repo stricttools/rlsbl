@@ -1231,13 +1231,21 @@ def _apply_tags(dep, item, run):
             _run_git(dep.target_path, "tag", "-d", tag)
     run.tag_mappings = mappings
 
-    kept = [
-        t for t in _git_tag_names(dep.target_path)
-        if parse_version_tag(t, mode=TagMode.PRERELEASE_INCLUSIVE) is not None
-        and t not in {new for _old, new in dep.tag_plan.translations}
-        and not (dep.tag_plan.alias and t == dep.tag_plan.alias[1])
-    ]
-    for tag in kept:
+    # What is left over: a tag that parses as a version tag under SOME scheme
+    # but is neither this releasable's own (in either the source or the
+    # destination spelling) nor another live member's. The conservative rule
+    # keeps it -- it is most likely this releasable's own history under a prefix
+    # it used before a rename -- and says so, because a kept foreign-looking tag
+    # in a fresh repository is otherwise a mystery.
+    own = set(_git_tag_names(dep.target_path, dep.departed_globs[0]))
+    own |= {new for _old, new in dep.tag_plan.translations}
+    if dep.tag_plan.alias:
+        own.add(dep.tag_plan.alias[1])
+    for tag in _git_tag_names(dep.target_path):
+        if tag in own:
+            continue
+        if parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE) is None:
+            continue
         print(
             f"  tag: keeping '{tag}' -- it matches no current member's scheme, "
             f"so it is most likely this releasable's own history under an "
@@ -1539,6 +1547,17 @@ def _declare_dep_floors(dep):
 
 def _apply_next_steps(dep, item, run):
     """Print what the operator still has to do. rlsbl administers nothing."""
+    if run.unremapped_anchors:
+        # Said once more at the end, where it will still be on screen: these
+        # archives record a commit that no longer exists in the new repository,
+        # and the lineage record is what explains why.
+        print(
+            "\nRelease anchors left as recorded (their commits did not survive "
+            "the filter):",
+            file=sys.stderr,
+        )
+        for name, sha in run.unremapped_anchors:
+            print(f"  - {name}: {sha[:12]}", file=sys.stderr)
     print("\nNext steps (rlsbl never administers an external system):")
     for step in _next_steps(dep):
         print(f"  - {step}")
