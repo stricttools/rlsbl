@@ -1,10 +1,11 @@
 """Claim a package name on npm or PyPI by publishing a minimal placeholder package with version 0.0.0 and an empty description."""
 
-import json
 import os
 import subprocess
 import sys
+
 from .. import effects
+from ..targets import TARGETS, claimable_targets
 
 
 def run_cmd(target, args, flags):
@@ -27,9 +28,15 @@ def run_cmd(target, args, flags):
 
     name = args[0]
 
-    if target not in ("npm", "pypi"):
-        print(f"Unsupported target: {target!r}. Must be 'npm' or 'pypi'.", file=sys.stderr)
+    claimable = claimable_targets()
+    if target not in claimable:
+        supported = " or ".join(f"'{t}'" for t in sorted(claimable))
+        print(
+            f"Unsupported target: {target!r}. Must be {supported}.",
+            file=sys.stderr,
+        )
         sys.exit(1)
+    target_obj = TARGETS[target]
 
     from rlsbl.commands.check import _check_single_name
 
@@ -56,14 +63,22 @@ def run_cmd(target, args, flags):
         else:
             sys.exit(1)
 
-    if target == "npm":
-        if "NPM_TOKEN" not in os.environ:
-            print("NPM_TOKEN environment variable is not set.", file=sys.stderr)
-            sys.exit(1)
-    elif target == "pypi":
-        if "PYPI_TOKEN" not in os.environ and "UV_PUBLISH_TOKEN" not in os.environ:
-            print("Neither PYPI_TOKEN nor UV_PUBLISH_TOKEN environment variable is set.", file=sys.stderr)
-            sys.exit(1)
+    # Which environment variable authenticates a claim is the target's own
+    # knowledge, declared alongside the publish routine it feeds.
+    token_vars = target_obj.claim_token_env_vars
+    if token_vars and not any(var in os.environ for var in token_vars):
+        if len(token_vars) == 1:
+            print(
+                f"{token_vars[0]} environment variable is not set.",
+                file=sys.stderr,
+            )
+        else:
+            joined = " nor ".join(token_vars)
+            print(
+                f"Neither {joined} environment variable is set.",
+                file=sys.stderr,
+            )
+        sys.exit(1)
 
     # No hand-rolled preview and no hand-rolled prompt: `claim-name` declares
     # itself `consequential`, so strictcli asks for confirmation before
@@ -75,88 +90,19 @@ def run_cmd(target, args, flags):
 
     tmpdir = effects.mkdtemp()
     try:
-        if target == "npm":
-            _claim_npm(name, tmpdir)
-        elif target == "pypi":
-            _claim_pypi(name, tmpdir)
+        # The publish routine is the target's own; the command no longer
+        # branches on the name to pick one.
+        url = target_obj.claim_placeholder(name, tmpdir)
     except subprocess.CalledProcessError as e:
         print(e.stderr, file=sys.stderr)
         sys.exit(1)
     finally:
         effects.rmtree(tmpdir)
 
-
-def _claim_npm(name, tmpdir):
-    package_json = {
-        "name": name,
-        "version": "0.0.0",
-        "description": "Name reservation",
-    }
-    with effects.open_write(os.path.join(tmpdir, "package.json"), "w") as f:
-        json.dump(package_json, f, indent=2)
-        f.write("\n")
-
-    effects.run(
-        ["npm", "publish", "--access", "public"],
-        grant="publish",
-        resource=f"npm:{name}",
-        cwd=tmpdir,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    )
     if not effects.previewing():
         # A preview published nothing, so it must not claim it did; the
         # would-do log the framework prints is the preview's own report.
-        print(f"Successfully claimed '{name}' on npm: https://www.npmjs.com/package/{name}")
-
-
-def _claim_pypi(name, tmpdir):
-    name_underscored = name.replace("-", "_")
-    pkg_dir = os.path.join(tmpdir, name_underscored)
-    effects.makedirs(pkg_dir)
-
-    with effects.open_write(os.path.join(pkg_dir, "__init__.py"), "w") as f:
-        pass
-
-    pyproject_toml = f"""\
-[project]
-name = "{name}"
-version = "0.0.0"
-description = "Name reservation"
-requires-python = ">=3.11"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-"""
-    with effects.open_write(os.path.join(tmpdir, "pyproject.toml"), "w") as f:
-        f.write(pyproject_toml)
-
-    effects.run(
-        ["uv", "build"],
-        cwd=tmpdir,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    )
-
-    # The token rides the environment, never argv: it must not reach a process
-    # listing, and it must not reach the would-do log a preview prints.
-    token = os.environ.get("UV_PUBLISH_TOKEN") or os.environ["PYPI_TOKEN"]
-
-    effects.run(
-        ["uv", "publish"],
-        grant="publish",
-        resource=f"pypi:{name}",
-        env={**os.environ, "UV_PUBLISH_TOKEN": token},
-        cwd=tmpdir,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    )
-    if not effects.previewing():
-        print(f"Successfully claimed '{name}' on PyPI: https://pypi.org/project/{name}/")
+        print(
+            f"Successfully claimed '{name}' on "
+            f"{target_obj.registry_display_name}: {url}"
+        )

@@ -445,6 +445,22 @@ class GoTarget(BaseTarget):
             "venv": None,
         }
 
+    @property
+    def registry_display_name(self):
+        return "pkg.go.dev"
+
+    def normalize_package_name(self, raw_name):
+        """Go compares the last segment of a module path, lowercased."""
+        from .utils import normalize_go
+
+        return normalize_go(raw_name)
+
+    def query_latest_version(self, name):
+        """Ask the Go module proxy for the latest published version."""
+        from ..registry import query_go_version
+
+        return query_go_version(name)
+
     def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
         """Add a ``retract`` directive for a version to go.mod.
 

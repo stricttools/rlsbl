@@ -235,6 +235,65 @@ class BaseTarget:
         """
         return []
 
+    def normalize_package_name(self, raw_name):
+        """Reduce a package name to the form this registry compares by.
+
+        Registries differ in what they consider "the same name": PyPI folds
+        runs of ``-_.`` to a single hyphen (PEP 503), npm removes them
+        entirely, Go compares the last path segment of a module path. A
+        cross-target name-consistency check must ask each target rather than
+        keep a dict keyed by target name.
+
+        The default lowercases, which is the right answer for a registry with
+        no normalization rules of its own.
+        """
+        return raw_name.lower()
+
+    def query_latest_version(self, name):
+        """Ask this target's registry for the latest published version.
+
+        Returns a dict with ``status`` ``"found"`` (plus ``version``),
+        ``"not_found"``, or ``"error"`` (plus ``message``) -- the shape
+        ``rlsbl.registry`` has always used.
+
+        The default answers ``error`` naming the target rather than returning
+        None: a caller comparing a local version against "the registry" must
+        never mistake "this ecosystem has no version API" for "the package is
+        unpublished".
+        """
+        return {
+            "status": "error",
+            "message": f"Unknown registry: {self.name}",
+        }
+
+    def claim_placeholder(self, name, tmpdir):
+        """Publish a minimal placeholder package to reserve *name*.
+
+        Targets whose registry accepts a publish override this. The default
+        raises: a target that cannot claim a name must not be reachable from
+        ``rlsbl claim-name``, and ``claimable_targets()`` derives the
+        command's accepted set from exactly this method.
+        """
+        raise NotImplementedError(
+            f"target '{self.name}' cannot claim a name on its registry"
+        )
+
+    claim_token_env_vars: ClassVar[tuple[str, ...]] = ()
+    """Environment variables, any one of which authenticates a name claim.
+
+    Empty for a target that cannot claim names at all.
+    """
+
+    @property
+    def registry_display_name(self):
+        """How to spell this target's registry in user-facing output.
+
+        Defaults to the target name, which is already right for npm and most
+        others. PyPI capitalises and Go's index has a different name entirely,
+        so they override. This replaced a display dict keyed by target name.
+        """
+        return self.name
+
     def format_version(self, version):
         """Format a semver version for this target's ecosystem.
 

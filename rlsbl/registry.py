@@ -108,18 +108,14 @@ def query_go_version(module_path):
         return {"status": "error", "message": str(e) or "Network error"}
 
 
-_REGISTRY_DISPATCH = {
-    "npm": query_npm_version,
-    "pypi": query_pypi_version,
-    "go": query_go_version,
-}
-
-
 def query_registry_version(name, registry):
     """Query a registry for the latest version of a package.
 
-    Dispatches to the appropriate registry-specific function based on
-    the registry parameter ("npm", "pypi", or "go").
+    The registry argument is a TARGET NAME, and the target answers: each one
+    that has a version API overrides ``query_latest_version``, and the base
+    implementation answers ``Unknown registry`` for the rest. This replaced a
+    hand-maintained dispatch dict that had to be edited alongside the target
+    registry and could silently disagree with it.
 
     Returns {"status": "found", "version": "X.Y.Z"} on success,
     {"status": "not_found"} if the package does not exist,
@@ -127,7 +123,9 @@ def query_registry_version(name, registry):
     or {"status": "error", "message": "Unknown registry: ..."} for
     unrecognized registry names.
     """
-    fn = _REGISTRY_DISPATCH.get(registry)
-    if fn is None:
+    from .targets import TARGETS
+
+    target = TARGETS.get(registry)
+    if target is None:
         return {"status": "error", "message": f"Unknown registry: {registry}"}
-    return fn(name)
+    return target.query_latest_version(name)

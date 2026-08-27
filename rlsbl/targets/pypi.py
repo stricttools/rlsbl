@@ -501,6 +501,76 @@ class PypiTarget(BaseTarget):
             },
         }
 
+    @property
+    def registry_display_name(self):
+        return "PyPI"
+
+    def normalize_package_name(self, raw_name):
+        """PyPI folds runs of ``-_.`` to a single hyphen (PEP 503)."""
+        from .utils import normalize_pypi
+
+        return normalize_pypi(raw_name)
+
+    def query_latest_version(self, name):
+        """Ask PyPI for the latest published version."""
+        from ..registry import query_pypi_version
+
+        return query_pypi_version(name)
+
+    # Order is the order the "not set" message names them. The publish routine
+    # below prefers UV_PUBLISH_TOKEN when both are present.
+    claim_token_env_vars = ("PYPI_TOKEN", "UV_PUBLISH_TOKEN")
+
+    def claim_placeholder(self, name, tmpdir):
+        """Build and publish a version 0.0.0 sdist/wheel to reserve *name*."""
+        name_underscored = name.replace("-", "_")
+        pkg_dir = os.path.join(tmpdir, name_underscored)
+        effects.makedirs(pkg_dir)
+
+        with effects.open_write(os.path.join(pkg_dir, "__init__.py"), "w"):
+            pass
+
+        pyproject_toml = f"""\
+[project]
+name = "{name}"
+version = "0.0.0"
+description = "Name reservation"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+"""
+        with effects.open_write(os.path.join(tmpdir, "pyproject.toml"), "w") as f:
+            f.write(pyproject_toml)
+
+        effects.run(
+            ["uv", "build"],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+        )
+
+        # The token rides the environment, never argv: it must not reach a
+        # process listing, and it must not reach the would-do log a preview
+        # prints.
+        token = os.environ.get("UV_PUBLISH_TOKEN") or os.environ["PYPI_TOKEN"]
+
+        effects.run(
+            ["uv", "publish"],
+            grant="publish",
+            resource=f"pypi:{name}",
+            env={**os.environ, "UV_PUBLISH_TOKEN": token},
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+        )
+        return f"https://pypi.org/project/{name}/"
+
     def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
         """Walk the operator through PyPI's manual yank.
 

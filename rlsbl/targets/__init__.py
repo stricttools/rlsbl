@@ -66,6 +66,32 @@ def targets_with_library_lint():
     )
 
 
+def targets_with_version_queries():
+    """Targets whose registry can be asked for a package's latest version.
+
+    Derived from the targets that override ``query_latest_version``. Replaces
+    the hand-mapped dispatch table ``rlsbl.registry`` used to carry.
+    """
+    return frozenset(
+        name
+        for name, target in TARGETS.items()
+        if type(target).query_latest_version is not BaseTarget.query_latest_version
+    )
+
+
+def claimable_targets():
+    """Targets on which ``rlsbl claim-name`` can reserve a name.
+
+    Derived from the targets that override ``claim_placeholder``. The command
+    used to hard-code the pair and then branch on the name twice more.
+    """
+    return frozenset(
+        name
+        for name, target in TARGETS.items()
+        if type(target).claim_placeholder is not BaseTarget.claim_placeholder
+    )
+
+
 def resolve_releasable_config_dir_for_ctx(ctx):
     """Resolve the releasable config directory from a check context.
 

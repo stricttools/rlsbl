@@ -15,8 +15,8 @@ import pytest
 
 import rlsbl
 from rlsbl.pipelines import PIPELINE_TYPES
-from rlsbl.registry import _REGISTRY_DISPATCH
-from rlsbl.targets import TARGETS
+from rlsbl.registry import query_registry_version
+from rlsbl.targets import TARGETS, targets_with_version_queries
 from conftest import cli_ctx
 
 app = rlsbl.app
@@ -34,8 +34,14 @@ class TestRegistriesDeregistered:
         assert "cargo" not in PIPELINE_TYPES
 
     def test_crates_registry_query_gone(self):
-        assert "cargo" not in _REGISTRY_DISPATCH
-        assert "crates" not in _REGISTRY_DISPATCH
+        # The version-query set is derived from the target registry now, so
+        # a deregistered target can no longer be queried at all.
+        assert "cargo" not in targets_with_version_queries()
+        assert "crates" not in targets_with_version_queries()
+        for registry in ("cargo", "crates"):
+            result = query_registry_version("anything", registry)
+            assert result["status"] == "error"
+            assert "Unknown registry" in result["message"]
 
 
 class TestModulesDeleted:

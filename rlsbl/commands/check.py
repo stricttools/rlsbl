@@ -579,6 +579,22 @@ def _check_single_name(name, registry, delay_ms=0):
     return result
 
 
+# Registries `check-name` can query that are NOT release targets. GitHub hosts
+# repositories, not packages, so no target owns it; every other entry in the
+# display table comes from the target registry.
+_NON_TARGET_REGISTRY_DISPLAY = {"github": "GitHub"}
+
+
+def _registry_display(registry):
+    """Human-readable name for a registry, asked of the target that owns it."""
+    from ..targets import TARGETS
+
+    target = TARGETS.get(registry)
+    if target is not None:
+        return target.registry_display_name
+    return _NON_TARGET_REGISTRY_DISPLAY.get(registry, registry)
+
+
 def _format_single_result(result):
     """Print the verbose output for a single name check result.
 
@@ -680,9 +696,10 @@ def _format_single_result(result):
             "(not publicly available)."
         )
 
-    # Steps-run summary
-    _REGISTRY_DISPLAY = {"npm": "npm", "pypi": "PyPI", "go": "pkg.go.dev", "github": "GitHub"}
-    steps = [_REGISTRY_DISPLAY.get(registry, registry)]
+    # Steps-run summary. Registry display names come from the targets, not
+    # from a dict keyed by target name; GitHub is not a release target and is
+    # declared here as the one non-target registry check-name can query.
+    steps = [_registry_display(registry)]
     if registry == "pypi":
         # stdlib check always runs for PyPI (it's local)
         steps.append("stdlib")

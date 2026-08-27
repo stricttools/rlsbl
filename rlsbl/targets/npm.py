@@ -262,6 +262,43 @@ class NpmTarget(BaseTarget):
             },
         }
 
+    def normalize_package_name(self, raw_name):
+        """npm folds a name by removing hyphens, underscores and dots."""
+        from .utils import normalize_npm
+
+        return normalize_npm(raw_name)
+
+    def query_latest_version(self, name):
+        """Ask the npm registry for the latest published version."""
+        from ..registry import query_npm_version
+
+        return query_npm_version(name)
+
+    claim_token_env_vars = ("NPM_TOKEN",)
+
+    def claim_placeholder(self, name, tmpdir):
+        """Publish a version 0.0.0 package.json to reserve *name* on npm."""
+        package_json = {
+            "name": name,
+            "version": "0.0.0",
+            "description": "Name reservation",
+        }
+        with effects.open_write(os.path.join(tmpdir, "package.json"), "w") as f:
+            json.dump(package_json, f, indent=2)
+            f.write("\n")
+
+        effects.run(
+            ["npm", "publish", "--access", "public"],
+            grant="publish",
+            resource=f"npm:{name}",
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
+        )
+        return f"https://www.npmjs.com/package/{name}"
+
     def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
         """Deprecate a published version on the npm registry.
 
