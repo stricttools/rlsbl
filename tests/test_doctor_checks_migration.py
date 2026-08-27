@@ -849,6 +849,87 @@ class TestWorkspaceUnregisteredCheck:
         # backend should NOT be in the unregistered list (it's registered)
         assert not any("backend" in p.text for p in result.problems)
 
+    @staticmethod
+    def _declare_member_targets(repo, targets):
+        """Register the repo root as a member declaring *targets*."""
+        rlsbl_dir = repo / ".rlsbl"
+        rlsbl_dir.mkdir(exist_ok=True)
+        (rlsbl_dir / "config.json").write_text(json.dumps({
+            "publish_mode": "ci",
+            "targets": targets,
+        }))
+
+    @staticmethod
+    def _npm_wrapper(repo, name="npm"):
+        """Create a subdirectory holding a publishable package.json."""
+        wrapper = repo / name
+        wrapper.mkdir()
+        (wrapper / "package.json").write_text(json.dumps({
+            "name": "wrapper",
+            "version": "1.0.0",
+        }))
+        return wrapper
+
+    def test_member_declared_target_path_not_flagged(self, mock_git_repo):
+        """A directory declared as a member's target path is NOT flagged."""
+        self._npm_wrapper(mock_git_repo)
+        (mock_git_repo / "pyproject.toml").write_text('[project]\nname = "core"\n')
+        self._declare_member_targets(
+            mock_git_repo, ["pypi", {"name": "npm", "path": "npm"}]
+        )
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": ".", "name": "core"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        assert result.status == "pass", [p.text for p in result.problems]
+
+    def test_releasable_declared_target_path_not_flagged(self, mock_git_repo):
+        """A directory declared as a releasable's target path is NOT flagged."""
+        self._npm_wrapper(mock_git_repo)
+        (mock_git_repo / "pyproject.toml").write_text('[project]\nname = "core"\n')
+        rel_dir = mock_git_repo / ".rlsbl-monorepo" / "releasables" / "core"
+        rel_dir.mkdir(parents=True)
+        (rel_dir / "config.json").write_text(json.dumps({
+            "publish_mode": "ci",
+            "targets": ["pypi", {"name": "npm", "path": "npm"}],
+        }))
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": ".", "name": "core", "releasable": "core"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        assert result.status == "pass", [p.text for p in result.problems]
+
+    def test_undeclared_dir_still_flagged_alongside_target_path(self, mock_git_repo):
+        """Exempting declared target paths must not exempt everything else."""
+        self._npm_wrapper(mock_git_repo)
+        (mock_git_repo / "pyproject.toml").write_text('[project]\nname = "core"\n')
+        self._declare_member_targets(
+            mock_git_repo, ["pypi", {"name": "npm", "path": "npm"}]
+        )
+        tools_dir = mock_git_repo / "tools"
+        tools_dir.mkdir()
+        (tools_dir / "pyproject.toml").write_text('[project]\nname = "tools"\n')
+
+        ctx = WorkspaceCheckContext(
+            project_root=mock_git_repo,
+            workspace_root=mock_git_repo,
+            config={},
+            projects=[{"path": ".", "name": "core"}],
+            graph=None,
+        )
+        result = app._check_defs["workspace-unregistered"].impl(ctx)
+        assert result.status == "fail"
+        assert any("tools" in p.text for p in result.problems)
+        assert not any("npm" in p.text for p in result.problems)
+
 
 # ---------------------------------------------------------------------------
 # Functional tests: private-hook-stale check

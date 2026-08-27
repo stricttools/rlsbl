@@ -168,8 +168,28 @@ def register_workspace_checks(app):
     @app.error_check("workspace-unregistered")
     def check_workspace_unregistered(ctx, reporter):
         """No project directories on disk should be missing from workspace.toml."""
+        from ..errors import ConfigError
+        from ..targets import detect_targets, resolve_releasable_config_dir
+
         root = str(ctx.workspace_root)
         registered_paths = {proj["path"].rstrip("/") for proj in ctx.projects}
+
+        # A member or releasable can put a target in its own subdirectory
+        # ({"name": "npm", "path": "npm"}). That subdirectory carries a
+        # manifest by construction and belongs to an already-registered
+        # project, so it is not an unregistered project.
+        declared_target_paths = set()
+        for proj in ctx.projects:
+            proj_dir = os.path.join(root, proj["path"])
+            rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
+            try:
+                entries = detect_targets(proj_dir, releasable_config_dir=rel_dir)
+            except (ConfigError, OSError):
+                continue
+            for entry in entries:
+                declared_target_paths.add(
+                    os.path.relpath(entry.path, root).rstrip("/")
+                )
 
         gitignored = set()
         try:
@@ -220,7 +240,9 @@ def register_workspace_checks(app):
             if any(rp.startswith(d + "/") for rp in registered_paths)
         }
 
-        unregistered = sorted(found_project_dirs - registered_paths)
+        unregistered = sorted(
+            found_project_dirs - registered_paths - declared_target_paths
+        )
         if unregistered:
             for d in unregistered:
                 reporter.error(f"{d}: has manifest but not in workspace.toml")
