@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = "check-name was reporting names as available when registries would rej
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "8dda2d72f9c18da5ab91a6998cb9e6431207b3e3"
+
+[tree_hashes]
+"." = "6010cb21b7e411fa093b7f31f5fd7fed49728cb9"

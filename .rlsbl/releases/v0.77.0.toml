@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = "Final cleanup round: completed the exception hierarchy (GitError for 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "e970fd614a8f02ab70f0c6b330dd23fbbcfd77fb"
+
+[tree_hashes]
+"." = "ef9b209db7caebf3e64230fe493cc5f6dbf78464"

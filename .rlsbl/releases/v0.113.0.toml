@@ -41,3 +41,7 @@ on a throwaway clone and touches nothing published or already pulled.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "c8d56101597c7627e855f25b371c979bb1656490"
+
+[tree_hashes]
+"." = "aaa2faa311f533344ea5eeef8078caf38aa3c3b6"

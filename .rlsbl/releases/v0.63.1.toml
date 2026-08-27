@@ -1,6 +1,12 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
 description = "Pass RLSBL_DIST_DIR env var to custom_assets build commands."
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "185ab406c5984fa1551b4a0566125b3563a62c61"
+
+[tree_hashes]
+"." = "0997b6e55defaa67447a0d54a10cc46d7c252703"

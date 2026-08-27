@@ -40,3 +40,7 @@ as would-run and checking nothing.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "774cbaeb50afd034fdf5ac39ee107bec1ecf687e"
+
+[tree_hashes]
+"." = "356e88be756747e0c20796c8a73d1afbd5937fd7"

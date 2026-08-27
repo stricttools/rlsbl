@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Per-target CI files, YAML indent fix, monorepo sync update"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "b58dceba1bea82881b4e4aeeec1521db4071eb3c"
+
+[tree_hashes]
+"." = "d1973b1efbc52c993ddc76eb4a5bc0c856fbe57c"

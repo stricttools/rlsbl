@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, or hotfix
 bump = "minor"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = """Release flow now delegates test and lint validation to the check sy
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "e1205adc001f109eb2b3232d53a5378bdb7c22dc"
+
+[tree_hashes]
+"." = "8f0f697714c7971291e775d865b90e0109692bfd"

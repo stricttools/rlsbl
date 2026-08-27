@@ -25,3 +25,7 @@ unreleased entries survive when members contribute none.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "09fb2ba3f8a669aa012b86ef4229891de55fab6b"
+
+[tree_hashes]
+"." = "232b8fc57e5769d4b2a16e3fd100fee70ad46d81"

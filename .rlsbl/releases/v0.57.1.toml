@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix Python 3.14 compatibility in monorepo release-init"
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "4bf5a3eef25d0956ba74ec5cc5d5bcc9a40676b6"
+
+[tree_hashes]
+"." = "3e9ff3afafe3caf9b2695ab5d140527371167783"

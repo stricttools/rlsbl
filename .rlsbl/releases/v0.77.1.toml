@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = "clean_stale_exclusions now removes commit-level batch exclusions when
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "f16d7f118125ccc81d3f0f7307a9f7bab73d07c7"
+
+[tree_hashes]
+"." = "b368271c3110e0350a7958cd10589db245e3bef3"

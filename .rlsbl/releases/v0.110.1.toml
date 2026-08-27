@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 bump = "patch"
 # Short description of this release (required)
@@ -18,3 +20,7 @@ cache), turning CI green so this release cycle ships to the registries.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "3078bbbaeb3d5768783826068eb8b0031bfbe837"
+
+[tree_hashes]
+"." = "50ad4fe7d1dbabee946cd1c91d14ed4b9371c812"

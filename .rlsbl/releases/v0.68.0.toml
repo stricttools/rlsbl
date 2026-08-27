@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "release scrub command, V4 hook removal"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "cf92690ba859df9e5658fb83ac74b60361b74b99"
+
+[tree_hashes]
+"." = "ccccf86c7c1c1ab9b8631b9f6d12a48e1a106ffc"

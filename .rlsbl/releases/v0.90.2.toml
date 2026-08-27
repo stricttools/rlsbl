@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, or hotfix
 bump = "patch"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = "ensure_github_topic and watch run_cmd migrated from run() to run_gh()
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "9f942455e9c898ec0d665a4234716530ea46a7ac"
+
+[tree_hashes]
+"." = "496710a447d912d545cb5105277282c5996e7c09"

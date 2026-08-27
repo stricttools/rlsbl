@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, hotfix, or prerelease
 bump = "minor"
 # Short description of this release (required)
@@ -17,3 +19,7 @@ rename-releasable crash recovery and batch-archival guards were hardened, and th
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "fc2c857612ac6e7d900c1494e40ee0f5cbe2c588"
+
+[tree_hashes]
+"." = "f4df33abe5be5dfd4a28304577c499bd62c140bb"

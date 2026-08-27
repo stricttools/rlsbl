@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Go workspace dependency validation, circular dependency detection
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "834c096b229db12426a72db009625e6653c40fc4"
+
+[tree_hashes]
+"." = "9f1230254c5f10587a5a0a13811a0950879d083a"

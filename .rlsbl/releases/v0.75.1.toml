@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = "The workspace test runner was running uv sync per sub-project instead
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "521cf14389ba96d50b516aac83b5f080d00f411e"
+
+[tree_hashes]
+"." = "b94a88f38b17fe1c59363f811c9ed9534d75726b"

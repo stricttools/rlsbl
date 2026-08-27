@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ Post-0.70.0 cleanup wave driven by loose ends from the previous session plus cro
 """
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "3a8b199e4d0f3211f75957fd8d1573fe7e048b30"
+
+[tree_hashes]
+"." = "134a9d04461d3494f75ce1c3a2f836f6f36a8ab9"

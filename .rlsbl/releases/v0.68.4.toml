@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "scaffold --force preserves gitignore entries"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "69a315f5aec24a66c69e77f277c324051a82b509"
+
+[tree_hashes]
+"." = "cc7302a6cd5243a98b8f21d34250c0859453565d"

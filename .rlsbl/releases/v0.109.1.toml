@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, hotfix, or prerelease
 bump = "patch"
 # Short description of this release (required)
@@ -10,3 +12,7 @@ context = "Found via the new CLI wiring coverage (which itself now covers all co
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "793a0c371335ae366441b1ee5bf6ba8a8f8e83c6"
+
+[tree_hashes]
+"." = "813984e1bd366676f360fbb15b4c84e6f6541240"

@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -12,3 +14,7 @@ Hook scripts are deprecated in favor of config entries. Existing customized scri
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "9506455962fb96f75cb750c45fd8f74cc33324bd"
+
+[tree_hashes]
+"." = "43f1caa73a681dd6852875c8043458ab4ee3c9d6"

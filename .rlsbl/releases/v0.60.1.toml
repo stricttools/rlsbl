@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Feature matrix n/a support for toolchain-native checks"
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "a4aae215f8c850ce20f4ba2565d9d4d430a0c301"
+
+[tree_hashes]
+"." = "8ee461db2ae66fd4fad343021cb87e5124a3a3dc"

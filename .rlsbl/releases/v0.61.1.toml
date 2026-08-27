@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix feature matrix column order and add directive tests."
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "3c88efa811f7ef243992f1560506af358ab95c13"
+
+[tree_hashes]
+"." = "42966464cff8f6108c845e384fb1eb27ef62f9d4"

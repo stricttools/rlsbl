@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -10,3 +12,7 @@ Breaking changes: publish.json config file removed (unused by all projects, 4-le
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "2ffc9f96c9d8cb22204b5ea294ceaadf91488c8e"
+
+[tree_hashes]
+"." = "3f72245ab9b41d0993a47c78bac72b79f4ea4b07"

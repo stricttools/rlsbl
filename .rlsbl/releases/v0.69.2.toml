@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Deno publish idempotency, orphan sweep script"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "ee7a0099dca1aec8a88497df2076795f1eb5fd94"
+
+[tree_hashes]
+"." = "8f5092fa5123dd06005294633a5c83758e2eb945"

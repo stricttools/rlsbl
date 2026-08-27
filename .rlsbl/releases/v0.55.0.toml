@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Monorepo release-init command, Go dead-modules detection, scaffol
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "a2b89784df0e26732b0cba7b82b7b04bf52e8b12"
+
+[tree_hashes]
+"." = "d127ea992f27e753955c1ffb61676085a1c88ead"

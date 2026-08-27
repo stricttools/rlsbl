@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix dead-modules false positives and watch test notification leak
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "32c18bd34dd6cef052ebccd6eab9584f217ed51c"
+
+[tree_hashes]
+"." = "3a45c851bd78195d9ac19926521c9345da2eaf4b"

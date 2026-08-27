@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Scrub tag matching, cmd_amend fix, strictcli public API, todo cle
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "0b17202c27c176d0411e6337fc57f1f4ac2b0cc7"
+
+[tree_hashes]
+"." = "b967597f3fe7f9db998457fdea08cc6a22a85f3d"

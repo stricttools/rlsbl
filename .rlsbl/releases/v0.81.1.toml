@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = ""
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "355e7dd1b1f4e934bb4d37b689fd600ef5f04073"
+
+[tree_hashes]
+"." = "ffafcbfbdd168ac212f78eb972f42d49601701bc"

@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = "When a project had a configured remote but no commits had been pushed
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "f0a6bb576bd708fee160e903d58785261064d737"
+
+[tree_hashes]
+"." = "b0fa03070885fdc49a88864f0e9e1941d19d6f74"

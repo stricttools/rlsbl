@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Batch release-init filtering, retry.toml cleanup, and feature sup
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "f644f2b55e8ecedd8c3e1a10b53d01db71f3905e"
+
+[tree_hashes]
+"." = "191703ca979cdb0d923094bc7f4d2eaac17ee486"

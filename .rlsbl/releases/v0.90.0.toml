@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, or hotfix
 bump = "minor"
 # Short description of this release (required)
@@ -18,3 +20,7 @@ Also includes fixes for `get_push_timeout` crashing with `config=None`, `uv.lock
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "81567897933431331baddde5ad53a667a3b980ba"
+
+[tree_hashes]
+"." = "e72399db05d2e2d43f248ba9e3cd6df96c5f5f5c"

@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "New dead-workspace-packages check for detecting unused library pa
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "2a9b56182c1e763e89acfdb6ed6abe066100d00b"
+
+[tree_hashes]
+"." = "4db7797c2361b9fec006c46e5bbfcbb1cc1dcf67"

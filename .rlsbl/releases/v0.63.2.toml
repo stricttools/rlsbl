@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix CI test failure when selfdoc not installed."
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "e2f47eb7d158316a687b6cc8822c3eb6107845ba"
+
+[tree_hashes]
+"." = "4db8f80d66a53cc0a7216ab669b4cdd0101d1f23"

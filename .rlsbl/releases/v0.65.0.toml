@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Documentation overhaul and notification UX fix"
 context = "Comprehensive docs rewrite (13 new guide pages, 2600+ lines), notification click-to-open fix, pipeline env var validation ordering fix, and new --allow-batch flag for changelog add."
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "814fbfd00fc9608e21a730a8319141abb7eec1a5"
+
+[tree_hashes]
+"." = "1ce4890d62a5e41dfa2070e1558b28247c79d73e"

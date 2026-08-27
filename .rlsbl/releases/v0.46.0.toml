@@ -1,3 +1,9 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "de6d0baaf64e166d4dfb1c39e30c94d3baa995d4"
+
+[tree_hashes]
+"." = "6f7bc9c1773d0cfefa508632b9994560be511ec4"

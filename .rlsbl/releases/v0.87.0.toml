@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, or hotfix
 bump = "minor"
 # Short description of this release (required)
@@ -14,3 +16,7 @@ Removed silent error swallowing in member version sync and dead-code convention 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "64271f7a039bca2d2923b754bb5e0d3202d356e7"
+
+[tree_hashes]
+"." = "9dfc25ffea6b34eb7a3b84e6f0ed806aa6052252"

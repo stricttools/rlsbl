@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Make release description mandatory"
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "e8ef6ea6e32f00c580bedfe3d866d91b37c43a29"
+
+[tree_hashes]
+"." = "f5da82f03bf9e6ccefc502719c3ab81e6fc9e4b9"

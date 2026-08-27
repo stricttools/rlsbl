@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Monorepo mirror command, native-android and native-ios targets."
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "ad1b155b841cfc895dc9e7a465baa8b8d1ad836a"
+
+[tree_hashes]
+"." = "f9e2ac054bc181f5570faed506533eafa5b2eccb"

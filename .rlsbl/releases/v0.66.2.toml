@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Auto-cleanup stale exclusions, DRY refactor manual-warning, hook 
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "8aadf8d439f8dd04e7742f929a0f50514351ab15"
+
+[tree_hashes]
+"." = "fd0e86725f22656c9ed0afbc569340dd530ed584"

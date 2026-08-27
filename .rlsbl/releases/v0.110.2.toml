@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 bump = "infra"
 # Short description of this release (required)
@@ -17,3 +19,7 @@ sandbox on CI, and the publish gate certifies it.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "8cef070da3d806b0ee858d75cb18070f3119b553"
+
+[tree_hashes]
+"." = "bec7df79f0b2115e13a74bc33d0b2ad4a2b81c4e"

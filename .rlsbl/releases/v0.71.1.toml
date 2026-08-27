@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Release undo traceback logging, per-version .md canonical regener
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "287f38fe8ec1277caa35241fb2293345ed535ed7"
+
+[tree_hashes]
+"." = "0b730972d958df85c158fc6a27511e47af7a799d"

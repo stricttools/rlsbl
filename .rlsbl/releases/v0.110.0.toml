@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 bump = "minor"
 # Short description of this release (required)
@@ -25,3 +27,7 @@ floor and a bare-run refusal guard.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "379a16126fdcc029931876534bd62ebc671ec468"
+
+[tree_hashes]
+"." = "740bffe4a07f23d751b9dbf751f2cca036c55f6e"

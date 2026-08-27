@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required for dev_node releases)
@@ -6,3 +8,7 @@ description = "Dev node architecture, release descriptions, quality checks, and 
 context = "The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinterpreted exempt as a desired behavior rather than a graph position. Dev nodes now fully opt out of the changelog system instead of being exempted from enforcement."
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "8f4b9b10e7f2521829c32ec1a4918cd40f60c0e6"
+
+[tree_hashes]
+"." = "80cc0f1ad79d9d97f908b5c29d6627757ef28199"

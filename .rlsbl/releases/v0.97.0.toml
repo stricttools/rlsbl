@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, hotfix, or prerelease
 bump = "minor"
 # Short description of this release (required)
@@ -10,3 +12,7 @@ context = "Completes the six-todo scope of the Phase 10 multi-artifact releasabl
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "ff7e497efbedcce7a0041aee443fa4968a129cbc"
+
+[tree_hashes]
+"." = "adcf068ddbbc55437bd99d6576c1251325b4dd80"

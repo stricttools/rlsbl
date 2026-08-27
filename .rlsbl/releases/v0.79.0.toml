@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -15,3 +17,7 @@ implicit releasable mode (monorepos must define [[releasables]]).
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "7cc295bb61d5ca0b307d41f123cb4ad5332a2852"
+
+[tree_hashes]
+"." = "0562ffcfc7d66a530c8da678d6e47ee377f4a778"

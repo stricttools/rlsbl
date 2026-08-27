@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Monorepo pre-push support, test-suite-workspace check, release ro
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "059a2a9cb38549b36dce9466ac6dc66d582eddb4"
+
+[tree_hashes]
+"." = "71b2498e28d30a65f33c68cad3ba8b7ae5ef517f"

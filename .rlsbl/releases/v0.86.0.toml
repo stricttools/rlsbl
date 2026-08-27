@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, or hotfix
 bump = "minor"
 # Short description of this release (required)
@@ -14,3 +16,7 @@ The releasable test runner now dispatches the correct test command per member ta
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "108100525b8a738c8e023f14ee50ca4cb1095965"
+
+[tree_hashes]
+"." = "ec37c04fb730b63b94cb74428508913c5e73892f"

@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "New checks (license-file, scaffold-unreplaced-vars, dead-modules-
 context = "LICENSE is no longer scaffold-managed -- projects own their LICENSE file, enforced by the new license-file check. Batch release-init now supports Flutter targets and includes TOML comments. Several fixes for retry.toml cleanup, bare scaffold on plain targets, workspace-unregistered false positives, and shared release config validation."
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "ea4a8d9cd559c63def19e7740cf0aff59c409b8b"
+
+[tree_hashes]
+"." = "40d6c2450a1a0aea5db1888960a7b08dcef16729"

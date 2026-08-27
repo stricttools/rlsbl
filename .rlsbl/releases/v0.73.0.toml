@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Changelog edit command, dev_node release prohibition, config hard
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "0ef27f083de00ffbd26b0b228c310fa11646a6fb"
+
+[tree_hashes]
+"." = "94f164a8be7957d295dab67af58cb1c5d39ea585"

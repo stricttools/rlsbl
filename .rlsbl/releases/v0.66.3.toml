@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "deps-undeclared respects try/except ImportError for optional impo
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "50a7e1ce052c42aa394ee3f093ed318d23925789"
+
+[tree_hashes]
+"." = "d9faa1f657d0e3b87bbcfc91bb1901aa08665188"

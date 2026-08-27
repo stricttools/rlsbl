@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Prepush check system: test-suite check, version-tag skip removal,
 context = "Major overhaul of the pre-push hook system. All pre-push logic migrated into the rlsbl check system under a new 'prepush' tag. The hook now runs 'rlsbl check --tag prepush' with 4 checks (changelog coverage, gitignore guard, manual-push warning, test-suite). Version-tag skip removed -- checks always run. Shared testing.py module extracted from release flow."
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "172ffff69c1f6b18be9ea3eba653aa954175c550"
+
+[tree_hashes]
+"." = "98d4c0c6811ba1507e70ffa43a1c400e45100504"

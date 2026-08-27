@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, hotfix, or prerelease
 bump = "minor"
 # Short description of this release (required)
@@ -14,3 +16,7 @@ New features: idempotent publish with registry probes; recovery dispatch across 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "386860de8b0ac73f19b473f740aff9d53a206a9d"
+
+[tree_hashes]
+"." = "949f03ba71863fc114d3b648b93fba02fb87ed4e"

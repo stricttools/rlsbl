@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "V4 shim workspace fix, check-name multi-target, zero SEO warnings
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "4f08c10d09564cb588766031c3605b7a7dfbcba8"
+
+[tree_hashes]
+"." = "a5c3790be6ec44e163ebd62fdbe9b920b84d4179"

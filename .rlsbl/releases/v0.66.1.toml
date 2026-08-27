@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix uv sync stripping pytest in workspaces, add workspace-unbuild
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "3c19f319e76bf30a607a46c10eb836c2ee403e1a"
+
+[tree_hashes]
+"." = "968b2ba22ee270f1269399a51b17a30f084c756a"

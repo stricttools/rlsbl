@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Managed-files registry, lint config filtering, publish idempotenc
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "d6cc7dcaa0b86fc7bf83c149cad77cbd52c5afa5"
+
+[tree_hashes]
+"." = "3272e897a00cf81108bf8d953d5b483b941ad2a3"

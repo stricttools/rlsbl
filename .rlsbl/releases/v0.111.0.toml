@@ -29,3 +29,7 @@ Finally, `rlsbl release reconcile` closes the loop on history rewrites. safegit 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "119985a854a11f0dfe3eb4eb4554434a2dbd5bbd"
+
+[tree_hashes]
+"." = "e6c049595c9cb300b8e413a2bb0da0e2f1035817"

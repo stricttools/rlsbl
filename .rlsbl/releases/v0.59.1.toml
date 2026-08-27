@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix false-positive deps-undeclared findings in root-project dep s
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "8e7bdcd29a6f9321f57f96443736d9566feb4644"
+
+[tree_hashes]
+"." = "a377b52810e8b37dab69c90ee75276229ea9efe3"

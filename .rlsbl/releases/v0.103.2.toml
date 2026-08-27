@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, hotfix, or prerelease
 bump = "patch"
 # Short description of this release (required)
@@ -10,3 +12,7 @@ context = "GitHub Release notes sync (rlsbl release edit) now works for explicit
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "c41c84d7de2ddfee18ba5833dacbab62734041ad"
+
+[tree_hashes]
+"." = "fdd6c9b09ebc2a2167c155b00b230e260a8a0258"

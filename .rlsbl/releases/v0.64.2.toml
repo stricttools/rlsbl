@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix Docker metadata false positive in scaffold check, add SSH hos
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "431532484de1f9635af3348137afcb173bfda452"
+
+[tree_hashes]
+"." = "5f939fd6fb85456f30b83618f373c1280ca41e35"

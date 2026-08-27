@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, hotfix, or prerelease
 bump = "patch"
 # Short description of this release (required)
@@ -16,3 +18,7 @@ Four bug fixes addressing release-flow reliability:
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "9a674380536d85d30db3c0410fe4bf20ce9d62ab"
+
+[tree_hashes]
+"." = "e4072148d46f110b26f6851350ba705823168ba1"

@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, major, hotfix, or prerelease
 bump = "minor"
 # Short description of this release (required)
@@ -22,3 +24,7 @@ gate, so history rewrites keep changelog metadata consistent end to end.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "2a00f384d21fe659f5d36627fea51bdf10275709"
+
+[tree_hashes]
+"." = "182a8af13ab086b4f5c01d99f293735df31db2aa"

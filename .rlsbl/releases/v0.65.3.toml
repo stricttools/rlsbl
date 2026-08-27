@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "safegit --yes, doc gaps, SEO fixes, retry dedup test"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "b66b07cc5c70c4f55f5eafb71b20fcdd690f65b3"
+
+[tree_hashes]
+"." = "797f7f6cdfe586d061c02dc950dfebbf060bc6eb"

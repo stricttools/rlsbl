@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 1
+bump = "patch"
+include = ["npm", "pypi"]
+exclude = []
+description = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes nor the CHANGELOG.md section carried one). Author a real description from this version's changelog entries and regenerate."
+candidate_sha = "24e0ddc3ef7cc6f4ef4a23b82766f77bdcb4a790"
+
+[tree_hashes]
+"." = "e71ef0d44aac337a6175eb9755a738e09b8c8ad9"

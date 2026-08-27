@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -19,3 +21,7 @@ releasable = false (not versioned). The --dev-node CLI flag is renamed to
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "d43d801a262a7d95662edc8b992662a3ac34c918"
+
+[tree_hashes]
+"." = "d5f3605d41b0d1a4dbb9268c45090267c87d75d7"

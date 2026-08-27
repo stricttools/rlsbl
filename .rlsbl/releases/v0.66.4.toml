@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Dynamic check-count directive, quality count fix, exclusion clean
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "cf7af9ec8335e99c3856b9c5fe1b514533f11c0a"
+
+[tree_hashes]
+"." = "b81db88e044f72d63ad21807cdfa1ed86335b519"

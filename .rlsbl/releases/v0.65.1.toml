@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Fix CI test failure from batch hint message"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "94d647c7ad34ce7d2dad1d573489887d1dd6b518"
+
+[tree_hashes]
+"." = "07b6e2c60881a81e3dff9e56ce9fd600d737abe6"

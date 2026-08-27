@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Batch release description enforcement, scan cache optimization, l
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "06f9b2ab204533e65853637846b9e1be38ee14a0"
+
+[tree_hashes]
+"." = "9985be82e8b5f6a793aa87c88498f2abb3cf87bc"

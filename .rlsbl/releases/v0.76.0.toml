@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -8,3 +10,7 @@ context = "The 1985-line release.py monolith was split into 6 modules with clean
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "7bcc46100e0eebc436094857a8ce215fe963472e"
+
+[tree_hashes]
+"." = "fef021a775f68841ec37ec6558ddd16c427f049a"

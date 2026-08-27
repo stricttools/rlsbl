@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "patch"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "CI template UV_NO_SOURCES fix"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "47c93574f1233e57dc5d730745bb841d8d705092"
+
+[tree_hashes]
+"." = "3a545ce0afaee806c35d8c46ecdfee449f3a9f80"

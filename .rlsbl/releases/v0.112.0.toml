@@ -71,3 +71,7 @@ strictcli that ships `dry_run_supported`.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "6df4c199ed37175480d5024dfba6d7d9255ecb0a"
+
+[tree_hashes]
+"." = "c2570d6865acbd79951054ab29c7167c7cd7d6ea"

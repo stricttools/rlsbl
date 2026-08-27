@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -6,3 +8,7 @@ description = "Unified manifest detection, PlainTarget auto-detection, monorepo 
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
+candidate_sha = "b48190e490cacd85186588eb1ce898eedcfdfec5"
+
+[tree_hashes]
+"." = "1593746c83c7ba9112d09359b472f16c7e6f26f7"

@@ -1,3 +1,5 @@
+# strictspec document version gate (do not remove)
+format_version = 1
 # Version bump type: patch, minor, or major
 bump = "minor"
 # Short description of this release (required)
@@ -12,3 +14,7 @@ Breaking: projects with .rlsbl/config.json that lack an explicit "targets" key w
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "e927a992298a91b25d8d080b3d29dfc2437f1c37"
+
+[tree_hashes]
+"." = "cb6f7f16fc32f60be07fc8fb819b5efda44ac587"
