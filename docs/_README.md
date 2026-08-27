@@ -69,7 +69,7 @@ When you run `rlsbl release run`:
 Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
 would-do log rather than performed. A small set of commands declares itself `consequential`
 (`release run`/`resume`/`retry`/`undo`/`deprecate`/`yank`/`scrub`/`reconcile`, `claim-name`,
-`deploy`, `monorepo release run`/`mirror`/`absorb`/`extract`/`extract-releasable`) and asks
+`deploy`, `monorepo release run`/`mirror`/`absorb`/`extract`) and asks
 for confirmation before running; pass `--approve-consequential` in non-interactive contexts
 (CI, AI agents), where the prompt is a hard error instead. Every other command runs without
 asking.
