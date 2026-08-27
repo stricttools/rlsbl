@@ -357,6 +357,10 @@ class TestLineageUndetermined:
         plan = observe(remote, str(mono), "mylib")
         assert plan.state == "lineage_undetermined"
         assert plan.undetermined_commits == [unreachable]
+        assert plan.foreign_commits == [], (
+            "nothing was shown to be foreign, so the field that says so must "
+            "stay empty"
+        )
 
     def test_apply_refuses_and_touches_nothing(self, mono, tmp_path, capsys):
         remote = _init_bare(tmp_path / "mirror.git")

@@ -375,14 +375,15 @@ def observe(remote, root, project_path):
             # authorize a write (behind, scaffold-missing) never rest on an
             # unanswerable question -- and the unanswerable commits above a
             # proven boundary are the ordinary case, judged by their paths.
-            foreign = [(c, _commit_paths(clone_dir, c)) for c in above]
             if undetermined:
+                # foreign_commits stays EMPTY here: nothing has been shown to
+                # be foreign, and a populated field named that is an
+                # accusation waiting for the next reader to render it.
                 return MirrorPlan(
                     state="lineage_undetermined",
                     split_sha=split_sha,
                     remote_tip=tip,
                     split_lineage_sha=None,
-                    foreign_commits=foreign,
                     undetermined_commits=undetermined,
                 )
             return MirrorPlan(
@@ -390,7 +391,7 @@ def observe(remote, root, project_path):
                 split_sha=split_sha,
                 remote_tip=tip,
                 split_lineage_sha=None,
-                foreign_commits=foreign,
+                foreign_commits=[(c, _commit_paths(clone_dir, c)) for c in above],
             )
 
         # (a) No layer: tip is a bare split-lineage commit.
