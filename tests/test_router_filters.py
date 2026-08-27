@@ -288,6 +288,21 @@ class TestUnreadableManifestsRefuseToDeriveFilters:
         assert "core" in message
         assert "pyproject.toml" in message
 
+    def test_a_member_the_graph_never_saw_is_refused(self, tmp_path):
+        """The other door into the same silent narrowing.
+
+        Asked for a project the graph was not built from, the derivation used
+        to answer "no dependencies" -- an empty territory set for a member
+        whose territories are simply unknown. No caller does this today, which
+        is precisely why the answer must be a refusal and not a default.
+        """
+        from rlsbl.errors import WorkspaceError
+
+        members = [_member("root", "."), _member("core", "packages/core")]
+        filters = RouterFilters(tmp_path, members)
+        with pytest.raises(WorkspaceError):
+            filters.patterns_for(_member("ghost", "packages/ghost"))
+
     def test_a_readable_workspace_still_derives(self, tmp_path):
         (tmp_path / "packages" / "core").mkdir(parents=True)
         (tmp_path / "packages" / "core" / "pyproject.toml").write_text(

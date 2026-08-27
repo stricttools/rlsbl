@@ -251,8 +251,21 @@ class RouterFilters:
         name = member_name(project)
         try:
             dep_names = self.graph.transitive_deps(name)
-        except KeyError:
-            return []
+        except KeyError as exc:
+            # Unreachable while every caller passes a member of the same list
+            # the graph was built from -- which is exactly why it must raise
+            # rather than default. "This member is not in the graph" is not
+            # evidence that it has no dependencies, and answering with an empty
+            # set would drop every dependency territory from its filter without
+            # anything on stderr: the same silent narrowing an unreadable
+            # manifest used to cause, arriving through the other door.
+            from .errors import WorkspaceError
+
+            raise WorkspaceError(
+                f"cannot derive the CI router's paths filters for '{name}': it "
+                f"is not a member of the workspace graph these filters were "
+                f"built from, so its dependency territories are unknown"
+            ) from exc
         return [self._by_name[d] for d in dep_names if d in self._by_name]
 
     def patterns_for(self, project) -> list[str]:
