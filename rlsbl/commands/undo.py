@@ -208,27 +208,38 @@ def _resolve_context(ctx):
     )
 
 
-def _find_latest_tag(uc):
-    """Resolve the latest release tag (scoped to releasable/project in monorepos)."""
-    if uc.releasable_name and uc.ws_root:
-        from ..commands.release.validate import _releasable_tag_glob
-        rel = next(r for r in uc.releasables if r.name == uc.releasable_name)
-        match_pattern = _releasable_tag_glob(rel.effective_tag_format, uc.releasable_name)
-    elif uc.monorepo_name:
-        abs_project_dir = os.path.join(uc.ws_root, uc.monorepo_project_path)
-        target_entries = detect_targets(abs_project_dir)
-        if target_entries:
-            target = TARGETS[target_entries[0].name]
-            match_pattern = target.monorepo_tag_glob(uc.monorepo_name, path=uc.monorepo_project_path)
-        else:
-            match_pattern = f"{uc.monorepo_name}@v*"
-    else:
-        match_pattern = "v*"
-    try:
-        return run("git", ["describe", "--tags", "--abbrev=0", "--match", match_pattern]).strip()
-    except Exception:
-        print("Error: no tags found. Nothing to undo.", file=sys.stderr)
+def _ledger_dir(uc):
+    """The release archives for the project or releasable being undone."""
+    return os.path.join(_audit_dir(uc), "releases")
+
+
+def _find_latest_release(uc):
+    """The version ``undo`` reverts, and its tag -- selected from the LEDGER.
+
+    ``undo`` used to ask ``git describe --tags --abbrev=0`` which release was
+    the latest, so a release whose tag had already been half-deleted was
+    invisible to the command whose whole job is deleting it, and a hand-made
+    tag could nominate a release that never happened. The archives answer
+    which version is latest; the tag is then derived by translation
+    (:func:`_build_tag_from_version`).
+
+    Only the archive's EXISTENCE is read here, not its anchor: everything
+    after this point -- the commit walk, the tag deletion, the revert --
+    operates on the tag namespace, so undo is an observe-and-repair layer over
+    tags in the same sense ``release reconcile`` is, and refusing to start
+    because an anchor and a tag disagree would refuse exactly the repair the
+    operator came for. The anchor IS read for the predecessor boundary, where
+    it decides which commits belong to this release (see :func:`_build_plan`).
+
+    Returns ``(version, tag)``, or exits when nothing is recorded.
+    """
+    from ..release_file import list_archived_versions
+
+    versions = list_archived_versions(_ledger_dir(uc))
+    if not versions:
+        print("Error: no releases recorded. Nothing to undo.", file=sys.stderr)
         sys.exit(1)
+    return versions[0], _build_tag_from_version(uc, versions[0])
 
 
 def _version_and_msg(uc, tag):
@@ -382,13 +393,35 @@ def _audit_dir(uc):
     return os.path.join(uc.project_path, ".rlsbl")
 
 
+def _previous_release_range(uc, version, tag):
+    """``<previous release's commit>..<tag>``, or just *tag* when there is none.
+
+    The predecessor is the next version below *version* in the ledger, and its
+    archive records the commit it shipped from -- so the boundary survives that
+    tag being deleted.
+    """
+    from ..ledger import read_entry
+    from ..release_file import list_archived_versions
+
+    versions = list_archived_versions(_ledger_dir(uc))
+    try:
+        below = versions[versions.index(version) + 1:]
+    except ValueError:
+        below = []
+    for prev in below:
+        entry = read_entry(_ledger_dir(uc), prev, cwd=uc.project_path)
+        if entry.anchored:
+            return f"{entry.candidate_sha}..{tag}"
+    return tag
+
+
 def _build_plan(uc, flags, ctx):
     """Compute the full UndoPlan for either path, before any mutation."""
     version_flag = flags.get("version")
     is_latest = not version_flag
     if is_latest:
-        tag = _find_latest_tag(uc)
-        version, expected_msg = _version_and_msg(uc, tag)
+        version, tag = _find_latest_release(uc)
+        _tag_version, expected_msg = _version_and_msg(uc, tag)
         revert_shas, cap_cl, cap_rf = _walk_release_commits(tag, expected_msg)
         # Completeness guard: if the walk collected release-shaped commits
         # but never reached the version-bump commit (e.g. a foreign commit
@@ -405,17 +438,14 @@ def _build_plan(uc, flags, ctx):
                 # If no version-bump exists at all (finalize-only releases),
                 # that's legitimate — proceed.
                 version_bump_exists = False
-                try:
-                    # Search only the current release's commits (between
-                    # this tag and its predecessor) to avoid matching version
-                    # bumps from earlier releases.
-                    prev_tag = run(
-                        "git", ["describe", "--tags", "--abbrev=0", f"{tag}^"],
-                        timeout=30,
-                    ).strip()
-                    log_range = f"{prev_tag}..{tag}"
-                except Exception:
-                    log_range = tag
+                # Search only the current release's commits -- between this
+                # release and the one before it -- so a version bump from an
+                # earlier release cannot match. The predecessor is the next
+                # version down in the LEDGER, and the range starts at the
+                # COMMIT its archive records, so a deleted predecessor tag
+                # cannot silently widen the range to the whole history the way
+                # a failed `git describe <tag>^` did.
+                log_range = _previous_release_range(uc, version, tag)
                 try:
                     log_output = run(
                         "git", ["log", "--format=%s", log_range],

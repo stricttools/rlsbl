@@ -26,6 +26,9 @@ from githarness import add_remote, git, init_repo, remote_ref, snapshot_remote_r
 from rlsbl.commands.undo import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
+from rlsbl.release_file import write_release_anchor
+
+from conftest import archive_release, ledger_dir
 
 _ENTRY = {
     "commits": [],
@@ -113,13 +116,23 @@ def _make_released_repo(repo, *, n_commits=5, with_remote=True):
         "batch_limits": {"exclusions": ["stale"]},
     }, indent=2) + "\n")
     _write(repo, ".rlsbl/changes/unreleased.jsonl", json.dumps(_ENTRY) + "\n")
-    _write(repo, ".rlsbl/releases/unreleased.toml", 'bump = "patch"\ndescription = "x"\n')
+    _write(
+        repo, ".rlsbl/releases/unreleased.toml",
+        'format_version = 1\nbump = "patch"\ninclude = ["npm"]\nexclude = []\n'
+        'description = "x"\n',
+    )
     _write(repo, "CHANGELOG.md", "# Changelog\n\n## Unreleased\n\n### Features\n\n- A shiny new thing.\n")
     _write(repo, ".gitignore", ".rlsbl/releases/in-progress.json\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "initial")
     git(repo, "tag", "v1.0.0")
     shas = {"initial": git(repo, "rev-parse", "HEAD")}
+    # 1.0.0's LEDGER entry -- what `undo` reads to find the release BEFORE the
+    # one it is reverting.
+    archive_release(
+        ledger_dir(repo), "1.0.0", shas["initial"],
+        tree=git(repo, "rev-parse", "HEAD^{tree}"),
+    )
 
     # 1. version-bump
     pkg = json.loads((repo / "package.json").read_text())
@@ -149,8 +162,14 @@ def _make_released_repo(repo, *, n_commits=5, with_remote=True):
         git(repo, "commit", "-q", "-m", "chore: clean 1 stale batch exclusion(s) from config.json")
         shas["clean_stale"] = git(repo, "rev-parse", "HEAD")
 
-    # 4. finalize-release-file (rename unreleased.toml -> v1.0.1.toml)
+    # 4. finalize-release-file (rename unreleased.toml -> v1.0.1.toml, then
+    #    write the anchor into it, exactly as the release flow does)
     os.rename(repo / ".rlsbl/releases/unreleased.toml", repo / ".rlsbl/releases/v1.0.1.toml")
+    write_release_anchor(
+        str(repo / ".rlsbl/releases/v1.0.1.toml"),
+        candidate_sha=shas["version_bump"],
+        tree_hashes={".": git(repo, "rev-parse", f'{shas["version_bump"]}^{{tree}}')},
+    )
     os.chmod(repo / ".rlsbl/releases/v1.0.1.toml", 0o444)
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "chore: finalize release file for 1.0.1")
@@ -473,12 +492,22 @@ class TestEdgeCases:
             "publish_mode": "ci", "targets": ["npm"],
         }, indent=2) + "\n")
         _write(repo, ".rlsbl/changes/unreleased.jsonl", json.dumps(_ENTRY) + "\n")
-        _write(repo, ".rlsbl/releases/unreleased.toml", 'bump = "patch"\ndescription = "x"\n')
+        _write(
+            repo, ".rlsbl/releases/unreleased.toml",
+            'format_version = 1\nbump = "patch"\ninclude = ["npm"]\nexclude = []\n'
+            'description = "x"\n',
+        )
         _write(repo, "CHANGELOG.md", "# Changelog\n")
         _write(repo, ".gitignore", ".rlsbl/releases/in-progress.json\n")
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "-m", "initial")
         git(repo, "tag", "v1.0.0")
+        archive_release(
+            ledger_dir(repo), "1.0.0", git(repo, "rev-parse", "HEAD"),
+            tree=git(repo, "rev-parse", "HEAD^{tree}"),
+        )
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "chore: finalize release file for 1.0.0")
 
         # 1. version-bump
         pkg = json.loads((repo / "package.json").read_text())
@@ -497,6 +526,12 @@ class TestEdgeCases:
         (repo / ".rlsbl/changes/unreleased.jsonl").write_text("")
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "-m", "chore: finalize changelog for 1.0.1")
+        archive_release(
+            ledger_dir(repo), "1.0.1", git(repo, "rev-parse", "HEAD"),
+            tree=git(repo, "rev-parse", "HEAD^{tree}"),
+        )
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "chore: finalize release file for 1.0.1")
         git(repo, "tag", "v1.0.1")
         add_remote(repo, repo.parent / "remote.git")
         monkeypatch.chdir(repo)
@@ -511,16 +546,24 @@ class TestEdgeCases:
         # Nothing was reverted.
         assert git(repo, "rev-parse", "HEAD") == head_before
 
-    def test_no_tags_errors(self, tmp_path, monkeypatch, capsys):
+    def test_no_releases_errors(self, tmp_path, monkeypatch, capsys):
+        """Nothing archived means nothing to undo.
+
+        This used to say "no tags found": undo asked the tag namespace what
+        the latest release was. It asks the release archives now, so a
+        repository with a hand-made tag and no release still reports that
+        there is nothing to undo.
+        """
         repo = tmp_path / "repo"
         init_repo(repo)
         _write(repo, "package.json", json.dumps({"name": "pkg", "version": "1.0.0"}) + "\n")
         _write(repo, ".rlsbl/config.json", json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n")
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "-m", "initial")
+        git(repo, "tag", "v9.9.9")  # a tag with no release behind it
         monkeypatch.chdir(repo)
 
         with pytest.raises(SystemExit) as exc:
             _run_undo(repo, {})
         assert exc.value.code == 1
-        assert "no tags" in capsys.readouterr().err.lower()
+        assert "no releases recorded" in capsys.readouterr().err.lower()

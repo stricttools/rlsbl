@@ -51,12 +51,20 @@ Site                                                    Was
 ``rlsbl/commands/unreleased.py`` header / payload tag   ``git describe``
 ``rlsbl/commands/watch.py`` commit labeling and         ``git describe
 release-page URL                                        --exact-match``
-``rlsbl/commands/undo.py`` ``_find_latest_tag``         ``git describe
-                                                        --tags --abbrev=0``
-``rlsbl/commands/undo.py`` predecessor lookup           ``git describe
+``rlsbl/commands/undo.py`` ``_find_latest_release``      ``git describe
+(which release is being undone)                         --tags --abbrev=0``
+``rlsbl/commands/undo.py`` predecessor boundary         ``git describe
                                                         --tags --abbrev=0
                                                         <tag>^``
 ======================================================  =======================
+
+``undo`` reads only which VERSION is latest (an archive-existence scan), then
+translates it into a tag: everything after that point -- the commit walk, the
+tag deletion, the revert -- operates on the tag namespace, so undo is an
+observe-and-repair layer over tags in the same sense ``release reconcile`` is,
+and refusing to start on a tag/anchor disagreement would refuse exactly the
+repair the operator came for. It DOES read the predecessor's anchor, because
+that decides which commits belong to the release being undone.
 
 Release preparation -- MIGRATED to the ledger:
 
