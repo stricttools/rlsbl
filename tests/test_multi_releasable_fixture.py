@@ -12,6 +12,8 @@ releases/ and config.json.
 import json
 import os
 
+import pytest
+
 from conftest import (
     DEFAULT_RELEASE_FILE,
     make_releasable_monorepo,
@@ -347,6 +349,73 @@ class TestMakeReleasableState:
         )
         body = (rel_dir / "releases" / "v0.1.0.toml").read_text()
         assert 'description = "custom"' in body
+
+    def test_rewriting_a_released_version_is_refused(self, tmp_path):
+        """A second call naming an already-written released version is a hard
+        error naming the file, never a silent unlock-and-rewrite.
+
+        Released state is immutable: rlsbl locks a version's .jsonl at
+        finalization. A fixture that quietly rewrote it would let a test
+        corrupt the premise it is asserting against. Before the guard this
+        died with a bare PermissionError from the 0444 open().
+        """
+        make_releasable_state(tmp_path, "core", versioned_entries={"0.1.0": []})
+
+        with pytest.raises(ValueError) as exc_info:
+            make_releasable_state(
+                tmp_path, "core", versioned_entries={"0.1.0": []},
+            )
+        msg = str(exc_info.value)
+        assert "0.1.0.jsonl" in msg
+        assert "never overwrites released state" in msg
+
+    def test_rewriting_a_released_archive_is_refused(self, tmp_path):
+        """The archived release file is locked too, so re-archiving a version
+        whose JSONL was left writable is refused just the same."""
+        make_releasable_state(
+            tmp_path, "core",
+            versioned_entries={"0.1.0": []}, lock_versioned=False,
+        )
+
+        with pytest.raises(ValueError, match="v0.1.0.toml"):
+            make_releasable_state(
+                tmp_path, "core",
+                versioned_entries={"0.1.0": []}, lock_versioned=False,
+            )
+
+    def test_a_second_call_adding_a_new_version_is_allowed(self, tmp_path):
+        """The guard refuses only a REWRITE: adding a version alongside the
+        released ones is how a fixture layers state in two passes."""
+        make_releasable_state(tmp_path, "core", versioned_entries={"0.1.0": []})
+        rel_dir = make_releasable_state(
+            tmp_path, "core",
+            versioned_entries={"0.2.0": []},
+            unreleased_entries=[
+                ChangelogEntry(commits=["abc1234"], user_facing=False),
+            ],
+        )
+        assert (rel_dir / "changes" / "0.1.0.jsonl").is_file()
+        assert (rel_dir / "changes" / "0.2.0.jsonl").is_file()
+        assert len(parse_jsonl(str(rel_dir / "changes" / "unreleased.jsonl"))) == 1
+
+    def test_refusal_happens_before_any_write(self, tmp_path):
+        """The guard runs up front, so a refused call leaves the state dir
+        exactly as it was -- no half-applied second pass."""
+        make_releasable_state(tmp_path, "core", versioned_entries={"0.1.0": []})
+        changes_dir = get_releasable_changes_dir(str(tmp_path), "core")
+        before = os.listdir(changes_dir)
+
+        with pytest.raises(ValueError):
+            make_releasable_state(
+                tmp_path, "core",
+                versioned_entries={"0.1.0": [], "0.9.9": []},
+                unreleased_entries=[
+                    ChangelogEntry(commits=["abc1234"], user_facing=False),
+                ],
+            )
+
+        assert sorted(os.listdir(changes_dir)) == sorted(before)
+        assert parse_jsonl(os.path.join(changes_dir, "unreleased.jsonl")) == []
 
     def test_raw_line_entries_are_written_verbatim(self, tmp_path):
         """A raw string entry lands on disk untouched, so a fixture can plant a

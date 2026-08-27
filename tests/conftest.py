@@ -995,6 +995,25 @@ def write_jsonl(path, entries, *, lock=False):
         os.chmod(path, 0o444)
 
 
+def _refuse_locked_rewrite(path):
+    """Hard-error when ``path`` exists and is locked against rewriting.
+
+    Released changelog files and archived release files are chmod 444 the
+    moment a release finalizes them, and rlsbl never rewrites one in place.
+    A fixture that unlocked and rewrote such a file would let a test quietly
+    corrupt the premise it is asserting against, so this refuses loudly
+    instead.
+    """
+    if os.path.exists(path) and not os.access(path, os.W_OK):
+        raise ValueError(
+            f"make_releasable_state would rewrite already-released state at "
+            f"{path}, which is locked (0444). The fixture never overwrites "
+            f"released state: a released version's files are immutable, "
+            f"exactly as rlsbl locks them. Write every version of a releasable "
+            f"in ONE call, or name a version that has not been released yet."
+        )
+
+
 def make_releasable_state(
     root,
     name,
@@ -1049,20 +1068,30 @@ def make_releasable_state(
     """
     root = str(root)
     rel_dir = get_releasable_dir(root, name)
+    changes_dir = get_releasable_changes_dir(root, name)
+    releases_dir = os.path.join(rel_dir, "releases")
+    versioned_entries = versioned_entries or {}
+    archives = {ver: DEFAULT_RELEASE_FILE for ver in versioned_entries}
+    archives.update(archived_releases or {})
+
+    # Released state is immutable in rlsbl: a version's .jsonl and its archived
+    # release file are locked at finalization and never rewritten. Refuse
+    # up front -- BEFORE any write -- so a second call naming an already-written
+    # version fails with a sentence instead of a bare PermissionError, and
+    # leaves the state dir exactly as it was.
+    for ver in versioned_entries:
+        _refuse_locked_rewrite(os.path.join(changes_dir, f"{ver}.jsonl"))
+    for ver in archives:
+        _refuse_locked_rewrite(os.path.join(releases_dir, f"v{ver}.toml"))
+
     os.makedirs(rel_dir, exist_ok=True)
 
     write_releasable_version(root, name, version)
 
-    changes_dir = get_releasable_changes_dir(root, name)
     os.makedirs(changes_dir, exist_ok=True)
     write_jsonl(
         os.path.join(changes_dir, "unreleased.jsonl"), unreleased_entries or []
     )
-
-    versioned_entries = versioned_entries or {}
-    releases_dir = os.path.join(rel_dir, "releases")
-    archives = {ver: DEFAULT_RELEASE_FILE for ver in versioned_entries}
-    archives.update(archived_releases or {})
 
     for ver, entries in versioned_entries.items():
         write_jsonl(
