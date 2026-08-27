@@ -1789,7 +1789,7 @@ def cmd_mono_snapshot_check(ctx):
     _cmd_snapshot_check({}, project_root=root)
 
 
-@mono.command(name="mirror", help="Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, or virgin) without writing.", effect="mutating", consequential=True)  # force-pushes the mirror remote
+@mono.command(name="mirror", help="Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, lineage-undetermined, or virgin) without writing.", effect="mutating", consequential=True)  # force-pushes the mirror remote
 @strictcli.arg(name="project", help="Name of the workspace project to split and push as a standalone mirror repo", presence="required")
 @effects.handler
 def cmd_mono_mirror(ctx, project):
