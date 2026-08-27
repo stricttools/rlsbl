@@ -38,11 +38,19 @@ Known blind spots, all shared with the sweep:
 - **Coincidental collisions.** ``"flutter"`` as a *pubspec.yaml key* reads
   exactly like the target name and is reported as a finding in the dart and
   flutter targets; both are inside the exempt package, but the same collision
-  is possible for any short target name elsewhere. Likewise ``"npm"`` and
-  ``"go"`` as PIPELINE type names and ``"python"``/``"go"``/``"npm"`` as LINT
-  LANGUAGE names are separate taxonomies that happen to share spellings; the
-  baseline entries in ``rlsbl/pipelines/``, ``rlsbl/config.py`` and
-  ``rlsbl/go_introspect.py`` are largely of that kind.
+  is possible for any short target name elsewhere. Several other taxonomies
+  share spellings with target names and are equally invisible to the sweep:
+
+  | Taxonomy | Where it collides |
+  | --- | --- |
+  | PIPELINE types (``npm``, ``go``, ``pypi``, ...) | ``rlsbl/pipelines/``, ``rlsbl/config.py``, ``rlsbl/commands/release/validate.py`` |
+  | LINT LANGUAGES (``python``, ``go``, ``npm``, ``maven``) | ``rlsbl/go_introspect.py`` |
+  | strictcli implementation LANGUAGES (``python``, ``go``, ``typescript``) | ``rlsbl/commands/release/validate.py`` |
+  | LAUNCHER entry types (``npm``, ``pypi``) | ``rlsbl/checks/project.py`` |
+
+  Baseline entries of that kind carry a comment saying so, per the
+  instruction in ``test_no_new_module_tests_a_target_name``. An entry with no
+  such comment is an un-migrated real target-name conditional.
 - **Multiplicity within a fingerprint.** The baseline counts findings per
   (module, category, name-tuple). Replacing one ``if registry == "pypi"`` with
   a different ``if registry == "pypi"`` in the same module is invisible; only
@@ -73,6 +81,9 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
         ("compare", ('flutter',)): 1,
     },
     "rlsbl/checks/project.py": {
+        # Spelling collision, not the target registry: both compare a
+        # LAUNCHER entry's declared ``type`` (a config taxonomy of its own)
+        # to decide which manifest keys that launcher kind must carry.
         ("compare", ('npm',)): 1,
         ("compare", ('pypi',)): 1,
     },
@@ -94,10 +105,18 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
         ("dispatch_key", ('swift', 'swift-apple')): 1,
     },
     "rlsbl/commands/release/phase_a.py": {
+        # A real target-name conditional, NOT a collision: the ecosystem
+        # keyword tagger picks between ensure_npm_keyword and
+        # ensure_pypi_keyword from the plan step's payload ``kind``, which is
+        # a target name (the planner indexes TARGETS with it). Un-migrated
+        # remainder -- the tagger belongs on the protocol.
         ("compare", ('npm',)): 1,
     },
     "rlsbl/commands/release/validate.py": {
+        # Spelling collision: the strictcli implementation LANGUAGE taxonomy
+        # (python / go / typescript) picking the --dump-schema argv.
         ("compare", ('go',)): 1,
+        # Spelling collision: an npm PIPELINE type declaring ``provenance``.
         ("compare", ('npm',)): 1,
     },
     "rlsbl/commands/release_init.py": {
