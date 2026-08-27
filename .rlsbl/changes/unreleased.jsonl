@@ -1,0 +1,1 @@
+{"format_version":1,"id":"18cfa86da59bf6d5dbffa6eeb48543d89c7a7620a5453f9a","commits":["ec9dd2624a6b571aa556c24e555bf2d6d79cc2c1"],"user_facing":true,"description":"`rlsbl monorepo migrate-releasable` no longer strips the stable `id` from changelog entries it consolidates, so migrated entries stay addressable by `changelog amend --id` and `changelog edit --id`","type":"fix"}
