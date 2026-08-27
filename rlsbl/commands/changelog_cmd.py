@@ -22,7 +22,7 @@ from ..changelog.schema import ChangelogEntry, generate_entry_id, parse_jsonl, s
 from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
 from ..git_util import filter_commits_for_scope
-from ..ownership import OwnershipScope
+from ..ownership import OwnershipError, OwnershipScope
 from ..utils import commit_files
 from ..workspace import (
     find_workspace_root,
@@ -39,22 +39,34 @@ from .. import effects
 
 
 class _ResolvedContext:
-    """Carries project, releasable, and workspace info for changelog commands."""
+    """Carries project, releasable, and workspace info for changelog commands.
 
-    def __init__(self, project, releasable=None, ws_root=None, member_projects=None,
-                 all_projects=None):
+    ``all_projects`` is mandatory and is every member of the workspace, not
+    just this releasable's: file attribution is decided against the whole list
+    (see :mod:`rlsbl.ownership`), so a context that carries only the members it
+    cares about would answer "who owns this file?" with the wrong member.
+    """
+
+    def __init__(self, project, all_projects, releasable=None, ws_root=None,
+                 member_projects=None):
         self.project = project
         self.releasable = releasable
         self.ws_root = ws_root
         self.member_projects = member_projects or []
-        # Every member of the workspace, not just this releasable's: file
-        # attribution is decided against the whole list (see rlsbl.ownership).
-        self.all_projects = list(all_projects) if all_projects else []
+        self.all_projects = list(all_projects)
 
     def scope(self):
         """The ownership scope this changelog covers."""
+        if not self.all_projects:
+            raise OwnershipError(
+                "changelog scope was asked for without a workspace member "
+                "list. Attribution needs every member to answer at all -- a "
+                "file under a nested member belongs to that member, whichever "
+                "members the caller cares about -- so there is no answer to "
+                "give here, silently narrowed or otherwise."
+            )
         in_scope = self.member_projects or ([self.project] if self.project else [])
-        return OwnershipScope.for_members(self.all_projects or in_scope, in_scope)
+        return OwnershipScope.for_members(self.all_projects, in_scope)
 
     @property
     def is_releasable(self):
@@ -118,27 +130,22 @@ def _check_project_scope(resolved_commits, ws_context):
     single-owner: a commit touching only another member's directory belongs in
     that member's changelog, and a commit touching only root files belongs in
     the root member's.
-    Skipped when ws_context is None (standalone mode).
+
+    *ws_context* is what :func:`_resolve_workspace_project` returns: a
+    :class:`_ResolvedContext` carrying the whole member list, or ``None`` in
+    standalone mode, where there is no scope to check.
     """
     if ws_context is None:
         return
 
-    if isinstance(ws_context, _ResolvedContext):
-        scope = ws_context.scope()
-        if ws_context.releasable is not None:
-            subject = f"releasable '{ws_context.releasable.name}'"
-        else:
-            project = ws_context.project
-            subject = (
-                f"project '{project.get('name', 'unknown')}' "
-                f"(path: {project.get('path', 'unknown')})"
-            )
+    scope = ws_context.scope()
+    if ws_context.releasable is not None:
+        subject = f"releasable '{ws_context.releasable.name}'"
     else:
-        # A raw project handed in directly (no workspace resolution).
-        scope = OwnershipScope.for_member([ws_context], ws_context)
+        project = ws_context.project
         subject = (
-            f"project '{ws_context.get('name', 'unknown')}' "
-            f"(path: {ws_context.get('path', 'unknown')})"
+            f"project '{project.get('name', 'unknown')}' "
+            f"(path: {project.get('path', 'unknown')})"
         )
 
     in_scope = filter_commits_for_scope(

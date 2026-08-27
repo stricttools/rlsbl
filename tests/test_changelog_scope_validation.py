@@ -311,3 +311,45 @@ class TestRootCommitIsInScope:
         with pytest.raises(SystemExit) as exc_info:
             cmd_add(flags, project_root=alpha_dir)
         assert exc_info.value.code == 1
+
+
+class TestScopeCarriesTheWholeMemberList:
+    """A changelog's scope is asked against every member, never a subset.
+
+    ``OwnershipScope`` answers "who owns this file?" against the whole
+    workspace and only then asks whether that owner is in scope.  Handing it
+    the in-scope members alone is the mis-attribution the class exists to
+    prevent: a member at ``pkg`` would claim ``pkg/inner/x.py`` because the
+    member at ``pkg/inner`` was not in the list to outrank it.
+    """
+
+    def test_the_member_list_is_mandatory(self):
+        from rlsbl.commands.changelog_cmd import _ResolvedContext
+
+        with pytest.raises(TypeError):
+            _ResolvedContext(project={"path": "pkg", "name": "pkg"})
+
+    def test_scope_attributes_against_every_member(self):
+        from rlsbl.commands.changelog_cmd import _ResolvedContext
+
+        pkg = {"path": "pkg", "name": "pkg"}
+        inner = {"path": "pkg/inner", "name": "inner"}
+        ctx = _ResolvedContext(
+            project=pkg,
+            member_projects=[pkg],
+            all_projects=[{"path": ".", "name": "root"}, pkg, inner],
+        )
+        scope = ctx.scope()
+        assert scope.owner_name_of("pkg/inner/x.py") == "inner"
+        assert scope.claims("pkg/inner/x.py") is False
+        assert scope.claims("pkg/x.py") is True
+
+    def test_an_empty_member_list_is_refused(self):
+        """No silent substitution of the in-scope members for the real list."""
+        from rlsbl.commands.changelog_cmd import _ResolvedContext
+        from rlsbl.ownership import OwnershipError
+
+        pkg = {"path": "pkg", "name": "pkg"}
+        ctx = _ResolvedContext(project=pkg, member_projects=[pkg], all_projects=[])
+        with pytest.raises(OwnershipError):
+            ctx.scope()

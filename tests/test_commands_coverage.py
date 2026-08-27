@@ -1482,7 +1482,7 @@ class TestResolvedContext:
     def test_is_releasable_no_project(self):
         from rlsbl.commands.changelog_cmd import _ResolvedContext
 
-        ctx = _ResolvedContext(project=None)
+        ctx = _ResolvedContext(project=None, all_projects=[])
         assert ctx.is_releasable is True
 
     def test_is_releasable_with_project(self):
@@ -1490,7 +1490,7 @@ class TestResolvedContext:
 
         proj = MagicMock()
         proj.is_releasable = False
-        ctx = _ResolvedContext(project=proj)
+        ctx = _ResolvedContext(project=proj, all_projects=[])
         assert ctx.is_releasable is False
 
     def test_name_with_project(self):
@@ -1498,13 +1498,13 @@ class TestResolvedContext:
 
         proj = MagicMock()
         proj.name = "mylib"
-        ctx = _ResolvedContext(project=proj)
+        ctx = _ResolvedContext(project=proj, all_projects=[])
         assert ctx.name == "mylib"
 
     def test_name_no_project(self):
         from rlsbl.commands.changelog_cmd import _ResolvedContext
 
-        ctx = _ResolvedContext(project=None)
+        ctx = _ResolvedContext(project=None, all_projects=[])
         assert ctx.name is None
 
     def test_get_method(self):
@@ -1512,13 +1512,13 @@ class TestResolvedContext:
 
         proj = MagicMock()
         proj.get.return_value = "value"
-        ctx = _ResolvedContext(project=proj)
+        ctx = _ResolvedContext(project=proj, all_projects=[])
         assert ctx.get("key") == "value"
 
     def test_get_no_project(self):
         from rlsbl.commands.changelog_cmd import _ResolvedContext
 
-        ctx = _ResolvedContext(project=None)
+        ctx = _ResolvedContext(project=None, all_projects=[])
         assert ctx.get("key", "default") == "default"
 
     def test_getitem(self):
@@ -1526,7 +1526,7 @@ class TestResolvedContext:
 
         proj = MagicMock()
         proj.__getitem__ = lambda self, k: "val"
-        ctx = _ResolvedContext(project=proj)
+        ctx = _ResolvedContext(project=proj, all_projects=[])
         assert ctx["anything"] == "val"
 
 
