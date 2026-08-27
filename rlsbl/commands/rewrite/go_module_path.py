@@ -190,6 +190,21 @@ def declared_modules(go_mod_paths):
 # ---------------------------------------------------------------------------
 
 
+#: The delimiters Go's two string literal forms use.  An import spec is
+#: written in one of them, and the scanner reports the path without either, so
+#: the rewrite looks for both and preserves whichever the file used.
+_QUOTES = ('"', "`")
+
+
+def _literal_on_line(line, import_path):
+    """The quoted literal for *import_path* as it appears on *line*, or None."""
+    for quote in _QUOTES:
+        literal = f"{quote}{import_path}{quote}"
+        if literal in line:
+            return quote, literal
+    return None
+
+
 def rewrite_go_source_text(text, sites, old, new):
     """Rewrite the import literals *sites* names, line-anchored.
 
@@ -199,9 +214,11 @@ def rewrite_go_source_text(text, sites, old, new):
             reported them, restricted to imports under *old*.
 
     Returns ``(new_text, occurrences, descriptions)``.  An import spec whose
-    quoted literal is not present on the reported line is a hard error: the
-    parser and the text disagree, and guessing where to write is exactly the
-    failure this command must not have.
+    quoted literal is not present on the reported line -- in EITHER of Go's
+    two string forms -- is a hard error: the parser and the text disagree, and
+    guessing where to write is exactly the failure this command must not have.
+    The form the file used is preserved: a raw-string import stays a raw
+    string.
     """
     lines = text.splitlines(keepends=True)
     occurrences = 0
@@ -218,14 +235,15 @@ def rewrite_go_source_text(text, sites, old, new):
             )
         line = lines[lineno - 1]
         for import_path in by_line[lineno]:
-            literal = f'"{import_path}"'
-            if literal not in line:
+            located = _literal_on_line(line, import_path)
+            if located is None:
                 raise GoModuleRewriteError(
-                    f"line {lineno} does not contain the import literal "
-                    f"{literal} the parser reported"
+                    f"line {lineno} does not contain the import literal for "
+                    f"{import_path} the parser reported, in either quote form"
                 )
+            quote, literal = located
             new_path = rewrite_module_prefix(import_path, old, new, sep=GO_SEP)
-            line = line.replace(literal, f'"{new_path}"', 1)
+            line = line.replace(literal, f"{quote}{new_path}{quote}", 1)
             occurrences += 1
             descriptions.append(f"line {lineno}: {import_path} -> {new_path}")
         lines[lineno - 1] = line

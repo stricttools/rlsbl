@@ -317,6 +317,76 @@ class TestASingleOccurrenceRepo:
         assert "1 occurrence across 1 file" in preview.items[-1].summary
 
 
+class TestRawStringImports:
+    """Go's second string form is a legal import literal, and gets renamed.
+
+    ``import `example.com/o/foo` `` compiles exactly like the double-quoted
+    spelling.  The tree-sitter scanner used to collect only
+    ``interpreted_string_literal``, so a raw-string import was invisible: not
+    counted, not rewritten, not reported.
+    """
+
+    def test_the_scanner_sees_both_quote_forms(self, tmp_path):
+        from rlsbl.lint.go_ast import scan_imports
+
+        src = _write(tmp_path, "both.go", (
+            "package main\n"
+            "\n"
+            "import (\n"
+            f"\t`{OLD}/internal/raw`\n"
+            f'\t"{OLD}/internal/interp"\n'
+            ")\n"
+        ))
+        found = scan_imports(str(src))
+        assert [(p, ln) for p, _fp, ln in found] == [
+            (f"{OLD}/internal/raw", 4),
+            (f"{OLD}/internal/interp", 5),
+        ]
+
+    def test_a_single_raw_import_is_scanned(self, tmp_path):
+        from rlsbl.lint.go_ast import scan_imports
+
+        src = _write(tmp_path, "solo.go", (
+            "package main\n"
+            "\n"
+            f"import `{OLD}/pkg`\n"
+        ))
+        assert [p for p, _fp, _ln in scan_imports(str(src))] == [f"{OLD}/pkg"]
+
+    def test_a_raw_import_is_planned_and_rewritten(self, repo):
+        _write(repo, "raw.go", (
+            "package main\n"
+            "\n"
+            "import (\n"
+            f"\t`{OLD}/internal/deep`\n"
+            f'\t"{OLD}/internal/svc"\n'
+            ")\n"
+        ))
+        preview = observe(repo, OLD, NEW)
+        assert preview.by_key("raw.go").data.occurrences == 2
+        for item in preview.items:
+            apply_item(item, OLD, NEW)
+        text = (repo / "raw.go").read_text()
+        assert f"`{NEW}/internal/deep`" in text
+        assert f'"{NEW}/internal/svc"' in text
+        assert OLD not in text
+
+    def test_a_raw_and_an_interpreted_import_share_one_line(self, repo):
+        """Both literals on one line are rewritten, each in its own form."""
+        _write(repo, "oneline.go", (
+            "package main\n"
+            "\n"
+            f'import (`{OLD}/internal/deep`; "{OLD}/internal/svc")\n'
+        ))
+        preview = observe(repo, OLD, NEW)
+        assert preview.by_key("oneline.go").data.occurrences == 2
+        for item in preview.items:
+            apply_item(item, OLD, NEW)
+        text = (repo / "oneline.go").read_text()
+        assert f"`{NEW}/internal/deep`" in text
+        assert f'"{NEW}/internal/svc"' in text
+
+
 class TestTheWalkerParameter:
     """``walk_source_files`` prunes the caller's names, not a fixed list."""
 

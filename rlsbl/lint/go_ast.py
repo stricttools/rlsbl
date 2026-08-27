@@ -37,9 +37,9 @@ def _check_forbidden_imports(tree, filepath, config):
 
     def _check_import_spec(node):
         if node.type == "import_spec":
-            # The import path is an interpreted_string_literal child
+            # The import path is a string literal child, in either quote form.
             for child in node.children:
-                if child.type == "interpreted_string_literal":
+                if child.type in STRING_LITERAL_TYPES:
                     # Extract content from the string literal
                     content = _extract_string_content(child)
                     if content in forbidden:
@@ -59,14 +59,31 @@ def _check_forbidden_imports(tree, filepath, config):
     return results
 
 
+#: Both Go string literal node types.  ``import `path` `` compiles exactly
+#: like ``import "path"``, so anything reading import specs must accept the
+#: raw form too or it silently sees fewer imports than the file has.
+STRING_LITERAL_TYPES = ("interpreted_string_literal", "raw_string_literal")
+
+_STRING_CONTENT_TYPES = frozenset(
+    f"{t}_content" for t in STRING_LITERAL_TYPES
+)
+
+
 def _extract_string_content(string_node):
-    """Extract the text content from an interpreted_string_literal node."""
+    """Extract the text content from a Go string literal node.
+
+    Handles both literal forms.  The interpreted form is delimited by ``"``
+    and the raw form by backquotes; a raw string has no escape sequences, so
+    its content is its bytes verbatim.
+    """
     for child in string_node.children:
-        if child.type == "interpreted_string_literal_content":
+        if child.type in _STRING_CONTENT_TYPES:
             return child.text.decode("utf-8")
-    # Fallback: strip quotes from the full text
+    # Fallback: strip the matching delimiter pair from the full text.
     text = string_node.text.decode("utf-8")
-    return text.strip('"')
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in '"`':
+        return text[1:-1]
+    return text.strip('"`')
 
 
 def _check_stdout(tree, filepath, config):
@@ -168,7 +185,8 @@ def scan_imports(filepath: str) -> list[tuple[str, str, int]]:
     """Extract all import paths from a Go source file.
 
     Parses the file with tree-sitter and walks import_declaration nodes
-    to collect every imported package path.
+    to collect every imported package path, in either of Go's two string
+    forms (``"path"`` and the raw ``` `path` ```).
 
     Args:
         filepath: absolute path to a .go file.
@@ -197,7 +215,7 @@ def scan_imports(filepath: str) -> list[tuple[str, str, int]]:
     def _collect_import_spec(node):
         if node.type == "import_spec":
             for child in node.children:
-                if child.type == "interpreted_string_literal":
+                if child.type in STRING_LITERAL_TYPES:
                     content = _extract_string_content(child)
                     results.append((content, filepath, _node_line(node)))
         elif node.type == "import_spec_list":
