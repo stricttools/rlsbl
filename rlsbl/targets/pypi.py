@@ -524,6 +524,24 @@ class PypiTarget(BaseTarget):
             message=f"{self.name} tests {'passed' if passed else 'failed'}",
         )
 
+    shares_workspace_environment = True
+    supports_dep_floors = True
+
+    def find_dead_modules(self, root, *, exclude_dirs=None, suppress=frozenset()):
+        """Union-of-imports detector over the project's Python modules."""
+        from ..dep_validation import find_dead_modules as _find
+
+        return [
+            (path, "not imported by any other module")
+            for path in _find(root, exclude_dirs=exclude_dirs, suppress=suppress)
+        ]
+
+    def find_circular_dependencies(self, root, *, exclude_dirs=None):
+        """Detect circular imports between the project's Python modules."""
+        from ..dep_validation import find_circular_python_deps
+
+        return find_circular_python_deps(root, exclude_dirs=exclude_dirs)
+
     def normalize_package_name(self, raw_name):
         """PyPI folds runs of ``-_.`` to a single hyphen (PEP 503)."""
         from .utils import normalize_pypi

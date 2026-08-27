@@ -8,6 +8,7 @@ import os
 
 from ..check_context import WorkspaceCheckContext
 from ..utils import get_check_timeout
+from . import check_scope_skip_reason
 from ._common import _sibling_exclude_dirs
 from .. import effects
 
@@ -75,8 +76,9 @@ def register_quality_checks(app):
             str(ctx.project_root), releasable_config_dir=rel_dir
         )
         target_names = {e.name for e in target_entries}
-        if "pypi" not in target_names:
-            return reporter.skipped("not a Python (pypi) project")
+        skip = check_scope_skip_reason("ruff-lint", target_names)
+        if skip is not None:
+            return reporter.skipped(skip)
 
         if not require_tool("ruff", fatal=False):
             reporter.error(
@@ -195,16 +197,26 @@ def register_quality_checks(app):
     @app.warn_check("dead-modules")
     def check_dead_modules(ctx, reporter):
         """Unreferenced Python modules, Go internal packages, npm or Dart source files."""
-        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
+        from ..targets import (
+            TARGETS,
+            detect_targets,
+            resolve_releasable_config_dir_for_ctx,
+            targets_with_import_analysis,
+        )
 
         root_str = str(ctx.project_root)
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         target_names = {e.name for e in target_entries}
 
-        supported = {"pypi", "go", "npm", "dart", "maven"} & target_names
-        if not supported:
-            return reporter.skipped("not a Python, Go, npm, Dart, or Maven project")
+        # Derived from the registry: a target answers dead-module detection
+        # iff it implements find_dead_modules.
+        analysable = sorted(targets_with_import_analysis() & target_names)
+        if not analysable:
+            supported = ", ".join(sorted(targets_with_import_analysis()))
+            return reporter.skipped(
+                f"no target with import analysis (supported: {supported})"
+            )
 
         exclude = None
         if isinstance(ctx, WorkspaceCheckContext) and ctx.project is not None:
@@ -218,54 +230,22 @@ def register_quality_checks(app):
         config_dir = rel_dir if rel_dir is not None else os.path.join(root_str, ".rlsbl")
         suppress = set(load_dead_module_exclusions(config_dir))
 
+        # Each target runs its own detector and supplies its own explanation.
+        # The Python and Go detectors are union-of-imports and take `suppress`
+        # directly, so a listed file's own imports cannot keep another module
+        # alive (no laundering); the npm/Dart/JVM detectors are
+        # BFS-from-entry-points, where a non-entry suppressed file's edges are
+        # never traversed, so subtracting the listed paths is provably
+        # sufficient. Both shapes are the target's business, not this check's.
         all_dead: list[str] = []
         details: list[str] = []
 
-        if "pypi" in target_names:
-            # Union-of-imports detector: thread suppress so a listed file's
-            # own imports cannot keep any other module alive (no laundering).
-            from ..dep_validation import find_dead_modules
-            py_dead = find_dead_modules(root_str, exclude_dirs=exclude, suppress=suppress)
-            all_dead.extend(py_dead)
-            details.extend(f"{path}: not imported by any other module" for path in py_dead)
-
-        if "go" in target_names:
-            # Union-of-imports detector: thread suppress (Go paths are
-            # package directories) to prevent entry-point laundering.
-            from ..dep_validation import find_dead_go_packages
-            go_dead = find_dead_go_packages(root_str, exclude_dirs=exclude, suppress=suppress)
-            all_dead.extend(go_dead)
-            details.extend(f"{path}: internal package not imported outside itself" for path in go_dead)
-
-        # npm/Dart/JVM detectors are BFS-from-entry-points: a non-entry
-        # suppressed file's edges are never traversed, so subtracting the
-        # listed paths from the reported dead set is provably sufficient.
-        if "npm" in target_names:
-            from ..dep_validation import find_dead_npm_modules
-            npm_dead = [
-                p for p in find_dead_npm_modules(root_str, exclude_dirs=exclude)
-                if p not in suppress
-            ]
-            all_dead.extend(npm_dead)
-            details.extend(f"{path}: not reachable from any entry point" for path in npm_dead)
-
-        if "dart" in target_names:
-            from ..dep_validation import find_dead_dart_modules
-            dart_dead = [
-                p for p in find_dead_dart_modules(root_str, exclude_dirs=exclude)
-                if p not in suppress
-            ]
-            all_dead.extend(dart_dead)
-            details.extend(f"{path}: not reachable from any entry point" for path in dart_dead)
-
-        if "maven" in target_names:
-            from ..dep_validation import find_dead_jvm_modules
-            jvm_dead = [
-                p for p in find_dead_jvm_modules(root_str, exclude_dirs=exclude)
-                if p not in suppress
-            ]
-            all_dead.extend(jvm_dead)
-            details.extend(f"{path}: not reachable from any entry point" for path in jvm_dead)
+        for name in analysable:
+            for path, reason in TARGETS[name].find_dead_modules(
+                root_str, exclude_dirs=exclude, suppress=suppress,
+            ):
+                all_dead.append(path)
+                details.append(f"{path}: {reason}")
 
         if all_dead:
             for d in details:
@@ -305,16 +285,26 @@ def register_quality_checks(app):
     @app.warn_check("circular-deps")
     def check_circular_deps(ctx, reporter):
         """Detect intra-package circular import dependencies."""
-        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
+        from ..targets import (
+            TARGETS,
+            detect_targets,
+            resolve_releasable_config_dir_for_ctx,
+            targets_with_circular_dep_analysis,
+        )
 
         root_str = str(ctx.project_root)
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(root_str, releasable_config_dir=rel_dir)
         target_names = {e.name for e in target_entries}
 
-        supported = {"pypi", "npm", "dart", "maven"} & target_names
-        if not supported:
-            return reporter.skipped("not a Python, npm, Dart, or Maven project")
+        # Derived from the registry. Go is deliberately absent: its compiler
+        # rejects circular imports, so a checker could only ever agree.
+        analysable = sorted(targets_with_circular_dep_analysis() & target_names)
+        if not analysable:
+            supported = ", ".join(sorted(targets_with_circular_dep_analysis()))
+            return reporter.skipped(
+                f"no target with cycle detection (supported: {supported})"
+            )
 
         exclude = None
         if isinstance(ctx, WorkspaceCheckContext) and ctx.project is not None:
@@ -324,26 +314,12 @@ def register_quality_checks(app):
             ) or None
 
         all_cycles: list[list[str]] = []
-
-        if "pypi" in target_names:
-            from ..dep_validation import find_circular_python_deps
-            py_cycles = find_circular_python_deps(root_str, exclude_dirs=exclude)
-            all_cycles.extend(py_cycles)
-
-        if "npm" in target_names:
-            from ..dep_validation import find_circular_npm_deps
-            npm_cycles = find_circular_npm_deps(root_str, exclude_dirs=exclude)
-            all_cycles.extend(npm_cycles)
-
-        if "dart" in target_names:
-            from ..dep_validation import find_circular_dart_deps
-            dart_cycles = find_circular_dart_deps(root_str, exclude_dirs=exclude)
-            all_cycles.extend(dart_cycles)
-
-        if "maven" in target_names:
-            from ..dep_validation import find_circular_jvm_deps
-            jvm_cycles = find_circular_jvm_deps(root_str, exclude_dirs=exclude)
-            all_cycles.extend(jvm_cycles)
+        for name in analysable:
+            all_cycles.extend(
+                TARGETS[name].find_circular_dependencies(
+                    root_str, exclude_dirs=exclude,
+                )
+            )
 
         if not all_cycles:
             return reporter.passed("no circular dependencies")
@@ -454,8 +430,11 @@ def register_quality_checks(app):
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
-        if not any(name == "maven" for name, _path in target_entries):
-            return reporter.skipped("not a maven project")
+        skip = check_scope_skip_reason(
+            "maven-central-metadata", {name for name, _path in target_entries},
+        )
+        if skip is not None:
+            return reporter.skipped(skip)
 
         pipelines = ctx.config.get("pipelines", {})
         if not any(p.get("type") == "maven-central" for p in pipelines.values()):

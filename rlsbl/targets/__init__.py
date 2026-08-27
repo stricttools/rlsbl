@@ -54,6 +54,42 @@ TARGETS = {
 }
 
 
+def targets_sharing_workspace_environment():
+    """Targets whose workspace members resolve into one shared environment."""
+    return frozenset(
+        name
+        for name, target in TARGETS.items()
+        if target.shares_workspace_environment
+    )
+
+
+def targets_with_import_analysis():
+    """Targets whose sources rlsbl can read to follow imports.
+
+    Backs the dead-module and workspace dependency checks, which used to keep
+    the same list of target names in five places between them.
+    """
+    return frozenset(
+        name for name, target in TARGETS.items() if target.supports_import_analysis
+    )
+
+
+def targets_with_circular_dep_analysis():
+    """Targets for which import-cycle detection is meaningful."""
+    return frozenset(
+        name
+        for name, target in TARGETS.items()
+        if target.supports_circular_dep_analysis
+    )
+
+
+def targets_with_dep_floors():
+    """Targets whose manifest states dependency floors a lockfile can outrun."""
+    return frozenset(
+        name for name, target in TARGETS.items() if target.supports_dep_floors
+    )
+
+
 def targets_with_builtin_tests():
     """Targets that ship a built-in test runner.
 

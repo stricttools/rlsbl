@@ -4,6 +4,7 @@ import os
 
 from ruamel.yaml import YAML
 
+from .base import BaseTarget
 from .dart import DartTarget
 
 
@@ -14,6 +15,15 @@ class FlutterTarget(DartTarget):
     detection_files = ()
     capabilities = frozenset({"read_name", "read_metadata", "ci_templates"})
     ecosystem = "Flutter"
+
+    # A Flutter app IS Dart sources, so the inherited Dart import analysers
+    # would run here -- but the check-to-target matrix has never listed
+    # flutter, and three of the checks that consume this property are
+    # error-severity. Turning them on for Flutter members is a scope decision,
+    # not a side effect of deriving the set from the registry, so the
+    # inherited implementations are explicitly dropped back to the base.
+    find_dead_modules = BaseTarget.find_dead_modules
+    find_circular_dependencies = BaseTarget.find_circular_dependencies
 
     @property
     def name(self):

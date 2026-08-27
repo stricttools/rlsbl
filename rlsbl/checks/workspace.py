@@ -442,16 +442,25 @@ def register_workspace_checks(app):
           Every pypi package is still verified, and "there is no root uv
           workspace" stops being reported as an unbuildable workspace.
         """
-        from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..targets import (
+            detect_targets,
+            resolve_releasable_config_dir,
+            targets_sharing_workspace_environment,
+        )
         from ..utils import detect_uv_workspace_root, is_virtual_uv_root
 
+        # Buildability is a question about the ONE environment a uv workspace
+        # resolves into, so it applies to the targets that share one. The
+        # target answers (shares_workspace_environment); the check no longer
+        # tests the name.
+        shared_env_targets = targets_sharing_workspace_environment()
         root = str(ctx.workspace_root)
         pypi_projects = []
         for proj in ctx.projects:
             proj_dir = os.path.join(root, proj["path"])
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
             target_entries = detect_targets(proj_dir, releasable_config_dir=rel_dir)
-            if any(e.name == "pypi" for e in target_entries):
+            if any(e.name in shared_env_targets for e in target_entries):
                 pypi_projects.append((proj["name"], proj_dir))
 
         if not pypi_projects:
@@ -704,6 +713,7 @@ def register_workspace_checks(app):
         from ..targets import (
             detect_targets,
             resolve_releasable_config_dir,
+            targets_sharing_workspace_environment,
             targets_with_builtin_tests,
         )
         from ..targets.outcomes import SuiteRunStatus
@@ -727,6 +737,10 @@ def register_workspace_checks(app):
         # Derived from the registry, not a copy of the set the `test-suite`
         # check carries: the two used to be able to disagree.
         runnable = targets_with_builtin_tests()
+        # Members of these targets share one resolved environment, so the sync
+        # below happens once at the workspace root and must exclude every
+        # member's overlays at once.
+        shared_env_targets = targets_sharing_workspace_environment()
         failed_projects = []
         skipped_projects = []
         passed_count = 0
@@ -743,7 +757,7 @@ def register_workspace_checks(app):
             )
 
             project_targets.append((proj, project_dir, target_name))
-            if target_name == "pypi":
+            if target_name in shared_env_targets:
                 has_pypi = True
 
         if has_pypi:
@@ -753,7 +767,11 @@ def register_workspace_checks(app):
             # registry wheels over them without a word.
             try:
                 overlays = collect_active_overlays(
-                    [d for _proj, d, target in project_targets if target == "pypi"]
+                    [
+                        d
+                        for _proj, d, target in project_targets
+                        if target in shared_env_targets
+                    ]
                 )
             except (OverlayModeConflictError, MalformedSentinelError) as e:
                 text = str(e)
@@ -865,7 +883,7 @@ def register_workspace_checks(app):
         """Releasables with publishing Go members should have companion tags."""
         from ..errors import ConfigError
         from ..member_context import resolve_member_context
-        from ..targets import resolve_releasable_config_dir
+        from ..targets import TARGETS, resolve_releasable_config_dir
         from ..workspace import read_releasable_version
 
         if not ctx.releasables:
@@ -898,19 +916,32 @@ def register_workspace_checks(app):
                     )
                     if member.publish_mode == "none":
                         continue
-                    has_go = any(e.name == "go" for e in member.targets)
+                    # Which tags a member needs alongside its primary release
+                    # tag is the target's own answer. This used to test the
+                    # target NAME and then re-derive the Go proxy tag format
+                    # by hand, a second copy of GoTarget.companion_tags.
+                    expected_tags = [
+                        tag
+                        for entry in member.targets
+                        if entry.name in TARGETS
+                        for tag in TARGETS[entry.name].companion_tags(
+                            proj["name"], version, path=pkg_path,
+                        )
+                    ]
                 except ConfigError as e:
                     config_errors.append(f"{rel.name}/{proj['name']}: member config error: {e}")
                     continue
-                if not has_go:
+                if not expected_tags:
                     continue
 
                 checked_any = True
 
-                sep = "" if pkg_path.endswith("/") else "/"
-                expected_tag = f"{pkg_path}{sep}v{version}"
-                if not tag_exists_locally(expected_tag, cwd=root):
-                    missing.append(f"{rel.name}/{proj['name']}: missing companion tag {expected_tag}")
+                for expected_tag in expected_tags:
+                    if not tag_exists_locally(expected_tag, cwd=root):
+                        missing.append(
+                            f"{rel.name}/{proj['name']}: missing companion tag "
+                            f"{expected_tag}"
+                        )
 
         if config_errors:
             for ce in config_errors:

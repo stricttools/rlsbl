@@ -21,6 +21,22 @@ class DartTarget(BaseTarget):
     def name(self):
         return "dart"
 
+    def find_dead_modules(self, root, *, exclude_dirs=None, suppress=frozenset()):
+        """Breadth-first reachability from the package's entry points."""
+        from ..dep_validation import find_dead_dart_modules
+
+        return [
+            (path, "not reachable from any entry point")
+            for path in find_dead_dart_modules(root, exclude_dirs=exclude_dirs)
+            if path not in suppress
+        ]
+
+    def find_circular_dependencies(self, root, *, exclude_dirs=None):
+        """Detect circular imports between the package's Dart sources."""
+        from ..dep_validation import find_circular_dart_deps
+
+        return find_circular_dart_deps(root, exclude_dirs=exclude_dirs)
+
     def detect(self, dir_path):
         pubspec = os.path.join(dir_path, "pubspec.yaml")
         if not os.path.exists(pubspec):

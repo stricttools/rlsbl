@@ -310,11 +310,11 @@ def register_project_checks(app):
                 except Exception:
                     continue
                 if manifest_version is not None and manifest_version != releasable_version:
-                    # Tolerate PEP 440 normalization for pypi targets
-                    if name == "pypi":
-                        from ..targets.pypi import PypiTarget
-                        if PypiTarget.format_version(None, releasable_version) == manifest_version:
-                            continue
+                    # Tolerate the target's own version spelling (PyPI's PEP 440
+                    # normalization). format_version is the identity for every
+                    # target that does not translate, so this is a no-op there.
+                    if target.format_version(releasable_version) == manifest_version:
+                        continue
                     mismatches.append(
                         f"{name}={manifest_version} (expected {releasable_version})"
                     )
@@ -384,16 +384,14 @@ def register_project_checks(app):
             return reporter.skipped(skip_reason)
 
         from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
-        from ..targets.utils import normalize_go, normalize_npm, normalize_pypi
 
         def _normalize_name(target_name, raw_name):
-            normalizers = {
-                "npm": normalize_npm,
-                "pypi": normalize_pypi,
-                "go": normalize_go,
-            }
-            normalizer = normalizers.get(target_name, str.lower)
-            return normalizer(raw_name)
+            # Each registry decides what "the same name" means; the target
+            # answers rather than this check keeping a dict of the rules.
+            target = TARGETS.get(target_name)
+            if target is None:
+                return raw_name.lower()
+            return target.normalize_package_name(raw_name)
 
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
@@ -941,9 +939,15 @@ def register_project_checks(app):
         rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
         target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
 
-        # Step 3: skip if no pypi target
-        if not any(name == "pypi" for name, _path in target_entries):
-            return reporter.skipped("no pypi target")
+        # Step 3: skip when the check's declared scope does not apply here.
+        # The scope is read from CHECK_TARGETS, not restated in the check.
+        from . import check_scope_skip_reason
+
+        skip = check_scope_skip_reason(
+            "dunder-version-missing", {name for name, _path in target_entries},
+        )
+        if skip is not None:
+            return reporter.skipped(skip)
 
         # Step 4: detect package root
         root_str = str(ctx.project_root)

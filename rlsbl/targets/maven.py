@@ -218,6 +218,22 @@ class MavenTarget(BaseTarget):
                     return True
         return False
 
+    def find_dead_modules(self, root, *, exclude_dirs=None, suppress=frozenset()):
+        """Breadth-first reachability from the project's entry points."""
+        from ..dep_validation import find_dead_jvm_modules
+
+        return [
+            (path, "not reachable from any entry point")
+            for path in find_dead_jvm_modules(root, exclude_dirs=exclude_dirs)
+            if path not in suppress
+        ]
+
+    def find_circular_dependencies(self, root, *, exclude_dirs=None):
+        """Detect circular imports between the project's JVM sources."""
+        from ..dep_validation import find_circular_jvm_deps
+
+        return find_circular_jvm_deps(root, exclude_dirs=exclude_dirs)
+
     def detect(self, dir_path):
         """Detect if dir has build.gradle.kts, build.gradle, or pom.xml.
 

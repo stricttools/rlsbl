@@ -334,6 +334,74 @@ class BaseTarget:
         """
         return {"global": None, "venv": None}
 
+    shares_workspace_environment: ClassVar[bool] = False
+    """Whether workspace members of this target share ONE resolved environment.
+
+    True for uv/Python, where every member of a uv workspace installs into a
+    single ``.venv`` -- which is why a sync at the workspace root has to
+    exclude every member's dev overlays at once, and why buildability is
+    checked at the root rather than per member. False for ecosystems whose
+    members each resolve independently.
+    """
+
+    supports_dep_floors: ClassVar[bool] = False
+    """Whether this target's manifest states dependency floors a lock resolves.
+
+    True for the ecosystems whose manifest declares minimum versions that a
+    lockfile can silently resolve ahead of -- the condition the ``dep-floors``
+    check exists to police. Declared rather than introspected: it is a fact
+    about the manifest format, not about any method here.
+    """
+
+    @property
+    def supports_import_analysis(self):
+        """Whether rlsbl can read this target's sources to follow imports.
+
+        Derived from the target implementing ``find_dead_modules``: the
+        dead-module detectors and the workspace dependency checks
+        (``deps-unused`` and friends) both rest on the same import scanners,
+        so a target that can answer one can answer the others.
+        """
+        return type(self).find_dead_modules is not BaseTarget.find_dead_modules
+
+    @property
+    def supports_circular_dep_analysis(self):
+        """Whether cycle detection is meaningful for this target's ecosystem.
+
+        Derived from the ``find_circular_dependencies`` override. Go
+        deliberately does not implement it: the compiler already rejects
+        circular imports, so a checker would only ever agree with it.
+        """
+        return (
+            type(self).find_circular_dependencies
+            is not BaseTarget.find_circular_dependencies
+        )
+
+    def find_dead_modules(self, root, *, exclude_dirs=None, suppress=frozenset()):
+        """Find source files or packages nothing else references.
+
+        Returns a list of ``(path, reason)`` pairs, where *reason* is the
+        ecosystem-specific explanation shown to the user ("not imported by any
+        other module", "not reachable from any entry point", ...). The default
+        returns nothing: a target with no import scanner has no opinion.
+
+        Args:
+            root: project root to scan.
+            exclude_dirs: sibling directories to keep out of the scan.
+            suppress: declared exclusions (legitimate non-entry points),
+                threaded into the detector where the detector supports it so a
+                listed file cannot keep other modules alive.
+        """
+        return []
+
+    def find_circular_dependencies(self, root, *, exclude_dirs=None):
+        """Find import cycles within this target's sources.
+
+        Returns a list of cycles, each a list of module identifiers. The
+        default returns nothing.
+        """
+        return []
+
     @property
     def has_builtin_test_runner(self):
         """Whether this target ships a built-in test runner.

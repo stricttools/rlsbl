@@ -275,6 +275,24 @@ class NpmTarget(BaseTarget):
             message=f"{self.name} tests {'passed' if passed else 'failed'}",
         )
 
+    supports_dep_floors = True
+
+    def find_dead_modules(self, root, *, exclude_dirs=None, suppress=frozenset()):
+        """Breadth-first reachability from the package's entry points."""
+        from ..dep_validation import find_dead_npm_modules
+
+        return [
+            (path, "not reachable from any entry point")
+            for path in find_dead_npm_modules(root, exclude_dirs=exclude_dirs)
+            if path not in suppress
+        ]
+
+    def find_circular_dependencies(self, root, *, exclude_dirs=None):
+        """Detect circular imports between the package's source files."""
+        from ..dep_validation import find_circular_npm_deps
+
+        return find_circular_npm_deps(root, exclude_dirs=exclude_dirs)
+
     def normalize_package_name(self, raw_name):
         """npm folds a name by removing hyphens, underscores and dots."""
         from .utils import normalize_npm

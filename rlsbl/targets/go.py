@@ -462,6 +462,23 @@ class GoTarget(BaseTarget):
             message=f"{self.name} tests {'passed' if passed else 'failed'}",
         )
 
+    supports_dep_floors = True
+
+    def find_dead_modules(self, root, *, exclude_dirs=None, suppress=frozenset()):
+        """Union-of-imports detector over the module's internal packages."""
+        from ..dep_validation import find_dead_go_packages
+
+        return [
+            (path, "internal package not imported outside itself")
+            for path in find_dead_go_packages(
+                root, exclude_dirs=exclude_dirs, suppress=suppress,
+            )
+        ]
+
+    # No find_circular_dependencies: the Go compiler rejects circular imports
+    # outright, so a checker here could only ever agree with it. The absence
+    # is what makes supports_circular_dep_analysis False for this target.
+
     def normalize_package_name(self, raw_name):
         """Go compares the last segment of a module path, lowercased."""
         from .utils import normalize_go

@@ -13,7 +13,14 @@ Check functions accumulate problems via ``reporter.error(text)`` /
 
 import os
 
-from ..targets import TARGETS
+from ..targets import (
+    TARGETS,
+    targets_with_builtin_tests,
+    targets_with_circular_dep_analysis,
+    targets_with_dep_floors,
+    targets_with_import_analysis,
+    targets_with_library_lint,
+)
 
 # Manifest filenames used by workspace-unregistered and workspace-stale-entries
 # to detect project directories. Derived from each target's detection_files
@@ -55,8 +62,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "strictspec-certificate-gate": None,
     "stricttest-floor": None,
     # dep-floors reads pyproject/uv.lock, package.json/package-lock.json, and
-    # go.mod -- the three ecosystems whose manifests state dependency floors.
-    "dep-floors": frozenset({"pypi", "npm", "go"}),
+    # go.mod. Which ecosystems those are is the targets' own answer
+    # (supports_dep_floors), not a list restated here.
+    "dep-floors": targets_with_dep_floors(),
     "license-file": None,
     # --- release tag (universal) ---
     "local-tag": None,
@@ -89,15 +97,18 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "subtree-remote-reachable": "workspace",
     "workspace-unbuildable": "workspace",
     # --- workspace + language-specific import scanners ---
-    "deps-unused": frozenset({"pypi", "dart", "npm", "go", "maven"}),
-    "deps-undeclared": frozenset({"pypi", "dart", "npm", "go", "maven"}),
-    "deps-runtime-test-only": frozenset({"pypi", "dart", "npm", "go", "maven"}),
-    "deps-dev-in-lib": frozenset({"pypi", "dart", "npm", "go", "maven"}),
+    # All five sets below are the targets' own answers, derived from the
+    # registry. They used to be five hand-listed copies that could drift from
+    # the dispatch they described and from each other.
+    "deps-unused": targets_with_import_analysis(),
+    "deps-undeclared": targets_with_import_analysis(),
+    "deps-runtime-test-only": targets_with_import_analysis(),
+    "deps-dev-in-lib": targets_with_import_analysis(),
     # --- target-specific quality checks ---
-    "dead-modules": frozenset({"pypi", "go", "npm", "dart", "maven"}),
-    "dead-modules-stale": frozenset({"pypi", "go", "npm", "dart", "maven"}),
-    "circular-deps": frozenset({"pypi", "npm", "dart", "maven"}),
-    "library-lint": frozenset({"pypi", "go", "npm", "maven"}),
+    "dead-modules": targets_with_import_analysis(),
+    "dead-modules-stale": targets_with_import_analysis(),
+    "circular-deps": targets_with_circular_dep_analysis(),
+    "library-lint": targets_with_library_lint(),
     # --- quality tag (universal) ---
     "scaffold-unreplaced-vars": None,
     # ruff-lint is Python-only: gated on a pypi target, mirroring dead-modules.
@@ -125,7 +136,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "prepush-changelog-coverage": None,
     "prepush-gitignore-guard": None,
     "prepush-manual-warning": None,
-    "test-suite": frozenset({"pypi", "go", "npm", "maven"}),
+    "test-suite": targets_with_builtin_tests(),
     "test-suite-workspace": "workspace",
     # --- maven-specific checks ---
     "maven-central-metadata": frozenset({"maven"}),
@@ -165,6 +176,41 @@ assert set(MATRIX_COLUMNS) == set(TARGETS.keys()), (
     f"missing={set(TARGETS.keys()) - set(MATRIX_COLUMNS)}, "
     f"extra={set(MATRIX_COLUMNS) - set(TARGETS.keys())}"
 )
+
+
+def targets_for_check(check_name: str) -> frozenset[str]:
+    """Return the targets a target-specific check applies to.
+
+    ``CHECK_TARGETS`` is the one place a check's target scope is written down,
+    and a check that needs to skip for an inapplicable project reads it from
+    here rather than repeating the target names in its own body. Raises for a
+    check that is universal or workspace-only -- asking those for a target set
+    is a bug, not a question with an empty answer.
+    """
+    try:
+        targets = CHECK_TARGETS[check_name]
+    except KeyError:
+        raise KeyError(
+            f"check '{check_name}' is not in CHECK_TARGETS; register it there"
+        ) from None
+    if targets is None or isinstance(targets, str):
+        raise ValueError(
+            f"check '{check_name}' is not target-specific "
+            f"({'universal' if targets is None else targets}); it has no target set"
+        )
+    return targets
+
+
+def check_scope_skip_reason(check_name: str, target_names) -> str | None:
+    """Return a skip reason when *target_names* misses this check's scope.
+
+    None means the check applies. The message names the targets the check does
+    support, which is the matrix's answer rather than a sentence restating it.
+    """
+    scope = targets_for_check(check_name)
+    if scope & set(target_names):
+        return None
+    return f"no {' / '.join(sorted(scope))} target"
 
 
 def get_feature_matrix() -> dict[str, dict[str, str]]:
