@@ -6,6 +6,8 @@ import subprocess
 
 import pytest
 
+from pathlib import Path
+
 from conftest import make_ctx, with_root_member, make_workspace
 from rlsbl.changelog.resolve import _unreleased_range
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
@@ -665,8 +667,13 @@ class TestMonorepoStatusWatch:
             _cmd_status({}, project_root=".")
         assert "tooling" in str(exc.value)
 
-    def test_no_watch_column_without_watch_keys(self, mock_git_repo, capsys):
-        """A workspace with no watch keys renders, and shows no Watch column."""
+    def test_there_is_no_watch_column_at_all(self, mock_git_repo, capsys):
+        """The column is gone from the renderer, not merely absent from a row.
+
+        This slot used to assert that a workspace without watch keys showed
+        no Watch column, which a workspace WITH them would still have shown.
+        No workspace can carry the key now, so the column has no source.
+        """
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
         _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
@@ -674,6 +681,11 @@ class TestMonorepoStatusWatch:
         _cmd_status({}, project_root=".")
         captured = capsys.readouterr()
         assert "Watch" not in captured.out
+
+        from rlsbl.commands.monorepo import commands as monorepo_commands
+
+        source = Path(monorepo_commands.__file__).read_text(encoding="utf-8")
+        assert '"Watch"' not in source
 
 
 class TestMonorepoStatusRemote:

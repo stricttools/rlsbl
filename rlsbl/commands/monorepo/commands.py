@@ -114,19 +114,6 @@ def _cmd_add(args, flags, project_root, dry_run=False):
     from ...ownership import ROOT_MEMBER_NAME, ROOT_MEMBER_PATH
     from ...workspace import is_root_path
 
-    watch_raw = flags.get("watch")
-    if watch_raw:
-        print(
-            "Error: --watch is no longer supported. Territory is derived from "
-            "declared member paths, never enumerated: every file belongs to "
-            "the member with the most specific declared path, and the root "
-            "member owns everything no other member claims. If this member "
-            "needs to own files outside its own directory, register that "
-            "directory as a member of its own.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     adding_root = is_root_path(path)
     if adding_root:
         path = ROOT_MEMBER_PATH
@@ -595,10 +582,6 @@ def _cmd_status(flags, project_root):
         deps_str = str(deps_count) if deps_count else "0"
         rdeps_str = str(rdeps_count) if rdeps_count else "0"
 
-        # Watch paths
-        watch = proj.get("watch", [])
-        watch_str = f"{len(watch)} paths" if watch else "-"
-
         # Library flag
         library_str = "yes" if proj.get("library", False) else ""
 
@@ -612,16 +595,15 @@ def _cmd_status(flags, project_root):
         # Releasable membership (explicit mode only)
         releasable_str = releasable_map.get(name, "") if explicit else ""
 
-        rows.append((name, path, target_display, version, latest_tag or "(none)", coverage_str, library_str, dev_only_str, deps_str, rdeps_str, watch_str, remote_str, releasable_str))
+        rows.append((name, path, target_display, version, latest_tag or "(none)", coverage_str, library_str, dev_only_str, deps_str, rdeps_str, remote_str, releasable_str))
 
     # Determine which dynamic columns to show
     any_library = any(row[6] != "" for row in rows)
     any_dev_only = any(row[7] != "" for row in rows)
     any_deps = any(row[8] != "0" for row in rows)
     any_rdeps = any(row[9] != "0" for row in rows)
-    any_watch = any(row[10] != "-" for row in rows)
-    any_remote = any(row[11] != "-" for row in rows)
-    any_releasable = any(row[12] != "" for row in rows)
+    any_remote = any(row[10] != "-" for row in rows)
+    any_releasable = any(row[11] != "" for row in rows)
 
     # Calculate column widths
     base_headers = ("Project", "Path", "Target", "Version", "Tag", "Coverage")
@@ -635,8 +617,6 @@ def _cmd_status(flags, project_root):
         base_headers = base_headers + ("Deps",)
     if any_rdeps:
         base_headers = base_headers + ("Rdeps",)
-    if any_watch:
-        base_headers = base_headers + ("Watch",)
     if any_remote:
         base_headers = base_headers + ("Remote",)
     headers = base_headers
@@ -646,7 +626,7 @@ def _cmd_status(flags, project_root):
     for row in rows:
         cells = list(row[:6])  # base columns: name, path, target, version, tag, unreleased
         if any_releasable:
-            cells.append(row[12])
+            cells.append(row[11])
         if any_library:
             cells.append(row[6])
         if any_dev_only:
@@ -655,10 +635,8 @@ def _cmd_status(flags, project_root):
             cells.append(row[8])
         if any_rdeps:
             cells.append(row[9])
-        if any_watch:
-            cells.append(row[10])
         if any_remote:
-            cells.append(row[11])
+            cells.append(row[10])
         display_rows.append(tuple(cells))
 
     widths = [len(h) for h in headers]

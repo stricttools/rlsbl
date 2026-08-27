@@ -424,9 +424,31 @@ class TestRouterFiltersFreshCheck:
         assert outcome.status == "fail"
         assert any("quantifier" in p.text for p in outcome.problems), outcome
 
-    def test_an_unreadable_block_fails(self, router_workspace):
+    def test_it_skips_a_router_it_did_not_generate(self, router_workspace):
+        """Freshness compares what sync wrote against what sync would write.
+
+        A hand-authored ci-router.yml has no generated form to be stale
+        against, and calling it stale would be a claim about a file rlsbl
+        does not own.
+        """
         router = router_workspace / ".github" / "workflows" / "ci-router.yml"
-        router.write_text("jobs:\n  detect:\n    steps: []\n", encoding="utf-8")
+        router.write_text(
+            "name: CI Router\non:\n  push:\njobs:\n  detect:\n"
+            "    runs-on: ubuntu-latest\n    steps: []\n",
+            encoding="utf-8",
+        )
+        outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
+        assert outcome.status == "skip", outcome
+
+    def test_a_generated_router_with_no_filters_block_fails(self, router_workspace):
+        """It claims to be generated, so its filters block must be readable."""
+        from rlsbl.commands.monorepo.sync import ROUTER_HEADER
+
+        router = router_workspace / ".github" / "workflows" / "ci-router.yml"
+        router.write_text(
+            f"{ROUTER_HEADER}\njobs:\n  detect:\n    steps: []\n",
+            encoding="utf-8",
+        )
         outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
         assert outcome.status == "fail"
 

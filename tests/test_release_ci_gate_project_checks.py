@@ -246,8 +246,8 @@ class TestSkippedProjectCheckBlocksTheTag:
         assert "paths filter" in text, (
             "the operator must be told WHY the job did not run"
         )
-        assert "ci-router.yml" in text and "watch" in text, (
-            "the operator must be told WHERE the filter lives"
+        assert "ci-router.yml" in text and "filters:" in text, (
+            "the operator must be told WHERE the filter is written down"
         )
         assert "rlsbl release resume" in text
         assert "was not" in text and "finalized" in text, (

@@ -40,7 +40,6 @@ path = "packages/mylib"
 name = "mylib"
 target = "pypi"
 library = true
-watch = ["packages/mylib/**", "shared/types/**"]
 depends_on = []
 
 [[projects]]
@@ -68,14 +67,13 @@ unrestricted = ["tests"]
 
 ### Project fields
 
-Each `[[projects]]` block supports 10 fields (1 required, 9 optional) that define the project's identity, release target, change detection scope, inter-project relationships, and behavioral flags. The only required field is `path` -- all other fields either have sensible defaults (like deriving `name` from the path basename) or are opt-in features that activate additional checks and behaviors:
+Each `[[projects]]` block declares the project's identity, release target, inter-project relationships, and behavioral flags. The only required field is `path` -- every other field either has a sensible default (like deriving `name` from the path basename) or is an opt-in feature that activates additional checks and behaviors. Note what is NOT declarable: what CI reacts to. The router's paths filters are derived from the workspace (see [Router paths filters](#router-paths-filters)), and a `watch` key is refused at load time.
 
 | Field | Required | Type | Description |
 | ----- | -------- | ---- | ----------- |
 | `path` | yes | string | Relative path from repo root to the project directory |
 | `name` | no | string | Project name (defaults to basename of `path`) |
 | `target` | no | string | Release target (auto-detected if omitted) |
-| `watch` | no | list of strings | Glob patterns for change detection beyond the project path |
 | `subtree_remote` | no | string | Git remote URL for subtree mirror publishing |
 | `depends_on` | no | list of strings | Explicit intra-workspace dependencies (project names) |
 | `library` | no | bool | Mark as a shared library (enables library-lint check) |
@@ -326,7 +324,17 @@ This ensures every project has its CI pipeline properly wired even when using di
 
 ### Router paths filters
 
-The generated router gates each project's inlined jobs on a `dorny/paths-filter` entry built from that project's `path` plus its `watch` patterns. A push whose diff matches none of a project's patterns leaves that project's CI job `skipped` on the pushed commit.
+The generated router filters each project's inlined jobs on a `dorny/paths-filter` entry **derived from the workspace**. Nothing is declared per project; the entry is composed of:
+
+- the project's own territory -- its declared `path` -- as `path/**`;
+- the territory of every workspace project it depends on, transitively and in every dependency scope (`runtime`, `dev`, `peer`, `explicit`): a change to a dev-scoped dependency breaks the dependent's tests, which is what its CI job runs;
+- the workspace-root manifests and lockfiles that are actually present (`pyproject.toml`, `uv.lock`, `package.json`, `go.mod`, and their kin), so a root dependency bump triggers every member;
+- the generated router itself, so a change to it re-runs everything;
+- for the root member, whose territory is the residual, `**` narrowed by a negated exclude of every other member's territory -- minus the territories it depends on, which stay included.
+
+The step declares `predicate-quantifier: some-with-excludes`. Under the action's default (`some`) a negated pattern matches everything *outside* itself, so the root member's excludes would match exactly the paths they exclude.
+
+A push whose diff matches none of a project's patterns leaves that project's CI job `skipped` on the pushed commit. `rlsbl check --name router-filters-fresh` re-derives the block and fails when the committed router no longer matches the workspace; regenerate with `rlsbl monorepo sync`.
 
 In explicit releasable mode, one more pattern is appended to **every** member of a releasable: the releasable's own `CHANGELOG.md` under `.rlsbl-monorepo/releasables/<name>/`. It is a single path shared by all members, so any commit that touches it matches all of their filters at once. This is a deliberate run-everything hook. A release commit may touch nothing under a member's own directory -- guaranteed on a first release, where the version write is a no-op -- and the publish gate refuses to treat that member's `skipped` check as passing, with no re-runnable recovery. Since the release commit always regenerates and commits the releasable `CHANGELOG.md`, anchoring every member's filter on it makes the release commit verifiable for all members.
 

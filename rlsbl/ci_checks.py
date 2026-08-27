@@ -490,9 +490,11 @@ def _no_checks_message(sha, missing, all_names):
         "The usual cause is the CI router's paths filter: the candidate's "
         "commits touch no path this project's filter covers, so its job never "
         "ran. The genuine fix is that the candidate must CONTAIN a commit "
-        "matching this project's paths filter (see the project's `watch` "
-        "patterns in .rlsbl-monorepo/workspace.toml and the `filters:` block "
-        "of .github/workflows/ci-router.yml).",
+        "matching this project's paths filter. The filter is derived from the "
+        "workspace -- the project's own directory, the directories of "
+        "everything it depends on, the workspace-root manifests and lockfiles "
+        "-- and is written out in the `filters:` block of "
+        ".github/workflows/ci-router.yml.",
         "",
         RUN_ALL_REMEDY,
     ])
@@ -522,9 +524,9 @@ def _failed_checks_message(sha, failures):
             "not run this project's part of it -- almost always the CI "
             "router's paths filter finding no change under the project's "
             "paths. The genuine fix is that the candidate must CONTAIN a "
-            "commit matching this project's paths filter (see the project's "
-            "`watch` patterns in .rlsbl-monorepo/workspace.toml and the "
-            "`filters:` block of .github/workflows/ci-router.yml). Releasing "
+            "commit matching this project's paths filter, which the "
+            "`filters:` block of .github/workflows/ci-router.yml states in "
+            "full. Releasing "
             "this project together with the commits that touch it -- or "
             "adding a commit under its paths and resuming -- makes its job "
             "run for real.",

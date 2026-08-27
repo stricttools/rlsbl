@@ -419,9 +419,9 @@ def _batch_ci_gate(workspace_root, flags, log, sha, pending):
             f"never publish.\n"
             f"\n"
             f"Make the candidate contain a commit each listed project's CI "
-            f"actually runs on -- commit a change under its paths on the "
-            f"release branch (its `watch` patterns feed the `filters:` block "
-            f"of .github/workflows/ci-router.yml) -- then re-run `rlsbl "
+            f"actually runs on -- commit a change under one of the paths its "
+            f"entry in the `filters:` block of "
+            f".github/workflows/ci-router.yml lists -- then re-run `rlsbl "
             f"monorepo release run`: each member resumes at its own unchanged "
             f"version."
         ) from exc

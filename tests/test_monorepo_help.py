@@ -39,7 +39,10 @@ class TestSubcommandHelp:
         result = app.test(["monorepo", "add", "--help"])
         assert "Register a project directory in the monorepo workspace.toml configuration" in result.stdout
         assert "--name" in result.stdout
-        assert "--watch" in result.stdout
+        assert "--depends-on" in result.stdout
+        # There is no --watch: what CI reacts to is derived from the
+        # workspace, never declared per project.
+        assert "--watch" not in result.stdout
         assert "--subtree-remote" in result.stdout
 
     def test_init_help(self):

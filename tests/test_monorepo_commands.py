@@ -97,18 +97,25 @@ class TestAdd:
         with pytest.raises(SystemExit):
             _cmd_add(["pkg-a"], {"releasable": "false"}, project_root=".")
 
-    def test_watch_flag_is_refused(self, mock_git_repo, capsys):
-        """--watch is gone: territory is derived from declared paths."""
+    def test_there_is_no_watch_flag(self, mock_git_repo, capsys):
+        """--watch is gone from the surface, not merely refused by the handler.
+
+        This slot used to assert the refusal message a transitional
+        `--watch` still printed. The flag itself is now unregistered, so
+        strictcli rejects it before any handler runs, and a member's
+        territory has exactly one spelling: its declared path.
+        """
+        import rlsbl
+
+        add_cmd = dict(rlsbl.app._collect_all_commands())["monorepo.add"]
+        assert "watch" not in {f.name for f in add_cmd.flags}
+
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "myproject")
-        with pytest.raises(SystemExit):
-            _cmd_add(
-                ["myproject"],
-                {"releasable": "false", "watch": "Package.swift,shared/**"},
-                project_root=".",
-            )
-        assert "--watch is no longer supported" in capsys.readouterr().err
-        assert _added(mock_git_repo) == []
+        _cmd_add(["myproject"], {"releasable": "false"}, project_root=".")
+        projects = _added(mock_git_repo)
+        assert len(projects) == 1
+        assert "watch" not in projects[0].to_dict()
 
     def test_subtree_remote_flag(self, mock_git_repo, capsys):
         _cmd_init({"root-dev-node": True}, project_root=".")

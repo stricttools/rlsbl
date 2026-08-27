@@ -1764,10 +1764,9 @@ def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
     _cmd_init(init_flags, project_root=root)
 
 
-@mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.", effect="mutating")
+@mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, subtree remote URL, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.", effect="mutating")
 @strictcli.flag(name="name", type=str, presence="optional", help="Display name for the project in workspace.toml (defaults to directory name)")
 @strictcli.flag(name="target", type=str, presence="optional", help="Registry this project publishes to (e.g. npm, pypi, go)")
-@strictcli.flag(name="watch", type=str, presence="optional", help="Comma-separated glob patterns for change detection in CI workflows")
 @strictcli.flag(name="subtree-remote", type=str, presence="optional", help="Git remote URL for split-publishing this project as a standalone repo")
 @strictcli.flag(name="depends-on", type=str, presence="optional", help="Comma-separated names of workspace projects this project depends on")
 @strictcli.flag(name="library", type=str, presence="optional", help="Mark as a shared library consumed by other workspace projects (true/false)")
@@ -1777,7 +1776,7 @@ def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
 @strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed)")
 @strictcli.arg(name="path", help="Relative path from the repo root to the project directory to register", presence="required")
 @effects.handler
-def cmd_mono_add(ctx, name, target, watch, subtree_remote, depends_on, library, dev_only, releasable, registry_name, auto_commit, path):
+def cmd_mono_add(ctx, name, target, subtree_remote, depends_on, library, dev_only, releasable, registry_name, auto_commit, path):
     """Register a project directory in the monorepo workspace.toml."""
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
@@ -1787,8 +1786,6 @@ def cmd_mono_add(ctx, name, target, watch, subtree_remote, depends_on, library, 
         flags["name"] = name
     if target:
         flags["target"] = target
-    if watch:
-        flags["watch"] = watch
     if subtree_remote:
         flags["subtree-remote"] = subtree_remote
     if depends_on:
@@ -1826,7 +1823,7 @@ def cmd_mono_remove(ctx, path):
     _cmd_remove([path], {}, project_root=root)
 
 
-@mono.command(name="list", help="Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.", effect="read_only")
+@mono.command(name="list", help="Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as subtree remotes, inter-project dependencies, and whether the project is marked as a library.", effect="read_only")
 @effects.handler
 def cmd_mono_list(ctx):
     """Display all projects registered in the monorepo workspace."""

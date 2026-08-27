@@ -82,12 +82,24 @@ def register_workspace_checks(app):
 
         if ctx.workspace_root is None:
             return reporter.skipped("not a workspace")
+        from ..commands.monorepo.sync import ROUTER_HEADER, _is_generated_router
+
         root = str(ctx.workspace_root)
         router_path = os.path.join(root, ".github", "workflows", "ci-router.yml")
         if not os.path.isfile(router_path):
             # workspace-ci-router already reports a missing router; saying it
             # twice would just double the noise.
             return reporter.skipped("no ci-router.yml to compare")
+        if not _is_generated_router(router_path):
+            # Freshness is a statement about a GENERATED artifact: it compares
+            # what sync wrote against what sync would write now. A router
+            # without the header was not written by sync, so there is nothing
+            # to call stale -- and reporting one would be a claim about a file
+            # rlsbl does not own. Visible as a skip rather than a silent pass.
+            return reporter.skipped(
+                f"ci-router.yml carries no '{ROUTER_HEADER}' header, so it is "
+                f"not a generated router"
+            )
 
         try:
             committed, quantifier = _committed_router_filters(router_path)

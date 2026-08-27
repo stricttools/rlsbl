@@ -91,7 +91,7 @@ When unreleased commits exist, a warning line appears:
 
 ### Monorepo awareness
 
-When run inside a monorepo sub-project, `rlsbl status` automatically scopes its output to that project by filtering tags to only those matching the project's naming pattern and counting only commits that touch files within the project's directory or watch patterns. This prevents cross-project noise in workspaces with many independently-versioned packages.
+When run inside a monorepo sub-project, `rlsbl status` automatically scopes its output to that project by filtering tags to only those matching the project's naming pattern and counting only commits that touch files the project owns. This prevents cross-project noise in workspaces with many independently-versioned packages.
 
 ## `rlsbl unreleased`
 

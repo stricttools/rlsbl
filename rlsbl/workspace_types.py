@@ -125,10 +125,6 @@ class WorkspaceProject:
         return self._data["path"]
 
     @property
-    def watch(self) -> list[str]:
-        return self._data.get("watch", [])
-
-    @property
     def library(self) -> bool:
         return bool(self._data.get("library", False))
 
