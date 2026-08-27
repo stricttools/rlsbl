@@ -435,6 +435,73 @@ class TestTheCountContract:
         assert "nothing further has been written" in str(exc.value)
         assert (root / "pyproject.toml").read_text() == before
 
+    def test_the_abort_names_the_dependencies_already_converted(self, tmp_path):
+        """An abort is not a rollback: the earlier writes are on disk."""
+        root = _project(tmp_path, """\
+            [project]
+            name = "app"
+            dependencies = ["core", "helper"]
+
+            [tool.uv.sources]
+            core = { path = "../core" }
+            helper = { path = "../helper" }
+        """, LOCK)
+        preview = observe(root, probe=_published)
+        applied = []
+        apply_item(preview.by_key("core"), root, applied=applied)
+
+        # helper gains an entry underneath the plan.
+        doc = tomlkit.parse((root / "pyproject.toml").read_text())
+        doc["project"]["dependencies"].append("helper")
+        _write(root, "pyproject.toml", tomlkit.dumps(doc))
+
+        with pytest.raises(UvPathSourceError) as exc:
+            apply_item(preview.by_key("helper"), root, applied=applied)
+        message = str(exc.value)
+        assert "Already written by this run" in message
+        assert "core" in message
+        assert "re-plans from the manifest as it is now" in message
+
+    def test_the_abort_says_so_when_nothing_was_written_yet(self, tmp_path):
+        root = _project(tmp_path, """\
+            [project]
+            name = "app"
+            dependencies = ["core"]
+
+            [tool.uv.sources]
+            core = { path = "../core" }
+        """, LOCK)
+        preview = observe(root, probe=_published)
+        _write(root, "pyproject.toml", textwrap.dedent("""\
+            [project]
+            name = "app"
+            dependencies = ["core"]
+
+            [dependency-groups]
+            dev = ["core"]
+
+            [tool.uv.sources]
+            core = { path = "../core" }
+        """))
+        with pytest.raises(UvPathSourceError) as exc:
+            apply_item(preview.by_key("core"), root, applied=[])
+        assert "Nothing had been written" in str(exc.value)
+
+    def test_a_manifest_that_vanished_before_apply_is_a_clean_error(self, tmp_path):
+        root = _project(tmp_path, """\
+            [project]
+            name = "app"
+            dependencies = ["core"]
+
+            [tool.uv.sources]
+            core = { path = "../core" }
+        """, LOCK)
+        preview = observe(root, probe=_published)
+        (root / "pyproject.toml").unlink()
+        with pytest.raises(UvPathSourceError) as exc:
+            apply_item(preview.by_key("core"), root, applied=[])
+        assert "no pyproject.toml" in str(exc.value)
+
 
 class TestCommandEntryPoint:
     def _root(self, tmp_path):

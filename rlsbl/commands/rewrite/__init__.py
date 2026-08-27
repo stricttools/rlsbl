@@ -13,6 +13,10 @@ share one contract, and it is the reason they live together:
   the preview reported.  A tree that moved between preview and apply is a hard
   abort with nothing further written -- never a silent partial sweep against
   content nobody previewed.
+* **The abort is honest about what it already wrote.**  Items applied before
+  the failing one stay on disk; there is no rollback.  The message enumerates
+  them (see :mod:`rlsbl.commands.rewrite.abort`) and says that a re-run
+  re-plans from the tree as it is now.
 
 Both commands are classified ``mutating`` but NOT ``consequential``: the writes
 are local, fully previewable, and revertible with git.

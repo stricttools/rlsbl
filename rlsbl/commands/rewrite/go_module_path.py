@@ -47,6 +47,7 @@ from ...lint.go_ast import scan_imports
 from ...lint.utils import walk_source_files
 from ...module_paths import GO_SEP, go_import_under_module, rewrite_module_prefix
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
+from .abort import already_written
 
 #: Path components that take a file out of the walk.  A vendored tree is a
 #: third-party copy, not this module.
@@ -393,21 +394,39 @@ def observe(root, old, new):
 # ---------------------------------------------------------------------------
 
 
-def apply_item(item, old, new):
-    """Write one file, refusing when its count moved since the preview."""
+def apply_item(item, old, new, applied=None):
+    """Write one file, refusing when its count moved since the preview.
+
+    *applied* is an optional list the caller passes through every item; each
+    successful write appends its key, so an abort can name what is already on
+    disk.
+    """
     found = item.data
     if found is None:
         return  # the summary / nothing-to-do items carry no file
-    new_text, count = recompute(found, old, new)
+    try:
+        new_text, count = recompute(found, old, new)
+    except (OSError, UnicodeDecodeError) as exc:
+        raise GoModuleRewriteError(
+            f"{found.rel}: the file the plan named could not be read at apply "
+            f"time ({exc}). It was there when the preview ran, so the working "
+            f"tree changed underneath the plan. "
+            f"{already_written(applied)}"
+            f"Re-run with --dry-run: the re-plan reads the tree as it is now."
+        ) from exc
     if count != found.occurrences:
         raise GoModuleRewriteError(
             f"{found.rel}: the preview counted {found.occurrences} "
             f"occurrence(s) but the file now has {count}. The working tree "
             f"changed between the preview and the apply; nothing further has "
-            f"been written. Re-run with --dry-run, read the plan, and apply "
-            f"again."
+            f"been written. "
+            f"{already_written(applied)}"
+            f"Re-run with --dry-run, read the plan, and apply again -- a "
+            f"re-run re-plans from the tree as it is now."
         )
     effects.atomic_write_text(found.path, new_text, preserve_mode=True)
+    if applied is not None:
+        applied.append(found.rel)
     print(f"  {found.rel}: rewrote {count} occurrence(s)")
 
 
@@ -432,9 +451,10 @@ def cmd_go_module_path(flags, project_root):
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
+    applied = []
     reconciler = Reconciler(
         observe=lambda: observe(project_root, old, new),
-        apply_item=lambda item: apply_item(item, old, new),
+        apply_item=lambda item: apply_item(item, old, new, applied=applied),
         show_keys=True,
     )
     try:

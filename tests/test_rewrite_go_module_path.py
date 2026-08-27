@@ -306,6 +306,83 @@ class TestTheCountContract:
         assert "--dry-run" in str(exc.value)
         assert "nothing further has been written" in str(exc.value)
 
+    def test_the_abort_names_the_files_already_written(self, repo):
+        """An abort is not a rollback, and does not pretend to be one.
+
+        The files applied BEFORE the failure are changed on disk. The message
+        enumerates them, so the operator knows the tree is half-renamed.
+        """
+        preview = observe(repo, OLD, NEW)
+        applied = []
+        apply_item(preview.by_key("go.mod"), OLD, NEW, applied=applied)
+        apply_item(
+            preview.by_key(os.path.join("internal", "svc", "svc.go")),
+            OLD, NEW, applied=applied,
+        )
+
+        # main.go moves underneath the plan: a second import appears.
+        (repo / "main.go").write_text(
+            "package main\n"
+            "\n"
+            "import (\n"
+            f'\t"{OLD}/internal/svc"\n'
+            f'\t"{OLD}/internal/deep"\n'
+            ")\n"
+        )
+        with pytest.raises(GoModuleRewriteError) as exc:
+            apply_item(preview.by_key("main.go"), OLD, NEW, applied=applied)
+        message = str(exc.value)
+        assert "go.mod" in message
+        assert os.path.join("internal", "svc", "svc.go") in message
+        assert "Already written by this run" in message
+        assert "re-plans from the tree as it is now" in message
+
+    def test_the_abort_says_so_when_nothing_was_written_yet(self, repo):
+        preview = observe(repo, OLD, NEW)
+        (repo / "go.mod").write_text("module example.com/moved\n")
+        with pytest.raises(GoModuleRewriteError) as exc:
+            apply_item(preview.by_key("go.mod"), OLD, NEW, applied=[])
+        assert "Nothing had been written" in str(exc.value)
+
+
+class TestAMissingFileAtApplyTime:
+    def test_a_planned_file_that_vanished_is_a_clean_error(self, repo):
+        """A deleted file is the command's own error, not a raw traceback."""
+        preview = observe(repo, OLD, NEW)
+        target = preview.by_key("main.go")
+        (repo / "main.go").unlink()
+        with pytest.raises(GoModuleRewriteError) as exc:
+            apply_item(target, OLD, NEW)
+        message = str(exc.value)
+        assert "main.go" in message
+        assert "could not be read" in message
+
+    def test_the_command_reports_it_instead_of_crashing(self, repo, capsys):
+        """Through the entry point: exit 1 with the message, no traceback."""
+        real_apply = apply_item
+
+        def vanish(item, old, new, applied=None):
+            if item.key == "main.go":
+                (repo / "main.go").unlink()
+            return real_apply(item, old, new, applied=applied)
+
+        import rlsbl.commands.rewrite.go_module_path as mod
+
+        original = mod.apply_item
+        mod.apply_item = vanish
+        try:
+            with pytest.raises(SystemExit) as exc:
+                cmd_go_module_path(
+                    {"from-module": OLD, "to-module": NEW, "dry-run": False},
+                    project_root=repo,
+                )
+        finally:
+            mod.apply_item = original
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "main.go" in err
+        assert "could not be read" in err
+
 
 class TestASingleOccurrenceRepo:
     def test_a_module_directive_alone_is_a_one_file_plan(self, tmp_path):

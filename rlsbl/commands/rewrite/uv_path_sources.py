@@ -62,6 +62,7 @@ from ...dep_rewrite import (
 )
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile, single
 from ...registry import query_pypi_release
+from .abort import already_written
 
 
 class UvPathSourceError(Exception):
@@ -299,13 +300,20 @@ def observe(project_root, *, probe=probe_published):
 # ---------------------------------------------------------------------------
 
 
-def apply_item(item, project_root):
-    """Apply one item, refusing when its count moved since the preview."""
+def apply_item(item, project_root, applied=None):
+    """Apply one item, refusing when its count moved since the preview.
+
+    *applied* is an optional list the caller passes through every item; each
+    successful write appends its key, so an abort can name what is already on
+    disk (this command has no rollback -- see :mod:`.abort`).
+    """
     root = str(project_root)
     if item.data is None:
         return  # the nothing-to-convert item
     if isinstance(item.data, tuple) and item.data[0] == "config":
-        _apply_config(root, item.data[1])
+        wrote = _apply_config(root, item.data[1])
+        if wrote and applied is not None:
+            applied.append(item.key)
         return
 
     conv = item.data
@@ -319,8 +327,10 @@ def apply_item(item, project_root):
             f"{conv.name}: the preview counted {conv.occurrences} entr"
             f"{'y' if conv.occurrences == 1 else 'ies'} but the manifest now "
             f"has {found}. The working tree changed between the preview and "
-            f"the apply; nothing further has been written. Re-run with "
-            f"--dry-run, read the plan, and apply again."
+            f"the apply; nothing further has been written. "
+            f"{already_written(applied)}"
+            f"Re-run with --dry-run, read the plan, and apply again -- a "
+            f"re-run re-plans from the manifest as it is now."
         )
 
     normalized = normalize_pypi_name(conv.name)
@@ -333,6 +343,8 @@ def apply_item(item, project_root):
     effects.atomic_write_text(
         pyproject_path, tomlkit.dumps(doc), preserve_mode=True,
     )
+    if applied is not None:
+        applied.append(item.key)
     print(
         f"  {conv.name}: floored at {conv.constraint} "
         f"({found} entr{'y' if found == 1 else 'ies'})"
@@ -340,9 +352,9 @@ def apply_item(item, project_root):
 
 
 def _apply_config(root, additions):
-    """Add *additions* to ``internal_dep_floors`` in .rlsbl/config.json."""
+    """Add *additions* to ``internal_dep_floors``.  True when it wrote."""
     if not additions:
-        return
+        return False
     from ...config import write_project_config
 
     config = read_json_config(_project_config(root))
@@ -350,6 +362,7 @@ def _apply_config(root, additions):
     declared = set(existing) if isinstance(existing, list) else set()
     write_project_config(CONFIG_KEY, sorted(declared | set(additions)), root)
     print(f"  {CONFIG_KEY}: added {', '.join(additions)}")
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -364,9 +377,10 @@ def cmd_uv_path_sources(flags, project_root):
     """
     dry_run = bool(flags.get("dry-run", False))
 
+    applied = []
     reconciler = Reconciler(
         observe=lambda: observe(project_root),
-        apply_item=lambda item: apply_item(item, project_root),
+        apply_item=lambda item: apply_item(item, project_root, applied=applied),
         show_keys=True,
     )
     try:
