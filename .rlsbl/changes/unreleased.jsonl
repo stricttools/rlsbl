@@ -28,3 +28,4 @@
 {"format_version":1,"id":"18cfafb5ea8e882bc8851a6852d340ba978267ec782146c7","commits":["45b499f1c4a4bd19544f86f3b228608207392e69"],"user_facing":false}
 {"format_version":1,"id":"18cfafcafc31cb07b843bc817b724d1c975b603f82ecdbc1","commits":["4d2e15381068f415344db6ee0b480d6c52ba4de9"],"user_facing":false}
 {"format_version":1,"id":"18cfb00870970ca8b4932307888c49bab8818a12f00968f5","commits":["e6aaeea298b9c4f13a58da4ab056ea9613ceefb0"],"user_facing":false}
+{"format_version":1,"id":"18cfb07b1c02aa005ce270c4e3624bd19d8e3149cd25fd2f","commits":["7c7d94d7bcf0e4251daed396be44e21bd19f53e4"],"user_facing":true,"description":"`workspace-unregistered` no longer reports a member's declared target path subdirectory (e.g. `{\"name\": \"npm\", \"path\": \"npm\"}`) as an unregistered project","type":"fix"}
