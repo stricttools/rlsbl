@@ -131,6 +131,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "selfdoc-version-drift": None,
     "scaffold-conflicts": None,
     "cross-repo-path-sources": frozenset({"pypi"}),
+    # target-matrix-fresh compares a committed artifact against a regeneration
+    # of the whole registry; no target decides whether it applies.
+    "target-matrix-fresh": None,
     "requires-services": None,
     # dev-sync overlays are uv/Python-only (venv dist-info inspection).
     "dev-overlay-drift": frozenset({"pypi"}),

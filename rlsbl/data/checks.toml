@@ -538,6 +538,22 @@ pure = true
 needs_network = false
 depends_on = []
 
+# target-matrix-fresh: the committed support matrix
+# (rlsbl/data/support-matrix.json) is generated from the target, check and
+# pipeline registries, and the docs directives render from it instead of
+# importing rlsbl. A stale file therefore ships wrong documentation, so this
+# regenerates in memory and compares. Skips visibly wherever the artifact does
+# not exist -- it ships inside the rlsbl package, so only rlsbl's own tree has
+# one. Pure (imports and serializes; no subprocess or network). In "preflight"
+# so a stale matrix blocks the release that would publish it.
+[checks.target-matrix-fresh]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 # requires-services: when config declares CI service containers (services /
 # test_env), the rendered CI workflow(s) on disk must actually provision them.
 # Pure filesystem read (config + workflow YAML), no subprocess/network.

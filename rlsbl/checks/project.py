@@ -15,6 +15,51 @@ from ..errors import ConfigError
 from ._common import exception_text
 
 
+def _matrix_drift_details(committed, fresh, limit=10):
+    """Name what changed between the committed support matrix and a fresh one.
+
+    A byte comparison decides staleness; this only makes the failure
+    actionable. Unparseable committed text is itself the finding.
+    """
+    try:
+        old = json.loads(committed)
+    except (json.JSONDecodeError, ValueError) as exc:
+        return [f"the committed file is not valid JSON: {exc}"]
+    new = json.loads(fresh)
+
+    details = []
+    for section in sorted(set(old) | set(new)):
+        if section not in old:
+            details.append(f"section '{section}' is missing from the committed file")
+        elif section not in new:
+            details.append(f"section '{section}' no longer exists but is still committed")
+        elif old[section] != new[section]:
+            details.append(f"section '{section}' differs")
+
+    old_targets = old.get("targets") or {}
+    new_targets = new.get("targets") or {}
+    for name in sorted(set(old_targets) | set(new_targets)):
+        old_row = old_targets.get(name)
+        new_row = new_targets.get(name)
+        if old_row is None:
+            details.append(f"target '{name}' has no row in the committed file")
+            continue
+        if new_row is None:
+            details.append(f"target '{name}' is committed but no longer registered")
+            continue
+        for axis in sorted(set(old_row) | set(new_row)):
+            if old_row.get(axis) != new_row.get(axis):
+                details.append(
+                    f"target '{name}' axis '{axis}': committed "
+                    f"{old_row.get(axis)!r}, derived {new_row.get(axis)!r}"
+                )
+
+    if len(details) > limit:
+        hidden = len(details) - limit
+        details = details[:limit] + [f"... and {hidden} further difference(s)"]
+    return details
+
+
 def _launcher_target_subdir_from_config(config, launcher_entry):
     """Resolve a launcher pipeline's linked target directory from config."""
     target_name = launcher_entry.get("target")
@@ -1061,6 +1106,39 @@ def register_project_checks(app):
                 "merge conflict markers"
             )
         return reporter.passed("no unresolved merge conflict markers")
+
+    @app.error_check("target-matrix-fresh")
+    def check_target_matrix_fresh(ctx, reporter):
+        """The committed support matrix must match a fresh regeneration."""
+        from ..targets.introspect import (
+            MATRIX_REGEN_COMMAND,
+            MATRIX_RELPATH,
+            matrix_path,
+            render_matrix,
+        )
+
+        path = matrix_path(str(ctx.project_root))
+        if not os.path.isfile(path):
+            # The artifact ships inside the rlsbl package, so only rlsbl's own
+            # source tree carries one. Everywhere else there is nothing to
+            # compare, and saying so is more honest than a trivial pass.
+            return reporter.skipped(f"no {MATRIX_RELPATH} in this project")
+
+        with open(path, encoding="utf-8") as f:
+            committed = f.read()
+
+        fresh = render_matrix()
+        if committed == fresh:
+            return reporter.passed(f"{MATRIX_RELPATH} matches the registries")
+
+        reporter.error(
+            f"{MATRIX_RELPATH} no longer matches the target, check and "
+            f"pipeline registries it is generated from; regenerate it with "
+            f"`{MATRIX_REGEN_COMMAND}` and commit the result"
+        )
+        for detail in _matrix_drift_details(committed, fresh):
+            reporter.error(detail)
+        return reporter.found(f"{MATRIX_RELPATH} is stale")
 
     @app.error_check("cross-repo-path-sources")
     def check_cross_repo_path_sources(ctx, reporter):
