@@ -604,7 +604,11 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
                     vp.stamp_format_version = True
                     vp.actions.append("stamp format_version = 1")
                 if already_anchored:
-                    vp.notes.append("already anchored; left alone")
+                    vp.notes.append(
+                        "already marked unanchorable; left alone"
+                        if state["unanchorable"]
+                        else "already anchored; left alone"
+                    )
                 elif vp.unanchorable:
                     vp.actions.append("write unanchorable = true")
                 else:
