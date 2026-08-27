@@ -19,3 +19,4 @@
 {"format_version":1,"id":"18cfae2db6cf8f7ded91ee4518384869b21b65e808319b50","commits":["a272279e5f75178c9b9e0497416899d4c4f62d55"],"user_facing":false}
 {"format_version":1,"id":"18cfae671b4cd03e7cd9b792f39a4a8789970b505a7eb848","commits":["0eb7bc58555ce5b7d65aa1ccec9fb4ff1a4cba4b"],"user_facing":false}
 {"format_version":1,"id":"18cfaea11d5c5d78695bf5b56fb443728894bdcda97f5282","commits":["39aac9d13cdd11dc138ee9330d7794e2e7bacc9f"],"user_facing":true,"description":"**`monorepo mirror --dry-run` renders a plan again.** The preview used to stop at step 1 with \"branched on unsettled value\" because observation's `git subtree split` and inspection clone were recorded instead of run; both are now allowlisted observes, and the plan no longer advertises scratch directories no apply would create.","type":"fix"}
+{"format_version":1,"id":"18cfaea2d424f8c7de3b8b174c054dfb81333b9fab3183c4","commits":["d5fefb7158b570035c4efcc1a15de7fa143fc0c7"],"user_facing":false}
