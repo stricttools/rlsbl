@@ -24,6 +24,11 @@ EITHER a bare split-lineage commit (the current split SHA or an older one --
 covers pre-scaffold-layer mirrors) OR exactly one commit atop a split-lineage
 commit whose changed paths are all scaffold-owned. Anything else is a foreign
 commit -- a contract violation -- and is a hard error that touches nothing.
+
+The observe/preview/apply machinery itself is not this module's: it comes from
+:mod:`rlsbl.preview_apply`. A mirror judges one subject (this project's whole
+mirror), so its preview is the one-item case of that module's keyed verdict
+list, and its plan output is composed by that module's single renderer.
 """
 
 import json
@@ -380,7 +385,7 @@ def observe(remote, root, project_path):
 
 
 # ---------------------------------------------------------------------------
-# Plan reporting (dry-run)
+# The verdict this plan becomes (rendered by rlsbl.preview_apply)
 # ---------------------------------------------------------------------------
 
 
