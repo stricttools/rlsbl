@@ -130,6 +130,13 @@ class TestTheAppConsumesTheDeclaredList:
 
 
 REF_UPDATES = [
+    # The branch-creating split: `-b` writes a ref, so only the spelling that
+    # puts `--prefix` in the third position is admitted.
+    ["git", "subtree", "split", "-b", "mirror", "--prefix", "pkg"],
+    ["git", "subtree", "split", "-b", "mirror", "--prefix=pkg"],
+    ["git", "subtree", "push", "--prefix=pkg", "origin", "main"],
+    ["git", "subtree", "add", "--prefix", "pkg", "origin", "main"],
+    ["git", "subtree", "pull", "--prefix", "pkg", "origin", "main"],
     ["git", "push", "origin", "HEAD:refs/heads/main"],
     ["git", "push", "--tags"],
     ["git", "fetch", "--prune"],
@@ -146,6 +153,19 @@ REF_UPDATES = [
     ["git", "stash", "push"],
     ["git", "remote", "add", "origin", "git@example:x/y"],
     ["git", "merge-file", "a", "b", "c"],
+]
+
+WORKTREE_WRITES = [
+    # The clone entry is admitted for its scratch DESTINATION, so every other
+    # clone spelling -- and every clone that writes into an existing tree --
+    # must miss it.
+    ["git", "clone", "/some/repo.git", "/home/user/project"],
+    ["git", "clone", "--quiet", "/some/repo.git", "/home/user/project"],
+    ["git", "clone", "--single-branch", "--branch", "main", "r", "d"],
+    ["git", "clone", "--quiet", "--single-branch", "--branch", "release", "r", "d"],
+    ["git", "init"],
+    ["git", "clean", "-fdx"],
+    ["git", "checkout", "--", "."],
 ]
 
 INDEX_WRITES = [
@@ -205,6 +225,15 @@ class TestTheBansHold:
             f"under --dry-run"
         )
 
+    @pytest.mark.parametrize("argv", WORKTREE_WRITES, ids=" ".join)
+    def test_no_prefix_admits_a_worktree_write(self, argv):
+        assert not _matches(argv), (
+            f"{' '.join(argv)} matches "
+            f"{[' '.join(e.argv) for e in _matches(argv)]}: the scratch-write "
+            f"clause admits loose objects and brand-new scratch directories "
+            f"only, never a write into a tree somebody already has"
+        )
+
     @pytest.mark.parametrize("argv", INDEX_WRITES, ids=" ".join)
     def test_no_prefix_admits_an_index_write(self, argv):
         assert not _matches(argv), (
@@ -249,6 +278,75 @@ class TestTheReadsStillMatch:
     ], ids=" ".join)
     def test_read_argv_is_observable(self, argv):
         assert _matches(argv), f"{' '.join(argv)} is a read but matches nothing"
+
+
+class TestTheScratchWriteCategory:
+    """Two entries write, and are admitted anyway -- narrowly, and on record.
+
+    A branchless ``git subtree split`` leaves loose objects; the mirror's
+    inspection ``git clone`` fills a directory the same observation just
+    created.  Neither touches a ref, an index or a worktree anybody had, which
+    is the scratch-write clause.  Both are pinned to the exact spelling their
+    one call site issues, because the two hazards they sit next to -- ``-b``
+    on the split, a durable destination on the clone -- are invisible to
+    prefix matching.
+    """
+
+    SPLIT = ["git", "subtree", "split", "--prefix", "packages/mylib"]
+    CLONE = ["git", "clone", "--quiet", "--single-branch", "--branch", "main",
+             "git@host:o/r.git", "/tmp/rlsbl-mirror-observe-x/mirror"]
+
+    @pytest.mark.parametrize("argv", [SPLIT, CLONE], ids=lambda a: " ".join(a[:4]))
+    def test_the_pinned_scratch_write_is_observable(self, argv):
+        assert _matches(argv), (
+            f"{' '.join(argv)} matches nothing, so under --dry-run it is "
+            f"RECORDED: the mirror reconciler's observation then reads a "
+            f"result that does not exist and the preview truncates"
+        )
+
+    @pytest.mark.parametrize("argv", [SPLIT, CLONE], ids=lambda a: " ".join(a[:4]))
+    def test_they_declare_the_scratch_write_category(self, argv):
+        entries = _matches(argv)
+        assert [e.category for e in entries] == ["scratch-write"], entries
+
+    def test_the_split_entry_records_its_branch_residual(self):
+        entry = next(
+            e for e in oa.OBSERVE_ALLOWLIST
+            if list(e.argv) == ["git", "subtree", "split", "--prefix"]
+        )
+        assert "-b" in entry.why, (
+            f"the split entry must say that -b creates a ref and that prefix "
+            f"matching cannot refuse an appended flag: {entry.why!r}"
+        )
+
+    def test_the_clone_entry_records_that_the_reason_is_the_destination(self):
+        entry = next(
+            e for e in oa.OBSERVE_ALLOWLIST if e.argv[:2] == ("git", "clone")
+        )
+        assert "DESTINATION" in entry.why or "destination" in entry.why, (
+            f"the clone entry must say the justification is where it writes, "
+            f"not which flags it carries: {entry.why!r}"
+        )
+
+    def test_the_category_states_what_it_forbids(self):
+        clause = oa.OBSERVE_CATEGORIES["scratch-write"]
+        for word in ("ref", "index", "worktree"):
+            assert word in clause.lower(), (
+                f"the scratch-write clause must name what it still forbids; "
+                f"'{word}' is missing from {clause!r}"
+            )
+
+    def test_the_mirror_issues_the_pinned_split_spelling(self):
+        """``--prefix=<path>`` is git-identical and allowlist-invisible."""
+        import inspect
+
+        from rlsbl.commands.monorepo import mirror_cmd
+
+        src = inspect.getsource(mirror_cmd.compute_split_sha)
+        assert '"subtree", "split", "--prefix", project_path' in src, (
+            "compute_split_sha must issue --prefix as its own token, or the "
+            f"pinned entry matches nothing it runs:\n{src}"
+        )
 
 
 class TestTheFetchIsRetainedByExplicitRuling:

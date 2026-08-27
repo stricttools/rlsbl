@@ -21,6 +21,13 @@ Legal under the standard:
 * **Cache writes** -- a package manager populating its own download cache is
   invisible plumbing: it changes no project state, no output, and no later
   decision.  Deleting the cache costs a re-download and nothing else.
+* **Scratch writes** -- loose objects added to an object database, and
+  brand-new directories the running process owns.  A program qualifies only
+  if it writes NO ref, NO index and NO worktree state in any pre-existing
+  repository: loose objects are unreachable garbage until a ref names them,
+  and a fresh scratch directory is not state anybody had before the preview
+  started.  Deleting either costs a recomputation and nothing else, which is
+  the same reasoning the cache clause rests on.
 
 Not legal under the standard:
 
@@ -80,6 +87,23 @@ Consequences of the standard, entry by entry
   it was never observe-safe under any reading of the standard.  Its three
   former callers now let ``gh`` resolve and use the credential internally
   (``gh api``), so the token never transits an rlsbl pipe.
+* ``git subtree split --prefix`` is pinned with ``--prefix`` as its own token,
+  and the mirror reconciler issues exactly that spelling (``["subtree",
+  "split", "--prefix", path]``, not ``--prefix=path``) so the pin can name it.
+  A branchless split prints a SHA and materializes the synthetic split lineage
+  as loose objects: no ref, no index, no worktree -- the scratch-write clause.
+  Its residual hazard is the same class as the fetch's: ``-b <branch>`` DOES
+  create a ref, and prefix matching cannot refuse a flag APPENDED after the
+  pin.  What the pin buys is that ``-b`` cannot be reached by writing a
+  SHORTER argv, since a ``-b`` in the third position no longer matches.
+* ``git clone --quiet --single-branch --branch main`` is admitted for its
+  DESTINATION, not for its flags: the mirror reconciler's inspection clone
+  writes into a directory inside a temp dir the same observation just created
+  (``effects.observe_scratch_dirs``), so the whole write is scratch the process
+  owns and deletes.  Prefix matching cannot see a destination, so the entry is
+  pinned to the exact spelling that one call site issues -- a future call site
+  cloning somewhere durable would satisfy the prefix while breaking the reason,
+  which is why the reason is recorded on the entry rather than assumed.
 
 Purity, which this list also defines
 ------------------------------------
@@ -104,7 +128,13 @@ Every entry declares a category from :data:`OBSERVE_CATEGORIES` and a reason.
 ``tests/test_observe_allowlist.py`` asserts the shape (declared category,
 non-empty reason, at least two tokens) and runs a corpus of known-mutating
 argvs past every prefix.  A new entry that cannot be justified in one of the
-three categories does not belong here.
+declared categories does not belong here.
+
+This list is also what :func:`rlsbl.preview_apply.no_writes` screens
+``effects.run`` against: during a reconciler's observation, an argv that
+matches no prefix here is refused outright.  So the list answers one question
+in one place -- "may this program run while we are only looking?" -- instead of
+being shadowed by a second, opposite-polarity denylist.
 """
 
 from collections import namedtuple
@@ -125,6 +155,12 @@ OBSERVE_CATEGORIES = {
     "self-report": (
         "The tool reports its own version or authentication state. No project "
         "state and no remote state is read or written."
+    ),
+    "scratch-write": (
+        "Writes only scratch: loose objects in an object database, or a "
+        "brand-new directory the running process owns. No ref, no index and "
+        "no worktree state of any pre-existing repository is touched, so "
+        "nothing a user would notice changes."
     ),
 }
 
@@ -190,6 +226,31 @@ OBSERVE_ALLOWLIST = (
         "three-way merges to stdout; -p is what keeps it from writing a file",
     ),
     ObserveEntry(("git", "--version"), "self-report", "prints git's version"),
+    # -- git scratch writes (see the scratch-write clause of the standard) ---
+    ObserveEntry(
+        ("git", "subtree", "split", "--prefix"), "scratch-write",
+        "the deterministic branchless split the mirror reconciler observes: it "
+        "prints the resulting SHA and materializes the synthetic split lineage "
+        "as loose objects, creating no ref, taking no index lock and leaving "
+        "the worktree alone. RESIDUAL, same class as the pinned fetch's: "
+        "`-b <branch>` DOES create a ref and prefix matching cannot refuse a "
+        "flag appended after the pin -- the pin buys that `-b` cannot be "
+        "reached by a SHORTER argv, and rlsbl's one call site "
+        "(mirror_cmd.compute_split_sha) issues this argv plus the prefix path "
+        "and nothing else",
+    ),
+    ObserveEntry(
+        ("git", "clone", "--quiet", "--single-branch", "--branch", "main"),
+        "scratch-write",
+        "the mirror reconciler's inspection clone. Admitted for its "
+        "DESTINATION, not its flags: the call site clones into a directory "
+        "inside a temp dir the same observation created via "
+        "effects.observe_scratch_dirs, so the entire write is scratch this "
+        "process owns and deletes, and the remote is only read. Prefix "
+        "matching cannot see a destination, so the pin is the exact spelling "
+        "that call site issues -- a future call site cloning somewhere durable "
+        "would satisfy the prefix while breaking this reason",
+    ),
     # -- gh reads (never `gh api` wholesale: it POSTs too) ---------------
     ObserveEntry(
         ("gh", "api", "--method", "GET"), "network-read",

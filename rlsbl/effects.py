@@ -69,7 +69,10 @@ than about convenience, and touches nothing a preview reports on:
 * :func:`tcp_connect` -- a connect-and-close probe is a network read, and
   reads execute in every mode here (see :func:`urlopen`).
 
-Everything else, including :func:`mkdtemp` and :func:`temp_file`, records.
+Everything else, including :func:`mkdtemp` and :func:`temp_file`, records --
+with one scoped exception, :func:`observe_scratch_dirs`, described on that
+function: inside an observation block a scratch directory is created and
+removed for real, because the observe that reads it really runs.
 """
 
 import functools
@@ -91,6 +94,10 @@ _CTX: ContextVar = ContextVar("rlsbl_effects_ctx", default=None)
 # Numbers the synthetic temp paths a preview hands back, so two staging
 # directories in one preview are told apart in the would-do log.
 _preview_temp_seq = itertools.count(1)
+
+# The scratch directories the running observation created, or None outside an
+# observation block.  See :func:`observe_scratch_dirs`.
+_OBSERVE_SCRATCH: ContextVar = ContextVar("rlsbl_effects_observe_scratch", default=None)
 
 
 def handler(fn):
@@ -487,6 +494,50 @@ def _preview_temp_path(prefix, suffix, dir):
     return os.path.join(parent, name)
 
 
+@contextmanager
+def observe_scratch_dirs():
+    """Make this block's scratch DIRECTORIES real in every mode.
+
+    The scoped exception to "preview mode records everything".  It exists for
+    observation -- the read-only phase of a reconciler (see
+    :mod:`rlsbl.preview_apply`), which really runs under ``--dry-run`` because
+    its subprocesses are allowlisted observes.  An observation that clones a
+    remote into a temp directory needs that directory to EXIST: a recorded
+    ``mkdir`` hands back a synthetic path, the allowlisted ``git clone`` aimed
+    at it really runs and fails on a missing parent, and the preview reports a
+    failure that is about the preview rather than about the subject.
+
+    The boundary, and nothing wider:
+
+    * Only :func:`mkdtemp` creates -- one brand-new directory the process owns,
+      never a path the caller names.
+    * Only :func:`rmtree` removes, and only a path this block's own
+      :func:`mkdtemp` returned (or something inside one).  Every other
+      filesystem operation keeps its normal mode behavior, so a write the
+      observation aims INTO the scratch directory is still recorded.
+    * Nothing here reaches project state, so the would-do log stays a list of
+      genuinely planned mutations instead of carrying a ``mkdir``/``remove``
+      pair for a directory no apply would ever create.
+    """
+    token = _OBSERVE_SCRATCH.set(set())
+    try:
+        yield
+    finally:
+        _OBSERVE_SCRATCH.reset(token)
+
+
+def observe_scratch_owns(path) -> bool:
+    """True when *path* is scratch the running observation itself created."""
+    tracked = _OBSERVE_SCRATCH.get()
+    if not tracked:
+        return False
+    real = os.path.realpath(_p(path))
+    return any(
+        real == owned or real.startswith(owned.rstrip(os.sep) + os.sep)
+        for owned in tracked
+    )
+
+
 def mkdtemp(*, prefix=None, suffix=None, dir=None):
     """Create a temporary directory and return its path.
 
@@ -497,7 +548,15 @@ def mkdtemp(*, prefix=None, suffix=None, dir=None):
     ``tempfile.mkdtemp`` directly could not do that -- it creates its
     directory in every mode, which is how ``claim-name --dry-run`` used to
     leave a real staging directory behind on every preview.
+
+    Inside :func:`observe_scratch_dirs` the directory is real in every mode
+    and is tracked, so the block's own :func:`rmtree` can remove it.
     """
+    tracked = _OBSERVE_SCRATCH.get()
+    if tracked is not None:
+        path = _direct.mkdtemp(prefix=prefix, suffix=suffix, dir=dir)
+        tracked.add(os.path.realpath(path))
+        return path
     h = _handle()
     if h is None:
         return _direct.mkdtemp(prefix=prefix, suffix=suffix, dir=dir)
@@ -623,7 +682,15 @@ def removedirs(path):
 
 
 def rmtree(path, *, ignore_errors=False):
-    """Recursively delete the directory tree at *path*."""
+    """Recursively delete the directory tree at *path*.
+
+    Real in every mode when *path* is scratch the running observation created
+    (see :func:`observe_scratch_dirs`); recorded like any other deletion
+    otherwise.
+    """
+    if observe_scratch_owns(path):
+        _direct.rmtree(path, ignore_errors=ignore_errors)
+        return
     h = _handle()
     if h is None:
         _direct.rmtree(path, ignore_errors=ignore_errors)

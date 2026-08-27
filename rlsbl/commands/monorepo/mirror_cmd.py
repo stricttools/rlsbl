@@ -206,12 +206,18 @@ def classify_remote(remote, cwd):
 def compute_split_sha(root, project_path):
     """Deterministic branchless subtree split of ``project_path``.
 
-    Runs ``git subtree split --prefix=<path>`` WITHOUT ``-b``: it prints the
+    Runs ``git subtree split --prefix <path>`` WITHOUT ``-b``: it prints the
     resulting commit SHA to stdout, creates no refs, and materializes the whole
     synthetic split lineage as loose objects in the monorepo (so later
     ancestry checks against older split commits resolve locally).
+
+    ``--prefix`` and the path are SEPARATE tokens on purpose: that is the
+    spelling the observe allowlist pins (``git subtree split --prefix``), and
+    the stuck form ``--prefix=<path>`` -- which git accepts identically --
+    would match no prefix, so under ``--dry-run`` this run would be recorded
+    instead of observed and the whole preview would truncate on its result.
     """
-    r = _git(["subtree", "split", f"--prefix={project_path}"], cwd=root)
+    r = _git(["subtree", "split", "--prefix", project_path], cwd=root)
     if r.returncode != 0:
         raise MirrorError(
             f"git subtree split failed: {r.stderr.strip() or r.stdout.strip()}"
