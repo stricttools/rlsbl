@@ -52,6 +52,7 @@ order: 90
 - [rlsbl.commands.monorepo.batch_release_init](../rlsbl-commands-monorepo-batch_release_init/)
 - [rlsbl.commands.monorepo.commands](../rlsbl-commands-monorepo-commands/)
 - [rlsbl.commands.monorepo.extract](../rlsbl-commands-monorepo-extract/)
+- [rlsbl.commands.monorepo.extract_cmd](../rlsbl-commands-monorepo-extract_cmd/)
 - [rlsbl.commands.monorepo.graph](../rlsbl-commands-monorepo-graph/)
 - [rlsbl.commands.monorepo.impact](../rlsbl-commands-monorepo-impact/)
 - [rlsbl.commands.monorepo.mirror_cmd](../rlsbl-commands-monorepo-mirror_cmd/)

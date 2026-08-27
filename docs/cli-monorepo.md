@@ -9,7 +9,7 @@ nav_order: 9
 
 # rlsbl monorepo
 
-Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 19 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, extract-releasable, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.
+Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 18 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.
 
 ## monorepo init
 
@@ -169,16 +169,22 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 ## monorepo extract
 
-Extract a package from the monorepo into a new standalone repository. Clones the monorepo, runs git filter-repo to keep only the package's history, migrates changelog entries, creates .rlsbl/ config in the new repo, and removes the project from workspace.toml.
+Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their anchors, config and hooks -- is transplanted, the anchors and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. Refuses a mirrored releasable, one owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.
 
-**Effect:** mutating
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the departed members' directories with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
 
 ### Arguments
 
 | Name | Type | Presence | Description |
 | --- | --- | --- | --- |
-| `package_name` | str | required | Name of the package as defined in workspace.toml to extract into a standalone repo |
-| `target_path` | str | required | Filesystem path where the new standalone repository will be created |
+| `releasable_name` | str | required | Name of the releasable group in workspace.toml to extract, with every member it owns |
+| `target_path` | str | required | Filesystem path where the new repository will be created (must not exist) |
 
 ## monorepo absorb
 
@@ -200,19 +206,6 @@ Absorb an external repository as a package in the monorepo. Rewrites the source'
 | --- | --- | --- | --- |
 | `source_repo` | str | required | Filesystem path to the external git repository to absorb |
 | `dest_path` | str | required | Destination directory (and workspace path) the source repo's history is rewritten under |
-
-## monorepo extract-releasable
-
-Extract all member packages of a releasable into a new repository. If the releasable has one member, creates a single-project repo. If it has multiple members, creates a new monorepo with workspace.toml. Migrates changelog entries for each member and removes all extracted projects from the source workspace.
-
-**Effect:** mutating
-
-### Arguments
-
-| Name | Type | Presence | Description |
-| --- | --- | --- | --- |
-| `releasable_name` | str | required | Name of the releasable group in workspace.toml to extract |
-| `target_path` | str | required | Filesystem path where the new repository will be created |
 
 ## monorepo cleanup
 

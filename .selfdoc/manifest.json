@@ -868,6 +868,11 @@
         },
         {
           "level": 3,
+          "text": "Flags",
+          "anchor": "flags-6"
+        },
+        {
+          "level": 3,
           "text": "Arguments",
           "anchor": "arguments-3"
         },
@@ -879,22 +884,12 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-6"
+          "anchor": "flags-7"
         },
         {
           "level": 3,
           "text": "Arguments",
           "anchor": "arguments-4"
-        },
-        {
-          "level": 2,
-          "text": "monorepo extract-releasable",
-          "anchor": "monorepo-extract-releasable"
-        },
-        {
-          "level": 3,
-          "text": "Arguments",
-          "anchor": "arguments-5"
         },
         {
           "level": 2,
@@ -909,7 +904,7 @@
         {
           "level": 3,
           "text": "Arguments",
-          "anchor": "arguments-6"
+          "anchor": "arguments-5"
         },
         {
           "level": 2,
@@ -919,7 +914,7 @@
         {
           "level": 3,
           "text": "Arguments",
-          "anchor": "arguments-7"
+          "anchor": "arguments-6"
         }
       ]
     },
@@ -3095,6 +3090,11 @@
         },
         {
           "level": 3,
+          "text": "The release anchor",
+          "anchor": "the-release-anchor"
+        },
+        {
+          "level": 3,
           "text": "The CI gate",
           "anchor": "the-ci-gate"
         },
@@ -4252,6 +4252,11 @@
           "level": 3,
           "text": "`_committed_router_filters`",
           "anchor": "_committed_router_filters"
+        },
+        {
+          "level": 3,
+          "text": "`_router_filter_drift`",
+          "anchor": "_router_filter_drift"
         },
         {
           "level": 3,
@@ -5750,88 +5755,13 @@
         },
         {
           "level": 3,
-          "text": "`_git_tag_list`",
-          "anchor": "_git_tag_list"
-        },
-        {
-          "level": 3,
           "text": "`_commit_resolves`",
           "anchor": "_commit_resolves"
         },
         {
           "level": 3,
-          "text": "`_translate_extract_tags`",
-          "anchor": "_translate_extract_tags"
-        },
-        {
-          "level": 3,
           "text": "`_prune_dangling_entries`",
           "anchor": "_prune_dangling_entries"
-        },
-        {
-          "level": 3,
-          "text": "`_remap_and_prune`",
-          "anchor": "_remap_and_prune"
-        },
-        {
-          "level": 3,
-          "text": "`_commit_extracted_state`",
-          "anchor": "_commit_extracted_state"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_own_tag_glob`",
-          "anchor": "_resolve_own_tag_glob"
-        },
-        {
-          "level": 3,
-          "text": "`_other_member_globs`",
-          "anchor": "_other_member_globs"
-        },
-        {
-          "level": 3,
-          "text": "`_assert_extract_target_config_valid`",
-          "anchor": "_assert_extract_target_config_valid"
-        },
-        {
-          "level": 3,
-          "text": "`_find_project`",
-          "anchor": "_find_project"
-        },
-        {
-          "level": 3,
-          "text": "`_get_default_branch`",
-          "anchor": "_get_default_branch"
-        },
-        {
-          "level": 3,
-          "text": "`_filter_changelog_entries`",
-          "anchor": "_filter_changelog_entries"
-        },
-        {
-          "level": 3,
-          "text": "`_migrate_changelog_to_new_repo`",
-          "anchor": "_migrate_changelog_to_new_repo"
-        },
-        {
-          "level": 3,
-          "text": "`_create_rlsbl_config`",
-          "anchor": "_create_rlsbl_config"
-        },
-        {
-          "level": 3,
-          "text": "`_remove_project_from_workspace`",
-          "anchor": "_remove_project_from_workspace"
-        },
-        {
-          "level": 3,
-          "text": "`validate_extract_preconditions`",
-          "anchor": "validate_extract_preconditions"
-        },
-        {
-          "level": 3,
-          "text": "`cmd_extract`",
-          "anchor": "cmd_extract"
         },
         {
           "level": 3,
@@ -5872,11 +5802,283 @@
           "level": 3,
           "text": "`_commit_absorb_followup`",
           "anchor": "_commit_absorb_followup"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-commands-monorepo-extract_cmd.md",
+      "title": "rlsbl.commands.monorepo.extract_cmd",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.monorepo.extract_cmd",
+          "anchor": "rlsblcommandsmonorepoextract_cmd"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.monorepo.extract_cmd`",
+          "anchor": "rlsblcommandsmonorepoextract_cmd"
         },
         {
           "level": 3,
-          "text": "`cmd_extract_releasable`",
-          "anchor": "cmd_extract_releasable"
+          "text": "`TagPlan`",
+          "anchor": "tagplan"
+        },
+        {
+          "level": 4,
+          "text": "`changes_names`",
+          "anchor": "changes_names"
+        },
+        {
+          "level": 3,
+          "text": "`Departure`",
+          "anchor": "departure"
+        },
+        {
+          "level": 4,
+          "text": "`member_paths`",
+          "anchor": "member_paths"
+        },
+        {
+          "level": 4,
+          "text": "`member_names`",
+          "anchor": "member_names"
+        },
+        {
+          "level": 4,
+          "text": "`is_multi`",
+          "anchor": "is_multi"
+        },
+        {
+          "level": 4,
+          "text": "`dest_state_dir`",
+          "anchor": "dest_state_dir"
+        },
+        {
+          "level": 4,
+          "text": "`dest_member_path`",
+          "anchor": "dest_member_path"
+        },
+        {
+          "level": 3,
+          "text": "`Applied`",
+          "anchor": "applied"
+        },
+        {
+          "level": 3,
+          "text": "`_tree_hash`",
+          "anchor": "_tree_hash"
+        },
+        {
+          "level": 3,
+          "text": "`_git_tag_names`",
+          "anchor": "_git_tag_names"
+        },
+        {
+          "level": 3,
+          "text": "`_origin_url`",
+          "anchor": "_origin_url"
+        },
+        {
+          "level": 3,
+          "text": "`_delete_path`",
+          "anchor": "_delete_path"
+        },
+        {
+          "level": 3,
+          "text": "`_write_config`",
+          "anchor": "_write_config"
+        },
+        {
+          "level": 3,
+          "text": "`_root_state_dir`",
+          "anchor": "_root_state_dir"
+        },
+        {
+          "level": 3,
+          "text": "`_relative`",
+          "anchor": "_relative"
+        },
+        {
+          "level": 3,
+          "text": "`_dirty_paths`",
+          "anchor": "_dirty_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_other_member_globs`",
+          "anchor": "_other_member_globs"
+        },
+        {
+          "level": 3,
+          "text": "`_plan_tags`",
+          "anchor": "_plan_tags"
+        },
+        {
+          "level": 3,
+          "text": "`_inbound_remedy`",
+          "anchor": "_inbound_remedy"
+        },
+        {
+          "level": 3,
+          "text": "`_check_inbound`",
+          "anchor": "_check_inbound"
+        },
+        {
+          "level": 3,
+          "text": "`_outbound_edges`",
+          "anchor": "_outbound_edges"
+        },
+        {
+          "level": 3,
+          "text": "`_check_no_inflight`",
+          "anchor": "_check_no_inflight"
+        },
+        {
+          "level": 3,
+          "text": "`resolve_departure`",
+          "anchor": "resolve_departure"
+        },
+        {
+          "level": 3,
+          "text": "`_next_steps`",
+          "anchor": "_next_steps"
+        },
+        {
+          "level": 3,
+          "text": "`_moves_a_pypi_target`",
+          "anchor": "_moves_a_pypi_target"
+        },
+        {
+          "level": 3,
+          "text": "`_state_entries`",
+          "anchor": "_state_entries"
+        },
+        {
+          "level": 3,
+          "text": "`_archived_versions`",
+          "anchor": "_archived_versions"
+        },
+        {
+          "level": 3,
+          "text": "`observe`",
+          "anchor": "observe"
+        },
+        {
+          "level": 3,
+          "text": "`_departing_registry_names`",
+          "anchor": "_departing_registry_names"
+        },
+        {
+          "level": 3,
+          "text": "`_source_lineage_path`",
+          "anchor": "_source_lineage_path"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_filter`",
+          "anchor": "_apply_filter"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_dependencies`",
+          "anchor": "_apply_dependencies"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_trees`",
+          "anchor": "_apply_trees"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_state`",
+          "anchor": "_apply_state"
+        },
+        {
+          "level": 3,
+          "text": "`_merge_standalone_config`",
+          "anchor": "_merge_standalone_config"
+        },
+        {
+          "level": 3,
+          "text": "`_remap_changelog`",
+          "anchor": "_remap_changelog"
+        },
+        {
+          "level": 3,
+          "text": "`_map_sha`",
+          "anchor": "_map_sha"
+        },
+        {
+          "level": 3,
+          "text": "`_remap_anchors`",
+          "anchor": "_remap_anchors"
+        },
+        {
+          "level": 3,
+          "text": "`_dest_anchor_path`",
+          "anchor": "_dest_anchor_path"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_tags`",
+          "anchor": "_apply_tags"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_destination`",
+          "anchor": "_apply_destination"
+        },
+        {
+          "level": 3,
+          "text": "`_write_destination_workspace`",
+          "anchor": "_write_destination_workspace"
+        },
+        {
+          "level": 3,
+          "text": "`_write_standalone_releasable`",
+          "anchor": "_write_standalone_releasable"
+        },
+        {
+          "level": 3,
+          "text": "`_assert_destination_loads`",
+          "anchor": "_assert_destination_loads"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_lineage`",
+          "anchor": "_apply_lineage"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_source`",
+          "anchor": "_apply_source"
+        },
+        {
+          "level": 3,
+          "text": "`_floor_config_paths`",
+          "anchor": "_floor_config_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_declare_dep_floors`",
+          "anchor": "_declare_dep_floors"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_next_steps`",
+          "anchor": "_apply_next_steps"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_extract`",
+          "anchor": "cmd_extract"
+        },
+        {
+          "level": 3,
+          "text": "`_cmd_extract`",
+          "anchor": "_cmd_extract"
         }
       ]
     },
@@ -6678,6 +6880,11 @@
         },
         {
           "level": 3,
+          "text": "`release_anchor_tree_hashes`",
+          "anchor": "release_anchor_tree_hashes"
+        },
+        {
+          "level": 3,
           "text": "`collect_companion_tags`",
           "anchor": "collect_companion_tags"
         },
@@ -7184,6 +7391,11 @@
           "level": 3,
           "text": "`validate_release_targets`",
           "anchor": "validate_release_targets"
+        },
+        {
+          "level": 3,
+          "text": "`validate_no_authored_anchors`",
+          "anchor": "validate_no_authored_anchors"
         },
         {
           "level": 3,
@@ -10386,6 +10598,11 @@
         },
         {
           "level": 3,
+          "text": "`LockHeldError`",
+          "anchor": "lockhelderror"
+        },
+        {
+          "level": 3,
           "text": "`acquire_lock`",
           "anchor": "acquire_lock"
         },
@@ -11972,6 +12189,11 @@
         },
         {
           "level": 3,
+          "text": "`_errors_name`",
+          "anchor": "_errors_name"
+        },
+        {
+          "level": 3,
           "text": "`read_release_file`",
           "anchor": "read_release_file"
         },
@@ -11979,6 +12201,36 @@
           "level": 3,
           "text": "`write_archived_release_file`",
           "anchor": "write_archived_release_file"
+        },
+        {
+          "level": 3,
+          "text": "`_check_anchor`",
+          "anchor": "_check_anchor"
+        },
+        {
+          "level": 3,
+          "text": "`_anchor_tree_table`",
+          "anchor": "_anchor_tree_table"
+        },
+        {
+          "level": 3,
+          "text": "`write_release_anchor`",
+          "anchor": "write_release_anchor"
+        },
+        {
+          "level": 3,
+          "text": "`writable_release_file`",
+          "anchor": "writable_release_file"
+        },
+        {
+          "level": 3,
+          "text": "`write_unanchorable_marker`",
+          "anchor": "write_unanchorable_marker"
+        },
+        {
+          "level": 3,
+          "text": "`strip_release_anchor`",
+          "anchor": "strip_release_anchor"
         },
         {
           "level": 3,
@@ -11999,6 +12251,11 @@
           "level": 3,
           "text": "`read_batch_release_file`",
           "anchor": "read_batch_release_file"
+        },
+        {
+          "level": 3,
+          "text": "`_bind_batch_release_config`",
+          "anchor": "_bind_batch_release_config"
         },
         {
           "level": 3,
@@ -12108,6 +12365,11 @@
           "level": 3,
           "text": "`RouterFilters`",
           "anchor": "routerfilters"
+        },
+        {
+          "level": 4,
+          "text": "`_relative`",
+          "anchor": "_relative"
         },
         {
           "level": 4,
@@ -15086,6 +15348,16 @@
         },
         {
           "level": 3,
+          "text": "`working_tree_status`",
+          "anchor": "working_tree_status"
+        },
+        {
+          "level": 3,
+          "text": "`working_tree_paths`",
+          "anchor": "working_tree_paths"
+        },
+        {
+          "level": 3,
           "text": "`get_last_version_tag`",
           "anchor": "get_last_version_tag"
         },
@@ -15432,6 +15704,11 @@
           "level": 3,
           "text": "`CycleError`",
           "anchor": "cycleerror"
+        },
+        {
+          "level": 3,
+          "text": "`ManifestScanError`",
+          "anchor": "manifestscanerror"
         },
         {
           "level": 3,
@@ -16016,11 +16293,6 @@
           "level": 3,
           "text": "`cmd_mono_absorb`",
           "anchor": "cmd_mono_absorb"
-        },
-        {
-          "level": 3,
-          "text": "`cmd_mono_extract_releasable`",
-          "anchor": "cmd_mono_extract_releasable"
         },
         {
           "level": 3,
@@ -17198,6 +17470,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-27T20:49:49.056659+00:00",
+  "last_gen": "2026-08-27T22:54:53.806386+00:00",
   "theme": "minimal"
 }
