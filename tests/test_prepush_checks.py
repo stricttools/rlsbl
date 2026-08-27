@@ -517,10 +517,15 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
 
         projects = load_workspace(str(repo))
 
+        # A config key the runner itself reads, and that leaves the check
+        # timeout at its default -- so the assertions below pin the forwarded
+        # config AND the default timeout at once.
+        config = {"uv_sync_verbose": True}
+
         ctx = WorkspaceCheckContext(
             project_root=Path(str(repo)),
             workspace_root=Path(str(repo)),
-            config={},
+            config=config,
             projects=projects,
             graph=None,
         )
@@ -538,9 +543,13 @@ class TestWorkspaceTestSuiteRunsAffectedProjects:
         mock_sync.assert_called_once_with(
             str(repo), check_timeout=DEFAULT_CHECK_TIMEOUT, overlays=[]
         )
-        # Per-project test runs with skip_sync=True
+        # Per-project test runs with skip_sync=True, and with the context's
+        # config: the project-level test-suite check passes it, and dropping
+        # it here silently used a different timeout and different pytest
+        # settings for workspace runs only.
         mock_tests.assert_called_once_with(
             "pypi", project_dir=str(pkg), workspace_root=str(repo), skip_sync=True,
+            config=config,
         )
 
     def test_member_overlay_is_excluded_from_the_workspace_sync(

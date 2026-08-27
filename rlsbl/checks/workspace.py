@@ -824,6 +824,10 @@ def register_workspace_checks(app):
                 project_dir=project_dir,
                 workspace_root=str(ctx.workspace_root),
                 skip_sync=True,
+                # Same config the project-level `test-suite` check passes:
+                # without it the configured check timeout and the pypi marker
+                # settings are dropped for workspace runs only.
+                config=ctx.config,
             )
             if outcome.status is SuiteRunStatus.SKIPPED:
                 skipped_projects.append(proj["name"])
