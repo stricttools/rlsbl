@@ -551,12 +551,17 @@ def declared_members(projects):
 def with_root_member(projects, *, releasable=False):
     """Return *projects* as a member list a loaded workspace will accept.
 
+    **Placement: the root member goes LAST.** It is appended after the
+    caller's own members, so ``projects[0]`` is still the first member the
+    test declared and every positional assertion about them keeps holding.
+    ``make_workspace`` does the opposite -- it PREPENDS its root member, so
+    there ``projects[0]`` is the root. Both conventions are relied on by
+    dozens of test files each; neither may be changed to match the other.
+
     For tests that call ``save_workspace`` directly, which the loader now holds
     to the full model:
 
-    - the default root member is appended when none is declared (appending,
-      rather than prepending, keeps every positional assertion about the
-      caller's own members valid);
+    - the default root member is appended when none is declared;
     - a member with no ``releasable`` key gets *releasable* (``False`` by
       default -- a bare ``save_workspace`` writes no releasables, so standing
       outside every releasable is the only consistent answer).
@@ -601,14 +606,22 @@ def workspace_toml(body="", *, releasables=(), root_member=ROOT_MEMBER_TOML):
     about either. This supplies both around whatever the test actually wants to
     say.
 
+    **Placement: the root member block goes LAST**, after *body*, so the
+    test's own ``[[projects]]`` blocks keep their positions and
+    ``load_workspace(...)[0]`` is still the first member the body declared.
+    ``make_workspace`` does the opposite -- it PREPENDS its root member, so
+    there ``projects[0]`` is the root. Both conventions are relied on by
+    dozens of test files each; neither may be changed to match the other.
+
     Args:
         body: the test's own TOML (typically ``[[projects]]`` blocks).
         releasables: the releasables to declare. Each item is a name string or
             a ``{"name": ..., "tag_format": ...}`` dict. Empty (the default)
             writes ``releasables = []`` -- an explicit-mode workspace with no
             releasables yet.
-        root_member: the root-member block to prepend, or ``""`` for none
-            (which is what a test asserting the no-root-member error wants).
+        root_member: the root-member block to append after *body*, or ``""``
+            for none (which is what a test asserting the no-root-member error
+            wants).
 
     A *body* that already declares its own releasables section or its own root
     member keeps it: neither is added twice, so this can be applied to every
@@ -672,8 +685,13 @@ def make_workspace(root, projects, releasables=None):
     test is about them:
 
     - **the root member.** When no member declares ``path = "."``, the
-      :data:`DEFAULT_ROOT_MEMBER` dev node is prepended. Declare your own root
-      member to override it.
+      :data:`DEFAULT_ROOT_MEMBER` dev node is PREPENDED -- it comes first, so
+      ``load_workspace(...)[0]`` is the root member and the caller's own
+      members start at index 1. (``with_root_member`` and ``workspace_toml``
+      do the opposite and APPEND theirs, leaving the caller's members at
+      their declared positions. Both conventions are relied on by dozens of
+      test files each; neither may be changed to match the other.) Declare
+      your own root member to override it.
     - **explicit mode.** When ``releasables`` is omitted, one releasable per
       releasable-eligible member is derived, named after the member, and the
       member gets the matching ``releasable`` key. Pass ``releasables``
