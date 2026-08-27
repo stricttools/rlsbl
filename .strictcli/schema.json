@@ -1794,11 +1794,45 @@
       "commands": {
         "init": {
           "name": "init",
-          "help": "Create a new monorepo workspace by generating the .rlsbl-monorepo directory and an empty workspace.toml configuration file at the current directory. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
+          "help": "Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, in explicit mode, carrying the mandatory root member whose kind you declare. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
           "effect": "mutating",
           "dry_run_supported": false,
           "dry_run_unsupported_reason": "it bootstraps the workspace every other command reads, and there is no workspace to preview against until it exists",
           "flags": [
+            {
+              "name": "root-member",
+              "help": "What kind of member owns the repository root. Every workspace has exactly one root member, and it owns every tracked file no other member claims; whether those files need changelog coverage is a per-repository decision with no default.",
+              "presence": "required",
+              "choices": [
+                {
+                  "name": "root-dev-node",
+                  "help": "The root member is a dev node: files at the repository root that no other member claims need no changelog coverage."
+                },
+                {
+                  "name": "root-releasable",
+                  "help": "The root member belongs to a named releasable: files at the repository root that no other member claims get changelog coverage under it.",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "name of the releasable the root member belongs to; it is created in [[releasables]]",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    },
+                    {
+                      "name": "tag-format",
+                      "help": "tag format for that releasable, e.g. \"v{version}\" for bare version tags or \"{name}@v{version}\" for the workspace scheme; a root releasable never inherits a default",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                }
+              ],
+              "elect_by": "member-flags"
+            },
             {
               "name": "auto-commit",
               "help": "Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed)",
@@ -2585,7 +2619,7 @@
           "flags": [
             {
               "name": "from-module",
-              "help": "The Go module path being renamed away from (must be declared by a go.mod in this repository)",
+              "help": "The Go module path being renamed away from. It need not be DECLARED here: a repository that only references the module is a consumer following an upstream move, and the plan reports that as a fact while rewriting the references. What is required is that something references it -- a path with zero occurrences anywhere in the repository is a hard error, because the overwhelmingly likely cause is a typo.",
               "value_schema": {
                 "type": "string"
               },
