@@ -589,6 +589,8 @@ root member's only territory).
   fixture helpers — this is the second enumerated sweep (make_workspace
   call sites plus literal workspace-file writers across the test tree;
   assert counts).
+- Fix on touch: remove the inert conftest fixture that sets a push
+  timeout environment variable rlsbl no longer reads.
 - Verify: full suite green on a quiescent tree; the two old vacuous
   tests demonstrably replaced (an uncovered root-owned commit fails).
 
@@ -657,6 +659,9 @@ Effort: extra large.
 - The destroyed-tag guard reads the ledger (a regression test encodes
   the dry-run false-positive scenario from the existing todo — the
   scenario restated in the test, not referenced).
+- Fix on touch: the monorepo-status tag-listing helper that omits its
+  working-directory argument (a latent wrong-repo lookup) gains it
+  during this switch.
 - Verify: per-consumer fixtures where ledger and tags agree (pass) and
   disagree (error naming both); an indeterminable fixture (truncated
   history) errors with the remedy; the dry-run guard test passes.
@@ -921,6 +926,10 @@ Effort: medium.
   implicit-mode conversions, which the script performs itself via the
   consolidation functions it inherited from the deleted module; re-run
   each repo's checks green.
+- Also post-release: rewrite the rlsbl sections of the user-level
+  CLAUDE files (the home rules file's rlsbl reference and its
+  corrections section) against the shipped surface — the campaign
+  retires commands, keys, and modes those files describe at length.
 - Verify: fleet-wide `rlsbl check` green in every workspace; no repo
   ever observed the upgrade errors.
 
