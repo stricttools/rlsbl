@@ -418,6 +418,63 @@ class TestFlowAuthorsTheAnchor:
         assert cfg.description == "A synthesized release."
 
 
+class TestMultiMemberAnchorHelper:
+    """A multi-member releasable anchors one tree per member path.
+
+    No single git object covers a SET of subtrees, so the archive carries a
+    per-member table. Each value must be git's own answer for that path at the
+    verified commit -- anything synthesized over the members would be an rlsbl
+    invention no git command can reproduce or check.
+    """
+
+    def _two_member_repo(self, repo):
+        repo.mkdir(parents=True, exist_ok=True)
+        _git(repo, "init", "-q", "-b", "main")
+        _git(repo, "config", "user.email", "test@test.local")
+        _git(repo, "config", "user.name", "Test")
+        for name, body in (("core", "core code\n"), ("cli", "cli code\n")):
+            d = repo / "packages" / name
+            d.mkdir(parents=True)
+            (d / "main.py").write_text(body)
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "initial")
+        return _git(repo, "rev-parse", "HEAD")
+
+    def _trees(self, repo, sha, paths):
+        from rlsbl.commands.release.execute import release_anchor_tree_hashes
+        from rlsbl.utils import run
+
+        return release_anchor_tree_hashes(
+            sha, run=run, git_root=str(repo), member_package_paths=paths,
+        )
+
+    def test_one_entry_per_member_equal_to_git_rev_parse(self, tmp_path):
+        repo = tmp_path / "repo"
+        sha = self._two_member_repo(repo)
+        paths = ["packages/core", "packages/cli"]
+
+        trees = self._trees(repo, sha, paths)
+
+        assert trees == {
+            p: _git(repo, "rev-parse", f"{sha}:{p}") for p in paths
+        }
+        assert len(trees) == 2
+        # Distinct member content means distinct trees: a single shared value
+        # (e.g. the root tree used for every key) would pass a laxer assertion.
+        assert trees["packages/core"] != trees["packages/cli"]
+        # And neither is the root tree.
+        root_tree = _git(repo, "rev-parse", f"{sha}^{{tree}}")
+        assert root_tree not in trees.values()
+
+    def test_a_member_path_that_does_not_exist_is_a_hard_error(self, tmp_path):
+        from rlsbl.errors import RlsblError
+
+        repo = tmp_path / "repo"
+        sha = self._two_member_repo(repo)
+        with pytest.raises(RlsblError, match="packages/missing"):
+            self._trees(repo, sha, ["packages/core", "packages/missing"])
+
+
 class TestFlowRefusesAnAuthoredAnchor:
 
     def test_anchored_editable_file_aborts_the_release(self, tmp_project, capsys):
@@ -435,6 +492,146 @@ class TestFlowRefusesAnAuthoredAnchor:
         assert "candidate_sha" in err
         # Refused before any mutation: no version bump commit was made.
         assert _git(tmp_project, "rev-parse", "HEAD") == head_before
+
+
+def _setup_two_member_releasable_workspace(root):
+    """One releasable ('alpha') with TWO member packages, npm targets.
+
+    The shape a per-member anchor table exists for: the release ships
+    ``packages/core`` and ``packages/cli`` together under one version.
+    """
+    from rlsbl.workspace import (
+        Releasable,
+        get_releasable_changes_dir,
+        get_releasable_dir,
+        save_workspace,
+        write_releasable_version,
+    )
+    from conftest import with_root_member
+    from test_batch_main_as_candidate import _write_batch_file
+
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "user.email", "test@test.local")
+    _git(root, "config", "user.name", "Test")
+
+    for name in ("core", "cli"):
+        d = root / "packages" / name
+        d.mkdir(parents=True)
+        (d / "package.json").write_text(
+            json.dumps({"name": name, "version": "1.0.0"}, indent=2) + "\n"
+        )
+        (d / "main.js").write_text(f"// {name}\n")
+
+    save_workspace(
+        str(root),
+        with_root_member([
+            {"path": "packages/core", "name": "core", "releasable": "alpha"},
+            {"path": "packages/cli", "name": "cli", "releasable": "alpha"},
+        ]),
+        releasables=[Releasable(name="alpha")],
+    )
+    write_releasable_version(str(root), "alpha", "1.0.0")
+    changes_dir = get_releasable_changes_dir(str(root), "alpha")
+    os.makedirs(changes_dir, exist_ok=True)
+    with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+        f.write("")
+    with open(
+        os.path.join(get_releasable_dir(str(root), "alpha"), "config.json"), "w",
+    ) as f:
+        json.dump({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}, f)
+
+    _write_batch_file(root, (
+        "[releasables.alpha]\n"
+        'bump = "patch"\ndescription = "Alpha patch"\n'
+        'include = ["npm"]\nexclude = []\n'
+    ))
+
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "initial")
+    _git(root, "tag", "alpha@v1.0.0")
+
+    # One feature commit touching BOTH members, so each member's subtree really
+    # moves and the two anchors cannot coincidentally match the old ones.
+    for name in ("core", "cli"):
+        (root / "packages" / name / "feature.txt").write_text(f"{name} feature\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "alpha: add feature to both members")
+    sha = _git(root, "rev-parse", "HEAD")
+    with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+        f.write(json.dumps({
+            "commits": [sha],
+            "user_facing": True,
+            "description": "**Alpha feature.** It works.",
+            "type": "feature",
+        }) + "\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "changelog: alpha feature")
+
+
+class TestBatchAnchorsAMultiMemberReleasable:
+    """The batch release path anchors a releasable's synthesized archive.
+
+    A releasable batch has no per-member editable release file: the archive is
+    synthesized from the workspace-level batch TOML, and it must be anchored
+    from the instant it exists -- with one tree entry per member path, since
+    the release ships all of them under one version.
+    """
+
+    def _archive(self, root, version="1.0.1"):
+        from rlsbl.release_file import get_releases_dir
+        from rlsbl.workspace import get_releasable_dir
+
+        return os.path.join(
+            get_releases_dir(
+                releasable_dir=get_releasable_dir(str(root), "alpha"),
+            ),
+            f"v{version}.toml",
+        )
+
+    def test_the_synthesized_archive_carries_one_anchor_per_member(
+        self, tmp_project,
+    ):
+        from test_batch_main_as_candidate import _run_batch
+
+        _setup_two_member_releasable_workspace(tmp_project)
+        _run_batch(tmp_project, ci_return=("green", []))
+
+        archive = self._archive(tmp_project)
+        assert os.path.isfile(archive), "the releasable's archive is missing"
+        cfg = read_release_file(archive)
+
+        verified = _git(tmp_project, "rev-list", "-n", "1", "alpha@v1.0.1")
+        assert cfg.candidate_sha == verified, (
+            "the anchor must name the commit the tag was created on"
+        )
+
+        # One entry per member path, each git's own answer -- not the root
+        # tree, and not one value repeated across the members.
+        expected = {
+            path: _git(tmp_project, "rev-parse", f"{verified}:{path}")
+            for path in ("packages/core", "packages/cli")
+        }
+        assert cfg.tree_hashes == expected
+        assert len(set(cfg.tree_hashes.values())) == 2
+        root_tree = _git(tmp_project, "rev-parse", f"{verified}^{{tree}}")
+        assert root_tree not in cfg.tree_hashes.values()
+
+        # The operator's batch metadata survived the anchoring.
+        assert cfg.description == "Alpha patch"
+        assert cfg.bump == "patch"
+
+    def test_the_anchored_archive_is_locked_and_committed(self, tmp_project):
+        from test_batch_main_as_candidate import _run_batch
+
+        _setup_two_member_releasable_workspace(tmp_project)
+        _run_batch(tmp_project, ci_return=("green", []))
+
+        archive = self._archive(tmp_project)
+        assert (os.stat(archive).st_mode & 0o222) == 0, (
+            "the anchored archive must be read-only"
+        )
+        status = _git(tmp_project, "status", "--porcelain")
+        assert "v1.0.1.toml" not in status, status
 
 
 class TestUndoAndReRelease:
