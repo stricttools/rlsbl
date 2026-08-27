@@ -22,6 +22,7 @@ import os
 import time
 from typing import Protocol, runtime_checkable
 from . import effects
+from .errors import RlsblError
 
 
 class Verdict(enum.Enum):
@@ -242,6 +243,11 @@ def write_undo_audit(audit_dir, version, tag, gate_result, operator_context=None
 
     Returns:
         path to the written audit file.
+
+    Raises:
+        RlsblError: an existing ``undo-audit.json`` that cannot be parsed. The
+            append is a whole-file rewrite, so continuing would replace the
+            records already in it.
     """
     effects.makedirs(audit_dir, exist_ok=True)
     audit_path = os.path.join(audit_dir, "undo-audit.json")
@@ -257,16 +263,30 @@ def write_undo_audit(audit_dir, version, tag, gate_result, operator_context=None
     if operator_context:
         record["operator_context"] = operator_context
 
-    # Append to existing audit file if present
+    # Append to the existing audit file if present. The whole file is
+    # read-modify-written, so an existing file that cannot be parsed must NOT
+    # be treated as an empty list: that silently overwrote every record the
+    # file held with the single new one -- data loss in the one file whose
+    # purpose is to survive a destructive operation. A malformed file is a hard
+    # error naming it, and the file is left exactly as found for recovery.
     existing = []
     if os.path.isfile(audit_path):
+        with open(audit_path, "r", encoding="utf-8") as f:
+            raw = f.read()
         try:
-            with open(audit_path, "r", encoding="utf-8") as f:
-                existing = json.load(f)
-            if not isinstance(existing, list):
-                existing = [existing]
-        except (json.JSONDecodeError, ValueError):
-            existing = []
+            existing = json.loads(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise RlsblError(
+                f"the undo audit file {audit_path} is not readable JSON "
+                f"({exc}), so appending to it would overwrite whatever record "
+                f"it holds. It is left untouched: repair or move it aside "
+                f"(its contents are the record of past undo operations), then "
+                f"re-run."
+            )
+        # A valid single record (an older single-object file) is readable, so
+        # it is wrapped and appended to rather than refused.
+        if not isinstance(existing, list):
+            existing = [existing]
 
     existing.append(record)
 

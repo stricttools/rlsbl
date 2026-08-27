@@ -7,6 +7,7 @@ import tempfile
 import pytest
 from unittest.mock import MagicMock
 
+from rlsbl.errors import RlsblError
 from rlsbl.evidence_gate import (
     Evidence,
     EvidenceKind,
@@ -234,17 +235,51 @@ class TestWriteUndoAudit:
             data = json.load(f)
         assert len(data) == 2
 
-    def test_handles_corrupt_existing_file(self, tmp_path):
+    def test_corrupt_existing_file_is_a_hard_error(self, tmp_path):
+        """A malformed audit file is never silently discarded.
+
+        The audit trail is the record of what an undo destroyed, and this
+        function read-modify-writes the WHOLE file. Treating an unparseable
+        existing file as an empty list overwrote every past record with the
+        new one -- silent data loss, in the one file whose purpose is to not
+        lose anything. It is now a hard error naming the file.
+        """
         audit_path = os.path.join(str(tmp_path), "undo-audit.json")
         with open(audit_path, "w") as f:
             f.write("not json")
+
+        gate = GateResult(Verdict.CLEARED, [], "test")
+        with pytest.raises(RlsblError, match="undo-audit.json"):
+            write_undo_audit(str(tmp_path), "1.0.0", "v1.0.0", gate)
+
+        # The unreadable file is left exactly as found -- nothing overwritten.
+        with open(audit_path) as f:
+            assert f.read() == "not json"
+
+    def test_truncated_existing_file_is_a_hard_error(self, tmp_path):
+        # A half-written array (an interrupted previous write) is the realistic
+        # shape of the corruption, and it must not cost the records it holds.
+        audit_path = os.path.join(str(tmp_path), "undo-audit.json")
+        with open(audit_path, "w") as f:
+            f.write('[{"version": "0.9.0", "tag": "v0.9.0"}')
+
+        gate = GateResult(Verdict.CLEARED, [], "test")
+        with pytest.raises(RlsblError):
+            write_undo_audit(str(tmp_path), "1.0.0", "v1.0.0", gate)
+
+    def test_non_list_existing_record_is_wrapped_not_refused(self, tmp_path):
+        # Valid JSON that is a single record (an older single-object file) is
+        # readable, so it is wrapped and appended to -- not an error.
+        audit_path = os.path.join(str(tmp_path), "undo-audit.json")
+        with open(audit_path, "w") as f:
+            json.dump({"version": "0.9.0", "tag": "v0.9.0"}, f)
 
         gate = GateResult(Verdict.CLEARED, [], "test")
         write_undo_audit(str(tmp_path), "1.0.0", "v1.0.0", gate)
 
         with open(audit_path) as f:
             data = json.load(f)
-        assert len(data) == 1
+        assert [r["version"] for r in data] == ["0.9.0", "1.0.0"]
 
     def test_includes_operator_context(self, tmp_path):
         gate = GateResult(Verdict.CLEARED, [], "test")
