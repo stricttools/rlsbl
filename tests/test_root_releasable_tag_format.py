@@ -304,3 +304,49 @@ class TestRenameReleasableKeepsTheFormat:
             "usable format: an undeclared releasable would rename into a tag "
             "format of None"
         )
+
+
+class TestLoaderErrorsReachTheCaller:
+    """A broken workspace must not resolve to "no releasable config".
+
+    ``resolve_releasable_config_dir`` caught every exception and returned
+    ``None``, which reads as "this directory belongs to no releasable" -- a
+    legitimate answer for a standalone repo, and a lie for a workspace whose
+    loader refused the file. The cost was real: a publish router generated
+    with unrendered template variables, and a debugging session spent looking
+    for the missing config instead of reading the loader error that was never
+    raised.
+    """
+
+    def _broken_workspace(self, root):
+        """A root-owning releasable with no tag_format -- refused at load."""
+        ws_dir = Path(root) / WORKSPACE_DIR
+        ws_dir.mkdir(parents=True, exist_ok=True)
+        (ws_dir / WORKSPACE_FILE).write_text(
+            '[[releasables]]\nname = "app"\n\n'
+            '[[projects]]\npath = "."\nname = "root"\nreleasable = "app"\n',
+            encoding="utf-8",
+        )
+        return Path(root)
+
+    def test_a_loader_error_propagates(self, tmp_path):
+        from rlsbl.context import resolve_releasable_config_dir
+        from rlsbl.errors import WorkspaceError
+
+        root = self._broken_workspace(tmp_path)
+        with pytest.raises(WorkspaceError, match="declares no tag_format"):
+            resolve_releasable_config_dir(root, root)
+
+    def test_a_missing_workspace_file_is_still_no_releasable(self, tmp_path):
+        """The genuine None case survives: nothing to resolve, no error."""
+        from rlsbl.context import resolve_releasable_config_dir
+
+        assert resolve_releasable_config_dir(tmp_path, tmp_path) is None
+
+    def test_a_healthy_workspace_still_resolves(self, tmp_path):
+        from rlsbl.context import resolve_releasable_config_dir
+
+        root = _bare_version_root_workspace(tmp_path)
+        resolved = resolve_releasable_config_dir(root, root)
+        assert resolved is not None
+        assert resolved.endswith(os.path.join("releasables", "app"))

@@ -91,7 +91,18 @@ def resolve_releasable_config_dir(root: Path, workspace_root: Path) -> str | Non
         try:
             projects_loaded = load_workspace(ws_root)
             releasables_loaded = load_releasables(ws_root, projects=projects_loaded)
-        except Exception:
+        except OSError:
+            # The ONLY reason to answer None here: the workspace file is not
+            # there to read (a race against a removal, or a directory that
+            # only looked like a workspace root). That is genuinely "this
+            # directory belongs to no releasable".
+            #
+            # A loader or validation error is NOT that, and used to be caught
+            # by a bare `except Exception` that returned None. Callers read
+            # None as "no releasable", so a refused workspace looked like a
+            # standalone one: a generated publish router came out with its
+            # releasable template variables unrendered, and the error
+            # explaining why was never raised. Let it through.
             return None
 
     return _resolve_releasable_config_dir(
