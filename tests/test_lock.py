@@ -152,6 +152,67 @@ def test_cross_process_lock(tmp_path, monkeypatch):
         release_lock()
 
 
+_CHILD_HOLD = """
+import fcntl, os, sys, time
+
+lock_dir = os.path.join(sys.argv[1], ".rlsbl-monorepo")
+os.makedirs(lock_dir, exist_ok=True)
+fd = open(os.path.join(lock_dir, "lock"), "w")
+fcntl.flock(fd, fcntl.LOCK_EX)
+print("held", flush=True)
+time.sleep(float(sys.argv[2]))
+"""
+
+
+class TestRefusingAcquire:
+    """``wait=False`` refuses a held lock instead of queueing behind it.
+
+    A conversion is long and destructive, and the lock it takes is the one a
+    release takes; blocking on it can mean waiting out a CI gate. The refusal
+    names the lock file so the operator can tell which state home is busy.
+    """
+
+    def _child_holding(self, tmp_path, seconds):
+        child = subprocess.Popen(
+            [sys.executable, "-c", _CHILD_HOLD, str(tmp_path), str(seconds)],
+            stdout=subprocess.PIPE, text=True,
+        )
+        assert child.stdout.readline().strip() == "held"
+        return child
+
+    def test_refuses_when_another_process_holds_it(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        child = self._child_holding(tmp_path, 30)
+        try:
+            with pytest.raises(rlsbl.lock.LockHeldError) as exc:
+                acquire_lock(".rlsbl-monorepo", project_root=tmp_path, wait=False)
+            assert os.path.join(".rlsbl-monorepo", "lock") in str(exc.value)
+            # Refused, not half-acquired: no descriptor was retained.
+            assert rlsbl.lock._lock_fd is None
+        finally:
+            child.kill()
+            child.wait(timeout=30)
+
+    def test_acquires_when_free(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        acquire_lock(".rlsbl-monorepo", project_root=tmp_path, wait=False)
+        try:
+            assert (tmp_path / ".rlsbl-monorepo" / "lock").exists()
+        finally:
+            release_lock()
+
+    def test_context_manager_refuses(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        child = self._child_holding(tmp_path, 30)
+        try:
+            with pytest.raises(rlsbl.lock.LockHeldError):
+                with rlsbl_lock(".rlsbl-monorepo", project_root=tmp_path, wait=False):
+                    pass
+        finally:
+            child.kill()
+            child.wait(timeout=30)
+
+
 def test_is_stale_no_file(tmp_path, monkeypatch):
     """is_stale returns False when no lock file exists."""
     monkeypatch.chdir(tmp_path)

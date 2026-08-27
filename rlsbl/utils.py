@@ -157,10 +157,48 @@ def is_virtual_uv_root(project_dir: str) -> bool:
     return has_workspace and "project" not in data
 
 
-def is_clean_tree():
-    """Returns True if the git working tree is clean (no uncommitted changes)."""
-    status = run("git", ["--no-optional-locks", "status", "--porcelain"])
-    return len(status) == 0
+def is_clean_tree(cwd=None):
+    """Returns True if the git working tree is clean (no uncommitted changes).
+
+    ``cwd`` selects the repository the probe runs in; None means the process
+    cwd. Every clean-tree question in rlsbl goes through here, so the
+    ``--no-optional-locks`` form is spelled once: without it ``git status``
+    refreshes the index and takes ``index.lock``, which in a worktree shared by
+    several sessions can make a concurrent commit fail, and it is also what
+    puts the probe on the observe allowlist so a preview really runs it.
+    """
+    return len(working_tree_status(cwd=cwd)) == 0
+
+
+def working_tree_status(cwd=None):
+    """The porcelain status lines of the working tree at ``cwd``.
+
+    The raw lines, NOT stripped: each is ``XY <path>`` and the leading status
+    columns carry meaning (a global strip eats the first line's leading space
+    and corrupts its path). :func:`working_tree_paths` is the parsed form.
+    """
+    status = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=cwd)
+    return [line for line in status.splitlines() if line.strip()]
+
+
+def working_tree_paths(cwd=None):
+    """Every path the working tree at ``cwd`` reports a change for.
+
+    Parses the porcelain lines :func:`working_tree_status` returns into the
+    path list a commit can name: the ``XY `` status columns are dropped, a
+    rename's ``old -> new`` yields the new path, and quoting is removed.
+    """
+    paths = []
+    for line in working_tree_status(cwd=cwd):
+        if len(line) < 4:
+            continue
+        rest = line[3:]
+        if " -> " in rest:
+            rest = rest.split(" -> ", 1)[1]
+        rest = rest.strip().strip('"')
+        if rest:
+            paths.append(rest)
+    return paths
 
 
 def get_last_version_tag(tag_glob: str = "v*", *, cwd=None) -> str | None:
