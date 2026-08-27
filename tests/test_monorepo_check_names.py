@@ -256,3 +256,71 @@ class TestDelay:
 
         assert mock_sleep.call_count == 1
         mock_sleep.assert_called_once_with(0.2)
+
+
+class TestDevNodesAreNotChecked:
+    """A dev node publishes nothing, so it has no registry name to ask about.
+
+    Every workspace has at least one -- its root member, when that member is a
+    dev node -- and asking a registry about it is pointless contact with an
+    external service.
+    """
+
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_dev_node_member_is_skipped(self, mock_check, mock_sleep,
+                                        mock_git_repo, capsys):
+        _setup_workspace(mock_git_repo, ["core"])
+        _make_npm_project(mock_git_repo, "toolbox")
+        _cmd_add(["toolbox"], {"releasable": "false", "dev_only": "true"},
+                 project_root=".")
+        capsys.readouterr()
+
+        mock_check.side_effect = [
+            {"name": "core", "registry": "npm", "status": "available",
+             "variants": []},
+        ]
+
+        _cmd_check_names([], {"target": "npm"}, project_root=".")
+
+        out = capsys.readouterr().out
+        # The dev node is absent from the table and from the totals, and the
+        # registry was never asked about it.
+        assert "toolbox" not in out
+        assert "core" in out
+        assert "(1 total)" in out
+        assert mock_check.call_count == 1
+        assert mock_check.call_args[0][0] == "core"
+
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_an_all_dev_node_workspace_says_so(self, mock_check, mock_sleep,
+                                               mock_git_repo, capsys):
+        """The root member alone is a dev node: nothing to check, said out loud."""
+        _cmd_init({"root-dev-node": True}, project_root=".")
+        capsys.readouterr()
+
+        _cmd_check_names([], {"target": "npm"}, project_root=".")
+
+        out = capsys.readouterr().out
+        assert "No publishable projects in workspace." in out
+        assert mock_check.call_count == 0
+
+    @patch("rlsbl.commands.monorepo.commands.time.sleep")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_the_dev_node_root_member_never_reaches_the_registry(
+        self, mock_check, mock_sleep, mock_git_repo, capsys,
+    ):
+        _setup_workspace(mock_git_repo, ["core"])
+        capsys.readouterr()
+
+        mock_check.side_effect = [
+            {"name": "core", "registry": "npm", "status": "available",
+             "variants": []},
+        ]
+
+        _cmd_check_names([], {"target": "npm"}, project_root=".")
+
+        checked = [c[0][0] for c in mock_check.call_args_list]
+        assert checked == ["core"]
+        assert "root" not in capsys.readouterr().out

@@ -410,6 +410,68 @@ def test_monorepo_empty_filter_errors(
 
 
 # ---------------------------------------------------------------------------
+# Dev nodes: skipped by a broad selection, installable when named
+# ---------------------------------------------------------------------------
+
+
+def _make_monorepo_with_dev_node(root):
+    """A workspace with one publishable member and one dev-node member.
+
+    Both carry a real manifest, so the only reason the dev node is not
+    installed is that it is a dev node.
+    """
+    ws_dir = root / ".rlsbl-monorepo"
+    ws_dir.mkdir()
+    (ws_dir / "workspace.toml").write_text(
+        workspace_toml(
+            '[[projects]]\npath = "py"\nname = "pyproj"\n\n'
+            '[[projects]]\npath = "tooling"\nname = "toolproj"\n'
+            'dev_only = true\nreleasable = false\n'
+        )
+    )
+    _make_pypi(str(root / "py"), name="pyproj")
+    _make_npm(str(root / "tooling"), name="toolproj")
+
+
+def test_monorepo_all_skips_dev_nodes(
+    tmp_project, fake_run, all_tools_present, capsys
+):
+    """--all installs what the workspace ships, and a dev node ships nothing."""
+    _make_monorepo_with_dev_node(tmp_project)
+    rc = run_install({"target": "global", "all": True}, project_root=".")
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "=== pyproj ===" in captured.out
+    assert "=== toolproj ===" not in captured.out
+    assert [c["cmd"][0] for c in fake_run.calls] == ["uv"]
+
+
+def test_monorepo_include_installs_a_named_dev_node(
+    tmp_project, fake_run, all_tools_present, capsys
+):
+    """Naming a dev node explicitly is a decision, and it is honoured."""
+    _make_monorepo_with_dev_node(tmp_project)
+    rc = run_install({"target": "global", "include": "toolproj"}, project_root=".")
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "=== toolproj ===" in captured.out
+    assert "=== pyproj ===" not in captured.out
+    assert [c["cmd"][0] for c in fake_run.calls] == ["npm"]
+
+
+def test_monorepo_exclude_still_skips_dev_nodes(
+    tmp_project, fake_run, all_tools_present, capsys
+):
+    """--exclude selects broadly, like --all: the dev node stays skipped."""
+    _make_monorepo_with_dev_node(tmp_project)
+    rc = run_install({"target": "global", "exclude": "nobody"}, project_root=".")
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "=== pyproj ===" in captured.out
+    assert "=== toolproj ===" not in captured.out
+
+
+# ---------------------------------------------------------------------------
 # Monorepo --uninstall propagation
 # ---------------------------------------------------------------------------
 
