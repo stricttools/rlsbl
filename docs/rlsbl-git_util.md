@@ -1,7 +1,8 @@
 ---
 title: rlsbl.git_util
-description: "Shared git path-filtering utilities: get_commit_files, file_matches_project with path prefix and watch globs, and filter_commits_for_project."
+description: "Shared git utilities: commit ancestry, and commit-level file attribution."
 generated: true
+seeded: true
 nav_group: "API Reference"
 nav_order: 85
 ---

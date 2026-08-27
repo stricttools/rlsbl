@@ -622,7 +622,8 @@
   },
   "en/rlsbl-git_util.md": {
     "content": "9d6ad9cce7becc427abf5a6648e9cf5e37eae42ff5faba420cb843c923fe4ef9",
-    "description": "6963c8785942ac820a4cb9d1934cfc55464b3ab93a6778605c6b6ceedbc67c0d",
+    "description": "1295492a1a10084d1438c13dd467017ca6759a1ba281872706cbdf8d5d09b4ed",
+    "seed_hash": "1295492a1a10084d1438c13dd467017ca6759a1ba281872706cbdf8d5d09b4ed",
     "source_docstring": "634b031a473d9ab6c4a5cd7a2d821a85ffc8312f8801fa06a3f98ae446a4897d"
   },
   "en/rlsbl-go_introspect.md": {
