@@ -32,7 +32,7 @@ from .extract import (
     validate_absorb_preconditions,
 )
 
-from .extract_cmd import cmd_extract, resolve_departure
+from .extract_cmd import cmd_extract, _cmd_extract
 
 from .sync import (
     _cmd_sync,
@@ -70,7 +70,7 @@ __all__ = [
     # extract/absorb
     "require_filter_repo",
     "cmd_extract",
-    "resolve_departure",
+    "_cmd_extract",
     "cmd_absorb",
     "ExtractError",
     "validate_absorb_preconditions",
