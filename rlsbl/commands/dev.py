@@ -120,12 +120,19 @@ def _install_monorepo(workspace_root, flags):
     include = _split_csv(flags.get("include"))
     exclude = _split_csv(flags.get("exclude"))
 
+    from ..workspace import project_is_dev_only
+
     selected = []
     for proj in projects:
         name = proj["name"]
         if include and name not in include:
             continue
         if exclude and name in exclude:
+            continue
+        # A dev node ships nothing, so there is nothing to install from it --
+        # and every workspace has one when its root member is a dev node.
+        # Naming it explicitly through --include still selects it.
+        if project_is_dev_only(proj) and not (include and name in include):
             continue
         selected.append(proj)
 

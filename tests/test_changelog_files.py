@@ -6,7 +6,12 @@ import stat
 
 import pytest
 
-from conftest import git_head, make_commit, run_git, workspace_toml
+from conftest import (
+    git_head as _git_head,
+    make_commit as _make_commit,
+    run_git as _run_git,
+    workspace_toml,
+)
 from rlsbl.changelog.files import (
     _parse_semver,
     append_entry,
@@ -604,7 +609,12 @@ class TestEnumerateChangelogDirs:
 
         (ws / ".rlsbl-monorepo").mkdir(exist_ok=True)
         (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
-            workspace_toml('projects = [{ path = "packages/alpha", name = "alpha" }]\n')
+            workspace_toml(
+                'projects = [\n'
+                '  { path = ".", name = "root", dev_only = true, releasable = false },\n'
+                '  { path = "packages/alpha", name = "alpha", releasable = false },\n'
+                ']\n'
+            )
         )
 
         dirs = enumerate_changelog_dirs(str(ws / "packages" / "alpha"), str(ws))
@@ -750,7 +760,12 @@ class TestChangelogRemapGlobs:
         rel_changes = ws / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
         rel_changes.mkdir(parents=True)
         (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
-            workspace_toml('projects = [{ path = "packages/alpha", name = "alpha" }]\n')
+            workspace_toml(
+                'projects = [\n'
+                '  { path = ".", name = "root", dev_only = true, releasable = false },\n'
+                '  { path = "packages/alpha", name = "alpha", releasable = false },\n'
+                ']\n'
+            )
         )
 
         globs = changelog_remap_globs(str(ws / "packages" / "alpha"), str(ws))
@@ -781,10 +796,13 @@ class TestChangelogRemapGlobs:
         ]:
             d.mkdir(parents=True)
         (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
-            workspace_toml("projects = ["
-            '{ path = "packages/alpha", name = "alpha" },'
-            '{ path = "libs/deep/beta", name = "beta" },'
-            "]\n")
+            workspace_toml(
+                "projects = ["
+                '{ path = ".", name = "root", dev_only = true, releasable = false },'
+                '{ path = "packages/alpha", name = "alpha", releasable = false },'
+                '{ path = "libs/deep/beta", name = "beta", releasable = false },'
+                "]\n"
+            )
         )
 
         dirs = enumerate_changelog_dirs(str(ws / "packages" / "alpha"), str(ws))

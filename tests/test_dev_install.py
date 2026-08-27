@@ -748,10 +748,9 @@ def test_run_install_requires_an_explicit_mode(tmp_project, fake_run, all_tools_
 
 
 def test_cli_workspace_root_gives_cd_guidance(tmp_path, monkeypatch):
-    """CLI-level: at a monorepo workspace root, `rlsbl dev install` must say
-    to cd into a sub-project -- not misleadingly suggest `rlsbl monorepo add`
-    (the workspace root is not an unregistered project; it is simply the
-    wrong place to run dev install from)."""
+    """CLI-level: at a monorepo workspace root, `rlsbl dev install` must name
+    the workspace-mode selector -- never misleadingly suggest `rlsbl monorepo
+    add`, since the workspace root is a registered member's directory."""
     from rlsbl import app
 
     ws_dir = tmp_path / ".rlsbl-monorepo"
@@ -762,7 +761,7 @@ def test_cli_workspace_root_gives_cd_guidance(tmp_path, monkeypatch):
 
     result = app.test(["dev", "install", "--target", "global"])
     assert result.exit_code == 1
-    assert "sub-project" in result.stderr
+    assert "--all, --include, or --exclude" in result.stderr
     assert "monorepo add" not in result.stderr
 
 
