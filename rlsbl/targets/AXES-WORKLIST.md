@@ -95,16 +95,34 @@ separate, registry-derived set: `targets_with_library_lint()`.
 & target_names` sets hand-listed which targets a check applies to. Each axis now
 answers from the target:
 
-| Axis | Protocol surface |
-| --- | --- |
-| dependency-manifest analysis (`deps-*`, `dead-modules`, `dead-modules-stale`) | `supports_dependency_analysis` |
-| circular-import analysis (`circular-deps`) | `supports_circular_dep_analysis` |
-| lockfile floor policing (`dep-floors`) | `supports_dep_floors` |
-| library boundary lint (`library-lint`) | `supports_library_lint` |
-| built-in test suite (`test-suite`) | overrides `run_tests` |
-| CI workflow inlining (`workspace-ci-synced`) | `provides_ci_templates` |
+| Axis | Protocol surface | How the target answers |
+| --- | --- | --- |
+| import analysis (`deps-*`, `dead-modules`, `dead-modules-stale`) | `supports_import_analysis` | implements `find_dead_modules` |
+| circular-import analysis (`circular-deps`) | `supports_circular_dep_analysis` | implements `find_circular_dependencies` |
+| lockfile floor policing (`dep-floors`) | `supports_dep_floors` | declared: a fact about the manifest format |
+| library boundary lint (`library-lint`) | `lint_language` | names a language in the lint table |
+| built-in test suite (`test-suite`) | `has_builtin_test_runner` | implements `run_tests` |
+| CI workflow inlining (`workspace-ci-synced`) | `provides_ci_templates` | ships `ci.yml.tpl` |
+| shared uv environment (`workspace-unbuildable`, the workspace test sync) | `shares_workspace_environment` | declared: a fact about the ecosystem |
+
+The per-target detectors moved with the sets: `find_dead_modules` and
+`find_circular_dependencies` are protocol methods, and each returns its own
+user-facing explanation instead of the check spelling one out per target name.
+
+A single-target check (`ruff-lint`, `maven-central-metadata`,
+`dunder-version-missing`) no longer restates its scope in its own body either:
+`check_scope_skip_reason` reads it from `CHECK_TARGETS`, which stays the one
+place a check's scope is written down.
 
 `MATRIX_COLUMNS` was already derived from `TARGETS.keys()` and stays that way.
+
+**One scope question was deliberately left open.** `FlutterTarget` extends
+`DartTarget`, so it inherits the Dart import analysers and the derived sets
+would have pulled Flutter members into `deps-unused`, `deps-undeclared` and
+`deps-dev-in-lib` -- three error-severity checks that have never applied to
+them. Flutter explicitly drops both methods back to the base so the migration
+changes no scope; whether Flutter should be in that set is a decision on its
+own.
 
 ### Companion tags — existing protocol method
 
@@ -140,17 +158,28 @@ now answered by asking the target directly:
 | `ci_templates` | `provides_ci_templates` | behavioural: does the target's template directory ship `ci.yml.tpl`? |
 | `publish`, `build_assets` | *(nothing)* | no target ever declared them and no code ever read them; the pipelines doc claimed otherwise and has been corrected |
 
-The declared frozensets had drifted from the code in two places, both of which
-the derivation corrects: several targets implement `read_metadata` without
-declaring it, and `swift-apple` inherits a `dev_install_command` it did not
-declare (its specs resolve to none, so the derived answer is still "no").
+The declared frozensets had drifted from the code in two places. Eight targets
+carried a `read_metadata` override that only restated the empty default with an
+ecosystem-specific docstring; under the derivation each would have claimed
+metadata support for a target that reads none, so the no-op overrides are
+deleted and not overriding is the honest statement. And `swift-apple` inherits a
+`dev_install_command` it did not declare (its specs resolve to none, so the
+derived answer is still "no").
 
 `getattr(target, "capabilities", default)` and `.get(axis, default)` are banned
-in the replacement. Three reader sites decide whether to run a publication
-probe — `rlsbl/evidence_gate.py`, `rlsbl/commands/yank.py` and
-`rlsbl/pipelines/base.py` — and a silent default at any of them would answer
-"no evidence" for a target that can in fact answer. `pipelines/base.py` used
-exactly that banned form before this change.
+in the replacement. Four reader sites decide whether to run a publication probe:
+
+| Site | What a silent default would cost |
+| --- | --- |
+| `rlsbl/pipelines/base.py` (pre-publish probe) | publishing over a version the registry already serves |
+| `rlsbl/commands/release/execute.py` (post-publish verification) | a probeable target dropped out of the verification set without a word |
+| `rlsbl/evidence_gate.py` (registry evidence source) | "no evidence" for a target that can answer |
+| `rlsbl/commands/yank.py` (yank's publication status) | a published version treated as unprobeable |
+
+The first two used exactly the banned `getattr(..., frozenset())` form before
+this change. `tests/test_target_capability_derivation.py` pins all four: by AST
+(no defaulted read of the axis remains in any of them) and by behaviour for the
+two that can be exercised directly.
 
 ## Known blind spots of the sweep and the guard
 

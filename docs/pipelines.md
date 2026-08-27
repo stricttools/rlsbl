@@ -1,5 +1,5 @@
 ---
-description: "Pipeline architecture: 9 built-in types, 3 auth patterns, custom assets, the pre-publish registry probe, launcher shims with download modes, and migration guide."
+description: "Pipeline architecture: 9 built-in types, 3 auth patterns, custom assets, the pre-publish registry probe, launcher shims, and a migration guide."
 ---
 
 # Pipelines
