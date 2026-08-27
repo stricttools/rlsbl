@@ -1194,6 +1194,43 @@ DEFAULT_RELEASE_FILE = (
 DEFAULT_RELEASABLE_CONFIG = {"publish_mode": "none"}
 
 
+def dirty_run_side_effect(commit_error=None):
+    """side_effect for a patched ``rlsbl.utils.run`` in ``commit_files`` tests.
+
+    ``commit_files`` reads the working tree first (``git status --porcelain
+    --ignored=matching`` per named path) so it can drop paths whose staging
+    would change nothing -- safegit 0.29+ refuses a commit that names one. A
+    bare ``MagicMock`` answers that probe with an empty reading, which makes
+    every path look unchanged and the commit is skipped before any argv is
+    built. This side_effect reports each probed path as modified and leaves the
+    commit invocation itself to the test: it returns ``""`` for it, or raises
+    ``commit_error`` when one is given.
+    """
+
+    def _side_effect(cmd, args=None, **kwargs):
+        argv = list(args or [])
+        if cmd == "git" and "status" in argv[:2] and "--porcelain" in argv:
+            return " M " + argv[-1]
+        if commit_error is not None:
+            raise commit_error
+        return ""
+
+    return _side_effect
+
+
+def commit_invocations(mock_run):
+    """The commit-tool calls a patched ``rlsbl.utils.run`` recorded.
+
+    Filters out the working-tree probes :func:`dirty_run_side_effect` answers,
+    so a test can pin the argv the commit was actually issued with.
+    """
+    return [
+        c for c in mock_run.call_args_list
+        if not (c.args and c.args[0] == "git"
+                and "status" in list(c.args[1] or [])[:2])
+    ]
+
+
 def jsonl_line(entry):
     """Render one changelog entry as a single JSONL line (no trailing newline).
 

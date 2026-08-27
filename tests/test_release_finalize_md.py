@@ -158,3 +158,71 @@ class TestReleaseFinalizeMd:
         assert "Add feature" in md_content, (
             "per-version .md should contain the feature description"
         )
+
+
+class TestFinalizeNeverNamesAnUnchangedChangelog:
+    """CHANGELOG.md is regenerated twice and is byte-identical the second time.
+
+    ``generate_changelog()`` runs before the mutating phase, so CHANGELOG.md is
+    already carried by the version-bump commit. The finalize step regenerates it
+    and names it again -- normally producing exactly the same bytes. safegit
+    0.29+ refuses a commit that names a path whose staging leaves the tree
+    unchanged (exit 11), which aborted the release after the candidate had been
+    pushed. The finalize commit must simply not name the unchanged file.
+    """
+
+    def test_finalize_commit_omits_the_unchanged_changelog(self, tmp_project):
+        _setup_releasable_npm_project(tmp_project)
+
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.utils import run as real_run
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            if cmd == "gh":
+                return ""
+            if cmd == "git" and args and args[0] == "push":
+                return ""
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        with (
+            patch("rlsbl.commands.release.check_gh_installed", return_value=True),
+            patch("rlsbl.commands.release.check_gh_auth", return_value=True),
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+        ):
+            run_cmd(
+                _rc(),
+                {"quiet": True},
+                ctx=ProjectContext(
+                    project_root=Path("."), workspace_root=None,
+                    config={"publish_mode": "ci", "pipelines": {}},
+                ),
+            )
+
+        # The release completed: the version JSONL was finalized.
+        assert (tmp_project / ".rlsbl" / "changes" / "1.0.1.jsonl").exists()
+
+        subjects = subprocess.run(
+            ["git", "log", "--format=%H %s"],
+            cwd=str(tmp_project), capture_output=True, text=True, check=True,
+        ).stdout.splitlines()
+        finalize = [line for line in subjects
+                    if line.split(" ", 1)[1] == "chore: finalize changelog for 1.0.1"]
+        assert finalize, f"no finalize commit found in:\n{chr(10).join(subjects)}"
+        named = subprocess.run(
+            ["git", "show", "--name-only", "--format=", finalize[0].split(" ", 1)[0]],
+            cwd=str(tmp_project), capture_output=True, text=True, check=True,
+        ).stdout.split()
+        assert "CHANGELOG.md" not in named, (
+            "the finalize commit named CHANGELOG.md even though the "
+            f"regeneration left it byte-identical; it carried: {named}"
+        )
+        assert ".rlsbl/changes/1.0.1.jsonl" in named
+
+        # And the working tree is clean -- the drop must not strand a dirty file.
+        porcelain = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(tmp_project), capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert porcelain == "", f"release left the tree dirty: {porcelain}"
