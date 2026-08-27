@@ -317,6 +317,12 @@ class TestRefusals:
         assert "'pkgC' depends on 'pkgA'" in message
         assert "rlsbl rewrite uv-path-sources" in message
         assert "extract never rewrites a manifest itself" in message
+        # The Python edge gets the Python remedy and NOTHING from another
+        # ecosystem: a go.mod named here would send the operator to a file
+        # that does not exist.
+        assert "go.mod" not in message
+        assert "go-module-path" not in message
+        assert "package.json" not in message
 
     def test_broken_target_declaration_on_a_remaining_member(self, tmp_path):
         """A member outside every releasable derives its glob from its targets.
@@ -337,6 +343,147 @@ class TestRefusals:
 
         with pytest.raises(ExtractError, match="broken target declaration"):
             cmd_extract(str(ns.root), "core", str(tmp_path / "out"))
+
+
+class TestInboundRemedyReadsTheManifests:
+    """Which remedy an inbound edge gets is decided by manifest EVIDENCE.
+
+    The scanners' ``dep_type`` cannot decide it: the Python scanner marks a
+    ``[tool.uv.sources]`` path/workspace edge ``"versioned"`` (only a direct
+    ``name @ file://`` reference is ``"path"``), so branching on that string
+    sent the most common Python edge to a Go remedy naming a go.mod that does
+    not exist. Every remedy below is asserted BOTH for what it says and for
+    what it must not say -- naming another ecosystem's file is the defect.
+    """
+
+    def _refuse(self, ns, tmp_path):
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(ns.root), "core", str(tmp_path / "out"))
+        return str(exc.value)
+
+    def test_a_uv_sources_edge_gets_the_python_remedy_only(self, tmp_path):
+        ns = make_source(tmp_path)
+        (ns.root / "pkgC" / "pyproject.toml").write_text(
+            '[project]\nname = "pkgC"\nversion = "0.1.0"\n'
+            'dependencies = ["pkgA"]\n\n'
+            '[tool.uv.sources]\npkgA = { workspace = true }\n'
+        )
+        run_git(ns.root, "add", "pkgC")
+        run_git(ns.root, "commit", "-q", "-m", "pkgC sources pkgA from the workspace")
+
+        message = self._refuse(ns, tmp_path)
+        assert "'pkgC' depends on 'pkgA'" in message
+        assert "pkgC/pyproject.toml" in message
+        assert "[tool.uv.sources]" in message
+        assert "rlsbl rewrite uv-path-sources" in message
+        assert "go.mod" not in message
+        assert "go-module-path" not in message
+        assert "package.json" not in message
+
+    def test_without_its_own_lock_the_python_remedy_says_so(self, tmp_path):
+        """`rewrite uv-path-sources` reads the floor from a uv.lock beside the
+        manifest it rewrites. A uv workspace keeps one lock at the root, so the
+        member has none -- and the remedy must not name a command that would
+        hard-error there."""
+        ns = make_source(tmp_path)
+        (ns.root / "pkgC" / "pyproject.toml").write_text(
+            '[project]\nname = "pkgC"\nversion = "0.1.0"\n'
+            'dependencies = ["pkgA"]\n\n'
+            '[tool.uv.sources]\npkgA = { workspace = true }\n'
+        )
+        run_git(ns.root, "add", "pkgC")
+        run_git(ns.root, "commit", "-q", "-m", "pkgC sources pkgA from the workspace")
+
+        message = self._refuse(ns, tmp_path)
+        assert "no uv.lock" in message
+        assert "by hand" in message
+        assert "cd pkgC && rlsbl rewrite uv-path-sources" not in message
+
+    def test_with_its_own_lock_the_python_remedy_is_the_runnable_command(
+        self, tmp_path,
+    ):
+        ns = make_source(tmp_path)
+        (ns.root / "pkgC" / "pyproject.toml").write_text(
+            '[project]\nname = "pkgC"\nversion = "0.1.0"\n'
+            'dependencies = ["pkgA"]\n\n'
+            '[tool.uv.sources]\npkgA = { workspace = true }\n'
+        )
+        (ns.root / "pkgC" / "uv.lock").write_text(
+            'version = 1\n\n[[package]]\nname = "pkgA"\nversion = "0.1.0"\n'
+        )
+        run_git(ns.root, "add", "pkgC")
+        run_git(ns.root, "commit", "-q", "-m", "pkgC locks pkgA itself")
+
+        message = self._refuse(ns, tmp_path)
+        assert "cd pkgC && rlsbl rewrite uv-path-sources --dry-run" in message
+        assert "no uv.lock" not in message
+
+    def test_an_npm_workspace_edge_gets_the_manual_package_json_edit(
+        self, tmp_path,
+    ):
+        ns = make_source(tmp_path)
+        (ns.root / "pkgC" / "package.json").write_text(json.dumps({
+            "name": "pkgC",
+            "version": "0.1.0",
+            "dependencies": {"pkgA": "workspace:*"},
+        }) + "\n")
+        run_git(ns.root, "add", "pkgC")
+        run_git(ns.root, "commit", "-q", "-m", "pkgC depends on pkgA through npm")
+
+        message = self._refuse(ns, tmp_path)
+        assert "pkgC/package.json" in message
+        assert '"pkgA": "workspace:*"' in message
+        assert "dependencies" in message
+        # No rewrite command exists for package.json, so the remedy states the
+        # edit rather than naming a command that does not do it.
+        assert "rlsbl rewrite" not in message
+        assert "go.mod" not in message
+
+    def test_a_go_edge_names_the_module_paths_it_read(self, tmp_path):
+        """No scanner reads go.mod, so a Go edge arrives as an explicit
+        ``depends_on``. The workspace.toml edit is one half of the remedy; the
+        go.mod that really carries the dependency is the other, and its module
+        path is READ rather than described."""
+        ns = make_source(tmp_path, projects=[
+            {"path": "pkgA", "name": "pkgA", "releasable": "core"},
+            {"path": "pkgB", "name": "pkgB", "releasable": "core"},
+            {"path": "pkgC", "name": "pkgC", "releasable": "extras",
+             "depends_on": ["pkgA"]},
+        ])
+        (ns.root / "pkgA" / "go.mod").write_text(
+            "module example.com/mono/pkgA\n\ngo 1.22\n"
+        )
+        (ns.root / "pkgC" / "go.mod").write_text(
+            "module example.com/mono/pkgC\n\ngo 1.22\n\n"
+            "require example.com/mono/pkgA v0.1.0\n"
+        )
+        run_git(ns.root, "add", "pkgA", "pkgC")
+        run_git(ns.root, "commit", "-q", "-m", "go modules")
+
+        message = self._refuse(ns, tmp_path)
+        assert "depends_on" in message
+        assert "workspace.toml" in message
+        assert "rlsbl rewrite go-module-path" in message
+        assert "--from-module example.com/mono/pkgA" in message
+        assert "pkgC/go.mod" in message
+        assert "uv-path-sources" not in message
+
+    def test_an_edge_no_manifest_explains_says_exactly_that(self, tmp_path):
+        """A depends_on with no manifest behind it gets the workspace.toml edit
+        and no invented ecosystem."""
+        ns = make_source(tmp_path, projects=[
+            {"path": "pkgA", "name": "pkgA", "releasable": "core"},
+            {"path": "pkgB", "name": "pkgB", "releasable": "core"},
+            {"path": "pkgC", "name": "pkgC", "releasable": "extras",
+             "depends_on": ["pkgA"]},
+        ])
+
+        message = self._refuse(ns, tmp_path)
+        assert "depends_on" in message
+        assert "workspace.toml" in message
+        assert "rlsbl rewrite" not in message
+        assert "go.mod" not in message
+        assert "package.json" not in message
 
 
 class TestDeletionConsent:

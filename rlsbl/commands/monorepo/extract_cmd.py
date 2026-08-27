@@ -472,27 +472,223 @@ def _plan_tags(workspace_root, own_glob, foreign_globs,
     )
 
 
-def _inbound_remedy(dependent, member, dep):
-    """The exact command that severs one inbound dependency edge."""
-    if dep.dep_type == "explicit":
-        return (
-            f"    remove '{member.name}' from depends_on in "
-            f"{WORKSPACE_DIR}/workspace.toml for member '{dependent.name}'"
+def _read_toml_doc(path):
+    """Parse a TOML file, or None when it is absent or unreadable.
+
+    Unreadable is None rather than an error on purpose: this reads manifests to
+    decide which REMEDY to print for an edge that is already a refusal. A
+    manifest nobody can parse costs its evidence, not the refusal.
+    """
+    if not os.path.isfile(path):
+        return None
+    try:
+        import tomlkit
+
+        with open(path, "r", encoding="utf-8") as f:
+            return tomlkit.parse(f.read())
+    except Exception:
+        return None
+
+
+def _read_json_doc(path):
+    """Parse a JSON file, or None when it is absent or unreadable."""
+    if not os.path.isfile(path):
+        return None
+    try:
+        import json
+
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _member_spellings(workspace_root, member, *, manifest, key):
+    """Every name the departing member can be spelled with in one ecosystem.
+
+    Its workspace name, the ``registry_name`` the workspace declares for it,
+    and the name its own manifest declares -- a member registered as ``pkgA``
+    can perfectly well publish as ``acme-pkg-a`` and be depended on under that
+    name.
+    """
+    names = {member.name}
+    if member.registry_name:
+        names.add(member.registry_name)
+    path = os.path.join(workspace_root, member.path, manifest)
+    doc = _read_toml_doc(path) if manifest.endswith(".toml") else _read_json_doc(path)
+    if doc is not None:
+        declared = key(doc)
+        if isinstance(declared, str) and declared:
+            names.add(declared)
+    return names
+
+
+def _go_module_path(workspace_root, path):
+    """The module path a ``go.mod`` under *path* declares, or None."""
+    gomod = os.path.join(workspace_root, path, "go.mod")
+    if not os.path.isfile(gomod):
+        return None
+    try:
+        with open(gomod, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("module "):
+            return stripped.split(None, 1)[1].strip().strip('"')
+    return None
+
+
+def _python_inbound_remedy(workspace_root, dependent, member):
+    """The Python edit, when the dependent's pyproject really names the member."""
+    from ...dep_floors import normalize_pypi_name
+    from ...dep_rewrite import SECTIONS_ALL, detect_uv_path_sources, find_dep_entries
+
+    dep_dir = os.path.join(workspace_root, dependent.path)
+    doc = _read_toml_doc(os.path.join(dep_dir, "pyproject.toml"))
+    if doc is None:
+        return None
+    spellings = _member_spellings(
+        workspace_root, member,
+        manifest="pyproject.toml",
+        key=lambda doc: (doc.get("project") or {}).get("name"),
+    )
+    names = {normalize_pypi_name(n): n for n in spellings}
+    entries = find_dep_entries(doc, names, SECTIONS_ALL)
+    sources = [
+        name for name in detect_uv_path_sources(doc)
+        if normalize_pypi_name(name) in names
+    ]
+    if not entries and not sources:
+        return None
+
+    declared = sources[0] if sources else entries[0]["normalized"]
+    edits = []
+    if sources:
+        edits.append(
+            "delete " + ", ".join(f"[tool.uv.sources].{name}" for name in sources)
         )
-    if dep.dep_type == "path":
-        return (
-            f"    (cd {dependent.path} && rlsbl rewrite uv-path-sources "
-            f"--dry-run)  then re-run without --dry-run"
+    if entries:
+        edits.append(
+            "floor " + ", ".join(
+                f"[{entry['section']}] entry {entry['original']!r}"
+                for entry in entries
+            )
         )
+    lines = [
+        f"    in {dependent.path}/pyproject.toml: {' and '.join(edits)}, so "
+        f"'{declared}' resolves from the registry "
+        f"('{declared}>=<the version the lock resolves>')."
+    ]
+    if os.path.isfile(os.path.join(dep_dir, "uv.lock")):
+        lines.append(
+            f"      `rlsbl rewrite uv-path-sources` writes exactly that edit: "
+            f"(cd {dependent.path} && rlsbl rewrite uv-path-sources --dry-run)"
+            f"  then re-run without --dry-run."
+        )
+    else:
+        lines.append(
+            f"      `rlsbl rewrite uv-path-sources` reads the floor from a "
+            f"uv.lock beside the manifest it rewrites, and {dependent.path} "
+            f"has no uv.lock of its own (a uv workspace resolves into one lock "
+            f"at the repository root), so make this edit by hand."
+        )
+    return "\n".join(lines)
+
+
+def _npm_inbound_remedy(workspace_root, dependent, member):
+    """The npm edit. Stated in full: no rewrite command owns package.json."""
+    doc = _read_json_doc(
+        os.path.join(workspace_root, dependent.path, "package.json")
+    )
+    if not isinstance(doc, dict):
+        return None
+    spellings = _member_spellings(
+        workspace_root, member,
+        manifest="package.json",
+        key=lambda doc: doc.get("name") if isinstance(doc, dict) else None,
+    )
+    for section in (
+        "dependencies", "devDependencies", "peerDependencies",
+        "optionalDependencies",
+    ):
+        entries = doc.get(section)
+        if not isinstance(entries, dict):
+            continue
+        for name, spec in entries.items():
+            if name not in spellings:
+                continue
+            return (
+                f"    in {dependent.path}/package.json: replace "
+                f'"{name}": "{spec}" in "{section}" with the published range '
+                f'("{name}": "^<the version it is developed against>"), and '
+                f'drop {member.path} from any "workspaces" array that lists '
+                f"it. No rewrite command owns package.json -- this one is a "
+                f"hand edit."
+            )
+    return None
+
+
+def _go_inbound_remedy(workspace_root, dependent, member):
+    """The Go edit, when the dependent's go.mod requires the member's module."""
+    module = _go_module_path(workspace_root, member.path)
+    if module is None:
+        return None
+    gomod = os.path.join(workspace_root, dependent.path, "go.mod")
+    if not os.path.isfile(gomod):
+        return None
+    try:
+        with open(gomod, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return None
+    if module not in text:
+        return None
     return (
-        f"    rlsbl rewrite go-module-path --from-module <the module "
-        f"'{member.name}' declares in {member.path}/go.mod> --to-module <its "
-        f"module path in the new repository>   -- or, for a Python member, "
-        f"(cd {dependent.path} && rlsbl rewrite uv-path-sources)"
+        f"    {dependent.path}/go.mod requires {module}, which moves with the "
+        f"extraction:\n"
+        f"      rlsbl rewrite go-module-path --from-module {module} "
+        f"--to-module <its module path in the new repository>   (run at the "
+        f"repository root, before extracting)"
     )
 
 
-def _check_inbound(graph, projects, members, member_names):
+def _inbound_remedies(workspace_root, dependent, member, dep):
+    """Every edit that severs one inbound dependency edge.
+
+    Decided from the DEPENDING member's manifests on disk, never from the
+    scanner's ``dep_type``: the Python scanner marks a ``[tool.uv.sources]``
+    path/workspace edge ``"versioned"`` (only a direct ``name @ file://``
+    reference is ``"path"``), so branching on that string routes the commonest
+    Python edge to a Go remedy naming a go.mod that does not exist.
+
+    Every remedy that applies is returned, because an edge can be declared in
+    more than one place -- a ``depends_on`` in workspace.toml AND the manifest
+    that really carries it -- and severing one of them leaves the other.
+    """
+    remedies = []
+    if dep.dep_type == "explicit":
+        remedies.append(
+            f"    remove '{member.name}' from depends_on in "
+            f"{WORKSPACE_DIR}/workspace.toml for member '{dependent.name}'"
+        )
+    for probe in (
+        _python_inbound_remedy, _npm_inbound_remedy, _go_inbound_remedy,
+    ):
+        remedy = probe(workspace_root, dependent, member)
+        if remedy is not None:
+            remedies.append(remedy)
+    if not remedies:
+        remedies.append(
+            f"    no manifest in {dependent.path} names '{member.name}' (the "
+            f"workspace graph read this edge as '{dep.dep_type}'), so sever it "
+            f"wherever it is declared before re-running."
+        )
+    return remedies
+
+
+def _check_inbound(workspace_root, graph, projects, members, member_names):
     """Refuse when a REMAINING member depends on one that is leaving.
 
     The edge cannot survive the conversion: the depended-on package will not be
@@ -526,7 +722,9 @@ def _check_inbound(graph, projects, members, member_names):
             f"  - '{dependent.name}' depends on '{member.name}' "
             f"({dep.dep_type}, scope {scope})"
         )
-        lines.append(_inbound_remedy(dependent, member, dep))
+        lines.extend(
+            _inbound_remedies(workspace_root, dependent, member, dep)
+        )
     raise ExtractError(
         "members that stay behind depend on members that would leave:\n"
         + "\n".join(lines)
@@ -653,7 +851,7 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
             f"would leave it dangling."
         )
     member_names = {m.name for m in members}
-    _check_inbound(graph, projects, members, member_names)
+    _check_inbound(workspace_root, graph, projects, members, member_names)
     outbound = _outbound_edges(graph, members, member_names)
 
     is_multi = len(members) > 1
