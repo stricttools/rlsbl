@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""One-off sweep: retarget ``run_project_tests`` assertions at TestRunOutcome.
+"""One-off sweep: retarget ``run_project_tests`` assertions at SuiteRunOutcome.
 
 ``run_project_tests`` used to return a bare bool, so an unsupported target and
-a passing suite were the same value. It now returns a ``TestRunOutcome``, and
+a passing suite were the same value. It now returns a ``SuiteRunOutcome``, and
 the tests that pinned the bool must pin the outcome instead.
 
-The rewrite is scoped by *provenance*, not by pattern: a line is rewritten only
+The rewrite is scoped by where the value came from, not by pattern: a line is
+rewritten only
 when the most recent ``result = ...`` assignment in the same file came from
 ``run_project_tests``. Other bool-returning helpers in the same files
 (``sync_workspace``) keep their assertions untouched.

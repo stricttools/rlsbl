@@ -51,7 +51,7 @@ returns an explicit `unsupported` outcome naming the target.
 (`rlsbl/checks/workspace.py`) each carried their own copy of the recognized
 set to steer around that silence.
 
-Migrated to `BaseTarget.run_tests()`, returning a `TestRunOutcome` whose status
+Migrated to `BaseTarget.run_tests()`, returning a `SuiteRunOutcome` whose status
 is `PASSED`, `FAILED` or `SKIPPED`. The base returns `SKIPPED` with a message
 naming the target, so an unsupported target now produces a visible skip line in
 the release step summary instead of a silent pass. The recognized set is
