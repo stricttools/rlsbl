@@ -182,6 +182,17 @@ class TestNoWrites:
             with no_writes():
                 effects.run(argv, capture_output=True, cwd=str(tmp_path))
 
+    def test_gh_rides_the_same_screen(self, tmp_path):
+        """``effects.gh`` funnels into ``effects.run``, so it is screened too.
+
+        Not a gh verb classification -- there is none, and the allowlist's
+        handful of gh reads is the whole vocabulary an observation has. What
+        this pins is the direction: an unlisted gh call is refused, not run.
+        """
+        with pytest.raises(ObserveWriteError, match="gh release create"):
+            with no_writes():
+                effects.gh(["release", "create", "v9.9.9"], capture_output=True)
+
     def test_a_shell_string_is_refused(self, tmp_path):
         with pytest.raises(ObserveWriteError, match="shell command"):
             with no_writes():
