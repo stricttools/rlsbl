@@ -2299,6 +2299,31 @@ def cmd_dev_status(ctx):
 
 
 # ---------------------------------------------------------------------------
+# rewrite group
+# ---------------------------------------------------------------------------
+
+rewrite = app.group("rewrite", help="Sweeping rewrites of the current working tree, each previewed before it is performed. Every command in this group observes the tree, reports a per-file plan with occurrence counts, and refuses to apply when a count moved between the preview and the write.")
+
+
+@rewrite.command(name="go-module-path", help="Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-anchored. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.", effect="mutating")
+@strictcli.flag(name="from-module", type=str, presence="required", help="The Go module path being renamed away from (must be declared by a go.mod in this repository)")
+@strictcli.flag(name="to-module", type=str, presence="required", help="The Go module path to rename to")
+@effects.handler
+def cmd_rewrite_go_module_path(ctx, from_module, to_module):
+    """Rename a Go module path across every go.mod and import site."""
+    root = _require_project_root()
+    from .commands.rewrite.go_module_path import cmd_go_module_path
+    cmd_go_module_path(
+        {
+            "from-module": from_module,
+            "to-module": to_module,
+            "dry-run": ctx.dry_run,
+        },
+        project_root=root,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Derived help counts
 # ---------------------------------------------------------------------------
 

@@ -614,3 +614,46 @@ class TestMonorepoWorkspaceGatedWiring:
         assert m.call_args[0][1] == "oldname"
         assert m.call_args[0][2] == "newname"
         assert m.call_args.kwargs["dry_run"] is True
+
+
+# ---------------------------------------------------------------------------
+# rewrite group
+# ---------------------------------------------------------------------------
+# Both handlers resolve the project root from cwd before dispatching, and this
+# module runs with the repo as cwd (see the module-level repo_cwd mark), so the
+# real rlsbl project satisfies that. The dispatch targets are patched at the
+# module that defines them, which is what the handler imports, so nothing
+# sweeps this repo.
+
+
+class TestRewriteWiring:
+
+    def test_go_module_path(self):
+        result, m = _dispatch(
+            ["rewrite", "go-module-path",
+             "--from-module", "github.com/o/foo",
+             "--to-module", "github.com/n/qux"],
+            "rlsbl.commands.rewrite.go_module_path.cmd_go_module_path",
+        )
+        assert result.exit_code == 0, result.stderr
+        f = _flags(m)
+        assert f["from-module"] == "github.com/o/foo"
+        assert f["to-module"] == "github.com/n/qux"
+        assert f["dry-run"] is False
+
+    def test_go_module_path_dry_run(self):
+        result, m = _dispatch(
+            ["--dry-run", "rewrite", "go-module-path",
+             "--from-module", "a/b", "--to-module", "c/d"],
+            "rlsbl.commands.rewrite.go_module_path.cmd_go_module_path",
+        )
+        assert result.exit_code == 0, result.stderr
+        assert _flags(m)["dry-run"] is True
+
+    def test_go_module_path_requires_both_modules(self):
+        result, _m = _dispatch(
+            ["rewrite", "go-module-path", "--from-module", "a/b"],
+            "rlsbl.commands.rewrite.go_module_path.cmd_go_module_path",
+        )
+        assert result.exit_code == 1
+        assert "to-module" in result.stderr

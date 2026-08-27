@@ -83,7 +83,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.117.2",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 13 top-level commands and 4 command groups (release, changelog, monorepo, dev).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 54 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite).",
   "proc_observe_allowlist": [
     [
       "git",
@@ -2571,6 +2571,35 @@
           "name": "status",
           "help": "Report the state of local dev-sync overlays: for each package recorded in the dev-overlays sentinel, show its declared editable checkout path and version alongside the venv's actual install (editable at the expected path, WIPED back to a registry wheel, or missing entirely). Exits 1 if any overlay drifted so scripts and pre-run guards can detect a silent wipe by a bare uv sync or uv run; exits 0 when all overlays are intact or none are declared.",
           "effect": "read_only"
+        }
+      }
+    },
+    "rewrite": {
+      "name": "rewrite",
+      "help": "Sweeping rewrites of the current working tree, each previewed before it is performed. Every command in this group observes the tree, reports a per-file plan with occurrence counts, and refuses to apply when a count moved between the preview and the write.",
+      "commands": {
+        "go-module-path": {
+          "name": "go-module-path",
+          "help": "Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-anchored. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.",
+          "effect": "mutating",
+          "flags": [
+            {
+              "name": "from-module",
+              "help": "The Go module path being renamed away from (must be declared by a go.mod in this repository)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "to-module",
+              "help": "The Go module path to rename to",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            }
+          ]
         }
       }
     }
