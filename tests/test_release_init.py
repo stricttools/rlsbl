@@ -436,7 +436,13 @@ class TestReleaseInitMonorepo:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
-            workspace_toml('[[projects]]\npath = "python"\nname = "mylib"\n')
+            # `releasable` is mandatory in explicit mode; this member stands
+            # outside every releasable, so its release file stays at the
+            # package level -- which is what the assertion below is about.
+            workspace_toml(
+                '[[projects]]\npath = "python"\nname = "mylib"\n'
+                'releasable = false\n'
+            )
         )
 
         # Create package directory with .rlsbl/ (scaffold creates this)

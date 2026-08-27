@@ -402,7 +402,7 @@ class TestCmdReleaseMissingFile:
         from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, bump="", description="", push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, preid="")
+            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, bump="", description="", push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, preid="", releasable=None)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -425,7 +425,7 @@ class TestCmdReleaseInvalidFile:
         from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, bump="", description="", push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, preid="")
+            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, bump="", description="", push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, preid="", releasable=None)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
