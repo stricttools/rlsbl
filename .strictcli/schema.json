@@ -505,6 +505,7 @@
               "ERROR",
               "PRIVATE",
               "UNPUBLISHED",
+              "NO_REGISTRY_API",
               null
             ]
           }
@@ -1126,6 +1127,14 @@
             {
               "name": "preid",
               "help": "Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "releasable",
+              "help": "Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it.",
               "value_schema": {
                 "type": "string"
               },
@@ -1846,7 +1855,7 @@
         },
         "add": {
           "name": "add",
-          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Supports 6 optional settings: display name, target registry, glob patterns for change detection, subtree remote URL, inter-project dependencies, and a library flag to mark shared code packages.",
+          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, subtree remote URL, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.",
           "effect": "mutating",
           "flags": [
             {
@@ -1860,14 +1869,6 @@
             {
               "name": "target",
               "help": "Registry this project publishes to (e.g. npm, pypi, go)",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "optional"
-            },
-            {
-              "name": "watch",
-              "help": "Comma-separated glob patterns for change detection in CI workflows",
               "value_schema": {
                 "type": "string"
               },
@@ -1961,7 +1962,7 @@
         },
         "list": {
           "name": "list",
-          "help": "Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as watch patterns, subtree remotes, inter-project dependencies, and whether the project is marked as a library.",
+          "help": "Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as subtree remotes, inter-project dependencies, and whether the project is marked as a library.",
           "effect": "read_only"
         },
         "sync": {
@@ -3224,6 +3225,18 @@
       "depends_on": [],
       "scope": "workspace"
     },
+    "router-filters-fresh": {
+      "tags": [
+        "workspace",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
+    },
     "ruff-lint": {
       "tags": [
         "quality"
@@ -3313,6 +3326,17 @@
       "needs_network": true,
       "depends_on": [],
       "scope": "workspace"
+    },
+    "target-matrix-fresh": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
     },
     "target-version-readable": {
       "tags": [
