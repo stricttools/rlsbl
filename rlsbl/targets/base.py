@@ -475,6 +475,33 @@ class BaseTarget:
         return []
 
     @property
+    def supports_version_query(self):
+        """Whether this target's registry can be asked for a latest version.
+
+        Derived from the ``query_latest_version`` override.
+        ``rlsbl.targets.targets_with_version_queries()`` is the set form.
+        """
+        return type(self).query_latest_version is not BaseTarget.query_latest_version
+
+    @property
+    def supports_name_claim(self):
+        """Whether ``rlsbl claim-name`` can reserve a name on this registry.
+
+        Derived from the ``claim_placeholder`` override.
+        ``rlsbl.targets.claimable_targets()`` is the set form.
+        """
+        return type(self).claim_placeholder is not BaseTarget.claim_placeholder
+
+    @property
+    def supports_yank(self):
+        """Whether this target's registry offers a removal action.
+
+        Derived from the ``yank`` override. The base answers UNSUPPORTED, so a
+        target that does not override it has nothing to run.
+        """
+        return type(self).yank is not BaseTarget.yank
+
+    @property
     def has_builtin_test_runner(self):
         """Whether this target ships a built-in test runner.
 

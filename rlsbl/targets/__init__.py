@@ -121,9 +121,7 @@ def targets_with_version_queries():
     the hand-mapped dispatch table ``rlsbl.registry`` used to carry.
     """
     return frozenset(
-        name
-        for name, target in TARGETS.items()
-        if type(target).query_latest_version is not BaseTarget.query_latest_version
+        name for name, target in TARGETS.items() if target.supports_version_query
     )
 
 
@@ -134,9 +132,7 @@ def claimable_targets():
     used to hard-code the pair and then branch on the name twice more.
     """
     return frozenset(
-        name
-        for name, target in TARGETS.items()
-        if type(target).claim_placeholder is not BaseTarget.claim_placeholder
+        name for name, target in TARGETS.items() if target.supports_name_claim
     )
 
 
@@ -402,3 +398,11 @@ def collect_releasable_targets(releasable_name, member_projects, workspace_root)
                 seen.add(e.name)
                 result.append(e.name)
     return result
+
+
+# The support-axis inventory and its two completeness assertions live in
+# ``introspect``, and run on import of that module: a registered target that
+# cannot answer an axis, or a support surface added to the protocol with no
+# axis, is an error the moment rlsbl loads its targets. Imported last, after
+# TARGETS is bound, because the assertion asks every registered target.
+from . import introspect  # noqa: E402,F401

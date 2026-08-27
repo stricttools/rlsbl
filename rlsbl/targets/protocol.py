@@ -63,6 +63,21 @@ class ReleaseTarget(Protocol):
         """Whether this target ships a built-in test runner."""
         ...
 
+    @property
+    def supports_version_query(self) -> bool:
+        """Whether this target's registry answers a latest-version query."""
+        ...
+
+    @property
+    def supports_name_claim(self) -> bool:
+        """Whether a name can be claimed on this target's registry."""
+        ...
+
+    @property
+    def supports_yank(self) -> bool:
+        """Whether this target's registry offers a removal action."""
+        ...
+
     ecosystem: str
     """Ecosystem identifier (e.g. 'node', 'python', 'go', 'jvm')."""
 
