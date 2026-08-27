@@ -233,6 +233,8 @@ class TestCreateContextReleasable:
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
             '[[releasables]]\nname = "alpha"\n\n'
+            '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
+            'releasable = false\n\n'
             '[[projects]]\npath = "core"\nname = "core"\nreleasable = "alpha"\n\n'
             '[[projects]]\npath = "cli"\nname = "cli"\nreleasable = "alpha"\n'
         )

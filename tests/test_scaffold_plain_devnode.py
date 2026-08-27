@@ -26,6 +26,8 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+import pathlib
+
 import pytest
 
 from rlsbl.commands.init_cmd import run_cmd, _is_non_releasable_project
@@ -60,16 +62,17 @@ class TestScaffoldPlainDevNode:
         # With project_root = sub-project dir (correct), non-releasable is detected
         assert _is_non_releasable_project(proj_dir) is True
 
-    def test_is_non_releasable_with_wrong_root(self, mock_git_repo, monkeypatch):
-        """_is_non_releasable_project returns False when project_root points to
-        the monorepo root (the buggy behavior)."""
+    def test_is_non_releasable_at_the_workspace_root(self, mock_git_repo, monkeypatch):
+        """At the workspace root, the answer is about the root member.
+
+        The workspace root used to match no member at all, so the answer was
+        False whatever the workspace said. It is the root member's directory,
+        and the default root member is a dev node -- so the answer is True.
+        """
         proj_dir = self._setup_monorepo_with_dev_node(mock_git_repo)
         monkeypatch.chdir(proj_dir)
 
-        # With project_root = monorepo root (wrong), non-releasable is NOT
-        # detected because resolve_project(ws_root, monorepo_root) can't
-        # match the sub-project
-        assert _is_non_releasable_project(mock_git_repo) is False
+        assert _is_non_releasable_project(mock_git_repo) is True
 
     def test_scaffold_plain_dev_node_no_changelog(self, mock_git_repo, monkeypatch):
         """Scaffolding a plain dev_node project must NOT create changelog files."""
@@ -116,15 +119,20 @@ class TestScaffoldPlainDevNode:
             "skip-shared": False,
         }, ctx=ctx)
 
-        # Non-dev-node projects SHOULD have changelog infrastructure
-        changelog = proj_dir / "CHANGELOG.md"
-        unreleased = proj_dir / ".rlsbl" / "changes" / "unreleased.jsonl"
+        # A releasable member's changelog lives under its releasable, not the
+        # package -- so that is where scaffolding puts it.
+        from rlsbl.workspace import get_releasable_changes_dir, get_releasable_dir
 
-        assert changelog.exists(), (
-            "CHANGELOG.md should be created for non-dev_node projects"
+        rel_dir = pathlib.Path(get_releasable_dir(str(mock_git_repo), "lib"))
+        unreleased = pathlib.Path(
+            get_releasable_changes_dir(str(mock_git_repo), "lib"),
+            "unreleased.jsonl",
         )
         assert unreleased.exists(), (
             "unreleased.jsonl should be created for non-dev_node projects"
+        )
+        assert rel_dir.is_dir(), (
+            "the releasable's state directory should be created"
         )
 
 

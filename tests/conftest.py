@@ -619,24 +619,32 @@ def workspace_toml(body="", *, releasables=(), root_member=ROOT_MEMBER_TOML):
     if declares_root:
         root_member = ""
 
-    parts = []
-    if declares_releasables:
-        pass
-    elif releasables:
-        for rel in releasables:
-            if isinstance(rel, str):
-                rel = {"name": rel}
-            block = f'[[releasables]]\nname = "{rel["name"]}"\n'
-            if rel.get("tag_format"):
-                block += f'tag_format = "{rel["tag_format"]}"\n'
-            parts.append(block)
-    else:
-        parts.append("releasables = []\n")
-    if root_member:
-        parts.append(root_member)
+    # Order is load-bearing in TOML: a top-level key written after a table
+    # header belongs to that table. The bare `releasables = []` key therefore
+    # goes first, the body next (its own top-level keys stay top-level), and
+    # the added tables last.
+    head = []
+    tail = []
+    if releasables is None:
+        # An explicit "emit nothing": the caller is testing what happens to a
+        # workspace with no releasables section at all.
+        declares_releasables = True
+    if not declares_releasables:
+        if releasables:
+            for rel in releasables:
+                if isinstance(rel, str):
+                    rel = {"name": rel}
+                block = f'[[releasables]]\nname = "{rel["name"]}"\n'
+                if rel.get("tag_format"):
+                    block += f'tag_format = "{rel["tag_format"]}"\n'
+                tail.append(block)
+        else:
+            head.append("releasables = []\n")
     if body:
-        parts.append(body if body.endswith("\n") else body + "\n")
-    return "\n".join(parts)
+        head.append(body if body.endswith("\n") else body + "\n")
+    if root_member:
+        tail.insert(0, root_member)
+    return "\n".join(head + tail)
 
 
 def _member_is_releasable(entry):
@@ -711,8 +719,12 @@ def make_workspace(root, projects, releasables=None):
             f"(path \".\"); got {[p['name'] for p in root_members]}"
         )
 
+    from rlsbl.workspace import WorkspaceProject as _WP
+
     prepared = []
     for proj in projects:
+        if isinstance(proj, _WP):
+            proj = proj.to_dict()
         unknown = sorted(set(proj) - _WORKSPACE_PROJECT_KEYS)
         if unknown:
             raise ValueError(
@@ -1017,8 +1029,17 @@ def monorepo_fixture(tmp_path, monkeypatch):
         {"path": "go", "name": "mygolib"},
     ]
 
-    # Create workspace.toml
+    # Create workspace.toml. make_workspace derives one releasable per member
+    # (named after it) and the mandatory root member.
     make_workspace(tmp_path, projects)
+
+    # Each derived releasable needs its own state: the version the member
+    # publishes and the changelog its entries go into.
+    for proj in projects:
+        write_releasable_version(str(tmp_path), proj["name"], "0.1.0")
+        rel_changes = get_releasable_changes_dir(str(tmp_path), proj["name"])
+        os.makedirs(rel_changes, exist_ok=True)
+        Path(rel_changes, "unreleased.jsonl").write_text("")
 
     # Create subproject directories and changelog files
     python_dir = tmp_path / "python"
@@ -1063,8 +1084,14 @@ def monorepo_fixture(tmp_path, monkeypatch):
     _uf_entry = json.dumps({"commits": [_post_tag_sha], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
     (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
     (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
+    for proj in projects:
+        Path(
+            get_releasable_changes_dir(str(tmp_path), proj["name"]),
+            "unreleased.jsonl",
+        ).write_text(_uf_entry)
     run_git(tmp_path, "add", "python/.rlsbl/changes/unreleased.jsonl")
     run_git(tmp_path, "add", "go/.rlsbl/changes/unreleased.jsonl")
+    run_git(tmp_path, "add", WORKSPACE_DIR)
     run_git(tmp_path, "commit", "-q", "-m", "add changelog entries")
 
     yield SimpleNamespace(

@@ -40,7 +40,7 @@ class TestPreservesTopLevelSections:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "[layers.core]" in content
@@ -54,7 +54,7 @@ class TestPreservesTopLevelSections:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "[check]" in content
@@ -67,7 +67,7 @@ class TestPreservesTopLevelSections:
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "# Monorepo configuration" in content
@@ -86,7 +86,7 @@ name = "pkg"
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
 
         projects = load_workspace(str(tmp_project))
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
 
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert 'custom_key = "hello"' in content
@@ -101,7 +101,7 @@ class TestPreservesProjectData:
 [[projects]]
 path = "libs/foo"
 name = "foo"
-watch = ["src/**"]
+custom_globs = ["src/**"]
 subtree_remote = "git@example.com:foo.git"
 library = true
 """
@@ -110,10 +110,10 @@ library = true
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
 
         projects = load_workspace(str(tmp_project))
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
 
         reloaded = load_workspace(str(tmp_project))
-        assert reloaded[0]["watch"] == ["src/**"]
+        assert reloaded[0]["custom_globs"] == ["src/**"]
         assert reloaded[0]["subtree_remote"] == "git@example.com:foo.git"
         assert reloaded[0]["library"] is True
 
@@ -123,7 +123,7 @@ library = true
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
 
         projects = load_workspace(str(tmp_project))
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
         reloaded = load_workspace(str(tmp_project))
 
         assert reloaded == projects
@@ -133,8 +133,8 @@ class TestNewFileCreation:
     """When workspace.toml does not exist yet, save_workspace() creates it."""
 
     def test_creates_file_when_missing(self, tmp_project):
-        projects = [{"path": "pkg/a", "name": "a"}]
-        make_workspace(str(tmp_project), projects)
+        projects = with_root_member([{"path": "pkg/a", "name": "a"}])
+        save_workspace(str(tmp_project), projects)
 
         ws_file = tmp_project / WORKSPACE_DIR / WORKSPACE_FILE
         assert ws_file.exists()

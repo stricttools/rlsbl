@@ -434,17 +434,35 @@ class TestLoadReleasablesMissingSection:
     """load_releasables() raises WorkspaceError when [[releasables]] is absent."""
 
     def test_missing_releasables_section_raises(self, tmp_project):
-        _write_workspace(tmp_project, """\
+        """A workspace with no releasables section is refused when it is read.
+
+        The refusal comes from load_workspace, which every reader goes
+        through, so load_releasables never sees an implicit-mode workspace.
+        """
+        _write_workspace(
+            tmp_project,
+            '''[[projects]]
+path = "."
+name = "root"
+dev_only = true
+releasable = false
+
 [[projects]]
 path = "a"
 name = "alpha"
-""")
-        with pytest.raises(WorkspaceError, match=r"\[\[releasables\]\] section required"):
+''',
+            root_member="",
+            releasables=None,
+        )
+        with pytest.raises(WorkspaceError, match="no \\[\\[releasables\\]\\] section"):
             load_releasables(str(tmp_project))
 
     def test_empty_workspace_raises(self, tmp_project):
-        _write_workspace(tmp_project, "projects = []\n")
-        with pytest.raises(WorkspaceError, match=r"\[\[releasables\]\] section required"):
+        """An empty workspace has no root member, which is refused first."""
+        _write_workspace(
+            tmp_project, "projects = []\n", root_member="", releasables=None,
+        )
+        with pytest.raises(WorkspaceError, match="declares no root member"):
             load_releasables(str(tmp_project))
 
 
@@ -535,11 +553,11 @@ class TestSaveWorkspaceReleasablesRoundTrip:
             WorkspaceProject({"path": "b", "name": "b", "releasable": False}),
             WorkspaceProject({"path": "c", "name": "c"}),
         ]
-        make_workspace(str(tmp_project), projects)
-        loaded = load_workspace(str(tmp_project))
-        assert loaded[0].releasable == "core"
-        assert loaded[1].releasable is False
-        assert loaded[2].releasable is None
+        make_workspace(str(tmp_project), projects, releasables=["core"])
+        loaded = {p.name: p for p in load_workspace(str(tmp_project))}
+        assert loaded["a"].releasable == "core"
+        assert loaded["b"].releasable is False
+        assert loaded["c"].releasable is None
 
     def test_releasables_section_preserved_when_not_passed(self, tmp_project):
         """When releasables=None, existing [[releasables]] is preserved."""
@@ -555,7 +573,7 @@ releasable = "core"
 """)
         projects = load_workspace(str(tmp_project))
         # Save without touching releasables
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
         # Re-load and verify releasables section survived
         releasables = load_releasables(str(tmp_project))
         assert len(releasables) == 1
@@ -592,8 +610,12 @@ releasable = "core"
         releasables = load_releasables(str(tmp_project))
         assert releasables[0].tag_format == DEFAULT_TAG_FORMAT
 
-    def test_empty_releasables_list_removes_section(self, tmp_project):
-        """Passing releasables=[] removes the [[releasables]] section."""
+    def test_empty_releasables_list_writes_an_empty_section(self, tmp_project):
+        """Passing releasables=[] writes `releasables = []`, not nothing.
+
+        Removing the section entirely would put the workspace back into
+        implicit mode, which no longer loads.
+        """
         _write_workspace(tmp_project, """\
 [[releasables]]
 name = "core"
@@ -604,10 +626,12 @@ name = "a"
 releasable = "core"
 """)
         projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), with_root_member(projects), releasables=[])
+        save_workspace(str(tmp_project), projects, releasables=[])
 
-        # Without [[releasables]], load_releasables raises
-        with pytest.raises(WorkspaceError, match=r"\[\[releasables\]\] section required"):
+        # An empty list writes an explicitly empty section, so the workspace
+        # still reads -- it simply has no releasables, and the member that
+        # named one is now dangling.
+        with pytest.raises(WorkspaceError, match="does not match any defined releasable"):
             load_releasables(str(tmp_project))
 
     def test_full_roundtrip_explicit_mode(self, tmp_project):

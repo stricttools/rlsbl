@@ -195,12 +195,22 @@ class TestCmdImpactFileMode:
         assert "Impact analysis for: models" in out
         assert "marketplace_contract" in out
 
-    def test_file_not_in_any_package(self, tmp_path, monkeypatch, capsys):
+    def test_file_outside_every_package_belongs_to_the_root_member(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        """No tracked file is package-less: the root member owns the residual."""
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
-        _cmd_impact(["outside/dir/file.dart"], {}, project_root=".")
-        err = capsys.readouterr().err
-        assert "does not belong to any workspace package" in err
+        data = _cmd_impact(["outside/dir/file.dart"], {}, project_root=".")
+        assert capsys.readouterr().err == ""
+        assert data["input"] == "root"
+
+    def test_tool_owned_file_belongs_to_no_package(self, tmp_path, monkeypatch, capsys):
+        """rlsbl's own bookkeeping is owned by nobody, and says so."""
+        monkeypatch.chdir(tmp_path)
+        _make_impact_workspace(tmp_path)
+        _cmd_impact([".rlsbl-monorepo/workspace.toml"], {}, project_root=".")
+        assert "does not belong to any workspace package" in capsys.readouterr().err
 
     def test_multiple_file_inputs(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
@@ -304,9 +314,10 @@ class TestCmdImpactErrors:
             _cmd_impact([], {}, project_root=".")
 
     def test_no_affected_packages_yields_no_payload(self, tmp_path, monkeypatch, capsys):
+        """A path no member owns -- a tool-owned one -- yields no payload."""
         monkeypatch.chdir(tmp_path)
         _make_impact_workspace(tmp_path)
         assert _cmd_impact(
-            ["outside/dir/file.dart"], {}, project_root=".",
+            [".rlsbl-monorepo/workspace.toml"], {}, project_root=".",
         ) is None
         assert "No affected packages found." in capsys.readouterr().out

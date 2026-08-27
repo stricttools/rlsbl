@@ -14,7 +14,7 @@ from rlsbl.snapshot import (
 from rlsbl.workspace import WORKSPACE_DIR
 from rlsbl.workspace_graph import WorkspaceGraph
 
-from conftest import workspace_toml
+from conftest import workspace_toml, with_root_member
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +62,10 @@ def _make_workspace(tmp_path, project_defs):
                 json.dumps({"name": pdef["name"], "version": version})
             )
 
+    # Every workspace declares a root member; the in-memory list the tests
+    # hand to generate_snapshot must match what the loader would return.
+    projects = with_root_member(projects)
+
     return root, projects
 
 
@@ -85,8 +89,9 @@ class TestGenerateSnapshot:
         snapshot = generate_snapshot(root, projects, graph)
 
         assert "generated_at" in snapshot
-        assert snapshot["package_count"] == 3
-        assert set(snapshot["packages"].keys()) == {"schema", "models", "app"}
+        # The three declared members, plus the mandatory root member.
+        assert snapshot["package_count"] == 4
+        assert set(snapshot["packages"].keys()) == {"schema", "models", "app", "root"}
 
     def test_package_fields(self, tmp_path):
         root, projects = _make_workspace(tmp_path, [
@@ -120,8 +125,8 @@ class TestGenerateSnapshot:
         graph = WorkspaceGraph(root, projects)
         snapshot = generate_snapshot(root, projects, graph)
 
-        assert snapshot["graph"]["leaf_nodes"] == ["schema"]
-        assert snapshot["graph"]["root_nodes"] == ["app"]
+        assert snapshot["graph"]["leaf_nodes"] == ["root", "schema"]
+        assert snapshot["graph"]["root_nodes"] == ["app", "root"]
 
     def test_topological_order(self, tmp_path):
         root, projects = _make_workspace(tmp_path, [
@@ -162,20 +167,21 @@ class TestGenerateSnapshot:
         snapshot = generate_snapshot(root, projects, graph)
 
         assert snapshot["graph"]["max_depth"] == 0
-        assert snapshot["graph"]["leaf_nodes"] == ["a", "b"]
-        assert snapshot["graph"]["root_nodes"] == ["a", "b"]
+        assert snapshot["graph"]["leaf_nodes"] == ["a", "b", "root"]
+        assert snapshot["graph"]["root_nodes"] == ["a", "b", "root"]
 
-    def test_empty_workspace(self, tmp_path):
+    def test_workspace_with_only_a_root_member(self, tmp_path):
+        """A workspace is never empty: it always declares its root member."""
         root, projects = _make_workspace(tmp_path, [])
         graph = WorkspaceGraph(root, projects)
         snapshot = generate_snapshot(root, projects, graph)
 
-        assert snapshot["package_count"] == 0
-        assert snapshot["packages"] == {}
-        assert snapshot["graph"]["leaf_nodes"] == []
-        assert snapshot["graph"]["root_nodes"] == []
+        assert snapshot["package_count"] == 1
+        assert list(snapshot["packages"]) == ["root"]
+        assert snapshot["graph"]["leaf_nodes"] == ["root"]
+        assert snapshot["graph"]["root_nodes"] == ["root"]
         assert snapshot["graph"]["max_depth"] == 0
-        assert snapshot["graph"]["topological_order"] == []
+        assert snapshot["graph"]["topological_order"] == ["root"]
 
     def test_defaults_for_optional_fields(self, tmp_path):
         """description defaults to None, library/test_only default to False."""
@@ -320,6 +326,9 @@ class TestCmdSnapshot:
             lines.append("[[projects]]")
             lines.append(f'path = "{p["path"]}"')
             lines.append(f'name = "{p["name"]}"')
+            if p.get("dev_only"):
+                lines.append("dev_only = true")
+            lines.append("releasable = false")
             if "depends_on" in p:
                 deps = ", ".join(f'"{d}"' for d in p["depends_on"])
                 lines.append(f"depends_on = [{deps}]")
@@ -343,7 +352,8 @@ class TestCmdSnapshot:
         assert snapshot_path.exists()
 
         data = json.loads(snapshot_path.read_text())
-        assert data["package_count"] == 2
+        # The two declared members, plus the mandatory root member.
+        assert data["package_count"] == 3
         assert "alpha" in data["packages"]
         assert "beta" in data["packages"]
 
@@ -357,7 +367,10 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
+            workspace_toml(
+                '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+                'releasable = false\n'
+            )
         )
 
         monkeypatch.chdir(tmp_path)
@@ -380,7 +393,10 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
+            workspace_toml(
+                '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+                'releasable = false\n'
+            )
         )
 
         monkeypatch.chdir(tmp_path)
@@ -418,7 +434,10 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
+            workspace_toml(
+                '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+                'releasable = false\n'
+            )
         )
         monkeypatch.chdir(tmp_path)
 
@@ -448,7 +467,10 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
+            workspace_toml(
+                '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+                'releasable = false\n'
+            )
         )
         monkeypatch.chdir(tmp_path)
 
@@ -475,7 +497,10 @@ class TestCmdSnapshot:
         ws_dir = tmp_path / WORKSPACE_DIR
         ws_dir.mkdir(exist_ok=True)
         (ws_dir / "workspace.toml").write_text(
-            workspace_toml('[[projects]]\npath = "packages/alpha"\nname = "alpha"\n')
+            workspace_toml(
+                '[[projects]]\npath = "packages/alpha"\nname = "alpha"\n'
+                'releasable = false\n'
+            )
         )
         monkeypatch.chdir(tmp_path)
         graph = WorkspaceGraph(root, projects)

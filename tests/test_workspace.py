@@ -120,7 +120,7 @@ class TestSaveWorkspace:
 
     def test_creates_file(self, tmp_project):
         projects = [{"path": "packages/foo", "name": "foo"}]
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         assert (tmp_project / ".rlsbl-monorepo" / "workspace.toml").exists()
 
     def test_creates_directory(self, tmp_project):
@@ -133,7 +133,7 @@ class TestSaveWorkspace:
             {"path": "packages/foo", "name": "foo"},
             {"path": "libs/bar", "name": "bar"},
         ]
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         loaded = declared(load_workspace(str(tmp_project)))
         assert [p.to_dict() for p in loaded] == [
             {**proj, "releasable": False} for proj in projects
@@ -150,7 +150,7 @@ class TestSaveWorkspace:
         make_workspace(str(tmp_project), [{"path": "b", "name": "b"}])
         loaded = declared(load_workspace(str(tmp_project)))
         assert [p.to_dict() for p in loaded] == [
-            {"path": "b", "name": "b", "releasable": False},
+            {"path": "b", "name": "b", "releasable": "b"},
         ]
 
 
@@ -196,7 +196,7 @@ class TestWorkspaceExtraKeys:
                 "owner": "platform-team",
             }
         ]
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         loaded = declared(load_workspace(str(tmp_project)))
         assert [p.to_dict() for p in loaded] == [
             {**proj, "releasable": False} for proj in projects
@@ -212,7 +212,7 @@ class TestWorkspaceExtraKeys:
                 "subtree_remote": "git@example.com:bar.git",
             }
         ]
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), with_root_member(projects))
         toml_path = tmp_project / ".rlsbl-monorepo" / "workspace.toml"
         content = toml_path.read_text()
         # path must come before name, name before extras, extras sorted
@@ -250,7 +250,12 @@ class TestResolveProject:
         assert result is not None
         assert result["name"] == "foo"
 
-    def test_returns_none_outside_any_project(self, tmp_project):
+    def test_directory_no_member_claims_is_the_root_members(self, tmp_project):
+        """Inside a workspace, some member always answers: the root member.
+
+        A directory no declared member claims used to resolve to nothing; the
+        root member owns the residual, so it answers instead.
+        """
         ws_dir = tmp_project / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
@@ -259,7 +264,17 @@ class TestResolveProject:
         other = tmp_project / "other"
         other.mkdir()
         result = resolve_project(str(tmp_project), str(other))
-        assert result is None
+        assert result["name"] == "root"
+
+    def test_returns_none_outside_the_workspace(self, tmp_project):
+        ws_dir = tmp_project / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text(
+            workspace_toml('[[projects]]\npath = "packages/foo"\nname = "foo"\n')
+        )
+        outside = tmp_project.parent / "outside-the-workspace"
+        outside.mkdir(exist_ok=True)
+        assert resolve_project(str(tmp_project), str(outside)) is None
 
     def test_picks_most_specific_on_nested_paths(self, tmp_project):
         ws_dir = tmp_project / ".rlsbl-monorepo"
@@ -281,6 +296,7 @@ class TestResolveProject:
         (ws_dir / "workspace.toml").write_text(
             workspace_toml('[[projects]]\npath = "pkg"\nname = "pkg"\n')
         )
-        # cwd is tmp_project (set by tmp_project fixture), which is not inside "pkg"
+        # cwd is tmp_project (set by tmp_project fixture), which is the root
+        # member's own directory rather than "pkg".
         result = resolve_project(str(tmp_project))
-        assert result is None
+        assert result["name"] == "root"

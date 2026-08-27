@@ -37,7 +37,7 @@ name = "beta"
 path = "libs/alpha-core"
 name = "alpha-core"
 releasable = "alpha"
-watch = ["src/**", "tests/**"]  # watched globs
+depends_on = ["beta-api"]  # a declared dependency
 
 [[projects]]
 path = "apps/alpha-web"
@@ -73,7 +73,7 @@ class TestFieldEditPreservesRest:
             if p["path"] == "apps/alpha-web":
                 p["library"] = True
 
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
         out = _read_ws(tmp_project)
 
         # Everything that was there is still there, verbatim.
@@ -81,16 +81,16 @@ class TestFieldEditPreservesRest:
         assert "custom_top = 42" in out
         assert 'name = "alpha"  # the alpha group' in out
         assert '# alpha-core is the shared library' in out
-        assert 'watch = ["src/**", "tests/**"]  # watched globs' in out
+        assert 'depends_on = ["beta-api"]  # a declared dependency' in out
         # The intended change landed.
         assert "library = true" in out
 
     def test_untouched_save_is_byte_identical(self, tmp_project):
         _write_ws(tmp_project, COMMENTED_TOML)
         projects = load_workspace(str(tmp_project))
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
         # A no-op save must not perturb a single byte.
-        assert _read_ws(tmp_project) == COMMENTED_TOML
+        assert _read_ws(tmp_project) == workspace_toml(COMMENTED_TOML)
 
 
 class TestAddPreservesRest:
@@ -104,7 +104,7 @@ class TestAddPreservesRest:
                 {"path": "apps/beta-cli", "name": "beta-cli", "releasable": "beta"}
             )
         )
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
         out = _read_ws(tmp_project)
 
         # The original content is a prefix-preserved subset: every original
@@ -123,7 +123,7 @@ class TestRemovePreservesRest:
         _write_ws(tmp_project, COMMENTED_TOML)
         projects = load_workspace(str(tmp_project))
         remaining = [p for p in projects if p["path"] != "apps/alpha-web"]
-        make_workspace(str(tmp_project), remaining)
+        save_workspace(str(tmp_project), remaining)
         out = _read_ws(tmp_project)
 
         # The removed table is gone.
@@ -132,7 +132,7 @@ class TestRemovePreservesRest:
         assert "# Top-of-file banner comment" in out
         assert 'name = "alpha"  # the alpha group' in out
         assert "# alpha-core is the shared library" in out
-        assert 'watch = ["src/**", "tests/**"]  # watched globs' in out
+        assert 'depends_on = ["beta-api"]  # a declared dependency' in out
         assert 'path = "libs/beta-api"' in out
         assert 'path = "libs/alpha-core"' in out
 
@@ -175,7 +175,7 @@ class TestRoundTripStillLoads:
                 {"path": "apps/new", "name": "new", "releasable": "alpha"}
             )
         )
-        make_workspace(str(tmp_project), projects)
+        save_workspace(str(tmp_project), projects)
 
         reloaded = load_workspace(str(tmp_project))
         paths = {p["path"] for p in reloaded}
