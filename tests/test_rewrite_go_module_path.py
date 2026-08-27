@@ -173,6 +173,65 @@ class TestObserveAndApply:
             apply_item(item, OLD, NEW)
         assert (repo / "doc.go").read_text().count(OLD) == 2
 
+    def test_ordinary_go_directories_named_like_build_output_are_swept(self, repo):
+        """``build``, ``assets`` and ``static`` are legal Go package names.
+
+        The walk used to prune a linter's build-output exclusion list, so a
+        package living in ``internal/assets`` was neither counted nor rewritten
+        and the command still reported success -- leaving a tree that does not
+        compile.  Everything except ``vendor/`` and ``.git/`` is swept.
+        """
+        _write(repo, "internal/assets/assets.go", (
+            "package assets\n"
+            "\n"
+            f'import "{OLD}/internal/deep"\n'
+        ))
+        _write(repo, "cmd/build/main.go", (
+            "package main\n"
+            "\n"
+            f'import "{OLD}/internal/svc"\n'
+            "\n"
+            "func main() {}\n"
+        ))
+        _write(repo, "web/static/gen.go", (
+            "package static\n"
+            "\n"
+            f'import "{OLD}/internal/deep"\n'
+        ))
+        _write(repo, "node_modules/pkg/thing.go", (
+            "package pkg\n"
+            "\n"
+            f'import "{OLD}/internal/deep"\n'
+        ))
+        _write(repo, "dist/go.mod", f"module {OLD}/dist\n")
+
+        preview = observe(repo, OLD, NEW)
+        for rel in (
+            os.path.join("internal", "assets", "assets.go"),
+            os.path.join("cmd", "build", "main.go"),
+            os.path.join("web", "static", "gen.go"),
+            os.path.join("node_modules", "pkg", "thing.go"),
+            os.path.join("dist", "go.mod"),
+        ):
+            assert rel in preview.keys, f"{rel} missing from the plan"
+
+        for item in preview.items:
+            apply_item(item, OLD, NEW)
+        assert NEW in (repo / "internal" / "assets" / "assets.go").read_text()
+        assert NEW in (repo / "cmd" / "build" / "main.go").read_text()
+        assert NEW in (repo / "web" / "static" / "gen.go").read_text()
+        assert OLD not in (repo / "web" / "static" / "gen.go").read_text()
+
+    def test_the_git_directory_is_never_swept(self, repo):
+        """``.git`` is the repository's own storage, not source to rename."""
+        _write(repo, ".git/hooks/thing.go", (
+            "package hooks\n"
+            "\n"
+            f'import "{OLD}/internal/deep"\n'
+        ))
+        preview = observe(repo, OLD, NEW)
+        assert not any(key.startswith(".git") for key in preview.keys)
+
     def test_vendored_trees_are_skipped(self, repo):
         _write(repo, "vendor/github.com/o/foo/v.go", (
             "package foo\n"
@@ -256,6 +315,35 @@ class TestASingleOccurrenceRepo:
         preview = observe(root, OLD, NEW)
         assert preview.keys == ("go.mod", "(total)")
         assert "1 occurrence across 1 file" in preview.items[-1].summary
+
+
+class TestTheWalkerParameter:
+    """``walk_source_files`` prunes the caller's names, not a fixed list."""
+
+    def test_the_default_is_the_linter_set(self, tmp_path):
+        from rlsbl.lint.utils import LINTER_EXCLUDED_DIRS, walk_source_files
+
+        for rel in ("build/a.go", "assets/b.go", "pkg.egg-info/c.go", "src/d.go"):
+            _write(tmp_path, rel, "package p\n")
+        found = walk_source_files(str(tmp_path), (".go",), [])
+        assert [os.path.relpath(p, tmp_path) for p in found] == [
+            os.path.join("src", "d.go")
+        ]
+        assert "build" in LINTER_EXCLUDED_DIRS
+        assert "*.egg-info" in LINTER_EXCLUDED_DIRS
+
+    def test_an_explicit_set_replaces_it_entirely(self, tmp_path):
+        from rlsbl.lint.utils import walk_source_files
+
+        for rel in ("build/a.go", "vendor/b.go", "src/d.go"):
+            _write(tmp_path, rel, "package p\n")
+        found = walk_source_files(
+            str(tmp_path), (".go",), [], excluded_dir_names=frozenset({"vendor"}),
+        )
+        assert sorted(os.path.relpath(p, tmp_path) for p in found) == [
+            os.path.join("build", "a.go"),
+            os.path.join("src", "d.go"),
+        ]
 
 
 class TestCommandEntryPoint:

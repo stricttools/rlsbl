@@ -26,7 +26,15 @@ What is deliberately NOT rewritten
 * **Any file that is not a ``go.mod`` or a ``.go``.**  READMEs, CI workflows
   and generated code are outside this command's scope, on purpose: it renames
   a module, it does not sweep a repository for a string.
-* **``vendor/``.**  Vendored trees are third-party copies, not this module.
+* **``vendor/`` and ``.git/``, and nothing else.**  A vendored tree is a
+  third-party copy, not this module, and ``.git`` is the repository's own
+  storage.  Every other directory is visited, INCLUDING ``build``, ``dist``,
+  ``static``, ``public``, ``assets`` and ``node_modules``: those are a
+  linter's build-output exclusions, and each of them is also a perfectly
+  ordinary Go package directory (``internal/assets``, ``cmd/build``,
+  ``web/static``).  Pruning them here skipped real packages silently and left
+  a tree that does not compile, so this command passes its own exclusion set
+  to the shared walker rather than inheriting the linters' one.
 """
 
 import os
@@ -40,9 +48,15 @@ from ...lint.utils import walk_source_files
 from ...module_paths import GO_SEP, go_import_under_module, rewrite_module_prefix
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
 
-#: Path components that take a file out of the walk, on top of the linter's
-#: own exclusions.  A vendored tree is a third-party copy, not this module.
+#: Path components that take a file out of the walk.  A vendored tree is a
+#: third-party copy, not this module.
 _EXCLUDED_COMPONENTS = frozenset({"vendor"})
+
+#: Directory names the sweep never descends into -- the WHOLE list.  Passed
+#: explicitly to :func:`~rlsbl.lint.utils.walk_source_files` so this command
+#: does not inherit the linters' build-output exclusions, which are ordinary
+#: Go package names (see the module docstring).
+_WALK_EXCLUDED_DIRS = frozenset({*_EXCLUDED_COMPONENTS, ".git"})
 
 #: Characters that continue a module-path token.  A match must not be preceded
 #: by one (or it sits inside a longer path) and must not be followed by one
@@ -105,7 +119,9 @@ def _excluded(path, root):
 
 def find_go_mod_files(root):
     """Every ``go.mod`` in the tree, absolute, sorted."""
-    found = walk_source_files(str(root), ("go.mod",), [])
+    found = walk_source_files(
+        str(root), ("go.mod",), [], excluded_dir_names=_WALK_EXCLUDED_DIRS,
+    )
     return sorted(
         p for p in found
         if os.path.basename(p) == "go.mod" and not _excluded(p, root)
@@ -291,7 +307,9 @@ def observe(root, old, new):
     owns = old in set(declared.values())
 
     sources = sorted(
-        p for p in walk_source_files(str(root), (".go",), [])
+        p for p in walk_source_files(
+            str(root), (".go",), [], excluded_dir_names=_WALK_EXCLUDED_DIRS,
+        )
         if not _excluded(p, root)
     )
 
