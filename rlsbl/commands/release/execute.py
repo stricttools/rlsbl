@@ -398,8 +398,21 @@ def _empty_candidate_window_message(*, version, tag, branch, candidate_sha,
     Same terminal state as :func:`_ci_not_run_message` and the same remedy --
     but reached BEFORE the push and before the CI wait, from the diff alone,
     so the operator learns it in a second instead of after a full CI cycle.
+
+    Negated patterns are rendered apart from the rest. The message's own
+    instruction is "commit a change under one of the paths above", and a root
+    member's filter is ``**`` narrowed by one negated exclude per other
+    territory -- so listing them together told the operator to commit under
+    ``!packages/core/**``, which is not a path and names the one area where a
+    commit would not help. They stay visible, as what the filter subtracts.
     """
-    listed = "\n".join(f"    {p}" for p in patterns) or "    (none)"
+    followable = [p for p in patterns if not p.startswith("!")]
+    excluded = [p[1:] for p in patterns if p.startswith("!")]
+    listed = "\n".join(f"    {p}" for p in followable) or "    (none)"
+    if excluded:
+        listed += "\n  Not counting (the filter excludes them):\n" + "\n".join(
+            f"    {p}" for p in excluded
+        )
     seen = "\n".join(f"    {p}" for p in sorted(changed)[:10]) or "    (nothing)"
     if len(changed) > 10:
         seen += f"\n    ... and {len(changed) - 10} more"

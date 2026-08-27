@@ -93,6 +93,56 @@ class TestReleaseRouterFilters:
         assert all(isinstance(name, str) and filt for name, filt in per_project)
 
 
+class TestTheRemediationListIsFollowable:
+    """The refusal tells the operator to commit under one of the paths it lists.
+
+    A root member's filter is ``**`` narrowed by a negated exclude per other
+    territory, and the message rendered the whole list -- so it instructed the
+    operator to commit under ``!packages/core/**``, which is not a path and,
+    read as one, is the exact place a commit would NOT help. Negated patterns
+    are now rendered apart from the followable ones.
+    """
+
+    @staticmethod
+    def _root_member_message(tmp_path):
+        from rlsbl.commands.release.execute import _empty_candidate_window_message
+        from rlsbl.router_filters import RouterFilters
+
+        members = [
+            {"name": "root", "path": "."},
+            {"name": "core", "path": "packages/core"},
+        ]
+        patterns = RouterFilters(tmp_path, members).patterns_for(members[0])
+        assert any(p.startswith("!") for p in patterns), patterns
+        return _empty_candidate_window_message(
+            version="0.5.0", tag="v0.5.0", branch="main",
+            candidate_sha="a" * 40, base_sha="b" * 40,
+            patterns=patterns, changed={"packages/core/src/index.ts"},
+            pushing=True,
+        )
+
+    def _filters_section(self, message):
+        """The patterns offered as places to commit, excludes not included."""
+        body = message.split("  Filters:\n", 1)[1]
+        body = body.split("\n  Changed in the window:", 1)[0]
+        return body.split("\n  Not counting", 1)[0]
+
+    def test_no_negated_pattern_is_offered_as_a_path_to_commit_under(self, tmp_path):
+        message = self._root_member_message(tmp_path)
+        offered = [
+            line.strip() for line in self._filters_section(message).splitlines()
+            if line.strip()
+        ]
+        assert offered == ["**"], offered
+        assert "Commit a change under one of the paths above" in message
+
+    def test_the_excluded_territories_are_still_shown(self, tmp_path):
+        """Dropping them would hide why a commit under them cannot help."""
+        message = self._root_member_message(tmp_path)
+        assert "packages/core/**" in message
+        assert "not counting" in message.lower()
+
+
 def _prepare_resumable_candidate(root, core, unrelated_path="docs/notes.md",
                                  published=True):
     """Stage the resumed-sibling shape.

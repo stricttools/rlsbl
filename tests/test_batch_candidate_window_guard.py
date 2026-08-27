@@ -105,6 +105,27 @@ def _commit_touching(root, path, message):
     return git(root, "rev-parse", "HEAD")
 
 
+def _commit_version_bump(root, rel_name, message, version="1.0.1"):
+    """A member's version-bump commit: a real edit to its real manifest.
+
+    Appending a junk line to ``package.json`` also produces a commit inside
+    the member's territory, which is all this fixture is about -- but it
+    leaves behind a manifest no dependency scanner can parse, and an
+    unparseable manifest is refused outright now (the edges it would have
+    contributed are what the router's filters are derived from).
+    """
+    path = os.path.join(str(root), rel_name, "package.json")
+    with open(path, encoding="utf-8") as f:
+        manifest = json.load(f)
+    manifest["version"] = version
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+        f.write("\n")
+    git(root, "add", f"{rel_name}/package.json")
+    git(root, "commit", "-q", "-m", message)
+    return git(root, "rev-parse", "HEAD")
+
+
 def _run_candidate_push(root, pending, remote_head):
     """Call the batch candidate push with ``git ls-remote`` answering *remote_head*.
 
@@ -132,8 +153,8 @@ class TestBatchCandidateWindowGuard:
         _setup_releasable_batch_workspace(root)
         bump_shas = {}
         for rel_name, _project_name in MEMBERS:
-            bump_shas[rel_name] = _commit_touching(
-                root, f"{rel_name}/package.json", f"{rel_name}@v1.0.1",
+            bump_shas[rel_name] = _commit_version_bump(
+                root, rel_name, f"{rel_name}@v1.0.1",
             )
         return bump_shas
 
@@ -268,8 +289,8 @@ class TestStrandedResumeDispatchesRunAllItself:
         git(tmp_project, "commit", "-q", "-m", "ci: router")
         bump_shas = {}
         for rel_name, _project_name in MEMBERS:
-            bump_shas[rel_name] = _commit_touching(
-                tmp_project, f"{rel_name}/package.json", f"{rel_name}@v1.0.1",
+            bump_shas[rel_name] = _commit_version_bump(
+                tmp_project, rel_name, f"{rel_name}@v1.0.1",
             )
         published = git(tmp_project, "rev-parse", "HEAD")
         pending = _seed_stranded_member_states(
