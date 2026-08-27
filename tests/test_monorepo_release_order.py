@@ -76,14 +76,12 @@ class TestReleaseOrderWithDeps:
 
         lines = [l.strip() for l in captured.out.strip().split("\n") if l.strip() and l.strip()[0].isdigit()]
         names = [l.split(". ", 1)[1] for l in lines]
-        assert names[0] == "D"
-        assert names[-1] in ("A", "root")
-        assert "A" in names
-        # B and C must come after D but before A
-        assert names.index("B") > names.index("D")
-        assert names.index("C") > names.index("D")
-        assert names.index("B") < names.index("A")
-        assert names.index("C") < names.index("A")
+        # The order is fully determined: Kahn's algorithm pops from a
+        # min-heap, so ties break alphabetically. D and the root member both
+        # start with no dependencies; "D" sorts before "root", and "root"
+        # loses every later tie too, so the dependency-free root member
+        # trails the whole chain it is unrelated to.
+        assert names == ["D", "B", "C", "A", "root"]
 
 
 class TestReleaseOrderIndependent:
