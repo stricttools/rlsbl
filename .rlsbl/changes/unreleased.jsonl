@@ -110,3 +110,4 @@
 {"format_version":1,"id":"18cfc49c873d48dd7467aea2bd7f4557aa6fd48ce8e007fa","commits":["259ed19fd82fe3a6effbeae73812494b36337362"],"user_facing":false}
 {"format_version":1,"id":"18cfc521d39a1c36c646ee92410d4068b5fdf4459529c49a","commits":["f191950b3097f1a6bb5c46b46593e75165904e70"],"user_facing":false}
 {"format_version":1,"id":"18cfc70be364f7f0f4e327d35adc4617b7f26e6235baca2a","commits":["250cf5a8203f8065639e9295006b183643f91789"],"user_facing":false}
+{"format_version":1,"id":"18cfc72b87e37352d302b6cb6fdd4161807d3f978c9e2b9c","commits":["a0a4c0f8d2ffb2aacb4ecb54cc60320a54271fb9"],"user_facing":true,"description":"**Undo audit file is no longer silently discarded.** A corrupted `undo-audit.json` was previously overwritten with a fresh single-record array, losing the record of every past undo; `rlsbl release undo` now reports it as an error and leaves the file untouched for repair.","type":"fix"}
