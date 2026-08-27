@@ -6399,11 +6399,6 @@
         },
         {
           "level": 3,
-          "text": "`_is_generated_router`",
-          "anchor": "_is_generated_router"
-        },
-        {
-          "level": 3,
           "text": "`_saferm_workflow`",
           "anchor": "_saferm_workflow"
         },
@@ -12086,6 +12081,11 @@
         },
         {
           "level": 3,
+          "text": "`is_generated_router`",
+          "anchor": "is_generated_router"
+        },
+        {
+          "level": 3,
           "text": "`_target_manifest_names`",
           "anchor": "_target_manifest_names"
         },
@@ -15196,6 +15196,11 @@
         },
         {
           "level": 3,
+          "text": "`partition_stageable`",
+          "anchor": "partition_stageable"
+        },
+        {
+          "level": 3,
           "text": "`assert_git_toplevel`",
           "anchor": "assert_git_toplevel"
         },
@@ -17193,6 +17198,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-27T20:01:33.703029+00:00",
+  "last_gen": "2026-08-27T20:49:49.056659+00:00",
   "theme": "minimal"
 }
