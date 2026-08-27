@@ -1434,9 +1434,11 @@ def _build_python_import_graph(
                 if target != rel_path:
                     resolved.add(target)
             else:
-                # Check if any module starts with this import (parent import)
+                # A parent import pulls in its children. Containment is the
+                # shared dotted rule, so "pkg.module" is not a child of
+                # "pkg.mod" merely for sharing a letter run.
                 for mod_name, mod_path in module_to_relpath.items():
-                    if mod_name.startswith(imp + ".") and mod_path != rel_path:
+                    if dotted_under_module(mod_name, imp) and mod_path != rel_path:
                         resolved.add(mod_path)
         if resolved:
             graph[rel_path] = resolved

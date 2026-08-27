@@ -158,10 +158,52 @@ class TestMigratedCallSitesHonourTheBoundary:
         assert os.path.join("internal", "used") in dead
         assert os.path.join("internal", "usedother") not in dead
 
-    def test_dead_python_module_detector_boundary(self):
-        """The dotted rule, exercised through the detector's own helper."""
+    def test_the_dotted_rule_itself(self):
+        """The rule, stated at the helper."""
         assert dotted_under_module("pkg.mod.sub", "pkg.mod")
         assert not dotted_under_module("pkg.module", "pkg.mod")
+
+    def test_dead_python_module_detector(self, tmp_path):
+        """The detector's own call site, on a similarly-named module.
+
+        ``import pkg.module`` must not keep ``pkg/mod.py`` alive: the two
+        module names merely share a letter run.
+        """
+        from rlsbl.dep_validation import find_dead_modules
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n'
+        )
+        pkg = tmp_path / "pkg"
+        pkg.mkdir()
+        (pkg / "mod.py").write_text("VALUE = 1\n")
+        (pkg / "module.py").write_text("OTHER = 2\n")
+        (pkg / "app.py").write_text("import pkg.module\n\nprint(pkg.module.OTHER)\n")
+
+        dead = find_dead_modules(str(tmp_path))
+        assert os.path.join("pkg", "mod.py") in dead
+        assert os.path.join("pkg", "module.py") not in dead
+
+    def test_python_import_graph_builder(self, tmp_path):
+        """The circular-dependency graph's call site, same question.
+
+        ``import pkg.mod`` resolves an edge to ``pkg/mod.py`` alone -- a
+        parent import pulls in its children, but ``pkg/module.py`` is not one
+        of ``pkg.mod``'s children.
+        """
+        from rlsbl.dep_validation import _build_python_import_graph
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "pkg"\nversion = "0.1.0"\n'
+        )
+        pkg = tmp_path / "pkg"
+        pkg.mkdir()
+        (pkg / "mod.py").write_text("VALUE = 1\n")
+        (pkg / "module.py").write_text("OTHER = 2\n")
+        (pkg / "app.py").write_text("import pkg.mod\n")
+
+        graph = _build_python_import_graph(str(tmp_path))
+        assert graph[os.path.join("pkg", "app.py")] == {os.path.join("pkg", "mod.py")}
 
     def test_jvm_import_scanner(self, tmp_path):
         from rlsbl.import_scanners import JavaImportScanner
