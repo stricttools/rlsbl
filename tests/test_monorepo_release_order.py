@@ -50,7 +50,8 @@ class TestReleaseOrderWithDeps:
 
         assert "Release order (leaves first):" in captured.out
         lines = [l.strip() for l in captured.out.strip().split("\n") if l.strip() and l.strip()[0].isdigit()]
-        assert len(lines) == 3
+        # The three declared members, plus the root member.
+        assert len(lines) == 4
         assert lines[0] == "1. C"
         assert lines[1] == "2. B"
         assert lines[2] == "3. A"
@@ -76,7 +77,8 @@ class TestReleaseOrderWithDeps:
         lines = [l.strip() for l in captured.out.strip().split("\n") if l.strip() and l.strip()[0].isdigit()]
         names = [l.split(". ", 1)[1] for l in lines]
         assert names[0] == "D"
-        assert names[-1] == "A"
+        assert names[-1] in ("A", "root")
+        assert "A" in names
         # B and C must come after D but before A
         assert names.index("B") > names.index("D")
         assert names.index("C") > names.index("D")
@@ -108,7 +110,7 @@ class TestReleaseOrderIndependent:
         assert "1." not in captured.out
         # Names should appear in alphabetical order
         lines = [l.strip() for l in captured.out.strip().split("\n") if l.strip() and not l.strip().startswith("All")]
-        assert lines == ["alpha", "mid", "zeta"]
+        assert lines == ["alpha", "mid", "root", "zeta"]
 
 
 class TestReleaseOrderCycle:
@@ -143,7 +145,9 @@ class TestReleaseOrderEdgeCases:
 
         _cmd_release_order({}, project_root=".")
         captured = capsys.readouterr()
-        assert "No projects in workspace." in captured.out
+        # A workspace is never empty: its root member is always a member.
+        assert "No projects in workspace." not in captured.out
+        assert "root" in captured.out
 
     def test_no_workspace(self, mock_git_repo):
         """No workspace should error and exit 1."""

@@ -280,6 +280,7 @@ class TestCleanupSkipsNoReleasables:
 [[projects]]
 path = "pkg"
 name = "pkg"
+releasable = false
 """)
         removed = cleanup_per_package_release_state(str(tmp_project))
         assert removed == []
@@ -294,6 +295,7 @@ name = "pkg"
 [[projects]]
 path = "a"
 name = "a"
+releasable = false
 
 [[projects]]
 path = "b"
@@ -559,10 +561,11 @@ class TestRootMemberExemption:
         _write_workspace(tmp_project, """\
 [[releasables]]
 name = "solo"
+tag_format = "v{version}"
 
 [[projects]]
 path = "."
-name = "solo-pkg"
+name = "root"
 releasable = "solo"
 """)
         removed = cleanup_per_package_release_state(str(tmp_project))
@@ -674,10 +677,11 @@ releasable = "core"
         _write_workspace(tmp_project, """\
 [[releasables]]
 name = "solo"
+tag_format = "v{version}"
 
 [[projects]]
 path = "."
-name = "solo-pkg"
+name = "root"
 releasable = "solo"
 """)
         result = self._impl()(self._ctx(tmp_project))

@@ -141,8 +141,10 @@ def _setup_explicit_workspace(tmp_path):
     ws_dir.mkdir()
     ws_toml = ws_dir / WORKSPACE_FILE
     ws_toml.write_text(
-        '[[projects]]\npath = "pkg-a"\n\n'
-        '[[releasables]]\nname = "core"\nmembers = ["pkg-a"]\n'
+        '[[projects]]\npath = "pkg-a"\nreleasable = "core"\n\n'
+        '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
+        'releasable = false\n\n'
+        '[[releasables]]\nname = "core"\n'
     )
     # Create the project directory with a detectable target
     proj_dir = tmp_path / "pkg-a"
@@ -154,11 +156,16 @@ def _setup_explicit_workspace(tmp_path):
 
 
 def _setup_implicit_workspace(tmp_path):
-    """Set up a monorepo workspace WITHOUT [[releasables]] (implicit mode)."""
+    """Set up a workspace whose one member stands outside every releasable."""
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir()
     ws_toml = ws_dir / WORKSPACE_FILE
-    ws_toml.write_text('[[projects]]\npath = "pkg-a"\n')
+    ws_toml.write_text(
+        'releasables = []\n\n'
+        '[[projects]]\npath = "pkg-a"\nreleasable = false\n\n'
+        '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
+        'releasable = false\n'
+    )
     proj_dir = tmp_path / "pkg-a"
     proj_dir.mkdir()
     (proj_dir / "pyproject.toml").write_text(
@@ -178,12 +185,16 @@ class TestReleaseInitExplicitModeWarning:
         assert "rlsbl monorepo release init" in captured.err
         assert "explicit mode" in captured.err
 
-    def test_no_warning_in_implicit_mode(self, tmp_path, capsys):
-        """release init does NOT warn when workspace is in implicit mode."""
+    def test_warns_even_with_no_releasables_declared(self, tmp_path, capsys):
+        """Every workspace declares its releasables, so the warning always fires.
+
+        There is no implicit mode to be quiet in; a workspace whose members
+        all stand outside every releasable is still an explicit-mode one.
+        """
         proj_dir = _setup_implicit_workspace(tmp_path)
         release_init_run_cmd(proj_dir)
         captured = capsys.readouterr()
-        assert "explicit mode" not in captured.err
+        assert "monorepo release init" in captured.err
 
     def test_no_warning_outside_monorepo(self, tmp_path, capsys):
         """release init does NOT warn when not inside a monorepo."""
@@ -493,7 +504,13 @@ class TestBatchPlanIdempotency:
             _git_tag(ws, f"{n}@v0.1.1")
 
         # Strand beta with an in-progress.json.
-        beta_state = get_state_path(os.path.join(str(ws), "beta"))
+        from rlsbl.commands.release.release_state import resolve_releasable_dir
+        beta_state = get_state_path(
+            os.path.join(str(ws), "beta"),
+            releasable_dir=resolve_releasable_dir(
+                os.path.join(str(ws), "beta"), str(ws),
+            ),
+        )
         os.makedirs(os.path.dirname(beta_state), exist_ok=True)
         with open(beta_state, "w", encoding="utf-8") as f:
             f.write('{"new_version": "0.1.1", "tag": "beta@v0.1.1"}\n')
@@ -665,7 +682,11 @@ class TestBatchMemberSilentExitZero:
 
         def mock_run(release_config, flags, **kwargs):
             project_dir = str(kwargs["ctx"].project_root)
-            state_path = get_state_path(project_dir)
+            from rlsbl.commands.release.release_state import resolve_releasable_dir
+            state_path = get_state_path(
+                project_dir,
+                releasable_dir=resolve_releasable_dir(project_dir, str(ws)),
+            )
             os.makedirs(os.path.dirname(state_path), exist_ok=True)
             with open(state_path, "w", encoding="utf-8") as f:
                 f.write('{"new_version": "0.1.1", "tag": "alpha@v0.1.1"}\n')
@@ -786,7 +807,12 @@ class TestBatchSeedsStrandedMembers:
     def _strand(self, ws, name, completed_steps):
         from rlsbl.commands.release.release_state import get_state_path
 
-        state_path = get_state_path(os.path.join(str(ws), name))
+        from rlsbl.commands.release.release_state import resolve_releasable_dir
+        _member_dir = os.path.join(str(ws), name)
+        state_path = get_state_path(
+            _member_dir,
+            releasable_dir=resolve_releasable_dir(_member_dir, str(ws)),
+        )
         os.makedirs(os.path.dirname(state_path), exist_ok=True)
         with open(state_path, "w", encoding="utf-8") as f:
             json.dump({

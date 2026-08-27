@@ -42,7 +42,7 @@ class TestBatchReleaseInitFlutter:
     """Batch release-init scaffolds Flutter target config sections."""
 
     def test_flutter_target_section(self, mock_git_repo):
-        """Flutter project gets [packages.<name>.targets.flutter] with mode=build."""
+        """Flutter project gets [releasables.<name>.targets.flutter] with mode=build."""
         make_workspace(mock_git_repo, [
             {"path": "app", "name": "app"},
         ])
@@ -59,8 +59,8 @@ class TestBatchReleaseInitFlutter:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
 
-        assert "app" in data["packages"]
-        pkg = data["packages"]["app"]
+        assert "app" in data["releasables"]
+        pkg = data["releasables"]["app"]
         assert "targets" in pkg
         assert "flutter" in pkg["targets"]
         assert pkg["targets"]["flutter"]["mode"] == "build"
@@ -85,7 +85,7 @@ class TestBatchReleaseInitFlutter:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
 
-        assert "targets" not in data["packages"]["lib"]
+        assert "targets" not in data["releasables"]["lib"]
 
     def test_mixed_flutter_and_non_flutter(self, mock_git_repo):
         """Mixed workspace: Flutter project gets targets, npm project does not."""
@@ -113,11 +113,11 @@ class TestBatchReleaseInitFlutter:
         data = tomlkit.loads(open(batch_path).read())
 
         # Flutter project has targets
-        assert "targets" in data["packages"]["app"]
-        assert "flutter" in data["packages"]["app"]["targets"]
+        assert "targets" in data["releasables"]["app"]
+        assert "flutter" in data["releasables"]["app"]["targets"]
 
         # npm project does not
-        assert "targets" not in data["packages"]["lib"]
+        assert "targets" not in data["releasables"]["lib"]
 
     def test_scaffolded_flutter_validates(self, mock_git_repo):
         """Scaffolded Flutter batch file passes read_batch_release_file when bump/description are filled."""
@@ -138,8 +138,8 @@ class TestBatchReleaseInitFlutter:
 
         # Edit the scaffolded file to set required fields
         data = tomlkit.loads(open(batch_path).read())
-        data["packages"]["app"]["bump"] = "patch"
-        data["packages"]["app"]["description"] = "test release"
+        data["releasables"]["app"]["bump"] = "patch"
+        data["releasables"]["app"]["description"] = "test release"
         with open(batch_path, "w") as f:
             tomlkit.dump(data, f)
 
@@ -238,7 +238,7 @@ class TestBatchReleaseInitComments:
 
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
-        assert data["packages"]["pkg"]["context"] == ""
+        assert data["releasables"]["pkg"]["context"] == ""
 
     def test_all_packages_have_comments_and_context(self, mock_git_repo):
         """Every package section has comments and context field."""
@@ -264,7 +264,7 @@ class TestBatchReleaseInitComments:
         raw = open(batch_path).read()
 
         for name in ("alpha", "beta"):
-            assert data["packages"][name]["context"] == ""
+            assert data["releasables"][name]["context"] == ""
 
         # Comments should appear at least twice (once per package)
         assert raw.count("# Version bump type:") >= 2
@@ -437,7 +437,7 @@ class TestSharedValidationViaPublicAPIs:
         """Batch path rejects Flutter target without mode."""
         f = tmp_path / "batch.toml"
         f.write_text(
-            '[packages.myapp]\n'
+            '[releasables.myapp]\n'
             'bump = "patch"\n'
             'description = "test"\n'
             'include = ["flutter"]\n'
@@ -450,13 +450,13 @@ class TestSharedValidationViaPublicAPIs:
         """Batch path accepts Flutter target with valid mode config."""
         f = tmp_path / "batch.toml"
         f.write_text(
-            '[packages.myapp]\n'
+            '[releasables.myapp]\n'
             'bump = "minor"\n'
             'description = "test release"\n'
             'include = ["flutter"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.myapp.targets.flutter]\n'
+            '[releasables.myapp.targets.flutter]\n'
             'mode = "build"\n'
         )
         config = read_batch_release_file(str(f))
@@ -479,7 +479,7 @@ class TestSharedValidationViaPublicAPIs:
         # Batch file with the same config under a package name
         batch = tmp_path / "batch.toml"
         batch.write_text(
-            '[packages.mylib]\n'
+            '[releasables.mylib]\n'
             'bump = "minor"\n'
             'include = ["pypi", "npm"]\n'
             'exclude = ["go"]\n'
