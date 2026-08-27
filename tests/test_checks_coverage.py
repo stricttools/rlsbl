@@ -1311,15 +1311,22 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
             result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
         assert result.status == "skip"
 
-    def test_root_level_commit_affects_the_root_member(self, tmp_path, monkeypatch):
-        """A commit outside every declared member is the root member's.
+    def _root_releasable_repo(self, repo, monkeypatch):
+        """A workspace whose root member belongs to a releasable with a changelog.
 
-        It used to affect no project at all; the root member owns the
-        residual, so the check reports on it -- and it has no changelog of
-        its own, so the push is covered.
+        Without one, a root-owned commit has nothing it could fail to be
+        covered by, and asserting a pass on it proves nothing about
+        attribution -- which is what this slot used to do.
         """
-        repo = tmp_path / "repo"
-        repo.mkdir()
+        from rlsbl.workspace import (
+            Releasable,
+            WorkspaceProject,
+            get_releasable_changes_dir,
+            save_workspace,
+            write_releasable_version,
+        )
+
+        repo.mkdir(exist_ok=True)
         monkeypatch.chdir(repo)
 
         run_git(repo, "init", "-q", "-b", "main")
@@ -1329,38 +1336,96 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         (repo / "README.md").write_text("# test\n")
         run_git(repo, "add", "README.md")
         run_git(repo, "commit", "-q", "-m", "initial")
-        run_git(repo, "tag", "v0.0.0")
+
+        (repo / "package.json").write_text('{"name": "root-pkg", "version": "0.1.0"}\n')
+        (repo / ".rlsbl").mkdir(exist_ok=True)
+        (repo / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
+        )
 
         pkg = repo / "packages" / "alpha"
         pkg.mkdir(parents=True)
         (pkg / "package.json").write_text('{"name": "alpha", "version": "0.1.0"}\n')
 
-        make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
+        releasables = [Releasable(name="app", tag_format="v{version}")]
+        save_workspace(
+            str(repo),
+            [
+                WorkspaceProject({"path": ".", "name": "root", "releasable": "app"}),
+                WorkspaceProject(
+                    {"path": "packages/alpha", "name": "alpha", "releasable": False}
+                ),
+            ],
+            releasables=releasables,
+        )
+        write_releasable_version(str(repo), "app", "0.1.0")
+        changes_dir = get_releasable_changes_dir(str(repo), "app")
+        os.makedirs(changes_dir, exist_ok=True)
+        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+            f.write("")
+
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
+        run_git(repo, "tag", "v0.1.0")
+        return releasables, changes_dir
 
-        base_sha = git_head(repo)
-
-        # Make a commit NOT in any project path (root-level)
-        (repo / "root-file.txt").write_text("root change\n")
-        run_git(repo, "add", "root-file.txt")
-        run_git(repo, "commit", "-q", "-m", "root change")
-        head_sha = git_head(repo)
-
+    def _prepush_ctx(self, repo, releasables, base_sha, head_sha):
         from rlsbl.workspace import load_workspace
-
-        projects = load_workspace(str(repo))
 
         ctx = WorkspaceCheckContext(
             project_root=Path(str(repo)),
             workspace_root=Path(str(repo)),
             config={},
-            projects=projects,
+            projects=load_workspace(str(repo)),
             graph=None,
+            releasables=releasables,
         )
         ctx.push_stdin = f"refs/heads/main {head_sha} refs/heads/main {base_sha}"
+        return ctx
 
+    def test_an_uncovered_root_level_commit_blocks_the_push(self, tmp_path, monkeypatch):
+        """The negative half: a root-owned commit with no entry is not covered.
+
+        A commit outside every declared member belongs to the root member,
+        which owns the residual. It used to affect no project at all, so the
+        check reported a vacuous pass.
+        """
+        repo = tmp_path / "repo"
+        releasables, _changes_dir = self._root_releasable_repo(repo, monkeypatch)
+        base_sha = git_head(repo)
+
+        (repo / "root-file.txt").write_text("root change\n")
+        run_git(repo, "add", "root-file.txt")
+        run_git(repo, "commit", "-q", "-m", "root change")
+        head_sha = git_head(repo)
+
+        ctx = self._prepush_ctx(repo, releasables, base_sha, head_sha)
         result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
-        assert result.status == "pass"
-        assert result.status == "pass"
-        assert "affected project(s) covered" in result.message
+        assert result.status == "fail", result
+
+    def test_a_covered_root_level_commit_passes(self, tmp_path, monkeypatch):
+        """The positive half, on the same commit the negative half rejects."""
+        repo = tmp_path / "repo"
+        releasables, changes_dir = self._root_releasable_repo(repo, monkeypatch)
+        base_sha = git_head(repo)
+
+        (repo / "root-file.txt").write_text("root change\n")
+        run_git(repo, "add", "root-file.txt")
+        run_git(repo, "commit", "-q", "-m", "root change")
+        covered_sha = git_head(repo)
+
+        entry = json.dumps({
+            "commits": [covered_sha],
+            "user_facing": True,
+            "description": "root change",
+            "type": "feature",
+        })
+        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+            f.write(entry + "\n")
+        run_git(repo, "add", "-A")
+        run_git(repo, "commit", "-q", "-m", "changelog: root change")
+        head_sha = git_head(repo)
+
+        ctx = self._prepush_ctx(repo, releasables, base_sha, head_sha)
+        result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
+        assert result.status == "pass", result

@@ -498,15 +498,99 @@ class TestWorkspaceRootWithDotProject:
         result = app._check_defs["changelog-coverage"].impl(ctx)
         assert result.status == "pass"
 
-    def test_root_member_outside_every_releasable_has_no_changelog(
+    def _root_releasable_repo(self, repo, monkeypatch):
+        """A workspace whose ROOT member belongs to a releasable.
+
+        The shape that makes root-owned commits checkable at all: the root
+        member owns every path no other member claims, and its releasable has
+        a changelog those commits have to appear in.
+        """
+        repo.mkdir(exist_ok=True)
+        monkeypatch.chdir(repo)
+
+        run_git(repo, "init", "-q", "-b", "main")
+        run_git(repo, "config", "user.email", "test@test.local")
+        run_git(repo, "config", "user.name", "Test")
+
+        (repo / "README.md").write_text("# test\n")
+        run_git(repo, "add", "README.md")
+        run_git(repo, "commit", "-q", "-m", "initial")
+
+        (repo / "package.json").write_text(
+            '{"name": "root-pkg", "version": "0.1.0"}\n'
+        )
+        (repo / ".rlsbl").mkdir(exist_ok=True)
+        (repo / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
+        )
+
+        releasables = [Releasable(name="app", tag_format="v{version}")]
+        save_workspace(
+            str(repo),
+            [WorkspaceProject({"path": ".", "name": "root", "releasable": "app"})],
+            releasables=releasables,
+        )
+        write_releasable_version(str(repo), "app", "0.1.0")
+        changes_dir = get_releasable_changes_dir(str(repo), "app")
+        os.makedirs(changes_dir, exist_ok=True)
+        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+            f.write("")
+
+        run_git(repo, "add", ".")
+        run_git(repo, "commit", "-q", "-m", "scaffold")
+        run_git(repo, "tag", "v0.1.0")
+        return releasables, changes_dir
+
+    def test_an_uncovered_root_owned_commit_fails_coverage(
         self, tmp_path, monkeypatch,
     ):
-        """A root member outside every releasable is not covered by any changelog.
+        """The negative half. This slot used to assert only that a root member
+        with no changelog produced a skip, which held whether or not
+        attribution reached root files at all."""
+        repo = tmp_path / "repo"
+        releasables, _changes_dir = self._root_releasable_repo(repo, monkeypatch)
 
-        This used to be the implicit-mode shape, where the member kept its own
-        per-package JSONL. A member with ``releasable = false`` produces no
-        releases, so the coverage check has nothing to check and says so.
-        """
+        (repo / "lib.js").write_text("module.exports = 1;\n")
+        run_git(repo, "add", "lib.js")
+        run_git(repo, "commit", "-q", "-m", "feat: root feature")
+
+        ctx = _make_workspace_ctx(repo, releasables)
+        result = app._check_defs["changelog-coverage"].impl(ctx)
+        assert result.status == "fail", result
+        assert "uncovered" in result.message.lower(), result.message
+
+    def test_a_covered_root_owned_commit_passes_coverage(
+        self, tmp_path, monkeypatch,
+    ):
+        """The positive half, on the same commit the negative half rejects."""
+        repo = tmp_path / "repo"
+        releasables, changes_dir = self._root_releasable_repo(repo, monkeypatch)
+
+        (repo / "lib.js").write_text("module.exports = 1;\n")
+        run_git(repo, "add", "lib.js")
+        run_git(repo, "commit", "-q", "-m", "feat: root feature")
+        head = git_head(repo)
+
+        entry = json.dumps({
+            "commits": [head],
+            "user_facing": True,
+            "description": "root feature",
+            "type": "feature",
+        })
+        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+            f.write(entry + "\n")
+        run_git(repo, "add", "-A")
+        run_git(repo, "commit", "-q", "-m", "add entry")
+
+        ctx = _make_workspace_ctx(repo, releasables)
+        result = app._check_defs["changelog-coverage"].impl(ctx)
+        assert result.status == "pass", result
+
+    def test_a_root_member_outside_every_releasable_has_no_changelog(
+        self, tmp_path, monkeypatch,
+    ):
+        """A member with ``releasable = false`` produces no releases, so the
+        coverage check has nothing to check and says so."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -519,33 +603,22 @@ class TestWorkspaceRootWithDotProject:
         run_git(repo, "add", "README.md")
         run_git(repo, "commit", "-q", "-m", "initial")
 
-        # Create implicit-mode workspace with path = "."
         (repo / "package.json").write_text('{"name": "root-pkg", "version": "0.1.0"}\n')
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
-        (repo / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci", "targets": ["npm"]}))
+        (repo / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci", "targets": ["npm"]})
+        )
 
         make_workspace(repo, [{"path": ".", "name": "root", "releasable": False}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
         run_git(repo, "tag", "root@v0.1.0")
 
-        # Make a commit and cover it
         (repo / "lib.js").write_text("module.exports = 1;\n")
         run_git(repo, "add", "lib.js")
         run_git(repo, "commit", "-q", "-m", "feat: root feature")
-        head = git_head(repo)
-
-        entry = json.dumps({
-            "commits": [head],
-            "user_facing": True,
-            "description": "root feature",
-            "type": "feature",
-        })
-        (changes / "unreleased.jsonl").write_text(entry + "\n")
-        run_git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
-        run_git(repo, "commit", "-q", "-m", "add entry")
 
         projects = load_workspace(str(repo))
         ctx = WorkspaceCheckContext(

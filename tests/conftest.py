@@ -900,17 +900,13 @@ def _default_tag_push_plan():
         yield
 
 
-@pytest.fixture(autouse=True)
-def _default_push_timeout(monkeypatch):
-    """Pin the push timeout for all tests via the env var.
-
-    Production code defaults to 120 when neither the env var nor the
-    push_timeout config field is set, but pinning the env var keeps
-    release-flow tests deterministic regardless of the host environment.
-    The env var has highest precedence, so individual tests can still
-    override via monkeypatch or by setting the env var themselves.
-    """
-    monkeypatch.setenv("RLSBL_PUSH_TIMEOUT", "120")
+# There is deliberately no push-timeout fixture here. One used to set
+# RLSBL_PUSH_TIMEOUT on every test "for determinism"; rlsbl stopped reading
+# that variable (and the rest of its family) when timeouts became
+# config-and-flag only, so the fixture had been setting an environment
+# variable nothing consulted. Determinism comes from the resolution order
+# itself: --push-timeout beats the config key beats the shipped default, and
+# no step of it can be reached from the environment.
 
 
 @pytest.fixture
