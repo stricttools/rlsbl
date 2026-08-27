@@ -740,13 +740,14 @@ class TestCmdMonoAdd:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_add")
     def test_delegates_with_all_flags(self, mock_add, _):
-        rlsbl.cmd_mono_add(cli_ctx(), name="mylib", target="npm", watch="*.ts,*.js", subtree_remote="git@github.com:user/mylib.git", depends_on="core,utils", library="true", dev_only="true", releasable="core", registry_name="mylib-npm", auto_commit=False, path="packages/mylib")
+        rlsbl.cmd_mono_add(cli_ctx(), name="mylib", target="npm", subtree_remote="git@github.com:user/mylib.git", depends_on="core,utils", library="true", dev_only="true", releasable="core", registry_name="mylib-npm", auto_commit=False, path="packages/mylib")
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][1]
         assert flags["name"] == "mylib"
         assert flags["target"] == "npm"
-        assert flags["watch"] == "*.ts,*.js"
         assert flags["registry-name"] == "mylib-npm"
+        # No `watch`: what CI reacts to is derived from the workspace.
+        assert "watch" not in flags
 
 
 class TestCmdMonoRemove:

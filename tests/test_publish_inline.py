@@ -824,8 +824,12 @@ def _setup_root_publisher(root, *, gate_regex, targets=("pypi",), name="orxtra")
 
     with open(os.path.join(mono, "workspace.toml"), "w") as f:
         f.write(
-            f'[[releasables]]\nname = "{name}"\n\n'
-            f'[[projects]]\npath = "."\nreleasable = "{name}"\n'
+            # tag_format is mandatory for a releasable that owns the root
+            # member: the loader refuses one that would inherit the workspace
+            # default by accident. This fixture is on the workspace scheme.
+            f'[[releasables]]\nname = "{name}"\n'
+            f'tag_format = "{{name}}@v{{version}}"\n\n'
+            f'[[projects]]\npath = "."\nname = "root"\nreleasable = "{name}"\n'
         )
     return {"name": name, "path": ".", "releasable": name, "_root_publisher": True}
 

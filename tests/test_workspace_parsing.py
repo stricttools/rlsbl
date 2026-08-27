@@ -39,13 +39,21 @@ class TestWorkspaceProjectProperties:
         wp = WorkspaceProject({"name": "foo", "path": "packages/foo"})
         assert wp.path == "packages/foo"
 
-    def test_watch_default_empty_list(self):
-        wp = WorkspaceProject({"name": "x", "path": "x"})
-        assert wp.watch == []
+    def test_there_is_no_watch_accessor(self):
+        """These two slots pinned a ``watch`` property that read extra globs.
 
-    def test_watch_explicit(self):
-        wp = WorkspaceProject({"name": "x", "path": "x", "watch": ["src/**", "*.toml"]})
-        assert wp.watch == ["src/**", "*.toml"]
+        Territory has one spelling now -- the declared ``path`` -- so the
+        accessor is gone, and a leftover key in the underlying dict is not
+        reachable through the type. (The loader refuses such a workspace
+        outright; see tests/test_watch_key_removed.py.)
+        """
+        wp = WorkspaceProject({"name": "x", "path": "x"})
+        assert not hasattr(wp, "watch")
+
+    def test_a_leftover_watch_key_is_not_a_territory_claim(self):
+        wp = WorkspaceProject({"name": "x", "path": "x", "watch": ["src/**"]})
+        assert not hasattr(wp, "watch")
+        assert wp.path == "x"
 
     def test_library_default_false(self):
         wp = WorkspaceProject({"name": "x", "path": "x"})
