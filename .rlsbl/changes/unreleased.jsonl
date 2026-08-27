@@ -78,3 +78,4 @@
 {"format_version":1,"id":"18cfb7bd6f97a83f8bed0cbbd58046879dcb9d715598eeb3","commits":["ec364613e467e79b31350441e4a61136d8ff3ad3"],"user_facing":false}
 {"format_version":1,"id":"18cfb7eda951d4a6d7c7b918aedb417f88b8426f7d49f0bf","commits":["cc3a852e0d1079799caeca1d0b153bf4cb96ee2a"],"user_facing":false}
 {"format_version":1,"id":"18cfb820fbd7268eb4c944cd4c5c47bfb9cec91150f8479f","commits":["9542e80ec13c27dfa55f94f2f63439b0cf9b5828"],"user_facing":false}
+{"format_version":1,"id":"18cfb95a28ff7a4bffb35dfb0ad44993b4352b00f9d23dbe","commits":["63b31be7b6e4951111b7eefb48ed3ad3e92947a3"],"user_facing":true,"description":"**`rlsbl monorepo release run` tags every package again in packages mode.** It looked for each member's release state beside the package instead of under the member's releasable, so it treated each one as already finished: no tags, no finalized changelogs, and a success report.","type":"fix"}
