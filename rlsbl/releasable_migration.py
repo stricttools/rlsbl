@@ -187,7 +187,8 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
               contributions, after dedup
             - ``source_projects`` (list[str]): projects that had entries
             - ``dest_path`` (str): path to the releasable's unreleased.jsonl
-            - ``duplicates_merged`` (int): entries merged due to identical commits
+            - ``duplicates_merged`` (int): true duplicates merged (identical
+              commit set and content)
             - ``exclusions_created`` (int): batch limit exclusions auto-created
             - ``consolidation_tag`` (str or None): tag created at HEAD, if any
     """
@@ -226,8 +227,9 @@ def consolidate_changelogs(workspace_root, releasable_name, member_projects,
                 )
                 all_entries.append(merged)
 
-    # Bug 3 fix: deduplicate entries with identical commit sets across packages.
-    # Group by frozenset of commits; merge entries with identical commit lists.
+    # Deduplicate true duplicates: entries matching on commit set AND content
+    # (the same logical entry arriving from several member packages). Distinct
+    # entries that merely share a commit set all survive.
     all_entries, duplicates_merged = _dedup_entries(all_entries)
 
     # Write all merged entries to the releasable's unreleased.jsonl
