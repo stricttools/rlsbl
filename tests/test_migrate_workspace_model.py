@@ -312,6 +312,20 @@ class TestRootMemberAlreadyPresent:
         assert "monorepo" in str(exc.value)
         assert "--root-dev-node" in str(exc.value)
 
+    def test_a_second_root_member_is_the_operators_decision(self, tmp_path):
+        """Two members claiming the root is residue: the loader says so."""
+        write_workspace(
+            tmp_path,
+            "releasables = []\n\n"
+            '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
+            "releasable = false\n\n"
+            '[[projects]]\npath = "./"\nname = "other"\nreleasable = false\n',
+        )
+        code, output = migrate(tmp_path, dev_node=True)
+        assert code == 1
+        assert "OPERATOR INPUT REQUIRED" in output
+        assert "both declare the repository root" in output
+
     def test_the_root_path_spelling_is_recognized(self, tmp_path):
         """'./' is the root, so no second root member is invented for it."""
         write_workspace(
@@ -326,3 +340,279 @@ class TestRootMemberAlreadyPresent:
         # ...and the spelling is canonicalized, so the file reads like the model.
         assert data["projects"][0]["path"] == "."
         assert "canonical" in output
+
+
+# ---------------------------------------------------------------------------
+# The watch key
+# ---------------------------------------------------------------------------
+
+
+class TestWatchKeys:
+    @pytest.fixture
+    def repo(self, tmp_path):
+        write_workspace(tmp_path, OLD_MODEL)
+        return tmp_path
+
+    def test_every_watch_key_is_deleted(self, repo):
+        migrate(repo, dev_node=True)
+        for member in read_workspace(repo)["projects"]:
+            assert "watch" not in member
+
+    def test_the_plan_names_each_one(self, repo):
+        _code, output = migrate(repo, dev_node=True)
+        assert output.count("delete the watch key") == 2
+        assert "projects[0] ('core')" in output
+        assert "projects[1] ('cli')" in output
+
+    def test_the_surrounding_declaration_survives(self, repo):
+        migrate(repo, dev_node=True)
+        text = workspace_path(repo).read_text()
+        assert "# The workspace, as an operator wrote it." in text
+        data = read_workspace(repo)
+        core = next(p for p in data["projects"] if p["name"] == "core")
+        assert core["path"] == "pkgs/core"
+        assert core["releasable"] == "core"
+
+
+# ---------------------------------------------------------------------------
+# The mirror destination
+# ---------------------------------------------------------------------------
+
+
+MIRRORED_MEMBER = """\
+[[releasables]]
+name = "cli"
+tag_format = "{name}@v{version}"
+
+[[projects]]
+path = "."
+name = "root"
+dev_only = true
+releasable = false
+
+[[projects]]
+path = "pkgs/cli"
+name = "cli"
+releasable = "cli"
+subtree_remote = "git@github.com:owner/cli.git"
+"""
+
+
+class TestMirrorRelocation:
+    @pytest.fixture
+    def repo(self, tmp_path):
+        write_workspace(tmp_path, MIRRORED_MEMBER)
+        return tmp_path
+
+    def test_the_key_moves_onto_the_releasable(self, repo):
+        code, output = migrate(repo, dev_node=True)
+        assert code == 0
+        data = read_workspace(repo)
+        member = next(p for p in data["projects"] if p["name"] == "cli")
+        assert "subtree_remote" not in member
+        assert data["releasables"][0]["subtree_remote"] == (
+            "git@github.com:owner/cli.git"
+        )
+        assert "move the mirror destination" in output
+
+    def test_a_releasable_already_declaring_it_just_loses_the_member_key(
+        self, tmp_path
+    ):
+        write_workspace(
+            tmp_path,
+            MIRRORED_MEMBER.replace(
+                'tag_format = "{name}@v{version}"',
+                'tag_format = "{name}@v{version}"\n'
+                'subtree_remote = "git@github.com:owner/cli.git"',
+            ),
+        )
+        code, _output = migrate(tmp_path, dev_node=True)
+        assert code == 0
+        data = read_workspace(tmp_path)
+        member = next(p for p in data["projects"] if p["name"] == "cli")
+        assert "subtree_remote" not in member
+        assert data["releasables"][0]["subtree_remote"] == (
+            "git@github.com:owner/cli.git"
+        )
+
+    def test_two_different_destinations_are_the_operators_decision(self, tmp_path):
+        write_workspace(
+            tmp_path,
+            MIRRORED_MEMBER.replace(
+                'tag_format = "{name}@v{version}"',
+                'tag_format = "{name}@v{version}"\n'
+                'subtree_remote = "git@github.com:owner/other.git"',
+            ),
+        )
+        with pytest.raises(MigrationError) as exc:
+            plan_for(tmp_path, dev_node=True)
+        assert "owner/other.git" in str(exc.value)
+        assert "owner/cli.git" in str(exc.value)
+
+    def test_a_member_outside_every_releasable_is_refused(self, tmp_path):
+        write_workspace(
+            tmp_path,
+            MIRRORED_MEMBER.replace('releasable = "cli"\nsubtree_remote', "subtree_remote"),
+        )
+        with pytest.raises(MigrationError) as exc:
+            plan_for(tmp_path, dev_node=True)
+        message = str(exc.value)
+        assert "'cli'" in message
+        # Both options are named, and neither is taken for the operator.
+        assert "releasable" in message
+        assert "delete" in message.lower()
+
+    def test_an_undefined_releasable_is_refused(self, tmp_path):
+        write_workspace(
+            tmp_path, MIRRORED_MEMBER.replace('releasable = "cli"', 'releasable = "gone"')
+        )
+        with pytest.raises(MigrationError) as exc:
+            plan_for(tmp_path, dev_node=True)
+        assert "gone" in str(exc.value)
+
+    def test_a_multi_member_releasable_is_refused(self, tmp_path):
+        write_workspace(
+            tmp_path,
+            MIRRORED_MEMBER
+            + '\n[[projects]]\npath = "pkgs/extra"\nname = "extra"\n'
+            'releasable = "cli"\n',
+        )
+        with pytest.raises(MigrationError) as exc:
+            plan_for(tmp_path, dev_node=True)
+        message = str(exc.value)
+        assert "cli" in message and "extra" in message
+
+    def test_nothing_is_written_when_the_relocation_is_refused(self, tmp_path):
+        write_workspace(
+            tmp_path, MIRRORED_MEMBER.replace('releasable = "cli"', 'releasable = "gone"')
+        )
+        before = workspace_path(tmp_path).read_bytes()
+        code, _output = migrate(tmp_path, dev_node=True)
+        assert code == 2
+        assert workspace_path(tmp_path).read_bytes() == before
+
+
+# ---------------------------------------------------------------------------
+# The whole old model at once
+# ---------------------------------------------------------------------------
+
+
+class TestFullMigration:
+    @pytest.fixture
+    def repo(self, tmp_path):
+        write_workspace(tmp_path, OLD_MODEL)
+        return tmp_path
+
+    def test_the_result_loads(self, repo):
+        code, output = migrate(repo, dev_node=True)
+        assert code == 0
+        assert "loads" in output
+
+    def test_every_edit_is_applied(self, repo):
+        migrate(repo, dev_node=True)
+        data = read_workspace(repo)
+        assert root_member(data)["dev_only"] is True
+        assert all("watch" not in p for p in data["projects"])
+        assert all("subtree_remote" not in p for p in data["projects"])
+        cli = next(r for r in data["releasables"] if r["name"] == "cli")
+        assert cli["subtree_remote"] == "git@github.com:owner/cli.git"
+
+
+# ---------------------------------------------------------------------------
+# Residue: what the script cannot decide
+# ---------------------------------------------------------------------------
+
+
+class TestResidue:
+    """A loader error that survives the edits is printed verbatim."""
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        # A non-root member holding the reserved name: which member owns the
+        # repository root is exactly the decision the script will not make.
+        write_workspace(
+            tmp_path,
+            '[[releasables]]\nname = "core"\ntag_format = "{name}@v{version}"\n\n'
+            '[[projects]]\npath = "pkgs/core"\nname = "root"\n'
+            'watch = ["pkgs/core/**"]\nreleasable = "core"\n',
+        )
+        return tmp_path
+
+    def test_the_mechanical_edits_are_still_applied(self, repo):
+        migrate(repo, dev_node=True)
+        data = read_workspace(repo)
+        assert all("watch" not in p for p in data["projects"])
+        assert any(p["path"] == "." for p in data["projects"])
+
+    def test_the_loader_error_is_printed_verbatim(self, repo):
+        code, output = migrate(repo, dev_node=True)
+        assert code == 1
+        assert "OPERATOR INPUT REQUIRED" in output
+        assert "reserved for the member that owns the repository root" in output
+
+    def test_the_backfill_is_not_run_on_a_workspace_that_does_not_load(self, repo):
+        _code, output = migrate(repo, dev_node=True, backfill=True)
+        assert "backfill" in output.lower()
+        assert "skipped" in output.lower()
+
+
+# ---------------------------------------------------------------------------
+# Idempotency and dry run
+# ---------------------------------------------------------------------------
+
+
+class TestIdempotency:
+    @pytest.fixture
+    def repo(self, tmp_path):
+        write_workspace(tmp_path, OLD_MODEL)
+        return tmp_path
+
+    def test_second_run_proposes_nothing(self, repo):
+        migrate(repo, dev_node=True)
+        assert plan_for(repo, dev_node=True).edits == []
+
+    def test_second_run_writes_nothing(self, repo):
+        migrate(repo, dev_node=True)
+        before = workspace_path(repo).read_bytes()
+        code, output = migrate(repo, dev_node=True)
+        assert code == 0
+        assert workspace_path(repo).read_bytes() == before
+        assert "nothing to migrate" in output.lower()
+
+    def test_the_releasable_kind_is_idempotent_too(self, tmp_path):
+        write_workspace(tmp_path, NO_ROOT_MEMBER)
+        migrate(tmp_path, releasable="monorepo", tag_format="v{version}")
+        before = workspace_path(tmp_path).read_bytes()
+        code, _output = migrate(tmp_path, releasable="monorepo", tag_format="v{version}")
+        assert code == 0
+        assert workspace_path(tmp_path).read_bytes() == before
+
+
+class TestDryRun:
+    @pytest.fixture
+    def repo(self, tmp_path):
+        write_workspace(tmp_path, OLD_MODEL)
+        return tmp_path
+
+    def test_nothing_is_written(self, repo):
+        before = workspace_path(repo).read_bytes()
+        code, output = migrate(repo, dev_node=True, dry_run=True)
+        assert code == 0
+        assert workspace_path(repo).read_bytes() == before
+        assert "--dry-run: nothing written." in output
+
+    def test_the_plan_is_the_one_the_real_run_applies(self, repo):
+        _code, preview = migrate(repo, dev_node=True, dry_run=True)
+        _code, real = migrate(repo, dev_node=True)
+        preview_edits = [ln for ln in preview.splitlines() if ln.startswith("  projects")]
+        real_edits = [ln for ln in real.splitlines() if ln.startswith("  projects")]
+        assert preview_edits == real_edits
+
+    def test_the_verification_is_deferred_to_the_real_run(self, repo):
+        _code, output = migrate(repo, dev_node=True, dry_run=True)
+        assert "never written" in output
+
+    def test_an_already_migrated_workspace_is_verified_under_dry_run(self, repo):
+        migrate(repo, dev_node=True)
+        _code, output = migrate(repo, dev_node=True, dry_run=True)
+        assert "loads" in output

@@ -389,6 +389,126 @@ def _plan_root_releasable_entry(plan, releasables, kind):
 
 
 # ---------------------------------------------------------------------------
+# Edit 2: the watch key
+# ---------------------------------------------------------------------------
+
+
+def _plan_watch_keys(plan, projects):
+    """Delete every ``watch`` key: territory is derived, never enumerated."""
+    for i, table in enumerate(projects.tables()):
+        if "watch" not in table:
+            continue
+        declared = list(table["watch"])
+        del table["watch"]
+        plan.add(
+            "drop-watch",
+            _member_label(i, table),
+            f"delete the watch key ({declared}) -- every file belongs to the "
+            f"member with the most specific declared path, and the root member "
+            f"owns everything no other member claims",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Edit 3: the mirror destination
+# ---------------------------------------------------------------------------
+
+
+def _plan_mirror_remotes(plan, projects, releasables):
+    """Move each member's ``subtree_remote`` onto the releasable it belongs to.
+
+    A mirror carries one subtree's whole history, its tags and its GitHub
+    Releases, and the unit that owns a version, a changelog and a tag scheme is
+    the releasable -- so the destination is declared there. Which releasable a
+    mirrored member should belong to, when it belongs to none, is a decision
+    this pass refuses to make.
+    """
+    members = projects.tables()
+    entries = releasables.tables()
+
+    for i, table in enumerate(members):
+        if "subtree_remote" not in table:
+            continue
+        remote = str(table["subtree_remote"])
+        label = _member_label(i, table)
+        rel_name = table.get("releasable", None)
+
+        if not isinstance(rel_name, str):
+            stated = (
+                "declares releasable = false"
+                if rel_name is False
+                else "declares no releasable"
+            )
+            raise MigrationError(
+                f"{label} declares subtree_remote = \"{remote}\" but {stated}, "
+                f"so there is no releasable to move the mirror's destination "
+                f"onto. Two ways out, and which one this repository wants is "
+                f"your decision: give this member a releasable of its own (a "
+                f"[[releasables]] entry with its name, its tag format and this "
+                f"member as its only member -- creating one is not a mechanical "
+                f"edit, so the script will not invent it), or delete the "
+                f"subtree_remote line because the mirror is retired."
+            )
+
+        target = None
+        for j, rel_table in enumerate(entries):
+            if rel_table.get("name") == rel_name:
+                target = (j, rel_table)
+                break
+        if target is None:
+            raise MigrationError(
+                f"{label} declares subtree_remote = \"{remote}\" and "
+                f"releasable = \"{rel_name}\", but no [[releasables]] entry is "
+                f"named '{rel_name}'. The mirror's destination belongs on that "
+                f"entry, and creating it -- with the tag format its existing "
+                f"tags already follow -- is your decision, not a mechanical "
+                f"edit."
+            )
+
+        siblings = [
+            str(m.get("name") or os.path.basename(str(m.get("path", ""))))
+            for m in members
+            if m.get("releasable") == rel_name
+        ]
+        if len(siblings) > 1:
+            raise MigrationError(
+                f"{label} declares subtree_remote = \"{remote}\", but its "
+                f"releasable '{rel_name}' has {len(siblings)} members "
+                f"({', '.join(siblings)}). A mirror is the standalone repository "
+                f"ONE subtree is split into, so a mirrored releasable has "
+                f"exactly one member -- moving the destination there would write "
+                f"a workspace the loader refuses. Either split the releasable so "
+                f"the mirrored member owns one of its own, or drop the mirror; "
+                f"which one is your decision."
+            )
+
+        j, rel_table = target
+        declared = rel_table.get("subtree_remote", None)
+        if declared is None:
+            rel_table["subtree_remote"] = remote
+            detail = (
+                f"move the mirror destination \"{remote}\" onto "
+                f"releasables[{j}] ('{rel_name}'), where the version, the "
+                f"changelog and the tag scheme already are"
+            )
+        elif str(declared) != remote:
+            raise MigrationError(
+                f"{label} declares subtree_remote = \"{remote}\" but its "
+                f"releasable '{rel_name}' already declares "
+                f"subtree_remote = \"{declared}\". Two destinations for one "
+                f"mirror, and only you know which repository this subtree is "
+                f"actually mirrored into -- resolve it by hand."
+            )
+        else:
+            detail = (
+                f"delete the mirror destination \"{remote}\" -- "
+                f"releasables[{j}] ('{rel_name}') already declares it"
+            )
+        del table["subtree_remote"]
+        plan.add("relocate-mirror", label, detail)
+
+
+# ---------------------------------------------------------------------------
 # Building and rendering
 # ---------------------------------------------------------------------------
 
@@ -429,6 +549,8 @@ def build_plan(repo: str, kind: RootKind) -> Plan:
     projects = Section(doc, "projects")
 
     _plan_root_member(plan, projects, releasables, kind)
+    _plan_watch_keys(plan, projects)
+    _plan_mirror_remotes(plan, projects, releasables)
     return plan
 
 
@@ -529,14 +651,27 @@ def run(
         # The file on disk is the migrated file (either it just got written, or
         # it already was one), so loading it answers for the real thing.
         status = verify(repo, out)
+        loads = status == 0
     else:
         print(
             "\nThe loader verification runs on the real pass: under --dry-run "
             "the migrated file was never written.",
             file=out,
         )
+        loads = False
 
     if backfill:
+        if not loads:
+            # The backfill enumerates a workspace's release scopes through the
+            # loader, so it has nothing to read until the workspace loads.
+            print(
+                "\nThe release-anchor backfill is skipped: it reads the "
+                "workspace through the loader, which this file does not pass "
+                "yet. Re-run this pass once the residue above is resolved -- "
+                "both halves are idempotent.",
+                file=out,
+            )
+            return status
         print("\n--- release-anchor backfill ---\n", file=out)
         status = (
             _load_backfill().run(
