@@ -168,7 +168,7 @@
     "description": "a1f0cfcb22389d01c5dab80b9b6be0783a0b97223ffc56dd9c0d8d3be71646b3"
   },
   "en/monorepo.md": {
-    "content": "8f97a7b782de2dfca9da5fd34cdd2ed6d55b0ec321d7df320ba7cf5b18320eb0",
+    "content": "70851514436fa8d93342678ebd36304db84978378fc55b300f20579ef36a6526",
     "description": "0e51cf2d23c1f9f391e9c51c13dba4cb9936e3da9d745fbfbd65fa7a0b12bf33",
     "source_docstring": "02b6fd46cd97711b77f82491b52bedc0ef190654867b753b5daebf51751f82e3"
   },
@@ -383,7 +383,7 @@
   "en/rlsbl-commands-monorepo-batch_plan.md": {
     "content": "f6d7429a12a68692153fa564636bdfe67753d763059a8395055077badc39920e",
     "description": "1be01fb4d7694221e062958afe90604f61d3c08ec29ee5f8675094fdebcb090c",
-    "source_docstring": "407e13d099396049d25b3b7887b9164fdfa3c5bfbcdf575eae5fd799467d4ee5"
+    "source_docstring": "7dcd4ede382ad3a98eead05715e643c86ca45f1df61ed89be3e34a4c2fb08d19"
   },
   "en/rlsbl-commands-monorepo-batch_release.md": {
     "content": "b781b0f60d282be08131cd33eb8554093021e8a7a503c0d1347611b5b0c00d3d",
@@ -558,7 +558,7 @@
   "en/rlsbl-commands-undo.md": {
     "content": "d1610f906a8c8c2580f6e4e134cac8d718a7e6c989a174a8cb0f50acee85f583",
     "description": "d6773bc627930c5f82d41fb52376bd8f0a7d214e1d4fef62f586b0e087ae40e9",
-    "source_docstring": "36c2f59ebdb8883d180e0f25cdc4fe4682ab76a13e26448978747dc2f2726434"
+    "source_docstring": "e640ee37b4dbef3fc1e649825a80bbd24c912d85a926a65ff0c889bbb6584e12"
   },
   "en/rlsbl-commands-unreleased.md": {
     "content": "470a1543d890d3f5d32709bd2ff766a0a4dc610d1c0507a2e19c5292e40e57e4",
@@ -1077,7 +1077,7 @@
   "en/rlsbl-targets-refs.md": {
     "content": "943ee6ee1a885f3a9912db4aef1b0ea974f6cfeb4deb24675c5e0f23cc246aae",
     "description": "a48bb9a08d7f5707daa37886c1a8bd18187f934829aeb9cf0f1c351a3962582e",
-    "source_docstring": "ece311978ef68738b35761f12f5a03a68f56eecd63e08b81d3451c7923e37cbe"
+    "source_docstring": "1d0f2bd3e6caf625ed3a814e176fdfcc1cf792ece2969851d2e7b44119240e1e"
   },
   "en/rlsbl-targets-spec.md": {
     "content": "72ae90d8ed4784d112c6996c7dd650113b02f1914e9ba9f2add8d333e0e09e01",
