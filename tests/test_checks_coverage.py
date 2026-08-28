@@ -19,7 +19,15 @@ import pytest
 
 from githarness import git as git_out, record_release
 
-from conftest import git_head, make_commit, make_ctx, make_workspace, run_git, workspace_toml
+from conftest import (
+    git_head,
+    make_commit,
+    make_ctx,
+    make_releasable_state,
+    make_workspace,
+    run_git,
+    workspace_toml,
+)
 
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
@@ -970,8 +978,8 @@ class TestFinalizeBatchFile:
 # ==================================================================
 
 
-class TestPrepushChangelogCoverageMonorepoNoReleasables:
-    """Tests for prepush-changelog-coverage in monorepo without [[releasables]]."""
+class TestPrepushChangelogCoverageMonorepoMembers:
+    """prepush-changelog-coverage over a workspace's members."""
 
     def test_monorepo_uncovered_commit_fails(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -991,12 +999,13 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         pkg = repo / "packages" / "alpha"
         pkg.mkdir(parents=True)
         (pkg / "package.json").write_text('{"name": "alpha", "version": "0.1.0"}\n')
-        changes = pkg / ".rlsbl" / "changes"
-        changes.mkdir(parents=True)
-        (changes / "unreleased.jsonl").write_text("")
+        (pkg / ".rlsbl").mkdir(parents=True)
         (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
+        # The changelog a member's commits are covered by belongs to its
+        # releasable, not to the member package.
+        changes = make_releasable_state(repo, "alpha") / "changes"
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
         record_release(repo, "alpha@v0.1.0")
@@ -1009,7 +1018,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         run_git(repo, "commit", "-q", "-m", "feat: uncovered")
         head_sha = git_head(repo)
 
-        from rlsbl.workspace import load_workspace
+        from rlsbl.workspace import load_releasables, load_workspace
 
         projects = load_workspace(str(repo))
 
@@ -1019,11 +1028,13 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
             config={},
             projects=projects,
             graph=None,
+            releasables=load_releasables(str(repo), projects),
         )
         ctx.push_stdin = f"refs/heads/main {head_sha} refs/heads/main {base_sha}"
 
         result = app._check_defs["prepush-changelog-coverage"].impl(ctx)
         assert result.status == "fail"
+        assert changes.is_dir()
 
     def test_monorepo_covered_commit_passes(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -1042,12 +1053,12 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         pkg = repo / "packages" / "alpha"
         pkg.mkdir(parents=True)
         (pkg / "package.json").write_text('{"name": "alpha", "version": "0.1.0"}\n')
-        changes = pkg / ".rlsbl" / "changes"
-        changes.mkdir(parents=True)
-        (changes / "unreleased.jsonl").write_text("")
+        (pkg / ".rlsbl").mkdir(parents=True)
         (pkg / ".rlsbl" / "config.json").write_text(json.dumps({"publish_mode": "ci"}))
 
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
+        changes = make_releasable_state(repo, "alpha") / "changes"
+        rel_jsonl = changes / "unreleased.jsonl"
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
         record_release(repo, "alpha@v0.1.0")
@@ -1066,11 +1077,11 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
             "description": "new feature",
             "type": "feature",
         })
-        (changes / "unreleased.jsonl").write_text(entry + "\n")
-        run_git(repo, "add", "packages/alpha/.rlsbl/changes/unreleased.jsonl")
+        rel_jsonl.write_text(entry + "\n")
+        run_git(repo, "add", str(rel_jsonl.relative_to(repo)))
         run_git(repo, "commit", "-q", "-m", "add entry")
 
-        from rlsbl.workspace import load_workspace
+        from rlsbl.workspace import load_releasables, load_workspace
 
         projects = load_workspace(str(repo))
 
@@ -1080,6 +1091,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
             config={},
             projects=projects,
             graph=None,
+            releasables=load_releasables(str(repo), projects),
         )
         ctx.push_stdin = f"refs/heads/main {git_head(repo)} refs/heads/main {base_sha}"
 

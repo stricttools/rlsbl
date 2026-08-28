@@ -155,9 +155,7 @@ class TestPerPackageFlags:
 class TestBatchSHACapture:
     """Verify that batch release captures SHA and calls watch after the loop."""
 
-    @pytest.mark.parametrize("func_name", [
-        "_batch_release_releasables", "_batch_release_packages",
-    ])
+    @pytest.mark.parametrize("func_name", ["_batch_release_releasables"])
     def test_batch_watches_the_verified_candidate(self, func_name):
         """Both loops watch a concrete SHA after the batch completes.
 
@@ -177,9 +175,7 @@ class TestBatchSHACapture:
             r"_batch_ci_gate\(\s*workspace_root,\s*flags,\s*log\b", source,
         ), "the batch loop must run the shared CI gate"
 
-    @pytest.mark.parametrize("func_name", [
-        "_batch_release_releasables", "_batch_release_packages",
-    ])
+    @pytest.mark.parametrize("func_name", ["_batch_release_releasables"])
     def test_both_loops_end_in_the_shared_watch_tail(self, func_name):
         """Neither loop may grow its own watch block.
 
@@ -211,9 +207,7 @@ class TestBatchSHACapture:
             "--no-watch must announce that the outcome is unverified"
         )
 
-    @pytest.mark.parametrize("func_name", [
-        "_batch_release_releasables", "_batch_release_packages",
-    ])
+    @pytest.mark.parametrize("func_name", ["_batch_release_releasables"])
     def test_dry_run_never_reaches_the_ci_gate(self, func_name):
         """A dry run pushes no candidate, so there is nothing to gate on.
 

@@ -320,7 +320,7 @@ class TestSharedValidation:
         """Missing bump with prefix includes prefix in message."""
         data = {"include": [], "exclude": []}
         with pytest.raises(
-            ReleaseFileError, match=r"^\[packages\.foo\] missing required field: bump$"
+            ReleaseFileError, match=r"^\[releasables\.foo\] missing required field: bump$"
         ):
             _validate_release_config(data, prefix="[releasables.foo] ")
 
@@ -333,7 +333,7 @@ class TestSharedValidation:
     def test_invalid_bump_with_prefix(self):
         """Invalid bump with prefix."""
         data = {"bump": "huge", "include": [], "exclude": []}
-        with pytest.raises(ReleaseFileError, match=r"\[packages\.bar\].*invalid bump"):
+        with pytest.raises(ReleaseFileError, match=r"\[releasables\.bar\].*invalid bump"):
             _validate_release_config(data, prefix="[releasables.bar] ")
 
     def test_flutter_mode_required_no_prefix(self):
@@ -355,7 +355,7 @@ class TestSharedValidation:
             "exclude": [],
             "description": "test",
         }
-        with pytest.raises(ReleaseFileError, match=r"\[packages\.app\].*requires.*mode"):
+        with pytest.raises(ReleaseFileError, match=r"\[releasables\.app\].*requires.*mode"):
             _validate_release_config(data, prefix="[releasables.app] ")
 
     def test_include_exclude_overlap_no_prefix(self):
@@ -376,7 +376,7 @@ class TestSharedValidation:
             "description": "test",
         }
         with pytest.raises(
-            ReleaseFileError, match=r"\[packages\.x\].*both include and exclude"
+            ReleaseFileError, match=r"\[releasables\.x\].*both include and exclude"
         ):
             _validate_release_config(data, prefix="[releasables.x] ")
 
@@ -398,7 +398,7 @@ class TestSharedValidation:
             "description": "",
         }
         with pytest.raises(
-            ReleaseFileError, match=r"\[packages\.z\].*description must be set"
+            ReleaseFileError, match=r"\[releasables\.z\].*description must be set"
         ):
             _validate_release_config(data, prefix="[releasables.z] ")
 
@@ -422,7 +422,7 @@ class TestSharedValidation:
             "context": True,
         }
         with pytest.raises(
-            ReleaseFileError, match=r"\[packages\.q\].*context must be a string"
+            ReleaseFileError, match=r"\[releasables\.q\].*context must be a string"
         ):
             _validate_release_config(data, prefix="[releasables.q] ")
 

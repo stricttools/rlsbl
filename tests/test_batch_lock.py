@@ -180,55 +180,6 @@ class TestBatchReleasePassesSkipLock:
         run_git(tmp_path, "commit", "-q", "-m", "add workspace")
 
     @patch("rlsbl.commands.monorepo.batch_release.rlsbl_lock")
-    def test_batch_packages_passes_skip_lock(self, mock_lock, tmp_path, monkeypatch):
-        """_batch_release_packages passes skip-lock=True in release_flags."""
-        monkeypatch.chdir(tmp_path)
-
-        projects_data = [
-            {"path": "pkg-a", "name": "pkg-a"},
-            {"path": "pkg-b", "name": "pkg-b"},
-        ]
-        self._setup_workspace(tmp_path, projects_data)
-
-        from rlsbl.workspace import load_workspace
-        projects = load_workspace(str(tmp_path))
-
-        batch_config = BatchReleaseConfig(
-            section_type="packages",
-            packages={
-                "pkg-a": ReleaseConfig(bump="patch", include=[], exclude=[], description="release a"),
-            },
-        )
-
-        batch_path = str(tmp_path / ".rlsbl-monorepo" / "releases" / "unreleased.toml")
-        os.makedirs(os.path.dirname(batch_path), exist_ok=True)
-        Path(batch_path).write_text("")
-
-        # Mock the context manager to yield immediately
-        mock_lock.return_value.__enter__ = MagicMock(return_value=None)
-        mock_lock.return_value.__exit__ = MagicMock(return_value=False)
-
-        captured_flags = {}
-
-        def fake_run_cmd(release_config, release_flags, *, ctx):
-            captured_flags.update(release_flags)
-
-        with patch("rlsbl.commands.monorepo.batch_release.WorkspaceGraph") as mock_graph:
-            mock_graph.return_value.topological_order.return_value = ["pkg-a", "pkg-b"]
-            with patch("rlsbl.commands.monorepo.batch_release._finalize_batch_file"):
-                from rlsbl.commands.monorepo import batch_release
-                with patch.object(batch_release, "__import__", create=True):
-                    with patch("rlsbl.commands.release.run_cmd", side_effect=fake_run_cmd) as mock_run:
-                        from rlsbl.commands.monorepo.batch_release import _batch_release_packages
-                        _batch_release_packages(
-                            {"dry-run": False, "quiet": True},
-                            str(tmp_path), batch_path, batch_config, projects,
-                        )
-
-        assert captured_flags.get("skip-lock") is True
-        mock_lock.assert_called_once_with(".rlsbl-monorepo", project_root=str(tmp_path))
-
-    @patch("rlsbl.commands.monorepo.batch_release.rlsbl_lock")
     def test_batch_releasables_passes_skip_lock(self, mock_lock, tmp_path, monkeypatch):
         """_batch_release_releasables passes skip-lock=True in release_flags."""
         monkeypatch.chdir(tmp_path)
@@ -242,7 +193,6 @@ class TestBatchReleasePassesSkipLock:
         projects = load_workspace(str(tmp_path))
 
         batch_config = BatchReleaseConfig(
-            section_type="releasables",
             packages={
                 "my-rel": ReleaseConfig(bump="patch", include=[], exclude=[], description="release rel"),
             },

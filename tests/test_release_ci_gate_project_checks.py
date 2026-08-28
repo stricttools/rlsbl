@@ -437,12 +437,12 @@ class TestTheGateCannotBeForgotten:
         source = inspect.getsource(batch_release._batch_ci_gate)
         assert "workspace_check_filters" in source
         assert "check_filters=check_filters" in source
-        # Both call sites pass the pending set.
+        # The one call site passes the pending set.
         whole = inspect.getsource(batch_release)
         assert whole.count(
             "_batch_ci_gate(\n                    workspace_root, flags, log, "
             "candidate_sha, pending,\n                )"
-        ) == 2
+        ) == 1
 
 
 # --------------------------------------------------------------------------- #

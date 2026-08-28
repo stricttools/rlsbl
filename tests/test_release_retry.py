@@ -291,13 +291,16 @@ class TestReleaseRetry(unittest.TestCase):
     @patch("rlsbl.commands.release_retry.TARGETS")
     @patch("rlsbl.commands.release_retry.resolve_project")
     @patch("rlsbl.commands.release_retry.find_workspace_root", return_value="/repo")
+    @patch("rlsbl.workspace.load_workspace", return_value=[])
+    @patch("rlsbl.workspace.load_releasables", return_value=[])
     @patch("rlsbl.commands.release_retry.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release_retry.check_gh_installed", return_value=True)
-    def test_monorepo_tag_format(self, _gh_inst, _gh_auth, _ws_root,
+    def test_monorepo_tag_format(self, _gh_inst, _gh_auth, _rels, _projs, _ws_root,
                                   mock_resolve, mock_targets_dict, mock_detect,
                                   _exists, mock_run, mock_run_gh,
                                   mock_cleanup):
-        """In monorepo context, uses monorepo_tag_format for the tag and dispatch ref."""
+        """A member belonging to no releasable uses monorepo_tag_format for the
+        tag and the dispatch ref."""
         target = self._make_mock_target()
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
