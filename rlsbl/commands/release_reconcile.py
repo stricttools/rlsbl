@@ -432,10 +432,11 @@ REFUSAL_STATES = (STATE_REFUSE_FOREIGN, STATE_REFUSE_IDENTITY)
 # repository root.
 PLAN_FILENAME = "reconcile-plan.toml"
 
-# How many Releases one listing asks for. A repository with more released
-# versions than this is not silently truncated: the listing count is compared
-# against the ledger and a short answer is an error, never a set of absent
-# Releases to materialize.
+# How many Releases one listing asks for. ``gh release list`` takes a --limit
+# and nothing else -- there is no pagination flag and no total to compare
+# against -- so a full answer and a truncated one are indistinguishable in the
+# output. A listing that comes back AT the cap is therefore a hard error naming
+# it, never a set of absent Releases to materialize.
 _RELEASE_LIST_LIMIT = 1000
 
 _LIST_TIMEOUT = 60
@@ -689,6 +690,11 @@ def list_releases(*, ctx, gh=None, gh_installed=None, gh_auth=None):
     unauthenticated -- the Release half of the reconcile then reports itself as
     unanswerable instead of proposing to create every Release the repository
     has ever published.
+
+    A listing that comes back holding exactly :data:`_RELEASE_LIST_LIMIT`
+    entries is refused: ``gh release list`` reports no total and offers no
+    pagination, so a repository with more Releases than the cap would have the
+    unlisted ones judged absent and proposed for creation.
     """
     gh = gh or run_gh
     gh_installed = gh_installed or check_gh_installed
@@ -711,7 +717,18 @@ def list_releases(*, ctx, gh=None, gh_installed=None, gh_auth=None):
     if not isinstance(out, str):
         # A preview carrier standing in for output that was never produced.
         return frozenset(), False
-    return frozenset(t.strip() for t in out.splitlines() if t.strip()), True
+    tags = [t.strip() for t in out.splitlines() if t.strip()]
+    if len(tags) >= _RELEASE_LIST_LIMIT:
+        raise ReconcileError(
+            f"the GitHub Release listing came back at its {_RELEASE_LIST_LIMIT}"
+            f"-entry limit, so it may be truncated. `gh release list` reports "
+            f"no total and offers no pagination, so a truncated listing is "
+            f"indistinguishable from a complete one -- and every unlisted "
+            f"Release would be judged absent and proposed for creation. Raise "
+            f"_RELEASE_LIST_LIMIT in rlsbl/commands/release_reconcile.py above "
+            f"this repository's Release count and re-run."
+        )
+    return frozenset(tags), True
 
 
 def observe_world(*, ctx, git=None, gh=None, gh_installed=None, gh_auth=None,

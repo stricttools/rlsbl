@@ -346,6 +346,41 @@ class TestTheReleaseHalf:
         assert "--prerelease" in seen["args"]
 
 
+class TestTheReleaseListing:
+    """The listing is a bounded question, so its bound must be visible."""
+
+    class _Ctx:
+        config = {}
+
+    def _list(self, out):
+        from rlsbl.commands.release_reconcile import list_releases
+
+        return list_releases(
+            ctx=self._Ctx(), gh=lambda *a, **k: out,
+            gh_installed=lambda: True, gh_auth=lambda: True,
+        )
+
+    def test_a_listing_that_hits_the_cap_is_a_hard_error(self):
+        """`gh release list` takes only a --limit, so a full answer and a
+        truncated one look identical. A repository with more Releases than the
+        cap must never have the missing ones read as absent and proposed for
+        creation."""
+        from rlsbl.commands.release_reconcile import (
+            _RELEASE_LIST_LIMIT,
+            ReconcileError,
+        )
+
+        out = "\n".join(f"v0.0.{i}" for i in range(_RELEASE_LIST_LIMIT))
+        with pytest.raises(ReconcileError) as exc:
+            self._list(out)
+        assert str(_RELEASE_LIST_LIMIT) in str(exc.value)
+
+    def test_a_listing_under_the_cap_is_answered(self):
+        tags, known = self._list("v1.0.0\nv1.1.0\n")
+        assert known is True
+        assert tags == frozenset({"v1.0.0", "v1.1.0"})
+
+
 class TestTheFreshCloneCase:
     """The journal lives under .git; the scrub archives are committed."""
 
