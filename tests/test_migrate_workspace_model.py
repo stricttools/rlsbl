@@ -616,3 +616,172 @@ class TestDryRun:
         migrate(repo, dev_node=True)
         _code, output = migrate(repo, dev_node=True, dry_run=True)
         assert "loads" in output
+
+
+# ---------------------------------------------------------------------------
+# The commit, and the anchor backfill that follows the edits
+# ---------------------------------------------------------------------------
+
+
+def make_git_workspace(tmp_path, text=OLD_MODEL):
+    """A real git repository carrying an old-model workspace."""
+    from githarness import git, init_repo
+
+    repo = tmp_path / "ws"
+    init_repo(repo)
+    (repo / "pkgs" / "core").mkdir(parents=True)
+    (repo / "pkgs" / "cli").mkdir(parents=True)
+    write_workspace(repo, text)
+    (repo / "README.md").write_text("hi\n", encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "initial")
+    return repo
+
+
+def test_the_commit_message_names_the_edits(tmp_path):
+    write_workspace(tmp_path, OLD_MODEL)
+    plan = plan_for(tmp_path, dev_node=True)
+    message = migrate_mod.commit_message(plan)
+    assert "ownership model" in message
+    assert "drop-watch x2" in message
+    assert "relocate-mirror" in message
+
+
+class TestCommit:
+    def test_the_migrated_file_is_committed(self, tmp_path):
+        from githarness import git
+
+        repo = make_git_workspace(tmp_path)
+        code, _output = migrate(repo, dev_node=True, auto_commit=True)
+        assert code == 0
+        assert git(repo, "status", "--porcelain") == ""
+        log = git(repo, "log", "-1", "--pretty=%B")
+        assert "Migrate workspace.toml to the ownership model" in log
+
+    def test_nothing_is_committed_when_nothing_changed(self, tmp_path):
+        from githarness import git
+
+        repo = make_git_workspace(tmp_path)
+        migrate(repo, dev_node=True, auto_commit=True)
+        head = git(repo, "rev-parse", "HEAD")
+        migrate(repo, dev_node=True, auto_commit=True)
+        assert git(repo, "rev-parse", "HEAD") == head
+
+
+class TestAnchorBackfill:
+    """The migration edits the workspace, then the anchor pass runs on it."""
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        from githarness import git
+
+        repo = make_git_workspace(tmp_path)
+        changes = repo / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "0.1.0.jsonl").write_text(
+            '{"format_version":1,"commits":["%s"],"user_facing":false}\n' % ("0" * 40),
+            encoding="utf-8",
+        )
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "core@v0.1.0")
+        git(repo, "tag", "core@v0.1.0")
+        return repo
+
+    def archive(self, repo):
+        return (
+            repo
+            / ".rlsbl-monorepo"
+            / "releasables"
+            / "core"
+            / "releases"
+            / "v0.1.0.toml"
+        )
+
+    def test_the_release_is_anchored_after_the_edits(self, repo):
+        from githarness import git
+
+        code, output = migrate(repo, dev_node=True, backfill=True)
+        assert code == 0
+        assert "release-anchor backfill" in output
+        with open(self.archive(repo), "rb") as f:
+            data = tomllib.load(f)
+        assert data["candidate_sha"] == git(repo, "rev-parse", "core@v0.1.0^{commit}")
+
+    def test_the_backfill_needs_the_migration_to_have_run_first(self, repo):
+        """The pass it invokes reads the workspace through the loader."""
+        backfill = migrate_mod._load_backfill()
+        with pytest.raises(Exception) as exc:
+            backfill.build_plan(str(repo), use_gh=False)
+        assert "root member" in str(exc.value)
+
+    def test_a_dry_run_previews_the_backfill_without_writing(self, repo):
+        migrate(repo, dev_node=True, backfill=False)
+        code, output = migrate(repo, dev_node=True, backfill=True, dry_run=True)
+        assert code == 0
+        assert "--dry-run: nothing written." in output
+        assert not self.archive(repo).exists()
+
+    def test_both_halves_are_idempotent_together(self, repo):
+        migrate(repo, dev_node=True, backfill=True)
+        before = self.archive(repo).read_bytes()
+        ws_before = workspace_path(repo).read_bytes()
+        code, output = migrate(repo, dev_node=True, backfill=True)
+        assert code == 0
+        assert self.archive(repo).read_bytes() == before
+        assert workspace_path(repo).read_bytes() == ws_before
+        assert "Nothing to do" in output
+
+
+class TestCommandLine:
+    """main() end to end: the flags an operator types during the fleet sweep."""
+
+    def test_a_dry_run_from_the_command_line(self, tmp_path, capsys):
+        repo = make_git_workspace(tmp_path)
+        code = migrate_mod.main(
+            ["--repo", str(repo), "--root-dev-node", "--dry-run", "--no-gh"]
+        )
+        captured = capsys.readouterr().out
+        assert code == 0
+        assert "--dry-run: nothing written." in captured
+        assert "watch" in captured
+        assert "watch" in workspace_path(repo).read_text()
+
+    def test_a_real_run_from_the_command_line(self, tmp_path, capsys):
+        repo = make_git_workspace(tmp_path)
+        code = migrate_mod.main(
+            ["--repo", str(repo), "--root-dev-node", "--no-commit", "--no-gh"]
+        )
+        assert code == 0
+        assert "loads" in capsys.readouterr().out
+        assert "watch" not in workspace_path(repo).read_text()
+
+    def test_a_releasable_root_from_the_command_line(self, tmp_path, capsys):
+        repo = make_git_workspace(tmp_path, text=NO_ROOT_MEMBER)
+        code = migrate_mod.main(
+            [
+                "--repo", str(repo), "--root-releasable", "monorepo",
+                "--tag-format", "v{version}", "--no-commit", "--no-gh",
+            ]
+        )
+        assert code == 0
+        capsys.readouterr()
+        data = read_workspace(repo)
+        assert root_member(data)["releasable"] == "monorepo"
+        assert any(
+            r["name"] == "monorepo" and r["tag_format"] == "v{version}"
+            for r in data["releasables"]
+        )
+
+    def test_a_repository_without_a_workspace_is_refused(self, tmp_path, capsys):
+        from githarness import init_repo
+
+        repo = tmp_path / "plain"
+        init_repo(repo)
+        code = migrate_mod.main(["--repo", str(repo), "--root-dev-node", "--no-gh"])
+        assert code == 2
+        assert "no workspace found" in capsys.readouterr().out
+
+    def test_a_directory_that_is_not_a_repository_is_refused(self, tmp_path, capsys):
+        code = migrate_mod.main(["--repo", str(tmp_path), "--root-dev-node"])
+        assert code == 2
+        assert "not a git repository" in capsys.readouterr().err
