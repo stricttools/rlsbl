@@ -281,3 +281,4 @@
 {"format_version":1,"id":"18cfe97684ce4c0540b7912af424453fbb2cf0482fcaeff6","commits":["f368f9e9c84132278180a5f1fac7713ea043007e"],"user_facing":true,"description":"**Two batch-release error messages no longer call the plan file a \"sidecar\".** `rlsbl monorepo release run` now says \"Missing plan file\" and \"delete the plan file and re-run\" when it refuses a batch whose companion `unreleased.plan.json` is missing or stale.","type":"fix"}
 {"format_version":1,"id":"18cfe98f6ba62b34d617d0aa7feb43c2aa88917fc5bcb50f","commits":["00e90cf0d16ad3484479e0b67ff5eeaae7460677"],"user_facing":false}
 {"format_version":1,"id":"18cfe9cb8303b3305578a60c21f94bfaa5b6a2ab771cf315","commits":["8e2c566e518ef6423060b0111e117df9bf366c7b"],"user_facing":false}
+{"format_version":1,"id":"18cfe9fb7b609d90662aa5ae66024053b909014cd733f01d","commits":["6d28920b0162bdda2f763eca8985ac1c7fecc303"],"user_facing":false}
