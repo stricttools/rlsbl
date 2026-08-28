@@ -760,10 +760,10 @@ def _print_plan(plan):
         print(f"  - Revert {len(plan.revert_shas)} release commit(s) (newest first):")
         for sha, subject in plan.revert_shas:
             print(f"      {sha[:10]}  {subject}")
-    elif plan.is_latest:
-        print("  - No release commits found to revert")
     else:
-        print(f"  - Un-finalize changelog for {plan.version} (no commit revert -- history moved on)")
+        # Only the non-latest path gets here: the latest path refuses when it
+        # cannot locate the release's version-bump commit.
+        print("  - No commit revert (non-latest release -- history moved on)")
     print(f"  - Un-finalize {plan.version}.jsonl back into unreleased.jsonl "
           f"(merging anything added since) and regenerate CHANGELOG.md")
     print(f'  - Commit the restored changelog ("chore: restore changelog after '
