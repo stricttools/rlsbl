@@ -1005,6 +1005,42 @@ class TestApplySingleMember:
         assert releasable.tag_format == "v{version}"
         assert gitout(target, "status", "--porcelain") == ""
 
+    def test_the_hoist_rides_the_one_filter_run(self, tmp_path, monkeypatch):
+        """The paths and the hoist go in as ONE git-filter-repo invocation.
+
+        Everything downstream -- the anchors, the changelog hashes, the tag
+        translation -- is keyed off ``.git/filter-repo/commit-map``, and that
+        file must map the SOURCE's commits. filter-repo rewrites it on every
+        run: a second, chained invocation leaves a map keyed by the FIRST run's
+        rewritten commits unless the installed filter-repo composes the two.
+        2.47 composes; 2.38 (the Ubuntu 24.04 package, and therefore CI) does
+        not, and there every original sha silently misses -- anchors are left
+        as recorded, changelog entries are dropped as pruned. So the shape is
+        asserted here rather than the composing behaviour of whichever
+        filter-repo happens to be on PATH.
+        """
+        import rlsbl.commands.monorepo.extract_cmd as mod
+
+        calls = []
+        real = mod._run_filter_repo
+
+        def recording(cwd, *args):
+            calls.append(list(args))
+            return real(cwd, *args)
+
+        monkeypatch.setattr(mod, "_run_filter_repo", recording)
+
+        ns = make_source(tmp_path)
+        cmd_extract(str(ns.root), "extras", str(tmp_path / "extras_out"))
+
+        assert len(calls) == 1, (
+            f"the rewrite must be one filter-repo run; got {len(calls)}: "
+            f"{calls}"
+        )
+        args = calls[0]
+        assert args[args.index("--path") + 1] == "pkgC"
+        assert args[args.index("--path-rename") + 1] == "pkgC/:"
+
     def test_state_lands_in_the_standalone_home_without_the_version_file(
         self, tmp_path,
     ):

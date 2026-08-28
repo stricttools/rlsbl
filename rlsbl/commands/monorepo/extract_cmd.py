@@ -1443,14 +1443,22 @@ def _apply_filter(dep, item, run):
     _run_git(dep.workspace_root, "clone", "--no-local", ".", dep.target_path)
     _ensure_git_identity(dep.target_path, dep.workspace_root)
 
+    # ONE invocation, carrying the path filter and (for a single member) the
+    # hoist together. filter-repo rewrites .git/filter-repo/commit-map on every
+    # run, so a second, chained run leaves a map keyed by the FIRST run's
+    # rewritten commits unless the installed filter-repo composes the two --
+    # 2.47 does, 2.38 (the Ubuntu 24.04 package) does not. Everything below
+    # keys off that map by the SOURCE's shas: anchors, changelog hashes, tag
+    # translation. Under a non-composing filter-repo the chained form made all
+    # three miss silently -- anchors left as recorded, changelog entries
+    # dropped as pruned. Both options in one run is filter-repo's own
+    # subdirectory-filter recipe and produces the identical rewritten history.
     args = []
     for path in dep.member_paths:
         args += ["--path", path]
-    _run_filter_repo(dep.target_path, *args, "--force")
     if not dep.is_multi:
-        _run_filter_repo(
-            dep.target_path, "--path-rename", f"{dep.member_paths[0]}/:", "--force",
-        )
+        args += ["--path-rename", f"{dep.member_paths[0]}/:"]
+    _run_filter_repo(dep.target_path, *args, "--force")
 
     commit_map = os.path.join(
         dep.target_path, ".git", "filter-repo", "commit-map",
