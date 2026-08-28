@@ -556,28 +556,6 @@
         "pypi"
       ]
     },
-    "github-release": {
-      "kind": "universal",
-      "targets": [
-        "pypi",
-        "go",
-        "npm",
-        "dart",
-        "deno",
-        "hex",
-        "zig",
-        "swift",
-        "swift-apple",
-        "maven",
-        "native-android",
-        "native-ios",
-        "docker",
-        "flutter",
-        "pgdesign",
-        "plain",
-        "spec"
-      ]
-    },
     "go-companion-tags": {
       "kind": "workspace",
       "targets": []
@@ -649,28 +627,6 @@
       "kind": "targets",
       "targets": [
         "pypi"
-      ]
-    },
-    "local-tag": {
-      "kind": "universal",
-      "targets": [
-        "pypi",
-        "go",
-        "npm",
-        "dart",
-        "deno",
-        "hex",
-        "zig",
-        "swift",
-        "swift-apple",
-        "maven",
-        "native-android",
-        "native-ios",
-        "docker",
-        "flutter",
-        "pgdesign",
-        "plain",
-        "spec"
       ]
     },
     "lock": {
@@ -850,28 +806,6 @@
     "releasable-residue": {
       "kind": "workspace",
       "targets": []
-    },
-    "remote-tag": {
-      "kind": "universal",
-      "targets": [
-        "pypi",
-        "go",
-        "npm",
-        "dart",
-        "deno",
-        "hex",
-        "zig",
-        "swift",
-        "swift-apple",
-        "maven",
-        "native-android",
-        "native-ios",
-        "docker",
-        "flutter",
-        "pgdesign",
-        "plain",
-        "spec"
-      ]
     },
     "requires-services": {
       "kind": "universal",
@@ -1094,6 +1028,28 @@
       "kind": "targets",
       "targets": [
         "pypi"
+      ]
+    },
+    "unpublished-refs": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
       ]
     },
     "unversioned-boundary": {

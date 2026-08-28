@@ -1,7 +1,7 @@
 """Tests for check handler functions to increase code coverage.
 
 Covers:
-- checks/release.py: local-tag, remote-tag, github-release, branch-sync
+- checks/release.py: unpublished-refs, branch-sync
 - checks/changelog.py: all 9 changelog check handlers (standalone mode)
 - checks/prepush.py: explicit releasable mode paths
 - commands/monorepo/batch_release.py: _releasable_release_order, _finalize_batch_file
@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
-from githarness import record_release
+from githarness import git as git_out, record_release
 
 from conftest import git_head, make_commit, make_ctx, make_workspace, run_git, workspace_toml
 
@@ -69,231 +69,214 @@ def _write_changelog_md(repo, version, content="Some changes"):
 # ==================================================================
 
 
-class TestLocalTagCheck:
-    """Tests for the local-tag check."""
+class TestUnpublishedRefsCheck:
+    """The successor of local-tag, remote-tag and github-release.
 
-    def test_tag_exists_passes(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
-        )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
+    Those three each looked at the primary tag of the CURRENT version only.
+    This one asks the ledger which versions were released and renders every ref
+    each of them owns -- primary, companions, recorded aliases -- against the
+    local repository and against origin, reporting three distinct failures.
+    """
 
-        ctx = make_ctx(repo)
-        result = app._check_defs["local-tag"].impl(ctx)
-        assert result.status == "pass"
-        assert "v0.1.0" in result.message
-
-    def test_tag_missing_warns(self, tmp_path, monkeypatch):
+    def _project(self, tmp_path, monkeypatch, *, version="0.1.0"):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
         _setup_changelog_repo(repo, tag=None, targets=["pypi"])
         (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "9.9.9"\n'
+            f'[project]\nname = "test"\nversion = "{version}"\n'
         )
         run_git(repo, "add", "pyproject.toml")
         run_git(repo, "commit", "-q", "-m", "add pyproject")
+        return repo
 
-        ctx = make_ctx(repo)
-        result = app._check_defs["local-tag"].impl(ctx)
-        assert result.status == "warn"
-        assert "not found" in result.message
+    def _run(self, ctx, *, local, remote=None, has_remote=True):
+        """Run the check with both tag namespaces supplied as maps."""
+        from rlsbl.utils import TagCommitMap
 
-    def test_no_version_skips(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag=None)
-        # No target files -> no version detected
+        patches = [
+            patch("rlsbl.utils.local_tag_commits", return_value=local),
+            patch("rlsbl.utils.remote_is_configured", return_value=has_remote),
+        ]
+        if remote is not None:
+            patches.append(
+                patch("rlsbl.utils.remote_tag_commits", return_value=remote)
+            )
+        for p in patches:
+            p.start()
+        try:
+            return app._check_defs["unpublished-refs"].impl(ctx)
+        finally:
+            for p in reversed(patches):
+                p.stop()
 
-        ctx = make_ctx(repo)
-        result = app._check_defs["local-tag"].impl(ctx)
-        assert result.status == "skip"
-
-
-class TestRemoteTagCheck:
-    """Tests for the remote-tag check."""
-
-    def test_no_version_skips(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag=None)
-
-        ctx = make_ctx(repo)
-        result = app._check_defs["remote-tag"].impl(ctx)
-        assert result.status == "skip"
-
-    def test_local_tag_missing_skips(self, tmp_path, monkeypatch):
-        """remote-tag skips when the local tag doesn't exist yet."""
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag=None, targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
-        )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
-
-        ctx = make_ctx(repo)
-        result = app._check_defs["remote-tag"].impl(ctx)
-        assert result.status == "skip"
-        assert "not created yet" in result.message
-
-    def test_remote_tag_not_found_warns(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
-        )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
-
-        ctx = make_ctx(repo)
-        # No remote exists, so ls-remote will fail
-        with patch("rlsbl.utils.run", side_effect=lambda cmd, args, **kw: (
-            "" if cmd == "git" and args and args[0] == "ls-remote" else
-            subprocess.run([cmd] + (args or []), capture_output=True, text=True, check=True, cwd=kw.get("cwd")).stdout.strip()
-        )):
-            result = app._check_defs["remote-tag"].impl(ctx)
-        assert result.status == "warn"
-
-    def test_remote_tag_found_passes(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
-        )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
-
-        ctx = make_ctx(repo)
-        with patch("rlsbl.utils.run", return_value="abc123 refs/tags/v0.1.0"):
-            result = app._check_defs["remote-tag"].impl(ctx)
-        assert result.status == "pass"
-
-
-class TestGithubReleaseCheck:
-    """Tests for the github-release check."""
-
-    def test_no_version_skips(self, tmp_path, monkeypatch):
+    def test_no_target_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
         _setup_changelog_repo(repo, tag=None)
 
-        ctx = make_ctx(repo)
-        result = app._check_defs["github-release"].impl(ctx)
+        result = app._check_defs["unpublished-refs"].impl(make_ctx(repo))
         assert result.status == "skip"
+        assert "no release target" in result.message
 
-    def test_local_tag_missing_skips(self, tmp_path, monkeypatch):
-        """github-release skips when the local tag doesn't exist yet (even without gh)."""
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag=None, targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
-        )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
-
-        ctx = make_ctx(repo)
-        # No gh mocking needed -- the check should skip before reaching gh calls
-        with patch("rlsbl.utils.check_gh_installed", side_effect=AssertionError("should not be called")):
-            result = app._check_defs["github-release"].impl(ctx)
+    def test_nothing_released_skips(self, tmp_path, monkeypatch):
+        repo = self._project(tmp_path, monkeypatch)
+        result = app._check_defs["unpublished-refs"].impl(make_ctx(repo))
         assert result.status == "skip"
-        assert "not created yet" in result.message
+        assert "no release" in result.message
 
-    def test_gh_not_installed_fails(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
+    def test_every_ref_present_passes(self, tmp_path, monkeypatch):
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
         )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
+        assert result.status == "pass", result
+        assert "1 released version" in result.message
 
-        ctx = make_ctx(repo)
-        with patch("rlsbl.utils.check_gh_installed", return_value=False):
-            result = app._check_defs["github-release"].impl(ctx)
+    def test_a_ref_missing_locally_fails(self, tmp_path, monkeypatch):
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({}),
+            remote=TagCommitMap({}),
+        )
         assert result.status == "fail"
-        assert "not installed" in result.message
+        assert any("does not exist locally" in p.text for p in result.problems)
+        assert any("rlsbl release reconcile" in p.text for p in result.problems)
 
-    def test_gh_not_authenticated_fails(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
+    def test_a_ref_missing_on_origin_fails(self, tmp_path, monkeypatch):
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({}),
         )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
-
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.utils.check_gh_installed", return_value=True),
-            patch("rlsbl.utils.check_gh_auth", return_value=False),
-        ):
-            result = app._check_defs["github-release"].impl(ctx)
         assert result.status == "fail"
-        assert "not authenticated" in result.message
-        # Actionable remediation names the exact command to run.
-        assert any("gh auth login" in p.text for p in result.problems)
+        assert any("not on origin" in p.text for p in result.problems)
 
-    def test_release_exists_passes(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
+    def test_a_ref_at_the_wrong_commit_fails(self, tmp_path, monkeypatch):
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        moved = "b" * 40
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": moved}),
+            remote=TagCommitMap({"v0.1.0": moved}),
         )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
+        assert result.status == "fail"
+        assert any("the ref moved" in p.text for p in result.problems)
 
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.utils.check_gh_installed", return_value=True),
-            patch("rlsbl.utils.check_gh_auth", return_value=True),
-            patch("rlsbl.utils.run_gh", return_value="release info"),
-        ):
-            result = app._check_defs["github-release"].impl(ctx)
+    def test_an_unreadable_remote_is_an_error_not_a_pass(self, tmp_path, monkeypatch):
+        """Fail-closed: an unanswered probe is not an answer."""
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({}, error="connection refused"),
+        )
+        assert result.status == "fail"
+        assert any("connection refused" in p.text for p in result.problems)
+
+    def test_an_unreadable_local_namespace_is_an_error(self, tmp_path, monkeypatch):
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({}, error="not a git repository"),
+        )
+        assert result.status == "fail"
+        assert any("not a git repository" in p.text for p in result.problems)
+
+    def test_no_origin_remote_checks_the_local_half_only(self, tmp_path, monkeypatch):
+        """No remote is a different state from an unreachable one."""
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            has_remote=False,
+        )
         assert result.status == "pass"
+        assert "no origin remote" in result.message
 
-    def test_release_not_found_warns(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _setup_changelog_repo(repo, tag="v0.1.0", targets=["pypi"])
-        (repo / "pyproject.toml").write_text(
-            '[project]\nname = "test"\nversion = "0.1.0"\n'
+    def test_an_unanchorable_versions_absent_ref_is_counted_not_errored(
+        self, tmp_path, monkeypatch,
+    ):
+        """No commit to recreate it at means no repair to name.
+
+        Surfaced in the pass message rather than passed over: a check that can
+        never go green is a check people stop reading, and an unanchorable
+        archive is a permanent recorded fact, not a fixable state.
+        """
+        from rlsbl.release_file import write_archived_release_file
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        write_archived_release_file(
+            str(repo / ".rlsbl" / "releases"), "0.1.0",
+            bump="patch", include=["pypi"], description="an old release",
+            candidate_sha=None, tree_hashes=None, unanchorable=True,
         )
-        run_git(repo, "add", "pyproject.toml")
-        run_git(repo, "commit", "-q", "-m", "add pyproject")
 
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.utils.check_gh_installed", return_value=True),
-            patch("rlsbl.utils.check_gh_auth", return_value=True),
-            patch("rlsbl.utils.run_gh", side_effect=subprocess.CalledProcessError(1, "gh")),
-        ):
-            result = app._check_defs["github-release"].impl(ctx)
-        assert result.status == "warn"
-        assert "not found" in result.message
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({}),
+            remote=TagCommitMap({}),
+        )
+        assert result.status == "pass", result
+        assert "unanchorable" in result.message
+
+    def test_every_archived_version_is_covered_not_just_the_latest(
+        self, tmp_path, monkeypatch,
+    ):
+        """The three retired checks saw only the current version."""
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch, version="0.2.0")
+        record_release(repo, "v0.1.0")
+        make_commit(repo, "more.txt", "more work")
+        record_release(repo, "v0.2.0")
+        latest = git_out(repo, "rev-parse", "v0.2.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.2.0": latest}),
+            remote=TagCommitMap({"v0.2.0": latest}),
+        )
+        assert result.status == "fail"
+        assert any("v0.1.0" in p.text for p in result.problems), result.problems
 
 
 class TestBranchSyncCheck:

@@ -15,10 +15,11 @@ app = "rlsbl"
 #
 # This replaced "the check spawns no subprocess at all". That older rule forced
 # nine checks that spawn only read-only local git to be declared impure, and it
-# quietly misdeclared two that DO spawn: `local-tag` runs `git tag --list`, and
-# `config-schema` can reach `go list` on its error path. Under the rule above
-# both are legitimately pure, and are declared so deliberately rather than by
-# accident. The full record is in rlsbl/observe_allowlist.py.
+# quietly misdeclared two that DO spawn: the retired `local-tag` ran
+# `git tag --list`, and `config-schema` can reach `go list` on its error path.
+# Under the rule above both are legitimately pure, and `config-schema` is
+# declared so deliberately rather than by accident. The full record is in
+# rlsbl/observe_allowlist.py.
 #
 # Verifiable rather than asserted: tests/test_check_purity.py executes every
 # pure-declared check under an effects observer and fails on any spawn whose
@@ -91,29 +92,13 @@ pure = true
 needs_network = false
 depends_on = []
 
-[checks.local-tag]
-tags = ["release"]
-severity = "warn"
-fast = true
-pure = true
-needs_network = false
-depends_on = ["version-consistency"]
-
-[checks.remote-tag]
-tags = ["release"]
-severity = "warn"
-fast = true
-pure = false
-needs_network = true
-depends_on = ["local-tag"]
-
-[checks.github-release]
+[checks.unpublished-refs]
 tags = ["release"]
 severity = "error"
 fast = false
 pure = false
 needs_network = true
-depends_on = ["remote-tag"]
+depends_on = ["version-consistency"]
 
 [checks.branch-sync]
 tags = ["release"]

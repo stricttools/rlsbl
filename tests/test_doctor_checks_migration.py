@@ -26,9 +26,7 @@ EXPECTED_CHECKS = [
     "private-hook-stale",
     "config-schema",
     "license-file",
-    "local-tag",
-    "remote-tag",
-    "github-release",
+    "unpublished-refs",
     "branch-sync",
     "changelog-entry",
     "library-lint",
@@ -204,7 +202,7 @@ class TestCheckTags:
         assert "project" in app._check_defs[name].tags
 
     @pytest.mark.parametrize("name", [
-        "local-tag", "remote-tag", "github-release", "branch-sync",
+        "unpublished-refs", "branch-sync",
     ])
     def test_release_tag(self, name):
         assert "release" in app._check_defs[name].tags
@@ -228,14 +226,8 @@ class TestCheckTags:
 class TestCheckDependencies:
     """Dependency chains are correctly declared."""
 
-    def test_local_tag_depends_on_version_consistency(self):
-        assert "version-consistency" in app._check_defs["local-tag"].depends_on
-
-    def test_remote_tag_depends_on_local_tag(self):
-        assert "local-tag" in app._check_defs["remote-tag"].depends_on
-
-    def test_github_release_depends_on_remote_tag(self):
-        assert "remote-tag" in app._check_defs["github-release"].depends_on
+    def test_unpublished_refs_depends_on_version_consistency(self):
+        assert "version-consistency" in app._check_defs["unpublished-refs"].depends_on
 
     def test_changelog_entry_depends_on_version_consistency(self):
         assert "version-consistency" in app._check_defs["changelog-entry"].depends_on
@@ -361,42 +353,34 @@ class TestChangelogEntryCheck:
 
 
 # ---------------------------------------------------------------------------
-# Functional tests: local-tag check
+# Functional tests: unpublished-refs check
 # ---------------------------------------------------------------------------
 
-class TestLocalTagCheck:
-    """The local-tag check verifies the git tag exists."""
+class TestUnpublishedRefsCheck:
+    """The successor of local-tag/remote-tag/github-release.
 
-    def test_local_tag_pass(self, mock_git_repo):
-        """Tag exists locally -> pass."""
+    Those three asked whether the CURRENT version's primary tag existed. This
+    one asks the ledger which versions were released and renders every ref each
+    of them owns against the repository. The two skip conditions the old checks
+    had -- no version, nothing tagged yet -- are one condition here: the ledger
+    records no release.
+    """
+
+    def test_skips_when_no_release_target(self, mock_git_repo):
+        """Nothing to name refs for -> skip."""
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+        result = app._check_defs["unpublished-refs"].impl(ctx)
+        assert result.status == "skip"
+
+    def test_skips_when_the_ledger_records_nothing(self, mock_git_repo):
+        """A project with a target but no archived release -> skip."""
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
-        subprocess.run(
-            ["git", "tag", "v1.0.0"],
-            cwd=str(mock_git_repo),
-            check=True,
-        )
 
         ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
-        result = app._check_defs["local-tag"].impl(ctx)
-        assert result.status == "pass"
-        assert "v1.0.0" in result.message
-
-    def test_local_tag_warn(self, mock_git_repo):
-        """Tag does not exist -> warn."""
-        pkg = {"name": "test-pkg", "version": "9.9.9"}
-        (mock_git_repo / "package.json").write_text(json.dumps(pkg))
-
-        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
-        result = app._check_defs["local-tag"].impl(ctx)
-        assert result.status == "warn"
-        assert "not found" in result.message
-
-    def test_local_tag_skip_no_version(self, mock_git_repo):
-        """No version detected -> skip."""
-        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
-        result = app._check_defs["local-tag"].impl(ctx)
+        result = app._check_defs["unpublished-refs"].impl(ctx)
         assert result.status == "skip"
+        assert "no release" in result.message
 
 
 # ---------------------------------------------------------------------------
@@ -460,7 +444,7 @@ class TestCheckTagFiltering:
     def test_tag_release(self):
         result = app.test(["--dry-run", "check", "--tag", "release"])
         assert result.exit_code == 0
-        assert "local-tag" in result.stdout
+        assert "unpublished-refs" in result.stdout
         assert "branch-sync" in result.stdout
         # project-only checks should not appear
         assert "lock" not in result.stdout

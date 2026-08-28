@@ -232,6 +232,66 @@ def _resolve_ledger_dir(ctx):
     return releases_dir_for_changes_dir(changes_dir)
 
 
+def _resolve_release_identity(ctx):
+    """Return ``(target, ref_context, releases_dir)`` for *ctx*'s project.
+
+    The one resolution the ref checks work from: which target answers ref
+    questions, the context ``expected_refs`` reads, and the ledger whose
+    archives say which versions exist.  All three describe the SAME project by
+    construction -- the releases dir comes from :func:`_resolve_ledger_dir`,
+    and the context is built from the same explicit-mode/implicit-mode branch
+    that resolved it.
+
+    Returns None when the project has no detectable target, so there is nothing
+    to name refs for.
+    """
+    from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
+    from ..targets.refs import ref_context
+
+    rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
+    entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
+    if not entries:
+        return None
+    target = TARGETS[entries[0].name]
+    releases_dir = _resolve_ledger_dir(ctx)
+
+    if not isinstance(ctx, WorkspaceCheckContext):
+        return target, ref_context(repo_root=str(ctx.project_root)), releases_dir
+
+    from ..workspace import (
+        get_releasable_dir,
+        is_explicit_mode,
+        members_of,
+        resolve_project,
+        resolve_releasable_for_project,
+    )
+
+    ws_root = str(ctx.workspace_root)
+    proj = resolve_project(ws_root, str(ctx.project_root))
+    if proj is None:
+        return target, ref_context(repo_root=str(ctx.project_root)), releases_dir
+
+    if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+        rel = resolve_releasable_for_project(proj, ctx.releasables)
+        if rel is None:
+            return None
+        members = members_of(rel.name, ctx.projects)
+        return target, ref_context(
+            repo_root=ws_root,
+            project_path=proj["path"],
+            primary_tag_format=rel.effective_tag_format,
+            releasable_name=rel.name,
+            member_package_paths=[m["path"] for m in members],
+            releasable_config_dir=get_releasable_dir(ws_root, rel.name),
+        ), releases_dir
+
+    return target, ref_context(
+        repo_root=ws_root,
+        project_path=proj["path"],
+        monorepo_name=proj["name"],
+    ), releases_dir
+
+
 def _get_all_changelog_contexts(ctx):
     """Return changelog contexts for ALL releasables when CWD is the workspace root.
 

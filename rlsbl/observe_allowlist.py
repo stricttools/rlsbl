@@ -113,11 +113,11 @@ is stated in terms of this list: a pure check starts only programs whose argv
 matches one of these prefixes.  Two consequences worth recording, because
 they used to be accidents rather than decisions:
 
-* ``local-tag`` shells out to ``git tag --list`` and ``config-schema`` can
-  reach ``go list`` on its error path.  Both were declared pure under the
-  older "starts no program" rule and were therefore misdeclared.  Under the
-  standard above they are legitimately pure, and stay declared that way
-  deliberately.
+* ``config-schema`` can reach ``go list`` on its error path, and the retired
+  ``local-tag`` shelled out to ``git tag --list``.  Both were declared pure
+  under the older "starts no program" rule and were therefore misdeclared.
+  Under the standard above they are legitimately pure, and ``config-schema``
+  stays declared that way deliberately.
 * Nine further checks that spawn only read-only local git flipped from impure
   to pure for the same reason.
 

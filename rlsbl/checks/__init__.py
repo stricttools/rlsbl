@@ -69,9 +69,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "dep-floors": targets_with_dep_floors(),
     "license-file": None,
     # --- release tag (universal) ---
-    "local-tag": None,
-    "remote-tag": None,
-    "github-release": None,
+    "unpublished-refs": None,
     "branch-sync": None,
     # --- changelog tag (universal) ---
     "changelog-entry": None,

@@ -512,6 +512,143 @@ def remote_tag_commit(tag, cwd=None, remote="origin", timeout=30):
     return RemoteTagResult(RemoteTagState.PRESENT, commit=commit)
 
 
+@dataclass(frozen=True)
+class TagCommitMap:
+    """Every tag in one namespace mapped to the commit it points at.
+
+    ``commits`` is empty exactly when the namespace holds no tags OR when the
+    probe failed; ``error`` distinguishes the two. A reader that cannot tell
+    "no tags" from "could not ask" would report every release as missing the
+    moment a remote became unreachable, which is why the two are separate
+    fields rather than an empty dict standing for both.
+    """
+
+    commits: dict
+    error: str | None = None
+
+    @property
+    def conclusive(self) -> bool:
+        return self.error is None
+
+
+def _peel_ref_lines(lines):
+    """Fold ``refs/tags`` lines into ``{tag: commit}``, preferring the peel.
+
+    Both ``ls-remote`` and ``for-each-ref`` emit an annotated tag twice: once
+    as the tag object and once as ``<tag>^{}``, the commit it wraps. The peeled
+    form is the commit and always wins; a lightweight tag has only the direct
+    form, whose object already IS the commit.
+    """
+    direct: dict = {}
+    peeled: dict = {}
+    for sha, ref in lines:
+        if not ref.startswith("refs/tags/"):
+            continue
+        name = ref[len("refs/tags/"):]
+        if name.endswith("^{}"):
+            peeled[name[:-3]] = sha
+        else:
+            direct[name] = sha
+    return {**direct, **peeled}
+
+
+def local_tag_commits(cwd=None, timeout=30):
+    """Every LOCAL tag mapped to its commit, in ONE git call.
+
+    The whole namespace at once rather than one probe per tag: a project with
+    hundreds of archived releases would otherwise spawn hundreds of processes
+    to answer a question ``for-each-ref`` answers in a single pass.
+    """
+    try:
+        result = effects.run(
+            ["git", "for-each-ref", "--format=%(objectname) %(refname)",
+             "refs/tags"],
+            capture_output=True, text=True, check=True, cwd=cwd, timeout=timeout,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        return TagCommitMap({}, error=str(getattr(e, "stderr", None) or e).strip())
+    if effects.unsettled(result):
+        return TagCommitMap({}, error="the local tag namespace was not readable")
+
+    lines = []
+    for line in result.stdout.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            lines.append((parts[0], parts[1].strip()))
+    # for-each-ref does not emit the ^{} peel by default, so an annotated tag's
+    # object name is the TAG object. Resolve those to their commits.
+    mapping = _peel_ref_lines(lines)
+    return TagCommitMap(_peel_local_annotated(mapping, cwd, timeout))
+
+
+def _peel_local_annotated(mapping, cwd, timeout):
+    """Replace any tag-object SHA in *mapping* with the commit it wraps.
+
+    One ``rev-parse`` carrying every tag's ``^{}`` form, so annotated tags cost
+    one extra process for the whole namespace rather than one each.
+    """
+    if not mapping:
+        return mapping
+    names = list(mapping)
+    try:
+        result = effects.run(
+            ["git", "rev-parse", *[f"refs/tags/{n}^{{}}" for n in names]],
+            capture_output=True, text=True, check=True, cwd=cwd, timeout=timeout,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return mapping
+    if effects.unsettled(result):
+        return mapping
+    peeled = result.stdout.split()
+    if len(peeled) != len(names):
+        return mapping
+    return dict(zip(names, peeled))
+
+
+def remote_tag_commits(cwd=None, remote="origin", timeout=60):
+    """Every tag on *remote* mapped to its commit, in ONE ``ls-remote`` call.
+
+    This is why the ``unpublished-refs`` check needs no version window: the
+    network cost of checking one release and of checking every release ever
+    made is the same single round trip.
+    """
+    try:
+        result = effects.run(
+            ["git", "ls-remote", "--tags", remote],
+            capture_output=True, text=True, check=True, cwd=cwd, timeout=timeout,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        return TagCommitMap({}, error=str(getattr(e, "stderr", None) or e).strip())
+    if effects.unsettled(result):
+        return TagCommitMap({}, error=f"the tag namespace of {remote} was not readable")
+
+    lines = []
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) == 2:
+            lines.append((parts[0], parts[1]))
+    return TagCommitMap(_peel_ref_lines(lines))
+
+
+def remote_is_configured(remote="origin", cwd=None, timeout=10):
+    """Is *remote* configured in this repository at all?
+
+    A repository with no remote has nothing to be missing FROM, which is a
+    different state from a remote that could not be reached -- the first is a
+    skip, the second is fail-closed.
+    """
+    try:
+        result = effects.run(
+            ["git", "remote"],
+            capture_output=True, text=True, check=True, cwd=cwd, timeout=timeout,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return False
+    if effects.unsettled(result):
+        return False
+    return remote in result.stdout.split()
+
+
 def resolve_tag_push_plan(tags, cwd=None, remote="origin"):
     """Commit-aware decision for pushing one or more release tags.
 

@@ -39,7 +39,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | Tag | Purpose | Check count |
 | --- | --- | --- |
 | `project` | Project-level metadata, config schema, version consistency | 22 |
-| `release` | Git tag and GitHub Release validation | 5 |
+| `release` | Released-version ref and branch-sync validation | 3 |
 | `changelog` | JSONL changelog validation and structure | 11 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 18 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 16 |
@@ -78,12 +78,30 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 
 | Check | Severity | Description |
 | --- | --- | --- |
-| `local-tag` | warn | A git tag exists locally for the current version |
-| `remote-tag` | warn | The version tag has been pushed to the remote (requires network) |
-| `github-release` | warn | A GitHub Release exists for the current version tag (requires network) |
+| `unpublished-refs` | error | Every ref each archived release owns -- its primary tag, its ecosystem's companion tags, and the aliases a rename or conversion recorded for it -- exists locally, exists on origin, and points at the commit the release anchored (requires network) |
 | `branch-sync` | error | Local branch is not behind the remote tracking branch (requires network) |
 
-`scaffold-conflicts` (see project checks) is also tagged `release`. Release checks form a dependency chain: `version-consistency` -> `local-tag` -> `remote-tag` -> `github-release`. If an upstream check fails, downstream checks are skipped.
+`scaffold-conflicts` (see project checks) is also tagged `release`. `unpublished-refs` depends on `version-consistency`; if it fails, `unpublished-refs` is skipped.
+
+### `unpublished-refs`
+
+The ref set it renders against reality is `expected_refs`, the target protocol's single authority for what one version owns -- the same derivation the release's tag step acts on, so a ref the release creates can never be a ref the check does not look for.
+
+It reports three distinct failures, each naming `rlsbl release reconcile` as the remedy:
+
+| Failure | What it means |
+| --- | --- |
+| missing locally | The ledger records the version as released, but the ref is not in this repository |
+| missing on origin | The ref exists locally but was never pushed, so consumers cannot resolve it |
+| wrong commit | The ref exists but points somewhere other than the release's anchor, so it moved after the release wrote it |
+
+It is fail-closed: a probe that cannot answer -- an unreadable local tag namespace, an `ls-remote` that fails -- is an error, never a pass. A repository with no `origin` remote at all is a different state: the remote half is skipped and the outcome says so.
+
+A version the ledger records as `unanchorable` has no recoverable commit, so a ref it is missing cannot be recreated and `rlsbl release reconcile` has nothing to point at. Those absences are counted and named in the outcome message instead of reported as fixable errors. Every other finding for such a version -- a ref that exists locally but not on origin -- is still reported.
+
+**No version window.** Both halves cover every archived release, not a recent slice. The whole local tag namespace comes from one `for-each-ref` and the whole remote namespace from one `ls-remote`, so probing two hundred releases costs the same single network round trip as probing one. A per-version probe would have forced a bound and left older releases unchecked.
+
+It replaced three narrower checks (`local-tag`, `remote-tag`, `github-release`) that each looked at the primary tag of the *current* version only, and so saw neither companion tags, nor recorded aliases, nor any past release.
 
 ## Changelog checks
 
@@ -215,7 +233,7 @@ A check is impure when it starts a program that is not on that list. Every impur
 
 Purity decides what a preview does. Under `rlsbl release run --dry-run` the preflight runs its pure checks for real and lists the impure ones as `would run: <name> (impure)` -- so a preview reports real findings from everything that can be run without changing anything, and is honest about the rest.
 
-This rule replaced an older one, "the check starts no program at all". That rule forced nine checks that spawn only read-only local git (the changelog validators, the two pre-push checks, `workspace-unregistered`, `go-companion-tags`) to be declared impure, and it quietly declared two checks pure that do spawn: `local-tag` runs `git tag --list`, and `config-schema` can reach `go list` on its error path. All eleven are pure under the current rule, and are now declared so deliberately rather than by accident.
+This rule replaced an older one, "the check starts no program at all". That rule forced nine checks that spawn only read-only local git (the changelog validators, the two pre-push checks, `workspace-unregistered`, `go-companion-tags`) to be declared impure, and it quietly declared two checks pure that do spawn: the retired `local-tag` ran `git tag --list`, and `config-schema` can reach `go list` on its error path. All of them are pure under the current rule, and are now declared so deliberately rather than by accident.
 
 The declaration is verified, not trusted: `tests/test_check_purity.py` executes every pure-declared check under an effects observer and fails on any spawn whose argv matches no allowlist prefix.
 
@@ -241,7 +259,7 @@ rlsbl check --all
 #       e4f5g6h  Fix timeout bug
 #   changelog-schema .............. pass
 #   changelog-user-facing ......... warn  No user-facing entries
-#   local-tag .................... warn  No tag for v0.5.3
+#   unpublished-refs ............. fail  v0.5.2: the ref v0.5.2 exists locally but not on origin
 #   test-suite ................... pass
 #
 #   12 passed, 1 failed, 2 warnings

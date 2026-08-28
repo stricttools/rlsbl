@@ -102,8 +102,7 @@ class TestTheReclassificationIsDeclared:
         "prepush-gitignore-guard",
         "workspace-unregistered",
         "go-companion-tags",
-        # were declared pure while spawning -- misdeclared then, legitimate now
-        "local-tag",
+        # was declared pure while spawning -- misdeclared then, legitimate now
         "config-schema",
     ])
     def test_check_is_declared_pure(self, name):
