@@ -2,11 +2,25 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "The conversion, ownership and ledger release: repository conversions become verified move-outs and move-ins on releasables with lineage records; workspaces gain single-owner attribution with a mandatory root member and derived CI filters; release archives become the anchored ledger every range, status and undo read; the publication reconciler repairs tags and Releases from recorded facts; mirrors carry release tags and Releases and can be promoted to standalone repos."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+This release ships one campaign. The old conversion commands copied part of a
+project's state and left both repositories incoherent; workspace ownership was
+implicit and a root member owned nothing; what a release WAS lived only in git
+tags; and mirrors were code copies that could not release. The campaign
+replaces all four foundations: conversions verify tree identity and transplant
+everything (state, anchors, tags, lineage); every file has exactly one owning
+member and CI triggering derives from ownership plus dependencies; the
+archived release files carry the CI-verified commit and tree hashes and are
+the authority every consumer reads; and the reconciler and mirror publication
+repair or extend the published surface only from recorded facts, refusing
+anything no record explains. Implicit-mode workspaces and the migrate/extract
+commands they used are gone -- deferred workspaces pin 0.117.2 per their own
+conversion plans, and scripts/migrate_workspace_model.py migrates the rest.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
