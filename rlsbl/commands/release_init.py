@@ -34,14 +34,13 @@ def run_cmd(project_root):
     releasable_dir = None
     monorepo_root = find_workspace_root(start_path)
     if monorepo_root:
-        from ..workspace import is_explicit_mode
-        if is_explicit_mode(monorepo_root):
-            print(
-                "Warning: this project belongs to a monorepo workspace that uses "
-                "[[releasables]] (explicit mode). Batch releases should use "
-                "'rlsbl monorepo release init' instead of 'rlsbl release init'.",
-                file=sys.stderr,
-            )
+        print(
+            "Warning: this project belongs to a monorepo workspace, and every "
+            "workspace declares its releasables in [[releasables]]. Batch "
+            "releases should use 'rlsbl monorepo release init' instead of "
+            "'rlsbl release init'.",
+            file=sys.stderr,
+        )
         project = resolve_project(monorepo_root, start_path)
         if project is not None:
             project_dir = os.path.join(monorepo_root, project["path"])

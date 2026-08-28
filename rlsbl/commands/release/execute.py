@@ -1548,7 +1548,7 @@ def _sync_lockfiles(target_paths, files_to_commit, log):
 def _publish_standalone_pipelines(
     ctx, target_paths, primary_path, new_version, state_path, log
 ):
-    """Publish every configured pipeline for a standalone / implicit-mode release.
+    """Publish every configured pipeline for a standalone release.
 
     Each pipeline publishes from its own linked target's path
     (``target_paths[pipeline.target]``) so multi-target projects whose
@@ -1638,7 +1638,7 @@ def release_anchor_tree_hashes(verified_sha, *, run, git_root,
       entry per member path. No single git object covers a SET of subtrees, so
       a per-member table is the honest record -- a synthesized hash over the
       members would be an rlsbl invention that no git command can reproduce;
-    * an **implicit-mode monorepo package** ships one directory, so it gets the
+    * a **single-member releasable** ships one directory, so it gets the
       single entry for that path (the degenerate one-member case).
 
     A member path of ``"."`` (a workspace whose root is itself a member)
@@ -1811,7 +1811,7 @@ class ReleaseState:
     monorepo_name: str | None = None
     monorepo_project_path: str | None = None
 
-    # Releasable (explicit mode) -- None in implicit mode
+    # Releasable -- None for a standalone repo
     releasable_name: str | None = None
     member_package_paths: list[str] | None = None
     releasable_tag_format: str | None = None
@@ -3383,7 +3383,7 @@ def _run_release_mutating(state: ReleaseState):
                 _pub_state_final["published_members"] = _published_members
                 save_release_state(_state_path, _pub_state_final)
             else:
-                # Standalone / implicit mode: each pipeline publishes from its
+                # Standalone: each pipeline publishes from its
                 # own linked target's path (multi-target subdir support), with
                 # resume tracking. See _publish_standalone_pipelines.
                 _publish_standalone_pipelines(

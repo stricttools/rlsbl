@@ -215,9 +215,8 @@ def release_check_filters(*, config, registry, project_dir,
     """Resolve the check filters the release CI gate must satisfy.
 
     Standalone repositories yield one filter. A monorepo yields one per
-    project released under the tag: the releasing project alone in implicit
-    mode, or every member of the releasable in explicit mode -- exactly the
-    set whose publish jobs the tag will trigger.
+    project released under the tag: every member of the releasable -- exactly
+    the set whose publish jobs the tag will trigger.
 
     The releasing project is ALWAYS in the result, keyed by its own name and
     directory. The workspace read only widens that set to the releasable's

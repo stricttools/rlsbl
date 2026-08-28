@@ -521,11 +521,18 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
         )
 
     # The project's releasable field names the releasable whose version file
-    # is the canonical version source.
-    releasable_name = None
+    # is the canonical version source. Every member of a workspace declares
+    # one (a member that declares `releasable = false` was refused above), so
+    # a missing field is a malformed workspace, not a second release mode.
     rel_val = project.releasable
-    if isinstance(rel_val, str):
-        releasable_name = rel_val
+    if not isinstance(rel_val, str):
+        raise ReleaseValidationError(
+            f"project '{monorepo_name}' has no 'releasable' field in "
+            f"workspace.toml. Every workspace declares its releasables in "
+            f"[[releasables]], and every member sets releasable = \"<name>\" "
+            f"or releasable = false."
+        )
+    releasable_name = rel_val
 
     return monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name
 

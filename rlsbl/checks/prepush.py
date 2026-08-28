@@ -36,7 +36,6 @@ def register_prepush_checks(app):
         if ctx.workspace_root is not None:
             from ..workspace import (
                 get_releasable_changes_dir,
-                is_explicit_mode,
                 load_workspace,
                 members_of,
                 resolve_releasable_for_project,
@@ -58,49 +57,34 @@ def register_prepush_checks(app):
 
             failures = []
 
-            if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
-                checked_releasables = set()
-                for proj in affected:
-                    if not project_is_releasable(proj):
-                        continue
-                    rel = resolve_releasable_for_project(proj, ctx.releasables)
-                    if rel is None or rel.name in checked_releasables:
-                        continue
-                    checked_releasables.add(rel.name)
-                    rel_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
-                    if not os.path.isdir(rel_changes_dir):
-                        continue
-                    member_projs = members_of(rel.name, projects)
-                    rel_commits = filter_commits_for_scope(
-                        all_pushed,
-                        OwnershipScope.for_members(projects, member_projs),
-                        operation="pre-push changelog coverage",
-                    )
-                    if not rel_commits:
-                        continue
-                    error = _check_jsonl_changelog(
-                        ws_root, refs, pushed_commits=rel_commits,
-                        changes_dir=rel_changes_dir,
-                    )
-                    if error:
-                        failures.append(f"{rel.name}: {error}")
-            else:
-                for proj in affected:
-                    if not project_is_releasable(proj):
-                        continue
-                    proj_dir = os.path.join(ws_root, proj["path"])
-                    if not changes_dir_exists(proj_dir):
-                        continue
-                    proj_commits = filter_commits_for_scope(
-                        all_pushed,
-                        OwnershipScope.for_member(projects, proj),
-                        operation="pre-push changelog coverage",
-                    )
-                    if not proj_commits:
-                        continue
-                    error = _check_jsonl_changelog(proj_dir, refs, pushed_commits=proj_commits)
-                    if error:
-                        failures.append(f"{proj['name']}: {error}")
+            # Coverage is per releasable: a member's commits are checked
+            # against its releasable's changelog. A member that belongs to no
+            # releasable (releasable = false) has no changelog to cover.
+            checked_releasables = set()
+            for proj in affected:
+                if not project_is_releasable(proj):
+                    continue
+                rel = resolve_releasable_for_project(proj, ctx.releasables)
+                if rel is None or rel.name in checked_releasables:
+                    continue
+                checked_releasables.add(rel.name)
+                rel_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+                if not os.path.isdir(rel_changes_dir):
+                    continue
+                member_projs = members_of(rel.name, projects)
+                rel_commits = filter_commits_for_scope(
+                    all_pushed,
+                    OwnershipScope.for_members(projects, member_projs),
+                    operation="pre-push changelog coverage",
+                )
+                if not rel_commits:
+                    continue
+                error = _check_jsonl_changelog(
+                    ws_root, refs, pushed_commits=rel_commits,
+                    changes_dir=rel_changes_dir,
+                )
+                if error:
+                    failures.append(f"{rel.name}: {error}")
 
             if failures:
                 msg = "; ".join(failures)
@@ -131,22 +115,20 @@ def register_prepush_checks(app):
         ):
             from ..workspace import (
                 get_releasable_changes_dir,
-                is_explicit_mode,
                 resolve_project,
                 resolve_releasable_for_project,
             )
 
             ws_root = str(ctx.workspace_root)
-            if is_explicit_mode(ws_root):
-                proj = resolve_project(ws_root, str(ctx.project_root))
-                if proj is not None:
-                    rel = resolve_releasable_for_project(proj, ctx.releasables)
-                    if rel is not None:
-                        rel_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
-                        extra_paths = [
-                            os.path.join(rel_changes_dir, "unreleased.jsonl"),
-                            os.path.join(rel_changes_dir, ".validated"),
-                        ]
+            proj = resolve_project(ws_root, str(ctx.project_root))
+            if proj is not None:
+                rel = resolve_releasable_for_project(proj, ctx.releasables)
+                if rel is not None:
+                    rel_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+                    extra_paths = [
+                        os.path.join(rel_changes_dir, "unreleased.jsonl"),
+                        os.path.join(rel_changes_dir, ".validated"),
+                    ]
 
         error = _check_gitignore_guard(str(ctx.project_root), extra_paths=extra_paths)
         if error is not None:

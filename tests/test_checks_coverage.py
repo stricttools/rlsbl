@@ -47,7 +47,10 @@ def _setup_changelog_repo(repo, tag="v0.1.0", targets=None):
     run_git(repo, "add", "README.md")
     run_git(repo, "commit", "-q", "-m", "initial")
     if tag:
-        run_git(repo, "tag", tag)
+        # Tagged AND archived: the ledger is what records a release, and a
+        # version tag over an empty ledger is a repository that shipped and was
+        # never backfilled -- a hard error, not a baseline.
+        record_release(repo, tag)
 
     changes = repo / ".rlsbl" / "changes"
     changes.mkdir(parents=True)
@@ -940,7 +943,7 @@ class TestFinalizeBatchFile:
         batch_path = str(releases_dir / "unreleased.toml")
 
         with open(batch_path, "w") as f:
-            f.write("[packages.test]\nbump = 'patch'\n")
+            f.write("[releasables.test]\nbump = 'patch'\n")
 
         log_messages = []
 

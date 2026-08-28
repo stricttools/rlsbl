@@ -117,7 +117,7 @@ def resolve_member_context(member_dir, releasable_config_dir=None,
         member_dir: path to the member package directory.
         releasable_config_dir: optional path to the releasable's state
             directory (e.g. ``.rlsbl-monorepo/releasables/<name>/``) for
-            config inheritance. None for standalone/implicit-mode projects.
+            config inheritance. None for standalone projects.
         primary_name: optional primary/registry target name (the release
             file's ``include[0]``); when given, ``resolved_targets`` marks the
             matching record ``primary=True``. None outside the release flow.

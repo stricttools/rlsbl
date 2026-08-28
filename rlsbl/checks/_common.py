@@ -70,27 +70,25 @@ def _resolve_version_and_tag(ctx):
     # In explicit releasable mode, version and tag come from the releasable
     if isinstance(ctx, WorkspaceCheckContext) and getattr(ctx, "releasables", None):
         from ..workspace import (
-            is_explicit_mode,
             read_releasable_version,
             resolve_project,
             resolve_releasable_for_project,
         )
 
         ws_root = str(ctx.workspace_root)
-        if is_explicit_mode(ws_root):
-            proj = resolve_project(ws_root, str(ctx.project_root))
-            if proj is not None:
-                rel = resolve_releasable_for_project(proj, ctx.releasables)
-                if rel is not None:
-                    try:
-                        version = read_releasable_version(ws_root, rel.name)
-                    except Exception:
-                        version = None
-                    if version:
-                        tag = rel.effective_tag_format.replace("{version}", version).replace("{name}", rel.name)
-                    else:
-                        tag = None
-                    return version, tag
+        proj = resolve_project(ws_root, str(ctx.project_root))
+        if proj is not None:
+            rel = resolve_releasable_for_project(proj, ctx.releasables)
+            if rel is not None:
+                try:
+                    version = read_releasable_version(ws_root, rel.name)
+                except Exception:
+                    version = None
+                if version:
+                    tag = rel.effective_tag_format.replace("{version}", version).replace("{name}", rel.name)
+                else:
+                    tag = None
+                return version, tag
 
     rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
     target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
@@ -129,7 +127,6 @@ def _get_changelog_context(ctx):
     from ..changelog.files import get_changes_dir, read_unreleased
     from ..workspace import (
         get_releasable_changes_dir,
-        is_explicit_mode,
         members_of,
         resolve_project,
         resolve_releasable_for_project,
@@ -148,9 +145,9 @@ def _get_changelog_context(ctx):
     proj = resolve_project(ws_root, str(ctx.project_root))
     if proj is None:
         # CWD is not inside any workspace project.
-        # In explicit mode with releasables, return None here -- callers
-        # should use _get_all_changelog_contexts() to iterate releasables.
-        if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+        # With releasables declared, return None here -- callers should use
+        # _get_all_changelog_contexts() to iterate releasables.
+        if getattr(ctx, "releasables", None):
             return None
         # Otherwise fall back to per-project (standalone-like)
         changes_dir = get_changes_dir(str(ctx.project_root))
@@ -159,8 +156,8 @@ def _get_changelog_context(ctx):
         entries = read_unreleased(changes_dir)
         return changes_dir, None, None, entries
 
-    if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
-        # Explicit mode: resolve the releasable for this project
+    if getattr(ctx, "releasables", None):
+        # Resolve the releasable for this project
         rel = resolve_releasable_for_project(proj, ctx.releasables)
         if rel is None:
             # Project is not releasable (releasable = false)
@@ -176,7 +173,7 @@ def _get_changelog_context(ctx):
         entries = read_unreleased(changes_dir)
         return changes_dir, tag_glob, scope, entries
 
-    # Implicit mode: per-project changes dir
+    # No releasable declared for this member: per-project changes dir
     changes_dir = get_changes_dir(str(ctx.project_root))
     if not os.path.isdir(changes_dir):
         return None
@@ -200,9 +197,9 @@ def _resolve_tag_glob(ctx):
     """Return the git tag glob that scopes *ctx*'s project to its own releases.
 
     The single derivation used by the changelog checks
-    (:func:`_get_changelog_context`): the releasable's ``tag_format`` in
-    explicit monorepo mode, the target's ``monorepo_tag_glob`` in implicit
-    mode, and the plain ``v*`` for a standalone repo. Reused by the
+    (:func:`_get_changelog_context`): the releasable's ``tag_format`` in a
+    monorepo, the target's ``monorepo_tag_glob`` for a member that belongs to
+    no releasable, and the plain ``v*`` for a standalone repo. Reused by the
     external-check release-context env so a consumer check resolves the same
     last tag rlsbl itself would.
     """
@@ -239,8 +236,7 @@ def _resolve_release_identity(ctx):
     questions, the context ``expected_refs`` reads, and the ledger whose
     archives say which versions exist.  All three describe the SAME project by
     construction -- the releases dir comes from :func:`_resolve_ledger_dir`,
-    and the context is built from the same explicit-mode/implicit-mode branch
-    that resolved it.
+    and the context is built from the same branch that resolved it.
 
     Returns None when the project has no detectable target, so there is nothing
     to name refs for.
@@ -260,7 +256,6 @@ def _resolve_release_identity(ctx):
 
     from ..workspace import (
         get_releasable_dir,
-        is_explicit_mode,
         members_of,
         resolve_project,
         resolve_releasable_for_project,
@@ -271,7 +266,7 @@ def _resolve_release_identity(ctx):
     if proj is None:
         return target, ref_context(repo_root=str(ctx.project_root)), releases_dir
 
-    if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+    if getattr(ctx, "releasables", None):
         rel = resolve_releasable_for_project(proj, ctx.releasables)
         if rel is None:
             return None
@@ -296,9 +291,9 @@ def _get_all_changelog_contexts(ctx):
     """Return changelog contexts for ALL releasables when CWD is the workspace root.
 
     When CWD is inside a specific project, delegates to ``_get_changelog_context``
-    and wraps the result in a list.  When CWD is the workspace root in an
-    explicit-mode workspace, iterates all releasables and returns a context
-    tuple for each one that has a changes directory.
+    and wraps the result in a list.  When CWD is the workspace root, iterates
+    all releasables and returns a context tuple for each one that has a
+    changes directory.
 
     Returns a list of ``(changes_dir, tag_glob, scope, entries)`` tuples,
     or an empty list when no contexts are available (caller should skip).
@@ -307,7 +302,6 @@ def _get_all_changelog_contexts(ctx):
     from ..ownership import OwnershipScope
     from ..workspace import (
         get_releasable_changes_dir,
-        is_explicit_mode,
         members_of,
         resolve_project,
     )
@@ -327,12 +321,12 @@ def _get_all_changelog_contexts(ctx):
     # changelog is in scope, including the root member's own.
     at_workspace_root = proj is None or is_root_member(proj)
 
-    if not at_workspace_root or not is_explicit_mode(ws_root) or not getattr(ctx, "releasables", None):
+    if not at_workspace_root or not getattr(ctx, "releasables", None):
         # CWD is inside a member package -- single context
         single = _get_changelog_context(ctx)
         return [single] if single is not None else []
 
-    # CWD is workspace root in explicit mode: iterate all releasables
+    # CWD is the workspace root: iterate all releasables
     contexts = []
     for rel in ctx.releasables:
         changes_dir = get_releasable_changes_dir(ws_root, rel.name)

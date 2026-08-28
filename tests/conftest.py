@@ -834,6 +834,7 @@ def make_workspace(root, projects, releasables=None):
                 rels.append(Releasable(name=name))
 
     save_workspace(str(root), prepared, releasables=rels)
+    return rels
 
 
 class FakeResponse:
@@ -1480,6 +1481,22 @@ def make_releasable_state(
             os.chmod(hook_path, 0o755)
 
     return Path(rel_dir)
+
+
+def make_state_for_every_releasable(root, version="0.1.0"):
+    """Create the state directory of every releasable declared at *root*.
+
+    A workspace fixture that declares releasables but writes no state under
+    ``.rlsbl-monorepo/releasables/`` is half-built: the version file is what
+    ``rlsbl monorepo sync`` creates and what every release path reads. Returns
+    the releasable names it built state for.
+    """
+    from rlsbl.workspace import load_releasables
+
+    names = [r.name for r in load_releasables(str(root))]
+    for name in names:
+        make_releasable_state(root, name, version=version)
+    return names
 
 
 def make_releasable_monorepo(root, **kwargs):

@@ -304,7 +304,7 @@ class TestSharedValidation:
             "description": "new feature",
             "context": "required for v2",
         }
-        cfg = _validate_release_config(data, prefix="[packages.mylib] ")
+        cfg = _validate_release_config(data, prefix="[releasables.mylib] ")
         assert cfg.bump == "minor"
         assert cfg.include == ["npm"]
         assert cfg.description == "new feature"
@@ -322,7 +322,7 @@ class TestSharedValidation:
         with pytest.raises(
             ReleaseFileError, match=r"^\[packages\.foo\] missing required field: bump$"
         ):
-            _validate_release_config(data, prefix="[packages.foo] ")
+            _validate_release_config(data, prefix="[releasables.foo] ")
 
     def test_invalid_bump_no_prefix(self):
         """Invalid bump without prefix."""
@@ -334,7 +334,7 @@ class TestSharedValidation:
         """Invalid bump with prefix."""
         data = {"bump": "huge", "include": [], "exclude": []}
         with pytest.raises(ReleaseFileError, match=r"\[packages\.bar\].*invalid bump"):
-            _validate_release_config(data, prefix="[packages.bar] ")
+            _validate_release_config(data, prefix="[releasables.bar] ")
 
     def test_flutter_mode_required_no_prefix(self):
         """Flutter mode validation works without prefix."""
@@ -356,7 +356,7 @@ class TestSharedValidation:
             "description": "test",
         }
         with pytest.raises(ReleaseFileError, match=r"\[packages\.app\].*requires.*mode"):
-            _validate_release_config(data, prefix="[packages.app] ")
+            _validate_release_config(data, prefix="[releasables.app] ")
 
     def test_include_exclude_overlap_no_prefix(self):
         data = {
@@ -378,7 +378,7 @@ class TestSharedValidation:
         with pytest.raises(
             ReleaseFileError, match=r"\[packages\.x\].*both include and exclude"
         ):
-            _validate_release_config(data, prefix="[packages.x] ")
+            _validate_release_config(data, prefix="[releasables.x] ")
 
     def test_description_empty_no_prefix(self):
         data = {
@@ -400,7 +400,7 @@ class TestSharedValidation:
         with pytest.raises(
             ReleaseFileError, match=r"\[packages\.z\].*description must be set"
         ):
-            _validate_release_config(data, prefix="[packages.z] ")
+            _validate_release_config(data, prefix="[releasables.z] ")
 
     def test_context_not_string_no_prefix(self):
         data = {
@@ -424,7 +424,7 @@ class TestSharedValidation:
         with pytest.raises(
             ReleaseFileError, match=r"\[packages\.q\].*context must be a string"
         ):
-            _validate_release_config(data, prefix="[packages.q] ")
+            _validate_release_config(data, prefix="[releasables.q] ")
 
 
 class TestSharedValidationViaPublicAPIs:

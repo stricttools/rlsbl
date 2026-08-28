@@ -52,15 +52,14 @@ def run_cmd(args, flags, project_root):
             monorepo_project_path = project["path"]
             releasable_config_dir = resolve_releasable_config_dir(project, monorepo_root)
 
-            # Detect explicit releasable mode
-            from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
-            if is_explicit_mode(monorepo_root):
-                ws_projects = _load_ws(monorepo_root)
-                releasables = load_releasables(monorepo_root, ws_projects)
-                rel = resolve_releasable_for_project(project, releasables)
-                if rel:
-                    releasable_name = rel.name
-                    releasable_tag_fmt = rel.effective_tag_format
+            # Resolve the releasable this member belongs to.
+            from ..workspace import load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
+            ws_projects = _load_ws(monorepo_root)
+            releasables = load_releasables(monorepo_root, ws_projects)
+            rel = resolve_releasable_for_project(project, releasables)
+            if rel:
+                releasable_name = rel.name
+                releasable_tag_fmt = rel.effective_tag_format
 
     # Project directory: project_root is already resolved to the sub-project
     # in monorepo mode (via _require_sub_project_root).

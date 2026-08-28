@@ -112,7 +112,6 @@ def register_changelog_checks(app):
         from ..check_context import WorkspaceCheckContext
         from ..workspace import (
             get_releasable_dir,
-            is_explicit_mode,
             resolve_project,
             resolve_releasable_for_project,
         )
@@ -122,12 +121,12 @@ def register_changelog_checks(app):
             return reporter.skipped("no version detected")
 
         # The canonical CHANGELOG.md location comes from the single home
-        # resolver: releasable dir in explicit releasable mode, project
-        # root otherwise.
+        # resolver: the releasable dir when the project belongs to one,
+        # project root otherwise.
         releasable_dir = None
         if isinstance(ctx, WorkspaceCheckContext) and ctx.workspace_root is not None:
             ws_root = str(ctx.workspace_root)
-            if is_explicit_mode(ws_root) and getattr(ctx, "releasables", None):
+            if getattr(ctx, "releasables", None):
                 proj = resolve_project(ws_root, str(ctx.project_root))
                 if proj is not None:
                     rel = resolve_releasable_for_project(proj, ctx.releasables)

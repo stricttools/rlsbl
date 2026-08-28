@@ -53,11 +53,11 @@ from conftest import (
 
 
 BATCH_TOML = (
-    '[packages.alpha]\n'
+    '[releasables.alpha]\n'
     'bump = "patch"\ndescription = "Alpha patch"\n'
     'include = ["npm"]\nexclude = []\n'
     '\n'
-    '[packages.beta]\n'
+    '[releasables.beta]\n'
     'bump = "patch"\ndescription = "Beta patch"\n'
     'include = ["npm"]\nexclude = []\n'
 )

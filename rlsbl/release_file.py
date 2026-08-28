@@ -149,9 +149,8 @@ def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = Non
 def get_release_file_path(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
     """Return the path to the release file (unreleased.toml).
 
-    Standalone projects and implicit-monorepo packages:
-    ``<project_dir>/.rlsbl/releases/unreleased.toml``. Releasable releases
-    (explicit monorepo mode): pass ``releasable_dir`` — the file lives at
+    Standalone projects: ``<project_dir>/.rlsbl/releases/unreleased.toml``.
+    Releasable releases: pass ``releasable_dir`` — the file is at
     ``.rlsbl-monorepo/releasables/<name>/releases/unreleased.toml``.
     """
     return os.path.join(
@@ -226,7 +225,7 @@ def check_legacy_release_file(project_dir: str, releasable_dir: str | None) -> N
     read path and left behind as per-package residue).
 
     Raises ReleaseFileError with a migration hint. No-op when
-    ``releasable_dir`` is None (standalone / implicit mode).
+    ``releasable_dir`` is None (a standalone project).
     """
     if not releasable_dir:
         return
@@ -807,14 +806,11 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
 class BatchReleaseConfig:
     """Configuration from a batch release TOML file (monorepo).
 
-    ``packages`` maps either package names (implicit mode / backward compat)
-    or releasable names (explicit mode) to their release configs.
-    ``section_type`` indicates which top-level key was used: ``"packages"``
-    or ``"releasables"``.
+    ``packages`` maps releasable names to their release configs, one entry
+    per ``[releasables.<name>]`` section of the batch release file.
     """
 
-    packages: dict[str, ReleaseConfig]  # name -> config
-    section_type: str = "packages"  # "packages" or "releasables"
+    packages: dict[str, ReleaseConfig]  # releasable name -> config
 
 
 def get_batch_release_file_path(workspace_root: str = ".") -> str:
@@ -825,9 +821,7 @@ def get_batch_release_file_path(workspace_root: str = ".") -> str:
 def read_batch_release_file(path: str) -> BatchReleaseConfig:
     """Read and validate a batch release TOML file.
 
-    Accepts either ``[packages.<name>]`` sections (implicit mode, backward
-    compat) or ``[releasables.<name>]`` sections (explicit mode). Having both
-    is a hard error.
+    Sections are ``[releasables.<name>]``, one per releasable being released.
 
     Each section has the same fields as a single ReleaseConfig (bump, include,
     exclude, optional targets, description, context).
@@ -844,28 +838,18 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
 
 def _bind_batch_release_config(data) -> BatchReleaseConfig:
     """Validate a parsed batch release document and build its config."""
-    has_packages = "packages" in data
-    has_releasables = "releasables" in data
-
-    if has_packages and has_releasables:
+    if "packages" in data:
         raise ReleaseFileError(
-            "batch release file has both [packages] and [releasables] sections. "
-            "Use [releasables] in explicit mode or [packages] in implicit mode, "
-            "not both."
+            "batch release file has a [packages] section. A batch release "
+            "names releasables, not packages: rewrite the sections as "
+            "[releasables.<name>], one per releasable, and re-run "
+            "`rlsbl monorepo release init` if you want them scaffolded."
         )
 
-    if not has_packages and not has_releasables:
-        raise ReleaseFileError(
-            "missing required section: [packages] or [releasables]"
-        )
+    if "releasables" not in data:
+        raise ReleaseFileError("missing required section: [releasables]")
 
-    if has_releasables:
-        section_key = "releasables"
-        section_type = "releasables"
-    else:
-        section_key = "packages"
-        section_type = "packages"
-
+    section_key = "releasables"
     raw = data[section_key]
     if not isinstance(raw, dict):
         raise ReleaseFileError(f"[{section_key}] must be a table of configurations")
@@ -886,7 +870,7 @@ def _bind_batch_release_config(data) -> BatchReleaseConfig:
             entry_data, prefix=f"[{section_key}.{name}] "
         )
 
-    return BatchReleaseConfig(packages=entries, section_type=section_type)
+    return BatchReleaseConfig(packages=entries)
 
 
 # ---------------------------------------------------------------------------

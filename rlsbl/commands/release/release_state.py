@@ -26,10 +26,9 @@ then may the success path clear it.
 
 State file location
 -------------------
-- Standalone projects and implicit-monorepo packages:
-  ``<project_dir>/.rlsbl/releases/in-progress.json``
-- Releasable releases (explicit monorepo mode): the state belongs to the
-  releasable, not the representative member package, and lives at
+- Standalone projects: ``<project_dir>/.rlsbl/releases/in-progress.json``
+- Releasable releases: the state belongs to the releasable, not the
+  representative member package, and is at
   ``<workspace_root>/.rlsbl-monorepo/releasables/<name>/releases/in-progress.json``.
 
 ALL derivations of the state path must go through :func:`get_state_path`
@@ -165,9 +164,8 @@ def resolve_releasable_dir(project_dir, workspace_root) -> str | None:
     """Resolve the releasable state dir for a project, or None.
 
     Returns ``<workspace_root>/.rlsbl-monorepo/releasables/<name>/`` when
-    ``project_dir`` is a member of a releasable in an explicit-mode
-    workspace; None for standalone projects, implicit-mode packages,
-    non-member projects, or when ``workspace_root`` is None.
+    ``project_dir`` is a member of a releasable; None for standalone
+    projects, non-member projects, or when ``workspace_root`` is None.
     """
     if workspace_root is None:
         return None

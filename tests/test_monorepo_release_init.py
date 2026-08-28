@@ -193,10 +193,10 @@ class TestBatchReleaseInit:
         Simulates the TOCTOU stale-writer path: the batch exists() check
         passed while the file was absent, then a racing init created and
         filled it before this writer reached its write step. Invoking the
-        write step (``_scaffold_package_sections``) directly against a
+        write step (``_scaffold_releasable_sections``) directly against a
         now-filled file must hit the atomic exclusive-create guard and refuse.
         """
-        from rlsbl.commands.monorepo.batch_release_init import _scaffold_package_sections
+        from rlsbl.commands.monorepo.batch_release_init import _scaffold_releasable_sections
         from rlsbl.workspace import load_workspace
 
         make_workspace(mock_git_repo, [
@@ -224,7 +224,7 @@ class TestBatchReleaseInit:
 
         # The stale writer reaches its write step; must refuse and preserve.
         with pytest.raises(SystemExit) as exc_info:
-            _scaffold_package_sections(str(mock_git_repo), projects, batch_path, None)
+            _scaffold_releasable_sections(str(mock_git_repo), projects, batch_path, None)
         assert exc_info.value.code == 1
         assert open(batch_path).read() == racer_text
 
@@ -568,13 +568,13 @@ class TestRenderCommentedSection:
         """A single-element include list is rendered correctly."""
         result = _render_commented_section("my-pkg", ["pypi"], "some reason")
         assert '# include = ["pypi"]' in result
-        assert "# [packages.my-pkg]" in result
+        assert "# [releasables.my-pkg]" in result
         assert "# my-pkg: some reason" in result
 
     def test_multiple_targets_include_rendered(self):
         """A multi-element include list is rendered as a TOML array."""
         result = _render_commented_section("widget", ["npm", "pypi", "docker"], "tagged")
-        assert "# [packages.widget]" in result
+        assert "# [releasables.widget]" in result
         # The include line must contain all three targets in array syntax
         include_line = [l for l in result.splitlines() if "include" in l][0]
         assert "npm" in include_line

@@ -9,13 +9,18 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_state_for_every_releasable, make_workspace, with_root_member
 
 from rlsbl.commands.release import _run_cmd_inner
 from rlsbl.commands.release_init import run_cmd as release_init_run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig, get_batch_release_file_path
-from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE, save_workspace
+from rlsbl.workspace import (
+    WORKSPACE_DIR,
+    WORKSPACE_FILE,
+    save_workspace,
+    write_releasable_version,
+)
 from rlsbl.commands.monorepo.batch_plan import (
     BatchPlan,
     PlanItem,
@@ -155,7 +160,7 @@ def _setup_explicit_workspace(tmp_path):
     return proj_dir
 
 
-def _setup_implicit_workspace(tmp_path):
+def _setup_no_releasable_workspace(tmp_path):
     """Set up a workspace whose one member stands outside every releasable."""
     ws_dir = tmp_path / WORKSPACE_DIR
     ws_dir.mkdir()
@@ -174,16 +179,16 @@ def _setup_implicit_workspace(tmp_path):
     return proj_dir
 
 
-class TestReleaseInitExplicitModeWarning:
-    """rlsbl release init should warn when run inside an explicit-mode monorepo."""
+class TestReleaseInitMonorepoWarning:
+    """rlsbl release init should warn when run inside a monorepo workspace."""
 
-    def test_warns_in_explicit_mode(self, tmp_path, capsys):
-        """release init emits a warning when workspace uses [[releasables]]."""
+    def test_warns_inside_a_workspace(self, tmp_path, capsys):
+        """release init emits a warning when run inside a monorepo member."""
         proj_dir = _setup_explicit_workspace(tmp_path)
         release_init_run_cmd(proj_dir)
         captured = capsys.readouterr()
         assert "rlsbl monorepo release init" in captured.err
-        assert "explicit mode" in captured.err
+        assert "[[releasables]]" in captured.err
 
     def test_warns_even_with_no_releasables_declared(self, tmp_path, capsys):
         """Every workspace declares its releasables, so the warning always fires.
@@ -191,7 +196,7 @@ class TestReleaseInitExplicitModeWarning:
         There is no implicit mode to be quiet in; a workspace whose members
         all stand outside every releasable is still an explicit-mode one.
         """
-        proj_dir = _setup_implicit_workspace(tmp_path)
+        proj_dir = _setup_no_releasable_workspace(tmp_path)
         release_init_run_cmd(proj_dir)
         captured = capsys.readouterr()
         assert "monorepo release init" in captured.err
@@ -205,7 +210,7 @@ class TestReleaseInitExplicitModeWarning:
         )
         release_init_run_cmd(proj_dir)
         captured = capsys.readouterr()
-        assert "explicit mode" not in captured.err
+        assert "monorepo release init" not in captured.err
 
 
 # ---------------------------------------------------------------------------
@@ -237,18 +242,22 @@ def _set_pyproject_version(proj_dir, version):
 
 
 def _git_tag(ws, tag):
-    subprocess.run(["git", "tag", tag], cwd=str(ws), check=True)
+    """Tag a release AND record it in the ledger the range is measured from."""
+    from githarness import record_release
+
+    record_release(ws, tag)
 
 
 def _setup_batch_packages(ws, names, base_version="0.1.0", pretag=True):
-    """Create an implicit-mode workspace with pypi packages and a batch file.
+    """Create a workspace with one releasable per pypi package and a batch file.
 
-    When ``pretag`` is set, each package's base tag (``name@vBASE``) is created
-    so compute_release_version takes the bump branch (real version change).
-    Returns the batch file path.
+    When ``pretag`` is set, each releasable's base tag (``name@vBASE``) is
+    created so compute_release_version takes the bump branch (real version
+    change). Returns the batch file path.
     """
     projects = [{"path": n, "name": n} for n in names]
     make_workspace(str(ws), projects)
+    make_state_for_every_releasable(str(ws), version=base_version)
     for n in names:
         _write_pyproject(os.path.join(str(ws), n), n, base_version)
         if pretag:
@@ -259,7 +268,7 @@ def _setup_batch_packages(ws, names, base_version="0.1.0", pretag=True):
     sections = []
     for n in names:
         sections.append(
-            f'[packages.{n}]\n'
+            f'[releasables.{n}]\n'
             f'bump = "patch"\ndescription = "release {n}"\n'
             f'include = ["pypi"]\nexclude = []\n'
         )
@@ -269,10 +278,15 @@ def _setup_batch_packages(ws, names, base_version="0.1.0", pretag=True):
 
 
 def _simulate_release_for(ws, name):
-    """Reproduce a real release's observable effects from the resolved plan."""
+    """Reproduce a real release's observable effects from the resolved plan.
+
+    A releasable's version file is what the skip predicate reads, so the
+    simulation writes it alongside the member manifest and the tag.
+    """
     plan = read_batch_plan(get_batch_plan_path(str(ws)))
     item = plan.items[name]
     _set_pyproject_version(os.path.join(str(ws), name), item.target_version)
+    write_releasable_version(str(ws), name, item.target_version)
     _git_tag(ws, item.tag)
 
 
@@ -351,7 +365,7 @@ class TestBatchPlanIdempotency:
             _run_batch(ws)
 
         out = capsys.readouterr().out
-        assert "Skipping alpha" in out
+        assert "Skipping releasable alpha" in out
         assert released == ["beta", "gamma"]
 
         # Both files archived; no stale unreleased files remain.
@@ -379,7 +393,6 @@ class TestBatchPlanIdempotency:
         # target tags created, and a matching plan persisted -- but the
         # unreleased.toml is still on disk (the stale-file scenario).
         plan = BatchPlan(
-            section_type="packages",
             items={
                 "alpha": PlanItem("alpha", "0.1.0", "0.1.1", "alpha@v0.1.1", "pypi", "patch"),
                 "beta": PlanItem("beta", "0.1.0", "0.1.1", "beta@v0.1.1", "pypi", "patch"),
@@ -388,6 +401,7 @@ class TestBatchPlanIdempotency:
         write_batch_plan(get_batch_plan_path(str(ws)), plan)
         for n in ["alpha", "beta"]:
             _set_pyproject_version(os.path.join(str(ws), n), "0.1.1")
+            write_releasable_version(str(ws), n, "0.1.1")
             _git_tag(ws, f"{n}@v0.1.1")
 
         released = []
@@ -432,13 +446,13 @@ class TestBatchPlanIdempotency:
         batch_path = _setup_batch_packages(ws, ["alpha"])
 
         plan = BatchPlan(
-            section_type="packages",
             items={
                 "alpha": PlanItem("alpha", "0.1.0", "0.1.1", "alpha@v0.1.1", "pypi", "patch"),
             },
         )
         write_batch_plan(get_batch_plan_path(str(ws)), plan)
         _set_pyproject_version(os.path.join(str(ws), "alpha"), "0.1.1")
+        write_releasable_version(str(ws), "alpha", "0.1.1")
         _git_tag(ws, "alpha@v0.1.1")
 
         with open(batch_path, "r", encoding="utf-8") as f:
@@ -492,7 +506,6 @@ class TestBatchPlanIdempotency:
         # Both items appear released per plan (manifests + tags), but beta still
         # has a lingering in-progress.json -- an unfinished/resumable release.
         plan = BatchPlan(
-            section_type="packages",
             items={
                 "alpha": PlanItem("alpha", "0.1.0", "0.1.1", "alpha@v0.1.1", "pypi", "patch"),
                 "beta": PlanItem("beta", "0.1.0", "0.1.1", "beta@v0.1.1", "pypi", "patch"),
@@ -501,6 +514,7 @@ class TestBatchPlanIdempotency:
         write_batch_plan(get_batch_plan_path(str(ws)), plan)
         for n in ["alpha", "beta"]:
             _set_pyproject_version(os.path.join(str(ws), n), "0.1.1")
+            write_releasable_version(str(ws), n, "0.1.1")
             _git_tag(ws, f"{n}@v0.1.1")
 
         # Strand beta with an in-progress.json.
@@ -736,7 +750,6 @@ class TestBatchCompletionRequiresEvidence:
         _setup_batch_packages(ws, ["alpha", "beta"])
 
         plan = BatchPlan(
-            section_type="packages",
             items={
                 "alpha": PlanItem("alpha", "0.1.0", "0.1.1", "alpha@v0.1.1", "pypi", "patch"),
                 "beta": PlanItem("beta", "0.1.0", "0.1.1", "beta@v0.1.1", "pypi", "patch"),
@@ -745,6 +758,7 @@ class TestBatchCompletionRequiresEvidence:
         write_batch_plan(get_batch_plan_path(str(ws)), plan)
         for n in ["alpha", "beta"]:
             _set_pyproject_version(os.path.join(str(ws), n), "0.1.1")
+            write_releasable_version(str(ws), n, "0.1.1")
             _git_tag(ws, f"{n}@v0.1.1")
 
         calls = {"n": 0}
@@ -795,7 +809,6 @@ class TestBatchSeedsStrandedMembers:
 
     def _stranded_plan(self, ws, names):
         plan = BatchPlan(
-            section_type="packages",
             items={
                 n: PlanItem(n, "0.1.0", "0.1.1", f"{n}@v0.1.1", "pypi", "patch")
                 for n in names

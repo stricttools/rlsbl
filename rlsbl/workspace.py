@@ -85,27 +85,6 @@ def write_releasable_version(workspace_root, releasable_name, version):
     effects.atomic_write_text(path, version + "\n", file_mode=0o600)
 
 
-def is_explicit_mode(workspace_root):
-    """Check whether the workspace has a ``[[releasables]]`` section.
-
-    Returns True when ``[[releasables]]`` is present in workspace.toml,
-    False otherwise.
-
-    Args:
-        workspace_root: path to the monorepo root.
-
-    Returns:
-        bool
-    """
-    path = os.path.join(workspace_root, WORKSPACE_DIR, WORKSPACE_FILE)
-    try:
-        with open(path, "rb") as f:
-            data = tomllib.load(f)
-    except FileNotFoundError:
-        return False
-    return data.get("releasables") is not None
-
-
 def find_workspace_root(start_path="."):
     """Walk up from start_path looking for a .rlsbl-monorepo/workspace.toml.
 
@@ -673,8 +652,9 @@ def save_workspace(root, projects, releasables=None):
 
         if not desired_rels:
             # An empty list means "no releasables yet", NOT "no section":
-            # deleting the section would put the workspace back into implicit
-            # mode, which the loader refuses. Empty arrays-of-tables produce no
+            # deleting the section would leave a workspace with no
+            # [[releasables]], which the loader refuses. Empty
+            # arrays-of-tables produce no
             # output in tomlkit, so write the explicit empty inline array.
             if "releasables" in doc:
                 del doc["releasables"]
@@ -692,8 +672,8 @@ def save_workspace(root, projects, releasables=None):
                     raot.append(_build_releasable_table(d))
                 doc.add("releasables", raot)
     elif "releasables" not in doc:
-        # releasables=None preserves an existing section -- but a document that
-        # has none is an implicit-mode workspace, which the loader refuses.
+        # releasables=None preserves an existing section -- but a document
+        # that has none is a workspace the loader refuses.
         # Writing a file rlsbl cannot read back is never the right outcome, so
         # a brand-new document gets the explicit empty section.
         doc.add("releasables", tomlkit.array())

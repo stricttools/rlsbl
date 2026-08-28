@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_state_for_every_releasable, make_workspace, with_root_member
 
 from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
@@ -54,10 +54,15 @@ def _make_npm_project(base_path, subdir, version="0.1.0", deps=None):
 
 
 def _init_workspace(base_path, projects):
-    """Initialize a workspace with the given project list."""
+    """Initialize a workspace with the given project list.
+
+    Every derived releasable also gets the version file ``monorepo sync``
+    would have written, since that is what the release paths read.
+    """
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
     make_workspace(str(base_path), projects)
+    make_state_for_every_releasable(str(base_path))
 
 
 # ---------------------------------------------------------------------------
@@ -87,12 +92,12 @@ class TestReadBatchReleaseFile:
         """Multiple packages in the batch file are parsed correctly."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.models]\n'
+            '[releasables.models]\n'
             'bump = "major"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
             '\n'
-            '[packages."marketplace-contract"]\n'
+            '[releasables."marketplace-contract"]\n'
             'bump = "minor"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
@@ -116,7 +121,7 @@ class TestReadBatchReleaseFile:
         """A single package is valid."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.mylib]\n'
+            '[releasables.mylib]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
@@ -129,47 +134,54 @@ class TestReadBatchReleaseFile:
         """Per-target configuration is preserved."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.myapp]\n'
+            '[releasables.myapp]\n'
             'bump = "minor"\ndescription = "test release"\n'
             'include = ["flutter"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.myapp.targets.flutter]\n'
+            '[releasables.myapp.targets.flutter]\n'
             'mode = "ota"\n'
         )
         config = read_batch_release_file(str(batch_file))
         assert config.packages["myapp"].targets == {"flutter": {"mode": "ota"}}
 
-    def test_missing_packages_section(self, tmp_path):
-        """Missing [packages] section raises ReleaseFileError."""
+    def test_missing_releasables_section(self, tmp_path):
+        """Missing [releasables] section raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text('bump = "patch"\ndescription = "test release"\n')
         with pytest.raises(ReleaseFileError, match="missing required section"):
             read_batch_release_file(str(batch_file))
 
-    def test_empty_packages(self, tmp_path):
-        """Empty [packages] section raises ReleaseFileError."""
+    def test_empty_releasables(self, tmp_path):
+        """Empty [releasables] section raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
-        batch_file.write_text('[packages]\n')
+        batch_file.write_text('[releasables]\n')
         with pytest.raises(ReleaseFileError, match="is empty"):
             read_batch_release_file(str(batch_file))
 
+    def test_a_packages_section_is_refused(self, tmp_path):
+        """The per-package batch form is gone; a [packages] file is refused."""
+        batch_file = tmp_path / "unreleased.toml"
+        batch_file.write_text('[packages.mylib]\nbump = "patch"\n')
+        with pytest.raises(ReleaseFileError, match=r"\[packages\] section"):
+            read_batch_release_file(str(batch_file))
+
     def test_missing_bump(self, tmp_path):
-        """Missing bump field in a package raises ReleaseFileError."""
+        """Missing bump field in a releasable raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.mylib]\n'
+            '[releasables.mylib]\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
         )
-        with pytest.raises(ReleaseFileError, match=r"\[packages\.mylib\].*bump"):
+        with pytest.raises(ReleaseFileError, match=r"\[releasables\.mylib\].*bump"):
             read_batch_release_file(str(batch_file))
 
     def test_invalid_bump(self, tmp_path):
         """Invalid bump value raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.mylib]\n'
+            '[releasables.mylib]\n'
             'bump = "huge"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n'
@@ -181,7 +193,7 @@ class TestReadBatchReleaseFile:
         """Missing include field raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.mylib]\n'
+            '[releasables.mylib]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'exclude = []\n'
         )
@@ -192,7 +204,7 @@ class TestReadBatchReleaseFile:
         """Missing exclude field raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.mylib]\n'
+            '[releasables.mylib]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
         )
@@ -203,7 +215,7 @@ class TestReadBatchReleaseFile:
         """Overlap between include and exclude raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"
         batch_file.write_text(
-            '[packages.mylib]\n'
+            '[releasables.mylib]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["pypi", "npm"]\n'
             'exclude = ["pypi"]\n'
@@ -234,12 +246,12 @@ class TestBatchValidation:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         _write_toml(
             batch_path,
-            '[packages.alpha]\n'
+            '[releasables.alpha]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.nonexistent]\n'
+            '[releasables.nonexistent]\n'
             'bump = "minor"\ndescription = "test release"\n'
             'include = ["pypi"]\n'
             'exclude = []\n',
@@ -289,17 +301,17 @@ class TestBatchTopologicalOrder:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         _write_toml(
             batch_path,
-            '[packages.A]\n'
+            '[releasables.A]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.B]\n'
+            '[releasables.B]\n'
             'bump = "minor"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.C]\n'
+            '[releasables.C]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
@@ -335,12 +347,12 @@ class TestBatchTopologicalOrder:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         _write_toml(
             batch_path,
-            '[packages.A]\n'
+            '[releasables.A]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.C]\n'
+            '[releasables.C]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
@@ -372,12 +384,12 @@ class TestBatchTopologicalOrder:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         _write_toml(
             batch_path,
-            '[packages.zeta]\n'
+            '[releasables.zeta]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.alpha]\n'
+            '[releasables.alpha]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
@@ -406,7 +418,7 @@ class TestBatchFinalization:
     def test_file_renamed_and_locked(self, mock_git_repo):
         """Batch file is renamed to timestamped name and made read-only."""
         batch_path = get_batch_release_file_path(str(mock_git_repo))
-        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
+        _write_toml(batch_path, '[releasables.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
 
         messages = []
 
@@ -433,7 +445,7 @@ class TestBatchFinalization:
     def test_finalize_commits_files(self, mock_git_repo):
         """Finalization calls commit_files with the correct paths."""
         batch_path = get_batch_release_file_path(str(mock_git_repo))
-        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
+        _write_toml(batch_path, '[releasables.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
 
         committed_files = []
 
@@ -451,7 +463,7 @@ class TestBatchFinalization:
     def test_timestamp_format(self, mock_git_repo):
         """Versioned file name follows batch-YYYYMMDD-HHMMSS.toml format."""
         batch_path = get_batch_release_file_path(str(mock_git_repo))
-        _write_toml(batch_path, '[packages.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
+        _write_toml(batch_path, '[releasables.x]\nbump = "patch"\ndescription = "test release"\ninclude = ["pypi"]\nexclude = []\n')
 
         with patch("rlsbl.commands.monorepo.batch_release.commit_files"):
             _finalize_batch_file(batch_path, lambda msg: None)
@@ -480,9 +492,9 @@ class TestBatchReleaseDevNode:
     def test_dev_node_project_included_in_batch(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Dev node projects in batch TOML trigger a hard error.
 
-        Dev nodes must be released individually via `rlsbl release run` in
-        their project directory. If a dev_node appears in the batch TOML,
-        it was manually added -- that's an error.
+        A dev node belongs to no releasable, so naming it in the batch file
+        names something the workspace does not declare -- which is what the
+        refusal says. Dev nodes are not released by a batch at all.
         """
         _make_npm_project(mock_git_repo, "internal", version="0.1.0")
         _make_npm_project(mock_git_repo, "public", version="0.1.0")
@@ -496,12 +508,12 @@ class TestBatchReleaseDevNode:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         _write_toml(
             batch_path,
-            '[packages.internal]\n'
+            '[releasables.internal]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.public]\n'
+            '[releasables.public]\n'
             'bump = "minor"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',
@@ -516,7 +528,7 @@ class TestBatchReleaseDevNode:
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
         assert "internal" in captured.err
-        assert "non-releasable projects cannot be in batch release" in captured.err
+        assert "releasables not found in workspace" in captured.err
 
     def test_batch_without_dev_nodes_succeeds(self, mock_git_repo, capsys, bypass_upfront_validation):
         """Batch release with only non-dev-node projects succeeds."""
@@ -532,12 +544,12 @@ class TestBatchReleaseDevNode:
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         _write_toml(
             batch_path,
-            '[packages.alpha]\n'
+            '[releasables.alpha]\n'
             'bump = "patch"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n'
             '\n'
-            '[packages.beta]\n'
+            '[releasables.beta]\n'
             'bump = "minor"\ndescription = "test release"\n'
             'include = ["npm"]\n'
             'exclude = []\n',

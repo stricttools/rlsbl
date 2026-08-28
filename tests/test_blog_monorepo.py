@@ -66,14 +66,14 @@ class TestBatchReleaseBlogWiring:
         _write_toml(
             batch_toml,
             """
-[packages.alpha]
+[releasables.alpha]
 bump = "patch"
 include = ["pypi"]
 exclude = []
 description = "Alpha release with blog"
 blog = true
 
-[packages.beta]
+[releasables.beta]
 bump = "minor"
 include = ["pypi"]
 exclude = []
@@ -128,7 +128,7 @@ blog = false
         _write_toml(
             batch_toml,
             """
-[packages.solo]
+[releasables.solo]
 bump = "patch"
 include = ["pypi"]
 exclude = []
@@ -159,14 +159,14 @@ description = "Solo release"
         """read_batch_release_file correctly parses blog field per package."""
         batch_toml = tmp_path / "batch.toml"
         batch_toml.write_text("""
-[packages.pkg_a]
+[releasables.pkg_a]
 bump = "patch"
 include = ["pypi"]
 exclude = []
 description = "Package A"
 blog = true
 
-[packages.pkg_b]
+[releasables.pkg_b]
 bump = "minor"
 include = ["npm"]
 exclude = []
@@ -198,20 +198,20 @@ blog = false
         _write_toml(
             batch_toml,
             """
-[packages.lib1]
+[releasables.lib1]
 bump = "patch"
 include = ["pypi"]
 exclude = []
 description = "lib1 release"
 blog = true
 
-[packages.lib2]
+[releasables.lib2]
 bump = "patch"
 include = ["pypi"]
 exclude = []
 description = "lib2 release"
 
-[packages.lib3]
+[releasables.lib3]
 bump = "minor"
 include = ["pypi"]
 exclude = []

@@ -182,7 +182,7 @@ class TestBatchReleaseRootSelfdocIntegration:
         releases_dir = ws_dir / "releases"
         releases_dir.mkdir()
         (releases_dir / "unreleased.toml").write_text(
-            '[packages.pkg]\nbump = "patch"\ndescription = "test"\n'
+            '[releasables.pkg]\nbump = "patch"\ndescription = "test"\n'
             'include = ["pypi"]\nexclude = []\n'
         )
 
@@ -211,7 +211,7 @@ class TestBatchReleaseRootSelfdocIntegration:
         ), patch(
             "rlsbl.commands.monorepo.batch_release._run_root_selfdoc"
         ) as mock_root_selfdoc, patch(
-            "rlsbl.commands.monorepo.batch_release._batch_release_packages"
+            "rlsbl.commands.monorepo.batch_release._batch_release_releasables"
         ):
             from pathlib import Path
             from rlsbl.commands.monorepo.batch_release import _cmd_batch_release

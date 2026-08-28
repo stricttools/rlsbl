@@ -117,7 +117,7 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
 
 
 def _build_pkg_section(proj, workspace_root, target_names):
-    """Build a tomlkit table for a single package section."""
+    """Build a tomlkit table for a single releasable section."""
     pkg_table = tomlkit.table()
     pkg_table.add(tomlkit.comment("Version bump type: patch, minor, major, infra, or prerelease"))
     pkg_table.add("bump", "")
@@ -146,15 +146,15 @@ def _build_pkg_section(proj, workspace_root, target_names):
     return pkg_table
 
 
-def _render_commented_section(name, target_names, reason, section_key="packages"):
-    """Render a package/releasable section as TOML comments.
+def _render_commented_section(name, target_names, reason):
+    """Render a releasable section as TOML comments.
 
     Returns a string of comment lines (each prefixed with '# ') that
     represent the section the user would uncomment if they want to include it.
     """
     lines = [
         f"# {name}: {reason}",
-        f"# [{section_key}.{name}]",
+        f"# [releasables.{name}]",
         "# bump = \"\"",
         "# description = \"\"",
         "# context = \"\"",
@@ -175,27 +175,20 @@ def _collect_releasable_targets(releasable_name, member_projects, workspace_root
 
 
 def _cmd_batch_release_init(project_root, packages=None):
-    """Create .rlsbl-monorepo/releases/unreleased.toml with per-package or
-    per-releasable sections.
+    """Create .rlsbl-monorepo/releases/unreleased.toml.
 
-    In explicit mode (workspace has ``[[releasables]]``), scaffolds
-    ``[releasables.<name>]`` sections grouped by releasable. In implicit
-    mode, scaffolds ``[packages.<name>]`` sections per package.
-
-    Iterates over all releasable units (skipping non-releasable projects),
-    detects targets for each, and scaffolds sections with empty bump/description
-    and the detected include list.
+    Scaffolds one ``[releasables.<name>]`` section per releasable declared in
+    workspace.toml, skipping non-releasable projects, detecting targets for
+    each, and writing sections with an empty bump/description and the detected
+    include list.
 
     Items with zero unreleased commits are included as commented-out sections.
 
     Args:
         project_root: Path to the project root directory.
-        packages: Optional comma-separated string of names to include.
-            In explicit mode these are releasable names; in implicit mode,
-            package names.
+        packages: Optional comma-separated string of releasable names to
+            include.
     """
-    from ...workspace import is_explicit_mode
-
     start = str(project_root)
     workspace_root = find_workspace_root(start)
     if workspace_root is None:
@@ -215,20 +208,13 @@ def _cmd_batch_release_init(project_root, packages=None):
         print("Error: no projects in workspace.", file=sys.stderr)
         sys.exit(1)
 
-    explicit = is_explicit_mode(workspace_root)
-
-    if explicit:
-        _scaffold_releasable_sections(
-            workspace_root, projects, batch_path, packages,
-        )
-    else:
-        _scaffold_package_sections(
-            workspace_root, projects, batch_path, packages,
-        )
+    _scaffold_releasable_sections(
+        workspace_root, projects, batch_path, packages,
+    )
 
 
 def _scaffold_releasable_sections(workspace_root, projects, batch_path, filter_names):
-    """Scaffold [releasables.<name>] sections for explicit mode."""
+    """Scaffold the [releasables.<name>] sections of a batch release file."""
     from ...workspace import load_releasables, members_of
 
     releasables = load_releasables(workspace_root, projects)
@@ -291,99 +277,6 @@ def _scaffold_releasable_sections(workspace_root, projects, batch_path, filter_n
         sys.exit(1)
 
     doc.add("releasables", section_table)
-
-    releases_dir = os.path.dirname(batch_path)
-    effects.makedirs(releases_dir, exist_ok=True)
-
-    toml_text = tomlkit.dumps(doc)
-
-    if commented_sections:
-        comment_blocks = []
-        for name, target_names, reason in commented_sections:
-            comment_blocks.append(
-                _render_commented_section(
-                    name, target_names, reason, section_key="releasables",
-                )
-            )
-        toml_text = toml_text.rstrip("\n") + "\n\n" + "\n\n".join(comment_blocks) + "\n"
-
-    # Atomic exclusive-create closes the TOCTOU (see _cmd_batch_release_init's
-    # exists() check); on collision, re-run refuse-unless-pristine.
-    try:
-        f = effects.open_exclusive(batch_path, file_mode=0o644)
-    except FileExistsError:
-        _handle_existing_batch(batch_path)
-        return
-    with f:
-        f.write(toml_text)
-
-    commit_scaffold_file(
-        "release: scaffold unreleased.toml", [batch_path],
-        cwd=workspace_root, expected_root=workspace_root,
-    )
-
-    print(batch_path)
-
-
-def _scaffold_package_sections(workspace_root, projects, batch_path, filter_names):
-    """Scaffold [packages.<name>] sections for implicit mode (original behavior)."""
-    # Parse filter
-    requested_names = None
-    if filter_names:
-        requested_names = [n.strip() for n in filter_names.split(",") if n.strip()]
-        all_names = {p["name"] for p in projects}
-        unknown = [n for n in requested_names if n not in all_names]
-        if unknown:
-            print(
-                f"Error: unknown package(s): {', '.join(unknown)}. "
-                f"Available: {', '.join(sorted(all_names))}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    doc = tomlkit.document()
-    packages_table = tomlkit.table(is_super_table=True)
-
-    any_added = False
-    commented_sections = []
-
-    for proj in projects:
-        if not proj.is_releasable:
-            print(f"Skipping non-releasable project: {proj['name']}", file=sys.stderr)
-            continue
-
-        if requested_names is not None and proj["name"] not in requested_names:
-            continue
-
-        project_dir = os.path.join(workspace_root, proj["path"])
-        rel_dir = resolve_releasable_config_dir(proj, workspace_root)
-        entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
-        if not entries:
-            print(
-                f"Warning: no targets detected for {proj['name']}, skipping.",
-                file=sys.stderr,
-            )
-            continue
-
-        target_names = [e.name for e in entries]
-
-        commit_count, last_release = _get_unreleased_commit_count(proj, workspace_root, projects)
-
-        if commit_count == 0 and last_release is not None:
-            reason = f"no unreleased commits since {last_release}"
-            commented_sections.append((proj["name"], target_names, reason))
-            any_added = True
-            continue
-
-        pkg_table = _build_pkg_section(proj, workspace_root, target_names)
-        packages_table.add(proj["name"], pkg_table)
-        any_added = True
-
-    if not any_added:
-        print("Error: no eligible projects with detected targets.", file=sys.stderr)
-        sys.exit(1)
-
-    doc.add("packages", packages_table)
 
     releases_dir = os.path.dirname(batch_path)
     effects.makedirs(releases_dir, exist_ok=True)

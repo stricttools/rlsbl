@@ -19,7 +19,6 @@ from rlsbl.workspace import (
     LAST_IMPLICIT_MODE_VERSION,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
-    is_explicit_mode,
     load_releasables,
     load_workspace,
     resolve_project,
@@ -314,7 +313,9 @@ class TestImplicitModeRefused:
         assert LAST_IMPLICIT_MODE_VERSION in message
         assert "todo" in message
 
-    def test_empty_releasables_section_is_explicit_mode(self, tmp_path):
+    def test_empty_releasables_section_loads(self, tmp_path):
+        """An empty releasables array is a declared (if empty) list, not an
+        undeclared one: the loader accepts it."""
         write_raw(
             tmp_path,
             'releasables = []\n\n[[projects]]\npath = "."\nname = "root"\n'
@@ -322,7 +323,6 @@ class TestImplicitModeRefused:
         )
         projects = load_workspace(str(tmp_path))
         assert len(projects) == 1
-        assert is_explicit_mode(str(tmp_path))
         assert load_releasables(str(tmp_path), projects) == []
 
 
@@ -505,8 +505,7 @@ class TestMonorepoInitRootMember:
         assert [p["name"] for p in projects] == [ROOT_MEMBER_NAME]
         assert projects[0]["path"] == ROOT_MEMBER_PATH
         assert projects[0]["dev_only"] is True
-        # Explicit mode with no releasables yet -- not implicit mode.
-        assert is_explicit_mode(str(tmp_path))
+        # A declared, empty releasables list -- the loader accepts it.
         assert load_releasables(str(tmp_path), projects) == []
 
     def test_releasable_root_member(self, tmp_path, monkeypatch):

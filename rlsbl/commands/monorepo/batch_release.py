@@ -4,13 +4,10 @@ Reads .rlsbl-monorepo/releases/unreleased.toml, validates all listed items,
 determines topological release order, and releases each sequentially
 by delegating to the existing single-package release flow.
 
-In explicit mode (``[releasables.*]`` sections), iterates releasables in
-dependency order (a releasable's position = max topological position of
-its member packages). For each releasable, picks one representative member
-package and releases through it.
-
-In implicit mode (``[packages.*]`` sections), iterates packages directly
-in topological order (original behavior).
+The file's ``[releasables.*]`` sections are iterated in dependency order (a
+releasable's position = max topological position of its member packages). For
+each releasable, one representative member package is picked and the release
+runs through it.
 """
 
 import os
@@ -26,7 +23,7 @@ from ...release_file import (
 from ...errors import ConfigError, GitError, ReleaseFileError
 from ...lock import rlsbl_lock
 from ...utils import commit_files, run, working_tree_paths
-from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
+from ...workspace import find_workspace_root, load_workspace
 from ...workspace_graph import CycleError, WorkspaceGraph
 from ..watch import wait_for_ci_green
 from .batch_plan import (
@@ -580,15 +577,6 @@ def _cmd_batch_release(flags, project_root):
         sys.exit(1)
 
     projects = load_workspace(workspace_root)
-    explicit = is_explicit_mode(workspace_root)
-
-    if batch_config.section_type == "releasables" and not explicit:
-        print(
-            "Error: batch release file uses [releasables] sections but the "
-            "workspace is in implicit mode (no [[releasables]] in workspace.toml).",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
     # --- Repair pass / resolved-plan handling ---
     # If a plan sidecar already exists, this is not a fresh batch: validate it
@@ -607,10 +595,10 @@ def _cmd_batch_release(flags, project_root):
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
 
-        if not dry_run and plan_all_released(workspace_root, plan, projects):
+        if not dry_run and plan_all_released(workspace_root, plan):
             with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
                 _abort_on_completed_plan(
-                    plan, plan_path, batch_path, workspace_root, projects,
+                    plan, plan_path, batch_path, workspace_root,
                 )
 
     # Upfront validation: fail before releasing anything
@@ -639,20 +627,14 @@ def _cmd_batch_release(flags, project_root):
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # The plan (possibly None here) is passed to the mode functions. When it is
-    # None and this is not a dry-run, the mode function resolves and persists a
-    # fresh plan AFTER validating item membership (so version/tag computation
-    # only runs for items that actually exist in the workspace).
-    if batch_config.section_type == "releasables":
-        _batch_release_releasables(
-            flags, workspace_root, batch_path, batch_config, projects,
-            plan, plan_path,
-        )
-    else:
-        _batch_release_packages(
-            flags, workspace_root, batch_path, batch_config, projects,
-            plan, plan_path,
-        )
+    # The plan (possibly None here) is passed on. When it is None and this is
+    # not a dry-run, a fresh plan is resolved and persisted AFTER item
+    # membership is validated (so version/tag computation only runs for items
+    # that actually exist in the workspace).
+    _batch_release_releasables(
+        flags, workspace_root, batch_path, batch_config, projects,
+        plan, plan_path,
+    )
 
 
 def _resolve_fresh_plan(workspace_root, batch_config, projects, plan_path, log):
@@ -780,9 +762,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
         # mid-flight are seeded straight into pass 2: their commits are
         # already on the branch, and this run's single push + gate covers
         # them exactly as it covers the members it commits itself.
-        stranded = _seed_stranded_pending(
-            plan, workspace_root, projects, dry_run, "releasable",
-        )
+        stranded = _seed_stranded_pending(plan, workspace_root, dry_run)
         pending = []
         for rel_name in release_order:
             release_config = batch_config.packages[rel_name]
@@ -795,7 +775,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
             # per the resolved plan (live version == target and tag exists).
             if plan is not None and not dry_run:
                 plan_item = plan.items[rel_name]
-                if item_is_released(workspace_root, plan_item, projects, "releasables"):
+                if item_is_released(workspace_root, plan_item):
                     log(
                         f"--- Skipping releasable {rel_name}: already released "
                         f"at {plan_item.target_version} (tag {plan_item.tag}) ---"
@@ -955,291 +935,18 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
         # Archive is state-driven: only fires when every plan item is released.
         if not dry_run:
             _archive_batch_if_complete(
-                batch_path, plan, workspace_root, projects, log,
-                flags=flags,
+                batch_path, plan, workspace_root, log, flags=flags,
             )
 
     # Log completion BEFORE the watch tail: the tail exits the process on a
     # red CI or a missing artifact, and would skip the announcement.
-    _announce_batch_completion(released, log, kind="releasable")
+    _announce_batch_completion(released, log)
 
     if not dry_run and last_sha:
         _watch_and_verify_batch(flags, last_sha, probe_specs, log)
 
 
-def _batch_release_packages(flags, workspace_root, batch_path, batch_config,
-                            projects, plan=None, plan_path=None):
-    """Execute batch release in package mode (implicit, original behavior)."""
-    project_names = {p["name"] for p in projects}
-    project_by_name = {p["name"]: p for p in projects}
-
-    # Validate all packages exist in workspace
-    missing = set(batch_config.packages.keys()) - project_names
-    if missing:
-        print(
-            f"Error: packages not found in workspace: {', '.join(sorted(missing))}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    # Reject non-releasable projects
-    non_releasable_in_batch = sorted(
-        name
-        for name in batch_config.packages
-        if not project_by_name[name].is_releasable
-    )
-    if non_releasable_in_batch:
-        print(
-            "Error: non-releasable projects cannot be in batch release: "
-            f"{', '.join(non_releasable_in_batch)}. "
-            "Set releasable = \"<name>\" in workspace.toml if these projects "
-            "should be releasable.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    # Determine topological order for the listed packages
-    graph = WorkspaceGraph(workspace_root, projects)
-    try:
-        full_order = graph.topological_order()
-    except CycleError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    # Filter to only the packages in the batch, preserving topological order
-    batch_names = set(batch_config.packages.keys())
-    release_order = [name for name in full_order if name in batch_names]
-
-    dry_run = flags.get("dry-run", False)
-    quiet = flags.get("quiet", False)
-
-    def log(msg):
-        if not quiet:
-            print(msg)
-
-    # Resolve a fresh plan now that membership is validated (skip in dry-run).
-    if plan is None and not dry_run and plan_path is not None:
-        plan = _resolve_fresh_plan(
-            workspace_root, batch_config, projects, plan_path, log,
-        )
-
-    log(f"Batch release: {len(release_order)} package(s)")
-    log(f"Release order: {', '.join(release_order)}")
-
-    if dry_run:
-        for i, name in enumerate(release_order, 1):
-            rc = batch_config.packages[name]
-            log(f"  {i}. {name} ({rc.bump}) — {rc.description}")
-
-    log("")
-
-    # Release each package in order
-    released = []
-    last_sha = None
-    # Per-member probe specs for the watch tail's registry check, captured
-    # before each package's state file is cleared by its pass-2 completion.
-    probe_specs = []
-    with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
-        # Workspace-level pin, taken before the first candidate is built. Every
-        # commit that appears in pin..HEAD must be one a member's own release
-        # call created; anything else is a ride-in and aborts the gate.
-        batch_pin = None if dry_run else head_sha(cwd=workspace_root)
-        inline_commits = []
-        # Pass 1: COMMIT every package's release locally (``ci-defer``). The
-        # push and the CI gate are deferred so ONE push publishes the whole
-        # batch and ONE wait covers it. Members an earlier invocation left
-        # mid-flight are seeded straight into pass 2: their commits are
-        # already on the branch, and this run's single push + gate covers
-        # them exactly as it covers the members it commits itself.
-        stranded = _seed_stranded_pending(
-            plan, workspace_root, projects, dry_run, "package",
-        )
-        pending = []
-        for pkg_name in release_order:
-            release_config = batch_config.packages[pkg_name]
-            project = project_by_name[pkg_name]
-            project_dir = os.path.join(workspace_root, project["path"])
-
-            # Per-item idempotency: skip a package already released per the
-            # resolved plan (live version == target and tag exists).
-            if plan is not None and not dry_run:
-                plan_item = plan.items[pkg_name]
-                if item_is_released(workspace_root, plan_item, projects, "packages"):
-                    log(
-                        f"--- Skipping {pkg_name}: already released at "
-                        f"{plan_item.target_version} (tag {plan_item.tag}) ---"
-                    )
-                    log("")
-                    continue
-
-            if pkg_name in stranded:
-                log(
-                    f"--- Resuming {pkg_name}: an earlier run left it "
-                    f"mid-flight; it joins this batch's candidate ---"
-                )
-                pending.append((pkg_name, project_dir, stranded[pkg_name]))
-                log("")
-                continue
-
-            log(f"--- Releasing {pkg_name} ({release_config.bump}) ---")
-
-            try:
-                from pathlib import Path
-
-                from ...context import create_context
-                from ..release import run_cmd
-
-                release_flags = _batch_release_flags(
-                    # ``ci-defer`` in EVERY mode: pass 1 is commit-only,
-                    # and a preview of pass 1 must be a preview of the
-                    # same thing. Without it a previewed member ran its
-                    # own candidate push, which the real pass 1 never
-                    # does -- the batch publishes one candidate for the
-                    # whole group. The batch preview is therefore the
-                    # members' Phase-A plans, concatenated, and nothing
-                    # else.
-                    flags, **{"ci-defer": True},
-                )
-                pkg_ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
-                _before = None if dry_run else head_sha(cwd=workspace_root)
-                run_cmd(release_config, release_flags, ctx=pkg_ctx)
-                if dry_run:
-                    released.append(pkg_name)
-                else:
-                    from ..release.release_state import (
-                        get_state_path as _gsp,
-                        resolve_releasable_dir as _rrd,
-                    )
-                    # A member's release state lives under its releasable, not
-                    # under the package -- every member belongs to one.
-                    _sp = _gsp(
-                        project_dir,
-                        releasable_dir=_rrd(project_dir, workspace_root),
-                    )
-                    if os.path.exists(_sp):
-                        pending.append((pkg_name, project_dir, _sp))
-                    else:
-                        # No in-progress state means nothing is in progress:
-                        # the package's release ran to completion inside its
-                        # own call. The archive gate below is the backstop.
-                        released.append(pkg_name)
-                        last_sha = run("git", ["rev-parse", "HEAD"])
-                        # Its trail died with its state file; the commits that
-                        # appeared across its call are the batch's own.
-                        inline_commits.extend(
-                            _commits_between(_before, last_sha.strip(),
-                                             workspace_root)
-                        )
-            except SystemExit as e:
-                if e.code not in (0, None):
-                    print(
-                        f"\nError: release of {pkg_name} failed. "
-                        f"Successfully released: {', '.join(released) if released else '(none)'}",
-                        file=sys.stderr,
-                    )
-                    raise
-                from ..release.release_state import (
-                    get_state_path as _gsp0,
-                    resolve_releasable_dir as _rrd0,
-                )
-                _absorb_member_exit_zero(
-                    pkg_name, project_dir,
-                    _gsp0(
-                        project_dir,
-                        releasable_dir=_rrd0(project_dir, workspace_root),
-                    ),
-                    pending, dry_run=dry_run, kind="package",
-                )
-
-            log("")
-
-        # ONE push for the whole batch, ONE CI gate on it, then pass 2:
-        # finalize, tag and release each package on the verified candidate.
-        if pending:
-            try:
-                candidate_sha = _publish_batch_candidate(
-                    workspace_root, pending, flags, log,
-                    pin_sha=batch_pin,
-                    trail=_batch_release_trail(pending, inline_commits),
-                )
-                verified_sha = _batch_ci_gate(
-                    workspace_root, flags, log, candidate_sha, pending,
-                )
-            except ForeignCommitError as e:
-                # A ride-in on the batch tip. Never rolled back: those commits
-                # are exactly what must be preserved. The batch's own commits
-                # are local and unpushed, and no version is burnt.
-                print(f"Error: {e}", file=sys.stderr)
-                sys.exit(1)
-            except GitError as e:
-                # The candidate push failed. Every member's release commits sit
-                # on the local branch, nothing is tagged, and re-running the
-                # batch republishes and re-gates the same commits.
-                print(
-                    f"Error: the batch release candidate could not be pushed: "
-                    f"{e}\nNothing was tagged, released or finalized. Re-run "
-                    f"`rlsbl monorepo release run` once pushing works again.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            except ReleaseCIError as e:
-                # The candidate's diff window cannot trigger some member's CI
-                # job (or CI did not go green on it). Nothing was tagged,
-                # released or finalized and no version is burnt: each member's
-                # state carries a CI_VERIFIED failure marker and the batch
-                # resumes once the window is widened.
-                print(f"Error: {e}", file=sys.stderr)
-                sys.exit(1)
-            except ReleaseValidationError as e:
-                print(f"Error: {e}", file=sys.stderr)
-                sys.exit(1)
-            for pkg_name, project_dir, state_path in pending:
-                log(f"--- Completing {pkg_name} ---")
-                # Read before the resume: a member that completes clears its
-                # state file, and the watch tail's registry probe needs that
-                # member's version and resolved targets.
-                _spec = _member_probe_spec(
-                    pkg_name, project_dir, workspace_root, state_path, log,
-                )
-                try:
-                    _resume_batch_item(
-                        pkg_name, project_dir, workspace_root, state_path,
-                        flags, verified_sha, log,
-                    )
-                except ReleaseValidationError as e:
-                    print(f"Error: {e}", file=sys.stderr)
-                    sys.exit(1)
-                except SystemExit as e:
-                    if e.code != 0:
-                        print(
-                            f"\nError: release of {pkg_name} failed. "
-                            f"Successfully released: {', '.join(released) if released else '(none)'}",
-                            file=sys.stderr,
-                        )
-                        raise
-                released.append(pkg_name)
-                if _spec is not None:
-                    probe_specs.append(_spec)
-                log("")
-            last_sha = verified_sha
-
-        # Archive is state-driven: only fires when every plan item is released.
-        if not dry_run:
-            _archive_batch_if_complete(
-                batch_path, plan, workspace_root, projects, log,
-                flags=flags,
-            )
-
-    # Log completion BEFORE the watch tail: the tail exits the process on a
-    # red CI or a missing artifact, and would skip the announcement.
-    _announce_batch_completion(released, log, kind="package")
-
-    if not dry_run and last_sha:
-        _watch_and_verify_batch(flags, last_sha, probe_specs, log)
-
-
-def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root,
-                             projects):
+def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root):
     """Every item in the resolved plan is already released: stop, nonzero.
 
     This path used to archive the batch file AND the plan and return 0. Two
@@ -1260,7 +967,7 @@ def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root,
     plan_rel = os.path.relpath(plan_path)
     batch_rel = os.path.relpath(batch_path)
 
-    stranded = _plan_items_in_progress(plan, workspace_root, projects)
+    stranded = _plan_items_in_progress(plan, workspace_root)
     if stranded:
         # The plan is not stale -- those items still need it. Archiving it
         # here would strand a resumable release with no way to finish it.
@@ -1324,7 +1031,7 @@ def _absorb_member_exit_zero(name, project_dir, state_path, pending, *,
     sys.exit(1)
 
 
-def _announce_batch_completion(released, log, *, kind):
+def _announce_batch_completion(released, log):
     """Print the completion line, or refuse when nothing was released.
 
     An empty ``released`` list means the run produced no release at all --
@@ -1334,7 +1041,8 @@ def _announce_batch_completion(released, log, *, kind):
     """
     if not released:
         print(
-            f"\nError: the batch released nothing -- every {kind} was skipped "
+            f"\nError: the batch released nothing -- every releasable was "
+            f"skipped "
             f"or unaccounted for.\nIf they are all already released, the batch "
             f"file and its plan are stale: archive them (or delete the plan "
             f"sidecar and re-run) instead of re-running an empty batch.",
@@ -1344,33 +1052,22 @@ def _announce_batch_completion(released, log, *, kind):
     log(f"Batch release complete: {', '.join(released)}")
 
 
-def _plan_item_state_paths(plan, workspace_root, projects):
+def _plan_item_state_paths(plan, workspace_root):
     """Yield ``(name, state_path)`` for every resolvable plan item.
 
     One place decides where a plan item's release state lives, so the archive
     gate, the completed-plan abort and the pass-1 resume seeding all address
     the same file.
     """
-    from ..release.release_state import get_state_path, resolve_releasable_dir
+    from ..release.release_state import get_state_path
     from ...workspace_types import get_releasable_dir
 
-    project_by_name = {p["name"]: p for p in projects}
     for name in plan.items:
-        if plan.section_type == "releasables":
-            rel_dir = get_releasable_dir(workspace_root, name)
-            yield name, get_state_path(workspace_root, releasable_dir=rel_dir)
-        else:
-            project = project_by_name.get(name)
-            if project is None:
-                continue
-            project_dir = os.path.join(workspace_root, project["path"])
-            yield name, get_state_path(
-                project_dir,
-                releasable_dir=resolve_releasable_dir(project_dir, workspace_root),
-            )
+        rel_dir = get_releasable_dir(workspace_root, name)
+        yield name, get_state_path(workspace_root, releasable_dir=rel_dir)
 
 
-def _plan_items_in_progress(plan, workspace_root, projects):
+def _plan_items_in_progress(plan, workspace_root):
     """Return the names of plan items with an on-disk in-progress.json.
 
     A per-item release state file means that item's release did not run to
@@ -1380,14 +1077,12 @@ def _plan_items_in_progress(plan, workspace_root, projects):
     """
     return [
         name
-        for name, state_path in _plan_item_state_paths(
-            plan, workspace_root, projects,
-        )
+        for name, state_path in _plan_item_state_paths(plan, workspace_root)
         if os.path.exists(state_path)
     ]
 
 
-def _partition_stranded_items(plan, workspace_root, projects):
+def _partition_stranded_items(plan, workspace_root):
     """Split the plan's in-progress items into batch-resumable and CI-sealed.
 
     Returns ``(resumable, sealed)``: a name -> state_path mapping of items this
@@ -1405,7 +1100,7 @@ def _partition_stranded_items(plan, workspace_root, projects):
 
     resumable = {}
     sealed = []
-    for name, state_path in _plan_item_state_paths(plan, workspace_root, projects):
+    for name, state_path in _plan_item_state_paths(plan, workspace_root):
         if not os.path.exists(state_path):
             continue
         state = load_release_state(state_path) or {}
@@ -1416,11 +1111,11 @@ def _partition_stranded_items(plan, workspace_root, projects):
     return resumable, sealed
 
 
-def _abort_on_sealed_items(sealed, kind):
+def _abort_on_sealed_items(sealed):
     """Refuse a batch that would have to re-gate a CI-verified member."""
     print(
         f"\nError: {', '.join(sealed)} {'is' if len(sealed) == 1 else 'are'} "
-        f"mid-release past the CI gate: the candidate {kind} "
+        f"mid-release past the CI gate: the candidate releasable "
         f"{'was' if len(sealed) == 1 else 'were'} already verified and "
         f"{'is' if len(sealed) == 1 else 'are'} sealed to that commit.\n"
         f"This batch would publish a NEW candidate and gate that instead, "
@@ -1433,7 +1128,7 @@ def _abort_on_sealed_items(sealed, kind):
     sys.exit(1)
 
 
-def _seed_stranded_pending(plan, workspace_root, projects, dry_run, kind):
+def _seed_stranded_pending(plan, workspace_root, dry_run):
     """Resolve which plan items pass 1 must SKIP and hand straight to pass 2.
 
     A batch that died between its pass-1 commits and its pass-2 completion
@@ -1447,13 +1142,13 @@ def _seed_stranded_pending(plan, workspace_root, projects, dry_run, kind):
     """
     if plan is None or dry_run:
         return {}
-    resumable, sealed = _partition_stranded_items(plan, workspace_root, projects)
+    resumable, sealed = _partition_stranded_items(plan, workspace_root)
     if sealed:
-        _abort_on_sealed_items(sealed, kind)
+        _abort_on_sealed_items(sealed)
     return resumable
 
 
-def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log,
+def _archive_batch_if_complete(batch_path, plan, workspace_root, log,
                                *, flags=None):
     """State-driven archive gate: finalize iff every plan item is released.
 
@@ -1476,12 +1171,12 @@ def _archive_batch_if_complete(batch_path, plan, workspace_root, projects, log,
     """
     if plan is None:
         return False
-    if not plan_all_released(workspace_root, plan, projects):
+    if not plan_all_released(workspace_root, plan):
         log(
             "Not archiving batch file: some plan items are not yet released."
         )
         return False
-    stranded = _plan_items_in_progress(plan, workspace_root, projects)
+    stranded = _plan_items_in_progress(plan, workspace_root)
     if stranded:
         log(
             "Not archiving batch file: in-progress release state exists for "

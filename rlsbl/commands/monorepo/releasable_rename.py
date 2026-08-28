@@ -52,7 +52,6 @@ from ...workspace import (
     WORKSPACE_FILE,
     get_releasable_changes_dir,
     get_releasable_dir,
-    is_explicit_mode,
     load_releasables,
     load_workspace,
     members_of,
@@ -382,12 +381,6 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
     Raises WorkspaceError on any preflight failure.
     """
     root = str(workspace_root)
-
-    if not is_explicit_mode(root):
-        raise WorkspaceError(
-            "rename-releasable requires explicit mode "
-            "([[releasables]] in workspace.toml)."
-        )
 
     projects = load_workspace(root)
     releasables = load_releasables(root, projects)

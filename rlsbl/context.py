@@ -26,7 +26,6 @@ def _resolve_releasable_config_dir(
     root: Path,
     workspace_root: Path,
     *,
-    is_explicit,
     projects,
     releasables,
     resolve_releasable_for_project_fn,
@@ -38,14 +37,11 @@ def _resolve_releasable_config_dir(
     from workspace.py (breaks the context->workspace circular dep edge).
 
     Returns None if the project is not in the workspace, is not
-    releasable, or if ``[[releasables]]`` is not defined.
+    releasable, or if the workspace could not be loaded.
     """
     import os
 
     ws_root = str(workspace_root)
-    if not is_explicit:
-        return None
-
     if projects is None or releasables is None:
         return None
 
@@ -77,38 +73,34 @@ def resolve_releasable_config_dir(root: Path, workspace_root: Path) -> str | Non
     """
     from .workspace import (
         get_releasable_dir,
-        is_explicit_mode,
         load_releasables,
         load_workspace,
         resolve_releasable_for_project,
     )
 
     ws_root = str(workspace_root)
-    is_explicit = is_explicit_mode(ws_root)
     projects_loaded = None
     releasables_loaded = None
-    if is_explicit:
-        try:
-            projects_loaded = load_workspace(ws_root)
-            releasables_loaded = load_releasables(ws_root, projects=projects_loaded)
-        except OSError:
-            # The ONLY reason to answer None here: the workspace file is not
-            # there to read (a race against a removal, or a directory that
-            # only looked like a workspace root). That is genuinely "this
-            # directory belongs to no releasable".
-            #
-            # A loader or validation error is NOT that, and used to be caught
-            # by a bare `except Exception` that returned None. Callers read
-            # None as "no releasable", so a refused workspace looked like a
-            # standalone one: a generated publish router came out with its
-            # releasable template variables unrendered, and the error
-            # explaining why was never raised. Let it through.
-            return None
+    try:
+        projects_loaded = load_workspace(ws_root)
+        releasables_loaded = load_releasables(ws_root, projects=projects_loaded)
+    except OSError:
+        # The ONLY reason to answer None here: the workspace file is not
+        # there to read (a race against a removal, or a directory that
+        # only looked like a workspace root). That is genuinely "this
+        # directory belongs to no releasable".
+        #
+        # A loader or validation error is NOT that, and used to be caught
+        # by a bare `except Exception` that returned None. Callers read
+        # None as "no releasable", so a refused workspace looked like a
+        # standalone one: a generated publish router came out with its
+        # releasable template variables unrendered, and the error
+        # explaining why was never raised. Let it through.
+        return None
 
     return _resolve_releasable_config_dir(
         root,
         workspace_root,
-        is_explicit=is_explicit,
         projects=projects_loaded,
         releasables=releasables_loaded,
         resolve_releasable_for_project_fn=resolve_releasable_for_project,
@@ -139,27 +131,23 @@ def create_context(
         # workspace imports and break the context->workspace edge.
         from .workspace import (
             get_releasable_dir,
-            is_explicit_mode,
             load_releasables,
             load_workspace,
             resolve_releasable_for_project,
         )
 
         ws_root = str(workspace_root)
-        is_explicit = is_explicit_mode(ws_root)
         projects_loaded = None
         releasables_loaded = None
-        if is_explicit:
-            try:
-                projects_loaded = load_workspace(ws_root)
-                releasables_loaded = load_releasables(ws_root, projects=projects_loaded)
-            except Exception:
-                pass
+        try:
+            projects_loaded = load_workspace(ws_root)
+            releasables_loaded = load_releasables(ws_root, projects=projects_loaded)
+        except Exception:
+            pass
 
         releasable_config_dir = _resolve_releasable_config_dir(
             root,
             workspace_root,
-            is_explicit=is_explicit,
             projects=projects_loaded,
             releasables=releasables_loaded,
             resolve_releasable_for_project_fn=resolve_releasable_for_project,

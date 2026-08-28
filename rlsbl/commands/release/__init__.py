@@ -602,7 +602,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # Pipeline config validation is deferred until after releasable context
     # is resolved, so per-member pipeline validation can run in releasable
-    # mode. Standalone/implicit mode validates the single representative.
+    # mode. A standalone repo validates the single representative.
     # (Moved below, after member_package_paths is known.)
 
     # In batch mode the batch orchestrator already validated gh CLI,
@@ -662,8 +662,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # Pipeline config validation (deferred from above so releasable
     # context is available). In releasable mode, validates each publishing
-    # member's pipeline config (publish_mode != "none"); in
-    # standalone/implicit mode, validates the representative's config.
+    # member's pipeline config (publish_mode != "none"); a standalone repo
+    # validates the representative's config.
     # Configs to scan for the npm provenance guard (below). Collected here so
     # the releasable member contexts are not resolved twice.
     _provenance_scan_configs = []
@@ -740,8 +740,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     monorepo_project = None
     if releasable_name and member_projs:
         monorepo_project = member_projs
-    elif monorepo_name and not releasable_name:
-        monorepo_project = resolve_project(monorepo_root, str(project_root))
 
     changes_dir = validate_changelog_state(
         project_dir, target, monorepo_name, monorepo_project_path,
@@ -904,7 +902,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     #   4. Per-package pre-release (alphabetical)
     #   5. Releasable pre-release
     #
-    # In implicit mode or standalone, use the single-level hook system.
+    # A standalone repo uses the single-level hook system.
     _use_releasable_hooks = releasable_name and monorepo_root and member_package_paths
 
     if _use_releasable_hooks:
@@ -1189,12 +1187,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         post_hook_dirty = set(working_tree_paths())
         hook_generated = post_hook_dirty - pre_hook_dirty
 
-    # In explicit mode, commit message uses releasable name;
-    # in implicit monorepo mode, uses the package name; standalone uses the tag.
+    # A monorepo release's commit message names the releasable; a standalone
+    # repo's names the tag.
     if releasable_name:
         commit_msg = f"{releasable_name}: release v{new_version}"
-    elif monorepo_name:
-        commit_msg = f"{monorepo_name}: release v{new_version}"
     else:
         commit_msg = tag
 

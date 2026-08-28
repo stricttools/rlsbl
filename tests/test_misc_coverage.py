@@ -402,12 +402,15 @@ class TestEditReleaseAdditionalCoverage:
         mock_project.__getitem__ = lambda self, key: {"name": "test", "path": "test"}[key]
         mock_project.is_releasable = False
 
-        # is_explicit_mode is called inside the monorepo block before the
-        # is_non_releasable check; mock it to avoid filesystem access.
+        # The monorepo block resolves the releasable before the
+        # is_non_releasable check; the workspace loaders are mocked below to
+        # avoid filesystem access.
         with patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True), \
              patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True), \
              patch("rlsbl.commands.edit_release.find_workspace_root", return_value=str(tmp_path)), \
              patch("rlsbl.commands.edit_release.resolve_project", return_value=mock_project), \
+             patch("rlsbl.workspace.load_workspace", return_value=[]), \
+             patch("rlsbl.workspace.load_releasables", return_value=[]), \
              patch("rlsbl.commands.edit_release.resolve_member_context", return_value=MagicMock(targets=[mock_entry])), \
              patch("rlsbl.commands.edit_release.TARGETS", {"npm": mock_target}):
             with pytest.raises(SystemExit) as exc_info:
@@ -1216,7 +1219,8 @@ class TestEditReleaseMonorepoTagFormat:
 
         with patch("rlsbl.commands.edit_release.find_workspace_root", return_value="/tmp/test"), \
              patch("rlsbl.commands.edit_release.resolve_project", return_value=mock_project), \
-             patch("rlsbl.workspace.is_explicit_mode", return_value=False), \
+             patch("rlsbl.workspace.load_workspace", return_value=[]), \
+             patch("rlsbl.workspace.load_releasables", return_value=[]), \
              patch("builtins.open", mock_open()), \
              patch("os.rename"), \
              patch("os.unlink"):

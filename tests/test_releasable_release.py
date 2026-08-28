@@ -170,14 +170,18 @@ exclude = []
         path.write_text(toml_content)
 
         config = read_batch_release_file(str(path))
-        assert config.section_type == "releasables"
         assert "www" in config.packages
         assert "core" in config.packages
         assert config.packages["www"].bump == "minor"
         assert config.packages["core"].bump == "patch"
 
-    def test_read_packages_section_backward_compat(self, tmp_path):
-        """[packages.*] sections still work and report section_type='packages'."""
+    def test_a_packages_section_is_refused(self, tmp_path):
+        """A batch release names releasables; [packages.*] is a hard error.
+
+        The per-package batch mode is gone with the workspace mode that
+        produced it, so a batch file written in the old shape is refused with
+        the rewrite it needs rather than read in a mode that no longer exists.
+        """
         toml_content = """\
 [packages.mylib]
 bump = "patch"
@@ -188,29 +192,7 @@ exclude = []
         path = tmp_path / "unreleased.toml"
         path.write_text(toml_content)
 
-        config = read_batch_release_file(str(path))
-        assert config.section_type == "packages"
-        assert "mylib" in config.packages
-
-    def test_both_sections_error(self, tmp_path):
-        """Having both [packages] and [releasables] is a hard error."""
-        toml_content = """\
-[packages.a]
-bump = "patch"
-description = "X"
-include = ["pypi"]
-exclude = []
-
-[releasables.b]
-bump = "patch"
-description = "Y"
-include = ["pypi"]
-exclude = []
-"""
-        path = tmp_path / "unreleased.toml"
-        path.write_text(toml_content)
-
-        with pytest.raises(ReleaseFileError, match="both.*packages.*releasables"):
+        with pytest.raises(ReleaseFileError, match=r"\[packages\] section"):
             read_batch_release_file(str(path))
 
     def test_missing_section_error(self, tmp_path):
@@ -527,29 +509,8 @@ class TestSyncMemberPackageVersions:
 
 class TestBatchReleaseInitReleasable:
 
-    def test_scaffold_package_sections(self, tmp_path):
-        """scaffold produces [packages.*] sections for package mode."""
-        from rlsbl.commands.monorepo.batch_release_init import _scaffold_package_sections
-
-        ws_root = str(tmp_path)
-        _make_pypi_project(tmp_path, "lib-a")
-
-        projects = [
-            WorkspaceProject({"name": "lib-a", "path": "lib-a"}),
-        ]
-        make_workspace(ws_root, projects)
-
-        batch_path = os.path.join(ws_root, ".rlsbl-monorepo", "releases", "unreleased.toml")
-
-        with patch("rlsbl.commands.monorepo.batch_release_init._get_unreleased_commit_count", return_value=(5, None)):
-            _scaffold_package_sections(ws_root, projects, batch_path, None)
-
-        content = open(batch_path).read()
-        assert "[packages.lib-a]" in content
-        assert "[releasables." not in content
-
-    def test_scaffold_explicit_mode_uses_releasables(self, tmp_path):
-        """In explicit mode, scaffold produces [releasables.*] sections."""
+    def test_scaffold_uses_releasables(self, tmp_path):
+        """Scaffold produces [releasables.*] sections, the only form."""
         from rlsbl.commands.monorepo.batch_release_init import _scaffold_releasable_sections
 
         ws_root = str(tmp_path)

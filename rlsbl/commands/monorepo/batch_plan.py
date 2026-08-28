@@ -60,11 +60,10 @@ class PlanItem:
 
 @dataclass
 class BatchPlan:
-    """The full resolved plan for a batch release, containing the
-    section type and a mapping of item names to their PlanItem entries."""
+    """The full resolved plan for a batch release: a mapping of releasable
+    names to their PlanItem entries."""
 
-    section_type: str  # "packages" or "releasables"
-    items: dict[str, PlanItem]  # name -> PlanItem
+    items: dict[str, PlanItem]  # releasable name -> PlanItem
 
 
 def get_batch_plan_path(workspace_root: str = ".") -> str:
@@ -82,7 +81,6 @@ def plan_exists(workspace_root: str) -> bool:
 def write_batch_plan(path: str, plan: BatchPlan) -> None:
     """Atomically write the resolved plan to ``path`` (tmp file + rename)."""
     payload = {
-        "section_type": plan.section_type,
         "items": [
             {
                 "name": it.name,
@@ -113,12 +111,6 @@ def read_batch_plan(path: str) -> BatchPlan:
     if not isinstance(data, dict):
         raise BatchPlanError(f"batch plan file {path} must be a JSON object")
 
-    section_type = data.get("section_type")
-    if section_type not in ("packages", "releasables"):
-        raise BatchPlanError(
-            f"batch plan file {path} has invalid section_type {section_type!r}"
-        )
-
     raw_items = data.get("items")
     if not isinstance(raw_items, list):
         raise BatchPlanError(f"batch plan file {path} 'items' must be a list")
@@ -141,7 +133,7 @@ def read_batch_plan(path: str) -> BatchPlan:
             bump=entry["bump"],
         )
 
-    return BatchPlan(section_type=section_type, items=items)
+    return BatchPlan(items=items)
 
 
 def _noop_log(_msg):
@@ -160,61 +152,36 @@ def compute_batch_plan(workspace_root, batch_config, projects):
     from ..release.validate import compute_release_version
     from ..release.execute import resolve_target_paths
     from ...targets import TARGETS
+    from ...workspace import load_releasables, members_of
+    from ...workspace_types import get_releasable_dir
 
-    section_type = batch_config.section_type
+    releasables = load_releasables(workspace_root, projects)
+    releasable_by_name = {r.name: r for r in releasables}
 
-    if section_type == "releasables":
-        from ...workspace import load_releasables, members_of
-        from ...workspace_types import get_releasable_dir
-
-        releasables = load_releasables(workspace_root, projects)
-        releasable_by_name = {r.name: r for r in releasables}
-
-        items: dict[str, PlanItem] = {}
-        for name, rc in batch_config.packages.items():
-            rel = releasable_by_name[name]
-            member_projs = members_of(name, projects)
-            representative = member_projs[0]
-            project_dir = os.path.join(workspace_root, representative["path"])
-            registry = rc.include[0]
-            target = TARGETS[registry]
-            rel_cfg_dir = get_releasable_dir(workspace_root, name)
-            target_paths = resolve_target_paths(
-                project_dir, releasable_config_dir=rel_cfg_dir
-            )
-            primary_path = target_paths.get(registry, project_dir)
-            current, new, _bump_type, tag = compute_release_version(
-                target, primary_path, rc.bump,
-                None, None, _noop_log,
-                workspace_root=workspace_root, releasable_name=name,
-                releasable_tag_fmt=rel.effective_tag_format, preid=rc.preid,
-            )
-            items[name] = PlanItem(
-                name=name, base_version=current, target_version=new,
-                tag=tag, registry=registry, bump=rc.bump,
-            )
-        return BatchPlan(section_type=section_type, items=items)
-
-    # package mode (implicit)
-    project_by_name = {p["name"]: p for p in projects}
-    items = {}
+    items: dict[str, PlanItem] = {}
     for name, rc in batch_config.packages.items():
-        project = project_by_name[name]
-        project_dir = os.path.join(workspace_root, project["path"])
+        rel = releasable_by_name[name]
+        member_projs = members_of(name, projects)
+        representative = member_projs[0]
+        project_dir = os.path.join(workspace_root, representative["path"])
         registry = rc.include[0]
         target = TARGETS[registry]
-        target_paths = resolve_target_paths(project_dir)
+        rel_cfg_dir = get_releasable_dir(workspace_root, name)
+        target_paths = resolve_target_paths(
+            project_dir, releasable_config_dir=rel_cfg_dir
+        )
         primary_path = target_paths.get(registry, project_dir)
         current, new, _bump_type, tag = compute_release_version(
             target, primary_path, rc.bump,
-            project["name"], project["path"], _noop_log,
-            preid=rc.preid,
+            None, None, _noop_log,
+            workspace_root=workspace_root, releasable_name=name,
+            releasable_tag_fmt=rel.effective_tag_format, preid=rc.preid,
         )
         items[name] = PlanItem(
             name=name, base_version=current, target_version=new,
             tag=tag, registry=registry, bump=rc.bump,
         )
-    return BatchPlan(section_type=section_type, items=items)
+    return BatchPlan(items=items)
 
 
 def validate_plan_against_config(plan: BatchPlan, batch_config) -> None:
@@ -228,12 +195,6 @@ def validate_plan_against_config(plan: BatchPlan, batch_config) -> None:
 
     Raises BatchPlanError on any mismatch.
     """
-    if plan.section_type != batch_config.section_type:
-        raise BatchPlanError(
-            f"batch plan section_type {plan.section_type!r} does not match "
-            f"batch file section_type {batch_config.section_type!r}"
-        )
-
     plan_names = set(plan.items.keys())
     config_names = set(batch_config.packages.keys())
     if plan_names != config_names:
@@ -261,35 +222,21 @@ def validate_plan_against_config(plan: BatchPlan, batch_config) -> None:
             )
 
 
-def read_live_version(workspace_root, item: PlanItem, projects, section_type):
+def read_live_version(workspace_root, item: PlanItem):
     """Read the current on-disk version for a plan item.
 
-    Returns the version string, or None if it cannot be read (e.g. a manifest
-    is missing). A None result makes the skip predicate treat the item as not
-    yet released, so it proceeds through the normal release path.
+    Returns the version string, or None if it cannot be read (e.g. the version
+    file is missing). A None result makes the skip predicate treat the item as
+    not yet released, so it proceeds through the normal release path.
     """
     try:
-        if section_type == "releasables":
-            from ...workspace import read_releasable_version
-            return read_releasable_version(workspace_root, item.name)
-
-        from ..release.execute import resolve_target_paths
-        from ...targets import TARGETS
-
-        project_by_name = {p["name"]: p for p in projects}
-        project = project_by_name[item.name]
-        project_dir = os.path.join(workspace_root, project["path"])
-        target = TARGETS[item.registry]
-        target_paths = resolve_target_paths(project_dir)
-        primary_path = target_paths.get(item.registry, project_dir)
-        # read_version is part of the concrete target protocol; BaseTarget does
-        # not declare it (same pattern as compute_release_version).
-        return target.read_version(primary_path)  # type: ignore[attr-defined]
+        from ...workspace import read_releasable_version
+        return read_releasable_version(workspace_root, item.name)
     except Exception:
         return None
 
 
-def item_is_released(workspace_root, item: PlanItem, projects, section_type) -> bool:
+def item_is_released(workspace_root, item: PlanItem) -> bool:
     """Skip predicate: True iff the item's release provably already happened.
 
     An item is released iff its live version equals the plan's target_version,
@@ -302,7 +249,7 @@ def item_is_released(workspace_root, item: PlanItem, projects, section_type) -> 
     bumped locally but never pushed (push failed) would look "released" and get
     skipped/archived, silently dropping the publish.
     """
-    live = read_live_version(workspace_root, item, projects, section_type)
+    live = read_live_version(workspace_root, item)
     if live is None:
         return False
     if not (live == item.target_version and tag_exists_locally(item.tag)):
@@ -324,11 +271,10 @@ def item_is_released(workspace_root, item: PlanItem, projects, section_type) -> 
     return True
 
 
-def plan_all_released(workspace_root, plan: BatchPlan, projects) -> bool:
+def plan_all_released(workspace_root, plan: BatchPlan) -> bool:
     """True iff every plan item satisfies the skip predicate."""
     return all(
-        item_is_released(workspace_root, it, projects, plan.section_type)
-        for it in plan.items.values()
+        item_is_released(workspace_root, it) for it in plan.items.values()
     )
 
 

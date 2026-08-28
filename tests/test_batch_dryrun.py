@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_state_for_every_releasable, make_workspace, with_root_member
 
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 from rlsbl.release_file import get_batch_release_file_path
@@ -33,18 +33,19 @@ def _init_workspace(base_path, projects):
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
     make_workspace(str(base_path), projects)
+    make_state_for_every_releasable(str(base_path))
 
 
 BATCH_TOML_3PKG = (
-    '[packages.auth]\n'
+    '[releasables.auth]\n'
     'bump = "patch"\ndescription = "Fix auth token refresh"\n'
     'include = ["npm"]\nexclude = []\n'
     '\n'
-    '[packages.sdk]\n'
+    '[releasables.sdk]\n'
     'bump = "minor"\ndescription = "Add streaming API"\n'
     'include = ["npm"]\nexclude = []\n'
     '\n'
-    '[packages.platform]\n'
+    '[releasables.platform]\n'
     'bump = "minor"\ndescription = "New deployment targets"\n'
     'include = ["npm"]\nexclude = []\n'
 )
@@ -122,7 +123,7 @@ class TestBatchDryRunSummary:
         out = captured.out
 
         # The summary header is printed, but NOT the numbered detail lines
-        assert "Batch release: 3 package(s)" in out
+        assert "Batch release: 3 releasable(s)" in out
         assert "1. auth (patch)" not in out
         assert "2. sdk (minor)" not in out
         assert "3. platform (minor)" not in out
@@ -168,8 +169,7 @@ class TestBatchDryRunSummary:
         def mock_run_cmd(release_config, flags, **kwargs):
             pass
 
-        with patch("rlsbl.commands.monorepo.batch_release.is_explicit_mode", return_value=True), \
-             patch("rlsbl.workspace.load_releasables",
+        with patch("rlsbl.workspace.load_releasables",
                    return_value=fake_releasables), \
              patch("rlsbl.workspace.members_of",
                    side_effect=fake_members_of), \

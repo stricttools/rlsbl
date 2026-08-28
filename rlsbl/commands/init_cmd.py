@@ -109,28 +109,26 @@ def _skip_publish_scaffold(private, is_ws_root, project_root):
 
 
 def _is_releasable_member_project(project_root):
-    """Check if the project belongs to a named releasable in explicit mode.
+    """Check if the project belongs to a named releasable.
 
-    When a project has ``releasable = "name"`` (explicit mode), its changelog
-    infrastructure lives at the releasable level, not per-package. Per-package
-    ``CHANGELOG.md`` and ``unreleased.jsonl`` should be skipped.
+    When a project has ``releasable = "name"``, its changelog infrastructure
+    is at the releasable level, not per-package. Per-package ``CHANGELOG.md``
+    and ``unreleased.jsonl`` should be skipped.
 
-    Returns False if not in a monorepo, not in explicit mode, or project has
-    no named releasable assignment.
+    Returns False if not in a monorepo, or the project has no named releasable
+    assignment.
     """
     if project_root is None:
         return False
-    from ..workspace import find_workspace_root, is_explicit_mode, resolve_project
+    from ..workspace import find_workspace_root, resolve_project
     ws_root = find_workspace_root(str(project_root))
     if ws_root is None:
-        return False
-    if not is_explicit_mode(ws_root):
         return False
     project = resolve_project(ws_root, str(project_root))
     if project is None:
         return False
-    # In explicit mode, projects with a named releasable have their changelog
-    # at the releasable level. Only string values indicate membership.
+    # Projects with a named releasable have their changelog at the releasable
+    # level. Only string values indicate membership.
     return isinstance(project.releasable, str)
 
 
@@ -151,7 +149,6 @@ def resolve_tag_prefix(project_root):
     from ..tag_glob import resolve_monorepo_tag_glob
     from ..workspace import (
         find_workspace_root,
-        is_explicit_mode,
         load_releasables,
         load_workspace,
         resolve_project,
@@ -164,12 +161,10 @@ def resolve_tag_prefix(project_root):
     project = resolve_project(ws_root, str(project_root))
     if project is None:
         return "v"
-    releasable = None
-    if is_explicit_mode(ws_root):
-        projects = load_workspace(ws_root)
-        releasable = resolve_releasable_for_project(
-            project, load_releasables(ws_root, projects=projects),
-        )
+    projects = load_workspace(ws_root)
+    releasable = resolve_releasable_for_project(
+        project, load_releasables(ws_root, projects=projects),
+    )
     glob = resolve_monorepo_tag_glob(project, ws_root, releasable=releasable)
     return glob[:-1] if glob.endswith("*") else glob
 
@@ -178,14 +173,13 @@ def _get_releasable_config_dir(project_root):
     """Return the releasable config directory for a releasable member project.
 
     Returns the path to ``.rlsbl-monorepo/releasables/{name}/`` if the
-    project belongs to a releasable in explicit mode, or None otherwise.
+    project belongs to a releasable, or None otherwise.
     """
     if project_root is None:
         return None
     from ..workspace import (
         find_workspace_root,
         get_releasable_dir,
-        is_explicit_mode,
         load_releasables,
         load_workspace,
         resolve_releasable_for_project,
@@ -194,8 +188,6 @@ def _get_releasable_config_dir(project_root):
 
     ws_root = find_workspace_root(str(project_root))
     if ws_root is None:
-        return None
-    if not is_explicit_mode(ws_root):
         return None
     project = resolve_project(ws_root, str(project_root))
     if project is None:

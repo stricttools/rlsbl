@@ -247,25 +247,21 @@ def _get_releasable_version_for_project(ctx):
 
     Returns a version string when ALL of the following hold:
     - The project is inside a monorepo (ctx.workspace_root is not None)
-    - The workspace uses explicit releasable mode ([[releasables]] present)
     - The current project has ``releasable = "<name>"`` (belongs to a releasable)
     - The releasable's version file exists and is non-empty
 
-    Returns None otherwise (implicit mode, non-releasable project, missing
-    version file, or not in a monorepo). Callers should fall through to the
-    standard per-target consistency check when None is returned.
+    Returns None otherwise (non-releasable project, missing version file, or
+    not in a monorepo). Callers should fall through to the standard per-target
+    consistency check when None is returned.
     """
     workspace_root = getattr(ctx, "workspace_root", None)
     if workspace_root is None:
         return None
 
-    from ..workspace import is_explicit_mode, read_releasable_version, resolve_project
+    from ..workspace import read_releasable_version, resolve_project
     from ..errors import WorkspaceError
 
     ws_root = str(workspace_root)
-    if not is_explicit_mode(ws_root):
-        return None
-
     project = resolve_project(ws_root, str(ctx.project_root))
     if project is None:
         return None
@@ -315,13 +311,13 @@ def register_project_checks(app):
     def check_version_consistency(ctx, reporter):
         """All detected targets must report the same version.
 
-        In explicit releasable mode (when the project belongs to a named
-        releasable with a version file), the releasable version is the
-        source of truth. Published (publish_mode != "none") member manifests are
-        checked against the releasable version -- a mismatch is an error.
+        When the project belongs to a named releasable with a version file,
+        the releasable version is the source of truth. Published
+        (publish_mode != "none") member manifests are checked against the
+        releasable version -- a mismatch is an error.
 
-        In implicit mode (no [[releasables]]), all targets within the
-        project must agree on the same version.
+        Otherwise (a standalone repo, or a non-releasable member), all targets
+        within the project must agree on the same version.
         """
         skip_reason = _virtual_root_skip_reason(ctx)
         if skip_reason is not None:
@@ -568,24 +564,23 @@ def register_project_checks(app):
             if legacy_marker in content:
                 stale_paths.append(os.path.relpath(hook_path, str(ctx.project_root)))
 
-        # Releasable-level hook (explicit mode only)
+        # Releasable-level hook
         workspace_root = getattr(ctx, "workspace_root", None)
         if workspace_root is not None:
-            from ..workspace import is_explicit_mode, resolve_project
+            from ..workspace import resolve_project
             ws_root = str(workspace_root)
-            if is_explicit_mode(ws_root):
-                project = resolve_project(ws_root, str(ctx.project_root))
-                if project is not None:
-                    rel_val = project.releasable
-                    if isinstance(rel_val, str):
-                        from ..workspace_types import get_releasable_hook_path
-                        rel_hook = get_releasable_hook_path(ws_root, rel_val, "post-release.sh")
-                        if os.path.exists(rel_hook):
-                            hooks_found = True
-                            with open(rel_hook, "r", encoding="utf-8") as f:
-                                rel_content = f.read()
-                            if legacy_marker in rel_content:
-                                stale_paths.append(os.path.relpath(rel_hook, str(ctx.project_root)))
+            project = resolve_project(ws_root, str(ctx.project_root))
+            if project is not None:
+                rel_val = project.releasable
+                if isinstance(rel_val, str):
+                    from ..workspace_types import get_releasable_hook_path
+                    rel_hook = get_releasable_hook_path(ws_root, rel_val, "post-release.sh")
+                    if os.path.exists(rel_hook):
+                        hooks_found = True
+                        with open(rel_hook, "r", encoding="utf-8") as f:
+                            rel_content = f.read()
+                        if legacy_marker in rel_content:
+                            stale_paths.append(os.path.relpath(rel_hook, str(ctx.project_root)))
 
         if stale_paths:
             msg = (

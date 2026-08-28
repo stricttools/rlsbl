@@ -4,7 +4,6 @@ Covers:
 - Path resolution utilities (get_releasable_dir, get_releasable_version_path)
 - Version read/write round-trip and atomic write behavior
 - Missing/empty version file errors
-- is_explicit_mode detection
 - compute_release_version with releasable version source
 - version-consistency check with and without releasables
 """
@@ -27,7 +26,6 @@ from rlsbl.workspace import (
     WorkspaceProject,
     get_releasable_dir,
     get_releasable_version_path,
-    is_explicit_mode,
     read_releasable_version,
     write_releasable_version,
 )
@@ -224,59 +222,6 @@ class TestReadVersionErrors:
             f.write("   \n\n  ")
         with pytest.raises(WorkspaceError, match="version file is empty"):
             read_releasable_version(str(tmp_path), "core")
-
-
-# ---------------------------------------------------------------------------
-# is_explicit_mode
-# ---------------------------------------------------------------------------
-
-
-class TestIsExplicitMode:
-    """is_explicit_mode detects [[releasables]] in workspace.toml."""
-
-    def test_explicit_mode_with_releasables(self, tmp_path):
-        _write_workspace(tmp_path, """\
-[[releasables]]
-name = "core"
-
-[[projects]]
-path = "a"
-name = "a"
-releasable = "core"
-""")
-        assert is_explicit_mode(str(tmp_path)) is True
-
-    def test_no_releasables_section(self, tmp_path):
-        """A workspace file with no releasables section at all is not explicit.
-
-        The loader refuses such a file, so it never reaches a reader -- but
-        the detection itself still answers honestly.
-        """
-        _write_workspace(
-            tmp_path,
-            """\
-[[projects]]
-path = "a"
-name = "a"
-""",
-            releasables=None,
-        )
-        assert is_explicit_mode(str(tmp_path)) is False
-
-    def test_no_workspace_file(self, tmp_path):
-        assert is_explicit_mode(str(tmp_path)) is False
-
-    def test_empty_releasables_is_explicit(self, tmp_path):
-        """An empty releasables array is still explicit mode."""
-        _write_workspace(tmp_path, """\
-releasables = []
-
-[[projects]]
-path = "a"
-name = "a"
-releasable = false
-""")
-        assert is_explicit_mode(str(tmp_path)) is True
 
 
 # ---------------------------------------------------------------------------
@@ -601,8 +546,13 @@ releasable = "core"
         assert name == "pkg"
         assert rel_name == "core"
 
-    def test_no_releasables_returns_none(self, tmp_path):
-        """Without [[releasables]], releasable_name is None."""
+    def test_member_without_a_releasable_field_is_refused(self, tmp_path):
+        """A member that declares no `releasable` is a malformed workspace.
+
+        There is no second release mode to fall into: every member either
+        names its releasable or declares `releasable = false`, so the absent
+        field is a hard error rather than a per-package release.
+        """
         _write_workspace(tmp_path, """\
 [[projects]]
 path = "pkg"
@@ -611,12 +561,12 @@ name = "pkg"
         pkg_dir = tmp_path / "pkg"
         pkg_dir.mkdir()
 
-        from rlsbl.commands.release.validate import resolve_monorepo_context
-        name, path, is_lib, is_non_releasable, rel_name = resolve_monorepo_context(
-            str(tmp_path), pkg_dir, lambda msg: None
+        from rlsbl.commands.release.validate import (
+            ReleaseValidationError,
+            resolve_monorepo_context,
         )
-        assert name == "pkg"
-        assert rel_name is None
+        with pytest.raises(ReleaseValidationError, match="no 'releasable' field"):
+            resolve_monorepo_context(str(tmp_path), pkg_dir, lambda msg: None)
 
     def test_not_monorepo_returns_none(self, tmp_path):
         """When not in a monorepo, releasable_name is None."""

@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock, call
 
 import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_state_for_every_releasable, make_workspace, with_root_member
 
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 from rlsbl.commands.release.validate import ReleaseValidationError
@@ -35,10 +35,11 @@ def _make_npm_project(base_path, subdir, version="0.1.0"):
 
 
 def _init_workspace(base_path, projects):
-    """Initialize a workspace with the given project list."""
+    """Initialize a workspace with the given project list and releasable state."""
     ws_dir = os.path.join(str(base_path), WORKSPACE_DIR)
     os.makedirs(ws_dir, exist_ok=True)
     make_workspace(str(base_path), projects)
+    make_state_for_every_releasable(str(base_path))
 
 
 def _setup_batch(mock_git_repo):
@@ -55,12 +56,12 @@ def _setup_batch(mock_git_repo):
     batch_path = get_batch_release_file_path(str(mock_git_repo))
     _write_toml(
         batch_path,
-        '[packages.alpha]\n'
+        '[releasables.alpha]\n'
         'bump = "patch"\ndescription = "test release"\n'
         'include = ["npm"]\n'
         'exclude = []\n'
         '\n'
-        '[packages.beta]\n'
+        '[releasables.beta]\n'
         'bump = "minor"\ndescription = "test release"\n'
         'include = ["npm"]\n'
         'exclude = []\n',

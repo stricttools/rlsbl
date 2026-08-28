@@ -193,20 +193,19 @@ def _cmd_add(args, flags, project_root, dry_run=False):
             print(f"Error: Project named '{name}' already exists in workspace.", file=sys.stderr)
             sys.exit(1)
 
-    # In explicit mode, --releasable is required
-    from ...workspace import is_explicit_mode, load_releasables
-    explicit = is_explicit_mode(root)
-    if explicit and releasable_value is None:
+    # Every workspace declares its releasables, so --releasable is required
+    from ...workspace import load_releasables
+    if releasable_value is None:
         print(
-            "Error: --releasable is required in explicit mode "
-            "(workspace has [[releasables]] defined). "
+            "Error: --releasable is required: every workspace declares its "
+            "releasables in [[releasables]]. "
             "Use --releasable <name> or --releasable false.",
             file=sys.stderr,
         )
         sys.exit(1)
 
     # Validate releasable name exists in [[releasables]]
-    if isinstance(releasable_value, str) and explicit:
+    if isinstance(releasable_value, str):
         releasables = load_releasables(root, projects)
         defined_names = {r.name for r in releasables}
         if releasable_value not in defined_names:
@@ -431,7 +430,7 @@ def _coverage_column(anchor, changes_dir, scope):
 
 
 def _cmd_status_explicit(root, projects):
-    """Render per-releasable status rows for an explicit-mode workspace.
+    """Render per-releasable status rows for a workspace.
 
     One row per releasable (version, tag, coverage, member count + names),
     plus one row for each standalone project not belonging to any releasable.
@@ -520,24 +519,19 @@ def _cmd_status(flags, project_root):
     # per-project table below still follows it: the two answer different
     # questions -- what is released, and what each member is -- and the
     # per-project columns (target, path, deps, remote) exist nowhere else.
-    from ...workspace import is_explicit_mode
-    if is_explicit_mode(root):
-        _cmd_status_explicit(root, projects)
-        print()
+    _cmd_status_explicit(root, projects)
+    print()
 
     # Build dependency graph
     graph = WorkspaceGraph(root, projects)
 
-    # Detect explicit releasable mode for column display
-    from ...workspace import is_explicit_mode
-    explicit = is_explicit_mode(root)
+    # Releasable membership, for the column display
+    from ...workspace import load_releasables, resolve_releasable_for_project
     releasable_map = {}  # project name -> releasable name
-    if explicit:
-        from ...workspace import load_releasables, resolve_releasable_for_project
-        releasables = load_releasables(root, projects)
-        for proj in projects:
-            rel = resolve_releasable_for_project(proj, releasables)
-            releasable_map[proj["name"]] = rel.name if rel else ""
+    releasables = load_releasables(root, projects)
+    for proj in projects:
+        rel = resolve_releasable_for_project(proj, releasables)
+        releasable_map[proj["name"]] = rel.name if rel else ""
 
     rows = []
     for proj in projects:
@@ -569,7 +563,7 @@ def _cmd_status(flags, project_root):
 
         from ...changelog.files import get_changes_dir
         _cl_changes_dir = None
-        _cl_rel_name = releasable_map.get(name, "") if explicit else ""
+        _cl_rel_name = releasable_map.get(name, "")
         if _cl_rel_name:
             from ...workspace import get_releasable_changes_dir
             _cl_changes_dir = get_releasable_changes_dir(root, _cl_rel_name)
@@ -595,8 +589,8 @@ def _cmd_status(flags, project_root):
         remote = proj.get("subtree_remote", "")
         remote_str = remote if remote else "-"
 
-        # Releasable membership (explicit mode only)
-        releasable_str = releasable_map.get(name, "") if explicit else ""
+        # Releasable membership
+        releasable_str = releasable_map.get(name, "")
 
         rows.append((name, path, target_display, version, fact.label(), coverage_str, library_str, dev_only_str, deps_str, rdeps_str, remote_str, releasable_str))
 

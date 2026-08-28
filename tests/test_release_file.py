@@ -117,7 +117,7 @@ class TestReleaseFileErrorsNameTheFile:
 
     def test_batch_release_file_errors_name_the_file(self, tmp_path):
         f = tmp_path / "unreleased.toml"
-        f.write_text('[packages.alpha]\nbump = "patch"\n')
+        f.write_text('[releasables.alpha]\nbump = "patch"\n')
         with pytest.raises(ReleaseFileError) as exc:
             read_batch_release_file(str(f))
         assert str(f) in str(exc.value)

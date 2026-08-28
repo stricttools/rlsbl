@@ -262,9 +262,9 @@ def _upload_assets_for_config(
 def upload_release_assets(tag, new_version, log, flags, *, ctx):
     """Build and upload release assets for pipelines with ``assets: true`` or ``custom_assets``.
 
-    Handles standalone and implicit-mode projects. In releasable mode,
-    the caller (``_run_release_mutating``) iterates members directly
-    and calls ``_upload_assets_for_config`` per member.
+    Handles standalone projects. In releasable mode, the caller
+    (``_run_release_mutating``) iterates members directly and calls
+    ``_upload_assets_for_config`` per member.
 
     Skips silently if no pipelines have assets enabled.
 

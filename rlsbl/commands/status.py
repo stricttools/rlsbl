@@ -259,7 +259,7 @@ def run_cmd(registry, args, flags, ctx):
     # and detect_targets can use releasable config inheritance
     monorepo_project = None
     monorepo_count = None
-    releasable_info = None  # (releasable_name, tag_format, version) in explicit mode
+    releasable_info = None  # (releasable_name, tag_format, version)
     releasable_config_dir = None
     releasable_changes_dir = None
     releasable_members = None
@@ -270,23 +270,22 @@ def run_cmd(registry, args, flags, ctx):
             ws_projects = load_workspace(ws_root)
             monorepo_count = len(ws_projects)
             monorepo_project = resolve_project(ws_root, root_str)
-            # Detect explicit releasable mode
+            # Resolve the releasable this member belongs to
             if monorepo_project:
-                from ..workspace import is_explicit_mode, load_releasables, resolve_releasable_for_project, read_releasable_version
-                if is_explicit_mode(ws_root):
-                    releasables = load_releasables(ws_root, ws_projects)
-                    rel = resolve_releasable_for_project(monorepo_project, releasables)
-                    if rel:
-                        try:
-                            rel_ver = read_releasable_version(ws_root, rel.name)
-                        except Exception:
-                            rel_ver = None
-                        releasable_info = (rel.name, rel.effective_tag_format, rel_ver)
-                        # A releasable member's JSONL lives under the
-                        # releasable, and its commit scope spans every member.
-                        from ..workspace import get_releasable_changes_dir, members_of
-                        releasable_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
-                        releasable_members = members_of(rel.name, ws_projects)
+                from ..workspace import load_releasables, resolve_releasable_for_project, read_releasable_version
+                releasables = load_releasables(ws_root, ws_projects)
+                rel = resolve_releasable_for_project(monorepo_project, releasables)
+                if rel:
+                    try:
+                        rel_ver = read_releasable_version(ws_root, rel.name)
+                    except Exception:
+                        rel_ver = None
+                    releasable_info = (rel.name, rel.effective_tag_format, rel_ver)
+                    # A releasable member's JSONL is under the releasable, and
+                    # its commit scope spans every member.
+                    from ..workspace import get_releasable_changes_dir, members_of
+                    releasable_changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+                    releasable_members = members_of(rel.name, ws_projects)
             if monorepo_project:
                 from ..targets import resolve_releasable_config_dir
                 releasable_config_dir = resolve_releasable_config_dir(monorepo_project, ws_root)
@@ -301,7 +300,7 @@ def run_cmd(registry, args, flags, ctx):
     primary_path = target_paths.get(registry, root_str)
 
     if releasable_info:
-        # In explicit mode, use the releasable's tag glob (shared resolver).
+        # A releasable member: use the releasable's tag glob (shared resolver).
         from ..tag_glob import releasable_tag_glob
         tag_glob = releasable_tag_glob(releasable_info[1], releasable_info[0])
     elif monorepo_project:

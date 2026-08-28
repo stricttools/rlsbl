@@ -157,7 +157,8 @@ def register_workspace_checks(app):
         # preflight) carry a single member. Deriving from a partial list would
         # report a fresh router as stale.
         projects = load_workspace(root)
-        # Unconditional: load_workspace refuses an implicit-mode workspace, so
+        # Unconditional: load_workspace refuses a workspace with no
+        # [[releasables]] section, so
         # every workspace that gets here declares its releasables. `monorepo
         # sync` and the release-time simulation of these same filters load them
         # the same way -- three consumers of one derivation, one spelling.

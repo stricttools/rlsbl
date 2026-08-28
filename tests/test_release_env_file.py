@@ -28,7 +28,7 @@ from rlsbl.config import load_env_file
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ConfigError
 
-from conftest import with_root_member, make_workspace
+from conftest import make_releasable_state, make_workspace, with_root_member
 
 
 _PROBE = "RLSBL_ENV_FILE_PROBE"
@@ -242,6 +242,10 @@ class TestBatchOrchestratorLoadsTheEnvFile:
         from rlsbl.workspace import save_workspace
 
         make_workspace(str(ws), [{"path": "alpha", "name": "alpha"}])
+        # The releasable has shipped 0.1.0 below (the tag), so its ledger
+        # carries the matching archive -- an empty ledger next to a real tag
+        # is refused.
+        make_releasable_state(ws, "alpha", version="0.1.0")
         (ws / "alpha").mkdir()
         (ws / "alpha" / "pyproject.toml").write_text(
             '[project]\nname = "alpha"\nversion = "0.1.0"\n'
@@ -250,12 +254,11 @@ class TestBatchOrchestratorLoadsTheEnvFile:
         (ws / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "none", "env_file": env_file}) + "\n"
         )
-        subprocess.run(["git", "tag", "alpha@v0.1.0"], cwd=str(ws), check=True)
         batch_path = get_batch_release_file_path(str(ws))
         os.makedirs(os.path.dirname(batch_path), exist_ok=True)
         with open(batch_path, "w", encoding="utf-8") as f:
             f.write(
-                '[packages.alpha]\nbump = "patch"\n'
+                '[releasables.alpha]\nbump = "patch"\n'
                 'description = "release alpha"\n'
                 'include = ["pypi"]\nexclude = []\n'
             )

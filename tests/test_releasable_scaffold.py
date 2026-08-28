@@ -35,7 +35,6 @@ from rlsbl.workspace import (
     get_releasable_changes_dir,
     get_releasable_dir,
     get_releasable_version_path,
-    is_explicit_mode,
     load_workspace,
 )
 from conftest import make_workspace, with_root_member, workspace_toml, declared_members
@@ -213,10 +212,15 @@ class TestScaffoldReleasableDirs:
         files = scaffold_releasable_dirs(str(tmp_path))
         assert files == []
 
-    def test_no_workspace_returns_empty(self, tmp_path):
-        """When no workspace.toml exists, returns empty list."""
-        files = scaffold_releasable_dirs(str(tmp_path))
-        assert files == []
+    def test_no_workspace_is_not_answered(self, tmp_path):
+        """With no workspace.toml there is nothing to scaffold FROM.
+
+        This is a step of ``monorepo sync``, which has already found and
+        loaded the workspace before it runs, so a missing workspace.toml here
+        is a caller bug rather than a case to answer with an empty list.
+        """
+        with pytest.raises(FileNotFoundError):
+            scaffold_releasable_dirs(str(tmp_path))
 
     def test_no_hook_scripts_scaffolded(self, tmp_path):
         """Hook scripts are not scaffolded -- hooks are config-driven."""

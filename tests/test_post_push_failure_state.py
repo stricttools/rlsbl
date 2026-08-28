@@ -299,7 +299,7 @@ class TestPermanentPushFailureCleanExit:
         ):
             # cwd is repo (monkeypatch.chdir above): the real ls-remote runs
             # against the bare remote, which lacks the tag.
-            assert not item_is_released(str(repo), item, [], "packages"), \
+            assert not item_is_released(str(repo), item), \
                 "a locally-tagged-but-unpushed item is not released"
 
 
@@ -336,11 +336,11 @@ class TestItemReleasedRequiresRemoteTag:
                 "rlsbl.commands.monorepo.batch_plan.read_live_version",
                 return_value="0.2.0",
             ):
-                assert not item_is_released(str(repo), item, [], "packages"), \
+                assert not item_is_released(str(repo), item), \
                     "local-only tag must not count as released"
                 # Push the tag: now the remote has it.
                 _git(repo, "push", "-q", "origin", "pkg@v0.2.0")
-                assert item_is_released(str(repo), item, [], "packages"), \
+                assert item_is_released(str(repo), item), \
                     "a pushed tag must count as released"
         finally:
             os.chdir(cwd0)
@@ -364,16 +364,17 @@ class TestArchiveRefusedWithInProgressState:
         )
 
         ws = tmp_path / "ws"
-        pkg_dir = ws / "packages" / "alpha"
-        (pkg_dir / ".rlsbl" / "releases").mkdir(parents=True, exist_ok=True)
-        # Write an in-progress.json for alpha.
-        (pkg_dir / ".rlsbl" / "releases" / "in-progress.json").write_text(
+        # A plan item's release state belongs to its releasable, so that is
+        # where the archive gate looks for an unfinished release.
+        rel_releases = (
+            ws / ".rlsbl-monorepo" / "releasables" / "alpha" / "releases"
+        )
+        rel_releases.mkdir(parents=True, exist_ok=True)
+        (rel_releases / "in-progress.json").write_text(
             json.dumps({"new_version": "0.2.0", "completed_steps": ["TAGGED"]})
         )
 
-        projects = [{"name": "alpha", "path": "packages/alpha"}]
         plan = BatchPlan(
-            section_type="packages",
             items={
                 "alpha": PlanItem(
                     "alpha", "0.1.0", "0.2.0", "alpha@v0.2.0", "pypi", "minor",
@@ -381,12 +382,12 @@ class TestArchiveRefusedWithInProgressState:
             },
         )
 
-        stranded = _plan_items_in_progress(plan, str(ws), projects)
+        stranded = _plan_items_in_progress(plan, str(ws))
         assert stranded == ["alpha"]
 
         batch_path = ws / ".rlsbl-monorepo" / "releases" / "unreleased.toml"
         batch_path.parent.mkdir(parents=True)
-        batch_path.write_text("[packages.alpha]\nbump = \"minor\"\n")
+        batch_path.write_text("[releasables.alpha]\nbump = \"minor\"\n")
 
         logs = []
         # plan_all_released short-circuits on the (missing) remote tag, so patch
@@ -396,7 +397,7 @@ class TestArchiveRefusedWithInProgressState:
             return_value=True,
         ):
             _archive_batch_if_complete(
-                str(batch_path), plan, str(ws), projects, logs.append,
+                str(batch_path), plan, str(ws), logs.append,
             )
 
         assert batch_path.exists(), \

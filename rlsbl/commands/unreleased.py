@@ -88,7 +88,6 @@ def _resolve_scope(root_str):
 
         from ..workspace import (
             get_releasable_changes_dir,
-            is_explicit_mode,
             load_releasables,
             members_of,
             resolve_releasable_for_project,
@@ -96,11 +95,9 @@ def _resolve_scope(root_str):
 
         from ..ownership import OwnershipScope
 
-        rel = None
         ws_projects = load_workspace(ws_root)
-        if is_explicit_mode(ws_root):
-            releasables = load_releasables(ws_root, ws_projects)
-            rel = resolve_releasable_for_project(project, releasables)
+        releasables = load_releasables(ws_root, ws_projects)
+        rel = resolve_releasable_for_project(project, releasables)
 
         if rel is not None:
             from ..commands.release.validate import _releasable_tag_glob

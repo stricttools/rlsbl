@@ -44,7 +44,6 @@ from rlsbl.workspace import (
     WorkspaceProject,
     get_releasable_changes_dir,
     get_releasable_dir,
-    is_explicit_mode,
     load_releasables,
     members_of,
     resolve_releasable_for_project,

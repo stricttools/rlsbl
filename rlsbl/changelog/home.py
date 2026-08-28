@@ -1,4 +1,4 @@
-"""Single source of truth for where generated CHANGELOG.md files live, resolving the correct directory for standalone, implicit, and releasable modes.
+"""Single source of truth for where generated CHANGELOG.md files live, resolving the correct directory for standalone projects and for releasables.
 
 Three consumers previously disagreed about the changelog home in explicit
 releasable mode: the release flow wrote CHANGELOG.md into the representative
