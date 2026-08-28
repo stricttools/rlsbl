@@ -382,7 +382,7 @@ The `release` command group covers the full release lifecycle — from scaffoldi
 | `rlsbl release resume` | Continue a release that stopped, skipping completed steps. Re-pins at the current tip, so a fix-forward commit is adopted and the same version completes. |
 | `rlsbl release retry` | Re-dispatch publish workflows for a completed release (reads from `retry.toml`) |
 | `rlsbl release edit [version]` | Sync GitHub Release notes from CHANGELOG.md (defaults to current version) |
-| `rlsbl release undo` | Revert a completed release: delete GitHub Release, delete tag, revert commit. Requires manual `git push` after. |
+| `rlsbl release undo` | Revert a completed release: delete GitHub Release, delete tag, revert commit, and push the reverted branch itself |
 | `rlsbl release deprecate <version>` | Flag a published release as deprecated on GitHub, with an optional reason and replacement |
 | `rlsbl release yank <version>` | Registry-aware removal of a published version (npm deprecate, cargo yank, Go retract, PyPI checklist) |
 | `rlsbl release scrub` | Scrub sensitive content from history and re-align tags, changelog hashes and GitHub Releases |
@@ -554,7 +554,7 @@ Do **not** start a new release at a higher version to escape a red CI, and do no
 
 ### Recovering from a release that completed and was wrong
 
-`rlsbl release undo` is for a release that ran to completion and then turned out to be bad — not for a CI failure, which under this ordering leaves nothing to undo. It deletes the GitHub Release, removes the git tag from both local and remote, and reverts the version bump commit; push manually afterwards.
+`rlsbl release undo` is for a release that ran to completion and then turned out to be bad — not for a CI failure, which under this ordering leaves nothing to undo. It deletes the GitHub Release, removes the git tag from both local and remote, reverts the version bump commit, and pushes the reverted branch itself — leaving the remote holding the undone state rather than the release it just removed locally. There is nothing to push afterwards.
 
 For a version that already reached a public registry, prefer `rlsbl release deprecate` (a soft flag on the GitHub Release) or `rlsbl release yank` (registry-aware removal). An undo cannot unpublish what a registry has already served.
 
