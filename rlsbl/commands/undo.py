@@ -51,6 +51,7 @@ from ..errors import RlsblError
 from ..evidence_gate import EvidenceKind, Verdict, run_evidence_gate, write_undo_audit
 from ..member_context import resolve_member_context
 from ..release_file import unfinalize_release_file
+from ..release_publication import delete_args
 from ..targets import TARGETS
 from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree, working_tree_paths
 from ..workspace import find_workspace_root, resolve_project
@@ -973,11 +974,12 @@ def _execute_plan(plan, uc, flags, ctx):
     # 2. Delete the GitHub Release
     if plan.github_release_exists:
         try:
-            run_gh(["release", "delete", tag, "--yes"], config=ctx.config)
+            run_gh(delete_args(tag), config=ctx.config)
             results.append(("Delete GitHub Release", OK, "-"))
         except Exception:
             traceback.print_exc()
-            results.append(("Delete GitHub Release", FAILED, f"gh release delete {tag} --yes"))
+            results.append(("Delete GitHub Release", FAILED,
+                            "gh " + " ".join(delete_args(tag))))
     else:
         results.append(("Delete GitHub Release", SKIPPED, "no GitHub Release found"))
 

@@ -27,6 +27,7 @@ from rlsbl.commands.undo import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
 from rlsbl.release_file import write_release_anchor
+from rlsbl.release_publication import delete_args
 
 from conftest import archive_release, ledger_dir
 
@@ -356,6 +357,12 @@ class TestFullUnwind:
         assert "v1.0.1" not in git(repo, "tag", "-l").split()
         assert remote_ref(repo, "refs/tags/v1.0.1") == ""
         assert gh.deleted
+
+        # The delete argv is the shared builder's, not a second inline spelling
+        # of the same command: undo and the publication module must never drift
+        # apart on how a Release is deleted.
+        deletes = [a for a in gh.calls if a[:2] == ["release", "delete"]]
+        assert deletes == [delete_args("v1.0.1")], f"gh calls: {gh.calls}"
 
         # An audit record was written before the deletions.
         assert (repo / ".rlsbl" / "undo-audit.json").exists()
