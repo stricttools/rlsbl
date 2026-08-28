@@ -3228,30 +3228,36 @@ def _run_release_mutating(state: ReleaseState):
                 # scaffold layer -- every converged mirror rejected it as a
                 # non-fast-forward, every release after the first reported a
                 # failed step, and nothing on the mirror advanced.
-                from ...commands.monorepo.mirror_cmd import converge_branch
+                from ...commands.monorepo import mirror_cmd as _mirror_cmd
 
                 _mirror_config = os.path.join(
                     monorepo_root, monorepo_project_path, ".rlsbl", "config.json",
                 )
-                log(f"Converging the mirror at {subtree_remote}...")
-                try:
-                    converge_branch(
-                        subtree_remote, monorepo_root, monorepo_project_path,
-                        _mirror_config,
-                    )
-                    log(f"Mirror branch converged: {subtree_remote}")
-                except Exception as e:
-                    print(f"Warning: mirror convergence failed: {e}", file=sys.stderr)
-                    save_step_failure(
-                        _state_path, "SUBTREE_PUBLISHED",
-                        f"converging the mirror at {subtree_remote} failed: "
-                        f"{e}. The release itself is published; heal the "
-                        f"mirror with `rlsbl monorepo mirror "
-                        f"{monorepo_name}`.",
-                    )
+                # Like every other step here, a success marker means done: a
+                # resume that re-entered because a LATER step failed must not
+                # re-converge a mirror this release already converged.
+                if "SUBTREE_PUBLISHED" in _completed:
+                    log("Skipping mirror convergence (already done)")
                 else:
-                    save_step(_state_path, "SUBTREE_PUBLISHED")
-                    _completed.add("SUBTREE_PUBLISHED")
+                    log(f"Converging the mirror at {subtree_remote}...")
+                    try:
+                        _mirror_cmd.converge_branch(
+                            subtree_remote, monorepo_root, monorepo_project_path,
+                            _mirror_config,
+                        )
+                        log(f"Mirror branch converged: {subtree_remote}")
+                    except Exception as e:
+                        print(f"Warning: mirror convergence failed: {e}", file=sys.stderr)
+                        save_step_failure(
+                            _state_path, "SUBTREE_PUBLISHED",
+                            f"converging the mirror at {subtree_remote} failed: "
+                            f"{e}. The release itself is published; heal the "
+                            f"mirror with `rlsbl monorepo mirror "
+                            f"{monorepo_name}`.",
+                        )
+                    else:
+                        save_step(_state_path, "SUBTREE_PUBLISHED")
+                        _completed.add("SUBTREE_PUBLISHED")
 
                 # MIRROR_RELEASED -- the mirror's TAG and its GitHub Release,
                 # through the shared publication module. The commit is DERIVED,
@@ -3268,37 +3274,53 @@ def _run_release_mutating(state: ReleaseState):
                 # published and nothing is rolled back. The failure marker still
                 # makes the run exit nonzero, stay resumable, and name its
                 # healer (see the epilogue).
-                from ...mirror_publication import publish_version
+                from ... import mirror_publication as _mirror_publication
 
-                try:
-                    publish_version(
-                        remote=subtree_remote,
-                        root=monorepo_root,
-                        subtree_path=monorepo_project_path,
-                        version=new_version,
-                        tag=plain_tag,
-                        anchor_sha=pushed_sha,
-                        notes=changelog_entry or "",
-                        # Unscoped: --repo names the mirror explicitly, so this
-                        # must NOT inherit the current project's GH_REPO.
-                        gh=lambda args, config=None: run_gh_unscoped(args),
-                        log=log,
-                    )
-                    log(f"Mirror release published: {plain_tag} -> {subtree_remote}")
-                except Exception as e:
-                    print(f"Warning: mirror release failed: {e}", file=sys.stderr)
-                    save_step_failure(
-                        _state_path, "MIRROR_RELEASED",
-                        f"publishing {plain_tag} on the mirror at "
-                        f"{subtree_remote} failed: {e}. The release itself is "
-                        f"published; heal the mirror's tags with `rlsbl "
-                        f"monorepo mirror {monorepo_name}` and this "
-                        f"repository's own release refs with `rlsbl release "
-                        f"reconcile`.",
-                    )
+                if "MIRROR_RELEASED" in _completed:
+                    log("Skipping mirror release (already done)")
                 else:
-                    save_step(_state_path, "MIRROR_RELEASED")
-                    _completed.add("MIRROR_RELEASED")
+                    try:
+                        _mirror_publication.publish_version(
+                            remote=subtree_remote,
+                            root=monorepo_root,
+                            subtree_path=monorepo_project_path,
+                            version=new_version,
+                            tag=plain_tag,
+                            anchor_sha=pushed_sha,
+                            notes=changelog_entry or "",
+                            # Unscoped: --repo names the mirror explicitly, so
+                            # this must NOT inherit the current project's
+                            # GH_REPO.
+                            gh=lambda args, config=None: run_gh_unscoped(args),
+                            # The mirror Release's notes file belongs beside
+                            # this release's own state, not in whatever
+                            # directory the release was invoked from -- a stray
+                            # `.rlsbl-notes-*.tmp` there is a file in somebody's
+                            # working tree.
+                            directory=os.path.dirname(_state_path) or ".",
+                            log=log,
+                        )
+                        log(
+                            f"Mirror release published: {plain_tag} -> "
+                            f"{subtree_remote}"
+                        )
+                    except Exception as e:
+                        print(
+                            f"Warning: mirror release failed: {e}",
+                            file=sys.stderr,
+                        )
+                        save_step_failure(
+                            _state_path, "MIRROR_RELEASED",
+                            f"publishing {plain_tag} on the mirror at "
+                            f"{subtree_remote} failed: {e}. The release itself "
+                            f"is published; heal the mirror's tags with `rlsbl "
+                            f"monorepo mirror {monorepo_name}` and this "
+                            f"repository's own release refs with `rlsbl release "
+                            f"reconcile`.",
+                        )
+                    else:
+                        save_step(_state_path, "MIRROR_RELEASED")
+                        _completed.add("MIRROR_RELEASED")
     finally:
         # Clean up temp files after the Release and the mirror steps
         for tmp in (notes_file, writing_file):

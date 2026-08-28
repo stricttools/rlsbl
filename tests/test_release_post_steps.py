@@ -759,6 +759,106 @@ class TestNonFatalFailures:
         assert creates[0][2] == "v1.0.1"
         assert "--repo" in creates[0]
 
+    def test_a_completed_mirror_step_is_not_re_converged_on_resume(
+        self, mock_git_repo, tmp_path,
+    ):
+        """A resume skips the mirror steps their markers say are done.
+
+        Every other step in the flow reads its success marker before acting;
+        the mirror block did not, so a resume after a LATER step failed
+        re-converged a mirror that was already converged and re-published a
+        version already on it.
+        """
+        import rlsbl.commands.monorepo.mirror_cmd as mirror_cmd
+        import rlsbl.mirror_publication as mirror_publication
+
+        mirror = _bare_mirror(tmp_path / "mirror.git")
+        project_dir = _setup_subtree_monorepo(
+            mock_git_repo, mirror_remote=mirror,
+        )
+        from rlsbl.commands.release.release_state import resolve_releasable_dir
+        state_path = get_state_path(
+            project_dir,
+            releasable_dir=resolve_releasable_dir(project_dir, str(mock_git_repo)),
+        )
+        state = load_release_state(state_path)
+        state["completed_steps"] = list(state["completed_steps"]) + [
+            "SUBTREE_PUBLISHED", "MIRROR_RELEASED",
+        ]
+        save_release_state(state_path, state)
+
+        converged = []
+        published = []
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run_gh_unscoped", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
+            patch.object(
+                mirror_cmd, "converge_branch",
+                side_effect=lambda *a, **k: converged.append(a),
+            ),
+            patch.object(
+                mirror_publication, "publish_version",
+                side_effect=lambda **k: published.append(k),
+            ),
+        ):
+            resume_cmd(
+                load_release_state(state_path),
+                {"quiet": True, "skip-lock": True},
+                ctx=_make_subtree_ctx(mock_git_repo, project_dir),
+            )
+
+        assert converged == [], "a completed mirror branch step was re-run"
+        assert published == [], "a completed mirror release step was re-run"
+
+    def test_the_mirror_release_notes_file_stays_out_of_the_release_cwd(
+        self, mock_git_repo, tmp_path, monkeypatch,
+    ):
+        """The mirror's Release body is written where the release keeps state.
+
+        It used to be written into whatever directory the release ran from,
+        where a stray ``.rlsbl-notes-*.tmp`` is a file in somebody's working
+        tree.
+        """
+        mirror = _bare_mirror(tmp_path / "mirror.git")
+        project_dir = _setup_subtree_monorepo(
+            mock_git_repo, mirror_remote=mirror,
+        )
+        from rlsbl.commands.release.release_state import resolve_releasable_dir
+        releasable_dir = resolve_releasable_dir(project_dir, str(mock_git_repo))
+        state_path = get_state_path(project_dir, releasable_dir=releasable_dir)
+
+        notes_paths = []
+
+        def fake_gh(args, **kwargs):
+            if "--notes-file" in args:
+                notes_paths.append(args[args.index("--notes-file") + 1])
+            if args[:2] == ["release", "view"]:
+                raise RuntimeError("not found")
+            return ""
+
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run_gh_unscoped", side_effect=fake_gh),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
+        ):
+            resume_cmd(
+                load_release_state(state_path),
+                {"quiet": True, "skip-lock": True},
+                ctx=_make_subtree_ctx(mock_git_repo, project_dir),
+            )
+
+        assert notes_paths, "the mirror Release must be created from a notes file"
+        for path in notes_paths:
+            assert os.path.dirname(path), (
+                f"the mirror notes file has no directory of its own: {path}"
+            )
+            assert os.path.realpath(os.path.dirname(path)) == os.path.realpath(
+                os.path.join(str(mock_git_repo), releasable_dir, "releases")
+            ), path
+
     def test_resume_after_nonfatal_failure_completes_and_clears_state(
         self, mock_git_repo,
     ):

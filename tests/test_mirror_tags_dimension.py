@@ -293,6 +293,48 @@ class TestThroughTheCommand:
         assert observe(remote, str(root), "mylib").state == "converged"
         assert "v1.0.0" in remote_tag_commits(remote_refs(remote, str(root)))
 
+    def test_the_release_notes_file_is_written_beside_the_release_state(
+        self, tmp_path, monkeypatch,
+    ):
+        """Not in the directory the command was invoked from.
+
+        A stray ``.rlsbl-notes-*.tmp`` in the operator's working tree is a file
+        the next `git status` reports; the mirror's Release body belongs beside
+        the release state the version came from.
+        """
+        import os
+
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+        notes_paths = []
+
+        class _RecordingGh(_FakeGh):
+            def __call__(self, args, config=None):
+                if "--notes-file" in args:
+                    notes_paths.append(args[args.index("--notes-file") + 1])
+                return super().__call__(args, config=config)
+
+        gh = _RecordingGh()
+        monkeypatch.setattr(
+            mirror_cmd, "validate_subtree_remote_ssh_host",
+            lambda remote, root: None,
+        )
+        monkeypatch.setattr(
+            "rlsbl.utils.run_gh_unscoped", lambda args, **kwargs: gh(args),
+        )
+
+        _cmd_mirror({"project": "mylib", "dry-run": False}, project_root=root)
+
+        assert notes_paths
+        expected = os.path.join(
+            get_releasable_dir(str(root), "mylib"), "releases",
+        )
+        for path in notes_paths:
+            assert os.path.realpath(os.path.dirname(path)) == os.path.realpath(
+                expected
+            ), path
+
     def test_the_converged_mirror_carries_no_publish_workflow(
         self, tmp_path, monkeypatch,
     ):

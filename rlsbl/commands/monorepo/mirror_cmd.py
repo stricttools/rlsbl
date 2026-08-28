@@ -1197,8 +1197,14 @@ def _observe_tags(plan, root, project, releasable, remote):
     )
 
 
-def _apply_tag(plan, remote, root, project_path):
-    """Materialize one released version's tag and Release on the mirror."""
+def _apply_tag(plan, remote, root, project_path, *, notes_dir):
+    """Materialize one released version's tag and Release on the mirror.
+
+    *notes_dir* is where the Release body's temporary notes file is written --
+    the releasable's own release state directory, never the directory the
+    command happened to be invoked from, where a stray ``.rlsbl-notes-*.tmp``
+    would show up in somebody's ``git status``.
+    """
     from ...mirror_publication import publish_version
     from ...utils import run_gh_unscoped
 
@@ -1229,6 +1235,7 @@ def _apply_tag(plan, remote, root, project_path):
         # Unscoped: --repo names the MIRROR, so this must not inherit the
         # monorepo's own GH_REPO.
         gh=lambda args, config=None: run_gh_unscoped(args),
+        directory=notes_dir,
         log=print,
     )
 
@@ -1309,9 +1316,26 @@ def _cmd_mirror(flags, project_root):
         ]
         return Preview(tuple(items)) if len(items) > 1 else single(items[0])
 
+    def _notes_dir():
+        """Where a materialized Release's notes file is written.
+
+        The releasable's own releases directory -- the same place the release
+        flow writes the mirror Release's notes file from. A tag plan exists
+        only for a member that belongs to a releasable, so this is never asked
+        without one.
+        """
+        from ...workspace_types import get_releasable_dir
+
+        return os.path.join(
+            get_releasable_dir(root, releasable.name), "releases",
+        )
+
     def _apply(item):
         if isinstance(item.data, MirrorTagPlan):
-            _apply_tag(item.data, subtree_remote, root, project_path)
+            _apply_tag(
+                item.data, subtree_remote, root, project_path,
+                notes_dir=_notes_dir(),
+            )
             return
         plan = item.data
         if plan.state == "lineage_undetermined":
