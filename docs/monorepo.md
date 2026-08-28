@@ -9,13 +9,20 @@ rlsbl supports monorepo workflows via the `rlsbl monorepo` command family. A mon
 ## Getting started
 
 ```bash
-# Initialize a monorepo workspace (creates .rlsbl-monorepo/ with workspace.toml)
-rlsbl monorepo init
+# Initialize a monorepo workspace (creates .rlsbl-monorepo/ with workspace.toml).
+# The root member's kind is a required choice: --root-dev-node, or
+# --root-releasable <name> --tag-format <format>.
+rlsbl monorepo init --root-dev-node
 
-# Add projects to the workspace
-rlsbl monorepo add --name mylib --path packages/mylib --target pypi --library
-rlsbl monorepo add --name cli --path packages/cli --target npm
-rlsbl monorepo add --name tests --path packages/tests --dev-node
+# Declare the releasables in .rlsbl-monorepo/workspace.toml first (see below):
+# every project registration names one, and `add` refuses a name that is not
+# declared.
+
+# Add projects to the workspace (the path is a positional argument, and
+# --releasable is required -- a name, or the literal `false` to opt out)
+rlsbl monorepo add packages/mylib --name mylib --library true --releasable mylib
+rlsbl monorepo add packages/cli --name cli --depends-on mylib --releasable cli
+rlsbl monorepo add packages/tests --name tests --dev-only true --releasable false
 
 # Scaffold CI for all projects
 rlsbl scaffold
@@ -35,24 +42,39 @@ rlsbl monorepo list
 The workspace file lives at `.rlsbl-monorepo/workspace.toml` and serves as the single source of truth for all project registrations, dependency declarations, and architectural layer rules. It uses TOML array-of-tables syntax for project declarations, with one `[[projects]]` block per sub-project:
 
 ```toml
+[[releasables]]
+name = "mylib"
+
+[[releasables]]
+name = "cli"
+
+[[projects]]
+path = "."
+name = "root"
+dev_only = true
+releasable = false
+
 [[projects]]
 path = "packages/mylib"
 name = "mylib"
 target = "pypi"
 library = true
+releasable = "mylib"
 depends_on = []
 
 [[projects]]
 path = "packages/cli"
 name = "cli"
 target = "npm"
+releasable = "cli"
 depends_on = ["mylib"]
 registry_name = "@org/cli"
 
 [[projects]]
 path = "packages/tests"
 name = "tests"
-dev_node = true
+dev_only = true
+releasable = false
 
 [layers]
 order = ["foundation", "app"]
@@ -67,17 +89,18 @@ unrestricted = ["tests"]
 
 ### Project fields
 
-Each `[[projects]]` block declares the project's identity, release target, inter-project relationships, and behavioral flags. The only required field is `path` -- every other field either has a sensible default (like deriving `name` from the path basename) or is an opt-in feature that activates additional checks and behaviors. Note what is NOT declarable: what CI reacts to. The router's paths filters are derived from the workspace (see [Router paths filters](#router-paths-filters)), and a `watch` key is refused at load time.
+Each `[[projects]]` block declares the project's identity, release target, inter-project relationships, and behavioral flags. `path` is always required, and `releasable` is required of every project that is not opted out of versioning -- every other field either has a sensible default (like deriving `name` from the path basename) or is an opt-in feature that activates additional checks and behaviors. Note what is NOT declarable: what CI reacts to. The router's paths filters are derived from the workspace (see [Router paths filters](#router-paths-filters)), and a `watch` key is refused at load time.
 
 | Field | Required | Type | Description |
 | ----- | -------- | ---- | ----------- |
 | `path` | yes | string | Relative path from repo root to the project directory |
-| `name` | no | string | Project name (defaults to basename of `path`) |
+| `releasable` | yes | string or `false` | The `[[releasables]]` entry this project is versioned under, or `false` to opt out of versioning entirely |
+| `name` | no | string | Project name (defaults to basename of `path`; the member at `path = "."` must be named `root`) |
 | `target` | no | string | Release target (auto-detected if omitted) |
 | `subtree_remote` | no | string | Git remote URL for subtree mirror publishing |
 | `depends_on` | no | list of strings | Explicit intra-workspace dependencies (project names) |
 | `library` | no | bool | Mark as a shared library (enables library-lint check) |
-| `dev_node` | no | bool | Mark as a dev-only project (no changelog, no CHANGELOG.md) |
+| `dev_only` | no | bool | Mark as a dev-only project (no changelog, no CHANGELOG.md). A dev-only project outside every releasable is a **dev node** |
 | `registry_name` | no | string | Override package name on the registry (e.g., scoped npm name) |
 | `description` | no | string | Short project description for documentation |
 
@@ -95,6 +118,8 @@ tag_format = "v{version}"
 ```
 
 `tag_format` is **explicit or absent**, never implicitly filled in. An entry that omits it tags with the workspace scheme, `{name}@v{version}`; an entry that declares it tags with what it declared. Absence is carried through loading and saving, so a rewrite of `workspace.toml` neither invents the key nor deletes a line an operator wrote — including one that spells out the default.
+
+A releasable is also the unit a repository boundary moves: `rlsbl monorepo extract` moves one out into a repository of its own and `rlsbl monorepo absorb` moves an external repository in as one. Splitting a member out of a releasable it shares with others is a workspace edit first -- see [Repository conversions](conversions.md).
 
 The distinction is not cosmetic. **A releasable that owns the root member (`path = "."`) must declare `tag_format`, and the loader refuses one that does not.** A repository root's releases are commonly tagged `v1.2.3` because the repository used to be a standalone one, and inheriting `{name}@v{version}` there would silently orphan every existing tag. Only the operator knows which scheme the repository's history already uses, so `rlsbl monorepo init --root-releasable <name>` requires `--tag-format` alongside it.
 
@@ -124,9 +149,9 @@ Libraries are packages consumed by other workspace projects as runtime or dev de
 
 Lint config resolves at two levels: a member's own `.rlsbl/lint/<language>.toml` wins when present, otherwise a releasable member falls back to the shared `.rlsbl-monorepo/releasables/<name>/lint/<language>.toml`. `rlsbl monorepo cleanup` removes a member's `.rlsbl/lint/` only when it is byte-identical to that shared config (a genuine override is preserved).
 
-### Dev nodes (`dev_node = true`)
+### Dev nodes (`dev_only = true`, `releasable = false`)
 
-Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. Dev nodes cannot be released:
+Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. A project is a dev node when it is `dev_only` *and* outside every releasable; a `dev_only` project that still declares `releasable = "<name>"` is an ordinary member of that releasable. Dev nodes cannot be released:
 
 - **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`
 - **No releases**: `rlsbl release run` and `rlsbl release edit` error with "dev_node projects cannot be released"
@@ -134,7 +159,7 @@ Dev nodes are projects at the edge of the dependency graph that nothing user-fac
 - Scaffold skips changelog infrastructure
 - Pre-push check ignores dev node commits
 - Batch release (`rlsbl monorepo release run`) excludes dev nodes
-- Remove `dev_node = true` from workspace.toml to make a project releasable
+- Give the project a `releasable = "<name>"` in workspace.toml (dropping `dev_only` if it is genuinely not dev-only) to make it releasable
 - The `dev-only-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
 A dev node is excluded from releases but not from their consequences. When its `uv.lock` records a releasable sibling through an editable path source (`source = { editable = "../python" }`), that lock pins the sibling's version — and the version bump is what stales it. So the release runs `uv lock` in every non-releasable workspace project whose lock resolves a path source into a directory the bump touches, and the refreshed lock joins the version-bump commit. The candidate is then self-consistent from the first push: a dev node's lock-pin meta-test passes on it, instead of going red at the CI gate and forcing a dev-node-only fix-forward whose window no releasable's paths filter matches.
@@ -329,6 +354,10 @@ Convergence never blindly overwrites the mirror. The remote tip must be **either
 
 > Note: `rlsbl monorepo sync` does **not** update mirror repositories. `sync` regenerates the monorepo's own `.github/workflows`. Mirrors are updated only by re-running `rlsbl monorepo mirror <project>` (for example after a release).
 
+### A mirrored releasable cannot be extracted
+
+Because the mirror derives from this repository, [extracting](conversions.md) the releasable a mirrored member belongs to would leave the mirror deriving from a subtree that no longer exists. `rlsbl monorepo extract` refuses that outright, during observation, and says to remove the `subtree_remote` binding (and the mirror remote) first. Turning a mirror into the real repository -- rather than deleting it and extracting -- is a separate operation.
+
 ## Sync
 
 `rlsbl monorepo sync` folds every project's CI jobs into a single generated router at the repository root's shared `.github/workflows/` directory, performing template variable resolution along the way. This is required because GitHub Actions only reads workflows from the repository root, not from individual project subdirectories.
@@ -448,22 +477,26 @@ cd ~/Projects/my-monorepo
 git init
 
 # Initialize the workspace
-rlsbl monorepo init
-#   Created .rlsbl-monorepo/workspace.toml
+rlsbl monorepo init --root-dev-node
+#   Initialized monorepo workspace in .rlsbl-monorepo/
+#   Root member 'root' is a dev node.
+
+# Declare [[releasables]] entries named "core" and "cli" in
+# .rlsbl-monorepo/workspace.toml before registering members against them.
 
 # Add a Python library
 mkdir -p packages/core
 # ... create packages/core/pyproject.toml ...
-rlsbl monorepo add --name core --path packages/core --target pypi --library
+rlsbl monorepo add packages/core --name core --library true --releasable core
 
 # Add an npm CLI that depends on the library
 mkdir -p packages/cli
 # ... create packages/cli/package.json ...
-rlsbl monorepo add --name cli --path packages/cli --target npm --depends-on core
+rlsbl monorepo add packages/cli --name cli --depends-on core --releasable cli
 
 # Add a test suite (dev node -- no changelog, no releases)
 mkdir -p packages/tests
-rlsbl monorepo add --name tests --path packages/tests --dev-node
+rlsbl monorepo add packages/tests --name tests --dev-only true --releasable false
 
 # Scaffold CI for each project
 cd packages/core && rlsbl scaffold && cd ../..
