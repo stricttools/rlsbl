@@ -67,9 +67,17 @@ def _setup_releasable_pypi_project(repo):
     Returns the SHA of the unreleased feature commit.
     """
     # pyproject.toml at v0.42.0
+    # pytest is pinned to the version the suite is ITSELF running under, never
+    # left floating. The release flow really runs `uv run pytest` inside this
+    # synthetic project, and the sandboxed runner is offline against a copy of
+    # the developer's uv cache -- so an unpinned `pytest` resolves to whatever
+    # the newest visible release is and goes red on a cache miss the day that
+    # release appears (which it did). The running interpreter's pytest is by
+    # construction already in the cache the sandbox was handed, so this pin can
+    # never miss, and it follows the repo's own pytest without maintenance.
     (repo / "pyproject.toml").write_text(
         '[project]\nname = "test-pkg"\nversion = "0.42.0"\n\n'
-        '[dependency-groups]\ndev = ["pytest"]\n'
+        f'[dependency-groups]\ndev = ["pytest=={pytest.__version__}"]\n'
     )
 
     # Package __init__.py with __version__
