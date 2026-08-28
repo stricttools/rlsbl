@@ -30,6 +30,23 @@ rlsbl monorepo absorb <source_repo> <dest_path> --dry-run
 
 The destination's shape follows the member count. A releasable with one member becomes a flat standalone repository: the member's directory is hoisted to the repository root, its state moves to `.rlsbl/`, and `.rlsbl/releasable.toml` records the releasable's name and the standalone tag format `v{version}`. A releasable with more than one member becomes a workspace of its own, with a `.rlsbl-monorepo/workspace.toml` carrying a dev-node root member, the extracted members at their existing paths, and the releasable declared with an explicit `tag_format`.
 
+## Two engines: filter, or promote the mirror
+
+Extraction has two engines, and one fact decides which runs: whether the releasable declares a `subtree_remote` — whether it is [mirrored](monorepo.md#mirror). Everything else in this chapter applies to both, except where it names the filter.
+
+An **unmirrored** releasable is *filtered*. A fresh clone of the source is rewritten with `git-filter-repo` down to the union of the member paths, hoisted to the repository root when the releasable has a single member.
+
+A **mirrored** releasable is *promoted*. The mirror already holds this subtree's standalone history — every commit that touched the member has a synthetic counterpart there, produced by the deterministic subtree split — and consumers already resolve those commit ids. Filtering the monorepo again would build a second standalone history of the same code under commit ids nobody resolves, so the destination starts from the mirror instead:
+
+- the destination is a clone of the mirror, whose remote becomes the new repository's `origin`;
+- the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release anchor is remapped through it rather than through a filter-repo commit map;
+- the correspondence is persisted into the destination's lineage record as a `promotion-split-map` [event](#what-gets-recorded), so the promoted repository can explain its own hashes without the monorepo;
+- `git-filter-repo` is neither required nor invoked. A promotion filters nothing, so the missing-tool precondition does not apply to it.
+
+A releasable with more than one member may not declare a `subtree_remote` at all — there would be no single subtree to mirror — so a promotion is always a single-member extract to a flat standalone repository.
+
+After a promotion the mirror stops being a derived artifact: nothing regenerates it, and a force-push to it is destructive. It also carries no publish workflow (a mirror's scaffold renders none, and every convergence sweeps any that reached it another way), so a promoted repository that publishes needs `rlsbl scaffold` run in it.
+
 ## Observe, then render or apply
 
 Both commands are reconcilers. Observation resolves everything the apply will act on and refuses everything that cannot be done, and it runs before anything is written -- so a `--dry-run` refuses exactly what a real run would refuse, and neither has written anything by the time it does. What the preview renders is the apply pipeline: each item is a step, applied in the order it was printed.
@@ -38,9 +55,9 @@ Extract's plan:
 
 | Item | What it covers |
 | ---- | -------------- |
-| `releasable` | Which members leave, the tag-format change, and the `git-filter-repo` invocation that produces the new history |
+| `releasable` | Which members leave, the tag-format change, and the engine: the `git-filter-repo` invocation that produces the new history, or — for a mirrored releasable — that the mirror is cloned and promoted |
 | `dependencies` | Edges that leave the workspace with the members (edges *into* them are a refusal, not a plan item) |
-| `trees` | The per-member tree hash that must survive the filter unchanged |
+| `trees` | The per-member tree hash that must survive the filter unchanged; for a promotion, the one member tree that must already equal the mirror's |
 | `state` | The state directory being transplanted, and the anchors that will be remapped |
 | `tags` | Translations, the boundary alias, and the foreign tags being pruned |
 | `destination` | The `workspace.toml` or `releasable.toml` the new repository gets |
@@ -79,7 +96,8 @@ Every refusal below is raised during observation, so it costs nothing and fires 
 | absorb | The source declares targets spanning **both tag schemes** | A releasable has exactly one tag format, and picking whichever target was detected first would tag the unit under a scheme nobody chose. State it with `--tag-format`. |
 | absorb | The source's version cannot be determined | A releasable's version file is state the release flow bumps from, so it is never invented. Set the version in the source's manifest, or tag its current release. |
 | absorb | A **tag name or a version collides** with the destination's | See [Collisions](#collisions). |
-| both | The working tree is dirty, `git-filter-repo` is missing, a release is in flight, or `saferm` is absent without `--delete-with-rm` | A history rewrite captures only committed state, so uncommitted work would be silently dropped. The tree is re-checked under rlsbl's advisory lock immediately before the first write. |
+| both | The working tree is dirty, a release is in flight, or `saferm` is absent without `--delete-with-rm` | A history rewrite captures only committed state, so uncommitted work would be silently dropped. The tree is re-checked under rlsbl's advisory lock immediately before the first write. |
+| extract | `git-filter-repo` is missing | Only for an **unmirrored** releasable, which is the only one whose history is filtered. A [promotion](#two-engines-filter-or-promote-the-mirror) filters nothing, so it never asks for the tool. |
 
 ## What rlsbl deliberately does not do
 
@@ -149,6 +167,8 @@ A conversion's whole claim is that the code that arrived is the code that left. 
 
 Before the filter runs, extract records the git tree object of every member at the source's `HEAD`. After the filter, it recomputes each one at the member's destination path -- the repository root for a single-member extract -- and compares. A tree object is content-addressed, so equality is exact identity of the whole subtree, not a heuristic.
 
+A [promotion](#two-engines-filter-or-promote-the-mirror) makes the same comparison against a different second hash: the source's `HEAD:<member>` must equal the root tree of the mirror's pre-scaffold split commit. That is also what justifies deleting the monorepo's copy -- a mirror that is behind the monorepo stops the promotion, with `rlsbl monorepo mirror <project>` named as the remedy, rather than losing the newer tree.
+
 A mismatch is a hard error naming both hashes, and nothing further is written:
 
 ```
@@ -162,7 +182,7 @@ Absorb has no equivalent per-member step, because its arriving content is a whol
 
 ### Release anchors
 
-An archived release file (`releases/v<version>.toml`) records which commit a version shipped from and the git tree of every path it shipped. Both statements are made in the source's object graph, which the rewrite has just replaced, so both are rewritten: the commit through `git-filter-repo`'s commit map, the trees recomputed at the new commit and the path the member now has.
+An archived release file (`releases/v<version>.toml`) records which commit a version shipped from and the git tree of every path it shipped. Both statements are made in the source's object graph, which the rewrite has just replaced, so both are rewritten: the commit through `git-filter-repo`'s commit map -- or, for a promotion, through the monorepo-to-mirror subtree-split correspondence -- and the trees recomputed at the new commit and the path the member now has.
 
 The recomputed tree is **checked against the recorded one**, not merely written over it. A faithful rewrite reproduces a content-addressed hash exactly, so a disagreement means the content of a historical release changed under the rewrite -- and this is the only place that fact is observable. It is a hard error, raised while the destination can still be deleted and the source is still untouched.
 
@@ -186,6 +206,8 @@ The plan's final item is the list of things rlsbl deliberately leaves to the ope
 - create the remote repository and add it as `origin` in the new repository;
 - run `rlsbl scaffold` there for CI, hooks and workflows;
 - review the regenerated CI router in the source before its next release. `monorepo sync` is re-run automatically, but which jobs the remaining members need is a human decision.
+
+A [promotion](#two-engines-filter-or-promote-the-mirror) inherits the first step and rewrites the second. The mirror remote is already the new repository's `origin`, and the printed step says instead that it has stopped being a derived artifact -- nothing regenerates it now, and a force-push to it is destructive. `rlsbl scaffold` is still named, for the one thing the promoted repository does not inherit: a mirror's scaffold layer renders no publish workflow, because its Releases came from a monorepo release flow that no longer publishes for it.
 
 For an absorb:
 
@@ -298,7 +320,7 @@ The plan says all of this out loud on a re-run -- `history-already-merged`, `alr
 
 ### Extract has no resume
 
-Extract has no state file and no resume, because everything before its last step is reversible by deletion. The apply order is: clone and filter, verify trees, transplant and remap state, retag, write the destination's identity and commit it, record lineage, and only then edit the source.
+Extract has no state file and no resume, because everything before its last step is reversible by deletion. The apply order is: clone and filter (or, for a promotion, clone the mirror and derive its split correspondence), verify trees, transplant and remap state, retag, write the destination's identity and commit it, record lineage, and only then edit the source.
 
 - **A failure anywhere up to and including the lineage step leaves the source untouched.** The target directory is a self-contained partial result; delete it, fix the cause, and re-run. This is exactly what the tree-verification and anchor-verification errors say.
 - **A failure inside the source-side edit** is the one case that needs a hand. That step appends the departure record, declares the floors, deletes the departed directories, rewrites `workspace.toml`, re-runs sync, regenerates the snapshot and commits all of it as one commit. A crash part-way leaves those edits uncommitted in the source's working tree, and the completed destination beside it. The deletions went through `saferm` unless `--delete-with-rm` was passed, so they are recoverable; the rest is ordinary uncommitted work. Finish or revert it by hand -- a re-run will refuse anyway, because the target path now exists and the source tree is dirty.
