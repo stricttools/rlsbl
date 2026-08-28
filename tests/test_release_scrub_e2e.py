@@ -521,7 +521,7 @@ class TestJournalRecoveryE2E:
         data["completed_steps"] = []
         data["remote_refs"] = remote_refs
         releases = repo / ".rlsbl" / "releases"
-        releases.mkdir(parents=True)
+        releases.mkdir(parents=True, exist_ok=True)
         (releases / "scrub-result.json").write_text(json.dumps(data))
 
         monkeypatch.chdir(repo)
@@ -690,7 +690,7 @@ class TestCleanupOkAbortE2E:
         _add_remote(repo, e2e_env / "remote")
 
         releases = repo / ".rlsbl" / "releases"
-        releases.mkdir(parents=True)
+        releases.mkdir(parents=True, exist_ok=True)
         (releases / "scrub-result.json").write_text(json.dumps({
             "rewrites": {c_old: c_new},
             "tags": [],

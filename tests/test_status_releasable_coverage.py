@@ -11,7 +11,7 @@ import json
 import os
 import subprocess
 
-from conftest import make_ctx, with_root_member
+from conftest import archive_release, make_ctx, with_root_member
 
 from rlsbl.commands.status import run_cmd
 from rlsbl.workspace import (
@@ -78,6 +78,15 @@ def _workspace_with_releasable(repo, members=("pkg-a", "pkg-b"), name="alpha",
         ["git", "commit", "-q", "-m", "workspace setup"], cwd=str(repo), check=True,
     )
     subprocess.run(["git", "tag", f"{name}@v{version}"], cwd=str(repo), check=True)
+    # The releasable's LEDGER entry: coverage is measured from the archived
+    # release, not from the tag.
+    archive_release(
+        os.path.join(os.path.dirname(changes_dir), "releases"), version,
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(repo),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip(),
+    )
     return changes_dir
 
 

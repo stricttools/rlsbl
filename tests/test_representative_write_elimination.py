@@ -19,6 +19,8 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import record_release
+
 from rlsbl.commands.release import run_cmd
 from rlsbl.context import ProjectContext, create_context
 from rlsbl.release_file import ReleaseConfig
@@ -152,7 +154,7 @@ def _setup_releasable_workspace(root, member_config=None,
 
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial")
-    _git(root, "tag", "alpha@v1.0.0")
+    record_release(root, "alpha@v1.0.0")
 
     (core / "feature.txt").write_text("new feature\n")
     _git(root, "add", "packages/core/feature.txt")
@@ -195,7 +197,7 @@ def _setup_standalone_npm(repo, scaffolded):
         (repo / ".rlsbl" / "version").write_text("0.0.1\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v1.0.0")
+    record_release(repo, "v1.0.0")
 
     (repo / "feature.txt").write_text("new feature\n")
     _git(repo, "add", "feature.txt")

@@ -127,7 +127,7 @@ class TestReleaseInitAlreadyExists:
     def test_errors_if_file_exists(self, tmp_path, monkeypatch):
         # Create the file first
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text(
             'bump = "patch"\ninclude = []\nexclude = []\n'
         )
@@ -148,7 +148,7 @@ class TestReleaseInitEmptyFileNoOp:
 
     def test_empty_file_noops(self, tmp_path, monkeypatch, capsys):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text("")
 
         entries = [TargetEntry(name="pypi", path=str(tmp_path))]
@@ -162,7 +162,7 @@ class TestReleaseInitEmptyFileNoOp:
 
     def test_whitespace_only_file_noops(self, tmp_path, monkeypatch, capsys):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text("   \n\n  \n")
 
         entries = [TargetEntry(name="npm", path=str(tmp_path))]
@@ -175,7 +175,7 @@ class TestReleaseInitEmptyFileNoOp:
 
     def test_nonempty_file_still_blocks(self, tmp_path, monkeypatch):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text('bump = "minor"\n')
 
         entries = [TargetEntry(name="pypi", path=str(tmp_path))]

@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import record_release
+
 from pathlib import Path
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
@@ -73,7 +75,7 @@ def _setup_releasable_npm_project(repo):
     _git(repo, "add", "package.json", "CHANGELOG.md",
          ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v1.0.0")
+    record_release(repo, "v1.0.0")
 
     # Make an unreleased commit and cover it with a JSONL entry
     (repo / "feature.txt").write_text("new feature\n")
@@ -207,7 +209,7 @@ def _setup_rerelease_with_committed_finalize(repo):
     _git(repo, "add", "package.json", "CHANGELOG.md",
          ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v1.0.0")
+    record_release(repo, "v1.0.0")
 
     # Unreleased feature commit, covered by an entry in unreleased.jsonl so
     # preflight (coverage + user-facing) passes.

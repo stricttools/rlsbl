@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from githarness import record_release
+
 from conftest import (
     with_root_member,
     git_head,
@@ -28,6 +30,7 @@ from rlsbl.workspace import (
     Releasable,
     WorkspaceProject,
     get_releasable_changes_dir,
+    get_releasable_dir,
     load_workspace,
     save_workspace,
     write_releasable_version,
@@ -83,10 +86,14 @@ def _setup_releasable_monorepo(
     run_git(repo, "add", ".")
     run_git(repo, "commit", "-q", "-m", "scaffold monorepo")
 
-    # Tag each releasable
+    # Tag each releasable AND record the release in its ledger -- the range
+    # coverage measures from is the archived release, not the tag.
     for rel in releasables:
         tag = rel.effective_tag_format.format(name=rel.name, version=initial_version)
-        run_git(repo, "tag", tag)
+        record_release(
+            repo, tag,
+            ledger=os.path.join(get_releasable_dir(str(repo), rel.name), "releases"),
+        )
 
     return releasables, projects
 
@@ -390,7 +397,7 @@ class TestImplicitModeNoCrash:
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "alpha@v0.1.0")
+        record_release(repo, "alpha@v0.1.0")
 
         from rlsbl import _check_context_factory
         ctx = _check_context_factory()
@@ -422,7 +429,7 @@ class TestImplicitModeNoCrash:
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "alpha@v0.1.0")
+        record_release(repo, "alpha@v0.1.0", ledger=pkg / ".rlsbl" / "releases")
 
         # Make a commit and cover it
         (pkg / "src.js").write_text("module.exports = 1;\n")
@@ -538,7 +545,10 @@ class TestWorkspaceRootWithDotProject:
 
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "v0.1.0")
+        record_release(
+            repo, "v0.1.0",
+            ledger=os.path.join(get_releasable_dir(str(repo), "app"), "releases"),
+        )
         return releasables, changes_dir
 
     def test_an_uncovered_root_owned_commit_fails_coverage(
@@ -614,7 +624,7 @@ class TestWorkspaceRootWithDotProject:
         make_workspace(repo, [{"path": ".", "name": "root", "releasable": False}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "root@v0.1.0")
+        record_release(repo, "root@v0.1.0")
 
         (repo / "lib.js").write_text("module.exports = 1;\n")
         run_git(repo, "add", "lib.js")

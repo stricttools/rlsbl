@@ -27,6 +27,8 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import record_release
+
 from rlsbl.commands.release import run_cmd
 from rlsbl.commands.release.release_state import (
     MUTATING_STEPS,
@@ -73,7 +75,7 @@ def _setup_npm_project(repo):
     _git(repo, "add", "package.json", "CHANGELOG.md",
          ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v1.0.0")
+    record_release(repo, "v1.0.0")
 
     (repo / "feature.txt").write_text("new feature\n")
     _git(repo, "add", "feature.txt")

@@ -6,6 +6,8 @@ import stat
 
 import pytest
 
+from githarness import record_release
+
 from conftest import (
     git_head as _git_head,
     make_commit as _make_commit,
@@ -281,7 +283,7 @@ class TestFinalizeVersionStaleWarning:
 
         pre_tag_sha = _git_head(repo)
 
-        _run_git(repo, "tag", "mylib@v0.1.0")
+        record_release(repo, "mylib@v0.1.0")
 
         post_tag_sha = _make_commit(repo, "post.txt", "post-tag commit")
 

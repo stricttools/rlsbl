@@ -20,7 +20,7 @@ class TestBlogBodyValidation:
     def test_blog_true_body_exists_nonempty(self, tmp_path):
         """blog=true with a non-empty body file: returns path, no warning."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         body = releases_dir / "unreleased.md"
         body.write_text("# Blog post\n\nSome content here.\n")
 
@@ -31,7 +31,7 @@ class TestBlogBodyValidation:
     def test_blog_true_body_missing_warns(self, tmp_path):
         """blog=true with missing body file: warning returned, no error."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         body_path, warning = validate_blog_body(str(tmp_path), blog_enabled=True)
         assert body_path is None
@@ -41,7 +41,7 @@ class TestBlogBodyValidation:
     def test_blog_true_body_empty_errors(self, tmp_path):
         """blog=true with an empty body file: raises ReleaseValidationError."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         body = releases_dir / "unreleased.md"
         body.write_text("")
 
@@ -51,7 +51,7 @@ class TestBlogBodyValidation:
     def test_blog_true_body_whitespace_only_errors(self, tmp_path):
         """blog=true with a whitespace-only body file: treated as empty, raises ReleaseValidationError."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         body = releases_dir / "unreleased.md"
         body.write_text("   \n\n  \n")
 
@@ -61,7 +61,7 @@ class TestBlogBodyValidation:
     def test_blog_false_skips_body_check(self, tmp_path):
         """blog=false: returns (None, None) even if body file exists and is empty."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         body = releases_dir / "unreleased.md"
         body.write_text("")
 
@@ -76,7 +76,7 @@ class TestBlogBodyArchival:
     def test_finalize_archives_body_file(self, tmp_path):
         """unreleased.md is renamed to v{version}.md and chmod 444."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         body = releases_dir / "unreleased.md"
         body.write_text("# My blog post\n\nDetails about the release.\n")
 
@@ -94,7 +94,7 @@ class TestBlogBodyArchival:
     def test_finalize_no_body_file(self, tmp_path):
         """No unreleased.md: returns None, no error."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         result = archive_blog_body(str(releases_dir), "1.2.3")
 
@@ -104,7 +104,7 @@ class TestBlogBodyArchival:
     def test_finalize_body_file_included_in_commit(self, tmp_path):
         """Archived path is returned (non-None) when body file exists."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         body = releases_dir / "unreleased.md"
         body.write_text("Blog content.\n")
 
@@ -116,7 +116,7 @@ class TestBlogBodyArchival:
     def test_finalize_body_file_not_in_commit_when_missing(self, tmp_path):
         """When no body file, returns None (nothing to add to commit)."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         result = archive_blog_body(str(releases_dir), "2.0.0")
 
@@ -130,7 +130,7 @@ class TestBlogBodyCleanup:
         """v{version}.md in releases/ is removed during cleanup."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         changes_dir = tmp_path / ".rlsbl" / "changes"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         changes_dir.mkdir(parents=True)
 
         version = "1.2.3"
@@ -146,7 +146,7 @@ class TestBlogBodyCleanup:
         """Cleanup does not crash when blog body archive is missing."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
         changes_dir = tmp_path / ".rlsbl" / "changes"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         changes_dir.mkdir(parents=True)
 
         _cleanup_release_artifacts(str(tmp_path), "1.2.3")
@@ -157,7 +157,7 @@ class TestBlogBodyCleanup:
         changes_dir = tmp_path / ".rlsbl" / "changes"
         releases_dir = tmp_path / ".rlsbl" / "releases"
         changes_dir.mkdir(parents=True)
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         version = "3.0.0"
         jsonl = changes_dir / f"{version}.jsonl"

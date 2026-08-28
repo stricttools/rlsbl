@@ -337,7 +337,7 @@ class TestUnfinalizeReleaseFile:
     def _finalized_state(self, tmp_path, version="1.2.3"):
         """Create the on-disk state left behind by a release finalization."""
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         versioned = releases_dir / f"v{version}.toml"
         versioned.write_text(self.CONTENT)
         os.chmod(str(versioned), 0o444)
@@ -402,7 +402,7 @@ class TestUnfinalizeReleaseFile:
 
     def test_noop_when_versioned_file_missing(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text("")
 
         assert unfinalize_release_file(str(releases_dir), "9.9.9") == []

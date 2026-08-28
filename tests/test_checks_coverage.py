@@ -17,6 +17,8 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import record_release
+
 from conftest import git_head, make_commit, make_ctx, make_workspace, run_git, workspace_toml
 
 from rlsbl import app
@@ -403,7 +405,7 @@ def changelog_repo(tmp_path, monkeypatch):
     run_git(repo, "commit", "-q", "-m", "scaffold")
 
     # Tag after scaffold
-    run_git(repo, "tag", "v0.1.0")
+    record_release(repo, "v0.1.0")
 
     # Make a real commit that we can add to the changelog
     (repo / "src.py").write_text("x = 1\n")
@@ -564,7 +566,7 @@ class TestChangelogRangeCheck:
         old_sha = git_head(repo)  # commit BEFORE the tag
 
         # Tag after the initial commit
-        run_git(repo, "tag", "v0.1.0")
+        record_release(repo, "v0.1.0")
 
         # Create changelog infra
         changes = repo / ".rlsbl" / "changes"
@@ -997,7 +999,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         (repo / "README.md").write_text("# test\n")
         run_git(repo, "add", "README.md")
         run_git(repo, "commit", "-q", "-m", "initial")
-        run_git(repo, "tag", "v0.0.0")
+        record_release(repo, "v0.0.0")
 
         # Create a sub-project with changelog
         pkg = repo / "packages" / "alpha"
@@ -1011,7 +1013,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "alpha@v0.1.0")
+        record_release(repo, "alpha@v0.1.0")
 
         base_sha = git_head(repo)
 
@@ -1049,7 +1051,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         (repo / "README.md").write_text("# test\n")
         run_git(repo, "add", "README.md")
         run_git(repo, "commit", "-q", "-m", "initial")
-        run_git(repo, "tag", "v0.0.0")
+        record_release(repo, "v0.0.0")
 
         pkg = repo / "packages" / "alpha"
         pkg.mkdir(parents=True)
@@ -1062,7 +1064,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "alpha@v0.1.0")
+        record_release(repo, "alpha@v0.1.0")
 
         base_sha = git_head(repo)
 
@@ -1111,7 +1113,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         (repo / "README.md").write_text("# test\n")
         run_git(repo, "add", "README.md")
         run_git(repo, "commit", "-q", "-m", "initial")
-        run_git(repo, "tag", "v0.0.0")
+        record_release(repo, "v0.0.0")
 
         # dev_node project -- not releasable
         pkg = repo / "packages" / "devtool"
@@ -1188,7 +1190,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         (repo / "f.txt").write_text("x\n")
         run_git(repo, "add", "f.txt")
         run_git(repo, "commit", "-q", "-m", "init")
-        run_git(repo, "tag", "v0.0.0")
+        record_release(repo, "v0.0.0")
 
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
@@ -1231,7 +1233,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
         (repo / "f.txt").write_text("x\n")
         run_git(repo, "add", "f.txt")
         run_git(repo, "commit", "-q", "-m", "init")
-        run_git(repo, "tag", "v0.0.0")
+        record_release(repo, "v0.0.0")
 
         changes = repo / ".rlsbl" / "changes"
         changes.mkdir(parents=True)
@@ -1366,7 +1368,7 @@ class TestPrepushChangelogCoverageMonorepoNoReleasables:
 
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        run_git(repo, "tag", "v0.1.0")
+        record_release(repo, "v0.1.0")
         return releasables, changes_dir
 
     def _prepush_ctx(self, repo, releasables, base_sha, head_sha):

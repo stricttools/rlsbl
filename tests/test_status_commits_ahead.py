@@ -12,7 +12,7 @@ import subprocess
 
 import pytest
 
-from conftest import make_ctx
+from conftest import archive_release, ledger_dir, make_ctx
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add
 
 
@@ -40,8 +40,21 @@ def _commit_file(repo, name, content="x\n", message="change"):
     ).stdout.strip()
 
 
-def _tag(repo, tag_name):
+def _tag(repo, tag_name, *, project="."):
+    """Tag a release AND record it in the project's LEDGER.
+
+    Tagging alone no longer makes a version released as far as rlsbl is
+    concerned: the unreleased range is bounded by the archived release, so a
+    fixture that only tags has released nothing.
+    """
     subprocess.run(["git", "tag", tag_name], cwd=str(repo), check=True)
+    version = tag_name.split("v")[-1]
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=str(repo),
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    proj_dir = repo if project == "." else os.path.join(str(repo), project)
+    archive_release(ledger_dir(proj_dir), version, head)
 
 
 class TestStatusCommitsAheadStandalone:
@@ -178,10 +191,10 @@ class TestStatusCommitsAheadStandalone:
         data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
 
         assert data["commits_ahead"] == 2
-        assert data["commits_ahead_tag"] == "v1.0.0"
+        assert data["range_anchor_tag"] == "v1.0.0"
 
-    def test_json_commits_ahead_none_without_tag(self, mock_git_repo, capsys):
-        """Without a prior tag, commits_ahead is None in --json."""
+    def test_json_commits_ahead_none_without_a_release(self, mock_git_repo, capsys):
+        """With nothing released, commits_ahead is None in --json."""
         _make_npm_project(mock_git_repo, name="pkg-a", version="0.1.0")
         subprocess.run(["git", "add", "package.json"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "commit", "-q", "-m", "add package"], cwd=str(mock_git_repo), check=True)
@@ -191,7 +204,7 @@ class TestStatusCommitsAheadStandalone:
         data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
 
         assert data["commits_ahead"] is None
-        assert data["commits_ahead_tag"] is None
+        assert data["range_anchor_tag"] is None
 
 
 class TestStatusCommitsAheadMonorepo:
@@ -213,7 +226,7 @@ class TestStatusCommitsAheadMonorepo:
         _cmd_add(["core"], {"releasable": "false"}, project_root=".")
 
         # Tag core
-        subprocess.run(["git", "tag", "core@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tag(mock_git_repo, "core@v1.0.0", project="core")
 
         # Make an unreleased commit affecting core
         _commit_file(mock_git_repo, "core/file.txt", message="post-release core change")
@@ -237,7 +250,7 @@ class TestStatusCommitsAheadMonorepo:
         with open(proj_dir / "package.json", "w") as f:
             json.dump({"name": "alpha", "version": "1.0.0"}, f)
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
-        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tag(mock_git_repo, "alpha@v1.0.0", project="alpha")
 
         capsys.readouterr()
         monkeypatch.chdir(str(proj_dir))
@@ -270,8 +283,8 @@ class TestStatusCommitsAheadMonorepo:
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         # Tag both at the same commit
-        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
-        subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tag(mock_git_repo, "alpha@v1.0.0", project="alpha")
+        _tag(mock_git_repo, "beta@v1.0.0", project="beta")
 
         # Add commits touching ONLY beta's files
         _commit_file(mock_git_repo, "beta/x.txt", message="beta change 1")
@@ -315,8 +328,8 @@ class TestStatusCommitsAheadMonorepo:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
-        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
-        subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tag(mock_git_repo, "alpha@v1.0.0", project="alpha")
+        _tag(mock_git_repo, "beta@v1.0.0", project="beta")
 
         # One commit touches alpha, two touch beta
         _commit_file(mock_git_repo, "alpha/a.txt", message="alpha change")
@@ -352,7 +365,7 @@ class TestStatusCommitsAheadMonorepo:
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
 
         # Tag alpha now, before more commits
-        subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tag(mock_git_repo, "alpha@v1.0.0", project="alpha")
 
         # Add commits AFTER alpha's tag (alpha now N commits ahead)
         _commit_file(mock_git_repo, "alpha/x.txt", message="alpha change 1")
@@ -365,7 +378,7 @@ class TestStatusCommitsAheadMonorepo:
             json.dump({"name": "beta", "version": "1.0.0"}, f)
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
         # Tag beta at current HEAD (after all commits)
-        subprocess.run(["git", "tag", "beta@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        _tag(mock_git_repo, "beta@v1.0.0", project="beta")
 
         from rlsbl.commands.status import run_cmd
 

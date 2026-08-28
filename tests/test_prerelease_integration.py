@@ -17,6 +17,8 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import record_release
+
 from rlsbl.commands.release import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
@@ -106,7 +108,7 @@ def _setup_releasable_pypi_project(repo):
          ".rlsbl/changes/unreleased.jsonl",
          ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v0.42.0")
+    record_release(repo, "v0.42.0")
 
     # Make an unreleased feature commit
     (repo / "feature.txt").write_text("new feature\n")
@@ -130,7 +132,7 @@ def _setup_releasable_pypi_project(repo):
 
     # Create the release file with preid
     releases_dir = repo / ".rlsbl" / "releases"
-    releases_dir.mkdir(parents=True)
+    releases_dir.mkdir(parents=True, exist_ok=True)
     (releases_dir / "unreleased.toml").write_text(
         'bump = "minor"\npreid = "alpha"\n'
         'description = "First alpha"\n'

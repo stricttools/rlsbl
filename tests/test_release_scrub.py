@@ -537,7 +537,7 @@ class TestFullScrubFlow:
         changes_dir = tmp_path / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         # unreleased.jsonl with a hash that will be remapped
         unreleased = changes_dir / "unreleased.jsonl"
@@ -702,7 +702,7 @@ class TestResumeFromScrubResult:
         changes_dir = tmp_path / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         # Unreleased JSONL (already remapped from previous partial run)
         unreleased = changes_dir / "unreleased.jsonl"
@@ -855,7 +855,7 @@ class TestReleasableDirsRemapped:
             ChangelogEntry(commits=["old_hash_2"], user_facing=False),
         ])
 
-        (proj_dir / ".rlsbl" / "releases").mkdir(parents=True)
+        (proj_dir / ".rlsbl" / "releases").mkdir(parents=True, exist_ok=True)
 
         mock_load_ws.return_value = [
             WorkspaceProject({"name": "alpha", "path": "packages/alpha"}),
@@ -1243,7 +1243,7 @@ class TestPostRemapValidationGate:
         changes_dir = tmp_path / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         bogus = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
         unreleased = changes_dir / "unreleased.jsonl"
@@ -2399,7 +2399,7 @@ class TestMonorepoTagCorrectProject:
 
         # Project releases dir for scrub-result.json
         releases_dir = alpha_dir / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         workspace_projects = [
             WorkspaceProject({"name": "alpha", "path": "packages/alpha"}),
@@ -2516,7 +2516,7 @@ class TestStandaloneTagNoPrefix:
         proj_changes.mkdir(parents=True)
         (proj_changes / "unreleased.jsonl").write_text("")
         releases_dir = proj_dir / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         workspace_projects = [
             WorkspaceProject({"name": "myproj", "path": "packages/myproj"}),

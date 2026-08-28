@@ -212,14 +212,15 @@ class TestBareVersionRootReleasable:
         prefix = _get_monorepo_tag_prefix(root_member, str(root), releasables)
         assert prefix == "v"
 
-    def test_status_reports_the_tag(self, tmp_path, capsys):
-        """`monorepo status` names the bare-version tag, not "(none)".
+    def test_status_reports_the_release(self, tmp_path, capsys):
+        """`monorepo status` names the releasable's release, not "(none)".
 
-        The releasable's row resolves its tag through the declared
-        ``tag_format``; resolving it through the workspace default
-        (``{name}@v{version}``) would match nothing and report the releasable
-        as never released.
+        The row reads the releasable's OWN archive directory; a bare-version
+        releasable used to be resolved through the workspace default tag glob
+        (``{name}@v{version}``), which matched nothing and reported it as never
+        released.
         """
+        from conftest import archive_release
         from rlsbl.commands.monorepo import _cmd_status
 
         root = _bare_version_root_workspace(tmp_path)
@@ -229,6 +230,10 @@ class TestBareVersionRootReleasable:
         git(root, "add", "-A")
         git(root, "commit", "-q", "-m", "initial")
         git(root, "tag", "v1.2.3")
+        archive_release(
+            root / ".rlsbl-monorepo" / "releasables" / "app" / "releases",
+            "1.2.3", git(root, "rev-parse", "HEAD"),
+        )
 
         cwd = os.getcwd()
         os.chdir(root)
@@ -240,7 +245,7 @@ class TestBareVersionRootReleasable:
         out = capsys.readouterr().out
         rows = [line for line in out.splitlines() if line.startswith("app")]
         assert rows, f"no row for the releasable in:\n{out}"
-        assert "v1.2.3" in rows[0], rows
+        assert "1.2.3" in rows[0], rows
         assert "(none)" not in rows[0], rows
 
     def test_coverage_anchors_on_the_bare_version_tag(self, tmp_path, capsys):

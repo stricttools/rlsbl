@@ -23,7 +23,7 @@ from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
-from githarness import add_remote, git as _ghgit, init_repo
+from githarness import add_remote, git as _ghgit, init_repo, record_release
 from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION
 from rlsbl.context import ProjectContext
 from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
@@ -91,6 +91,11 @@ def _ctx(root=None, config=None, workspace_root=None):
 # ============================================================================
 
 MOD_UNDO = "rlsbl.commands.undo"
+
+
+def _latest_release_stub(uc):
+    """Stand-in for undo's ledger read: "the latest release is 1.0.0"."""
+    return ("1.0.0", "v1.0.0")
 
 
 class TestUndoPrintSummary:
@@ -228,6 +233,7 @@ def _summary_row(output, label):
 class TestUndoGhDeleteFails:
     """Covers lines 118-120: gh release delete fails."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -254,6 +260,7 @@ class TestUndoGhDeleteFails:
 class TestUndoRemoteTagDeleteFails:
     """Covers lines 128-130: git push origin :tag fails."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -278,6 +285,7 @@ class TestUndoRemoteTagDeleteFails:
 class TestUndoLocalTagDeleteFails:
     """Covers lines 136-138: git tag -d fails."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -312,6 +320,7 @@ class TestUndoRevertException:
     push-guard is the belt-and-braces backstop.
     """
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -333,6 +342,7 @@ class TestUndoRevertException:
                 run_cmd("npm", [], {}, ctx=_ctx())
         assert "FAILED" in _summary_row(out.getvalue(), "Revert commits")
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -355,7 +365,6 @@ class TestUndoRevertException:
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
-            "v1.0.0",
             "",                                # git push origin :v1.0.0 (tag delete)
             "",                                # git tag -d
             "v1.0.0",                         # git log
@@ -385,6 +394,7 @@ class TestUndoRevertException:
 class TestUndoChangelogRestoreFails:
     """Covers lines 216-218: changelog restoration exception."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.generate_changelog", side_effect=Exception("gen failed"))
     @patch(f"{MOD_UNDO}.unfinalize_version", return_value=["unreleased.jsonl"])
     @patch(f"{MOD_UNDO}.get_changes_dir", return_value="/fake/.rlsbl/changes")
@@ -401,7 +411,6 @@ class TestUndoChangelogRestoreFails:
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
-            "v1.0.0",
             "",                                           # git push origin :v1.0.0
             "",                                           # git tag -d
             "chore: finalize changelog for 1.0.0",       # git log (finalize commit)
@@ -420,6 +429,7 @@ class TestUndoChangelogRestoreFails:
 class TestUndoReleaseFileRestoreFails:
     """Covers lines 232-234: release file restore exception."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", side_effect=Exception("bad"))
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -433,7 +443,6 @@ class TestUndoReleaseFileRestoreFails:
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
-            "v1.0.0",
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -448,6 +457,7 @@ class TestUndoReleaseFileRestoreFails:
 class TestUndoPushDeclined:
     """Covers lines 240-244: user declines push after revert."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
@@ -460,7 +470,6 @@ class TestUndoPushDeclined:
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
-            "v1.0.0",
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -472,6 +481,7 @@ class TestUndoPushDeclined:
                 run_cmd("npm", [], {}, ctx=_ctx())
         # No push_if_needed called -- verified by no push call in mock_run
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
@@ -484,7 +494,6 @@ class TestUndoPushDeclined:
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
-            "v1.0.0",
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -499,6 +508,7 @@ class TestUndoPushDeclined:
 class TestUndoPushFails:
     """Covers lines 255-257: push_if_needed fails."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed", side_effect=Exception("push boom"))
@@ -512,7 +522,6 @@ class TestUndoPushFails:
         from rlsbl.commands.undo import run_cmd
 
         mock_run.side_effect = [
-            "v1.0.0",
             "",         # git push origin :v1.0.0
             "",         # git tag -d
             "v1.0.0",   # git log
@@ -528,6 +537,7 @@ class TestUndoPushFails:
 class TestUndoReleaseFileFinalize:
     """Covers lines 179-182: release-file finalize commit at HEAD is peeled."""
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=["unreleased.toml"])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -563,6 +573,7 @@ class TestUndoFinalizeOnlyReverted:
     completes cleanly. Real git; only run_gh and the registry gate are mocked.
     """
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
     @patch(f"{MOD_UNDO}.push_if_needed")
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
@@ -595,7 +606,7 @@ class TestUndoFinalizeOnlyReverted:
         (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         _ghgit(repo, "add", "-A")
         _ghgit(repo, "commit", "-q", "-m", "chore: finalize changelog for 1.0.0")
-        _ghgit(repo, "tag", "v1.0.0")
+        record_release(repo, "v1.0.0")
         add_remote(repo, repo.parent / "finalize-remote.git")
 
         monkeypatch.chdir(repo)
@@ -618,6 +629,7 @@ class TestUndoCoverageNeverPollutesRealRepo:
     accumulated hundreds of fixture-version records across test runs.
     """
 
+    @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
@@ -1094,7 +1106,7 @@ class TestArchiveBlogBody:
         from rlsbl.commands.release.execute import archive_blog_body
 
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.md").write_text("blog body")
 
         result = archive_blog_body(str(releases_dir), "1.0.0")
@@ -1109,7 +1121,7 @@ class TestArchiveBlogBody:
         from rlsbl.commands.release.execute import archive_blog_body
 
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         result = archive_blog_body(str(releases_dir), "1.0.0")
         assert result is None
 
@@ -1234,7 +1246,7 @@ class TestScrubStaleResult:
 
     def test_stale_scrub_result_exits(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "scrub-result.json").write_text(json.dumps({
             "new_head": "stale_sha",
             "completed_steps": [],

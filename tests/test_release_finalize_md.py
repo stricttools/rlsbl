@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import record_release
+
 from pathlib import Path
 from rlsbl.context import ProjectContext
 
@@ -76,7 +78,7 @@ def _setup_releasable_npm_project(repo):
     )
     _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v1.0.0")
+    record_release(repo, "v1.0.0")
 
     # Make an unreleased feature commit
     (repo / "feature.txt").write_text("new feature\n")

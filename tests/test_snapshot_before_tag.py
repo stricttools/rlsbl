@@ -23,7 +23,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from githarness import add_remote, git
+from githarness import add_remote, git, record_release
 
 from rlsbl.commands.release import run_cmd
 from rlsbl.commands.release.release_state import RELEASE_STEPS
@@ -153,6 +153,9 @@ class TestUndoUnwindsSnapshotCommit:
         (repo / ".rlsbl-monorepo" / "snapshot.json").write_text('{"packages": {}}\n')
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "-m", "snapshot")
+        # Only the TAG moves onto the snapshot commit; 1.0.1 is already in the
+        # ledger from _make_released_repo, and re-archiving it here would add a
+        # commit above the tag that the undo walk would then try to revert.
         git(repo, "tag", "v1.0.1")
         add_remote(repo, repo.parent / "remote.git")
         monkeypatch.chdir(repo)

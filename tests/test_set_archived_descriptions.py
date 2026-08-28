@@ -54,7 +54,7 @@ candidate_sha = "1111111111111111111111111111111111111111"
 @pytest.fixture
 def repo(tmp_path):
     root = tmp_path / "proj"
-    (root / ".rlsbl" / "releases").mkdir(parents=True)
+    (root / ".rlsbl" / "releases").mkdir(parents=True, exist_ok=True)
     return root
 
 

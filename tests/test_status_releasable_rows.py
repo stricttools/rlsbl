@@ -10,11 +10,12 @@ shown.
 import os
 import subprocess
 
-from conftest import make_ctx, with_root_member
+from conftest import archive_release, make_ctx, with_root_member
 
 from rlsbl.commands.monorepo import _cmd_status
 from rlsbl.tag_glob import resolve_monorepo_tag_glob, releasable_tag_glob
 from rlsbl.workspace import (
+    get_releasable_dir,
     Releasable,
     WorkspaceProject,
     save_workspace,
@@ -67,15 +68,26 @@ class TestPerReleasableStatusRows:
         )
         write_releasable_version(str(mock_git_repo), "alpha", "1.0.0")
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
+        archive_release(
+            os.path.join(
+                get_releasable_dir(str(mock_git_repo), "alpha"), "releases",
+            ),
+            "1.0.0",
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=str(mock_git_repo),
+                capture_output=True, text=True, check=True,
+            ).stdout.strip(),
+        )
 
         capsys.readouterr()
         _cmd_status({}, project_root=str(mock_git_repo))
         out = capsys.readouterr().out
 
-        # One row for the releasable with its real tag (regression: was "(none)")
-        assert "alpha@v1.0.0" in out
-        # The releasable's own row carries the real tag; the root member's
-        # row has no tag of its own.
+        # One row for the releasable naming its real release (regression: the
+        # column used to read "(none)" for every releasable member).
+        assert "1.0.0" in out
+        # The releasable's own row names the release; the root member's row
+        # has released nothing.
         rel_row = next(line for line in out.splitlines() if line.startswith("alpha "))
         assert "(none)" not in rel_row
         # Per-releasable header + members column

@@ -6,6 +6,8 @@ import subprocess
 import time
 
 import pytest
+
+from githarness import record_release
 import tomlkit
 
 from conftest import make_commit, make_workspace, run_git
@@ -13,6 +15,7 @@ from conftest import make_commit, make_workspace, run_git
 from rlsbl.commands.monorepo import _cmd_batch_release_init
 from rlsbl.commands.monorepo.batch_release_init import _render_commented_section
 from rlsbl.release_file import get_batch_release_file_path
+from rlsbl.workspace import get_releasable_dir
 
 
 class TestBatchReleaseInit:
@@ -409,7 +412,12 @@ class TestCommentOutZeroCommits:
         run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
 
         # Tag the project so it has a "last release"
-        run_git(mock_git_repo, "tag", "pkg-a@v1.0.0")
+        record_release(
+            mock_git_repo, "pkg-a@v1.0.0",
+            ledger=os.path.join(
+                get_releasable_dir(str(mock_git_repo), "pkg-a"), "releases",
+            ),
+        )
 
         _cmd_batch_release_init(project_root=mock_git_repo)
 
@@ -417,7 +425,7 @@ class TestCommentOutZeroCommits:
         raw = open(batch_path).read()
 
         # Should appear as comments, not as a real TOML section
-        assert "# pkg-a: no unreleased commits since pkg-a@v1.0.0" in raw
+        assert "# pkg-a: no unreleased commits since 1.0.0" in raw
         assert "# [releasables.pkg-a]" in raw
         assert '# bump = ""' in raw
 
@@ -441,7 +449,12 @@ class TestCommentOutZeroCommits:
         run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
 
         # Tag the project
-        run_git(mock_git_repo, "tag", "pkg-a@v1.0.0")
+        record_release(
+            mock_git_repo, "pkg-a@v1.0.0",
+            ledger=os.path.join(
+                get_releasable_dir(str(mock_git_repo), "pkg-a"), "releases",
+            ),
+        )
 
         # Make an unreleased commit touching pkg-a files
         (pkg_a / "index.js").write_text(f"// change {time.monotonic_ns()}\n")
@@ -503,8 +516,18 @@ class TestCommentOutZeroCommits:
         run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
 
         # Tag both
-        run_git(mock_git_repo, "tag", "active@v1.0.0")
-        run_git(mock_git_repo, "tag", "stale@v0.5.0")
+        record_release(
+            mock_git_repo, "active@v1.0.0",
+            ledger=os.path.join(
+                get_releasable_dir(str(mock_git_repo), "active"), "releases",
+            ),
+        )
+        record_release(
+            mock_git_repo, "stale@v0.5.0",
+            ledger=os.path.join(
+                get_releasable_dir(str(mock_git_repo), "stale"), "releases",
+            ),
+        )
 
         # Make a commit touching only 'active'
         (active_dir / "index.js").write_text(f"// change {time.monotonic_ns()}\n")
@@ -522,7 +545,7 @@ class TestCommentOutZeroCommits:
 
         # 'stale' is commented out
         assert "stale" not in data.get("packages", {})
-        assert "# stale: no unreleased commits since stale@v0.5.0" in raw
+        assert "# stale: no unreleased commits since 0.5.0" in raw
         assert "# [releasables.stale]" in raw
 
 

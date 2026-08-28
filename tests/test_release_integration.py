@@ -15,6 +15,8 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from githarness import record_release
+
 from rlsbl.commands.release import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
@@ -85,7 +87,7 @@ def _setup_releasable_npm_project(repo):
          ".rlsbl/changes/unreleased.jsonl",
          ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v1.0.0")
+    record_release(repo, "v1.0.0")
 
     # Make an unreleased feature commit
     (repo / "feature.txt").write_text("new feature\n")
@@ -109,7 +111,7 @@ def _setup_releasable_npm_project(repo):
 
     # Create the release file
     releases_dir = repo / ".rlsbl" / "releases"
-    releases_dir.mkdir(parents=True)
+    releases_dir.mkdir(parents=True, exist_ok=True)
     (releases_dir / "unreleased.toml").write_text(
         'bump = "patch"\ninclude = ["npm"]\nexclude = []\n'
     )

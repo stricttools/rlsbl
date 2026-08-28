@@ -34,7 +34,7 @@ class TestFlagAssembly:
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
         # Create blog body file
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.md").write_text("Blog body content.\n")
 
         captured_cmd = []

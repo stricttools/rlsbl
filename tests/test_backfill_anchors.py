@@ -42,7 +42,7 @@ def make_standalone(tmp_path, name="proj"):
     repo = tmp_path / name
     repo.mkdir()
     init_repo(repo)
-    (repo / ".rlsbl" / "releases").mkdir(parents=True)
+    (repo / ".rlsbl" / "releases").mkdir(parents=True, exist_ok=True)
     (repo / ".rlsbl" / "changes").mkdir(parents=True)
     commit_file(repo, "README.md", "hello\n", "initial")
     return repo
@@ -352,7 +352,7 @@ def test_releasable_tag_scheme_anchors_normally(tmp_path, monkeypatch):
     init_repo(repo)
     (repo / "pkgs" / "core").mkdir(parents=True)
     (repo / ".rlsbl-monorepo" / "releasables" / "core" / "changes").mkdir(parents=True)
-    (repo / ".rlsbl-monorepo" / "releasables" / "core" / "releases").mkdir(parents=True)
+    (repo / ".rlsbl-monorepo" / "releasables" / "core" / "releases").mkdir(parents=True, exist_ok=True)
     make_workspace(
         repo,
         [{"path": "pkgs/core", "name": "core", "releasable": "core"}],

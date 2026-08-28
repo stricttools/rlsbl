@@ -35,6 +35,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from githarness import record_release
+
 from rlsbl.commands.release import run_cmd
 from rlsbl.commands.undo import run_cmd as undo_run_cmd
 from rlsbl.context import create_context
@@ -133,7 +135,7 @@ def _setup_releasable_workspace(root):
 
     _git(root, "add", ".rlsbl-monorepo", "packages")
     _git(root, "commit", "-q", "-m", "initial")
-    _git(root, "tag", "alpha@v1.0.0")
+    record_release(root, "alpha@v1.0.0")
 
     # Member-scoped feature commit
     (core / "feature.txt").write_text("new feature\n")
@@ -442,7 +444,7 @@ class TestUndoRestoresReleasableReleaseFile:
         _git(root, "add", "-A")
         _git(root, "commit", "-q", "-m", "chore: finalize release file for 1.0.1")
 
-        _git(root, "tag", "alpha@v1.0.1")
+        record_release(root, "alpha@v1.0.1")
         return core
 
     def test_undo_restores_release_file_at_releasable_level(

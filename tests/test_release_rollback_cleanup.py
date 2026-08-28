@@ -15,7 +15,7 @@ class TestCleanupReleaseArtifacts:
         changes_dir = tmp_path / ".rlsbl" / "changes"
         releases_dir = tmp_path / ".rlsbl" / "releases"
         changes_dir.mkdir(parents=True)
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         version = "1.2.3"
         jsonl_file = changes_dir / f"{version}.jsonl"
@@ -42,7 +42,7 @@ class TestCleanupReleaseArtifacts:
 
         # Directories exist but files don't
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
-        (tmp_path / ".rlsbl" / "releases").mkdir(parents=True)
+        (tmp_path / ".rlsbl" / "releases").mkdir(parents=True, exist_ok=True)
         _cleanup_release_artifacts(str(tmp_path), "0.5.0")
 
     def test_rollback_preserves_unrelated_files(self, tmp_path):
@@ -50,7 +50,7 @@ class TestCleanupReleaseArtifacts:
         changes_dir = tmp_path / ".rlsbl" / "changes"
         releases_dir = tmp_path / ".rlsbl" / "releases"
         changes_dir.mkdir(parents=True)
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
 
         # Unrelated files that should survive cleanup
         unreleased = changes_dir / "unreleased.jsonl"
@@ -98,7 +98,7 @@ class TestCleanupTrackedGuard:
         changes = repo / ".rlsbl" / "changes"
         releases = repo / ".rlsbl" / "releases"
         changes.mkdir(parents=True)
-        releases.mkdir(parents=True)
+        releases.mkdir(parents=True, exist_ok=True)
 
         version = "1.2.3"
         jsonl = changes / f"{version}.jsonl"

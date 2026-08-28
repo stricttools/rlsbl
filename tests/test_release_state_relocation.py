@@ -26,6 +26,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from githarness import record_release
+
 from conftest import with_root_member
 
 from rlsbl.commands.release import resume_cmd, run_cmd
@@ -125,7 +127,7 @@ def _setup_releasable_workspace(root):
 
     _git(root, "add", ".rlsbl-monorepo", "packages")
     _git(root, "commit", "-q", "-m", "initial")
-    _git(root, "tag", "alpha@v1.0.0")
+    record_release(root, "alpha@v1.0.0")
 
     # Member-scoped feature commit
     (core / "feature.txt").write_text("new feature\n")
@@ -492,7 +494,7 @@ class TestBatchOrchestratorAlignment:
 
         # Batch release file for the releasable
         releases_dir = tmp_project / ".rlsbl-monorepo" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text(
             '[releasables.alpha]\n'
             'bump = "patch"\n'

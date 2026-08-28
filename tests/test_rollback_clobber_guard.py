@@ -62,7 +62,7 @@ def _setup_repo(tmp_path):
 
     # Create .rlsbl/releases/ for state file
     releases_dir = repo / ".rlsbl" / "releases"
-    releases_dir.mkdir(parents=True)
+    releases_dir.mkdir(parents=True, exist_ok=True)
 
     return repo, pre_release_sha
 

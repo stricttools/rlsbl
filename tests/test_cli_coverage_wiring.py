@@ -327,7 +327,12 @@ class TestStandaloneWiring:
             "rlsbl.commands.unreleased.run_cmd",
             # The handler hands this straight to ctx.payload, which validates
             # it against the command's declared schema.
-            ret={"tag": None, "commits": []},
+            ret={
+                "latest_release": None,
+                "latest_release_in_checkout": None,
+                "range_anchor_version": None,
+                "commits": [],
+            },
         )
         assert result.exit_code == 0, result.stderr
         assert m.call_args[0][2] == {"json": True}

@@ -15,6 +15,8 @@ import stat
 
 import pytest
 
+from githarness import record_release
+
 from conftest import run_git as _run_git, git_head as _git_head, make_commit as _make_commit
 from rlsbl.changelog.files import append_entry
 from rlsbl.changelog.schema import ChangelogEntry
@@ -42,7 +44,7 @@ def git_repo(tmp_path, monkeypatch):
     _run_git(repo, "add", "README.md")
     _run_git(repo, "commit", "-q", "-m", "initial")
 
-    _run_git(repo, "tag", "v0.0.0")
+    record_release(repo, "v0.0.0")
 
     changes = repo / ".rlsbl" / "changes"
     changes.mkdir(parents=True)

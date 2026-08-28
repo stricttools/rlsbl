@@ -746,7 +746,7 @@ class TestGenerateChangelog:
 
         # Create archived release toml files
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "v1.0.0.toml").write_text(
             'bump = "major"\ndescription = "First stable release"\ncontext = ""\n'
             'include = ["pypi"]\nexclude = []\n'
@@ -813,7 +813,7 @@ class TestGenerateChangelog:
             },
         )
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "v3.0.0.toml").write_text(
             'bump = "major"\ndescription = "Complete redesign"\n'
             'context = "Old API was unmaintainable"\n'
@@ -834,7 +834,7 @@ class TestReadReleaseMetadata:
 
     def test_reads_description_and_context(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "v1.0.0.toml").write_text(
             'bump = "minor"\ndescription = "A release"\ncontext = "Some context"\n'
             'include = ["pypi"]\nexclude = []\n'
@@ -850,7 +850,7 @@ class TestReadReleaseMetadata:
 
     def test_returns_empty_context_when_context_empty(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "v2.0.0.toml").write_text(
             'bump = "minor"\ndescription = "Release"\ncontext = ""\n'
             'include = ["pypi"]\nexclude = []\n'
@@ -861,7 +861,7 @@ class TestReadReleaseMetadata:
 
     def test_returns_empty_when_no_description_field(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         # Old-style toml without description/context
         (releases_dir / "v0.1.0.toml").write_text(
             'bump = "patch"\ninclude = ["pypi"]\nexclude = []\n'
@@ -872,7 +872,7 @@ class TestReadReleaseMetadata:
 
     def test_strips_whitespace(self, tmp_path):
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "v1.0.0.toml").write_text(
             'bump = "minor"\ndescription = "  padded  "\ncontext = "  also padded  "\n'
             'include = ["pypi"]\nexclude = []\n'

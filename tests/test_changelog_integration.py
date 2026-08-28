@@ -237,13 +237,29 @@ class TestPrePushWithJsonl:
 # ---------------------------------------------------------------------------
 
 
+def _tag_and_archive(repo, tag):
+    """Tag a baseline release and record it in the ledger.
+
+    The unreleased range is measured from the archived release, so a fixture
+    that only tags has released nothing and every commit reads as unreleased.
+    """
+    from conftest import archive_release, ledger_dir
+
+    subprocess.run(["git", "tag", tag], cwd=str(repo), check=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=str(repo),
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    archive_release(ledger_dir(repo), tag.lstrip("v"), head)
+
+
 class TestUnreleasedWithJsonl:
     """Unreleased command uses hash-based matching when .rlsbl/changes/ exists."""
 
     def test_exact_hash_matching(self, mock_git_repo, capsys):
         """JSONL entries with matching hashes -> commits marked [COVERED]."""
         repo = mock_git_repo
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v1.0.0")
 
         sha = _make_commit(repo, "feat.txt", "feat: add widget")
 
@@ -260,7 +276,7 @@ class TestUnreleasedWithJsonl:
     def test_uncovered_commits_marked_missing(self, mock_git_repo, capsys):
         """Commits not in any JSONL entry -> marked [MISSING]."""
         repo = mock_git_repo
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v1.0.0")
 
         sha1 = _make_commit(repo, "feat.txt", "feat: add widget")
         sha2 = _make_commit(repo, "fix.txt", "fix: something else")
@@ -281,7 +297,7 @@ class TestUnreleasedWithJsonl:
     def test_json_output_with_jsonl(self, mock_git_repo, capsys):
         """JSON output mode works with JSONL matching."""
         repo = mock_git_repo
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v1.0.0")
 
         sha = _make_commit(repo, "feat.txt", "feat: add widget")
 

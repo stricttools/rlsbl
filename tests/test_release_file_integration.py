@@ -526,7 +526,7 @@ class TestReleaseFileFinalization:
         from rlsbl.release_file import get_release_file_path
 
         releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         release_file = releases_dir / "unreleased.toml"
         release_file.write_text('bump = "patch"\ninclude = ["npm"]\nexclude = []\n')
 
@@ -595,7 +595,7 @@ class TestMonorepoReleaseFilePath:
         # Simulate monorepo structure: root/python/.rlsbl/releases/
         pkg_dir = tmp_path / "python"
         releases_dir = pkg_dir / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         release_file = releases_dir / "unreleased.toml"
         release_file.write_text('bump = "minor"\ninclude = ["pypi"]\nexclude = []\n')
 

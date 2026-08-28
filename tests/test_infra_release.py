@@ -4,6 +4,8 @@ import json
 import os
 
 import pytest
+
+from githarness import record_release
 import tomlkit
 
 from conftest import run_git as _run_git, make_commit as _make_commit
@@ -53,7 +55,7 @@ def git_repo(tmp_path, monkeypatch):
     _run_git(repo, "commit", "-q", "-m", "initial")
 
     # Create a baseline version tag so <tag>..HEAD works
-    _run_git(repo, "tag", "v0.0.0")
+    record_release(repo, "v0.0.0")
 
     # Set up .rlsbl/changes
     changes = repo / ".rlsbl" / "changes"
@@ -235,7 +237,7 @@ class TestInfraChangelogAssembly:
             '"description":"Initial","type":"feature"}\n'
         )
         releases = tmp_path / ".rlsbl" / "releases"
-        releases.mkdir(parents=True)
+        releases.mkdir(parents=True, exist_ok=True)
         doc = tomlkit.document()
         doc.add("bump", "infra")
         doc.add("description", "Scaffold refresh.")

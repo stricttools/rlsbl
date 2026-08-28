@@ -29,7 +29,7 @@ class TestBatchFinalizeDoesNotCreateEmptyFile:
 
         # Set up the releases directory with an unreleased.toml
         releases_dir = tmp_path / ".rlsbl-monorepo" / "releases"
-        releases_dir.mkdir(parents=True)
+        releases_dir.mkdir(parents=True, exist_ok=True)
         batch_path = releases_dir / "unreleased.toml"
         batch_path.write_text('[releasables.core]\nbump = "patch"\n')
 

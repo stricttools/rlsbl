@@ -24,6 +24,8 @@ from unittest.mock import patch
 
 import pytest
 
+from githarness import record_release
+
 from rlsbl.commands.release.validate import (
     ReleaseValidationError,
     validate_no_authored_anchors,
@@ -315,12 +317,12 @@ def _setup_npm_project(repo, *, release_file=None):
                ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json"]
     if release_file is not None:
         releases = repo / ".rlsbl" / "releases"
-        releases.mkdir(parents=True)
+        releases.mkdir(parents=True, exist_ok=True)
         (releases / "unreleased.toml").write_text(release_file)
         tracked.append(".rlsbl/releases/unreleased.toml")
     _git(repo, "add", *tracked)
     _git(repo, "commit", "-q", "-m", "initial")
-    _git(repo, "tag", "v1.0.0")
+    record_release(repo, "v1.0.0")
 
     (repo / "feature.txt").write_text("new feature\n")
     _git(repo, "add", "feature.txt")
@@ -581,7 +583,7 @@ def _setup_two_member_releasable_workspace(root):
 
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial")
-    _git(root, "tag", "alpha@v1.0.0")
+    record_release(root, "alpha@v1.0.0")
 
     # One feature commit touching BOTH members, so each member's subtree really
     # moves and the two anchors cannot coincidentally match the old ones.
