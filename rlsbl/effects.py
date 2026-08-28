@@ -430,6 +430,45 @@ def append_text(path, content, *, encoding="utf-8"):
     h.write(_p(path), existing + content)
 
 
+def append_lines(path, lines, *, encoding="utf-8"):
+    """Append *lines* to *path* as ONE append, each on its own line.
+
+    This is the append every record-file writer here uses -- the changelog
+    JSONL files and the lineage record alike -- and it carries the whole batch
+    in a single :func:`append_text`.  Prior content is never read back and
+    rewritten, so a concurrent writer cannot be clobbered and an already-written
+    line is never modified.
+
+    The one thing read first is the existing file's final byte: when the file is
+    non-empty and does not end in a newline -- an interrupted write, a hand edit
+    -- a separating newline leads the batch, so the new content starts its own
+    line instead of being concatenated onto the damaged one.  The damaged line
+    stays damaged; the file's reader is what names it.  Reading one byte is
+    legal in every effects mode: it observes the world without changing it.
+
+    An empty *lines* writes nothing at all, so a preview does not record an
+    append that would carry no content.
+    """
+    body = "".join(line + "\n" for line in lines)
+    if not body:
+        return
+    append_text(path, _newline_separator(path) + body, encoding=encoding)
+
+
+def _newline_separator(path):
+    """``"\\n"`` when *path* holds content not ending in a newline, else ``""``."""
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return ""
+    if size == 0:
+        return ""
+    with open(path, "rb") as f:
+        f.seek(-1, os.SEEK_END)
+        last = f.read(1)
+    return "" if last == b"\n" else "\n"
+
+
 def write_bytes(path, data):
     """Write *data* to *path*, truncating any existing file."""
     h = _handle()

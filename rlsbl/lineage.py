@@ -45,7 +45,9 @@ On-disk format and the append pattern
 One JSON object per line, each stamped with ``format_version`` as its leading
 key -- the same shape and the same append mechanics as the JSONL changelog
 (:func:`rlsbl.changelog.files._append_entry_to_file`): create the parent through
-the effect seam, then one ``effects.append_text`` carrying the whole batch.
+the effect seam, then one :func:`rlsbl.effects.append_lines` carrying the whole
+batch. That helper is the single authority for the append mechanics both
+writers rely on.
 
 What the append actually guarantees, stated precisely:
 
@@ -566,28 +568,8 @@ def append_events(path: str, events) -> list:
     parent = os.path.dirname(path)
     if parent:
         effects.makedirs(parent, exist_ok=True)
-    body = _newline_separator(path) + "".join(line + "\n" for line in lines)
-    effects.append_text(path, body)
+    effects.append_lines(path, lines)
     return stamped
-
-
-def _newline_separator(path: str) -> str:
-    """``"\\n"`` when ``path`` holds content not ending in a newline, else ``""``.
-
-    Reading one byte is legal in every effects mode -- it observes the world
-    without changing it -- and it is what keeps a new event out of a torn last
-    line.
-    """
-    try:
-        size = os.path.getsize(path)
-    except OSError:
-        return ""
-    if size == 0:
-        return ""
-    with open(path, "rb") as f:
-        f.seek(-1, os.SEEK_END)
-        last = f.read(1)
-    return "" if last == b"\n" else "\n"
 
 
 def append_event(path: str, event):

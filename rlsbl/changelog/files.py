@@ -299,17 +299,23 @@ def append_entry_to_version(changes_dir: str, version: str, entry: ChangelogEntr
 def _append_entry_to_file(target: str, entry: ChangelogEntry) -> None:
     """Append one entry to any JSONL file, creating parents when missing.
 
-    One append of one line, through the effect seam.  It used to stage the
-    line in a ``tempfile.mkstemp`` file and then copy that into the target,
-    which bought nothing -- the copy was itself a plain append, so a crash
-    mid-write could truncate the target either way -- and cost purity:
+    One append of one line, through :func:`rlsbl.effects.append_lines` -- the
+    shared append the lineage record uses too.  Prior content is never read back
+    and rewritten, so a `changelog add` racing another one cannot clobber the
+    entry it just wrote, and a torn last line cannot swallow the new entry: the
+    helper leads the append with a separating newline when the file does not end
+    in one.
+
+    It used to stage the line in a ``tempfile.mkstemp`` file and then copy that
+    into the target, which bought nothing -- the copy was itself a plain append,
+    so a crash mid-write could truncate the target either way -- and cost purity:
     ``mkstemp`` creates its file unconditionally, so under --dry-run the
     recorded cleanup never ran and the preview left a stray ``.tmp`` in
     ``.rlsbl/changes/``.
     """
     parent = os.path.dirname(target)
     effects.makedirs(parent, exist_ok=True)
-    effects.append_text(target, serialize_entry(entry) + "\n")
+    effects.append_lines(target, [serialize_entry(entry)])
 
 
 def _warn_stale_entries(src: str, tag_glob: str) -> None:

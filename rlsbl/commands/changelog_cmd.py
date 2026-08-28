@@ -23,7 +23,7 @@ from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
 from ..git_util import filter_commits_for_scope
 from ..ownership import OwnershipError, OwnershipScope
-from ..utils import commit_files, working_tree_paths
+from ..utils import commit_files, run, working_tree_paths
 from ..workspace import (
     find_workspace_root,
     get_releasable_changes_dir,
@@ -259,6 +259,66 @@ def _build_entry(flags, resolved_commits):
     return entry
 
 
+def _entry_is_committed(entry, unreleased_path):
+    """True when HEAD's copy of ``unreleased_path`` already carries ``entry``.
+
+    The authority on whether an entry was recorded is git, not the commit tool's
+    exit status.  Two ``changelog add`` runs at once append safely -- the append
+    never reads the file back -- but their commits collide: whichever stages
+    first carries BOTH lines, and the loser's commit then finds nothing left to
+    stage and exits non-zero even though its entry is safely in the tree.
+
+    A repository git cannot answer for (no HEAD yet, the file untracked at HEAD)
+    reads as not committed, which is the conservative direction: the caller
+    retries and then says so.
+    """
+    directory = os.path.dirname(unreleased_path) or "."
+    try:
+        top = run("git", ["rev-parse", "--show-toplevel"], cwd=directory)
+        rel = os.path.relpath(os.path.abspath(unreleased_path), top)
+        blob = run("git", ["show", f"HEAD:{rel}"], cwd=directory)
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return False
+    return f'"{entry.id}"' in blob
+
+
+def _commit_appended_entry(entry, unreleased_path, commit_msg):
+    """Commit the just-appended entry, judging the outcome by git.
+
+    Losing the commit race is benign and is reported as what it is; an entry
+    that no commit carries is a hard error, because "added" was printed and the
+    file is one tree-cleaning step away from losing it silently.
+
+    A commit the tool reports as made is taken at its word, as is the no-op it
+    reports when the named file already matches HEAD -- that state means HEAD's
+    copy holds this entry.  Only a REPORTED failure is put to git, and only then
+    is a retry spent.
+    """
+    for attempt in (1, 2):
+        if commit_files(commit_msg, [unreleased_path], allow_failure=True):
+            return
+        if _entry_is_committed(entry, unreleased_path):
+            print(
+                "The entry is recorded even so: a concurrent `changelog add` "
+                "committed the file first, carrying this entry with it."
+            )
+            return
+        if attempt == 1:
+            print(
+                "Warning: this run's commit did not record the entry; retrying "
+                "once (a concurrent `changelog add` may hold the commit lock).",
+                file=sys.stderr,
+            )
+    print(
+        f"Error: the entry was appended to {unreleased_path} but no commit "
+        f"carries it.\n"
+        f"The file itself is correct -- commit it with:\n"
+        f'  safegit commit -m "{commit_msg}" -- {unreleased_path}',
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 def _regenerate_changelog_outputs(ws_context, project_root, changes_dir):
     """Regenerate CHANGELOG.md via the single home resolver.
 
@@ -473,7 +533,7 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
             commit_msg = f"changelog: {description}"
         else:
             commit_msg = "changelog: non-user-facing entry"
-        commit_files(commit_msg, [unreleased_path], allow_failure=True)
+        _commit_appended_entry(entry, unreleased_path, commit_msg)
 
 
 
