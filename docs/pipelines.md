@@ -1,5 +1,5 @@
 ---
-description: "Pipeline architecture: the built-in pipeline types and their auth patterns, custom assets, the pre-publish registry probe, launcher shims, and a migration guide."
+description: "Pipeline architecture: the built-in pipeline types and their auth patterns, custom assets, the pre-publish registry probe, launcher shims, and migration."
 ---
 
 # Pipelines

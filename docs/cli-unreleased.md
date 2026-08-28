@@ -1,6 +1,6 @@
 ---
 title: rlsbl unreleased
-description: "List commits between the latest version tag and HEAD with their JSONL changelog coverage status, output as plain text or JSON for tooling."
+description: "List the commits between the release this checkout is anchored to and HEAD, with each one's JSONL changelog coverage, as plain text or as JSON."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 17

@@ -1,6 +1,6 @@
 ---
 title: rlsbl release
-description: "Release lifecycle: run, resume, scaffold release files, retry CI, sync notes, undo, deprecate, yank, scrub history, and reconcile tags after a rewrite."
+description: "Release lifecycle: run, resume, scaffold release files, retry CI, sync notes, undo, deprecate, yank, scrub history, reconcile published refs and Releases."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 12
