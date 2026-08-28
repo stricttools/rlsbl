@@ -25,7 +25,7 @@ from conftest import make_ctx
 
 
 def _pyproject(root, deps, *, optional=None, groups=None, name="consumer",
-               version="0.1.0"):
+               version="0.1.0", sources=None):
     lines = ["[project]", f'name = "{name}"']
     if version is not None:
         lines.append(f'version = "{version}"')
@@ -44,12 +44,21 @@ def _pyproject(root, deps, *, optional=None, groups=None, name="consumer",
         for group, entries in groups.items():
             rendered = ", ".join(f'"{e}"' for e in entries)
             lines.append(f"{group} = [{rendered}]")
+    if sources:
+        lines.append("")
+        lines.append("[tool.uv.sources]")
+        for dep, spec in sources.items():
+            lines.append(f"{dep} = {spec}")
     (root / "pyproject.toml").write_text("\n".join(lines) + "\n")
 
 
 def _uv_lock(root, *, requires=(), dev=None, name="consumer", version="0.1.0",
-             source_path="."):
-    """A uv.lock whose entry for this project records *requires* / *dev*."""
+             source_path=".", metadata=True):
+    """A uv.lock whose entry for this project records *requires* / *dev*.
+
+    ``metadata=False`` omits the ``[package.metadata]`` table entirely, which
+    is what uv writes for a project that declares no requirement at all.
+    """
     lines = [
         "version = 1",
         'requires-python = ">=3.11"',
@@ -58,25 +67,32 @@ def _uv_lock(root, *, requires=(), dev=None, name="consumer", version="0.1.0",
         f'name = "{name}"',
         f'version = "{version}"',
         f'source = {{ editable = "{source_path}" }}',
-        "",
-        "[package.metadata]",
-        "requires-dist = [",
     ]
-    for entry in requires:
-        lines.append(f"    {_inline(entry)},")
-    lines.append("]")
-    for group, entries in (dev or {}).items():
-        lines.append("")
-        lines.append("[package.metadata.requires-dev]")
-        lines.append(f"{group} = [")
-        for entry in entries:
+    if metadata:
+        lines += ["", "[package.metadata]", "requires-dist = ["]
+        for entry in requires:
             lines.append(f"    {_inline(entry)},")
         lines.append("]")
+        for group, entries in (dev or {}).items():
+            lines.append("")
+            lines.append("[package.metadata.requires-dev]")
+            lines.append(f"{group} = [")
+            for entry in entries:
+                lines.append(f"    {_inline(entry)},")
+            lines.append("]")
     (root / "uv.lock").write_text("\n".join(lines) + "\n")
 
 
 def _inline(entry):
-    """Render one requires-dist entry: a bare name, or ``(name, specifier)``."""
+    """Render one requires-dist entry.
+
+    A bare name, a ``(name, specifier)`` pair, or a ``{key: value}`` mapping
+    rendered verbatim -- which is how a source-backed entry
+    (``{ name = "x", editable = "x" }``) is written.
+    """
+    if isinstance(entry, dict):
+        body = ", ".join(f'{k} = "{v}"' for k, v in entry.items())
+        return f"{{ {body} }}"
     if isinstance(entry, tuple):
         dep, specifier = entry
         return f'{{ name = "{dep}", specifier = "{specifier}" }}'
@@ -277,6 +293,157 @@ class TestPypi:
         assert result.status == "pass"
 
 
+class TestUvSources:
+    """A ``[tool.uv.sources]`` entry erases the specifier uv records.
+
+    Verified against uv's own output: ``libdep>=0.2`` plus
+    ``libdep = { workspace = true }`` locks as
+    ``{ name = "libdep", editable = "libdep" }`` -- the specifier is not
+    recorded at all, because the source decides what is installed. Comparing
+    the declared specifier against a lock that structurally cannot carry it
+    reported every uv workspace member as a stale lock.
+    """
+
+    def test_a_workspace_sourced_dependency_is_compared_by_presence(self, tmp_path):
+        _pyproject(
+            tmp_path, ["libdep>=0.2"], sources={"libdep": "{ workspace = true }"},
+        )
+        _uv_lock(tmp_path, requires=[{"name": "libdep", "editable": "libdep"}])
+        assert _run(tmp_path).status == "pass"
+
+    def test_a_path_sourced_dependency_is_compared_by_presence(self, tmp_path):
+        _pyproject(
+            tmp_path, ["libdep>=0.2"],
+            sources={"libdep": '{ path = "vendor/libdep" }'},
+        )
+        _uv_lock(
+            tmp_path,
+            requires=[{"name": "libdep", "directory": "vendor/libdep"}],
+        )
+        assert _run(tmp_path).status == "pass"
+
+    def test_a_source_in_a_dependency_group_is_compared_by_presence(self, tmp_path):
+        _pyproject(
+            tmp_path, [], groups={"dev": ["libdep>=0.2"]},
+            sources={"libdep": "{ workspace = true }"},
+        )
+        _uv_lock(
+            tmp_path, requires=[],
+            dev={"dev": [{"name": "libdep", "editable": "libdep"}]},
+        )
+        assert _run(tmp_path).status == "pass"
+
+    def test_a_marker_gated_source_list_counts(self, tmp_path):
+        """uv accepts a LIST of marker-gated source tables for one name."""
+        _pyproject(
+            tmp_path, ["libdep>=0.2"],
+            sources={
+                "libdep": '[{ workspace = true, marker = "sys_platform == \'linux\'" }]',
+            },
+        )
+        _uv_lock(tmp_path, requires=[{"name": "libdep", "editable": "libdep"}])
+        assert _run(tmp_path).status == "pass"
+
+    def test_an_index_source_still_compares_the_specifier(self, tmp_path):
+        """``index`` only picks WHERE a version comes from; the bound survives."""
+        _pyproject(
+            tmp_path, ["libdep>=0.2"], sources={"libdep": '{ index = "extra" }'},
+        )
+        _uv_lock(tmp_path, requires=[("libdep", ">=0.1")])
+        result = _run(tmp_path)
+        assert result.status == "fail"
+        assert "libdep" in _text(result)
+
+    def test_a_source_added_after_the_lock_is_still_stale(self, tmp_path):
+        _pyproject(
+            tmp_path, ["libdep>=0.2"], sources={"libdep": "{ workspace = true }"},
+        )
+        _uv_lock(tmp_path, requires=[("libdep", ">=0.2")])
+        assert _run(tmp_path).status == "fail"
+
+    def test_a_source_removed_after_the_lock_is_still_stale(self, tmp_path):
+        _pyproject(tmp_path, ["libdep>=0.2"])
+        _uv_lock(tmp_path, requires=[{"name": "libdep", "editable": "libdep"}])
+        assert _run(tmp_path).status == "fail"
+
+    def test_a_workspace_roots_sources_reach_its_members(self, tmp_path):
+        """uv applies the ROOT's [tool.uv.sources] to every member.
+
+        A member declaring a bare sibling name is therefore source-backed even
+        though its own manifest carries no sources table -- which is how every
+        member of a flat uv workspace is written.
+        """
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.uv.workspace]\nmembers = ["packages/*"]\n\n'
+            '[tool.uv.sources]\nlibdep = { workspace = true }\n'
+        )
+        member = tmp_path / "packages" / "app"
+        member.mkdir(parents=True)
+        _pyproject(member, ["libdep"], name="app")
+        _uv_lock(
+            tmp_path, requires=[{"name": "libdep", "editable": "packages/libdep"}],
+            name="app", source_path="packages/app",
+        )
+        assert _run(member).status == "pass"
+
+    def test_a_member_source_overrides_the_workspace_roots(self, tmp_path):
+        """The member's own entry wins, which is uv's precedence."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.uv.workspace]\nmembers = ["packages/*"]\n\n'
+            '[tool.uv.sources]\nlibdep = { workspace = true }\n'
+        )
+        member = tmp_path / "packages" / "app"
+        member.mkdir(parents=True)
+        _pyproject(
+            member, ["libdep>=0.2"], name="app",
+            sources={"libdep": '{ index = "extra" }'},
+        )
+        _uv_lock(
+            tmp_path, requires=[("libdep", ">=0.1")], name="app",
+            source_path="packages/app",
+        )
+        assert _run(member).status == "fail"
+
+    def test_a_source_backed_dependency_the_lock_never_saw_is_stale(self, tmp_path):
+        _pyproject(
+            tmp_path, ["libdep>=0.2"], sources={"libdep": "{ workspace = true }"},
+        )
+        _uv_lock(tmp_path, requires=[])
+        result = _run(tmp_path)
+        assert result.status == "fail"
+        assert "libdep" in _text(result)
+
+
+class TestLockEntryWithoutMetadata:
+    """uv omits ``[package.metadata]`` for a project that requires nothing.
+
+    Treating the absent table as an unreadable lock made every
+    dependency-free package a hard error naming a relock that cannot fix it.
+    """
+
+    def test_a_project_that_requires_nothing_passes(self, tmp_path):
+        _pyproject(tmp_path, [])
+        _uv_lock(tmp_path, metadata=False)
+        assert _run(tmp_path).status == "pass"
+
+    def test_a_requirement_the_lock_never_saw_is_still_reported(self, tmp_path):
+        _pyproject(tmp_path, ["requests>=2.0"])
+        _uv_lock(tmp_path, metadata=False)
+        result = _run(tmp_path)
+        assert result.status == "fail"
+        assert "requests" in _text(result)
+
+    def test_a_malformed_metadata_table_errors(self, tmp_path):
+        _pyproject(tmp_path, ["requests>=2.0"])
+        (tmp_path / "uv.lock").write_text(
+            'version = 1\n\n[[package]]\nname = "consumer"\nversion = "0.1.0"\n'
+            'source = { editable = "." }\nmetadata = "not a table"\n'
+        )
+        result = _run(tmp_path)
+        assert result.status == "fail"
+        assert "metadata" in _text(result)
+
+
 # ---------------------------------------------------------------------------
 # npm: package.json vs package-lock.json
 # ---------------------------------------------------------------------------
@@ -458,6 +625,37 @@ class TestGoModParsing:
 ])
 def test_normalize_specifier(text, expected):
     assert normalize_specifier(text) == expected
+
+
+@pytest.mark.parametrize("declared,locked", [
+    # Every pair below was produced by uv itself: the left spelling was
+    # written into pyproject.toml, the right one is what uv.lock recorded.
+    (">=1.0.0-alpha1", ">=1.0.0a1"),
+    (">=1.0.0RC1", ">=1.0.0rc1"),
+    (">=01.02.03", ">=1.2.3"),
+    (">=1.0.0.post0,!=1.2", ">=1.0.0.post0,!=1.2"),
+    ("==1.0.0+local", "==1.0.0+local"),
+    ("~= 1.4", "~=1.4"),
+    ("> 1 , <= 2 , != 1.5", ">1,!=1.5,<=2"),
+    ("==0.19.*", "==0.19.*"),
+])
+def test_a_spelling_uv_canonicalizes_is_not_a_difference(declared, locked):
+    assert normalize_specifier(declared) == normalize_specifier(locked)
+
+
+@pytest.mark.parametrize("left,right", [
+    (">=1.0.0", ">=1.0.1"),
+    (">=1.0.0a1", ">=1.0.0b1"),
+    (">=1.0.0a1", ">=1.0.0"),
+    ("==1.0.0+local", "==1.0.0+other"),
+])
+def test_canonicalization_does_not_collapse_different_bounds(left, right):
+    assert normalize_specifier(left) != normalize_specifier(right)
+
+
+def test_arbitrary_equality_is_matched_literally(tmp_path):
+    """PEP 440 says ``===`` is a raw string match, so it is not canonicalized."""
+    assert normalize_specifier("===1.0.0-Alpha1") == "===1.0.0-Alpha1"
 
 
 def test_evaluate_reports_every_ecosystem_it_saw(tmp_path):

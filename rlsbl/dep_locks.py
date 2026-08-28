@@ -50,6 +50,13 @@ own path.
 Limits, stated rather than hidden
 ---------------------------------
 
+* A requirement uv resolves from a SOURCE -- a direct reference
+  (``name @ file:///...``) or a ``[tool.uv.sources]`` workspace/path/git/url
+  entry -- is compared by PRESENCE only. uv records the source in
+  ``requires-dist`` and drops the version specifier entirely, so there is
+  nothing on the lock's side for the declared constraint to be compared
+  against. Adding or removing the source itself is still drift, and is still
+  reported.
 * A lockfileVersion 1 ``package-lock.json`` records no root requirement map, so
   only presence of each declared dependency is compared, and the outcome says
   so.
@@ -113,14 +120,92 @@ def _load_json(path):
         return None
 
 
+#: The comparison operators a PEP 440 clause can start with, longest first so
+#: ``===`` is recognized before ``==``.
+_OPERATORS = ("===", "~=", "==", "!=", "<=", ">=", "<", ">")
+
+#: One PEP 440 version, split into the parts the canonical spelling reorders.
+#: Anything this does not match is left exactly as written.
+_PEP440 = re.compile(
+    r"^(?:(?P<epoch>\d+)!)?"
+    r"(?P<release>\d+(?:\.\d+)*)"
+    r"(?:[-_.]?(?P<pre_l>alpha|beta|preview|pre|a|b|c|rc)[-_.]?(?P<pre_n>\d+)?)?"
+    r"(?:(?:-(?P<post_n1>\d+))"
+    r"|(?:[-_.]?(?P<post_l>post|rev|r)[-_.]?(?P<post_n2>\d+)?))?"
+    r"(?P<dev>[-_.]?dev[-_.]?(?P<dev_n>\d+)?)?"
+    r"(?:\+(?P<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?$",
+    re.I,
+)
+
+#: PEP 440's pre-release spellings and the single canonical letter each one
+#: normalizes to.
+_PRE_LETTERS = {
+    "alpha": "a", "a": "a",
+    "beta": "b", "b": "b",
+    "c": "rc", "pre": "rc", "preview": "rc", "rc": "rc",
+}
+
+
+def normalize_version(text):
+    """A PEP 440 version in the canonical spelling uv writes.
+
+    uv re-serializes every requirement it locks from its PARSED form, so
+    ``uv.lock`` carries the canonical spelling of what ``pyproject.toml``
+    declared -- verified against uv's own output, which rewrote
+    ``>=1.0.0-alpha1`` to ``>=1.0.0a1``, ``>=1.0.0RC1`` to ``>=1.0.0rc1`` and
+    ``>=01.02.03`` to ``>=1.2.3``. Comparing the two texts therefore means
+    canonicalizing the declared side the same way, or a manifest that spelled a
+    version legally but not canonically reads as a lock that predates it.
+
+    Anything this does not recognize -- a wildcard (``1.0.*``), a local
+    directory, an unparseable string -- is returned unchanged rather than
+    guessed at.
+    """
+    raw = (text or "").strip()
+    m = _PEP440.match(raw)
+    if m is None:
+        return raw
+    out = ""
+    if m.group("epoch"):
+        out += f"{int(m.group('epoch'))}!"
+    out += ".".join(str(int(part)) for part in m.group("release").split("."))
+    if m.group("pre_l"):
+        letter = _PRE_LETTERS[m.group("pre_l").lower()]
+        out += f"{letter}{int(m.group('pre_n') or 0)}"
+    if m.group("post_n1") is not None:
+        out += f".post{int(m.group('post_n1'))}"
+    elif m.group("post_l"):
+        out += f".post{int(m.group('post_n2') or 0)}"
+    if m.group("dev"):
+        out += f".dev{int(m.group('dev_n') or 0)}"
+    if m.group("local"):
+        out += "+" + re.sub(r"[-_.]", ".", m.group("local").lower())
+    return out
+
+
 def normalize_specifier(text):
     """A PEP 440 / npm specifier reduced to a comparable form.
 
-    Whitespace is dropped and comma-separated clauses are sorted, so
-    ``">=1, <2"`` and ``"<2,>=1"`` are the same constraint -- which they are.
+    Whitespace is dropped, each clause's version is canonicalized (see
+    :func:`normalize_version`) and comma-separated clauses are sorted, so
+    ``">=1, <2"`` and ``"<2,>=1"`` are the same constraint -- which they are,
+    and which is exactly the reordering uv performs when it writes the lock.
+
+    ``===`` is left alone: PEP 440 defines arbitrary equality as a literal
+    string match, so canonicalizing its operand would change its meaning.
     """
     clauses = [c.strip() for c in (text or "").replace(" ", "").split(",")]
-    return ",".join(sorted(c for c in clauses if c))
+    return ",".join(sorted(_normalize_clause(c) for c in clauses if c))
+
+
+def _normalize_clause(clause):
+    """One comparison clause with its version canonicalized."""
+    for op in _OPERATORS:
+        if clause.startswith(op):
+            if op == "===":
+                return clause
+            return op + normalize_version(clause[len(op):])
+    return clause
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +213,7 @@ def normalize_specifier(text):
 # ---------------------------------------------------------------------------
 
 
-def _declared_pypi_requirements(data):
+def _declared_pypi_requirements(data, sourced=frozenset()):
     """``(runtime_specs, dev_specs)`` declared by a parsed ``pyproject.toml``.
 
     *runtime_specs* is ``{name: {specifier, ...}}`` over ``[project]``'s
@@ -138,9 +223,10 @@ def _declared_pypi_requirements(data):
     plus the legacy ``[tool.uv].dev-dependencies``, which uv records as the
     ``dev`` group.
 
-    A direct reference (``name @ file:///...``) contributes its name with the
-    sentinel specifier :data:`_URL_SPEC`: the lock records the source, not a
-    specifier, so only its presence is comparable.
+    A direct reference (``name @ file:///...``) and a requirement redirected by
+    ``[tool.uv.sources]`` both contribute their name with the sentinel
+    specifier :data:`_URL_SPEC`: the lock records the source, not a specifier,
+    so only presence is comparable.
     """
     project = data.get("project") or {}
     runtime = {}
@@ -148,27 +234,79 @@ def _declared_pypi_requirements(data):
     for extra_entries in (project.get("optional-dependencies") or {}).values():
         entries.extend(extra_entries or [])
     for entry in entries:
-        _add_requirement(runtime, entry)
+        _add_requirement(runtime, entry, sourced)
 
     dev = {}
     for group, group_entries in (data.get("dependency-groups") or {}).items():
         bucket = dev.setdefault(group, {})
         for entry in group_entries or []:
-            _add_requirement(bucket, entry)
+            _add_requirement(bucket, entry, sourced)
     legacy = ((data.get("tool") or {}).get("uv") or {}).get("dev-dependencies")
     if isinstance(legacy, list) and legacy:
         bucket = dev.setdefault("dev", {})
         for entry in legacy:
-            _add_requirement(bucket, entry)
+            _add_requirement(bucket, entry, sourced)
     return runtime, dev
 
 
-#: Stands in for the specifier of a direct reference, on both sides of the
-#: comparison, so a URL/path requirement is compared by presence only.
+#: Stands in for the specifier of a requirement the lock resolves from a
+#: SOURCE, on both sides of the comparison, so it is compared by presence only.
 _URL_SPEC = "(direct reference)"
 
+#: ``[tool.uv.sources]`` keys that make uv resolve a requirement from a source
+#: instead of from a version specifier. Verified against uv's own output: the
+#: locked ``requires-dist`` entry then carries the source and NO ``specifier``
+#: at all, so the manifest's constraint has nothing on the other side to be
+#: compared against. ``index`` is deliberately absent -- it only selects which
+#: registry a version is downloaded from, and the specifier survives.
+_SOURCE_KEYS = ("workspace", "path", "git", "url")
 
-def _add_requirement(bucket, entry):
+
+def uv_sources_table(data):
+    """The ``[tool.uv.sources]`` table of a parsed manifest, or ``{}``."""
+    sources = ((data or {}).get("tool") or {}).get("uv") or {}
+    table = sources.get("sources")
+    return table if isinstance(table, dict) else {}
+
+
+def source_backed_names(*tables):
+    """Normalized names whose ``[tool.uv.sources]`` entry erases the specifier.
+
+    Later *tables* override earlier ones, which is uv's own precedence: the
+    sources a WORKSPACE ROOT declares apply to every member, unless the member
+    declares its own entry for that name. Reading only the member's table
+    reported every member of a flat uv workspace -- where the sibling sources
+    are declared once at the root -- as a stale lock.
+
+    A source may be declared as a table or as a LIST of marker-gated tables;
+    one source-bearing element is enough, because the lock then records the
+    source for that requirement.
+    """
+    merged = {}
+    for table in tables:
+        merged.update(table or {})
+    found = set()
+    for name, spec in merged.items():
+        if not isinstance(name, str):
+            continue
+        for entry in (spec if isinstance(spec, list) else [spec]):
+            if isinstance(entry, dict) and any(k in entry for k in _SOURCE_KEYS):
+                found.add(normalize_pypi_name(name))
+                break
+    return found
+
+
+def _inherited_sources(root):
+    """The ``[tool.uv.sources]`` a uv workspace root lends to *root*, or ``{}``."""
+    from .uv_workspace import find_uv_workspace_root
+
+    workspace_root = find_uv_workspace_root(root)
+    if workspace_root is None:
+        return {}
+    return uv_sources_table(_load_toml(os.path.join(workspace_root, "pyproject.toml")))
+
+
+def _add_requirement(bucket, entry, sourced=frozenset()):
     """Record one manifest requirement in *bucket* (``{name: {spec, ...}}``)."""
     if not isinstance(entry, str):
         # PEP 735 `{include-group = "..."}` and anything else non-textual: the
@@ -178,7 +316,10 @@ def _add_requirement(bucket, entry):
     if split is None:
         return
     name, kind, constraint = split
-    spec = _URL_SPEC if kind == "url" else normalize_specifier(constraint)
+    if kind == "url" or name in sourced:
+        spec = _URL_SPEC
+    else:
+        spec = normalize_specifier(constraint)
     bucket.setdefault(name, set()).add(spec)
 
 
@@ -290,16 +431,22 @@ def _evaluate_pypi(root):
                 f"predates the version change. Run `{PYPI_RELOCK}`."
             )
 
-    metadata = entry.get("metadata")
+    # uv omits [package.metadata] entirely for a project that declares no
+    # requirement at all, so an ABSENT table is an empty one -- reading it as
+    # an unreadable lock made every dependency-free package a hard error
+    # naming a relock that could not fix it. A table that is present but not a
+    # table is a different thing: a malformed lock, which is still an error.
+    metadata = entry.get("metadata", {})
     if not isinstance(metadata, dict):
         problems.append(
-            f"pypi: this project's uv.lock entry carries no metadata section, "
-            f"so the requirements it was resolved from cannot be compared. Run "
-            f"`{PYPI_RELOCK}`."
+            f"pypi: this project's uv.lock entry has a metadata section that "
+            f"is not a table, so the requirements it was resolved from cannot "
+            f"be compared. Run `{PYPI_RELOCK}`."
         )
         return problems, []
 
-    declared_runtime, declared_dev = _declared_pypi_requirements(data)
+    sourced = source_backed_names(_inherited_sources(root), uv_sources_table(data))
+    declared_runtime, declared_dev = _declared_pypi_requirements(data, sourced)
     _compare_requirement_sets(
         declared_runtime,
         _locked_pypi_requirements(metadata.get("requires-dist")),
