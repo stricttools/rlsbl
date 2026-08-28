@@ -133,7 +133,7 @@ Remove a published version from package registries. Probes each configured targe
 
 ## release scrub
 
-Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.
+Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, re-points the tags, and rewrites each tag's GitHub Release document in place. A Release is never deleted, so a failure mid-step leaves the previous document standing rather than a tag with no Release at all.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 

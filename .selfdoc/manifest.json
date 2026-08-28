@@ -1430,6 +1430,11 @@
         },
         {
           "level": 2,
+          "text": "Two engines: filter, or promote the mirror",
+          "anchor": "two-engines-filter-or-promote-the-mirror"
+        },
+        {
+          "level": 2,
           "text": "Observe, then render or apply",
           "anchor": "observe-then-render-or-apply"
         },
@@ -2586,6 +2591,16 @@
         },
         {
           "level": 3,
+          "text": "The root member",
+          "anchor": "the-root-member"
+        },
+        {
+          "level": 3,
+          "text": "What the loader refuses",
+          "anchor": "what-the-loader-refuses"
+        },
+        {
+          "level": 3,
           "text": "Releasables section",
           "anchor": "releasables-section"
         },
@@ -2703,6 +2718,11 @@
           "level": 3,
           "text": "Release tags on the mirror",
           "anchor": "release-tags-on-the-mirror"
+        },
+        {
+          "level": 3,
+          "text": "The release flow's own mirror steps",
+          "anchor": "the-release-flows-own-mirror-steps"
         },
         {
           "level": 3,
@@ -3249,6 +3269,11 @@
           "level": 3,
           "text": "The release anchor",
           "anchor": "the-release-anchor"
+        },
+        {
+          "level": 4,
+          "text": "The stronger version that was deliberately not adopted",
+          "anchor": "the-stronger-version-that-was-deliberately-not-adopted"
         },
         {
           "level": 4,
@@ -17930,6 +17955,26 @@
         },
         {
           "level": 3,
+          "text": "`_target_names`",
+          "anchor": "_target_names"
+        },
+        {
+          "level": 3,
+          "text": "`_dev_install_targets`",
+          "anchor": "_dev_install_targets"
+        },
+        {
+          "level": 3,
+          "text": "`_dev_uninstall_targets`",
+          "anchor": "_dev_uninstall_targets"
+        },
+        {
+          "level": 3,
+          "text": "`_count_and_names`",
+          "anchor": "_count_and_names"
+        },
+        {
+          "level": 3,
           "text": "`_resolve_target`",
           "anchor": "_resolve_target"
         },
@@ -19474,6 +19519,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-28T07:34:18.232342+00:00",
+  "last_gen": "2026-08-28T07:54:35.297033+00:00",
   "theme": "minimal"
 }
