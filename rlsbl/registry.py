@@ -87,8 +87,13 @@ def query_go_version(module_path):
     Returns {"status": "found", "version": "X.Y.Z"} on success (v prefix stripped),
     {"status": "not_found"} if the module does not exist,
     or {"status": "error", "message": "..."} on failure.
+
+    The path is escaped the way the proxy demands (see
+    :func:`escape_module_path`), exactly as :func:`query_go_mod` does: an
+    unescaped uppercase letter names a module the proxy does not serve, and its
+    404 would read as "never published" for a module that is.
     """
-    url = f"https://proxy.golang.org/{module_path}/@latest"
+    url = f"https://proxy.golang.org/{escape_module_path(module_path)}/@latest"
     try:
         with _request_with_backoff(url) as resp:
             data = json.loads(resp.read())

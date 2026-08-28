@@ -60,6 +60,21 @@ class TestQueryGoVersion:
         result = query_go_version("golang.org/x/net")
         assert result == {"status": "found", "version": "1.21.0"}
 
+    @patch("urllib.request.urlopen")
+    def test_an_uppercase_module_path_is_escaped(self, mock_urlopen):
+        """The proxy's URL space is case-insensitive and demands ``!x``.
+
+        An unescaped uppercase path answers 404, which the caller reads as
+        "never published" -- so a module with a capital letter in its path
+        silently looked unpublished to every probe built on this.
+        """
+        mock_urlopen.return_value = FakeResponse({"Version": "v1.0.0"})
+        query_go_version("github.com/Owner/Repo")
+        url = mock_urlopen.call_args[0][0]
+        assert url.full_url == (
+            "https://proxy.golang.org/github.com/!owner/!repo/@latest"
+        )
+
 
 class TestQueryRegistryVersion:
     @patch("urllib.request.urlopen")
