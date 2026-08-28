@@ -3083,7 +3083,10 @@ def _run_release_mutating(state: ReleaseState):
 
     # GITHUB_RELEASE guard: skip if the release already exists
     # Create GitHub Release using a temp notes file
-    # Notes file cleanup is deferred until after subtree publishing (which reuses it)
+    # Cleanup is deferred to the try/finally that also covers the mirror
+    # steps. The mirror no longer reuses this file: its Release composes its own
+    # body, carrying a marker that names the MIRROR's commit rather than this
+    # repository's.
     notes_file = f".rlsbl-notes-{int(time.time() * 1000)}.tmp"
     writing_file = notes_file + ".writing"
     release_created = True
@@ -3105,8 +3108,9 @@ def _run_release_mutating(state: ReleaseState):
     # commit CI ran on: the CI-verified candidate, which is also the tag's
     # commit. Under main-as-candidate ordering CI has ALREADY concluded green
     # on it before this Release exists, so the gate confirms rather than waits.
-    # The notes file is written UNCONDITIONALLY -- the subtree mirror release
-    # reuses it, and a pre-existing Release gets the marker reconciled in below.
+    # The notes file is written UNCONDITIONALLY: a pre-existing Release gets
+    # the marker reconciled in below, which reads it back through the same
+    # document.
     #
     # The document is built by rlsbl.release_publication, the one authority for
     # what a Release body carries -- shared with `rlsbl release reconcile`,
@@ -3207,7 +3211,7 @@ def _run_release_mutating(state: ReleaseState):
                 )
             except Exception as e:
                 from ...utils import warn_exception
-                warn_exception("could not load workspace for subtree publishing", e)
+                warn_exception("could not load workspace for mirror publishing", e)
                 subtree_remote = None
 
             if subtree_remote:
@@ -3296,7 +3300,7 @@ def _run_release_mutating(state: ReleaseState):
                     save_step(_state_path, "MIRROR_RELEASED")
                     _completed.add("MIRROR_RELEASED")
     finally:
-        # Clean up temp files after both main and mirror releases
+        # Clean up temp files after the Release and the mirror steps
         for tmp in (notes_file, writing_file):
             if os.path.exists(tmp):
                 effects.remove(tmp)
@@ -3608,7 +3612,7 @@ def _run_release_mutating(state: ReleaseState):
         raise PostReleaseError(f"GitHub Release creation failed for {tag}")
 
     # Single decision point for the whole non-fatal family (deploy, post
-    # hooks, subtree push, mirror release, post-hoc snapshot). "Non-fatal"
+    # hooks, mirror convergence, mirror release, post-hoc snapshot). "Non-fatal"
     # means the release is not rolled back and stays resumable -- it never
     # meant "exit 0". Any failure marker at this point is a step that ran and
     # failed, so the run reports it through its exit code and KEEPS the state
