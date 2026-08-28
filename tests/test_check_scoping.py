@@ -327,6 +327,13 @@ def test_ci_synced_fails_non_dev_node_missing_workflow(tmp_path):
     (wf / "ci-router.yml").write_text(
         "name: CI Router\non: push\njobs:\n  detect:\n    runs-on: ubuntu-latest\n"
     )
+    # mylib carries a CI workflow of its own, so the router owes it jobs. A
+    # member with none contributes nothing to the router and is skipped.
+    mylib_wf = ws / "mylib" / ".github" / "workflows"
+    mylib_wf.mkdir(parents=True)
+    (mylib_wf / "ci.yml").write_text(
+        "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
+    )
 
     projects = [
         {"name": "mylib", "path": "mylib"},

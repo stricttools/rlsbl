@@ -20,22 +20,37 @@ CI_ROUTER_FILE = "ci-router.yml"
 def discover_project_ci_sources(project_dir) -> list[str]:
     """Absolute paths of *project_dir*'s own CI workflow source files.
 
-    ``ci.yml`` plus every ``ci-*.yml`` except the generated router. This is
+    ``ci.yml`` plus every ``ci-*.yml`` except a generated router. This is
     the ONE discovery shared by ``monorepo sync`` (which inlines these files
-    into the router, minting the job keys) and the release CI gate (which
-    must know the check-run names those keys produce), so the router and the
-    gate can never be derived from different file sets.
+    into the router, minting the job keys), the release CI gate (which
+    must know the check-run names those keys produce) and the
+    ``workspace-ci-synced`` check (which asks whether the router carries a
+    member's jobs at all), so the router, the gate and the check can never be
+    derived from different file sets.
+
+    A generated router is never a project's own CI source: the transform
+    pipeline is not idempotent on its own output. The workspace root member is
+    where this is not hypothetical -- its ``.github/workflows/`` directory IS
+    the routers' home. Recognition is by the header ``monorepo sync`` writes
+    (:func:`~rlsbl.router_filters.is_generated_router`), not by file name
+    alone, so a router left behind under any name is still recognized; a
+    hand-authored root workflow carries no header and stays a real source.
     """
+    from .router_filters import is_generated_router
+
     wf_dir = os.path.join(str(project_dir), ".github", "workflows")
     if not os.path.isdir(wf_dir):
         return []
     sources = []
     single = os.path.join(wf_dir, "ci.yml")
-    if os.path.isfile(single):
+    if os.path.isfile(single) and not is_generated_router(single):
         sources.append(single)
     for path in sorted(glob.glob(os.path.join(wf_dir, "ci-*.yml"))):
-        if os.path.basename(path) != CI_ROUTER_FILE:
-            sources.append(path)
+        if os.path.basename(path) == CI_ROUTER_FILE:
+            continue
+        if is_generated_router(path):
+            continue
+        sources.append(path)
     return sources
 
 

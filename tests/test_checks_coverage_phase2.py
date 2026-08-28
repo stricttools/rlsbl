@@ -2052,6 +2052,20 @@ class TestWorkspaceCiSynced:
         assert result.status == "skip"
 
     @staticmethod
+    def _write_project_ci(repo, path):
+        """Give a member a CI workflow of its own.
+
+        The check only asks the router about members that HAVE one: a member
+        with no ``.github/workflows/ci*.yml`` contributes no router jobs (sync
+        mints none for it), so it is skipped rather than demanded.
+        """
+        wf = repo / path / ".github" / "workflows"
+        wf.mkdir(parents=True, exist_ok=True)
+        (wf / "ci.yml").write_text(
+            "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n"
+        )
+
+    @staticmethod
     def _write_router(repo, job_keys):
         """Write a minimal ci-router.yml with a detect job plus *job_keys*."""
         wf = repo / ".github" / "workflows"
@@ -2071,6 +2085,7 @@ class TestWorkspaceCiSynced:
 
         from rlsbl.workspace import WorkspaceProject
 
+        self._write_project_ci(repo, "alpha")
         projects = [WorkspaceProject({"name": "alpha", "path": "alpha"})]
         ctx = _make_ws_ctx(repo, projects)
 
@@ -2087,6 +2102,8 @@ class TestWorkspaceCiSynced:
 
         # Router has beta's jobs but not alpha's.
         self._write_router(repo, ["beta-ci-build"])
+        self._write_project_ci(repo, "alpha")
+        self._write_project_ci(repo, "beta")
 
         from rlsbl.workspace import WorkspaceProject
 
@@ -2109,6 +2126,8 @@ class TestWorkspaceCiSynced:
         _init_repo(repo)
 
         self._write_router(repo, ["alpha-ci-build", "alpha-ci-test", "beta-ci-build"])
+        self._write_project_ci(repo, "alpha")
+        self._write_project_ci(repo, "beta")
 
         from rlsbl.workspace import WorkspaceProject
 
@@ -2162,8 +2181,11 @@ class TestWorkspaceCiSynced:
         monkeypatch.chdir(repo)
         _init_repo(repo)
 
-        # Router has alpha's jobs but NOT the dev_node member's.
+        # Router has alpha's jobs but NOT the dev_node member's, though both
+        # carry a CI workflow of their own.
         self._write_router(repo, ["alpha-ci-build"])
+        self._write_project_ci(repo, "alpha")
+        self._write_project_ci(repo, "devtool")
 
         from rlsbl.workspace import WorkspaceProject
 
@@ -3208,6 +3230,8 @@ class TestWorkspaceCiSyncedEdge:
         _init_repo(repo)
 
         TestWorkspaceCiSynced._write_router(repo, ["alpha-ci-build"])
+        TestWorkspaceCiSynced._write_project_ci(repo, "alpha")
+        TestWorkspaceCiSynced._write_project_ci(repo, "beta")
         # beta's jobs are absent from the router
 
         from rlsbl.workspace import WorkspaceProject

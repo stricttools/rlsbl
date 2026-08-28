@@ -216,11 +216,12 @@ def register_workspace_checks(app):
     def check_workspace_ci_synced(ctx, reporter):
         """Each project's CI jobs must be inlined into the shared ci-router.yml."""
         from ..targets import detect_targets, TARGETS, resolve_releasable_config_dir
-        from ..ci_router import _router_ci_job_keys
+        from ..ci_router import _router_ci_job_keys, discover_project_ci_sources
         from ruamel.yaml import YAML
 
         required = []
         skipped = 0
+        without_workflows = []
         for proj in ctx.projects:
             proj_dir = os.path.join(str(ctx.workspace_root), proj["path"])
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
@@ -237,13 +238,42 @@ def register_workspace_checks(app):
                 if not has_ci:
                     skipped += 1
                     continue
-            required.append((proj["name"], _router_ci_job_keys(proj)))
+            # A member with no CI workflow file of its own has nothing to
+            # inline: `monorepo sync` warns and mints no router jobs for it, so
+            # demanding router jobs here would report a workspace sync itself
+            # calls done. The member this bites is the mandated root one, whose
+            # `.github/workflows/` holds the GENERATED routers rather than its
+            # own CI -- and discovery drops a generated router by the header
+            # sync writes, so the routers sitting there are never mistaken for
+            # the root member's own workflows.
+            sources = discover_project_ci_sources(proj_dir)
+            if not sources:
+                without_workflows.append(proj["name"])
+                continue
+            required.append((proj["name"], _router_ci_job_keys(proj, proj_dir)))
+
+        for name in without_workflows:
+            reporter.note(
+                f"{name}: no CI workflow of its own "
+                f"(.github/workflows/ci*.yml), so `rlsbl monorepo sync` inlines "
+                f"nothing for it and there is nothing to keep in sync"
+            )
+
+        def _suffix():
+            parts = []
+            if skipped:
+                parts.append(f"{skipped} skipped, no CI templates")
+            if without_workflows:
+                parts.append(
+                    f"{len(without_workflows)} skipped, no CI workflow of its "
+                    f"own: {', '.join(without_workflows)}"
+                )
+            return f" ({'; '.join(parts)})" if parts else ""
 
         if not required:
-            msg = "no in-scope projects require CI inlining"
-            if skipped:
-                msg += f" ({skipped} skipped, no CI templates)"
-            return reporter.passed(msg)
+            return reporter.passed(
+                "no in-scope projects require CI inlining" + _suffix()
+            )
 
         router_path = os.path.join(
             str(ctx.workspace_root), ".github", "workflows", "ci-router.yml"
@@ -274,10 +304,9 @@ def register_workspace_checks(app):
             return reporter.found(
                 f"projects not inlined in ci-router.yml: {', '.join(missing)}"
             )
-        msg = f"all {len(required)} project(s) inlined in ci-router.yml"
-        if skipped:
-            msg += f" ({skipped} skipped, no CI templates)"
-        return reporter.passed(msg)
+        return reporter.passed(
+            f"all {len(required)} project(s) inlined in ci-router.yml" + _suffix()
+        )
 
     @app.error_check("workspace-targets")
     def check_workspace_targets(ctx, reporter):
