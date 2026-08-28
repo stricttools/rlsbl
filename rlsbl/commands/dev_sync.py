@@ -65,6 +65,106 @@ def _fail(message):
     return None
 
 
+def _repo_root(project_root):
+    """The git repository *project_root* is in, or None when it is in none.
+
+    The scope guard below is about THIS REPOSITORY, so it asks git rather than
+    comparing against the project directory: a member of a workspace is inside
+    the repository without being inside the sub-project, and a checkout that is
+    its own repository is outside it however close by it sits on disk.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=str(project_root), capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    top = result.stdout.strip()
+    return os.path.realpath(top) if top else None
+
+
+def _is_inside(path, root):
+    """Is *path* the same directory as *root*, or under it?"""
+    path = os.path.realpath(path)
+    root = os.path.realpath(root)
+    return path == root or path.startswith(root + os.sep)
+
+
+def _member_spellings(project_root):
+    """Every name a member of this workspace can be installed under.
+
+    Its workspace name and the ``registry_name`` it publishes as, normalized
+    the way uv normalizes a distribution name, mapped to the member path that
+    declared it. Empty when the project is not in a workspace.
+    """
+    from ..workspace import find_workspace_root, load_workspace
+
+    workspace_root = find_workspace_root(str(project_root))
+    if workspace_root is None:
+        return {}
+    try:
+        members = load_workspace(workspace_root)
+    except Exception:
+        # A workspace this project cannot read is not this command's business
+        # to report: `rlsbl check` says so with the diagnostic it deserves, and
+        # refusing an overlay over it would name the wrong problem.
+        return {}
+    spellings = {}
+    for member in members:
+        for spelling in (member["name"], member.get("registry_name")):
+            if spelling:
+                spellings.setdefault(_normalize(spelling), member["path"])
+    return spellings
+
+
+def _scope_refusal(project_root, package, path):
+    """The refusal for an overlay that names something inside this repository.
+
+    An overlay puts a SIBLING repository's checkout in front of the registry
+    wheel this project locked. Two things it therefore cannot name, each with
+    its own reason:
+
+    * **a package this workspace itself builds.** The member IS that package's
+      source, so an editable second copy of it means the code under test is
+      decided by install order rather than by declaration -- and what the
+      overlay would shadow is not a released wheel at all.
+    * **a path inside this repository.** ``uv pip install -e`` on it makes the
+      environment depend on a tree that ships with the repository, which is the
+      hazard the committed-path-source ban exists for, in a different medium:
+      it resolves here and nowhere else.
+
+    Returns the message, or None when the overlay names neither.
+    """
+    member_path = _member_spellings(project_root).get(_normalize(package))
+    if member_path is not None:
+        return (
+            f"Error: [[overlay]] entry '{package}' names a member of this "
+            f"workspace ({member_path}). An overlay puts a SIBLING project's "
+            f"checkout in front of the registry wheel this project locked, and "
+            f"a member is not resolved from a registry here at all -- it is "
+            f"already the source. Two editable copies of one package leave "
+            f"which one the tests import to install order. Depend on the "
+            f"member as a member, and drop this entry."
+        )
+    repo_root = _repo_root(project_root)
+    if repo_root is not None and _is_inside(path, repo_root):
+        return (
+            f"Error: [[overlay]] entry '{package}' resolves to {path}, which is "
+            f"inside this repository ({repo_root}). An overlay names a checkout "
+            f"of ANOTHER repository; an editable install of a path this "
+            f"repository ships makes the environment depend on a tree that "
+            f"exists on no other machine -- the same hazard a committed "
+            f"[tool.uv.sources] path entry carries. Point the entry at the "
+            f"sibling checkout, or vendor the code properly."
+        )
+    return None
+
+
 def _load_overlays(project_root):
     """Parse and validate the overlay file. Returns a list of
     {"package": str, "path": str (absolute), "version": str | None} dicts,
@@ -175,6 +275,10 @@ def _load_overlays(project_root):
                 "protect the overlay."
             )
 
+        refusal = _scope_refusal(project_root, package, abs_path)
+        if refusal is not None:
+            return _fail(refusal)
+
         overlays.append(
             {
                 "package": package,
@@ -239,6 +343,18 @@ def run_status(project_root):
     if not sentinel:
         print(f"{SENTINEL_FILENAME} records no overlays.")
         return 0
+
+    # The same two refusals `dev sync` makes, over what the sentinel recorded.
+    # A sentinel outlives the file it was written from: the overlay file can be
+    # edited, and the workspace can grow a member that takes an overlaid name.
+    # Reporting a state the sync would refuse to create as though it were
+    # ordinary drift would send the reader to re-run the very command that
+    # refuses it.
+    for entry in sentinel:
+        refusal = _scope_refusal(project_root, entry["package"], entry["path"])
+        if refusal is not None:
+            print(refusal, file=sys.stderr)
+            return 1
 
     drifted = 0
     print(f"Dev overlays declared in {SENTINEL_FILENAME}:")

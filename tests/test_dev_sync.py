@@ -642,3 +642,185 @@ def test_run_sync_preexisting_sentinel_untouched_on_failure(
     # The old sentinel is preserved exactly -- no partial rewrite.
     after = (tmp_project / SENTINEL_FILENAME).read_text()
     assert after == before
+
+
+# ---------------------------------------------------------------------------
+# Scope guards: what an overlay may NOT name
+# ---------------------------------------------------------------------------
+#
+# An overlay exists to put a SIBLING repository's checkout in front of the
+# registry wheel this project locked. Two things it therefore cannot name, and
+# both are refusals rather than warnings:
+#
+#   - a package this very workspace builds. The member IS the source; a
+#     second, editable copy of it decides which code the tests import by
+#     install order.
+#   - a path inside this repository. `uv pip install -e` on it makes the
+#     environment depend on a tree that ships with the repo -- the same hazard
+#     the committed-path-source ban exists for, in a different medium.
+
+
+def _member_workspace(root, members):
+    """Write a workspace.toml declaring *members* (name -> path) at *root*."""
+    ws_dir = root / ".rlsbl-monorepo"
+    ws_dir.mkdir(exist_ok=True)
+    body = "".join(
+        f'[[projects]]\npath = "{path}"\nname = "{name}"\nreleasable = false\n\n'
+        for name, path in members.items()
+    )
+    (ws_dir / "workspace.toml").write_text(workspace_toml(body))
+
+
+def _git_init(root):
+    for args in (
+        ["git", "init", "-q", "-b", "main"],
+        ["git", "config", "user.email", "test@test.local"],
+        ["git", "config", "user.name", "Test"],
+    ):
+        subprocess.run(args, cwd=str(root), check=True, capture_output=True)
+
+
+def test_an_overlay_naming_a_workspace_member_is_a_hard_error(
+    tmp_path, fake_run, uv_present, no_sync_env, monkeypatch, capsys
+):
+    root = tmp_path / "mono"
+    (root / "py").mkdir(parents=True)
+    (root / "sibling").mkdir()
+    _member_workspace(root, {"py": "py", "sibling": "sibling"})
+    outside = _make_overlay_project(tmp_path, "sibling-src", "sibling")
+    _write_overlay_file(
+        root / "py",
+        f'[[overlay]]\npackage = "sibling"\npath = "{outside}"\n',
+    )
+    monkeypatch.chdir(str(root / "py"))
+
+    rc = run_sync(str(root / "py"))
+
+    assert rc == 1
+    assert fake_run.calls == []
+    err = capsys.readouterr().err
+    assert "sibling" in err
+    assert "member" in err
+
+
+def test_a_member_match_is_normalized(
+    tmp_path, fake_run, uv_present, no_sync_env, monkeypatch, capsys
+):
+    """PEP 503 again: My_Pkg as a member is named by an overlay for my-pkg."""
+    root = tmp_path / "mono"
+    (root / "py").mkdir(parents=True)
+    (root / "libs" / "My_Pkg").mkdir(parents=True)
+    _member_workspace(root, {"py": "py", "My_Pkg": "libs/My_Pkg"})
+    outside = _make_overlay_project(tmp_path, "mypkg-src", "my-pkg")
+    _write_overlay_file(
+        root / "py", f'[[overlay]]\npackage = "my-pkg"\npath = "{outside}"\n'
+    )
+    monkeypatch.chdir(str(root / "py"))
+
+    rc = run_sync(str(root / "py"))
+
+    assert rc == 1
+    assert fake_run.calls == []
+    assert "member" in capsys.readouterr().err
+
+
+def test_an_overlay_naming_a_registry_name_of_a_member_is_a_hard_error(
+    tmp_path, fake_run, uv_present, no_sync_env, monkeypatch, capsys
+):
+    """A member publishes under registry_name; that is the name uv installs."""
+    root = tmp_path / "mono"
+    (root / "py").mkdir(parents=True)
+    (root / "sibling").mkdir()
+    ws_dir = root / ".rlsbl-monorepo"
+    ws_dir.mkdir()
+    (ws_dir / "workspace.toml").write_text(workspace_toml(
+        '[[projects]]\npath = "py"\nname = "py"\nreleasable = false\n\n'
+        '[[projects]]\npath = "sibling"\nname = "sibling"\n'
+        'registry_name = "acme-sibling"\nreleasable = false\n'
+    ))
+    outside = _make_overlay_project(tmp_path, "acme-src", "acme-sibling")
+    _write_overlay_file(
+        root / "py",
+        f'[[overlay]]\npackage = "acme-sibling"\npath = "{outside}"\n',
+    )
+    monkeypatch.chdir(str(root / "py"))
+
+    rc = run_sync(str(root / "py"))
+
+    assert rc == 1
+    assert "acme-sibling" in capsys.readouterr().err
+
+
+def test_an_overlay_path_inside_the_repository_is_a_hard_error(
+    mock_git_repo, fake_run, uv_present, no_sync_env, capsys
+):
+    _make_overlay_project(mock_git_repo, "vendored", "depa")
+    _write_overlay_file(
+        mock_git_repo, '[[overlay]]\npackage = "depa"\npath = "vendored"\n'
+    )
+
+    rc = run_sync(str(mock_git_repo))
+
+    assert rc == 1
+    assert fake_run.calls == []
+    err = capsys.readouterr().err
+    assert "vendored" in err
+    assert "inside this repository" in err
+
+
+def test_an_overlay_path_in_a_sibling_repository_is_fine(
+    tmp_path, fake_run, uv_present, no_sync_env, monkeypatch, capsys
+):
+    """The legitimate shape: a checkout that is its own repository."""
+    project = tmp_path / "consumer"
+    project.mkdir()
+    _git_init(project)
+    sibling = _make_overlay_project(tmp_path, "depa-src", "depa")
+    _git_init(sibling)
+    _write_overlay_file(
+        project, f'[[overlay]]\npackage = "depa"\npath = "{sibling}"\n'
+    )
+    monkeypatch.chdir(str(project))
+
+    rc = run_sync(str(project))
+
+    assert rc == 0, capsys.readouterr().err
+
+
+def test_dev_status_refuses_an_overlay_naming_a_member(
+    tmp_path, monkeypatch, capsys
+):
+    from rlsbl.commands.dev_sync import run_status
+    from rlsbl.overlay_state import SENTINEL_FILENAME
+
+    root = tmp_path / "mono"
+    (root / "py").mkdir(parents=True)
+    (root / "sibling").mkdir()
+    _member_workspace(root, {"py": "py", "sibling": "sibling"})
+    (root / "py" / SENTINEL_FILENAME).write_text(
+        '[[overlay]]\npackage = "sibling"\n'
+        f'path = "{tmp_path / "sibling-src"}"\nversion = "0.1.0"\n'
+    )
+    monkeypatch.chdir(str(root / "py"))
+
+    rc = run_status(str(root / "py"))
+
+    assert rc == 1
+    assert "member" in capsys.readouterr().err
+
+
+def test_dev_status_refuses_an_overlay_path_inside_the_repository(
+    mock_git_repo, capsys
+):
+    from rlsbl.commands.dev_sync import run_status
+    from rlsbl.overlay_state import SENTINEL_FILENAME
+
+    (mock_git_repo / SENTINEL_FILENAME).write_text(
+        '[[overlay]]\npackage = "depa"\n'
+        f'path = "{mock_git_repo / "vendored"}"\nversion = "0.1.0"\n'
+    )
+
+    rc = run_status(str(mock_git_repo))
+
+    assert rc == 1
+    assert "inside this repository" in capsys.readouterr().err
