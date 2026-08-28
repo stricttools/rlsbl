@@ -235,9 +235,11 @@ OBSERVE_ALLOWLIST = (
         "the worktree alone. RESIDUAL, same class as the pinned fetch's: "
         "`-b <branch>` DOES create a ref and prefix matching cannot refuse a "
         "flag appended after the pin -- the pin buys that `-b` cannot be "
-        "reached by a SHORTER argv, and rlsbl's one call site "
-        "(mirror_cmd.compute_split_sha) issues this argv plus the prefix path "
-        "and nothing else",
+        "reached by a SHORTER argv, and rlsbl's two call sites issue this argv "
+        "plus operands and nothing else: mirror_cmd.compute_split_sha appends "
+        "the prefix path, and mirror_publication.split_commit_for appends the "
+        "prefix path and one commit sha (the split AT that commit, which still "
+        "creates no ref)",
     ),
     ObserveEntry(
         ("git", "clone", "--quiet", "--single-branch", "--branch", "main"),

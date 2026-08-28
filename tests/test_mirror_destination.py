@@ -136,6 +136,29 @@ subtree_remote = "https://example.com/o/mylib.git"
         assert "[[releasables]]" in message
         assert "migration script" in message
 
+    def test_the_remedy_is_pasteable_toml(self, tmp_path):
+        """The suggested line must be TOML, not a Python repr.
+
+        The remedy is meant to be copied into workspace.toml as it stands, and
+        TOML strings are double-quoted.
+        """
+        _write(tmp_path, """\
+[[releasables]]
+name = "mylib"
+
+[[projects]]
+path = "packages/mylib"
+name = "mylib"
+releasable = "mylib"
+subtree_remote = "https://example.com/o/mylib.git"
+""")
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_path))
+        assert (
+            'subtree_remote = "https://example.com/o/mylib.git"'
+            in str(exc.value)
+        ), str(exc.value)
+
     def test_the_error_names_the_offending_member(self, tmp_path):
         _write(tmp_path, """\
 [[releasables]]

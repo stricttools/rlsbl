@@ -325,7 +325,7 @@ def validate_workspace_model(data, projects):
                 f"\n"
                 f"  [[releasables]]\n"
                 f"  name = \"<the releasable '{proj['name']}' belongs to>\"\n"
-                f"  subtree_remote = {proj['subtree_remote']!r}\n"
+                f"  subtree_remote = \"{proj['subtree_remote']}\"\n"
                 f"\n"
                 f"and delete it from this member. A releasable with more than "
                 f"one member cannot declare one at all: there would be no "
