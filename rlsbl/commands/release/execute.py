@@ -701,11 +701,6 @@ def _guard_empty_candidate_window(*, candidate_sha, remote_head, needs_push,
     raise ReleaseCIError(detail)
 
 
-# The publish gate's only precise statement of which commit CI must be green
-# on. Matched on its own line so a reconcile replaces rather than duplicates.
-_CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
-
-
 def _marker_reconcile_failure(tag, marker, what, exc):
     """The message for a CI-SHA marker that could not be read or written."""
     return (
@@ -733,7 +728,7 @@ class CiShaMarkerError(RlsblError):
     """
 
 
-def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
+def _reconcile_ci_sha_marker(pub, *, config, log):
     """Ensure an ALREADY-EXISTING GitHub Release carries the CI-SHA marker.
 
     The marker used to be written only on the creation path, so a Release that
@@ -753,40 +748,41 @@ def _reconcile_ci_sha_marker(tag, marker, notes_file, *, config, log):
     resumable exit, and every step after this one is skipped: the gate reading
     the marker is what decides whether the tag may publish at all, so acting
     further on a Release whose marker is unknown is exactly the move to refuse.
+
+    What a Release body IS -- the notes, the marker, the pre-release flag -- is
+    :mod:`rlsbl.release_publication`'s decision, shared with the reconciler that
+    materializes and repairs Releases outside the release flow. This function
+    keeps only the release flow's fail-closed error handling around it.
     """
     # Late-bound through the package namespace, like the rest of this module,
     # so mock.patch("rlsbl.commands.release.run_gh") is honored at call time.
     from . import run_gh
+    from ...release_publication import (
+        edit_notes_args,
+        notes_file as _notes_file,
+        read_release_body,
+    )
 
     try:
-        body = run_gh(
-            ["release", "view", tag, "--json", "body", "-q", ".body"],
-            config=config,
-        )
+        body = read_release_body(pub.tag, gh=run_gh, config=config)
     except Exception as exc:
         raise CiShaMarkerError(
-            _marker_reconcile_failure(tag, marker, "read", exc)
+            _marker_reconcile_failure(pub.tag, pub.marker, "read", exc)
         ) from exc
 
-    if marker in body:
-        log(f"CI-SHA marker already present on {tag}")
+    new_body = pub.reconciled_body(body)
+    if new_body is None:
+        log(f"CI-SHA marker already present on {pub.tag}")
         return True
 
-    stripped = _CI_SHA_MARKER_RE.sub("", body).rstrip("\n")
-    new_body = f"{stripped}\n\n{marker}\n"
-    tmp = notes_file + ".reconcile"
     try:
-        with effects.open_write(tmp, "w", encoding="utf-8") as f:
-            f.write(new_body)
-        run_gh(["release", "edit", tag, "--notes-file", tmp], config=config)
+        with _notes_file(new_body) as path:
+            run_gh(edit_notes_args(pub.tag, path), config=config)
     except Exception as exc:
         raise CiShaMarkerError(
-            _marker_reconcile_failure(tag, marker, "write", exc)
+            _marker_reconcile_failure(pub.tag, pub.marker, "write", exc)
         ) from exc
-    finally:
-        if os.path.exists(tmp):
-            effects.remove(tmp)
-    log(f"Reconciled CI-SHA marker onto existing release {tag}")
+    log(f"Reconciled CI-SHA marker onto existing release {pub.tag}")
     return True
 
 
@@ -3112,10 +3108,21 @@ def _run_release_mutating(state: ReleaseState):
     # on it before this Release exists, so the gate confirms rather than waits.
     # The notes file is written UNCONDITIONALLY -- the subtree mirror release
     # reuses it, and a pre-existing Release gets the marker reconciled in below.
-    _ci_sha = pushed_sha.strip()
-    _ci_marker = f"<!-- rlsbl-ci-sha: {_ci_sha} -->"
-    notes_body = (changelog_entry or "").rstrip("\n")
-    notes_body = f"{notes_body}\n\n{_ci_marker}\n"
+    #
+    # The document is built by rlsbl.release_publication, the one authority for
+    # what a Release body carries -- shared with `rlsbl release reconcile`,
+    # which materializes and repairs Releases outside this flow. The anchor it
+    # projects into the marker is `pushed_sha`, the verified candidate this
+    # release wrote into the version's archive as `candidate_sha` a few steps
+    # above, so the marker and the ledger state the same commit by
+    # construction.
+    from ...release_publication import publication as _publication
+
+    _pub = _publication(
+        tag=tag, version=new_version, candidate_sha=pushed_sha,
+        notes=changelog_entry or "",
+    )
+    notes_body = _pub.body
     with effects.open_write(writing_file, "w", encoding="utf-8") as f:
         f.write(notes_body)
     effects.rename(writing_file, notes_file)
@@ -3123,9 +3130,7 @@ def _run_release_mutating(state: ReleaseState):
     try:
         if _gh_release_already_exists:
             try:
-                _reconcile_ci_sha_marker(
-                    tag, _ci_marker, notes_file, config=ctx.config, log=log,
-                )
+                _reconcile_ci_sha_marker(_pub, config=ctx.config, log=log)
             except CiShaMarkerError as e:
                 from ...errors import PostReleaseError
                 save_step_failure(_state_path, "GITHUB_RELEASE", str(e))
@@ -3134,10 +3139,11 @@ def _run_release_mutating(state: ReleaseState):
             # Retry gh release create with race-condition detection.
             # GitHub API can return an error even when the release was actually created,
             # so after each failure we check whether the release exists before retrying.
-            gh_release_args = ["release", "create", tag, "--title", tag, "--notes-file", notes_file]
-            # Mark pre-release versions as GitHub pre-releases
-            if "-" in new_version:
-                gh_release_args.append("--prerelease")
+            # The argv (title, notes file, and the --prerelease flag a
+            # pre-release version earns) is the publication's own.
+            from ...release_publication import create_args as _create_args
+
+            gh_release_args = _create_args(_pub, notes_file)
             gh_release_succeeded = False
             for attempt in range(2):
                 try:
