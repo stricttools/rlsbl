@@ -1558,7 +1558,15 @@ def _apply_promotion_clone(dep, item, run):
 
     print(f"Cloning the mirror {dep.mirror_remote} -> {dep.target_path} ...")
     try:
-        _run_git(dep.workspace_root, "clone", dep.mirror_remote, dep.target_path)
+        # --branch main, never the remote's HEAD: a bare repository's HEAD is a
+        # symbolic ref anybody can repoint, and the mirror contract is about
+        # `main` -- the branch the reconciler converges and the branch the tree
+        # proof below is about. A clone that checked out whatever HEAD named
+        # would judge, tag and commit on some other branch.
+        _run_git(
+            dep.workspace_root, "clone", "--branch", "main",
+            dep.mirror_remote, dep.target_path,
+        )
     except subprocess.CalledProcessError as exc:
         raise ExtractError(
             f"could not clone the mirror at {dep.mirror_remote}: {exc}. A "
@@ -1592,6 +1600,75 @@ def _apply_promotion_clone(dep, item, run):
         effects.copy_file(source_config, dest_config)
 
 
+def _require_clean_mirror_contract(dep, member):
+    """Refuse to adopt a mirror whose contract the reconciler does not vouch for.
+
+    The same :func:`~rlsbl.commands.monorepo.mirror_cmd.observe` the reconciler
+    runs, on the same remote -- so "may this mirror be promoted?" and "may this
+    mirror be converged?" are answered by one classification rather than by two
+    that can drift apart.
+
+    ``contract_violated`` and ``lineage_undetermined`` refuse: the first because
+    a promotion would make hand-authored commits the permanent history of the
+    extracted repository, the second because whether that is what would happen
+    was never established. Neither refusal sends the operator at
+    ``rlsbl monorepo mirror``: converging force-pushes the split over the
+    mirror's tip, which for a contract violation means DESTROYING the very
+    commits this refusal is about. The remedy is to resolve them first.
+
+    ``behind`` is deliberately not refused here: the tree proof below is the
+    check that names it, with both tree hashes.
+    """
+    from .mirror_cmd import MirrorError, observe
+
+    try:
+        plan = observe(dep.mirror_remote, dep.workspace_root, member.path)
+    except MirrorError as exc:
+        raise ExtractError(
+            f"the mirror at {dep.mirror_remote} could not be classified, so a "
+            f"promotion cannot know whose history it would adopt: {exc}"
+        ) from exc
+
+    if plan.state == "contract_violated":
+        listed = "\n".join(
+            f"  - commit {sha[:12]} touches: "
+            + (", ".join(paths[:8]) + (" ..." if len(paths) > 8 else "")
+               if paths else "(no paths)")
+            for sha, paths in plan.foreign_commits
+        )
+        raise ExtractError(
+            f"the mirror at {dep.mirror_remote} carries commit(s) the mirror "
+            f"contract does not account for, and a promotion would adopt them "
+            f"as the extracted repository's own history:\n{listed}\n"
+            f"Tree equality proves only that the member's CURRENT bytes match; "
+            f"it says nothing about the commits that produced them.\n"
+            f"Resolve the mirror contract first -- port the work into the "
+            f"monorepo (under '{member.path}/') and re-run, or reset the mirror "
+            f"branch if the commits are to be discarded. Do NOT run `rlsbl "
+            f"monorepo mirror {member.name}` to make this message go away: "
+            f"converging force-pushes over exactly these commits. Nothing has "
+            f"been written to the source and {dep.target_path} can be deleted."
+        )
+
+    if plan.state == "lineage_undetermined":
+        listed = "\n".join(
+            f"  - commit {sha[:12]}: git could not tell whether it belongs to "
+            f"the split lineage."
+            for sha in plan.undetermined_commits
+        )
+        raise ExtractError(
+            f"the mirror at {dep.mirror_remote} could not be shown to share "
+            f"this member's split lineage, so a promotion cannot say whose "
+            f"history it would adopt:\n{listed}\n"
+            f"This is NOT a finding of hand-authored work -- the question was "
+            f"never answered, usually because the monorepo lacks the objects "
+            f"(pruned by gc, or a shallow clone).\n"
+            f"Give the monorepo the objects (`git fetch --unshallow`, fetch the "
+            f"mirror remote) and re-run. Nothing has been written to the source "
+            f"and {dep.target_path} can be deleted."
+        )
+
+
 def _apply_promotion_trees(dep, item, run):
     """Prove the mirror carries exactly the subtree that is about to be deleted.
 
@@ -1605,9 +1682,17 @@ def _apply_promotion_trees(dep, item, run):
     two shapes the mirror contract allows (a bare split, or exactly one scaffold
     commit atop one). A mirror that is behind fails here and says so, rather
     than promoting an older tree and taking the newer one out of the monorepo.
+
+    The tree proof is the SECOND question, not the first. A promotion adopts the
+    mirror's whole history, so the mirror contract itself -- the reconciler's own
+    classification -- is asked before it: a pair of hand-authored commits that
+    cancel each other out leaves the member's tree byte-identical and would sail
+    through a proof that only compares trees.
     """
     member = dep.members[0]
     expected = dep.source_trees[member.name]
+
+    _require_clean_mirror_contract(dep, member)
 
     candidates = []
     for rev in ("HEAD", "HEAD^"):

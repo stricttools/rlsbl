@@ -320,3 +320,90 @@ class TestApply:
         # ...and with the releasable goes its mirror binding.
         text = (ns.root / ".rlsbl-monorepo" / "workspace.toml").read_text()
         assert "subtree_remote" not in text
+
+
+class TestTheMirrorContractIsAskedBeforeAnythingIsAdopted:
+    """Tree equality is not the whole question a promotion has to ask.
+
+    A promotion adopts the mirror's HISTORY, not just its current tree, so a
+    hand-authored commit on the mirror becomes part of the extracted
+    repository's permanent record. Proving the member's tree survived says
+    nothing about that: a pair of foreign commits that cancel each other out
+    leaves the tree byte-identical and used to promote without a word.
+    """
+
+    def _foreign_pair_on_the_mirror(self, ns, mirror, tmp_path):
+        """Two hand-authored commits whose net tree change is nothing."""
+        from rlsbl.commands.monorepo.mirror_cmd import compute_split_sha
+
+        split = compute_split_sha(str(ns.root), "pkg")
+        work = tmp_path / "attacker"
+        subprocess.run(
+            ["git", "clone", "-q", mirror, str(work)], check=True,
+        )
+        run_git(work, "config", "user.email", "evil@x")
+        run_git(work, "config", "user.name", "Evil")
+        run_git(work, "reset", "-q", "--hard", split)
+        (work / "backdoor.py").write_text("import os  # hand-authored\n")
+        run_git(work, "add", "backdoor.py")
+        run_git(work, "commit", "-q", "-m", "hand-authored on the mirror")
+        sneaky = gitout(work, "rev-parse", "HEAD")
+        run_git(work, "rm", "-q", "backdoor.py")
+        run_git(work, "commit", "-q", "-m", "and taken back out again")
+        run_git(work, "push", "-q", "--force", "origin", "HEAD:main")
+        return sneaky
+
+    def test_a_byte_identical_foreign_history_is_refused(self, tmp_path):
+        ns, mirror = make_promotable(tmp_path)
+        sneaky = self._foreign_pair_on_the_mirror(ns, mirror, tmp_path)
+
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(
+                str(ns.root), "pkg", str(tmp_path / "out"), delete_with_rm=True,
+            )
+
+        message = str(exc.value)
+        assert "contract" in message.lower()
+        assert sneaky[:12] in message, (
+            "the refusal must name the commit it refuses to adopt:\n" + message
+        )
+        # Nothing was taken out of the source.
+        assert (ns.root / "pkg").is_dir()
+
+    def test_a_clean_mirror_still_promotes(self, tmp_path):
+        ns, _mirror = make_promotable(tmp_path)
+        target = tmp_path / "out"
+        cmd_extract(str(ns.root), "pkg", str(target), delete_with_rm=True)
+        assert (target / ".rlsbl" / "config.json").is_file()
+
+
+class TestThePromotionClonesTheContractBranch:
+    """A mirror whose remote HEAD names another branch still promotes.
+
+    The destination is a clone of the mirror, and a bare repository's HEAD is
+    just a symbolic ref somebody can point anywhere. The contract is about
+    ``main``: that is the branch the reconciler converges, the branch whose tip
+    the tree proof is about, and therefore the branch the clone must check out.
+    """
+
+    def test_a_diverted_remote_head_does_not_derail_the_promotion(self, tmp_path):
+        ns, mirror = make_promotable(tmp_path)
+        # A stale branch, and the bare repo's HEAD pointed at it.
+        stale = subprocess.run(
+            ["git", "rev-parse", "main^^"], cwd=mirror,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["git", "update-ref", "refs/heads/stale", stale], cwd=mirror,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "symbolic-ref", "HEAD", "refs/heads/stale"], cwd=mirror,
+            check=True,
+        )
+
+        target = tmp_path / "out"
+        cmd_extract(str(ns.root), "pkg", str(target), delete_with_rm=True)
+
+        assert gitout(target, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+        assert (target / ".rlsbl" / "config.json").is_file()
