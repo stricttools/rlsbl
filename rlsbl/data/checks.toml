@@ -770,6 +770,22 @@ depends_on = ["config-schema"]
 # offline by construction: no package manager is invoked (see rlsbl/dep_locks.py
 # for why `uv lock --check` was rejected). In "preflight" so a stale lock blocks
 # the release whose bump would otherwise silently rewrite it.
+# strictspec-generated-floor: a generated validator calls
+# require_runtime_version(GENERATED_BY) at IMPORT, and that pairing is exact, so
+# a declared strictspec floor below any committed GENERATED_BY ships an artifact
+# whose validators cannot import on a floor-resolved install. Compared at full
+# patch precision against the generated files -- dep-floors compares major.minor
+# against the lock and cannot see this. Pure (reads strictspec.toml, the
+# generated files and pyproject.toml). In "preflight" because this class broke a
+# release attempt.
+[checks.strictspec-generated-floor]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 # go-module-identity: a go.mod module path IS the URL the toolchain fetches
 # from, so a renamed repo, a new owner or an absorb that moved the module under
 # a subdirectory leaves a module nobody can `go get`. Compared against the

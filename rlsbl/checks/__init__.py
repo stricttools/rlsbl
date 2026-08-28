@@ -74,6 +74,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # go-module-identity compares a go.mod module path against the repository's
     # own origin identity, which only Go has.
     "go-module-identity": frozenset({"go"}),
+    # strictspec-generated-floor compares a python dependency floor against the
+    # python validators strictspec generated.
+    "strictspec-generated-floor": frozenset({"pypi"}),
     "license-file": None,
     # --- release tag (universal) ---
     "unpublished-refs": None,

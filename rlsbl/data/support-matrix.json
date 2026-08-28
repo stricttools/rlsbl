@@ -949,6 +949,12 @@
         "spec"
       ]
     },
+    "strictspec-generated-floor": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
     "stricttest-floor": {
       "kind": "universal",
       "targets": [
@@ -1447,6 +1453,14 @@
         ],
         [
           "ruff-lint",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "strictspec-generated-floor",
           "yes",
           "no",
           "no",

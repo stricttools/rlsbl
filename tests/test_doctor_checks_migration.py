@@ -108,6 +108,8 @@ EXPECTED_CHECKS = [
     "dep-locks",
     # a go.mod module path names where the repository actually lives
     "go-module-identity",
+    # the declared strictspec floor reaches every generated validator
+    "strictspec-generated-floor",
     # committed target support matrix freshness (regenerate-and-compare)
     "target-matrix-fresh",
     # Path-capable tool checks and their competing-scope guards

@@ -796,6 +796,37 @@ def register_project_checks(app):
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} lagging dep floor(s)")
 
+    @app.error_check("strictspec-generated-floor")
+    def check_strictspec_generated_floor(ctx, reporter):
+        """The declared strictspec floor must reach every generated validator.
+
+        A generated validator pairs with the exact strictspec release that
+        produced it (``require_runtime_version(GENERATED_BY)``, at import), so
+        a floor below any committed ``GENERATED_BY`` ships an artifact whose
+        validators cannot import on a floor-resolved install. Compared at full
+        patch precision, which is what ``dep-floors`` (major.minor, and reading
+        the lock rather than the generated code) cannot see.
+        """
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
+
+        from ..strictspec_floor import evaluate_strictspec_floor
+
+        verdict = evaluate_strictspec_floor(str(ctx.project_root))
+        if verdict.skip_reason is not None:
+            return reporter.skipped(verdict.skip_reason)
+        if verdict.ok:
+            return reporter.passed(
+                "; ".join(verdict.notes[:3]) or "strictspec floor covers the "
+                "generated validators"
+            )
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(
+            f"{len(verdict.problems)} strictspec floor problem(s)"
+        )
+
     @app.error_check("go-module-identity")
     def check_go_module_identity(ctx, reporter):
         """Every go.mod's module path must name where the repository lives.
