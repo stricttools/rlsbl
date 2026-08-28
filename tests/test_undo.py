@@ -188,6 +188,116 @@ def _make_released_repo(repo, *, n_commits=5, with_remote=True):
     return shas
 
 
+def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=False):
+    """Build ``repo`` in the state a completed 1.0.1 release ACTUALLY leaves.
+
+    Main-as-candidate ordering, which is what the release flow really does and
+    what ``rlsbl unreleased`` shows on rlsbl's own repository:
+
+      1. ``initial``                                (version 1.0.0)
+      2. ``chore: archive release 1.0.0``           (the predecessor's ledger)
+      3. ``v1.0.1``                                 the version-bump commit --
+         the CANDIDATE: it carries the tag AND the ledger anchor
+      3b. with *resumed*: a fix-forward commit and a changelog commit land on
+          top of the candidate after a red CI verdict, and the tag/anchor move
+          to that tip -- the tag is then NOT on the version-bump commit
+      4. ``chore: finalize changelog for 1.0.1``    ABOVE the tag
+      5. ``chore: finalize release file for 1.0.1`` ABOVE the tag
+
+    The old ``_make_released_repo`` fixture tags the LAST commit instead, which
+    puts every finalization commit below the tag -- a shape the release flow
+    stopped producing when the CI gate moved in front of the tag.
+
+    Returns a dict of shas (``version_bump``, ``anchor``, ...).
+    """
+    init_repo(repo)
+
+    _write(repo, "package.json", json.dumps({"name": "pkg", "version": "1.0.0"}, indent=2) + "\n")
+    _write(repo, ".rlsbl/config.json", json.dumps({
+        "publish_mode": "ci", "targets": ["npm"],
+    }, indent=2) + "\n")
+    _write(repo, ".rlsbl/changes/unreleased.jsonl", json.dumps(_ENTRY) + "\n")
+    _write(
+        repo, ".rlsbl/releases/unreleased.toml",
+        'format_version = 1\nbump = "patch"\ninclude = ["npm"]\nexclude = []\n'
+        'description = "x"\n',
+    )
+    _write(repo, "CHANGELOG.md", "# Changelog\n\n## Unreleased\n\n### Features\n\n- A shiny new thing.\n")
+    _write(repo, ".gitignore", ".rlsbl/releases/in-progress.json\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "initial")
+    git(repo, "tag", "v1.0.0")
+    shas = {"initial": git(repo, "rev-parse", "HEAD")}
+
+    archive_release(
+        ledger_dir(repo), "1.0.0", shas["initial"],
+        tree=git(repo, "rev-parse", "HEAD^{tree}"),
+    )
+    git(repo, "add", ".rlsbl/releases")
+    git(repo, "commit", "-q", "-m", "chore: archive release 1.0.0")
+
+    # The candidate: the version-bump commit, pushed UNTAGGED and gated by CI.
+    pkg = json.loads((repo / "package.json").read_text())
+    pkg["version"] = "1.0.1"
+    (repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+    (repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## 1.0.1\n\n### Features\n\n- A shiny new thing.\n\n## 1.0.0\n\n- none\n"
+    )
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "v1.0.1")
+    shas["version_bump"] = git(repo, "rev-parse", "HEAD")
+    shas["anchor"] = shas["version_bump"]
+
+    if resumed:
+        # A red CI verdict, fixed forward at the SAME version: the fix and its
+        # changelog entry sit between the bump commit and the verified tip.
+        _write(repo, "ci-fix.txt", "make the linter happy\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "fix: make CI green")
+        shas["ci_fix"] = git(repo, "rev-parse", "HEAD")
+        with open(repo / ".rlsbl/changes/unreleased.jsonl", "a") as fh:
+            fh.write(json.dumps({
+                "commits": [shas["ci_fix"]], "user_facing": False,
+            }) + "\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "changelog: non-user-facing entry")
+        shas["anchor"] = git(repo, "rev-parse", "HEAD")
+
+    if snapshot:
+        # The monorepo snapshot is regenerated pre-push, so it rides INTO the
+        # candidate: the tag and the anchor land on it, not on the bump commit.
+        _write(repo, ".rlsbl-monorepo/snapshot.json", '{"packages": {}}\n')
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "snapshot")
+        shas["snapshot"] = git(repo, "rev-parse", "HEAD")
+        shas["anchor"] = shas["snapshot"]
+
+    # Finalization -- ABOVE the tag.
+    os.rename(repo / ".rlsbl/changes/unreleased.jsonl", repo / ".rlsbl/changes/1.0.1.jsonl")
+    (repo / ".rlsbl/changes/unreleased.jsonl").write_text("")
+    (repo / ".rlsbl/changes/1.0.1.md").write_text("### Features\n\n- A shiny new thing.\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "chore: finalize changelog for 1.0.1")
+    shas["finalize_changelog"] = git(repo, "rev-parse", "HEAD")
+
+    os.rename(repo / ".rlsbl/releases/unreleased.toml", repo / ".rlsbl/releases/v1.0.1.toml")
+    write_release_anchor(
+        str(repo / ".rlsbl/releases/v1.0.1.toml"),
+        candidate_sha=shas["anchor"],
+        tree_hashes={".": git(repo, "rev-parse", f'{shas["anchor"]}^{{tree}}')},
+    )
+    os.chmod(repo / ".rlsbl/releases/v1.0.1.toml", 0o444)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "chore: finalize release file for 1.0.1")
+    shas["finalize_release_file"] = git(repo, "rev-parse", "HEAD")
+
+    # The tag goes on the CI-VERIFIED commit, not on HEAD.
+    git(repo, "tag", "v1.0.1", shas["anchor"])
+    if with_remote:
+        add_remote(repo, repo.parent / "remote.git")
+    return shas
+
+
 def _ctx(repo):
     return ProjectContext(
         project_root=Path(str(repo)), workspace_root=None,
@@ -480,10 +590,19 @@ class TestEdgeCases:
         # Undo still unwound the release.
         assert json.loads((repo / "package.json").read_text())["version"] == "1.0.0"
 
-    def test_interleaved_foreign_commit_refuses_partial_undo(self, tmp_path, monkeypatch, capsys):
-        """A foreign commit interleaved in the release sequence stops the walk
-        before reaching the version-bump commit. The undo must hard-error
-        rather than silently performing a partial revert."""
+    def test_interleaved_foreign_commit_is_kept_while_the_release_is_reverted(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        """A foreign commit interleaved in the release sequence is left alone.
+
+        This fixture used to be refused: the walk started at the tag, stopped
+        at the foreign commit before reaching the version bump, and a
+        completeness guard turned that into a hard error. The release commits
+        are now found through the ledger instead of by a contiguous walk, and
+        an interleaved foreign commit is the NORMAL shape of a resumed release
+        (a fix-forward between the bump and the CI-verified commit) -- so the
+        release commits are reverted around it and the foreign work survives.
+        """
         repo = tmp_path / "repo"
         init_repo(repo)
 
@@ -536,15 +655,14 @@ class TestEdgeCases:
         add_remote(repo, repo.parent / "remote.git")
         monkeypatch.chdir(repo)
 
-        head_before = git(repo, "rev-parse", "HEAD")
-        with pytest.raises(SystemExit) as exc:
-            _run_undo(repo, {})
-        assert exc.value.code == 1
+        _run_undo(repo, {})
 
-        err = capsys.readouterr().err
-        assert "version bump" in err.lower() or "version_bump" in err.lower()
-        # Nothing was reverted.
-        assert git(repo, "rev-parse", "HEAD") == head_before
+        assert json.loads((repo / "package.json").read_text())["version"] == "1.0.0"
+        assert (repo / "foreign.txt").read_text() == "unrelated work\n", (
+            "the interleaved foreign commit must not be reverted"
+        )
+        assert not (repo / ".rlsbl/changes/1.0.1.jsonl").exists()
+        assert "v1.0.1" not in git(repo, "tag", "-l").split()
 
     def test_no_releases_errors(self, tmp_path, monkeypatch, capsys):
         """Nothing archived means nothing to undo.
@@ -621,3 +739,220 @@ class TestRestoreChangelogNamesRealPaths:
         assert git(repo, "status", "--porcelain") == ""
         assert (changes / "unreleased.jsonl").is_file()
         assert "Unreleased" in (project / "CHANGELOG.md").read_text()
+
+
+# --------------------------------------------------------------------------- #
+# The REAL release shape: the tag is on the version-bump commit and the
+# finalization commits sit ABOVE it (main-as-candidate ordering).
+# --------------------------------------------------------------------------- #
+
+class TestRealReleaseShape:
+
+    def test_reverts_the_bump_and_repairs_the_finalization(self, tmp_path, monkeypatch):
+        repo = tmp_path / "repo"
+        shas = _make_real_shape_repo(repo)
+        monkeypatch.chdir(repo)
+        assert git(repo, "rev-list", "-n", "1", "v1.0.1") == shas["version_bump"], (
+            "fixture must tag the CANDIDATE, not the last finalization commit"
+        )
+
+        gh = _run_undo(repo, {})
+
+        assert json.loads((repo / "package.json").read_text())["version"] == "1.0.0"
+        # The finalization above the tag is repaired rather than reverted.
+        assert not (repo / ".rlsbl/changes/1.0.1.jsonl").exists()
+        assert "A shiny new thing" in (repo / ".rlsbl/changes/unreleased.jsonl").read_text()
+        assert not (repo / ".rlsbl/releases/v1.0.1.toml").exists()
+        assert (repo / ".rlsbl/releases/unreleased.toml").exists()
+        assert "v1.0.1" not in git(repo, "tag", "-l").split()
+        assert remote_ref(repo, "refs/tags/v1.0.1") == ""
+        assert gh.deleted
+
+    def test_resumed_release_still_reverts_the_version_bump(self, tmp_path, monkeypatch):
+        """A resumed release tags the CI-verified tip, not the bump commit.
+
+        The commit walk used to start at the tag and stop at the first
+        non-release-shaped subject, so on this shape it collected ZERO commits
+        and undo reported success with the version files still bumped.
+        """
+        repo = tmp_path / "repo"
+        shas = _make_real_shape_repo(repo, resumed=True)
+        monkeypatch.chdir(repo)
+        assert git(repo, "rev-list", "-n", "1", "v1.0.1") != shas["version_bump"]
+
+        _run_undo(repo, {})
+
+        assert json.loads((repo / "package.json").read_text())["version"] == "1.0.0", (
+            "the version bump must be reverted even when the tag is not on it"
+        )
+        # The fix-forward work that made CI green is NOT reverted.
+        assert (repo / "ci-fix.txt").exists()
+        assert "v1.0.1" not in git(repo, "tag", "-l").split()
+
+    def test_post_release_entries_survive_the_unfinalize(self, tmp_path, monkeypatch):
+        """Un-finalizing must MERGE, never overwrite.
+
+        Work committed after the release adds entries to the fresh
+        unreleased.jsonl. Renaming 1.0.1.jsonl over it destroyed them and undo
+        still printed success.
+        """
+        repo = tmp_path / "repo"
+        _make_real_shape_repo(repo)
+        post = {
+            "format_version": 1, "commits": [], "user_facing": True,
+            "description": "**Post-release work.** Landed after the release.",
+            "type": "fix", "id": "post-release-id",
+        }
+        (repo / ".rlsbl/changes/unreleased.jsonl").write_text(json.dumps(post) + "\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "changelog: post-release work")
+        monkeypatch.chdir(repo)
+
+        _run_undo(repo, {})
+
+        text = (repo / ".rlsbl/changes/unreleased.jsonl").read_text()
+        assert "Post-release work" in text, "post-release entries must not be destroyed"
+        assert "A shiny new thing" in text, "released entries must come back"
+        assert "post-release-id" in text, "entry ids are preserved"
+        # Released entries first, then the work that came after them.
+        assert text.index("A shiny new thing") < text.index("Post-release work")
+
+    def test_unrelated_commit_above_the_tag_does_not_block_the_undo(
+        self, tmp_path, monkeypatch,
+    ):
+        """A post-release hook commit touching its own files is harmless."""
+        repo = tmp_path / "repo"
+        _make_real_shape_repo(repo)
+        _write(repo, "DEPLOYED.txt", "deployed\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "chore: post-release deploy notes")
+        monkeypatch.chdir(repo)
+
+        _run_undo(repo, {})
+
+        assert json.loads((repo / "package.json").read_text())["version"] == "1.0.0"
+        assert (repo / "DEPLOYED.txt").exists()
+
+
+class TestForeignWorkAboveTheTag:
+    """Work above the tag touching what the revert touches is refused UP FRONT.
+
+    Reverting the version bump underneath somebody else's edit of the same file
+    is how the rollback ends up mid-conflict. The plan refuses before anything
+    is deleted, naming the commit and the overlapping paths.
+    """
+
+    def test_refuses_before_deleting_anything(self, tmp_path, monkeypatch, capsys):
+        repo = tmp_path / "repo"
+        _make_real_shape_repo(repo)
+        pkg = json.loads((repo / "package.json").read_text())
+        pkg["dependencies"] = {"left-pad": "^1.0.0"}
+        (repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "feat: add a dependency")
+        monkeypatch.chdir(repo)
+
+        head_before = git(repo, "rev-parse", "HEAD")
+        tags_before = git(repo, "tag", "-l")
+        remote_before = snapshot_remote_refs(repo)
+
+        gh = _FakeGh()
+        with pytest.raises(SystemExit) as exc:
+            _run_undo(repo, {}, gh=gh)
+        assert exc.value.code == 1
+
+        err = capsys.readouterr().err
+        assert "package.json" in err
+        assert "feat: add a dependency" in err
+        assert not gh.deleted
+        assert git(repo, "tag", "-l") == tags_before
+        assert snapshot_remote_refs(repo) == remote_before
+        assert git(repo, "rev-parse", "HEAD") == head_before
+        assert not (repo / ".rlsbl" / "undo-audit.json").exists()
+
+
+class TestConflictedRevertStops:
+    """A conflicted revert is a hard stop, not a step that records FAILED.
+
+    The flow used to continue: the next ``git add``/``git commit`` in the
+    changelog restore CONCLUDED the in-progress revert, folding conflicted
+    content into "chore: restore changelog after undo ..." -- and then pushed.
+    """
+
+    def _repo_with_conflicting_changelog(self, repo):
+        _make_real_shape_repo(repo)
+        # CHANGELOG.md is tool-owned, so it clears the foreign-work check --
+        # and rewriting it makes the version-bump commit's revert conflict.
+        (repo / "CHANGELOG.md").write_text(
+            "# Changelog\n\n## 1.0.2\n\n### Fixes\n\n- something else entirely\n"
+        )
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "chore: rewrite the changelog")
+
+    def test_stops_without_committing_or_pushing(self, tmp_path, monkeypatch, capsys):
+        repo = tmp_path / "repo"
+        self._repo_with_conflicting_changelog(repo)
+        monkeypatch.chdir(repo)
+
+        gh = _FakeGh()
+        with pytest.raises(SystemExit) as exc:
+            _run_undo(repo, {}, gh=gh)
+        assert exc.value.code == 1
+
+        subjects = git(repo, "log", "--format=%s").splitlines()
+        assert not any(s.startswith("chore: restore") for s in subjects), (
+            "nothing may be committed after a conflicted revert"
+        )
+        assert not (repo / ".git" / "REVERT_HEAD").exists(), (
+            "the in-progress revert must be aborted, not left for the next commit"
+        )
+        assert git(repo, "status", "--porcelain") == "", "the tree is left clean"
+        assert (repo / ".rlsbl/changes/1.0.1.jsonl").exists(), (
+            "no further restoration after the stop"
+        )
+
+        out = capsys.readouterr()
+        report = out.out + out.err
+        assert "conflict" in report.lower()
+        # The report states what already happened and what is left to do.
+        assert "v1.0.1" in report
+
+    def test_does_not_push_after_the_stop(self, tmp_path, monkeypatch):
+        repo = tmp_path / "repo"
+        self._repo_with_conflicting_changelog(repo)
+        monkeypatch.chdir(repo)
+
+        gh = _FakeGh()
+        with patch("rlsbl.commands.undo.check_gh_installed", return_value=True), \
+             patch("rlsbl.commands.undo.check_gh_auth", return_value=True), \
+             patch("rlsbl.commands.undo.run_gh", side_effect=gh), \
+             patch("rlsbl.commands.undo.run_evidence_gate", side_effect=_cleared_gate), \
+             patch("rlsbl.commands.undo.push_if_needed") as mock_push:
+            with pytest.raises(SystemExit):
+                run_cmd("npm", [], {}, ctx=_ctx(repo))
+
+        # A half-done rollback must never be pushed.
+        mock_push.assert_not_called()
+
+
+class TestDryRunPlanNamesEveryWrite:
+    """--dry-run must name every commit the apply would make.
+
+    The plan listed the reverts only, while the apply also writes and commits
+    the audit record, the restored changelog and the restored release file.
+    """
+
+    def test_plan_names_the_restore_and_audit_commits(self, tmp_path, monkeypatch, capsys):
+        repo = tmp_path / "repo"
+        _make_real_shape_repo(repo)
+        monkeypatch.chdir(repo)
+
+        _run_undo(repo, {"dry-run": True})
+
+        out = capsys.readouterr().out
+        assert "chore: audit record for undo of v1.0.1" in out
+        assert "chore: restore changelog after undo of v1.0.1" in out
+        assert "chore: restore release file after undo of v1.0.1" in out
+        assert "unreleased.jsonl" in out
+        assert "CHANGELOG.md" in out
+        assert "Push" in out or "push" in out

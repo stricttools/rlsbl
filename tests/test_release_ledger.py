@@ -55,7 +55,7 @@ release-page URL                                        --exact-match``
 ``rlsbl/commands/undo.py`` ``_find_latest_release``     ``git describe
 (which release is being undone)                         --tags --abbrev=0``
 ``rlsbl/commands/undo.py``                              ``git describe
-``_previous_release_range``                             --tags --abbrev=0
+``_predecessor_anchor``                                 --tags --abbrev=0
                                                         <tag>^``
 ======================================================  =======================
 
@@ -64,14 +64,16 @@ release-page URL                                        --exact-match``
 does not contain it. ``watch`` asks ``ledger.release_at_commit`` -- which
 release a given commit IS -- and that costs one archive read, not a scan.
 
-``undo`` reads only which VERSION is latest (an archive-existence scan through
-``list_archived_versions``), then translates it into a tag: everything after
-that point -- the commit walk, the tag deletion, the revert -- operates on the
-tag namespace, so undo is an observe-and-repair layer over tags in the same
-sense ``release reconcile`` is, and refusing to start on a tag/anchor
-disagreement would refuse exactly the repair the operator came for. It DOES
-read the predecessor's anchor, because that decides which commits belong to
-the release being undone.
+``undo`` reads which VERSION is latest (an archive-existence scan through
+``list_archived_versions``) and then reads TWO anchors: the version's own --
+the commit CI verified and the tag was created on, which is where its release
+commits are found -- and the predecessor's, which bounds that search from
+below. Tag deletion still operates on the tag namespace, and a tag pointing
+somewhere other than the anchor is reported as a WARNING rather than refused:
+undo is an observe-and-repair layer over tags in the same sense ``release
+reconcile`` is, and refusing to start on a tag/anchor disagreement would refuse
+exactly the repair the operator came for -- the archive wins, and the tag is
+being deleted anyway.
 
 Release preparation -- MIGRATED to the ledger:
 

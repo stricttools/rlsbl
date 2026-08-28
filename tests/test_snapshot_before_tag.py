@@ -23,7 +23,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from githarness import add_remote, git, record_release
+from githarness import git
 
 from rlsbl.commands.release import run_cmd
 from rlsbl.commands.release.release_state import RELEASE_STEPS
@@ -36,7 +36,7 @@ from test_representative_write_elimination import (  # noqa: E402
     _run_release,
     _setup_releasable_workspace,
 )
-from test_undo import _make_released_repo, _run_undo  # noqa: E402
+from test_undo import _make_real_shape_repo, _run_undo  # noqa: E402
 
 
 _SNAPSHOT_REL = os.path.join(".rlsbl-monorepo", "snapshot.json")
@@ -136,28 +136,17 @@ class TestBatchModeSnapshotPreTag:
 class TestUndoUnwindsSnapshotCommit:
 
     def test_undo_reverts_snapshot_commit(self, tmp_path, monkeypatch):
-        """A release whose newest commit is the pre-tag snapshot commit must
-        undo completely: the walker recognizes the 'snapshot' subject and
-        reverts it along with the rest of the release.
+        """A release whose candidate is the pre-tag snapshot commit must undo
+        completely: the snapshot commit is recognized as a release commit and
+        reverted along with the version bump.
 
-        Red-green: without the walker recognizing 'snapshot', the walk stops
-        at the snapshot commit (treated as the pre-release boundary), reverts
-        nothing, and package.json stays at 1.0.1."""
+        The snapshot is regenerated BEFORE the candidate push, so it rides into
+        the candidate -- the tag and the ledger anchor land on it, and the
+        version bump sits below it. Red-green: without the 'snapshot' subject
+        being recognized, the collected set stops at the version bump and
+        snapshot.json survives the undo."""
         repo = tmp_path / "repo"
-        _make_released_repo(repo, n_commits=5, with_remote=False)
-
-        # Reproduce the new ordering: the snapshot commit sits between the
-        # finalize commits and the tag. Move the tag onto it.
-        git(repo, "tag", "-d", "v1.0.1")
-        (repo / ".rlsbl-monorepo").mkdir(exist_ok=True)
-        (repo / ".rlsbl-monorepo" / "snapshot.json").write_text('{"packages": {}}\n')
-        git(repo, "add", "-A")
-        git(repo, "commit", "-q", "-m", "snapshot")
-        # Only the TAG moves onto the snapshot commit; 1.0.1 is already in the
-        # ledger from _make_released_repo, and re-archiving it here would add a
-        # commit above the tag that the undo walk would then try to revert.
-        git(repo, "tag", "v1.0.1")
-        add_remote(repo, repo.parent / "remote.git")
+        _make_real_shape_repo(repo, snapshot=True)
         monkeypatch.chdir(repo)
 
         _run_undo(repo, {})

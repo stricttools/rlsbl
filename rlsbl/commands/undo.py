@@ -2,11 +2,39 @@
 
 The undo flow is plan-driven: an :class:`UndoPlan` is computed UPFRONT (for
 both the latest-release path and the ``--version`` non-latest path) before
-anything is mutated. The plan enumerates the release commits to revert (found
-by walking git history from the release tag toward the pre-release boundary),
+anything is mutated. The plan enumerates the release commits to revert,
 companion tags to delete, whether a GitHub Release exists, and the registry
 evidence verdict. ``--dry-run`` prints the plan and exits without touching
 anything; a real run consumes the identical plan object.
+
+The shape a release really leaves behind
+----------------------------------------
+
+Under main-as-candidate ordering the version-bump commit is the CANDIDATE: it
+is pushed untagged, CI judges it, and only then is it tagged -- so the tag sits
+at the BOTTOM of the release's commits and the finalization commits (changelog
+rename, release-file archive, per-version .md) sit ABOVE it. A resumed release
+moves the tag further still: after a fix-forward the verified commit is the tip
+at resume time, several commits above the bump.
+
+So the release commits are found from the LEDGER, not by walking down from the
+tag: the archive for the version records the commit that was verified and
+tagged (the anchor), the predecessor's archive records where the previous
+release ended, and the release's own commits are the release-shaped commits
+between those two. Walking down from the tag and stopping at the first
+non-release-shaped subject collected ZERO commits on a resumed release, and
+undo reported success with the version files still bumped.
+
+What is reverted, and what is repaired
+--------------------------------------
+
+Reverted: the release's own commits at or below the anchor (always the version
+bump; also the finalization commits on the older shape where they sat below the
+tag). Repaired rather than reverted: the finalization ABOVE the anchor -- the
+changelog is un-finalized and CHANGELOG.md regenerated, and the archived
+release file is restored to ``unreleased.toml``. Foreign work in between (a
+fix-forward that made CI green) is neither reverted nor repaired: it is
+somebody's actual work and it stays.
 """
 
 import dataclasses
@@ -291,50 +319,254 @@ def _classify_release_commit(subject, expected_msg):
     return None
 
 
-def _walk_release_commits(tag, expected_msg):
-    """Walk history from the tag's commit toward the pre-release boundary.
+def _die(*lines):
+    """Print an operator-facing refusal and exit, having changed nothing."""
+    for line in lines:
+        print(line, file=sys.stderr)
+    sys.exit(1)
 
-    Collects contiguous release-shaped commits newest-first. Message-shape
-    matching only VALIDATES what the walk finds; the walk itself (not the
-    shape of the current HEAD) drives iteration, so it is immune to the
-    "revert changes HEAD's subject" bug. Stops at the first non-release-shaped
-    commit (the boundary) or after collecting the version-bump commit (the
-    oldest commit of a release -- this keeps back-to-back releases from
-    bleeding into each other).
+
+def _release_anchor(uc, version, tag):
+    """The commit the LEDGER records *version* as having shipped from.
+
+    Read from the archive DIRECTLY rather than through
+    :func:`rlsbl.ledger.read_entry`, which refuses when the version's tag and
+    the anchor disagree. Undo is the repair path for exactly that state and is
+    about to delete the tag, so a disagreement is reported as a warning and the
+    ARCHIVE wins: it is written by the release flow, read-only from the instant
+    it exists and committed, while a tag is a ref anyone can move.
+    """
+    from ..release_file import archived_release_path, read_release_file
+
+    path = archived_release_path(_ledger_dir(uc), version)
+    try:
+        cfg = read_release_file(path)
+    except Exception as exc:
+        _die(
+            f"Error: the release archive for {version} could not be read: {path}",
+            f"  {exc}",
+            "  Undo refused: nothing was destroyed. That archive is what records "
+            "which commit the release shipped from.",
+        )
+    if getattr(cfg, "unanchorable", False) or not getattr(cfg, "candidate_sha", None):
+        _die(
+            f"Error: the release archive for {version} records no commit: {path}",
+            "  Undo cannot find the release's own commits without it, and "
+            "deleting the tag while",
+            "  leaving the version files bumped is the half-undone state this "
+            "command exists to avoid.",
+            "  Backfill the anchor (scripts/backfill_release_anchors.py) and "
+            "re-run.",
+        )
+    anchor = cfg.candidate_sha
+    try:
+        anchor = run("git", ["rev-parse", "--verify", f"{anchor}^{{commit}}"],
+                     timeout=30).strip()
+    except Exception:
+        _die(
+            f"Error: the commit the release archive records for {version} is not "
+            f"in this repository: {cfg.candidate_sha}",
+            f"  archive: {path}",
+            "  Fetch the missing history (git fetch --unshallow) and re-run.",
+        )
+
+    tag_sha = ""
+    try:
+        tag_sha = run("git", ["rev-list", "-n", "1", tag], timeout=30).strip()
+    except Exception:
+        pass
+    if tag_sha and tag_sha != anchor:
+        print(
+            f"warning: the tag {tag} points at {tag_sha[:12]} but the release "
+            f"archive anchors {version} at {anchor[:12]}. The archive is what "
+            f"undo reverts from; the tag is deleted either way.",
+            file=sys.stderr,
+        )
+    return anchor
+
+
+def _predecessor_anchor(uc, version):
+    """The commit the release BELOW *version* shipped from, or None.
+
+    The boundary survives that release's tag being deleted, because it is read
+    from the archive rather than from ``git describe``.
+    """
+    from ..ledger import read_entry
+    from ..release_file import list_archived_versions
+
+    versions = list_archived_versions(_ledger_dir(uc))
+    try:
+        below = versions[versions.index(version) + 1:]
+    except ValueError:
+        below = []
+    for prev in below:
+        try:
+            entry = read_entry(_ledger_dir(uc), prev, cwd=uc.project_path)
+        except Exception as exc:
+            # An unreadable predecessor archive (a tag that disagrees with its
+            # anchor, say) only widens the search range, and the version-bump
+            # subject is version-specific, so a wider range cannot match an
+            # older release's bump. Said out loud rather than swallowed.
+            print(
+                f"warning: the release archive for {prev} could not be read "
+                f"({exc}); looking further back for the boundary of "
+                f"{version}'s commits.",
+                file=sys.stderr,
+            )
+            continue
+        if entry.anchored:
+            return entry.candidate_sha
+    return None
+
+
+def _log_commits(range_spec):
+    """``[(sha, subject)]`` for a git range, newest first."""
+    try:
+        out = run("git", ["log", "--format=%H%x1f%s", range_spec], timeout=60)
+    except Exception:
+        return None
+    commits = []
+    for line in out.splitlines():
+        sha, _sep, subject = line.partition("\x1f")
+        if sha.strip():
+            commits.append((sha.strip(), subject.strip()))
+    return commits
+
+
+def _collect_release_commits(uc, version, tag, expected_msg):
+    """The release's own commits, newest-first, located through the LEDGER.
+
+    The search range is ``<predecessor's anchor>..<this release's anchor>``,
+    both read from the archives. Inside it the version-bump commit is
+    identified and everything release-shaped from the bump up to the anchor is
+    collected; foreign commits in between (a fix-forward) are left alone, and
+    the predecessor's own finalization commits are below the bump and so out of
+    the collected set.
 
     Returns ``(revert_shas, captured_finalize_changelog,
-    captured_finalize_release_file)``.
+    captured_finalize_release_file, anchor)``. Refuses -- loudly, before
+    anything is destroyed -- when the version-bump commit cannot be found: a
+    silent "no release commits found" is how undo used to delete a tag and a
+    GitHub Release while leaving the version files bumped.
     """
-    try:
-        sha = run("git", ["rev-list", "-n", "1", tag]).strip()
-    except Exception:
-        return [], False, False
+    anchor = _release_anchor(uc, version, tag)
+    predecessor = _predecessor_anchor(uc, version)
+    range_spec = f"{predecessor}..{anchor}" if predecessor else anchor
 
+    commits = _log_commits(range_spec)
+    if commits is None:
+        _die(
+            f"Error: could not read the commits of release {tag}: "
+            f"git log {range_spec} failed.",
+            "  Undo refused: nothing was destroyed.",
+        )
+
+    bump_indexes = [
+        i for i, (_sha, subject) in enumerate(commits)
+        if _classify_release_commit(subject, expected_msg) == "version_bump"
+    ]
+    if not bump_indexes:
+        anchor_subject = commits[0][1] if commits else "(no commits in range)"
+        _die(
+            f"Error: could not find the version-bump commit of {tag}.",
+            f"  The release archive anchors {version} at {anchor[:12]} "
+            f'("{anchor_subject}").',
+            f"  Searched {range_spec} for a commit whose subject is exactly "
+            f'"{expected_msg}"',
+            f"  and found none among its {len(commits)} commit(s).",
+            "  Undo refused: nothing was destroyed. Deleting the tag and the "
+            "GitHub Release while",
+            "  leaving the version files bumped is the half-undone state this "
+            "command exists to avoid.",
+            f"  Inspect the range (git log --oneline {range_spec}); if the "
+            "release's commits were",
+            "  rewritten, repair the ledger and the tags first "
+            "(`rlsbl release reconcile`).",
+        )
+    if len(bump_indexes) > 1:
+        shas = ", ".join(commits[i][0][:10] for i in bump_indexes)
+        _die(
+            f"Error: {len(bump_indexes)} commits in {range_spec} carry the "
+            f'version-bump subject "{expected_msg}": {shas}.',
+            "  Undo refused: nothing was destroyed. rlsbl will not guess which "
+            "one shipped the release.",
+        )
+
+    # Everything release-shaped from the bump commit up to the anchor. The list
+    # is newest-first, so the bump is the LAST element of the slice.
+    span = commits[: bump_indexes[0] + 1]
     collected = []
     captured_cl = False
     captured_rf = False
-    seen = set()
-    while sha and sha not in seen:
-        seen.add(sha)
-        try:
-            subject = run("git", ["log", "-1", "--format=%s", sha]).strip()
-        except Exception:
-            break
+    for sha, subject in span:
         shape = _classify_release_commit(subject, expected_msg)
         if shape is None:
-            break  # pre-release boundary
+            continue
         collected.append((sha, subject))
         if shape == "finalize_changelog":
             captured_cl = True
         elif shape == "finalize_release_file":
             captured_rf = True
-        if shape == "version_bump":
-            break  # oldest release commit reached
-        try:
-            sha = run("git", ["rev-parse", f"{sha}^"]).strip()
-        except Exception:
-            break
-    return collected, captured_cl, captured_rf
+    return collected, captured_cl, captured_rf, anchor
+
+
+def _commit_paths(sha):
+    """Every path a commit touches (empty for a merge, which shows no diff)."""
+    try:
+        out = run("git", ["show", "--pretty=format:", "--name-only", sha],
+                  timeout=60)
+    except Exception:
+        return []
+    return [p.strip() for p in out.splitlines() if p.strip()]
+
+
+def _refuse_foreign_work_above_anchor(anchor, revert_shas, tag):
+    """Refuse when work above the released commit endangers the revert.
+
+    A commit between the anchor and HEAD is safe when either it is entirely
+    rlsbl's own bookkeeping (the finalization commits, and anything else in the
+    tool-owned set) or it touches none of the files the revert touches -- a
+    post-release hook writing its own notes cannot conflict with reverting a
+    version bump. Anything else is refused BEFORE the first deletion: reverting
+    the bump underneath somebody's edit of the same file is how a rollback ends
+    up mid-conflict, and by then the tag and the GitHub Release are gone.
+    """
+    from ..ownership import is_tool_owned_path
+
+    if not revert_shas:
+        return
+    reverted_paths = set()
+    for sha, _subject in revert_shas:
+        reverted_paths.update(_commit_paths(sha))
+    if not reverted_paths:
+        return
+
+    span = _log_commits(f"{anchor}..HEAD")
+    if span is None:
+        _die(
+            f"Error: could not read the commits above the released commit "
+            f"{anchor[:12]}.",
+            "  Undo refused: nothing was destroyed.",
+        )
+    for sha, subject in span:
+        paths = _commit_paths(sha)
+        if paths and all(is_tool_owned_path(p) for p in paths):
+            continue
+        overlap = sorted(set(paths) & reverted_paths)
+        if not overlap:
+            continue
+        _die(
+            f"Error: cannot undo {tag} -- commit {sha[:12]} "
+            f'("{subject}") sits above the released commit and changes files '
+            f"the undo must revert:",
+            *[f"    {p}" for p in overlap],
+            "  Reverting the release underneath it would leave the rollback "
+            "mid-conflict, with the",
+            "  tag and the GitHub Release already deleted.",
+            "  Undo refused: nothing was destroyed. Move that work aside (or "
+            "revert it yourself)",
+            "  and re-run.",
+        )
 
 
 def _plan_companion_tags(uc, tag, version):
@@ -428,28 +660,6 @@ def _audit_dir(uc):
     return os.path.join(uc.project_path, ".rlsbl")
 
 
-def _previous_release_range(uc, version, tag):
-    """``<previous release's commit>..<tag>``, or just *tag* when there is none.
-
-    The predecessor is the next version below *version* in the ledger, and its
-    archive records the commit it shipped from -- so the boundary survives that
-    tag being deleted.
-    """
-    from ..ledger import read_entry
-    from ..release_file import list_archived_versions
-
-    versions = list_archived_versions(_ledger_dir(uc))
-    try:
-        below = versions[versions.index(version) + 1:]
-    except ValueError:
-        below = []
-    for prev in below:
-        entry = read_entry(_ledger_dir(uc), prev, cwd=uc.project_path)
-        if entry.anchored:
-            return f"{entry.candidate_sha}..{tag}"
-    return tag
-
-
 def _build_plan(uc, flags, ctx):
     """Compute the full UndoPlan for either path, before any mutation."""
     version_flag = flags.get("version")
@@ -457,53 +667,12 @@ def _build_plan(uc, flags, ctx):
     if is_latest:
         version, tag = _find_latest_release(uc)
         _tag_version, expected_msg = _version_and_msg(uc, tag)
-        revert_shas, cap_cl, cap_rf = _walk_release_commits(tag, expected_msg)
-        # Completeness guard: if the walk collected release-shaped commits
-        # but never reached the version-bump commit (e.g. a foreign commit
-        # was interleaved and stopped the walk early), refuse the undo
-        # rather than silently performing a partial revert.
-        if revert_shas:
-            has_version_bump = any(
-                _classify_release_commit(subj, expected_msg) == "version_bump"
-                for _, subj in revert_shas
-            )
-            if not has_version_bump:
-                # No version-bump found. Check if one exists deeper in the
-                # tag's ancestry (meaning a foreign commit stopped the walk).
-                # If no version-bump exists at all (finalize-only releases),
-                # that's legitimate — proceed.
-                version_bump_exists = False
-                # Search only the current release's commits -- between this
-                # release and the one before it -- so a version bump from an
-                # earlier release cannot match. The predecessor is the next
-                # version down in the LEDGER, and the range starts at the
-                # COMMIT its archive records, so a deleted predecessor tag
-                # cannot silently widen the range to the whole history the way
-                # a failed `git describe <tag>^` did.
-                log_range = _previous_release_range(uc, version, tag)
-                try:
-                    log_output = run(
-                        "git", ["log", "--format=%s", log_range],
-                        timeout=30,
-                    ).strip()
-                    for line in log_output.splitlines():
-                        if _classify_release_commit(line.strip(), expected_msg) == "version_bump":
-                            version_bump_exists = True
-                            break
-                except Exception:
-                    pass
-
-                if version_bump_exists:
-                    # A non-release commit stopped the walk -- refuse.
-                    print(
-                        f"Error: release commit walk for {tag} collected "
-                        f"{len(revert_shas)} commit(s) but never reached the "
-                        f"version bump commit. A non-release commit in the "
-                        f"release range stopped the walk. Refusing to "
-                        f"partially undo.",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
+        revert_shas, cap_cl, cap_rf, anchor = _collect_release_commits(
+            uc, version, tag, expected_msg,
+        )
+        # The one guard left, and it fires before anything is destroyed: work
+        # above the released commit that touches what the revert touches.
+        _refuse_foreign_work_above_anchor(anchor, revert_shas, tag)
     else:
         version = version_flag.lstrip("v")
         tag = _build_tag_from_version(uc, version)
@@ -568,8 +737,18 @@ def _enforce_gate(plan):
 
 
 def _print_plan(plan):
+    """Print every write, deletion and commit the apply would perform.
+
+    The plan used to name only the reverts, while the apply also wrote and
+    committed the audit record, the restored changelog and the restored release
+    file -- three commits a preview never mentioned. Steps whose commit is
+    conditional say so rather than being left out.
+    """
     kind = "latest" if plan.is_latest else "non-latest"
     print(f"Undo plan for {plan.tag} ({kind} release):")
+    audit_path = os.path.join(plan.audit_dir, "undo-audit.json")
+    print(f"  - Write {audit_path} and commit it "
+          f'("chore: audit record for undo of {plan.tag}")')
     if plan.github_release_exists:
         print(f"  - Delete the GitHub Release for {plan.tag}")
     else:
@@ -585,11 +764,20 @@ def _print_plan(plan):
         print("  - No release commits found to revert")
     else:
         print(f"  - Un-finalize changelog for {plan.version} (no commit revert -- history moved on)")
+    print(f"  - Un-finalize {plan.version}.jsonl back into unreleased.jsonl "
+          f"(merging anything added since) and regenerate CHANGELOG.md")
+    print(f'  - Commit the restored changelog ("chore: restore changelog after '
+          f'undo of {plan.tag}"), when it changed anything')
+    if not plan.captured_finalize_release_file:
+        print(f"  - Restore unreleased.toml from v{plan.version}.toml and commit "
+              f'it ("chore: restore release file after undo of {plan.tag}"), '
+              f"when it changed anything")
+    print("  - Push the branch to the remote")
+    print("  - Clear any in-progress release state")
     if plan.gate_result is not None:
         print("  Evidence:")
         for e in plan.gate_result.evidence:
             print(f"    {e.source}/{e.target}: {e.kind.value} -- {e.message}")
-    print("  - Write undo audit record")
 
 
 # ---------------------------------------------------------------------------
@@ -658,6 +846,74 @@ def _restore_release_file(plan, uc, results):
     except Exception:
         traceback.print_exc()
         results.append(("Restore release file", FAILED, f"manually restore unreleased.toml from v{plan.version}.toml in the releases dir"))
+
+
+def _stop_on_conflicted_revert(plan, sha, subject, done, results):
+    """End the undo where a revert conflicted -- committing and pushing nothing.
+
+    A failed revert used to record FAILED and CONTINUE, so the next ``git add``
+    / ``git commit`` in the changelog restore CONCLUDED the in-progress revert:
+    conflict markers and all, folded into "chore: restore changelog after undo
+    of <tag>", and then pushed. The in-progress revert is aborted here instead,
+    the operator is told exactly what already happened, and nothing further is
+    written.
+    """
+    aborted = True
+    try:
+        run("git", ["revert", "--abort"], timeout=60)
+    except Exception:
+        aborted = False
+    results.append(("Revert commits", FAILED, f"git revert {sha[:10]} (conflicted)"))
+
+    print(
+        f"\nError: reverting {sha[:12]} (\"{subject}\") conflicted, so the undo "
+        f"of {plan.tag} stopped there.",
+        file=sys.stderr,
+    )
+    if aborted:
+        print(
+            "  The in-progress revert was aborted: the working tree is back "
+            "where it was and nothing",
+            file=sys.stderr,
+        )
+        print(
+            "  was committed or pushed after it.",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            "  The in-progress revert could NOT be aborted -- resolve it by "
+            "hand (git revert --abort)",
+            file=sys.stderr,
+        )
+        print(
+            "  before doing anything else. Nothing was committed or pushed "
+            "after the conflict.",
+            file=sys.stderr,
+        )
+    if done:
+        print(
+            f"  Already reverted (and left in place): "
+            f"{', '.join(s[:10] for s in done)}",
+            file=sys.stderr,
+        )
+    print(
+        f"  Still in place: the release commit(s) of {plan.tag}, and the "
+        f"finalized changelog for",
+        file=sys.stderr,
+    )
+    print(
+        f"  {plan.version}. The steps that DID complete are listed below and "
+        f"were not rolled back.",
+        file=sys.stderr,
+    )
+    print(
+        "  Resolve the conflicting work above the release commit, then re-run "
+        "`rlsbl release undo`.",
+        file=sys.stderr,
+    )
+    _print_summary(results)
+    sys.exit(1)
 
 
 def _execute_plan(plan, uc, flags, ctx):
@@ -743,13 +999,15 @@ def _execute_plan(plan, uc, flags, ctx):
     #    explicitly (never re-deriving from HEAD). Newest-first so each revert
     #    applies cleanly against the working tree.
     if plan.revert_shas:
-        try:
-            for sha, _subject in plan.revert_shas:
+        done = []
+        for sha, subject in plan.revert_shas:
+            try:
                 run("git", ["revert", "--no-edit", sha])
-            results.append(("Revert commits", OK, f"reverted {len(plan.revert_shas)} commit(s)"))
-        except Exception:
-            traceback.print_exc()
-            results.append(("Revert commits", FAILED, "git revert --no-edit <sha>"))
+            except Exception:
+                traceback.print_exc()
+                _stop_on_conflicted_revert(plan, sha, subject, done, results)
+            done.append(sha)
+        results.append(("Revert commits", OK, f"reverted {len(plan.revert_shas)} commit(s)"))
 
     # 6. Reconcile CHANGELOG.md with the restored JSONL (both paths; idempotent).
     #    Skipped only when the release has no changes dir at all.
