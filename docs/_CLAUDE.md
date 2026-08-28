@@ -46,17 +46,33 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
 
 ## Who writes which ref namespace
 
-Every ref rlsbl writes has exactly one writer, and no other part of the tool
-writes it. Reading this table is how you know whether something you are about
-to do belongs to you or to a command:
+Each namespace has ONE routine writer -- the flow that puts refs there in the
+ordinary course of shipping -- plus a small, named set of repair and retraction
+surfaces that exist to correct or withdraw what was already written. Reading
+this is how you know whether something you are about to do belongs to you or to
+a command:
 
-| Namespace | Written by | Never written by |
+| Namespace | Routine writer | Never written by |
 | --- | --- | --- |
-| `origin` branch heads | Releases only -- `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits. There is no dev-branch push path. | Anything else. There is no `rlsbl push`, and the pre-push hook refuses a manual push to a release branch. |
-| `origin` tags, and the GitHub Releases attached to them | The release's own tag step, and `rlsbl release reconcile` when a rewrite or a partial release left them wrong. Both compose the Release through the one publication module, so the notes and the `rlsbl-ci-sha` marker are identical either way. | Hand-created tags. A released tag is never moved. |
+| `origin` branch heads | Releases -- `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits. There is no dev-branch push path. | Anything else. There is no `rlsbl push`, and the pre-push hook refuses a manual push to a release branch. (`rlsbl release undo` also pushes the branch -- it is a retraction surface, see below.) |
+| `origin` tags, and the GitHub Releases attached to them | The release's own tag step. `rlsbl release reconcile` repairs them when a rewrite or a partial release left them wrong; both compose the Release through the one publication module, so the notes and the `rlsbl-ci-sha` marker are identical either way. | Hand-created tags. A released tag is never MOVED by anything -- the repair surfaces below re-push, delete or rewrite a Release body, never relocate a shipped tag. |
 | A subtree mirror's `main` | The mirror reconciler's converge -- `rlsbl monorepo mirror <project>`, and the release's mirror step, which calls the same code. Force-with-lease is its routine write, because the mirror is a derived artifact. | Anything that authors on the mirror. A commit the reconciler cannot account for is a contract violation and it refuses. |
-| A subtree mirror's tags, and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. | The mirror's own CI -- a mirror's scaffold renders no publish workflow, on purpose. |
-| Rewritten history on any of the above | `rlsbl release scrub` (which wraps `safegit scrub`), the ONE sanctioned rewrite write. It force-pushes, remaps the changelog hashes, moves the tags and recreates the GitHub Releases in one pass. | A bare `git push --force`. A rewrite performed outside it leaves the ledger, the tags and the Releases stale; `rlsbl release reconcile` is what heals that. |
+| A subtree mirror's tags, and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. | The mirror's own CI. A mirror's scaffold renders no publish workflow, and any publish workflow that reaches the mirror another way is swept on the next convergence. |
+| Rewritten history on any of the above | `rlsbl release scrub` (which wraps `safegit scrub`), the one sanctioned rewrite. It force-pushes, remaps the changelog hashes, moves the tags and recreates the GitHub Releases in one pass. | A bare `git push --force`. A rewrite performed outside it leaves the ledger, the tags and the Releases stale; `rlsbl release reconcile` is what heals that. |
+
+**The sanctioned repair and retraction surfaces.** These write the same
+namespaces on purpose. The list is complete; a write from anywhere else is not
+rlsbl's:
+
+| Command | What it writes |
+| --- | --- |
+| `rlsbl release undo` | Deletes the GitHub Release, deletes the tag (remote and local), reverts the version-bump commit and pushes the branch. |
+| `rlsbl release reconcile` | Re-pushes the tags an out-of-band rewrite moved and recreates their GitHub Releases. Fail-closed: a divergence the rewrite journal does not explain is a hard error. |
+| `rlsbl release scrub` | The rewrite itself: force-push, tag updates, GitHub Releases recreated. |
+| `rlsbl release edit` | Re-syncs one Release's notes from CHANGELOG.md. |
+| `rlsbl release deprecate` / `rlsbl release yank` | Rewrites a Release's body and sets its pre-release flag; `yank` also performs the registry's own removal. |
+| `rlsbl changelog amend` / `rlsbl changelog edit` | Rewrites a released version's JSONL and re-syncs that version's GitHub Release notes. |
+| `rlsbl monorepo rename-releasable` | Pushes one boundary alias tag at the renamed releasable's current version. |
 
 ## Release pipeline order
 

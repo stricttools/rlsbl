@@ -5,7 +5,9 @@ into. Its BRANCH is the mirror reconciler's business
 (:mod:`rlsbl.commands.monorepo.mirror_cmd`): tool-owned, force-pushed with a
 lease, exactly one scaffold commit atop the current split. Its TAGS and its
 GitHub Releases are this module's, and nothing else writes them -- a mirror
-scaffold deliberately ships no publish workflow, so a mirror never releases
+scaffold deliberately ships no publish workflow, and the reconciler sweeps any
+publish workflow that reaches the mirror another way (an older scaffold layer's
+leftover, or one carried in by the subtree split), so a mirror never releases
 itself.
 
 The commit correspondence

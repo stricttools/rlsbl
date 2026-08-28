@@ -269,15 +269,30 @@ Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly
 
 ## Who writes which ref namespace
 
-Every ref rlsbl writes has exactly one writer. The table is the whole rule; anything not listed here is not written by rlsbl at all.
+Every namespace has one **routine writer** -- the flow that puts refs there in the ordinary course of shipping. Correcting or withdrawing something already shipped is a different job, done by a named and complete set of **repair and retraction surfaces**, listed under the table. Between the two, that is everything rlsbl writes.
 
-| Namespace | Written by | Notes |
+| Namespace | Routine writer | Notes |
 | --- | --- | --- |
-| `origin` branch heads | **Releases only.** `rlsbl release run` pushes the untagged candidate (step 15) and, after the CI gate, the finalization commits (step 20). | There is no dev-branch push path: `rlsbl push` does not exist, and both release entry points hard-error when the current branch is not a release branch. The pre-push hook warns on a manual push to one. |
-| `origin` tags, and the GitHub Releases attached to them | **The release's tag step** (steps 19-21), and **`rlsbl release reconcile`** when a rewrite or a partial release left them wrong. | Both compose the Release through the one publication module, so the notes and the `rlsbl-ci-sha` marker are identical whichever wrote it. A released tag is never moved: the reconciler refuses a divergence no record explains rather than force-pushing. |
+| `origin` branch heads | **Releases.** `rlsbl release run` pushes the untagged candidate (step 15) and, after the CI gate, the finalization commits (step 20). | There is no dev-branch push path: `rlsbl push` does not exist, and both release entry points hard-error when the current branch is not a release branch. The pre-push hook warns on a manual push to one. The one other command that pushes a branch is `rlsbl release undo`, which pushes the revert of a version bump. |
+| `origin` tags, and the GitHub Releases attached to them | **The release's tag step** (steps 19-21). | `rlsbl release reconcile` repairs them when a rewrite or a partial release left them wrong; it composes the Release through the same publication module, so the notes and the `rlsbl-ci-sha` marker are identical whichever wrote it. A released tag is never *moved*: the reconciler refuses a divergence no record explains rather than force-pushing, and the retraction surfaces delete a tag or rewrite a Release body rather than relocating one. |
 | A subtree **mirror's `main`** | **The mirror reconciler's converge** -- `rlsbl monorepo mirror <project>`, and the release's mirror step, which calls the same code. | The mirror is a tool-owned derived artifact, so force-with-lease is its routine write. A commit the reconciler cannot account for is a contract violation and it refuses, touching nothing. |
-| A subtree **mirror's tags**, and their GitHub Releases | **The mirror publication module**, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a released version the mirror is missing. | The commit is derived, never the branch tip: it is the subtree split of that version's ledger anchor. A mirror's scaffold renders no publish workflow, so a mirror never releases itself. |
-| Rewritten history on any of the above | **`rlsbl release scrub`** (which wraps `safegit scrub`) -- the one sanctioned rewrite write. | It force-pushes with an explicit `--force-with-lease` captured from the actual remote, then remaps the changelog hashes, moves the tags and recreates the GitHub Releases in the same pass. A rewrite performed outside it leaves all three stale; `rlsbl release reconcile` is what heals that. |
+| A subtree **mirror's tags**, and their GitHub Releases | **The mirror publication module**, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a released version the mirror is missing. | The commit is derived, never the branch tip: it is the subtree split of that version's ledger anchor. A mirror's scaffold renders no publish workflow, and any publish workflow reaching the mirror another way is swept on the next convergence, so a mirror never releases itself. |
+| Rewritten history on any of the above | **`rlsbl release scrub`** (which wraps `safegit scrub`) -- the one sanctioned rewrite. | It force-pushes with an explicit `--force-with-lease` captured from the actual remote, then remaps the changelog hashes, moves the tags and recreates the GitHub Releases in the same pass. A rewrite performed outside it leaves all three stale; `rlsbl release reconcile` is what heals that. |
+
+### The repair and retraction surfaces
+
+Each of these writes one of the namespaces above deliberately, and the list is complete:
+
+| Command | What it writes | Namespace |
+| --- | --- | --- |
+| `rlsbl release undo` | Deletes the GitHub Release, deletes the tag (remote and local), reverts the version-bump commit and pushes the branch. With `--version`, a non-latest release only when it is provably unpublished, and then the Release and tag only. | branch heads, tags, Releases |
+| `rlsbl release reconcile` | Re-pushes the tags an out-of-band rewrite moved and recreates their GitHub Releases, driven by safegit's rewrite journal. Fail-closed: a divergence the journal does not explain is a hard error, never a force-push. | tags, Releases |
+| `rlsbl release scrub` | The rewrite itself -- see the table above. | history, tags, Releases |
+| `rlsbl release edit` | Re-syncs one version's GitHub Release notes from CHANGELOG.md. | Releases |
+| `rlsbl release deprecate` | Prepends a deprecation notice to a Release's body and sets its pre-release flag. | Releases |
+| `rlsbl release yank` | Prepends a yank notice and sets the pre-release flag, plus the registry's own removal (npm deprecate, Go retract, a PyPI checklist). | Releases (and registries) |
+| `rlsbl changelog amend` / `rlsbl changelog edit` | Rewrites a released version's JSONL, regenerates CHANGELOG.md, and re-syncs that version's GitHub Release notes. | Releases |
+| `rlsbl monorepo rename-releasable` | Creates and pushes one boundary alias tag at the renamed releasable's current version, when the tag format carries `{name}`. Historical releases stay under the old prefix. | tags |
 
 ## Publish gating
 
