@@ -425,7 +425,7 @@ def _root_job_prefix(project: dict, root: str) -> str:
 
     A root project's derived name is the basename of its path (".") -- not a
     valid job ID (GitHub job IDs must match ``[A-Za-z_][A-Za-z0-9_-]*``). Use
-    the releasable name when the root belongs to one (explicit mode), else the
+    the releasable name when the root belongs to one, else the
     repository directory name.
     """
     name = project.get("name")

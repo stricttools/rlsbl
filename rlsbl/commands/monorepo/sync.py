@@ -585,7 +585,7 @@ def _cmd_sync(flags, project_root):
         # Re-load projects so the rest of sync sees the updated import_names
         projects = load_workspace(root)
 
-    # Scaffold releasable directory structure (explicit mode only).
+    # Scaffold every releasable's directory structure.
     # This runs early so that releasable dirs exist before CI workflow
     # generation, which may need to reference releasable paths.
     releasable_files = scaffold_releasable_dirs(root)

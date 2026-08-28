@@ -1634,7 +1634,7 @@ class RootReleasable:
 
 @mono.command(
     name="init",
-    help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, in explicit mode, carrying the mandatory root member whose kind you declare. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
+    help="Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, carrying the mandatory root member whose kind you declare and a [[releasables]] section. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
     effect="mutating",
     dry_run_supported=False,
     dry_run_unsupported_reason=(

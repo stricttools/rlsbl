@@ -1824,7 +1824,7 @@
       "commands": {
         "init": {
           "name": "init",
-          "help": "Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, in explicit mode, carrying the mandatory root member whose kind you declare. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
+          "help": "Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, carrying the mandatory root member whose kind you declare and a [[releasables]] section. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.",
           "effect": "mutating",
           "dry_run_supported": false,
           "dry_run_unsupported_reason": "it bootstraps the workspace every other command reads, and there is no workspace to preview against until it exists",
@@ -2426,7 +2426,7 @@
         },
         "cleanup": {
           "name": "cleanup",
-          "help": "Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.",
+          "help": "Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Detect residue first with `rlsbl check --name releasable-residue`.",
           "effect": "mutating"
         },
         "rename-releasable": {

@@ -161,7 +161,7 @@ Only the distribution side changes, and it changes automatically from the versio
 
 ### Declaring it
 
-The release file's `preid` key is the normal path, and `rlsbl release init` scaffolds it as a commented line. The `--preid` flag on `rlsbl release run` is valid **only** alongside `--bump` (the flag pair that bypasses the release file entirely). In a monorepo, each `[releasables.<name>]` / `[packages.<name>]` section carries its own `preid`, so one workspace release can ship some packages stable and others as alphas.
+The release file's `preid` key is the normal path, and `rlsbl release init` scaffolds it as a commented line. The `--preid` flag on `rlsbl release run` is valid **only** alongside `--bump` (the flag pair that bypasses the release file entirely). In a monorepo, each `[releasables.<name>]` section carries its own `preid`, so one workspace release can ship some releasables stable and others as alphas.
 
 ## Release pipeline order
 
@@ -216,7 +216,7 @@ Step 18 does more than preserve the release prose. Before the archive is locked 
 
 - a **standalone repository** ships everything, so the table has the single `"."` entry carrying the root tree of `candidate_sha`;
 - a **workspace releasable** ships its member directories, so there is one entry per member path. No single git object covers a *set* of subtrees, so one tree hash per member is the honest record — a synthesized hash over the members would be an rlsbl invention that no git command could reproduce or check;
-- an **implicit-mode monorepo package** ships one directory and gets the single entry for that path.
+- a **single-member releasable** ships one directory and gets the single entry for that path.
 
 Both fields are written by the flow and by nothing else. The editable `unreleased.toml` never carries them: neither value exists before the release runs, so one found there is either a claim about a commit that has not happened or an archive copied back without being un-finalized — and it aborts the release at validation, before any mutation. `rlsbl release undo` strips both fields when it restores an archive as the editable release file, so the freed version can be released again.
 

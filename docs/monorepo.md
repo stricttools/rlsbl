@@ -214,49 +214,55 @@ Supports `--depth N` to limit BFS traversal depth (default: unlimited, traverses
 
 ## Batch release
 
-`rlsbl monorepo release run` releases multiple packages in a single coordinated flow, respecting topological order so that leaf packages (those with no intra-workspace dependencies) are released first, followed by their dependents. This ensures downstream packages always reference the latest versions of their workspace dependencies.
+`rlsbl monorepo release run` releases multiple releasables in a single coordinated flow, respecting topological order so that leaf releasables (those whose members have no intra-workspace dependencies) are released first, followed by their dependents. This ensures downstream packages always reference the latest versions of their workspace dependencies.
+
+The unit of a batch is the **releasable**, not the package: a releasable's position in the order is the highest topological position of any of its member packages, and each releasable is released through one representative member.
 
 ### Workflow
 
 1. Run `rlsbl monorepo release init` to scaffold `.rlsbl-monorepo/releases/unreleased.toml`
-2. Edit the file: set bump type, description, and context per package
+2. Edit the file: set bump type, description, and context per releasable
 3. Run `rlsbl monorepo release run --watch --approve-consequential`
 
 ### release init scaffolding
 
-`rlsbl monorepo release init` auto-detects release targets for each workspace project and generates a TOML file with pre-populated per-package sections. Packages with no unreleased commits are commented out, and dev nodes are excluded entirely since they cannot be released:
+`rlsbl monorepo release init` auto-detects release targets for each releasable's members and generates a TOML file with pre-populated per-releasable sections. Releasables with no unreleased commits are commented out, and dev nodes are excluded entirely since they cannot be released:
 
 ```toml
-[packages.mylib]
+[releasables.mylib]
 bump = "patch"
 description = ""
 include = ["pypi"]
 
-[packages.cli]
+[releasables.cli]
 bump = "minor"
 description = ""
 include = ["npm"]
 
-# [packages.tests]
+# [releasables.tests]
 # No unreleased commits since tests@v0.3.0
 ```
 
+`[releasables.<name>]` is the only section form a batch release file takes. A file carrying a `[packages]` section is refused with the rewrite it needs -- there is no per-package batch mode, because there is no workspace mode without `[[releasables]]` (the loader refuses one).
+
 - Dev nodes are excluded entirely (they have no changelog)
-- Packages with zero unreleased commits since their last tag are rendered as commented-out sections
-- Each section's `include` list is pre-populated from detected targets
+- Releasables with zero unreleased commits since their last tag are rendered as commented-out sections
+- Each section's `include` list is pre-populated from the targets detected across the releasable's members
 
 ### Execution
 
-Each package is released sequentially using the standard single-package release flow (validation, tests, version bump, commit, tag, push, GitHub Release). The batch orchestrator determines execution order from the workspace dependency graph:
+Each releasable is released sequentially through the standard single-package release flow (validation, tests, version bump, commit, tag, push, GitHub Release), run from one representative member. The batch orchestrator determines execution order from the workspace dependency graph:
 
-1. Validate all listed packages exist in workspace
+1. Validate all listed releasables exist in workspace.toml
 2. Build topological order from the full workspace graph
-3. Filter to only packages in the batch, preserving topological order
-4. Release each package in order
+3. Map each releasable to its highest-positioned member, preserving topological order
+4. Release each releasable in order
+
+The resolved base version, target version and tag of every item are written to a plan sidecar (`unreleased.plan.json`) before anything is released, and the plan is never regenerated mid-flight -- so a re-run skips exactly the items it can prove already shipped.
 
 ### Partial failure
 
-If a package's release fails mid-batch, there is no automatic resume. The command prints what succeeded, then re-raises the error. To recover, fix the issue, remove already-released packages from the batch file, and re-run.
+If a releasable's release fails mid-batch, there is no automatic resume of the batch itself. The command prints what succeeded, then re-raises the error. To recover, fix the issue and re-run: items the plan proves are already released are skipped.
 
 ## Snapshot
 
@@ -483,11 +489,11 @@ rlsbl monorepo release init
 #   Created .rlsbl-monorepo/releases/unreleased.toml
 
 # Edit the release file:
-#   [packages.core]
+#   [releasables.core]
 #   bump = "minor"
 #   description = "Add async support to core API"
 #
-#   [packages.cli]
+#   [releasables.cli]
 #   bump = "patch"
 #   description = "Update CLI to use new async core API"
 
