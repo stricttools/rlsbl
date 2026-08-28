@@ -87,7 +87,6 @@ from ..preview_apply import (
     Reconciler,
     VerdictItem,
     reconcile,
-    render_preview,
 )
 from ..tag_glob import TagMode, parse_version_tag
 from ..utils import (
@@ -98,7 +97,6 @@ from ..utils import (
     run,
     run_gh,
 )
-from ..workspace import load_workspace
 
 
 def tag_name_from_refname(refname):
