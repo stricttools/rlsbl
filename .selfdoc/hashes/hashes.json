@@ -201,6 +201,11 @@
     "description": "5dcebe0f05bd2dd423087ed852f1310689c2ee0a89edf61cbd5bc9aad4a3bde3",
     "source_docstring": "a116f97dc5732204b856a82b5d9fc0de64a4d39ba06263788ed13d73e48e9001"
   },
+  "en/rlsbl-anchor_remap.md": {
+    "content": "a3c2fcf2569f3f796dbe1eea746e7189759119263003d48af08b87f285768418",
+    "description": "c169f4978efe0410f76a9b0052b59995574ab29c6887376e796aab6d42829a0f",
+    "seed_hash": "c169f4978efe0410f76a9b0052b59995574ab29c6887376e796aab6d42829a0f"
+  },
   "en/rlsbl-changelog-exemptions.md": {
     "content": "c9dde4cb70cd255b95c032b1b19473d1e1cefb64ad0949879e069bb3302bf0ac",
     "description": "8045dd93ccd983b022fee88b85e277bf7b3057916d360ebcab90ffbb18eddef5",
@@ -916,6 +921,11 @@
     "content": "5ba5e64163cfc8a8b5de492079f7a947ff32786674e92edef9a06b945d1c306f",
     "description": "e2553f75be8c3fd0d4dfc47b5fd02e0214abda527f684e2a240f9827ef10c9f5",
     "source_docstring": "971a0d157d19c49731f7f0eb3d42655c9158b6781c57348fd72c80ba2d3e2aa0"
+  },
+  "en/rlsbl-release_publication.md": {
+    "content": "09717f46f333c10bf11d5eeb4805c4b91040f34d59ff24fa1db5f2b909693bb5",
+    "description": "5af60259a7f1967d718c68877c015d61cf6dc9ad77badd2ca201dac479e8f793",
+    "seed_hash": "5af60259a7f1967d718c68877c015d61cf6dc9ad77badd2ca201dac479e8f793"
   },
   "en/rlsbl-resolved_target.md": {
     "content": "f6c4e13b1bc9c1eabbae169563236e24054a94bdb2375955c9a6cd6d5265e48b",

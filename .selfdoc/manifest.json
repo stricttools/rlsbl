@@ -3312,6 +3312,26 @@
         },
         {
           "level": 2,
+          "text": "Reconciling published metadata",
+          "anchor": "reconciling-published-metadata"
+        },
+        {
+          "level": 3,
+          "text": "The four explanation sources",
+          "anchor": "the-four-explanation-sources"
+        },
+        {
+          "level": 3,
+          "text": "The five verdicts",
+          "anchor": "the-five-verdicts"
+        },
+        {
+          "level": 3,
+          "text": "File-driven consent",
+          "anchor": "file-driven-consent"
+        },
+        {
+          "level": 2,
           "text": "Examples",
           "anchor": "examples"
         },
@@ -3570,6 +3590,73 @@
           "level": 3,
           "text": "`get_all_versions`",
           "anchor": "get_all_versions"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-anchor_remap.md",
+      "title": "rlsbl.anchor_remap",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.anchor_remap",
+          "anchor": "rlsblanchor_remap"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.anchor_remap`",
+          "anchor": "rlsblanchor_remap"
+        },
+        {
+          "level": 3,
+          "text": "`AnchorRemap`",
+          "anchor": "anchorremap"
+        },
+        {
+          "level": 3,
+          "text": "`_map_sha`",
+          "anchor": "_map_sha"
+        },
+        {
+          "level": 3,
+          "text": "`_tree_at`",
+          "anchor": "_tree_at"
+        },
+        {
+          "level": 3,
+          "text": "`plan_anchor_remap`",
+          "anchor": "plan_anchor_remap"
+        },
+        {
+          "level": 3,
+          "text": "`remap_release_anchors`",
+          "anchor": "remap_release_anchors"
+        },
+        {
+          "level": 3,
+          "text": "`anchor_remap_event`",
+          "anchor": "anchor_remap_event"
+        },
+        {
+          "level": 3,
+          "text": "`record_anchor_remap`",
+          "anchor": "record_anchor_remap"
+        },
+        {
+          "level": 3,
+          "text": "`releases_dirs_for`",
+          "anchor": "releases_dirs_for"
+        },
+        {
+          "level": 3,
+          "text": "`lineage_path_for_releases_dir`",
+          "anchor": "lineage_path_for_releases_dir"
+        },
+        {
+          "level": 3,
+          "text": "`repair_anchors`",
+          "anchor": "repair_anchors"
         }
       ]
     },
@@ -8301,8 +8388,138 @@
         },
         {
           "level": 3,
-          "text": "`plan_reconcile`",
-          "anchor": "plan_reconcile"
+          "text": "`plan_path`",
+          "anchor": "plan_path"
+        },
+        {
+          "level": 3,
+          "text": "`_same_commit`",
+          "anchor": "_same_commit"
+        },
+        {
+          "level": 3,
+          "text": "`Explanations`",
+          "anchor": "explanations"
+        },
+        {
+          "level": 4,
+          "text": "`resolve`",
+          "anchor": "resolve"
+        },
+        {
+          "level": 3,
+          "text": "`_journal_map`",
+          "anchor": "_journal_map"
+        },
+        {
+          "level": 3,
+          "text": "`_scrub_archive_maps`",
+          "anchor": "_scrub_archive_maps"
+        },
+        {
+          "level": 3,
+          "text": "`_lineage_facts`",
+          "anchor": "_lineage_facts"
+        },
+        {
+          "level": 3,
+          "text": "`collect_explanations`",
+          "anchor": "collect_explanations"
+        },
+        {
+          "level": 3,
+          "text": "`Observation`",
+          "anchor": "observation"
+        },
+        {
+          "level": 4,
+          "text": "`digest`",
+          "anchor": "digest"
+        },
+        {
+          "level": 3,
+          "text": "`_local_tag_refs`",
+          "anchor": "_local_tag_refs"
+        },
+        {
+          "level": 3,
+          "text": "`list_releases`",
+          "anchor": "list_releases"
+        },
+        {
+          "level": 3,
+          "text": "`observe_world`",
+          "anchor": "observe_world"
+        },
+        {
+          "level": 3,
+          "text": "`RefAction`",
+          "anchor": "refaction"
+        },
+        {
+          "level": 3,
+          "text": "`_identity_refusal`",
+          "anchor": "_identity_refusal"
+        },
+        {
+          "level": 3,
+          "text": "`_ref_verdict`",
+          "anchor": "_ref_verdict"
+        },
+        {
+          "level": 3,
+          "text": "`_release_verdict`",
+          "anchor": "_release_verdict"
+        },
+        {
+          "level": 3,
+          "text": "`build_preview`",
+          "anchor": "build_preview"
+        },
+        {
+          "level": 3,
+          "text": "`refusals`",
+          "anchor": "refusals"
+        },
+        {
+          "level": 3,
+          "text": "`tripwire_error`",
+          "anchor": "tripwire_error"
+        },
+        {
+          "level": 3,
+          "text": "`render_plan`",
+          "anchor": "render_plan"
+        },
+        {
+          "level": 3,
+          "text": "`read_plan`",
+          "anchor": "read_plan"
+        },
+        {
+          "level": 3,
+          "text": "`check_plan_matches`",
+          "anchor": "check_plan_matches"
+        },
+        {
+          "level": 3,
+          "text": "`_release_publication_for`",
+          "anchor": "_release_publication_for"
+        },
+        {
+          "level": 3,
+          "text": "`apply_item`",
+          "anchor": "apply_item"
+        },
+        {
+          "level": 3,
+          "text": "`_resolve_identity`",
+          "anchor": "_resolve_identity"
+        },
+        {
+          "level": 3,
+          "text": "`_changelog_path`",
+          "anchor": "_changelog_path"
         },
         {
           "level": 3,
@@ -8412,6 +8629,11 @@
           "level": 3,
           "text": "`_recover_from_rewrite_journal`",
           "anchor": "_recover_from_rewrite_journal"
+        },
+        {
+          "level": 3,
+          "text": "`heal_anchors_from_journal`",
+          "anchor": "heal_anchors_from_journal"
         },
         {
           "level": 3,
@@ -9405,6 +9627,16 @@
         },
         {
           "level": 3,
+          "text": "`_pass_note`",
+          "anchor": "_pass_note"
+        },
+        {
+          "level": 3,
+          "text": "`_nothing_policed_note`",
+          "anchor": "_nothing_policed_note"
+        },
+        {
+          "level": 3,
           "text": "`_evaluate_go`",
           "anchor": "_evaluate_go"
         },
@@ -9442,13 +9674,38 @@
         },
         {
           "level": 3,
+          "text": "`normalize_version`",
+          "anchor": "normalize_version"
+        },
+        {
+          "level": 3,
           "text": "`normalize_specifier`",
           "anchor": "normalize_specifier"
         },
         {
           "level": 3,
+          "text": "`_normalize_clause`",
+          "anchor": "_normalize_clause"
+        },
+        {
+          "level": 3,
           "text": "`_declared_pypi_requirements`",
           "anchor": "_declared_pypi_requirements"
+        },
+        {
+          "level": 3,
+          "text": "`uv_sources_table`",
+          "anchor": "uv_sources_table"
+        },
+        {
+          "level": 3,
+          "text": "`source_backed_names`",
+          "anchor": "source_backed_names"
+        },
+        {
+          "level": 3,
+          "text": "`_inherited_sources`",
+          "anchor": "_inherited_sources"
         },
         {
           "level": 3,
@@ -10199,6 +10456,21 @@
         },
         {
           "level": 3,
+          "text": "`CachedRegistrySource`",
+          "anchor": "cachedregistrysource"
+        },
+        {
+          "level": 4,
+          "text": "`name`",
+          "anchor": "name-2"
+        },
+        {
+          "level": 4,
+          "text": "`gather`",
+          "anchor": "gather-2"
+        },
+        {
+          "level": 3,
           "text": "`GateResult`",
           "anchor": "gateresult"
         },
@@ -10397,6 +10669,11 @@
           "level": 3,
           "text": "`module_matches`",
           "anchor": "module_matches"
+        },
+        {
+          "level": 3,
+          "text": "`with_major_suffix`",
+          "anchor": "with_major_suffix"
         },
         {
           "level": 3,
@@ -13242,6 +13519,118 @@
       ]
     },
     {
+      "path": "rlsbl-release_publication.md",
+      "title": "rlsbl.release_publication",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.release_publication",
+          "anchor": "rlsblrelease_publication"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.release_publication`",
+          "anchor": "rlsblrelease_publication"
+        },
+        {
+          "level": 3,
+          "text": "`ci_sha_marker`",
+          "anchor": "ci_sha_marker"
+        },
+        {
+          "level": 3,
+          "text": "`strip_ci_sha_marker`",
+          "anchor": "strip_ci_sha_marker"
+        },
+        {
+          "level": 3,
+          "text": "`is_prerelease`",
+          "anchor": "is_prerelease"
+        },
+        {
+          "level": 3,
+          "text": "`ReleasePublication`",
+          "anchor": "releasepublication"
+        },
+        {
+          "level": 4,
+          "text": "`release_title`",
+          "anchor": "release_title"
+        },
+        {
+          "level": 4,
+          "text": "`prerelease`",
+          "anchor": "prerelease"
+        },
+        {
+          "level": 4,
+          "text": "`marker`",
+          "anchor": "marker"
+        },
+        {
+          "level": 4,
+          "text": "`body`",
+          "anchor": "body"
+        },
+        {
+          "level": 4,
+          "text": "`reconciled_body`",
+          "anchor": "reconciled_body"
+        },
+        {
+          "level": 3,
+          "text": "`publication`",
+          "anchor": "publication"
+        },
+        {
+          "level": 3,
+          "text": "`anchor_from_ledger`",
+          "anchor": "anchor_from_ledger"
+        },
+        {
+          "level": 3,
+          "text": "`view_body_args`",
+          "anchor": "view_body_args"
+        },
+        {
+          "level": 3,
+          "text": "`create_args`",
+          "anchor": "create_args"
+        },
+        {
+          "level": 3,
+          "text": "`edit_notes_args`",
+          "anchor": "edit_notes_args"
+        },
+        {
+          "level": 3,
+          "text": "`delete_args`",
+          "anchor": "delete_args"
+        },
+        {
+          "level": 3,
+          "text": "`notes_file`",
+          "anchor": "notes_file"
+        },
+        {
+          "level": 3,
+          "text": "`create_release`",
+          "anchor": "create_release"
+        },
+        {
+          "level": 3,
+          "text": "`read_release_body`",
+          "anchor": "read_release_body"
+        },
+        {
+          "level": 3,
+          "text": "`ensure_marker`",
+          "anchor": "ensure_marker"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-resolved_target.md",
       "title": "rlsbl.resolved_target",
       "type": "doc",
@@ -13923,6 +14312,11 @@
         },
         {
           "level": 4,
+          "text": "`cached_registry_probe`",
+          "anchor": "cached_registry_probe"
+        },
+        {
+          "level": 4,
           "text": "`dev_install_command`",
           "anchor": "dev_install_command"
         },
@@ -13930,6 +14324,11 @@
           "level": 4,
           "text": "`supports_publication_probe`",
           "anchor": "supports_publication_probe"
+        },
+        {
+          "level": 4,
+          "text": "`supports_cached_registry_probe`",
+          "anchor": "supports_cached_registry_probe"
         },
         {
           "level": 4,
@@ -14340,6 +14739,11 @@
           "level": 4,
           "text": "`publication_probe`",
           "anchor": "publication_probe"
+        },
+        {
+          "level": 4,
+          "text": "`cached_registry_probe`",
+          "anchor": "cached_registry_probe"
         },
         {
           "level": 4,
@@ -15320,6 +15724,16 @@
         },
         {
           "level": 4,
+          "text": "`supports_cached_registry_probe`",
+          "anchor": "supports_cached_registry_probe"
+        },
+        {
+          "level": 4,
+          "text": "`release_materialization_policy`",
+          "anchor": "release_materialization_policy"
+        },
+        {
+          "level": 4,
           "text": "`supports_read_name`",
           "anchor": "supports_read_name"
         },
@@ -15487,6 +15901,11 @@
           "level": 4,
           "text": "`publication_probe`",
           "anchor": "publication_probe"
+        },
+        {
+          "level": 4,
+          "text": "`cached_registry_probe`",
+          "anchor": "cached_registry_probe"
         },
         {
           "level": 4,
@@ -16429,11 +16848,6 @@
         },
         {
           "level": 3,
-          "text": "`detect_uv_workspace_root`",
-          "anchor": "detect_uv_workspace_root"
-        },
-        {
-          "level": 3,
           "text": "`is_virtual_uv_root`",
           "anchor": "is_virtual_uv_root"
         },
@@ -17334,6 +17748,16 @@
         },
         {
           "level": 3,
+          "text": "`ReconcilePlanMode`",
+          "anchor": "reconcileplanmode"
+        },
+        {
+          "level": 3,
+          "text": "`ReconcileApplyMode`",
+          "anchor": "reconcileapplymode"
+        },
+        {
+          "level": 3,
           "text": "`cmd_release_reconcile`",
           "anchor": "cmd_release_reconcile"
         },
@@ -17743,6 +18167,16 @@
         },
         {
           "level": 4,
+          "text": "`supports_cached_registry_probe`",
+          "anchor": "supports_cached_registry_probe"
+        },
+        {
+          "level": 4,
+          "text": "`release_materialization_policy`",
+          "anchor": "release_materialization_policy"
+        },
+        {
+          "level": 4,
           "text": "`supports_read_name`",
           "anchor": "supports_read_name"
         },
@@ -17910,6 +18344,11 @@
           "level": 4,
           "text": "`publication_probe`",
           "anchor": "publication_probe"
+        },
+        {
+          "level": 4,
+          "text": "`cached_registry_probe`",
+          "anchor": "cached_registry_probe"
         },
         {
           "level": 4,
@@ -18113,6 +18552,11 @@
         },
         {
           "level": 4,
+          "text": "`cached_registry_probe`",
+          "anchor": "cached_registry_probe-1"
+        },
+        {
+          "level": 4,
           "text": "`dev_install_command`",
           "anchor": "dev_install_command-1"
         },
@@ -18120,6 +18564,11 @@
           "level": 4,
           "text": "`supports_publication_probe`",
           "anchor": "supports_publication_probe-1"
+        },
+        {
+          "level": 4,
+          "text": "`supports_cached_registry_probe`",
+          "anchor": "supports_cached_registry_probe-1"
         },
         {
           "level": 4,
@@ -18468,6 +18917,11 @@
         },
         {
           "level": 4,
+          "text": "`cached_registry_probe`",
+          "anchor": "cached_registry_probe-2"
+        },
+        {
+          "level": 4,
           "text": "`dev_install_command`",
           "anchor": "dev_install_command-2"
         },
@@ -18475,6 +18929,11 @@
           "level": 4,
           "text": "`supports_publication_probe`",
           "anchor": "supports_publication_probe-2"
+        },
+        {
+          "level": 4,
+          "text": "`supports_cached_registry_probe`",
+          "anchor": "supports_cached_registry_probe-2"
         },
         {
           "level": 4,
@@ -18708,6 +19167,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-28T04:00:25.421196+00:00",
+  "last_gen": "2026-08-28T05:26:42.647497+00:00",
   "theme": "minimal"
 }
