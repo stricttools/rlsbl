@@ -74,11 +74,19 @@ def register_release_checks(app):
         missing_remote = 0
         wrong_commit = 0
         unrecoverable = 0
+        # Versions whose ref set could not be derived at all -- an unreadable
+        # archive, or a target that could not name the refs. Counted, because
+        # the terminal decision below is the ONLY thing that decides pass or
+        # fail: a reported problem that increments nothing reaches `passed()`,
+        # which refuses to finalize a pass over reported problems and takes the
+        # whole check run down with a ValueError instead of failing this check.
+        underivable = 0
 
         for version in versions:
             try:
                 archive = read_release_file(archived_release_path(releases_dir, version))
             except (RlsblError, OSError) as exc:
+                underivable += 1
                 reporter.error(
                     f"{version}: its release archive could not be read ({exc}), "
                     f"so the refs it should own are unknown."
@@ -89,6 +97,7 @@ def register_release_checks(app):
             try:
                 expected = target.expected_refs(version, ref_ctx)
             except RlsblError as exc:
+                underivable += 1
                 reporter.error(
                     f"{version}: the refs this version owns could not be "
                     f"derived ({exc})."
@@ -134,7 +143,7 @@ def register_release_checks(app):
                         f"consumers resolve it. {_REMEDY}"
                     )
 
-        if not (missing_local or missing_remote or wrong_commit):
+        if not (missing_local or missing_remote or wrong_commit or underivable):
             scope = (
                 f"{len(versions)} released version(s)"
                 if has_remote else
@@ -147,11 +156,17 @@ def register_release_checks(app):
                 )
             return reporter.passed(f"every ref exists for {scope}")
 
-        return reporter.found(
+        summary = (
             f"{missing_local} ref(s) missing locally, "
             f"{missing_remote} missing on origin, "
             f"{wrong_commit} at the wrong commit"
         )
+        if underivable:
+            summary += (
+                f", {underivable} release archive(s) whose ref set could not "
+                f"be derived"
+            )
+        return reporter.found(summary)
 
     @app.error_check("branch-sync")
     def check_branch_sync(ctx, reporter):

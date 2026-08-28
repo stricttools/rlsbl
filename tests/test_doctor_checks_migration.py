@@ -382,6 +382,26 @@ class TestUnpublishedRefsCheck:
         assert result.status == "skip"
         assert "no release" in result.message
 
+    def test_unreadable_archive_fails_the_check(self, mock_git_repo):
+        """An archive that cannot be read is a FAILURE, not a pass.
+
+        The per-version read error was reported to the reporter but counted
+        nowhere, so the terminal decision saw zero findings and called
+        ``passed()`` with problems already reported -- which the reporter
+        refuses with a ValueError that takes the whole check run down.
+        """
+        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        (mock_git_repo / "package.json").write_text(json.dumps(pkg))
+        releases = mock_git_repo / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        (releases / "v1.0.0.toml").write_text("this is not = valid = toml\n")
+
+        ctx = ProjectContext(project_root=mock_git_repo, workspace_root=None, config={})
+        result = app._check_defs["unpublished-refs"].impl(ctx)
+        assert result.status == "fail"
+        assert "1.0.0" in result.problems[0].text
+        assert "1 release archive" in result.message
+
 
 # ---------------------------------------------------------------------------
 # Functional tests: branch-sync check
