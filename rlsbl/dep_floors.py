@@ -390,6 +390,25 @@ def _floor_problem(name, constraint, locked_version, *, kind, floor, where, reme
     return None
 
 
+def _pass_note(ecosystem, name, constraint, version):
+    """One fact line for a dependency whose declared floor covers the lock.
+
+    The go path always stated its outcome, while pypi and npm said nothing on
+    success -- so a passing run showed only the go line and read as if the
+    other ecosystems had never been evaluated, in exactly the place someone
+    looks to confirm that they were. A pass now names what it compared.
+    """
+    return f"{ecosystem}: {name} '{constraint}' covers the locked {version}"
+
+
+def _nothing_policed_note(ecosystem, manifest):
+    """The outcome when a manifest declares none of the policed dependencies."""
+    return (
+        f"{ecosystem}: {manifest} declares none of the enforced "
+        f"ecosystem-internal dependencies"
+    )
+
+
 def _evaluate_pypi(root, names):
     declared = pypi_declared(root)
     if declared is None:
@@ -412,6 +431,7 @@ def _evaluate_pypi(root, names):
         ], []
 
     problems = []
+    notes = []
     for name in sorted({normalize_pypi_name(n) for n in names} & set(declared)):
         label, req_kind, constraint = declared[name]
         version = locked.get(name)
@@ -429,9 +449,13 @@ def _evaluate_pypi(root, names):
             where=f"pyproject.toml {label}",
             remedy=f'"{name}>={version}"',
         )
-        if problem is not None:
+        if problem is None:
+            notes.append(_pass_note("pypi", name, constraint, version))
+        else:
             problems.append(problem)
-    return problems, []
+    if not problems and not notes:
+        notes.append(_nothing_policed_note("pypi", "pyproject.toml"))
+    return problems, notes
 
 
 def _evaluate_npm(root, names):
@@ -443,6 +467,7 @@ def _evaluate_npm(root, names):
         return [], ["npm: no package-lock.json -- no locked versions to compare"]
 
     problems = []
+    notes = []
     for key in sorted({normalize_npm_name(n) for n in names} & set(declared)):
         section, declared_name, rng = declared[key]
         version = locked.get(key)
@@ -460,7 +485,11 @@ def _evaluate_npm(root, names):
         )
         if problem is not None:
             problems.append(problem)
-    return problems, []
+        elif kind != "skip":
+            notes.append(_pass_note("npm", declared_name, rng, version))
+    if not problems and not notes:
+        notes.append(_nothing_policed_note("npm", "package.json"))
+    return problems, notes
 
 
 def _evaluate_go(root, names):

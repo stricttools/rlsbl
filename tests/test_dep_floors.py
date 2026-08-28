@@ -182,6 +182,29 @@ class TestPypi:
         result = _run(tmp_path, _config())
         assert result.status == "pass"
 
+    def test_a_pass_names_the_comparison_it_made(self, tmp_path):
+        """Silence is not evidence that the pypi comparison ran.
+
+        The go path always emitted its note, so a passing polyglot run showed
+        only that line and read as if pypi had not been evaluated at all --
+        in exactly the place someone looks to confirm it was.
+        """
+        _pyproject(tmp_path, ["strictcli>=0.36.0"])
+        _uv_lock(tmp_path, {"strictcli": "0.36.4"})
+        result = _run(tmp_path, _config())
+        assert result.status == "pass"
+        assert "strictcli" in result.message
+        assert ">=0.36.0" in result.message
+        assert "0.36.4" in result.message
+
+    def test_a_pass_with_no_policed_dependency_says_so(self, tmp_path):
+        _pyproject(tmp_path, ["requests>=2.0"])
+        _uv_lock(tmp_path, {"requests": "2.31.0"})
+        result = _run(tmp_path, _config())
+        assert result.status == "pass"
+        assert "pypi" in result.message
+        assert "strictcli" not in result.message
+
     def test_floor_behind_locked_minor_errors(self, tmp_path):
         _pyproject(tmp_path, ["strictcli>=0.35.0"])
         _uv_lock(tmp_path, {"strictcli": "0.36.0"})
@@ -375,6 +398,15 @@ class TestNpm:
         _package_lock_v3(tmp_path, {"strictcli": "1.4.2"})
         result = _run(tmp_path, _config())
         assert result.status == "pass"
+
+    def test_a_pass_names_the_comparison_it_made(self, tmp_path):
+        _package_json(tmp_path, {"strictcli": "^1.4.0"})
+        _package_lock_v3(tmp_path, {"strictcli": "1.4.2"})
+        result = _run(tmp_path, _config())
+        assert result.status == "pass"
+        assert "strictcli" in result.message
+        assert "^1.4.0" in result.message
+        assert "1.4.2" in result.message
 
     def test_caret_range_behind_locked_minor_errors(self, tmp_path):
         _package_json(tmp_path, {"strictcli": "^1.3.0"})
