@@ -1216,6 +1216,8 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             changelog_entry, monorepo_root=monorepo_root,
             member_package_paths=member_package_paths,
             releasable_config_dir=_rel_cfg_dir,
+            releasable_name=releasable_name,
+            releasable_tag_fmt=releasable_tag_fmt,
         )
         if not effects.previewing():
             # No effects handle is bound, so there is nothing for Phase A to

@@ -262,6 +262,100 @@ class BaseTarget:
         """
         return []
 
+    # --- The full ref set of one released version ---
+
+    def expected_refs(self, version, context):
+        """Every git ref *version* owns: the primary tag, companions, aliases.
+
+        THE single authority for the question. The release flow creates and
+        pushes exactly this set, and the ``unpublished-refs`` check renders
+        exactly this set against the repository and its remote -- one
+        derivation, so a ref the release creates can never be a ref the check
+        does not look for.
+
+        *context* is a :class:`~rlsbl.targets.refs.RefContext` built by
+        :func:`~rlsbl.targets.refs.ref_context`. Returns an
+        :class:`~rlsbl.targets.refs.ExpectedRefs`.
+
+        Not overridden by any target: the per-target facts it composes
+        (``tag_format``, ``monorepo_tag_format``, ``companion_tags``) are the
+        axes, and this is the assembly of them.
+        """
+        from .refs import ExpectedRefs, recorded_aliases
+
+        primary = self._primary_ref(version, context)
+        return ExpectedRefs(
+            version=version,
+            primary=primary,
+            companions=self._companion_refs(version, context, primary),
+            aliases=recorded_aliases(context, version),
+        )
+
+    def _primary_ref(self, version, context):
+        """The one tag the release itself is named after.
+
+        Three naming authorities, in precedence order: a releasable's declared
+        ``tag_format``, a monorepo package's target-derived
+        ``monorepo_tag_format``, and a standalone repository's ``tag_format``.
+        """
+        if context.primary_tag_format:
+            return context.primary_tag_format.format(
+                name=context.releasable_name or "", version=version,
+            )
+        if context.monorepo_name:
+            return self.monorepo_tag_format(
+                context.monorepo_name, version, path=context.project_path,
+            )
+        return self.tag_format(version)
+
+    def _companion_refs(self, version, context, primary):
+        """The extra tags this release's members' ecosystems require.
+
+        Only a releasable release has members to ask, which is why
+        ``member_package_paths`` being None -- rather than empty -- means "no
+        companions", exactly as the release flow's own guard did.
+
+        Two rules, both inherited from the collector this replaced:
+
+        * A primary tag that is ALREADY Go-compatible (it contains ``/v``)
+          suppresses companions entirely, so a Go-shaped release does not
+          duplicate its own tag.
+        * A publish-suppressed member (``publish_mode: "none"``) contributes
+          nothing -- there is no proxy to satisfy for something never published.
+
+        A member whose config cannot be resolved is a HARD ERROR, matching the
+        version-sync plan: the two must agree on the member set, and silently
+        skipping one here would tag a release the sync path would have refused.
+        """
+        if context.member_package_paths is None:
+            return ()
+        if "/v" in primary:
+            return ()
+
+        from . import TARGETS
+        from ..member_context import resolve_member_context
+
+        seen: set[str] = set()
+        found: list[str] = []
+        for pkg_path in context.member_package_paths:
+            abs_pkg = os.path.join(context.repo_root, pkg_path)
+            if not os.path.isdir(abs_pkg):
+                continue
+            member = resolve_member_context(
+                abs_pkg, releasable_config_dir=context.releasable_config_dir,
+            )
+            if member.publish_mode == "none":
+                continue
+            for entry in member.targets or ():
+                target = TARGETS.get(entry.name)
+                if target is None:
+                    continue
+                for tag in target.companion_tags(entry.name, version, path=pkg_path):
+                    if tag != primary and tag not in seen:
+                        seen.add(tag)
+                        found.append(tag)
+        return tuple(found)
+
     def normalize_package_name(self, raw_name):
         """Reduce a package name to the form this registry compares by.
 

@@ -862,7 +862,8 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
                           commit_msg, branch, target_paths, project_dir,
                           changelog_entry, monorepo_root=None,
                           member_package_paths=None,
-                          releasable_config_dir=None):
+                          releasable_config_dir=None,
+                          releasable_name=None, releasable_tag_fmt=None):
     """Print the release's identity summary: which release this is.
 
     The first of the preview's three parts. It answers "what release is this?"
@@ -873,7 +874,7 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
     no effects handle to record onto and this summary is the whole preview.
     """
     from . import TARGETS, load_workspace
-    from .execute import collect_companion_tags
+    from .execute import release_ref_context
 
     log("\n--- Dry run summary ---")
     log(f"Registry:  {registry}")
@@ -899,14 +900,26 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
                 other_files.append(os.path.normpath(rel))
     if other_files:
         log(f"Sync to:   {', '.join(other_files)}")
-    # Show companion tags (e.g. Go module proxy tags)
+    # Show the rest of the ref set the release would create -- the same
+    # expected_refs answer the tag step acts on, so the preview cannot show a
+    # different set from the one that would be tagged.
     if member_package_paths is not None and monorepo_root:
-        companion = collect_companion_tags(
-            member_package_paths, monorepo_root, new_version, tag,
-            releasable_config_dir=releasable_config_dir,
+        expected = TARGETS[registry].expected_refs(
+            new_version,
+            release_ref_context(
+                monorepo_root=monorepo_root, git_root=project_dir,
+                monorepo_name=monorepo_name,
+                monorepo_project_path=monorepo_project_path,
+                releasable_name=releasable_name,
+                releasable_tag_format=releasable_tag_fmt,
+                member_package_paths=member_package_paths,
+                releasable_config_dir=releasable_config_dir,
+            ),
         )
-        if companion:
-            log(f"Companion tags: {', '.join(companion)}")
+        if expected.companions:
+            log(f"Companion tags: {', '.join(expected.companions)}")
+        if expected.aliases:
+            log(f"Recorded alias tags: {', '.join(expected.aliases)}")
     # Show subtree publishing info
     if monorepo_name:
         target = TARGETS[registry]

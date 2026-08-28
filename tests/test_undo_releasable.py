@@ -241,7 +241,7 @@ class TestUndoReleasablePaths:
             ctx,
             flags={"version": "1.0.1"},
             extra_patches=[patch(
-                "rlsbl.commands.release.execute.collect_companion_tags",
+                "rlsbl.commands.undo._plan_companion_tags",
                 return_value=["core/v1.0.1"],
             )],
         )
@@ -298,7 +298,7 @@ class TestNonLatestAuditFailureRefusesTheUndo:
                 extra_patches=[
                     patch("rlsbl.commands.undo.run_gh", side_effect=spy_gh),
                     patch(
-                        "rlsbl.commands.release.execute.collect_companion_tags",
+                        "rlsbl.commands.undo._plan_companion_tags",
                         return_value=["core/v1.0.1"],
                     ),
                 ],

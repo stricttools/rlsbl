@@ -177,6 +177,20 @@ class ReleaseTarget(Protocol):
         """
         return []
 
+    def expected_refs(self, version: str, context):
+        """Every git ref *version* owns: the primary tag, companions, aliases.
+
+        THE single authority for a released version's ref set. *context* is a
+        :class:`~rlsbl.targets.refs.RefContext`; the return is an
+        :class:`~rlsbl.targets.refs.ExpectedRefs`. The release flow creates and
+        pushes exactly this set and the ``unpublished-refs`` check renders
+        exactly this set against reality, so the two can never diverge.
+
+        Composed from the per-target facts above rather than overridden: no
+        target implements this itself.
+        """
+        ...
+
     def format_version(self, version: str) -> str:
         """Translate a semver version into this ecosystem's version format.
 

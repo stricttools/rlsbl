@@ -1,9 +1,13 @@
-"""Tests for Go companion tag infrastructure (Phases 2-4).
+"""Tests for Go companion tag infrastructure.
 
 Covers:
 - BaseTarget.companion_tags() returns empty list
 - GoTarget.companion_tags() with/without path
-- collect_companion_tags helper (Go members, private, non-Go, Go-compatible primary)
+- The companion half of ``expected_refs`` (Go members, publish-suppressed,
+  non-Go, Go-compatible primary). These tests used to exercise a standalone
+  ``collect_companion_tags`` helper in the release flow; the rules it carried
+  now live in ``BaseTarget._companion_refs`` and are reached through
+  ``expected_refs``, which is the single authority for a version's ref set.
 - Integration test with real git repo (creation, push, rollback)
 - Validation check (go-companion-tags)
 """
@@ -19,7 +23,27 @@ import pytest
 
 from rlsbl.targets.base import BaseTarget
 from rlsbl.targets.go import GoTarget
-from rlsbl.commands.release.execute import collect_companion_tags
+from rlsbl.targets.refs import ref_context
+
+
+def _companions(member_paths, workspace_root, version, primary_tag,
+                *, target=None, releasable_config_dir=None):
+    """The companion refs ``expected_refs`` derives, for a stated primary tag.
+
+    ``primary_tag_format`` is the honest way to state "this release's primary
+    tag is X": the format is the naming authority, and rendering it at *version*
+    is what produces the primary the companion rules are evaluated against.
+    """
+    tgt = target if target is not None else BaseTarget()
+    expected = tgt.expected_refs(version, ref_context(
+        repo_root=str(workspace_root),
+        primary_tag_format=primary_tag.replace(version, "{version}"),
+        releasable_name="rel",
+        member_package_paths=member_paths,
+        releasable_config_dir=releasable_config_dir,
+    ))
+    assert expected.primary == primary_tag
+    return list(expected.companions)
 
 
 # ---------------------------------------------------------------------------
@@ -55,20 +79,35 @@ class TestGoTargetCompanionTags:
 
 
 # ---------------------------------------------------------------------------
-# Unit tests: collect_companion_tags helper
+# Unit tests: the companion half of expected_refs
 # ---------------------------------------------------------------------------
 
 
-class TestCollectCompanionTags:
-    """Tests for the detection helper that collects companion tags from member packages."""
+class TestExpectedRefsCompanions:
+    """The rules the release flow's companion-tag collector used to carry.
+
+    They now belong to ``expected_refs``, so a ref the release creates and a ref
+    a check looks for come from one derivation.
+    """
 
     def test_skips_when_primary_tag_is_go_compatible(self):
         """If the primary tag already contains /v, no companion tags are needed."""
-        result = collect_companion_tags(
+        assert _companions(
             ["packages/mylib"], "/some/workspace", "1.0.0",
             "packages/mylib/v1.0.0",
-        )
-        assert result == []
+        ) == []
+
+    def test_not_a_releasable_release_has_no_companions(self, tmp_path):
+        """``member_package_paths=None`` -- not empty -- means no companions.
+
+        This is the release flow's own guard: only a releasable release has
+        members to ask.
+        """
+        expected = BaseTarget().expected_refs("1.0.0", ref_context(
+            repo_root=str(tmp_path),
+        ))
+        assert expected.primary == "v1.0.0"
+        assert expected.companions == ()
 
     def test_returns_go_companion_for_non_private_go_member(self, tmp_path):
         """Non-private Go member should produce a companion tag."""
@@ -80,8 +119,8 @@ class TestCollectCompanionTags:
 
         with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
-             patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
-            result = collect_companion_tags(
+             patch("rlsbl.targets.TARGETS", {"go": GoTarget()}):
+            result = _companions(
                 ["packages/mylib"], str(tmp_path), "1.0.0",
                 "myreleasable@v1.0.0",
             )
@@ -96,7 +135,7 @@ class TestCollectCompanionTags:
 
         with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "none"}), \
              patch("rlsbl.targets.detect_targets", mock_detect):
-            result = collect_companion_tags(
+            result = _companions(
                 ["packages/internal"], str(tmp_path), "1.0.0",
                 "myreleasable@v1.0.0",
             )
@@ -115,8 +154,8 @@ class TestCollectCompanionTags:
         # BaseTarget.companion_tags returns [] for npm
         with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[npm_entry]), \
-             patch("rlsbl.commands.release.TARGETS", {"npm": BaseTarget()}):
-            result = collect_companion_tags(
+             patch("rlsbl.targets.TARGETS", {"npm": BaseTarget()}):
+            result = _companions(
                 ["packages/jslib"], str(tmp_path), "1.0.0",
                 "myreleasable@v1.0.0",
             )
@@ -134,8 +173,8 @@ class TestCollectCompanionTags:
 
         with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[go_entry1, go_entry2]), \
-             patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
-            result = collect_companion_tags(
+             patch("rlsbl.targets.TARGETS", {"go": GoTarget()}):
+            result = _companions(
                 ["packages/mylib"], str(tmp_path), "1.0.0",
                 "myreleasable@v1.0.0",
             )
@@ -153,8 +192,8 @@ class TestCollectCompanionTags:
         # Primary tag happens to match what GoTarget would produce
         with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
              patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
-             patch("rlsbl.commands.release.TARGETS", {"go": GoTarget()}):
-            result = collect_companion_tags(
+             patch("rlsbl.targets.TARGETS", {"go": GoTarget()}):
+            result = _companions(
                 ["packages/mylib"], str(tmp_path), "1.0.0",
                 "packages/mylib/v1.0.0",
             )
@@ -171,14 +210,14 @@ class TestCollectCompanionTags:
         # No publish_mode key at all -- required-read raises, never silently skips.
         with patch("rlsbl.config.read_project_config", return_value={}):
             with pytest.raises(ConfigError):
-                collect_companion_tags(
+                _companions(
                     ["packages/mylib"], str(tmp_path), "1.0.0",
                     "myreleasable@v1.0.0",
                 )
 
     def test_corrupt_member_config_raises(self, tmp_path):
-        """A member with a corrupt config.json must abort companion-tag
-        collection with a hard error, mirroring _sync_member_package_versions_plan.
+        """A member with a corrupt config.json must abort ref derivation with a
+        hard error, mirroring _sync_member_package_versions_plan.
         Silently skipping would let a release proceed without the member's
         Go proxy tag while version sync aborts on the very same config."""
         from rlsbl.errors import ConfigError
@@ -188,18 +227,17 @@ class TestCollectCompanionTags:
         (pkg_dir / ".rlsbl" / "config.json").write_text("{not valid json")
 
         with pytest.raises(ConfigError):
-            collect_companion_tags(
+            _companions(
                 ["packages/mylib"], str(tmp_path), "1.0.0",
                 "myreleasable@v1.0.0",
             )
 
     def test_skips_nonexistent_package_dir(self, tmp_path):
         """Non-existent package directories are silently skipped."""
-        result = collect_companion_tags(
+        assert _companions(
             ["packages/nonexistent"], str(tmp_path), "1.0.0",
             "myreleasable@v1.0.0",
-        )
-        assert result == []
+        ) == []
 
 
 # ---------------------------------------------------------------------------
@@ -258,8 +296,8 @@ class TestCompanionTagIntegration:
         repo = git_repo
         primary_tag = "myreleasable@v1.0.0"
 
-        # Collect companion tags (using real file system)
-        companion = collect_companion_tags(
+        # Derive the ref set (using real file system)
+        companion = _companions(
             ["packages/golib"], str(repo), "1.0.0", primary_tag,
         )
         assert companion == ["packages/golib/v1.0.0"]
@@ -303,7 +341,7 @@ class TestCompanionTagIntegration:
         _run_git(repo, "add", ".")
         _run_git(repo, "commit", "-m", "initial")
 
-        companion = collect_companion_tags(
+        companion = _companions(
             ["packages/private-golib"], str(repo), "1.0.0",
             "myreleasable@v1.0.0",
         )

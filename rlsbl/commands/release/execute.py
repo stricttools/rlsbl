@@ -1679,75 +1679,36 @@ def release_anchor_tree_hashes(verified_sha, *, run, git_root,
     return trees
 
 
-def collect_companion_tags(member_package_paths, workspace_root, version,
-                           primary_tag, releasable_config_dir=None):
-    """Collect companion tags from all publishing member packages.
+def release_ref_context(*, monorepo_root, git_root, monorepo_name=None,
+                        monorepo_project_path=None, releasable_name=None,
+                        releasable_tag_format=None, member_package_paths=None,
+                        releasable_config_dir=None):
+    """Build the :class:`~rlsbl.targets.refs.RefContext` for one release.
 
-    Iterates member packages in an explicit releasable, detects their
-    targets, and collects companion tags (e.g. Go module proxy tags).
+    The single translation from the release flow's own vocabulary into the
+    context ``expected_refs`` reads, so the tag step, the dry-run preview and
+    ``release undo`` all ask the ref question with identical inputs.
 
-    Guards:
-    - Only meaningful in explicit releasable mode (caller checks).
-    - Skips companion creation if the primary tag already contains a
-      ``/v`` pattern (Go-compatible), to avoid duplicate tags.
-    - Skips publish-suppressed packages (same logic as
-      _sync_member_package_versions_plan, including releasable-level config
-      inheritance).
-
-    Args:
-        member_package_paths: workspace-relative paths for member packages.
-        workspace_root: absolute path to the monorepo root.
-        version: version string being released.
-        primary_tag: the primary release tag string.
-        releasable_config_dir: optional path to the releasable's state
-            directory for config inheritance.
-
-    Returns:
-        List of companion tag strings (deduplicated, excluding the primary tag).
+    ``primary_tag_format`` is passed only when a releasable actually owns the
+    naming (both its format and its name are known), matching the precedence
+    :func:`~rlsbl.commands.release.validate.compute_release_version` applies
+    when it resolves the release's own tag.
     """
-    from . import TARGETS
-    from ...member_context import resolve_member_context
+    from ...targets.refs import ref_context
 
-    # If the primary tag is already Go-compatible (contains /v), skip
-    # companion creation to avoid duplicates.
-    if "/v" in primary_tag:
-        return []
-
-    seen = set()
-    result = []
-    for pkg_path in member_package_paths:
-        abs_pkg = os.path.join(str(workspace_root), pkg_path)
-        if not os.path.isdir(abs_pkg):
-            continue
-
-        # A broken member config is a hard error, mirroring
-        # _sync_member_package_versions_plan: version sync and companion-tag
-        # collection must agree on the member set, so this must never
-        # silently skip a member the sync path would abort on. (The undo
-        # flow wraps its collect_companion_tags call in its own try/except
-        # and degrades gracefully there.)
-        member = resolve_member_context(
-            abs_pkg, releasable_config_dir=releasable_config_dir,
-        )
-
-        # Skip publish-suppressed packages (publish_mode == "none")
-        if member.publish_mode == "none":
-            continue
-
-        entries = member.targets
-        if not entries:
-            continue
-
-        for entry in entries:
-            tgt = TARGETS.get(entry.name)
-            if not tgt:
-                continue
-            for ctag in tgt.companion_tags(entry.name, version, path=pkg_path):
-                if ctag not in seen and ctag != primary_tag:
-                    seen.add(ctag)
-                    result.append(ctag)
-
-    return result
+    return ref_context(
+        repo_root=str(monorepo_root or git_root),
+        project_path=monorepo_project_path,
+        monorepo_name=monorepo_name,
+        primary_tag_format=(
+            releasable_tag_format
+            if releasable_tag_format is not None and releasable_name is not None
+            else None
+        ),
+        releasable_name=releasable_name,
+        member_package_paths=member_package_paths,
+        releasable_config_dir=releasable_config_dir,
+    )
 
 
 def _sync_member_package_versions_plan(
@@ -2889,20 +2850,43 @@ def _run_release_mutating(state: ReleaseState):
                     log("Skipping tag creation (tag already at the verified commit)")
 
         if not _tag_already_exists:
+            # The refs this release creates ARE expected_refs for the new
+            # version -- one derivation, never a second list assembled here.
+            _expected = target.expected_refs(new_version, release_ref_context(
+                monorepo_root=monorepo_root, git_root=_git_root,
+                monorepo_name=monorepo_name,
+                monorepo_project_path=monorepo_project_path,
+                releasable_name=releasable_name,
+                releasable_tag_format=releasable_tag_format_str,
+                member_package_paths=member_package_paths,
+                releasable_config_dir=_releasable_cfg_dir,
+            ))
+            if _expected.primary != tag:
+                raise RlsblError(
+                    f"the release resolved its tag as {tag!r} but the ref "
+                    f"authority names {_expected.primary!r} for "
+                    f"{new_version}. Both read the same naming inputs, so a "
+                    f"disagreement means one of them was handed different "
+                    f"ones -- refusing to tag rather than create a ref the "
+                    f"checks will not look for."
+                )
+
             # Create local git tag on the commit CI verified
             run("git", ["tag", tag, verified_sha])
             log(f"Tagged: {tag} -> {verified_sha[:12]} (CI-verified)")
 
-            # Create companion tags (e.g. Go module proxy tags in releasable mode)
-            if member_package_paths is not None:
-                _companion_list = collect_companion_tags(
-                    member_package_paths, monorepo_root, new_version, tag,
-                    releasable_config_dir=_releasable_cfg_dir,
-                )
-                for ctag in _companion_list:
-                    run("git", ["tag", ctag, verified_sha])
-                    state.companion_tags.append(ctag)
-                    log(f"Created Go companion tag: {ctag}")
+            # Companion tags (Go module proxy tags in releasable mode) and any
+            # recorded alias the version already owns.
+            for ctag in _expected.companions:
+                run("git", ["tag", ctag, verified_sha])
+                state.companion_tags.append(ctag)
+                log(f"Created Go companion tag: {ctag}")
+            for atag in _expected.aliases:
+                if atag == tag or atag in state.companion_tags:
+                    continue
+                run("git", ["tag", atag, verified_sha])
+                state.companion_tags.append(atag)
+                log(f"Created recorded alias tag: {atag}")
 
             save_step(_state_path, "TAGGED")
             _completed.add("TAGGED")

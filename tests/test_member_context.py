@@ -4,7 +4,7 @@ Four code paths must resolve a releasable member's effective config and
 targets identically:
 
 - the Phase-A member version-sync pair (release execute + phase_a)
-- collect_companion_tags (release execute)
+- the companion half of expected_refs (the target protocol)
 - the go-companion-tags workspace check
 - resolve_target_paths (primary registry/path resolution)
 
@@ -24,10 +24,28 @@ import pytest
 from conftest import run_git, sync_member_versions, workspace_toml
 from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.member_context import MemberContext, resolve_member_context
-from rlsbl.commands.release.execute import (
-    collect_companion_tags,
-    resolve_target_paths,
-)
+from rlsbl.commands.release.execute import resolve_target_paths
+from rlsbl.targets import TARGETS
+from rlsbl.targets.refs import ref_context
+
+
+def companion_refs(member_paths, repo, version, primary_tag,
+                   releasable_config_dir=None):
+    """The companion half of ``expected_refs`` for a stated primary tag.
+
+    The rules this exercises used to belong to a ``collect_companion_tags``
+    helper in the release flow; they are now reached through the one ref
+    authority, so the four paths above agree by construction.
+    """
+    expected = TARGETS["go"].expected_refs(version, ref_context(
+        repo_root=str(repo),
+        primary_tag_format=primary_tag.replace(version, "{version}"),
+        releasable_name="myrel",
+        member_package_paths=member_paths,
+        releasable_config_dir=releasable_config_dir,
+    ))
+    assert expected.primary == primary_tag
+    return list(expected.companions)
 from rlsbl.workspace import (
     Releasable,
     WorkspaceProject,
@@ -150,11 +168,11 @@ class TestResolveMemberContext:
 
 
 # ---------------------------------------------------------------------------
-# collect_companion_tags with releasable-level inheritance
+# expected_refs companions with releasable-level inheritance
 # ---------------------------------------------------------------------------
 
 
-class TestCollectCompanionTagsInheritance:
+class TestExpectedRefsCompanionInheritance:
     def test_releasable_level_private_false_produces_companion_tag(self, tmp_path):
         """A member private/targeted only at the releasable level gets a companion tag."""
         repo, _member, rel_dir = _make_go_member_monorepo(
@@ -162,8 +180,8 @@ class TestCollectCompanionTagsInheritance:
             member_config={},
             releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
-        result = collect_companion_tags(
-            ["packages/golib"], str(repo), "1.0.0", "myrel@v1.0.0",
+        result = companion_refs(
+            ["packages/golib"], repo, "1.0.0", "myrel@v1.0.0",
             releasable_config_dir=rel_dir,
         )
         assert result == ["packages/golib/v1.0.0"]
@@ -175,8 +193,8 @@ class TestCollectCompanionTagsInheritance:
             member_config={"publish_mode": "none"},
             releasable_config={"publish_mode": "ci", "targets": ["go"]},
         )
-        result = collect_companion_tags(
-            ["packages/golib"], str(repo), "1.0.0", "myrel@v1.0.0",
+        result = companion_refs(
+            ["packages/golib"], repo, "1.0.0", "myrel@v1.0.0",
             releasable_config_dir=rel_dir,
         )
         assert result == []
@@ -268,9 +286,9 @@ class TestMemberSetAgreement:
         assert (member / "VERSION").read_text().strip() == "2.0.0"
         assert files_to_commit  # VERSION was recorded for commit
 
-        # 2. Companion tag collection agrees
-        companions = collect_companion_tags(
-            ["packages/golib"], str(repo), "2.0.0", "myrel@v2.0.0",
+        # 2. The ref authority's companion half agrees
+        companions = companion_refs(
+            ["packages/golib"], repo, "2.0.0", "myrel@v2.0.0",
             releasable_config_dir=rel_dir,
         )
         assert companions == ["packages/golib/v2.0.0"]

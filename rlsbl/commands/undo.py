@@ -340,20 +340,60 @@ def _walk_release_commits(tag, expected_msg):
 
 
 def _plan_companion_tags(uc, tag, version):
-    """Enumerate companion tags to delete (both paths, releasable mode only)."""
+    """Enumerate the version's non-primary refs to delete (releasable mode only).
+
+    Asks the same ``expected_refs`` authority the release's tag step asked when
+    it CREATED them, so undo cannot leave behind a ref the release made. A
+    recorded alias is included: it addresses the version being undone.
+
+    Degrades to an empty list on any failure, with the traceback printed. Undo
+    is a repair path, and refusing to remove the primary tag because a member's
+    config no longer resolves would strand the release entirely.
+    """
     if not (uc.releasable_name and uc.ws_root):
         return []
     try:
-        from ..commands.release.execute import collect_companion_tags
-        from ..workspace import get_releasable_dir, load_workspace, members_of
+        from ..commands.release.execute import release_ref_context
+        from ..workspace import (
+            get_releasable_dir,
+            is_explicit_mode,
+            load_releasables,
+            load_workspace,
+            members_of,
+        )
 
         ws_projects = load_workspace(uc.ws_root)
         member_paths = [p["path"] for p in members_of(uc.releasable_name, ws_projects)]
         rel_cfg_dir = get_releasable_dir(str(uc.ws_root), uc.releasable_name)
-        return collect_companion_tags(
-            member_paths, uc.ws_root, version, tag,
-            releasable_config_dir=rel_cfg_dir,
+
+        tag_fmt = None
+        if is_explicit_mode(uc.ws_root):
+            rel = next(
+                (r for r in load_releasables(uc.ws_root, ws_projects)
+                 if r.name == uc.releasable_name),
+                None,
+            )
+            tag_fmt = rel.effective_tag_format if rel else None
+
+        member = resolve_member_context(
+            uc.start_path, releasable_config_dir=uc.releasable_config_dir,
         )
+        entries = member.targets
+        if not entries:
+            return []
+        expected = TARGETS[entries[0].name].expected_refs(
+            version,
+            release_ref_context(
+                monorepo_root=uc.ws_root, git_root=uc.project_path,
+                monorepo_name=uc.monorepo_name,
+                monorepo_project_path=uc.monorepo_project_path,
+                releasable_name=uc.releasable_name,
+                releasable_tag_format=tag_fmt,
+                member_package_paths=member_paths,
+                releasable_config_dir=rel_cfg_dir,
+            ),
+        )
+        return [t for t in expected.tags if t != tag]
     except Exception:
         traceback.print_exc()
         return []

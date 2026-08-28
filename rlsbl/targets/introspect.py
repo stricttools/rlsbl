@@ -274,6 +274,11 @@ NON_AXIS_ATTRIBUTES: dict[str, str] = {
                             "kind of project (the fact is detection_files).",
     "claim_placeholder": "operation: publishes a placeholder to claim a name "
                          "(the fact is supports_name_claim).",
+    "expected_refs": "operation: assembles ONE version's full ref set from a "
+                     "version and a repository context. The per-target facts "
+                     "it composes -- tag_format, monorepo_tag_format, "
+                     "companion_tags -- are each already an axis; the assembly "
+                     "is per-version, not per-target, so it has no cell.",
     "find_circular_dependencies": "operation: scans sources for import cycles "
                                   "(the fact is supports_circular_dep_analysis).",
     "find_dead_modules": "operation: scans sources for unreachable modules "
