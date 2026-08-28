@@ -249,3 +249,4 @@
 {"format_version":1,"id":"18cfe37d1d25b3ec14d57a4132654b04bc3f79c9705e2055","commits":["a07bc75a8187ad29b920c561974a00cfabf13118"],"user_facing":true,"description":"**A scrub's summary now reports the GitHub Releases it actually recreated.** It counted the rewritten tags that looked like released versions instead, so a tag carrying no Release still added to the total.","type":"fix"}
 {"format_version":1,"id":"18cfe380e63fc119952c89693b8946b587490b4988ed19f5","commits":["7ef7ddd7d1ca34c91a1865fb5402b18789d4719b"],"user_facing":false}
 {"format_version":1,"id":"18cfe3918ef2fb9efb6715349b5140f8bfe9934b2db8de82","commits":["45b944c81ecd75e5221865c80e6bc1470cf7cf8c"],"user_facing":false}
+{"format_version":1,"id":"18cfe3964d0777c09d49c36ad49443d9a7b6e5552f1b642a","commits":["c532f8302d21d2e19720620103a979f0ae905040"],"user_facing":false}
