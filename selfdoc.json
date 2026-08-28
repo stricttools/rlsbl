@@ -46,6 +46,7 @@
     "table-targets": "docs/directives/target_table.py",
     "table-target-axes": "docs/directives/target_axes.py",
     "check-count": "docs/directives/check_count.py",
+    "table-check-tags": "docs/directives/check_tags.py",
     "target-count": "docs/directives/target_count.py"
   },
   "topology": {

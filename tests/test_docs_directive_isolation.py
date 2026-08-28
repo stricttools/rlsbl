@@ -31,6 +31,7 @@ DIRECTIVES = [
     "pipeline_table",
     "target_count",
     "check_count",
+    "check_tags",
 ]
 
 
@@ -177,3 +178,30 @@ class TestTheIsolatedOutputIsTheRealOne:
         with open(REPO_ROOT / "rlsbl" / "data" / "checks.toml", "rb") as f:
             checks = tomllib.load(f)["checks"]
         assert f"{len(checks)} checks" in _run_probe("check_count")["output"]
+
+    def test_check_tags_renders_a_row_per_tag_with_the_registered_count(self):
+        """The README's per-tag table is the registry's own arithmetic."""
+        import tomllib
+        from collections import Counter
+
+        with open(REPO_ROOT / "rlsbl" / "data" / "checks.toml", "rb") as f:
+            checks = tomllib.load(f)["checks"]
+        counts = Counter()
+        untagged = 0
+        for meta in checks.values():
+            if not meta["tags"]:
+                untagged += 1
+            for tag in meta["tags"]:
+                counts[tag] += 1
+
+        output = _run_probe("check_tags")["output"]
+        for tag, count in counts.items():
+            assert f"| `{tag}` | {count} |" in output, tag
+        assert f"| (untagged) | {untagged} |" in output
+        # No tag may be missing from the rendering, and none invented.
+        rendered = {
+            line.split("|")[1].strip().strip("`")
+            for line in output.splitlines()
+            if line.startswith("| ") and line.split("|")[2].strip().isdigit()
+        }
+        assert rendered == set(counts) | {"(untagged)"}

@@ -12,7 +12,10 @@ part of the repository, and a stale one is a check failure rather than a
 silently wrong page.
 
 This module is loaded by each directive through ``importlib`` by path, because
-selfdoc loads directive files individually rather than as a package.
+selfdoc loads directive files individually rather than as a package. It is also
+where the Markdown table renderer is reached, so every directive that emits a
+table -- including the ones deriving from ``rlsbl/data/checks.toml`` rather than
+from the matrix -- resolves selfdoc-core in one place.
 """
 
 import json
@@ -39,6 +42,11 @@ def _renderer():
             "Install with: pip install rlsbl[docs]"
         ) from exc
     return render_markdown_table
+
+
+def render_rows(headers, rows):
+    """Render arbitrary headers and rows as Markdown, for non-matrix data."""
+    return _renderer()(headers, rows)
 
 
 def render_table(name, empty_message):
