@@ -736,7 +736,7 @@ class TestCleanupCommand:
         # delegate to the original captured at module import time.
         return _REAL_SUBPROCESS_RUN(cmd, *args, **kwargs)
 
-    def _setup_git_workspace(self, root):
+    def _setup_git_workspace(self, root, pkg_path="pkg"):
         import subprocess as sp
 
         def git(*args):
@@ -747,19 +747,19 @@ class TestCleanupCommand:
         git("config", "user.email", "t@t.local")
         git("config", "user.name", "T")
 
-        pkg = root / "pkg"
+        pkg = root / pkg_path
         _make_rlsbl_dir(pkg, subdirs=["changes", "hooks"],
                         files=["version", "config.json"])
         (pkg / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         (pkg / ".rlsbl" / "hooks" / "pre-release.sh").write_text("#!/bin/sh\n")
         (pkg / ".rlsbl" / "config.json").write_text('{"publish_mode": "none"}\n')
         (pkg / "CHANGELOG.md").write_text("# Changelog\n")
-        _write_workspace(root, """\
+        _write_workspace(root, f"""\
 [[releasables]]
 name = "core"
 
 [[projects]]
-path = "pkg"
+path = "{pkg_path}"
 name = "pkg"
 releasable = "core"
 """)
@@ -805,6 +805,41 @@ releasable = "core"
             capture_output=True, text=True, check=True,
         ).stdout.strip()
         assert "residue" in head_msg
+
+    def test_cleanup_commits_a_unicode_members_deletions(
+        self, tmp_project, monkeypatch,
+    ):
+        """A member directory outside plain ASCII still leaves a clean tree.
+
+        The deletions are committed by naming the removed paths back to git.
+        Read in git's default porcelain form those paths arrive C-quoted
+        (``"pkg\\303\\251 nom/CHANGELOG.md"``), and a commit naming that
+        literal commits nothing -- leaving the member's files deleted on disk
+        and the deletion uncommitted, which is exactly the half-done state the
+        commit exists to prevent.
+        """
+        from unittest.mock import patch as _patch
+
+        from rlsbl.releasable_cleanup import run_cleanup_command
+
+        pkg = self._setup_git_workspace(tmp_project, pkg_path="pkgé nom")
+        monkeypatch.chdir(tmp_project)
+
+        with _patch(
+            "rlsbl.effects.run",
+            side_effect=self._mock_saferm_delete,
+        ):
+            removed = run_cleanup_command(str(tmp_project))
+
+        assert not (pkg / "CHANGELOG.md").exists()
+        assert removed
+
+        import subprocess as sp
+        status = sp.run(
+            ["git", "status", "--porcelain"], cwd=str(tmp_project),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert status == "", f"cleanup must commit its deletions, got: {status}"
 
     def test_cleanup_dry_run_removes_nothing(self, tmp_project, monkeypatch):
         from unittest.mock import patch as _patch

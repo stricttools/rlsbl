@@ -1,12 +1,12 @@
-"""Cleanup utilities for per-package .rlsbl/ directories after releasable model migration, removing orphaned changelog and release state files from the old layout.
+"""Cleanup utilities for per-package .rlsbl/ directories, removing orphaned changelog and release state files left over from an older layout.
 
-When a workspace uses explicit-mode releasables, changelog and release state
-moves to per-releasable directories under ``.rlsbl-monorepo/releasables/{name}/``.
-The per-package ``.rlsbl/changes/`` and ``.rlsbl/releases/`` directories become
-dead state that should be removed.
+Changelog and release state belongs to the releasable, under
+``.rlsbl-monorepo/releasables/{name}/``. A member package's own
+``.rlsbl/changes/`` and ``.rlsbl/releases/`` directories are dead state that
+should be removed.
 
-These functions are intended for use by migration tooling (Phase 10), not for
-automatic invocation during scaffold or release.
+These functions run from ``rlsbl monorepo cleanup``, never automatically
+during scaffold or release.
 """
 
 import os
@@ -15,11 +15,9 @@ from .config import read_json_config
 from .workspace import (
     WorkspaceProject,
     get_releasable_dir,
-    is_explicit_mode,
     load_releasables,
     load_workspace,
 )
-from . import effects
 from .saferm import saferm_delete
 
 
@@ -40,11 +38,10 @@ EXPECTED_RLSBL_CONTENTS = frozenset({
 
 def cleanup_per_package_release_state(workspace_root, projects=None,
                                       releasables=None, dry_run=False):
-    """Remove per-package .rlsbl/ state for packages in explicit-mode releasables.
+    """Remove per-package .rlsbl/ state for packages that belong to a releasable.
 
-    Only acts when the workspace is in explicit mode (``[[releasables]]`` is
-    defined in workspace.toml).  For each project that belongs to a releasable
-    (``releasable`` is a string, not False), removes:
+    For each project that belongs to a releasable (``releasable`` is a string,
+    not False), removes:
 
     - ``.rlsbl/changes/`` -- changelog state (moved to releasable level)
     - ``.rlsbl/releases/`` -- release state (moved to releasable level)
@@ -81,9 +78,6 @@ def cleanup_per_package_release_state(workspace_root, projects=None,
         RuntimeError: if saferm is not available on PATH.
         subprocess.CalledProcessError: if saferm fails for a path.
     """
-    if not is_explicit_mode(workspace_root):
-        return []
-
     if projects is None:
         projects = load_workspace(workspace_root)
     if releasables is None:
@@ -200,14 +194,11 @@ def run_cleanup_command(workspace_root, *, dry_run=False):
     # Commit the deletions of tracked paths so trees stay clean. Untracked
     # residue (e.g. an uncommitted .rlsbl/version) vanishes without a
     # git-visible change and must not be passed to the commit tool.
-    status = effects.run(
-        ["git", "--no-optional-locks", "status", "--porcelain", "--", *removed],
-        capture_output=True, text=True, cwd=str(workspace_root),
+    from .utils import working_tree_paths
+
+    tracked_changes = working_tree_paths(
+        cwd=str(workspace_root), paths=removed,
     )
-    tracked_changes = []
-    for line in status.stdout.splitlines():
-        if len(line) >= 4:
-            tracked_changes.append(line[3:].strip())
     if tracked_changes:
         from .utils import commit_files
         commit_files(
