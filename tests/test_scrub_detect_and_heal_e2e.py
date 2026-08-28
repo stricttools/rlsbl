@@ -138,6 +138,12 @@ def _gh_recorder(calls, existing_tags=("v1.0.0",)):
 
 
 def _run_reconcile(repo, gh_calls):
+    """Both halves of the file-driven reconcile: write the plan, then apply it.
+
+    Consent is file-driven now -- `--plan` observes and writes
+    `.rlsbl/releases/reconcile-plan.toml`, `--apply` re-observes and performs
+    it -- so the heal step of this loop is two calls, not one.
+    """
     ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
     patches = [
         patch(f"{RECONCILE_MOD}.check_gh_installed", return_value=True),
@@ -147,7 +153,8 @@ def _run_reconcile(repo, gh_calls):
     for p in patches:
         p.start()
     try:
-        reconcile_run_cmd({}, ctx=ctx)
+        reconcile_run_cmd({"mode": "plan"}, ctx=ctx)
+        reconcile_run_cmd({"mode": "apply"}, ctx=ctx)
     finally:
         for p in patches:
             p.stop()
@@ -227,10 +234,19 @@ class TestRawRewriteIsDetectedAndHealed:
         assert remote_peeled in _git(repo, "rev-list", "HEAD").split(), (
             "the restored tag must point into the rewritten history"
         )
-        assert ["release", "delete", "v1.0.0", "--yes"] in gh_calls
-        created = [c for c in gh_calls if c[:2] == ["release", "create"]]
-        assert created and created[0][2] == "v1.0.0", (
-            "the GitHub Release must be recreated on the moved tag"
+        # The Release follows the TAG NAME, so re-pointing the tag moves the
+        # existing Release onto the rewritten commit by itself -- there is
+        # nothing to delete and recreate. What does NOT follow is the body's
+        # rlsbl-ci-sha marker, which still names the pre-rewrite commit and is
+        # what the publish workflow reads, so the reconcile re-points it.
+        assert ["release", "delete", "v1.0.0", "--yes"] not in gh_calls, (
+            "a Release that already exists on the moved tag must not be "
+            "destroyed and rebuilt"
+        )
+        edits = [c for c in gh_calls if c[:2] == ["release", "edit"]]
+        assert edits and edits[0][2] == "v1.0.0", (
+            "the Release's ci-sha marker must be re-pointed at the rewritten "
+            f"commit; got {gh_calls}"
         )
 
     def test_a_raw_author_rewrite_also_proceeds(self, e2e_env, monkeypatch):

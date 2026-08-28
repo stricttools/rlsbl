@@ -4,3 +4,4 @@ rlsbl/strictspec_gen/adjudication_validator.py text eol=lf linguist-generated=tr
 rlsbl/strictspec_gen/changelog_entry_commit_validator.py text eol=lf linguist-generated=true
 rlsbl/strictspec_gen/changelog_entry_changeset_file_validator.py text eol=lf linguist-generated=true
 rlsbl/strictspec_gen/lineage_event_validator.py text eol=lf linguist-generated=true
+rlsbl/strictspec_gen/reconcile_plan_validator.py text eol=lf linguist-generated=true

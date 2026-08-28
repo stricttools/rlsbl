@@ -111,6 +111,8 @@ A version the ledger records as `unanchorable` has no recoverable commit, so a r
 
 It replaced three narrower checks (`local-tag`, `remote-tag`, `github-release`) that each looked at the primary tag of the *current* version only, and so saw neither companion tags, nor recorded aliases, nor any past release.
 
+**Where GitHub Release presence went.** The retired `github-release` check asked whether the current version's Release exists. That question is now answered by `rlsbl release reconcile --plan`, over every archived version rather than the current one, and anchored to the ledger: a version whose tag exists but whose Release does not gets a `materialize` verdict, and `--apply` creates the Release with the same body the release flow itself writes (the changelog section, the `rlsbl-ci-sha` marker taken from the ledger anchor, and the pre-release flag the version earns). It sits there rather than in a check because the answer is a repair plan, not a pass/fail: the same observation that finds the gap is what closes it. See [Reconciling published metadata](release-workflow.md#reconciling-published-metadata).
+
 ## Changelog checks
 
 | Check | Severity | Description |

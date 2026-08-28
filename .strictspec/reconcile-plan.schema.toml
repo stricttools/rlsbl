@@ -1,0 +1,96 @@
+# strictspec schema for the RECONCILE PLAN file written by
+# `rlsbl release reconcile --plan` and consumed by
+# `rlsbl release reconcile --apply`.
+#
+# The plan is the preview's output artifact and the apply step's only input.
+# It records what was observed, what each subject's verdict was, and a digest of
+# the world the verdicts were computed from -- the apply re-observes and refuses
+# when that digest no longer matches, so a plan can never be applied against a
+# remote that moved under it.
+
+name = "rlsbl-reconcile-plan"
+meta_version = 1
+format_version = 1
+document_syntax = "toml"
+role = "schema"
+root = "ReconcilePlan"
+targets = ["python"]
+description = "The observed plan `rlsbl release reconcile --apply` consumes: one verdict per release ref or GitHub Release, plus a digest of the world they were judged against."
+
+[types.ReconcilePlan]
+type = "record"
+
+[types.ReconcilePlan.fields.generated_at]
+type = "string"
+required = true
+non_empty = true
+description = "When the plan was written (RFC 3339 with a UTC offset)."
+
+[types.ReconcilePlan.fields.generated_by]
+type = "string"
+required = true
+non_empty = true
+description = "The rlsbl version that wrote the plan."
+
+[types.ReconcilePlan.fields.world_digest]
+type = "string"
+required = true
+non_empty = true
+description = "Digest over the observed remote refs and GitHub Release listing. The apply step re-observes and refuses when this no longer matches."
+
+[types.ReconcilePlan.fields.items]
+type = "array"
+required = true
+description = "One verdict per subject, in the order the preview rendered them. Empty when the reconcile found nothing to do."
+[types.ReconcilePlan.fields.items.item]
+type = "PlanItem"
+
+[types.PlanItem]
+type = "record"
+
+[types.PlanItem.fields.key]
+type = "string"
+required = true
+non_empty = true
+description = "The subject judged: a ref name, or `release:<tag>` for a GitHub Release."
+
+[types.PlanItem.fields.kind]
+type = "enum"
+required = true
+values = ["ref", "release"]
+description = "Which kind of subject this item judges."
+
+[types.PlanItem.fields.state]
+type = "enum"
+required = true
+values = [
+  "materialize",
+  "already-correct",
+  "re-point-with-lease",
+  "refuse-foreign",
+  "refuse-identity-mismatch",
+]
+description = "The verdict class."
+
+[types.PlanItem.fields.version]
+type = "string"
+required = false
+non_empty = true
+description = "The released version this subject belongs to, when the ledger names one."
+
+[types.PlanItem.fields.target]
+type = "string"
+required = false
+non_empty = true
+description = "The commit the subject should end up at."
+
+[types.PlanItem.fields.observed]
+type = "string"
+required = false
+non_empty = true
+description = "What the remote held when the plan was written -- the force-with-lease expectation."
+
+[types.PlanItem.fields.summary]
+type = "string"
+required = false
+description = "The one-line headline the preview printed for this item."

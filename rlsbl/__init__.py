@@ -1201,17 +1201,36 @@ def cmd_release_scrub(
     run_cmd(flags, ctx=ctx)
 
 
+# Consent for a reconcile is file-driven, so the two halves of it are the two
+# members of one required choice: `--plan` observes and writes the plan file,
+# `--apply` consumes it. Neither is a default -- which half of a
+# force-pushing repair you are running is not something to leave implicit.
+@strictcli.choice("plan", help="Observe origin and write the reconcile plan to .rlsbl/releases/reconcile-plan.toml. Writes nothing to origin.")
+class ReconcilePlanMode:
+    pass
+
+
+@strictcli.choice("apply", help="Perform the plan in .rlsbl/releases/reconcile-plan.toml, after re-observing origin and refusing if it moved since the plan was written.")
+class ReconcileApplyMode:
+    pass
+
+
 @release_group.command(
     name="reconcile",
     effect="mutating",
-    # Force-pushes tags and recreates the GitHub Releases attached to them.
+    # Force-pushes tags and creates GitHub Releases.
     consequential=True,
-    help="Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.",
+    help="Reconcile this project's published release metadata with what its own records say it released: push the refs origin is missing, re-point the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Merges four explanation sources -- safegit's rewrite journal, the release ledger's anchors, the lineage records, and the committed scrub archives -- into one preview whose verdicts are materialize, already-correct, re-point-with-lease, refuse-foreign, or refuse-identity-mismatch. Fail-closed: one ref origin holds that no record explains aborts the whole reconcile, and nothing anywhere is repaired. Consent is file-driven: --plan writes the plan, --apply performs it.",
 )
-@strictcli.flag(name="push-timeout", type=int, presence="optional", help="Timeout in seconds for each tag push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.")
+@strictcli.choice_flag(
+    "mode", help="Which half of the reconcile to run: write the plan, or perform it. Exactly one must be elected.",
+    presence="required",
+    elect_by="member-flags", choices=[ReconcilePlanMode, ReconcileApplyMode],
+)
+@strictcli.flag(name="push-timeout", type=int, presence="optional", help="Timeout in seconds for each ref push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.")
 @effects.handler
-def cmd_release_reconcile(ctx, push_timeout):
-    """Re-push rewritten tags and recreate their GitHub Releases."""
+def cmd_release_reconcile(ctx, mode: ReconcilePlanMode | ReconcileApplyMode, push_timeout):
+    """Reconcile published refs and Releases with the repository's records."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
     root = _require_project_root()
@@ -1226,6 +1245,7 @@ def cmd_release_reconcile(ctx, push_timeout):
             "dry-run": dry_run,
             "quiet": quiet,
             "push-timeout": push_timeout,
+            "mode": "plan" if isinstance(mode, ReconcilePlanMode) else "apply",
         },
         ctx=ctx,
     )

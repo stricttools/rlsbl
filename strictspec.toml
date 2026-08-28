@@ -43,3 +43,11 @@ path = ".strictspec/lineage-event.schema.toml"
   lang    = "python"
   output  = "rlsbl/strictspec_gen/lineage_event_validator.py"
   package = "rlsbl.strictspec_gen"
+
+[[schemas]]
+path = ".strictspec/reconcile-plan.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "python"
+  output  = "rlsbl/strictspec_gen/reconcile_plan_validator.py"
+  package = "rlsbl.strictspec_gen"
