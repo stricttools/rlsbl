@@ -9,6 +9,8 @@ the EvidenceSource protocol and registering them in the sources list.
 Current sources:
 - RegistryProbeSource: uses publication_probe() from target implementations
   (npm, pypi, go)
+- GoModuleProxySource: asks the Go module proxy directly, because the Go
+  target's own probe asks the git remote instead (see the class docstring)
 
 Future sources (not yet implemented):
 - CIPublishRunSource: checks GitHub Actions workflow conclusions
@@ -135,9 +137,99 @@ class RegistryProbeSource:
         return evidence
 
 
+class GoModuleProxySource:
+    """Evidence source asking the Go module proxy about one version.
+
+    The Go target's own ``publication_probe`` asks the GIT REMOTE whether the
+    version's tag exists, not the proxy. That is the right question for "did we
+    tag this?", and the wrong one for "is this out in the world?": the proxy
+    caches a module version PERMANENTLY the first time anyone resolves it, so a
+    tag that was deleted after someone fetched it is gone from the remote and
+    still served by ``proxy.golang.org`` forever. Reading the tag's absence as
+    "never published" is how a destructive operation gets cleared for a version
+    that consumers can still download today.
+
+    This source answers only two ways, never three:
+
+    * **PUBLISHED** -- the proxy serves the version's ``go.mod``. Under the
+      gate's rule that alone blocks, which is the whole point.
+    * **INCONCLUSIVE** -- the proxy does not serve it, or could not be asked.
+
+    Absence on the proxy is deliberately NOT reported as UNPUBLISHED. The proxy
+    indexes lazily: a genuinely published version nobody has fetched yet is
+    absent from it, so proxy lag alone must never be the evidence that clears a
+    deletion. Something that really did observe the version's absence -- the
+    tag probe -- has to say so.
+    """
+
+    @property
+    def name(self):
+        return "go_module_proxy"
+
+    def gather(self, targets, project_dir, version, ctx=None):
+        from .registry import query_go_mod
+        from .utils import read_go_module_path
+
+        evidence = []
+        for target in targets:
+            if target.name != "go":
+                continue
+            module_path = read_go_module_path(project_dir)
+            if not module_path:
+                evidence.append(Evidence(
+                    source=self.name,
+                    target=target.name,
+                    kind=EvidenceKind.INCONCLUSIVE,
+                    message=(
+                        f"no module path could be read from go.mod in "
+                        f"{project_dir}, so the module proxy could not be asked"
+                    ),
+                ))
+                continue
+
+            result = query_go_mod(module_path, f"v{version}")
+            status = result.get("status")
+            if status == "found":
+                evidence.append(Evidence(
+                    source=self.name,
+                    target=target.name,
+                    kind=EvidenceKind.PUBLISHED,
+                    message=(
+                        f"proxy.golang.org serves {module_path}@v{version}; "
+                        f"the module proxy is permanent, so this version "
+                        f"remains downloadable whatever happens to the tag"
+                    ),
+                ))
+            elif status == "not_found":
+                evidence.append(Evidence(
+                    source=self.name,
+                    target=target.name,
+                    kind=EvidenceKind.INCONCLUSIVE,
+                    message=(
+                        f"proxy.golang.org does not serve {module_path}@"
+                        f"v{version}, which is not evidence that it was never "
+                        f"published: the proxy indexes lazily and a version "
+                        f"nobody has fetched is absent from it"
+                    ),
+                ))
+            else:
+                evidence.append(Evidence(
+                    source=self.name,
+                    target=target.name,
+                    kind=EvidenceKind.INCONCLUSIVE,
+                    message=(
+                        f"the module proxy could not be asked about "
+                        f"{module_path}@v{version}: "
+                        f"{result.get('message') or 'unknown error'}"
+                    ),
+                ))
+        return evidence
+
+
 # Default evidence sources -- extensible by appending to this list
 DEFAULT_SOURCES = [
     RegistryProbeSource(),
+    GoModuleProxySource(),
 ]
 
 

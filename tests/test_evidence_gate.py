@@ -340,3 +340,135 @@ class TestNonLatestUndoIntegration:
                 run_cmd(None, [], {"version": "1.0.0"}, ctx=ctx)
             assert exc.value.code == 1
             assert "cannot undo" in err.getvalue()
+
+
+class TestGoModuleProxySource:
+    """The Go module proxy is the second Go evidence source, and it never clears.
+
+    The Go target's own ``publication_probe`` asks the git REMOTE whether the
+    version's tag exists. That is the right question for "did we tag this?" and
+    the wrong one for "is this out in the world?": the proxy caches a module
+    version permanently the first time anyone resolves it, so a tag deleted
+    after someone fetched it is gone from the remote and served by
+    ``proxy.golang.org`` forever.
+    """
+
+    def _go_target(self):
+        from rlsbl.targets import TARGETS
+
+        return TARGETS["go"]
+
+    def _gather(self, proxy_answer, monkeypatch, *, module_path="example.com/m"):
+        from rlsbl import evidence_gate as gate_mod
+        from rlsbl.evidence_gate import GoModuleProxySource
+
+        monkeypatch.setattr(
+            "rlsbl.registry.query_go_mod",
+            lambda path, version: proxy_answer,
+        )
+        monkeypatch.setattr(
+            "rlsbl.utils.read_go_module_path", lambda d: module_path,
+        )
+        assert gate_mod  # the source is registered on the module under test
+        return GoModuleProxySource().gather(
+            [self._go_target()], "/fake", "1.0.0",
+        )
+
+    def test_a_served_version_is_published(self, monkeypatch):
+        evidence = self._gather(
+            {"status": "found", "text": "module example.com/m\n"}, monkeypatch,
+        )
+        assert [e.kind for e in evidence] == [EvidenceKind.PUBLISHED]
+        assert "permanent" in evidence[0].message
+
+    def test_absence_on_the_proxy_is_inconclusive_never_unpublished(
+        self, monkeypatch,
+    ):
+        evidence = self._gather({"status": "not_found"}, monkeypatch)
+        assert [e.kind for e in evidence] == [EvidenceKind.INCONCLUSIVE]
+        assert "lazily" in evidence[0].message
+
+    def test_an_unanswerable_proxy_is_inconclusive(self, monkeypatch):
+        evidence = self._gather(
+            {"status": "error", "message": "HTTP 503"}, monkeypatch,
+        )
+        assert [e.kind for e in evidence] == [EvidenceKind.INCONCLUSIVE]
+        assert "503" in evidence[0].message
+
+    def test_an_unreadable_module_path_is_inconclusive(self, monkeypatch):
+        evidence = self._gather(
+            {"status": "found", "text": ""}, monkeypatch, module_path=None,
+        )
+        assert [e.kind for e in evidence] == [EvidenceKind.INCONCLUSIVE]
+
+    def test_non_go_targets_produce_nothing(self):
+        from rlsbl.evidence_gate import GoModuleProxySource
+        from rlsbl.targets import TARGETS
+
+        assert GoModuleProxySource().gather(
+            [TARGETS["npm"]], "/fake", "1.0.0",
+        ) == []
+
+
+class TestTheTwoGoSourcesCombine:
+    """Fail-closed: either source saying PUBLISHED blocks; proxy lag never clears."""
+
+    def _sources(self, tag_status, proxy_status):
+        class FakeTagProbe:
+            name = "registry_probe"
+
+            def gather(self, targets, project_dir, version, ctx=None):
+                return [Evidence("registry_probe", "go", tag_status, "tag probe")]
+
+        class FakeProxy:
+            name = "go_module_proxy"
+
+            def gather(self, targets, project_dir, version, ctx=None):
+                if proxy_status is None:
+                    return []
+                return [Evidence("go_module_proxy", "go", proxy_status, "proxy")]
+
+        return [FakeTagProbe(), FakeProxy()]
+
+    def test_the_proxy_alone_can_block_a_deleted_tag(self):
+        """The tag is gone; the proxy still serves it. That must block."""
+        result = run_evidence_gate(
+            [], "/fake", "1.0.0",
+            sources=self._sources(
+                EvidenceKind.UNPUBLISHED, EvidenceKind.PUBLISHED,
+            ),
+        )
+        assert result.verdict == Verdict.BLOCKED
+        assert "go" in result.reason
+
+    def test_proxy_lag_alone_can_never_clear_a_deletion(self):
+        """An inconclusive proxy plus an inconclusive tag probe stays blocked.
+
+        This is the property the source's INCONCLUSIVE-not-UNPUBLISHED
+        answer exists to guarantee: if the proxy could report absence as
+        "unpublished", a version nobody has fetched yet would be cleared for
+        deletion on the strength of the proxy not having indexed it.
+        """
+        result = run_evidence_gate(
+            [], "/fake", "1.0.0",
+            sources=self._sources(
+                EvidenceKind.INCONCLUSIVE, EvidenceKind.INCONCLUSIVE,
+            ),
+        )
+        assert result.verdict == Verdict.BLOCKED
+        assert "no authoritative evidence" in result.reason
+
+    def test_the_tag_probe_still_clears_on_its_own(self):
+        """Adding the proxy source must not block what used to be cleared."""
+        result = run_evidence_gate(
+            [], "/fake", "1.0.0",
+            sources=self._sources(
+                EvidenceKind.UNPUBLISHED, EvidenceKind.INCONCLUSIVE,
+            ),
+        )
+        assert result.verdict == Verdict.CLEARED
+
+    def test_the_proxy_source_is_wired_into_the_defaults(self):
+        from rlsbl.evidence_gate import DEFAULT_SOURCES
+
+        assert "go_module_proxy" in [s.name for s in DEFAULT_SOURCES]
