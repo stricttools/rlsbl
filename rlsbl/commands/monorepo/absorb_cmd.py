@@ -852,8 +852,11 @@ def resolve_arrival(workspace_root, source_repo, dest_path, *, name,
                 f"absorb into: {exc}. Its state directory "
                 f"({get_releasable_dir(workspace_root, releasable_name)}) is "
                 f"where the arriving changelog and release archives go. Run "
-                f"`rlsbl monorepo migrate-releasable {releasable_name}` first "
-                f"if this workspace still keeps that state per package."
+                f"`rlsbl monorepo sync` to create it -- it writes a 0.0.0 "
+                f"version file and an empty unreleased.jsonl for every "
+                f"declared releasable -- and, if '{releasable_name}' has "
+                f"already shipped, put its real version in that version file "
+                f"before absorbing."
             ) from exc
 
     source_version_tags = [

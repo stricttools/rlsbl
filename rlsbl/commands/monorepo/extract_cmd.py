@@ -952,10 +952,9 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
     own_format = releasable.effective_tag_format
     dest_format = own_format if is_multi else STANDALONE_TAG_FORMAT
     # The version is read from the releasable's state directory, which is also
-    # the directory the conversion transplants. A workspace that declares
-    # [[releasables]] but keeps its release state per package has not finished
-    # migrating to the releasable model, and there is nothing to carry over --
-    # so this is where that is said, before any history is rewritten.
+    # the directory the conversion transplants. A releasable declared in
+    # workspace.toml with no state directory behind it has nothing to carry
+    # over -- so this is where that is said, before any history is rewritten.
     try:
         version = read_releasable_version(workspace_root, releasable_name)
     except WorkspaceError as exc:
@@ -964,8 +963,10 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
             f"over: {exc}. Its state directory "
             f"({get_releasable_dir(workspace_root, releasable_name)}) holds the "
             f"version, changelog and release archives the conversion moves. Run "
-            f"`rlsbl monorepo migrate-releasable {releasable_name}` first if "
-            f"this workspace still keeps that state per package."
+            f"`rlsbl monorepo sync` to create it -- it writes a 0.0.0 version "
+            f"file and an empty unreleased.jsonl for every declared releasable "
+            f"-- and, if '{releasable_name}' has already shipped, put its real "
+            f"version in that version file before extracting."
         ) from exc
 
     own_glob = releasable_tag_glob(own_format, releasable_name)

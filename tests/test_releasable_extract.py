@@ -952,7 +952,7 @@ class TestAbsorbReleasable:
         The old command absorbed into a bare ``[[releasables]]`` entry and
         appended the arriving changelog to a directory nothing else described,
         leaving a releasable with a changelog and no version. The rebuilt one
-        refuses and names the migration that creates the state.
+        refuses and names the command that creates the state.
         """
         root = tmp_path / "mono_bare"
         root.mkdir()
@@ -981,7 +981,8 @@ name = "core"
             )
         message = str(exc.value)
         assert "no release state to absorb into" in message
-        assert "rlsbl monorepo migrate-releasable core" in message
+        assert "rlsbl monorepo sync" in message
+        assert "migrate-releasable" not in message
 
 
 class TestAbsorbCliBinding:
@@ -1463,24 +1464,24 @@ class TestExtractRoundTrip:
 
 
 @skip_no_filter_repo
-class TestExtractOnTheHalfMigratedLayout:
-    """A workspace that declares releasables but keeps release state per package.
+class TestExtractOnTheStatelessReleasableLayout:
+    """A workspace that declares releasables with no state directory behind them.
 
     ``_setup_monorepo_with_releasables`` is that shape: ``[[releasables]]`` in
     workspace.toml, changelog entries under ``pkgA/.rlsbl/changes/``, and no
-    releasable state directories at all. It is a workspace mid-migration, and
-    the old command extracted it anyway -- producing a repository with a
-    releasable grouping and no version, changelog or release archives behind it.
+    releasable state directories at all. The old command extracted it anyway --
+    producing a repository with a releasable grouping and no version, changelog
+    or release archives behind it.
 
     The rebuilt conversion moves the releasable's state directory, so it refuses
-    a releasable that has none and names the migration that creates it. Every
+    a releasable that has none and names the command that creates it. Every
     structural assertion this class used to make (the new workspace.toml, the
     kept and translated tags, the emptied source) is made in
     ``TestExtractOnTheReleasableStateLayout`` against the layout where the state
     exists.
     """
 
-    def test_a_releasable_with_no_state_is_refused_with_the_migration(
+    def test_a_releasable_with_no_state_is_refused(
         self, tmp_path,
     ):
         root, _ = _setup_monorepo_with_releasables(tmp_path)
@@ -1490,7 +1491,8 @@ class TestExtractOnTheHalfMigratedLayout:
             cmd_extract(str(root), "core", str(target), dry_run=True)
         message = str(exc.value)
         assert "no release state to carry over" in message
-        assert "rlsbl monorepo migrate-releasable core" in message
+        assert "rlsbl monorepo sync" in message
+        assert "migrate-releasable" not in message
 
     def test_the_refusal_writes_nothing(self, tmp_path):
         root, _ = _setup_monorepo_with_releasables(tmp_path)
