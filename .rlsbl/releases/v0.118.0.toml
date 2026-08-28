@@ -31,3 +31,7 @@ conversion plans, and scripts/migrate_workspace_model.py migrates the rest.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "6823e69df3ad3602799fd56bf069d7de948dde3b"
+
+[tree_hashes]
+"." = "ce77598bc867dd4da4cf6eb309e53874dbc0f71e"
