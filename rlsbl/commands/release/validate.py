@@ -981,9 +981,9 @@ def _phase_b_rows(state, *, registry):
     ]
     if state.monorepo_name and state.monorepo_project_path:
         rows.append(("SUBTREE_PUBLISHED",
-                     "split and push the subtree mirror, if one is configured"))
+                     "converge the subtree mirror's branch, if one is configured"))
         rows.append(("MIRROR_RELEASED",
-                     "create the mirror repo's GitHub Release"))
+                     "publish this version's tag and GitHub Release on the mirror"))
     rows += [
         ("ASSETS_UPLOADED", f"build and upload release assets to {tag}"),
         ("PIPELINES_PUBLISHED",

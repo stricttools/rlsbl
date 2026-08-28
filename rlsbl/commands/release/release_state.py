@@ -75,9 +75,11 @@ MUTATING_STEPS = (
 
 # Ordered steps of the post-release phase (after the GitHub Release).
 #
-# SUBTREE_PUBLISHED / MIRROR_RELEASED only do work for a monorepo project
-# that declares a ``subtree_remote``; everywhere else they are marked
-# trivially done. They are tracked (rather than left as bare warnings)
+# SUBTREE_PUBLISHED / MIRROR_RELEASED only do work for a monorepo member whose
+# RELEASABLE declares a ``subtree_remote``; everywhere else they are marked
+# trivially done. SUBTREE_PUBLISHED converges the mirror's branch through the
+# mirror reconciler; MIRROR_RELEASED publishes that version's tag and GitHub
+# Release on the mirror. They are tracked (rather than left as bare warnings)
 # because an unpublished mirror is a failed step like any other, and the
 # completion epilogue is the single place that turns failed steps into a
 # nonzero exit.

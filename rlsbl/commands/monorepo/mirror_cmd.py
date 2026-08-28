@@ -922,6 +922,38 @@ def _converge(plan, remote, root, project_path, sub_config_path):
         effects.rmtree(tmpdir, ignore_errors=True)
 
 
+def converge_branch(remote, root, project_path, sub_config_path):
+    """Observe one mirror's branch and converge it. The reusable entry point.
+
+    Same observation and same convergence the command performs, without the
+    preview: the release flow's mirror step calls this so a release and a
+    ``rlsbl monorepo mirror`` bring the branch to exactly the same state by
+    exactly the same code -- including the force-with-lease, the scaffold layer,
+    and the two refusals below.
+
+    Returns the observed :class:`MirrorPlan`. Raises :class:`MirrorError` when
+    the mirror carries foreign commits or its lineage could not be established:
+    both touch nothing, and neither is something a release may decide to
+    overwrite.
+    """
+    plan = observe(remote, root, project_path)
+    if plan.state == "lineage_undetermined":
+        raise MirrorError(
+            "lineage-undetermined -- git could not determine whether the "
+            "mirror shares this project's split lineage; nothing was "
+            f"touched.\n{_undetermined_detail(plan, project_path)}"
+        )
+    if plan.state == "contract_violated":
+        raise MirrorError(
+            "contract-violated -- the mirror has foreign commit(s); nothing "
+            f"was touched.\n{_remediation(plan, project_path)}"
+        )
+    if plan.state == "converged":
+        return plan
+    _converge(plan, remote, root, project_path, sub_config_path)
+    return plan
+
+
 # ---------------------------------------------------------------------------
 # Command entry point
 # ---------------------------------------------------------------------------
@@ -1098,6 +1130,10 @@ def _cmd_mirror(flags, project_root):
             print(f"Already converged: {subtree_remote}")
             return
         _converge(plan, subtree_remote, root, project_path, sub_config_path)
+
+    # (The command keeps its own refusal printing above rather than calling
+    # converge_branch: it exits with a status per refusal, where the release
+    # flow's non-fatal step wants the same refusal as an exception.)
 
     # A mirror preview judges more than one subject now: the branch, and every
     # released version's tag. Keys are shown -- the project name on the branch

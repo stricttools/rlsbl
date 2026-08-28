@@ -180,13 +180,18 @@ def _bump_and_tag(repo, version="1.0.1"):
 
 
 def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
-                            version="1.0.1"):
+                            version="1.0.1", mirror_remote=None):
     """A monorepo whose only releasable declares a ``subtree_remote``, staged at
     the point a resume re-enters the post-GitHub-Release phase.
 
     Returns the project directory. The release is already tagged and its
     state file records every mutating step, so the resume goes straight to
-    the subtree/mirror publishing block.
+    the mirror publishing block.
+
+    *mirror_remote* is the mirror's git URL. Pass a local bare repository (see
+    ``_bare_mirror``) for a test that lets the mirror steps really run; the
+    default names a remote nothing can reach, for tests about what happens when
+    they fail.
     """
     from rlsbl.workspace import save_workspace
 
@@ -204,7 +209,7 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
         [{"path": project_path, "name": name, "releasable": name}],
         releasables=[{
             "name": name,
-            "subtree_remote": "https://github.com/example/mylib.git",
+            "subtree_remote": mirror_remote or "/nonexistent/mirror.git",
         }],
     )
     _git(repo, "add", "-A")
@@ -241,6 +246,29 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
         "blog": False,
     })
     return str(proj_dir)
+
+
+def _bare_mirror(path):
+    """A local bare repository standing in for the mirror remote.
+
+    Every mirror push in this file goes here: the suite never reaches a real
+    remote, and the reconciler's force-with-lease, scaffold layer and tag push
+    are all exercised for real against it.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", "--bare"], cwd=str(path), check=True)
+    return str(path)
+
+
+def _mirror_refs(remote, cwd):
+    """``{refname: sha}`` on the mirror, tags peeled to their commits."""
+    from rlsbl.mirror_publication import parse_ls_remote
+
+    out = subprocess.run(
+        ["git", "ls-remote", remote], cwd=str(cwd),
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return parse_ls_remote(out)
 
 
 def _make_subtree_ctx(repo, project_dir):
@@ -571,12 +599,12 @@ class TestNonFatalFailures:
         assert "POST_HOOKS_RUN" in captured.err
         assert "hook exploded" in captured.err
 
-    def test_subtree_push_failure_exits_nonzero_and_preserves_state(
+    def test_mirror_convergence_failure_exits_nonzero_and_preserves_state(
         self, mock_git_repo, capsys,
     ):
-        """A failed subtree push used to print a bare warning and let the
-        release exit 0. It is a tracked step now: nonzero exit, marker
-        recorded, state preserved."""
+        """A mirror the reconciler cannot converge is a tracked step, not a
+        bare warning: nonzero exit, marker recorded, state preserved, and the
+        marker names the command that heals it."""
         project_dir = _setup_subtree_monorepo(mock_git_repo)
         from rlsbl.commands.release.release_state import resolve_releasable_dir
         state_path = get_state_path(
@@ -584,17 +612,15 @@ class TestNonFatalFailures:
             releasable_dir=resolve_releasable_dir(project_dir, str(mock_git_repo)),
         )
 
-        def failing_subtree_run(cmd, args=None, timeout=120, env=None, cwd=None):
-            if cmd == "git" and args and args[0] == "subtree":
-                raise RuntimeError("subtree split exploded")
-            return _fake_run_factory()(cmd, args=args, timeout=timeout,
-                                       env=env, cwd=cwd)
-
         with (
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run_gh_unscoped", return_value=""),
-            patch("rlsbl.commands.release.run", side_effect=failing_subtree_run),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
+            patch(
+                "rlsbl.commands.monorepo.mirror_cmd.converge_branch",
+                side_effect=RuntimeError("the mirror is unreachable"),
+            ),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 resume_cmd(
@@ -606,17 +632,22 @@ class TestNonFatalFailures:
         assert exc_info.value.code == 1
         assert os.path.exists(state_path)
         state = load_release_state(state_path)
-        assert "SUBTREE_PUBLISHED" in state.get("failed_steps", {})
-        assert "subtree split exploded" in state["failed_steps"]["SUBTREE_PUBLISHED"]
+        marker = state["failed_steps"]["SUBTREE_PUBLISHED"]
+        assert "the mirror is unreachable" in marker
+        assert "rlsbl monorepo mirror mylib" in marker
 
         err = capsys.readouterr().err
         assert "SUBTREE_PUBLISHED" in err
 
     def test_mirror_release_failure_exits_nonzero_and_preserves_state(
-        self, mock_git_repo, capsys,
+        self, mock_git_repo, capsys, tmp_path,
     ):
-        """Same for the mirror GitHub Release: a warning is not an outcome."""
-        project_dir = _setup_subtree_monorepo(mock_git_repo)
+        """Same for the mirror's tag and Release: a warning is not an outcome,
+        and the marker names both healers."""
+        mirror = _bare_mirror(tmp_path / "mirror.git")
+        project_dir = _setup_subtree_monorepo(
+            mock_git_repo, mirror_remote=mirror,
+        )
         from rlsbl.commands.release.release_state import resolve_releasable_dir
         state_path = get_state_path(
             project_dir,
@@ -626,13 +657,12 @@ class TestNonFatalFailures:
         def failing_mirror(*args, **kwargs):
             raise RuntimeError("mirror repo not found")
 
-        fake_run = _fake_run_factory()
         with (
             patch("rlsbl.commands.release.push_if_needed"),
             patch("rlsbl.commands.release.run_gh", return_value=""),
             patch("rlsbl.commands.release.run_gh_unscoped",
                   side_effect=failing_mirror),
-            patch("rlsbl.commands.release.run", side_effect=fake_run),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 resume_cmd(
@@ -644,10 +674,90 @@ class TestNonFatalFailures:
         assert exc_info.value.code == 1
         assert os.path.exists(state_path)
         state = load_release_state(state_path)
-        assert "MIRROR_RELEASED" in state.get("failed_steps", {})
+        marker = state["failed_steps"]["MIRROR_RELEASED"]
+        assert "rlsbl monorepo mirror mylib" in marker
+        assert "rlsbl release reconcile" in marker
+        # The branch step still succeeded on its own.
+        assert "SUBTREE_PUBLISHED" in state["completed_steps"]
 
         err = capsys.readouterr().err
         assert "MIRROR_RELEASED" in err
+
+    def test_a_converged_mirror_gets_one_tag_one_release_and_no_branch_write(
+        self, mock_git_repo, tmp_path,
+    ):
+        """The whole mirror step against a real (local) mirror remote.
+
+        The mirror is converged FIRST, at exactly the commit the release is
+        staged on, so the branch has nothing left to do -- which is what makes
+        the assertion meaningful: publishing the version must add exactly one
+        tag and one GitHub Release, and must not move ``main``.
+        """
+        from rlsbl.commands.monorepo import mirror_cmd
+        from rlsbl.commands.monorepo.mirror_cmd import converge_branch
+
+        mirror = _bare_mirror(tmp_path / "mirror.git")
+        project_dir = _setup_subtree_monorepo(
+            mock_git_repo, mirror_remote=mirror,
+        )
+        from rlsbl.commands.release.release_state import resolve_releasable_dir
+        state_path = get_state_path(
+            project_dir,
+            releasable_dir=resolve_releasable_dir(project_dir, str(mock_git_repo)),
+        )
+
+        converge_branch(
+            mirror, str(mock_git_repo), "packages/mylib",
+            os.path.join(project_dir, ".rlsbl", "config.json"),
+        )
+        before = _mirror_refs(mirror, mock_git_repo)
+        assert "refs/heads/main" in before
+        assert not [r for r in before if r.startswith("refs/tags/")]
+
+        gh_calls = []
+
+        def fake_gh(args, **kwargs):
+            gh_calls.append(list(args))
+            if args[:2] == ["release", "view"]:
+                raise RuntimeError("not found")
+            return ""
+
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run_gh_unscoped", side_effect=fake_gh),
+            patch("rlsbl.commands.release.run", side_effect=_fake_run_factory()),
+        ):
+            resume_cmd(
+                load_release_state(state_path),
+                {"quiet": True, "skip-lock": True},
+                ctx=_make_subtree_ctx(mock_git_repo, project_dir),
+            )
+
+        assert not os.path.exists(state_path), "a clean release clears its state"
+
+        after = _mirror_refs(mirror, mock_git_repo)
+        assert after["refs/heads/main"] == before["refs/heads/main"], (
+            "publishing a version must not move the mirror's branch"
+        )
+        tags = {r: sha for r, sha in after.items() if r.startswith("refs/tags/")}
+        assert list(tags) == ["refs/tags/v1.0.1"]
+        # The tag names the subtree split of the release's ledger anchor,
+        # which this fixture stages at HEAD.
+        from rlsbl.mirror_publication import split_commit_for
+
+        anchor = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=str(mock_git_repo),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert tags["refs/tags/v1.0.1"] == split_commit_for(
+            str(mock_git_repo), "packages/mylib", anchor,
+        )
+
+        creates = [c for c in gh_calls if c[:2] == ["release", "create"]]
+        assert len(creates) == 1
+        assert creates[0][2] == "v1.0.1"
+        assert "--repo" in creates[0]
 
     def test_resume_after_nonfatal_failure_completes_and_clears_state(
         self, mock_git_repo,

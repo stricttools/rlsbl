@@ -3184,7 +3184,11 @@ def _run_release_mutating(state: ReleaseState):
                     file=sys.stderr,
                 )
 
-        # Subtree publishing for monorepo projects with subtree_remote configured
+        # Mirror publishing, for a monorepo member whose releasable declares a
+        # subtree_remote. Two tracked steps, both NON-FATAL: the release itself
+        # is already published and the mirror is a derived artifact, so a
+        # failure here records a marker (nonzero exit, resumable) naming the
+        # command that heals it rather than rolling anything back.
         if release_created and monorepo_name and monorepo_project_path:
             try:
                 from ...workspace import load_releasables, mirror_remote_for
@@ -3209,47 +3213,84 @@ def _run_release_mutating(state: ReleaseState):
             if subtree_remote:
                 validate_subtree_remote_ssh_host(subtree_remote, str(ctx.project_root))
                 plain_tag = target.tag_format(new_version)
-                log(f"Publishing subtree to {subtree_remote}...")
-                _subtree_pushed = False
+
+                # SUBTREE_PUBLISHED -- the mirror's BRANCH, through the mirror
+                # reconciler itself. Not a hand-rolled push: the reconciler
+                # observes the remote, refuses a mirror carrying foreign work or
+                # one whose lineage it could not establish, force-pushes the new
+                # split WITH A LEASE, and re-applies the scaffold layer. The
+                # unforced `_rlsbl-subtree-tmp:refs/heads/main` push this
+                # replaced could only ever succeed on a mirror that had no
+                # scaffold layer -- every converged mirror rejected it as a
+                # non-fast-forward, every release after the first reported a
+                # failed step, and nothing on the mirror advanced.
+                from ...commands.monorepo.mirror_cmd import converge_branch
+
+                _mirror_config = os.path.join(
+                    monorepo_root, monorepo_project_path, ".rlsbl", "config.json",
+                )
+                log(f"Converging the mirror at {subtree_remote}...")
                 try:
-                    run("git", ["subtree", "split", f"--prefix={monorepo_project_path}", "-b", "_rlsbl-subtree-tmp"])
-                    run("git", ["push", "--no-verify", subtree_remote, f"_rlsbl-subtree-tmp:refs/tags/{plain_tag}"])
-                    run("git", ["push", "--no-verify", subtree_remote, "_rlsbl-subtree-tmp:refs/heads/main"])
-                    log(f"Subtree published: {plain_tag} -> {subtree_remote}")
-                    _subtree_pushed = True
+                    converge_branch(
+                        subtree_remote, monorepo_root, monorepo_project_path,
+                        _mirror_config,
+                    )
+                    log(f"Mirror branch converged: {subtree_remote}")
                 except Exception as e:
-                    print(f"Warning: subtree push failed: {e}", file=sys.stderr)
+                    print(f"Warning: mirror convergence failed: {e}", file=sys.stderr)
                     save_step_failure(
                         _state_path, "SUBTREE_PUBLISHED",
-                        f"subtree push to {subtree_remote} failed: {e}",
+                        f"converging the mirror at {subtree_remote} failed: "
+                        f"{e}. The release itself is published; heal the "
+                        f"mirror with `rlsbl monorepo mirror "
+                        f"{monorepo_name}`.",
                     )
-                finally:
-                    try:
-                        run("git", ["branch", "-D", "_rlsbl-subtree-tmp"])
-                    except Exception:
-                        pass
-                if _subtree_pushed:
+                else:
                     save_step(_state_path, "SUBTREE_PUBLISHED")
                     _completed.add("SUBTREE_PUBLISHED")
 
-                # Create GitHub Release on the mirror repo. Non-fatal in the
-                # sense that the primary release is already published and
-                # nothing is rolled back -- the failure marker still makes the
-                # run exit nonzero and stay resumable (see the epilogue).
+                # MIRROR_RELEASED -- the mirror's TAG and its GitHub Release,
+                # through the shared publication module. The commit is DERIVED,
+                # never the branch tip: it is the subtree split of the ledger
+                # anchor for this version -- the CI-verified candidate this
+                # release wrote into the archive -- so the mirror's tag names
+                # the same code the monorepo's tag does even when the
+                # finalization commits have moved main on. The Release's
+                # rlsbl-ci-sha marker carries that split commit, because a
+                # marker naming the monorepo's anchor would name a commit the
+                # mirror does not have.
+                #
+                # Non-fatal, like the branch: the primary release is already
+                # published and nothing is rolled back. The failure marker still
+                # makes the run exit nonzero, stay resumable, and name its
+                # healer (see the epilogue).
+                from ...mirror_publication import publish_version
+
                 try:
-                    # Unscoped: --repo names the mirror explicitly, so this
-                    # must NOT inherit the current project's GH_REPO.
-                    run_gh_unscoped(["release", "create", plain_tag,
-                                     "--repo", subtree_remote,
-                                     "--title", plain_tag,
-                                     "--notes-file", notes_file])
-                    log(f"Created mirror GitHub Release: {plain_tag} on {subtree_remote}")
+                    publish_version(
+                        remote=subtree_remote,
+                        root=monorepo_root,
+                        subtree_path=monorepo_project_path,
+                        version=new_version,
+                        tag=plain_tag,
+                        anchor_sha=pushed_sha,
+                        notes=changelog_entry or "",
+                        # Unscoped: --repo names the mirror explicitly, so this
+                        # must NOT inherit the current project's GH_REPO.
+                        gh=lambda args, config=None: run_gh_unscoped(args),
+                        log=log,
+                    )
+                    log(f"Mirror release published: {plain_tag} -> {subtree_remote}")
                 except Exception as e:
-                    print(f"Warning: mirror GitHub Release failed: {e}", file=sys.stderr)
+                    print(f"Warning: mirror release failed: {e}", file=sys.stderr)
                     save_step_failure(
                         _state_path, "MIRROR_RELEASED",
-                        f"mirror GitHub Release {plain_tag} on "
-                        f"{subtree_remote} failed: {e}",
+                        f"publishing {plain_tag} on the mirror at "
+                        f"{subtree_remote} failed: {e}. The release itself is "
+                        f"published; heal the mirror's tags with `rlsbl "
+                        f"monorepo mirror {monorepo_name}` and this "
+                        f"repository's own release refs with `rlsbl release "
+                        f"reconcile`.",
                     )
                 else:
                     save_step(_state_path, "MIRROR_RELEASED")
@@ -3261,7 +3302,7 @@ def _run_release_mutating(state: ReleaseState):
                 effects.remove(tmp)
 
     # Subtree/mirror mark-up: the two steps above only run for a monorepo
-    # project that declares a subtree_remote. Everywhere else they are
+    # member whose releasable declares a subtree_remote. Everywhere else they are
     # trivially done, and the completeness check below demands a marker for
     # every canonical step. An existing marker (success OR failure) is never
     # overwritten -- a resume re-attempts the failed push above and clears its
