@@ -438,7 +438,7 @@ class TestScaffoldFailureHardError:
         # exercise the hard-error path directly.
         from rlsbl.commands.monorepo import mirror_cmd
 
-        def boom(clone_dir, sub_config_path):
+        def boom(clone_dir, sub_config_path, remote):
             raise MirrorError("rlsbl scaffold failed in mirror clone (exit 1)")
 
         monkeypatch.setattr(mirror_cmd, "_run_scaffold", boom)
