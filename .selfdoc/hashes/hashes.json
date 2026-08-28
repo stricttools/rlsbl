@@ -362,6 +362,11 @@
     "description": "36a8a7ab4fbb66028d91fee058eba7458c15d4ffa4c4da5600181e469864aba0",
     "source_docstring": "36a8a7ab4fbb66028d91fee058eba7458c15d4ffa4c4da5600181e469864aba0"
   },
+  "en/rlsbl-commands-monorepo-absorb_cmd.md": {
+    "content": "8b5b1167ba873922a0daab9e6a28bf14565099940310e8c088837f0ef754ab10",
+    "description": "8cc384397c9f665ff5619f27d25f28d766f5cf1583826564fb1bb3db316d34db",
+    "seed_hash": "8cc384397c9f665ff5619f27d25f28d766f5cf1583826564fb1bb3db316d34db"
+  },
   "en/rlsbl-commands-monorepo-batch_plan.md": {
     "content": "f6d7429a12a68692153fa564636bdfe67753d763059a8395055077badc39920e",
     "description": "498f99570b3d9a3301d2210e765a2b18b71e228c6059a5e085bfb9bbd3aa98a2",
@@ -651,6 +656,11 @@
     "content": "3b81fc9b7fcaf88ba077e5c6ff2f3d192b9a57a8fa12b26d1e5b2cbb071278e5",
     "description": "c3e33012514be6cc84668d289d209c979a845c31e5329c4157a9192c6be37f52",
     "source_docstring": "c9306a65bbf9dace71b8a27f7d31ed6e85b3f1c932cbb3719fc2c2955cf5734e"
+  },
+  "en/rlsbl-ledger.md": {
+    "content": "ce8f57fbbff5d357b6baee0926fe9d601d9c8e4ce15ba4b3e050a2e716de0abb",
+    "description": "34e0ac585fb26329e31a1e5ad8f3893d86f586dba0471a0413fa2a0530f8e0cc",
+    "seed_hash": "34e0ac585fb26329e31a1e5ad8f3893d86f586dba0471a0413fa2a0530f8e0cc"
   },
   "en/rlsbl-lineage.md": {
     "content": "7b89aa5393a84a8d247f452e9f984fd59846106a051ce3a6483d245396ef1658",
@@ -1033,6 +1043,11 @@
     "content": "a4507209db4cdb26f2eadecc69e6f78c03de6e04c8e6b71b9e0f3ba7861d7f33",
     "description": "aaef0b2eac70168d6c923388d01dfbfd45f4a52b9a961cc9677260f957e160fc",
     "source_docstring": "aaef0b2eac70168d6c923388d01dfbfd45f4a52b9a961cc9677260f957e160fc"
+  },
+  "en/rlsbl-targets-refs.md": {
+    "content": "943ee6ee1a885f3a9912db4aef1b0ea974f6cfeb4deb24675c5e0f23cc246aae",
+    "description": "da75d8948125413c794154f972382b6a5359b935284e4223f07cf4861120da61",
+    "seed_hash": "da75d8948125413c794154f972382b6a5359b935284e4223f07cf4861120da61"
   },
   "en/rlsbl-targets-spec.md": {
     "content": "72ae90d8ed4784d112c6996c7dd650113b02f1914e9ba9f2add8d333e0e09e01",

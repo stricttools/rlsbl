@@ -9,7 +9,7 @@ nav_order: 15
 
 # rlsbl status
 
-Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.
+Display the current project version, branch, latest release, unreleased commit count, and changelog coverage. The latest release comes from the project's release archives and is annotated when this checkout does not contain it. Outputs plain text by default or structured JSON with the --json flag.
 
 **Effect:** read_only
 

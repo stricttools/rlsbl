@@ -9,6 +9,6 @@ nav_order: 17
 
 # rlsbl unreleased
 
-List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
+List the commits between the release this checkout is anchored to and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
 
 **Effect:** read_only

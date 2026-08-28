@@ -9,11 +9,11 @@ nav_order: 9
 
 # rlsbl monorepo
 
-Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 18 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.
+Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release.
 
 ## monorepo init
 
-Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, in explicit mode, carrying the mandatory root member whose kind you declare. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.
+Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, carrying the mandatory root member whose kind you declare and a [[releasables]] section. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.
 
 **Effect:** mutating
 
@@ -188,7 +188,7 @@ Extract a releasable out of the monorepo into its own repository. The releasable
 
 ## monorepo absorb
 
-Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.
+Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their anchors, config and version -- moves into a releasable's state directory with every hash and anchor remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -196,34 +196,24 @@ Absorb an external repository as a package in the monorepo. Rewrites the source'
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--name` |  | str | optional |  | Workspace project name for the absorbed package (the basename of the destination path when omitted) |
+| `--name` |  | str | optional |  | Workspace member name for the absorbed package (the basename of the destination path when omitted) |
 | `--registry-name` |  | str | optional |  | Package registry identity recorded in workspace.toml (used verbatim for name checks) |
-| `--releasable` |  | str | optional |  | Releasable group to assign the absorbed package to |
+| `--releasable` |  | str | optional |  | An existing releasable group to join. When omitted, a singleton releasable named after the member is created for it. |
+| `--tag-format` |  | str | optional |  | The tag format of the releasable this command creates, e.g. "{name}@v{version}" or "pkgs/thing/v{version}". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal with --releasable, which brings its own format. |
+| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the per-package release state that moves to the releasable with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
 
 ### Arguments
 
 | Name | Type | Presence | Description |
 | --- | --- | --- | --- |
 | `source_repo` | str | required | Filesystem path to the external git repository to absorb |
-| `dest_path` | str | required | Destination directory (and workspace path) the source repo's history is rewritten under |
+| `dest_path` | str | required | Destination directory (and workspace member path) the source repo's history is rewritten under |
 
 ## monorepo cleanup
 
-Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.
+Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Detect residue first with `rlsbl check --name releasable-residue`.
 
 **Effect:** mutating
-
-## monorepo migrate-releasable
-
-Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).
-
-**Effect:** mutating
-
-### Arguments
-
-| Name | Type | Presence | Description |
-| --- | --- | --- | --- |
-| `releasable_name` | str | required | Name of the releasable group in workspace.toml to migrate |
 
 ## monorepo rename-releasable
 
