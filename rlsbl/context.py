@@ -184,6 +184,15 @@ def resolve_release_scope(root):
     releases -- listing unreleased commits, labelling a watched commit with
     the release it is -- so they all read the same directory and the same tag
     scheme for the same checkout.
+
+    The per-package fallback answers exactly ONE question: this checkout is not
+    inside a workspace, or is inside one that does not claim it. Both are plain
+    returns below. Everything past them is a workspace that exists and claims
+    this project, so a loader or validation failure there is a hard error and
+    propagates: degrading it to the fallback would answer with the member
+    package's own (empty) changes directory and no tag scheme, and the caller
+    would report a coverage figure and an unreleased range for a project it had
+    in fact failed to identify.
     """
     from .changelog import get_changes_dir
     from .workspace import find_workspace_root, load_workspace, resolve_project
@@ -193,43 +202,41 @@ def resolve_release_scope(root):
     tag_glob = None
     changes_dir = get_changes_dir(root_str)
     scope = None
-    try:
-        ws_root = find_workspace_root(root_str)
-        if ws_root is None:
-            return project, tag_glob, changes_dir, scope
-        project = resolve_project(ws_root, root_str)
-        if project is None:
-            return project, tag_glob, changes_dir, scope
 
-        from .ownership import OwnershipScope
-        from .tag_glob import releasable_tag_glob
-        from .targets import TARGETS, detect_targets, resolve_releasable_config_dir
-        from .workspace import (
-            get_releasable_changes_dir,
-            load_releasables,
-            members_of,
-            resolve_releasable_for_project,
+    ws_root = find_workspace_root(root_str)
+    if ws_root is None:
+        return project, tag_glob, changes_dir, scope
+    project = resolve_project(ws_root, root_str)
+    if project is None:
+        return project, tag_glob, changes_dir, scope
+
+    from .ownership import OwnershipScope
+    from .tag_glob import releasable_tag_glob
+    from .targets import TARGETS, detect_targets, resolve_releasable_config_dir
+    from .workspace import (
+        get_releasable_changes_dir,
+        load_releasables,
+        members_of,
+        resolve_releasable_for_project,
+    )
+
+    ws_projects = load_workspace(ws_root)
+    releasables = load_releasables(ws_root, ws_projects)
+    rel = resolve_releasable_for_project(project, releasables)
+
+    if rel is not None:
+        tag_glob = releasable_tag_glob(rel.effective_tag_format, rel.name)
+        changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+        scope = OwnershipScope.for_members(
+            ws_projects, members_of(rel.name, ws_projects),
         )
-
-        ws_projects = load_workspace(ws_root)
-        releasables = load_releasables(ws_root, ws_projects)
-        rel = resolve_releasable_for_project(project, releasables)
-
-        if rel is not None:
-            tag_glob = releasable_tag_glob(rel.effective_tag_format, rel.name)
-            changes_dir = get_releasable_changes_dir(ws_root, rel.name)
-            scope = OwnershipScope.for_members(
-                ws_projects, members_of(rel.name, ws_projects),
+    else:
+        scope = OwnershipScope.for_member(ws_projects, project)
+        rel_dir = resolve_releasable_config_dir(project, ws_root)
+        targets = detect_targets(root_str, releasable_config_dir=rel_dir)
+        if targets:
+            target = TARGETS[targets[0].name]
+            tag_glob = target.monorepo_tag_glob(
+                project["name"], path=project["path"],
             )
-        else:
-            scope = OwnershipScope.for_member(ws_projects, project)
-            rel_dir = resolve_releasable_config_dir(project, ws_root)
-            targets = detect_targets(root_str, releasable_config_dir=rel_dir)
-            if targets:
-                target = TARGETS[targets[0].name]
-                tag_glob = target.monorepo_tag_glob(
-                    project["name"], path=project["path"],
-                )
-    except Exception:
-        pass
     return project, tag_glob, changes_dir, scope
