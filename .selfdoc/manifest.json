@@ -3271,6 +3271,11 @@
           "anchor": "who-writes-which-ref-namespace"
         },
         {
+          "level": 3,
+          "text": "The repair and retraction surfaces",
+          "anchor": "the-repair-and-retraction-surfaces"
+        },
+        {
           "level": 2,
           "text": "Publish gating",
           "anchor": "publish-gating"
@@ -6725,6 +6730,11 @@
         },
         {
           "level": 3,
+          "text": "`_require_clean_mirror_contract`",
+          "anchor": "_require_clean_mirror_contract"
+        },
+        {
+          "level": 3,
           "text": "`_apply_promotion_trees`",
           "anchor": "_apply_promotion_trees"
         },
@@ -7046,6 +7056,16 @@
         },
         {
           "level": 3,
+          "text": "`is_publish_workflow`",
+          "anchor": "is_publish_workflow"
+        },
+        {
+          "level": 3,
+          "text": "`publish_workflows_in`",
+          "anchor": "publish_workflows_in"
+        },
+        {
+          "level": 3,
           "text": "`_load_owned_predicate`",
           "anchor": "_load_owned_predicate"
         },
@@ -7093,6 +7113,11 @@
           "level": 3,
           "text": "`_run_scaffold`",
           "anchor": "_run_scaffold"
+        },
+        {
+          "level": 3,
+          "text": "`_sweep_publish_workflows`",
+          "anchor": "_sweep_publish_workflows"
         },
         {
           "level": 3,
@@ -8503,8 +8528,8 @@
         },
         {
           "level": 3,
-          "text": "`recreate_github_releases`",
-          "anchor": "recreate_github_releases"
+          "text": "`update_github_releases`",
+          "anchor": "update_github_releases"
         },
         {
           "level": 3,
@@ -10269,6 +10294,11 @@
           "level": 3,
           "text": "`previewing`",
           "anchor": "previewing"
+        },
+        {
+          "level": 3,
+          "text": "`render_would_do_log`",
+          "anchor": "render_would_do_log"
         },
         {
           "level": 3,
@@ -13822,6 +13852,11 @@
         },
         {
           "level": 3,
+          "text": "`edit_all_args`",
+          "anchor": "edit_all_args"
+        },
+        {
+          "level": 3,
           "text": "`delete_args`",
           "anchor": "delete_args"
         },
@@ -13834,6 +13869,11 @@
           "level": 3,
           "text": "`create_release`",
           "anchor": "create_release"
+        },
+        {
+          "level": 3,
+          "text": "`update_release`",
+          "anchor": "update_release"
         },
         {
           "level": 3,
@@ -19434,6 +19474,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-28T06:14:57.783732+00:00",
+  "last_gen": "2026-08-28T07:34:18.232342+00:00",
   "theme": "minimal"
 }

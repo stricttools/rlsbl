@@ -211,15 +211,27 @@ On partial failure, prints a structured summary table with remediation commands 
 
 ## Who writes which ref namespace
 
-Every ref rlsbl writes has one writer:
+Each namespace has one routine writer -- the flow that puts refs there while
+shipping -- and a named set of repair and retraction surfaces for correcting or
+withdrawing what already shipped:
 
-| Namespace | Written by |
+| Namespace | Routine writer |
 |-----------|------------|
-| `origin` branch heads | Releases only. `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits; there is no dev-branch push path. |
-| `origin` tags and their GitHub Releases | The release's tag step, and `rlsbl release reconcile` when a rewrite or a partial release left them wrong -- both composing the Release through one module, so the notes and the `rlsbl-ci-sha` marker match either way. |
+| `origin` branch heads | Releases. `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits; there is no dev-branch push path. |
+| `origin` tags and their GitHub Releases | The release's tag step, repaired by `rlsbl release reconcile` when a rewrite or a partial release left them wrong -- both composing the Release through one module, so the notes and the `rlsbl-ci-sha` marker match either way. |
 | A subtree mirror's `main` | The mirror reconciler's converge (`rlsbl monorepo mirror`, and the release's mirror step, which calls the same code). Force-with-lease is its routine write; a commit it cannot account for is a contract violation it refuses. |
-| A subtree mirror's tags and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. A mirror's scaffold renders no publish workflow, so the mirror never releases itself. |
-| Rewritten history on any of the above | `rlsbl release scrub`, the one sanctioned rewrite write: it force-pushes, remaps the changelog hashes, moves the tags and recreates the Releases in a single pass. |
+| A subtree mirror's tags and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. A mirror's scaffold renders no publish workflow and every convergence sweeps one that arrived another way, so the mirror never releases itself. |
+| Rewritten history on any of the above | `rlsbl release scrub`, the one sanctioned rewrite: it force-pushes, remaps the changelog hashes, moves the tags and recreates the Releases in a single pass. |
+
+The repair and retraction surfaces, in full: `rlsbl release undo` (deletes the
+Release and the tag, reverts the version-bump commit and pushes the branch),
+`rlsbl release reconcile` (re-pushes moved tags, recreates their Releases),
+`rlsbl release scrub` (the rewrite), `rlsbl release edit` (re-syncs one
+Release's notes), `rlsbl release deprecate` and `rlsbl release yank` (rewrite a
+Release body and set its pre-release flag; `yank` also performs the registry's
+removal), `rlsbl changelog amend` and `rlsbl changelog edit` (re-sync a released
+version's Release notes), and `rlsbl monorepo rename-releasable` (pushes one
+boundary alias tag). A write from anywhere else is not rlsbl's.
 
 ## Pre-push hook
 
