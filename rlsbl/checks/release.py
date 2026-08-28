@@ -1,8 +1,21 @@
-"""Release checks (tag: release) verifying that every released version's refs exist -- locally and on the remote, at the commit the release anchored -- and that the branch is in sync.
+"""Release checks (tag: release): the refs, the branch, the CI credentials, and the follow-ups a recorded conversion still owes the outside world.
 
-Checks: unpublished-refs, branch-sync.
+Checks: unpublished-refs, branch-sync, npm-token-presence, old-repo-archived,
+go-deprecation-published.
+
+Every check in this module reads something OUTSIDE the working tree -- the
+remote's refs, the GitHub API, the Go module proxy -- which is why they carry
+the ``release`` tag rather than ``project``: the offline tags (``project``,
+``changelog``, ``quality``, ``prepush``) stay answerable with no network, and a
+networked check placed in one of them would make an offline run fail for a
+reason that has nothing to do with the repository.
+
+All of them are fail-closed. A probe that cannot answer is a hard error, never
+a pass: "we could not ask" is not evidence that a ref is pushed, a secret
+exists, a repository is archived, or a module is deprecated.
 """
 
+import os
 import subprocess
 
 from ._common import _resolve_release_identity
@@ -198,6 +211,139 @@ def register_release_checks(app):
             return reporter.found(f"{behind} commit(s) behind origin/{branch}")
         reporter.error(f"{behind} behind, {ahead} ahead of origin/{branch}")
         return reporter.found(f"{behind} behind, {ahead} ahead of origin/{branch}")
+
+    register_networked_release_checks(app)
+
+
+def _lineage_paths(ctx):
+    """Every lineage record this project can reach, newest home first.
+
+    The three homes :func:`rlsbl.lineage.get_lineage_path` resolves: a
+    standalone project's own record, the workspace-scoped record, and one per
+    releasable. A monorepo carries facts in all three, and a conversion
+    follow-up is owed whichever record recorded it.
+    """
+    from ..check_context import WorkspaceCheckContext
+    from ..lineage import get_lineage_path, lineage_file_exists
+
+    paths = [get_lineage_path(str(ctx.project_root))]
+    if isinstance(ctx, WorkspaceCheckContext):
+        root = str(ctx.workspace_root)
+        paths.append(get_lineage_path(root, workspace=True))
+        from ..workspace_types import get_releasable_dir
+
+        for releasable in ctx.releasables or []:
+            paths.append(get_lineage_path(
+                root, releasable_dir=get_releasable_dir(root, releasable.name),
+            ))
+    seen = []
+    for path in paths:
+        if path not in seen and lineage_file_exists(path):
+            seen.append(path)
+    return seen
+
+
+def _read_lineage(ctx, reporter):
+    """``(events, error_outcome)`` -- the events, or a finalized failure.
+
+    A malformed record is this check's finding, not a traceback: reading a
+    record FOR USE is where :func:`rlsbl.lineage.read_events` raises, and a
+    check that consumes one has to report it.
+    """
+    from ..lineage import LineageError, read_events
+
+    events = []
+    for path in _lineage_paths(ctx):
+        try:
+            events.extend(read_events(path))
+        except LineageError as exc:
+            reporter.error(
+                f"{os.path.basename(path)} could not be read ({exc}), so the "
+                f"conversions it records cannot be verified."
+            )
+            return None, reporter.found("the lineage record could not be read")
+    return events, None
+
+
+def _followup_outcome(verdict, reporter, *, passed):
+    """Report a :class:`rlsbl.lineage_followup.FollowupVerdict`."""
+    if verdict.skip_reason is not None:
+        return reporter.skipped(verdict.skip_reason)
+    if verdict.ok:
+        return reporter.passed("; ".join(verdict.notes[:3]) or passed)
+    for problem in verdict.problems:
+        reporter.error(problem)
+    return reporter.found(f"{len(verdict.problems)} finding(s)")
+
+
+def register_networked_release_checks(app):
+    """Register the probing release-tag checks on *app*."""
+
+    @app.error_check("npm-token-presence")
+    def check_npm_token_presence(ctx, reporter):
+        """A repo whose CI publishes to npm must carry the NPM_TOKEN secret.
+
+        Without it the publish job dies with ``ENEEDAUTH`` -- after the release
+        has already tagged, pushed and created the GitHub Release. Presence
+        only: the value is not retrievable through the API and rlsbl never puts
+        a credential on a pipe.
+        """
+        from ..ci_secrets import evaluate_npm_token_presence
+        from ..utils import get_github_repo
+
+        verdict = evaluate_npm_token_presence(
+            ctx.config, get_github_repo(ctx.config),
+        )
+        if verdict.skip_reason is not None:
+            return reporter.skipped(verdict.skip_reason)
+        if verdict.ok:
+            return reporter.passed(
+                "; ".join(verdict.notes) or "the npm publish credential exists"
+            )
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(f"{len(verdict.problems)} missing CI secret(s)")
+
+    @app.error_check("old-repo-archived")
+    def check_old_repo_archived(ctx, reporter):
+        """A repository this one absorbed should be archived.
+
+        Until it is, it keeps collecting issues, pull requests and clones for
+        code that now lives here. rlsbl never archives it: the finding prints
+        the `gh repo archive` command instead.
+        """
+        from ..lineage_followup import evaluate_old_repo_archived
+
+        events, failure = _read_lineage(ctx, reporter)
+        if failure is not None:
+            return failure
+        if not events:
+            return reporter.skipped("this repository has no lineage record")
+        return _followup_outcome(
+            evaluate_old_repo_archived(events), reporter,
+            passed="every absorbed source repository is archived",
+        )
+
+    @app.error_check("go-deprecation-published")
+    def check_go_deprecation_published(ctx, reporter):
+        """A superseded Go module path should serve a deprecation notice.
+
+        A module path rlsbl recorded as moved is still published at the old
+        path, and a consumer resolving it sees nothing about the move unless
+        the old repository ships `// Deprecated:` in its `go.mod`. The finding
+        prints the steps; rlsbl never commits into a retired repository.
+        """
+        from ..lineage_followup import evaluate_go_deprecation_published
+
+        events, failure = _read_lineage(ctx, reporter)
+        if failure is not None:
+            return failure
+        if not events:
+            return reporter.skipped("this repository has no lineage record")
+        return _followup_outcome(
+            evaluate_go_deprecation_published(events), reporter,
+            passed="every superseded module path is deprecated",
+        )
 
 
 def _same_commit(a, b):

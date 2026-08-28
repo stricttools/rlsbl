@@ -28,6 +28,11 @@ EXPECTED_CHECKS = [
     "license-file",
     "unpublished-refs",
     "branch-sync",
+    # Networked release checks: CI credential, and the follow-ups a recorded
+    # conversion still owes the outside world
+    "npm-token-presence",
+    "old-repo-archived",
+    "go-deprecation-published",
     "changelog-entry",
     "library-lint",
     # Changelog validation checks

@@ -568,6 +568,28 @@
       "kind": "workspace",
       "targets": []
     },
+    "go-deprecation-published": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
     "go-module-identity": {
       "kind": "targets",
       "targets": [
@@ -705,6 +727,34 @@
       "kind": "targets",
       "targets": [
         "npm"
+      ]
+    },
+    "npm-token-presence": {
+      "kind": "targets",
+      "targets": [
+        "npm"
+      ]
+    },
+    "old-repo-archived": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
       ]
     },
     "prepush-changelog-coverage": {
@@ -1445,6 +1495,14 @@
         ],
         [
           "npm-private-mismatch",
+          "no",
+          "no",
+          "yes",
+          "no",
+          "no"
+        ],
+        [
+          "npm-token-presence",
           "no",
           "no",
           "yes",

@@ -108,6 +108,52 @@ pure = false
 needs_network = true
 depends_on = []
 
+# The three probing release checks. Each reads something outside the working
+# tree and each is fail-closed: an unanswered probe is an error, never a pass.
+# They carry "release" rather than "project" so the offline tags stay offline.
+# Deliberately NOT in "preflight": the release pipeline's own steps already
+# authenticate against GitHub and the registries, and a probe failure at
+# preflight time would block a release for a network condition rather than for
+# anything about the repository.
+
+# npm-token-presence: a CI npm publish authenticates with the NPM_TOKEN
+# repository secret; without it the publish job dies with ENEEDAUTH after the
+# release has already tagged, pushed and created the GitHub Release. Presence
+# only -- a secret's value is not retrievable through the API, and rlsbl never
+# puts a credential on a pipe.
+[checks.npm-token-presence]
+tags = ["release"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+
+# old-repo-archived: an absorb leaves its source repository standing, where it
+# keeps collecting issues, pull requests and clones for code that moved here.
+# Skips when the lineage record holds no absorb. rlsbl never archives it: the
+# finding prints the `gh repo archive` command.
+[checks.old-repo-archived]
+tags = ["release"]
+severity = "error"
+fast = false
+pure = false
+needs_network = true
+depends_on = []
+
+# go-deprecation-published: a recorded go-module-path transition leaves the OLD
+# path published, and a consumer resolving it sees nothing about the move until
+# the old repository serves a `// Deprecated:` notice. Probes the module proxy
+# for the old path's latest go.mod. Skips when the record holds no such
+# transition; rlsbl never commits into the retired repository.
+[checks.go-deprecation-published]
+tags = ["release"]
+severity = "error"
+fast = false
+pure = false
+needs_network = true
+depends_on = []
+
 [checks.changelog-entry]
 tags = ["changelog"]
 severity = "error"

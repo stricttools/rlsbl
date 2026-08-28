@@ -108,6 +108,101 @@ def query_go_version(module_path):
         return {"status": "error", "message": str(e) or "Network error"}
 
 
+def escape_module_path(module_path):
+    """Encode a module path the way the Go module proxy demands.
+
+    The proxy's URL space is case-insensitive, so every uppercase letter is
+    written as ``!`` plus its lowercase form. A path sent unescaped resolves to
+    a different (usually absent) module, which would read as "never published"
+    for a module that is published.
+    """
+    return "".join(
+        f"!{ch.lower()}" if ch.isupper() else ch for ch in (module_path or "")
+    )
+
+
+def query_go_mod(module_path, version):
+    """Fetch one version's ``go.mod`` text from the Go module proxy.
+
+    Returns {"status": "found", "text": "..."}, {"status": "not_found"} when
+    the proxy has no such module or version, or {"status": "error",
+    "message": "..."}. A caller that must be certain treats "error" as a
+    refusal to answer, never as absence.
+    """
+    escaped = escape_module_path(module_path)
+    url = f"https://proxy.golang.org/{escaped}/@v/{version}.mod"
+    try:
+        with _request_with_backoff(url) as resp:
+            return {"status": "found", "text": resp.read().decode("utf-8", "replace")}
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 410):
+            return {"status": "not_found"}
+        return {"status": "error", "message": f"HTTP {e.code}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e) or "Network error"}
+
+
+def go_mod_deprecation(text):
+    """The deprecation message a ``go.mod`` states, or None.
+
+    Go's own rule, applied exactly: the notice is a ``// Deprecated:`` comment
+    in the comment block IMMEDIATELY BEFORE the ``module`` directive, or a
+    comment on the same line. A ``// Deprecated:`` anywhere else in the file
+    (inside a ``retract`` block, say) deprecates that thing, not the module, so
+    it is deliberately not read here.
+    """
+    block = []
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            block = []
+            continue
+        if line.startswith("//"):
+            block.append(line[2:].strip())
+            continue
+        if line.startswith("module "):
+            _directive, _, inline = line.partition("//")
+            candidates = block + ([inline.strip()] if inline else [])
+            for comment in candidates:
+                if comment.startswith("Deprecated:"):
+                    return comment[len("Deprecated:"):].strip() or "(no reason given)"
+            return None
+        block = []
+    return None
+
+
+def query_go_module_deprecation(module_path):
+    """Does the module proxy serve a deprecation notice for *module_path*?
+
+    Two reads: the latest version, then that version's ``go.mod``. Returns
+    {"status": "deprecated", "version": v, "message": m},
+    {"status": "not_deprecated", "version": v}, {"status": "not_found"} when
+    the module was never published, or {"status": "error", "message": ...}.
+    """
+    latest = query_go_version(module_path)
+    status = latest.get("status")
+    if status != "found":
+        return latest
+    version = latest["version"]
+    if not version.startswith("v"):
+        version = f"v{version}"
+    document = query_go_mod(module_path, version)
+    if document.get("status") != "found":
+        if document.get("status") == "not_found":
+            return {
+                "status": "error",
+                "message": (
+                    f"the proxy serves {module_path} {version} but not its "
+                    f"go.mod"
+                ),
+            }
+        return document
+    message = go_mod_deprecation(document["text"])
+    if message is None:
+        return {"status": "not_deprecated", "version": version}
+    return {"status": "deprecated", "version": version, "message": message}
+
+
 def query_registry_version(name, registry):
     """Query a registry for the latest version of a package.
 

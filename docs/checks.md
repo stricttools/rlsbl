@@ -39,7 +39,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | Tag | Purpose | Check count |
 | --- | --- | --- |
 | `project` | Project-level metadata, config schema, version consistency | 25 |
-| `release` | Released-version ref and branch-sync validation | 3 |
+| `release` | Released-version refs, branch sync, CI credentials, and conversion follow-ups | 6 |
 | `changelog` | JSONL changelog validation and structure | 11 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 18 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 16 |
@@ -83,8 +83,13 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | --- | --- | --- |
 | `unpublished-refs` | error | Every ref each archived release owns -- its primary tag, its ecosystem's companion tags, and the aliases a rename or conversion recorded for it -- exists locally, exists on origin, and points at the commit the release anchored (requires network) |
 | `branch-sync` | error | Local branch is not behind the remote tracking branch (requires network) |
+| `npm-token-presence` | error | A repository whose pipelines publish to npm from CI carries the `NPM_TOKEN` Actions secret. Without it the publish job fails with `ENEEDAUTH` after the release has already tagged, pushed and created the GitHub Release. Presence only -- the value is never read. The finding names the exact `gh secret set` command (requires network) |
+| `old-repo-archived` | error | Every repository this one absorbed (from the lineage record's conversion facts) is archived on GitHub, so it stops collecting issues, pull requests and clones for code that moved here. rlsbl never archives it -- the finding prints `gh repo archive`. Skips when the record holds no absorb (requires network) |
+| `go-deprecation-published` | error | Every superseded Go module path (from the lineage record's identity transitions) serves a `// Deprecated:` notice in the `go.mod` the module proxy returns for its latest version. rlsbl never commits into the retired repository -- the finding prints the steps. Skips when the record holds no `go-module-path` transition (requires network) |
 
 `scaffold-conflicts` (see project checks) is also tagged `release`. `unpublished-refs` depends on `version-consistency`; if it fails, `unpublished-refs` is skipped.
+
+Every check in this tag reads something outside the working tree -- the remote's refs, the GitHub API, the Go module proxy. That is why they carry `release` rather than `project`: the offline tags (`project`, `changelog`, `quality`, `prepush`) stay answerable with no network, and a networked check placed in one of them would fail an offline run for a reason that has nothing to do with the repository. All of them are fail-closed: a probe that cannot answer is a hard error, never a pass. None is in `preflight` -- the release pipeline's own steps already authenticate against GitHub and the registries, and a probe failure there would block a release for a network condition rather than for anything about the repository.
 
 ### `unpublished-refs`
 
