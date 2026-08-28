@@ -154,7 +154,7 @@ Scrub sensitive content from git history and update release metadata to match th
 
 ## release reconcile
 
-Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.
+Reconcile this project's published release metadata with what its own records say it released: push the refs origin is missing, re-point the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Merges four explanation sources -- safegit's rewrite journal, the release ledger's anchors, the lineage records, and the committed scrub archives -- into one preview whose verdicts are materialize, already-correct, re-point-with-lease, refuse-foreign, or refuse-identity-mismatch. Fail-closed: one ref origin holds that no record explains aborts the whole reconcile, and nothing anywhere is repaired. Consent is file-driven: --plan writes the plan, --apply performs it.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -162,4 +162,7 @@ Reconcile release metadata with a rewritten history: re-push the tags a rewrite 
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--push-timeout` |  | int | optional |  | Timeout in seconds for each tag push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
+| `mode` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--plan`, `--apply`. Which half of the reconcile to run: write the plan, or perform it. Exactly one must be elected. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--plan` |  |  | required |  | Elects `mode` = `plan`. Observe origin and write the reconcile plan to .rlsbl/releases/reconcile-plan.toml. Writes nothing to origin. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--apply` |  |  | required |  | Elects `mode` = `apply`. Perform the plan in .rlsbl/releases/reconcile-plan.toml, after re-observing origin and refusing if it moved since the plan was written. |
+| `--push-timeout` |  | int | optional |  | Timeout in seconds for each ref push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |

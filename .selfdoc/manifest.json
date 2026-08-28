@@ -2701,6 +2701,11 @@
         },
         {
           "level": 3,
+          "text": "Release tags on the mirror",
+          "anchor": "release-tags-on-the-mirror"
+        },
+        {
+          "level": 3,
           "text": "Extracting a mirrored releasable promotes the mirror",
           "anchor": "extracting-a-mirrored-releasable-promotes-the-mirror"
         },
@@ -19429,6 +19434,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-28T06:13:19.419818+00:00",
+  "last_gen": "2026-08-28T06:14:57.783732+00:00",
   "theme": "minimal"
 }
