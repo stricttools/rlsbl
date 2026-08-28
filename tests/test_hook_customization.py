@@ -19,7 +19,7 @@ from rlsbl.commands.release.hooks import (
     is_hook_customized,
     is_releasable_hook_customized,
 )
-from rlsbl.commands.release.validate import parse_porcelain_paths
+from rlsbl.utils import parse_status_paths, working_tree_paths
 
 from conftest import workspace_toml
 
@@ -226,17 +226,25 @@ class TestHookGeneratedDirtySnapshot:
     by git status --porcelain.
     """
 
-    def test_parse_porcelain_new_file(self):
-        """A new untracked file appears in parse_porcelain_paths output."""
-        output = "?? generated.txt\n"
-        result = parse_porcelain_paths(output)
-        assert "generated.txt" in result
+    def test_the_shared_parse_sees_a_new_file(self):
+        """A new untracked file appears in the shared parser's output."""
+        assert "generated.txt" in parse_status_paths("?? generated.txt\0")
 
-    def test_parse_porcelain_modified_file(self):
-        """A modified tracked file appears in parse_porcelain_paths output."""
-        output = " M src/config.py\n"
-        result = parse_porcelain_paths(output)
-        assert "src/config.py" in result
+    def test_the_shared_parse_sees_a_modified_file(self):
+        """A modified tracked file appears in the shared parser's output."""
+        assert "src/config.py" in parse_status_paths(" M src/config.py\0")
+
+    def test_the_shared_parse_keeps_an_awkward_name_intact(self):
+        """The snapshot diff is by path, so an escaped name would never cancel.
+
+        A pre-hook snapshot holding git's C-escaped spelling and a post-hook
+        snapshot holding it too would still subtract cleanly -- but the paths
+        that survive the subtraction are handed to a commit, where the escaped
+        spelling names nothing.
+        """
+        assert parse_status_paths(" M docs/naïve note.md\0") == [
+            "docs/naïve note.md",
+        ]
 
     def test_hook_generated_set_creation(self):
         """The hook_generated set is post_hook_dirty - pre_hook_dirty."""
@@ -259,8 +267,8 @@ class TestHookGeneratedDirtySnapshot:
         captured by the dirty snapshot mechanism.
 
         This test simulates the full flow: run_config_hooks creates a file,
-        git status --porcelain shows it, parse_porcelain_paths picks it up,
-        and the set difference produces the correct hook_generated set.
+        the shared working-tree read shows it, and the set difference produces
+        the correct hook_generated set.
         """
         import subprocess as real_subprocess
 
@@ -288,22 +296,14 @@ class TestHookGeneratedDirtySnapshot:
             cwd=str(tmp_path), check=True,
         )
 
-        # Snapshot before hook
-        pre_output = real_subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=str(tmp_path), capture_output=True, text=True, check=True,
-        ).stdout
-        pre_hook_dirty = parse_porcelain_paths(pre_output) if pre_output else set()
+        # Snapshot before hook, through the same helper the release uses
+        pre_hook_dirty = set(working_tree_paths(cwd=str(tmp_path)))
 
         # Simulate config-driven hook: create a file (as the hook command would)
         (tmp_path / "generated_by_hook.txt").write_text("hook output\n")
 
-        # Snapshot after hook
-        post_output = real_subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=str(tmp_path), capture_output=True, text=True, check=True,
-        ).stdout
-        post_hook_dirty = parse_porcelain_paths(post_output) if post_output else set()
+        # Snapshot after hook, through the same helper the release uses
+        post_hook_dirty = set(working_tree_paths(cwd=str(tmp_path)))
 
         hook_generated = post_hook_dirty - pre_hook_dirty
         assert "generated_by_hook.txt" in hook_generated
@@ -340,22 +340,14 @@ class TestHookGeneratedDirtySnapshot:
             cwd=str(tmp_path), check=True,
         )
 
-        # Snapshot before hook
-        pre_output = real_subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=str(tmp_path), capture_output=True, text=True, check=True,
-        ).stdout
-        pre_hook_dirty = parse_porcelain_paths(pre_output) if pre_output else set()
+        # Snapshot before hook, through the same helper the release uses
+        pre_hook_dirty = set(working_tree_paths(cwd=str(tmp_path)))
 
         # Simulate config-driven hook: modify the tracked file
         tracked_file.write_text('{"version": "1.0.1"}\n')
 
-        # Snapshot after hook
-        post_output = real_subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=str(tmp_path), capture_output=True, text=True, check=True,
-        ).stdout
-        post_hook_dirty = parse_porcelain_paths(post_output) if post_output else set()
+        # Snapshot after hook, through the same helper the release uses
+        post_hook_dirty = set(working_tree_paths(cwd=str(tmp_path)))
 
         hook_generated = post_hook_dirty - pre_hook_dirty
         assert "config.json" in hook_generated

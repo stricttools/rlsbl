@@ -973,46 +973,54 @@ class TestReleaseCommitTrailers:
 
 
 class TestPorcelainParsing:
-    """Tests for parse_porcelain_paths in rlsbl.commands.release."""
+    """The release flow's working-tree read is the one shared helper.
 
-    def test_stripped_leading_space_on_first_line(self):
-        """run() strips stdout, which can remove a leading space from the first line.
+    ``rlsbl.commands.release`` used to carry its own porcelain parser. It reads
+    through ``working_tree_paths`` now, so what is pinned here is the shared
+    read's own behavior plus the fact that the release module really uses it.
+    """
 
-        Porcelain format is "XY path" where X/Y are status codes.
-        A line like " M pyproject.toml" becomes "M pyproject.toml" after strip.
-        The parser must still extract the correct path using lstrip().split(None, 1).
+    def test_the_release_module_reads_through_the_shared_helper(self):
+        import rlsbl.commands.release as release_pkg
+        from rlsbl.utils import working_tree_paths
+
+        assert release_pkg.working_tree_paths is working_tree_paths
+        assert not hasattr(release_pkg, "parse_porcelain_paths")
+
+    def test_an_unstaged_record_keeps_its_leading_space(self):
+        """The read is NOT trimmed, so `` M path`` still has three columns.
+
+        Trimming the output shifted the first record's columns and the parsed
+        path lost its first character, which is why the read no longer goes
+        through the trimming ``run`` wrapper.
         """
-        from rlsbl.commands.release import parse_porcelain_paths
+        from rlsbl.utils import parse_status_paths
 
-        # Simulate output where run() has stripped leading whitespace from first line
-        # Original porcelain: "M  package.json\n M pyproject.toml\n?? .rlsbl/lock"
-        # After run().strip(): "M package.json\n M pyproject.toml\n?? .rlsbl/lock"
-        porcelain = "M package.json\n M pyproject.toml\n?? .rlsbl/lock"
-        result = parse_porcelain_paths(porcelain)
-        assert result == {"package.json", "pyproject.toml", ".rlsbl/lock"}
+        stdout = "M  package.json\0 M pyproject.toml\0?? .rlsbl/lock\0"
+        assert set(parse_status_paths(stdout)) == {
+            "package.json", "pyproject.toml", ".rlsbl/lock",
+        }
 
     def test_rename_entry(self):
-        """Rename entries use 'R old -> new' format; parser should extract new path."""
-        from rlsbl.commands.release import parse_porcelain_paths
+        """A rename emits its origin as a separate field; the NEW path wins."""
+        from rlsbl.utils import parse_status_paths
 
-        porcelain = "R  old.txt -> new.txt\nM  other.txt"
-        result = parse_porcelain_paths(porcelain)
-        assert "new.txt" in result
-        assert "other.txt" in result
+        stdout = "R  new.txt\0old.txt\0M  other.txt\0"
+        result = parse_status_paths(stdout)
+        assert result == ["new.txt", "other.txt"]
 
     def test_empty_output(self):
-        """Empty porcelain output returns empty set."""
-        from rlsbl.commands.release import parse_porcelain_paths
+        """Empty output means nothing changed."""
+        from rlsbl.utils import parse_status_paths
 
-        assert parse_porcelain_paths("") == set()
+        assert parse_status_paths("") == []
 
-    def test_blank_lines_ignored(self):
-        """Blank lines in output are safely ignored."""
-        from rlsbl.commands.release import parse_porcelain_paths
+    def test_the_trailing_empty_field_is_ignored(self):
+        """Every record is NUL-TERMINATED, so the split leaves a final empty."""
+        from rlsbl.utils import parse_status_paths
 
-        porcelain = "M  file.txt\n\n?? untracked.txt"
-        result = parse_porcelain_paths(porcelain)
-        assert result == {"file.txt", "untracked.txt"}
+        stdout = "M  file.txt\0?? untracked.txt\0"
+        assert parse_status_paths(stdout) == ["file.txt", "untracked.txt"]
 
 
 # ---------------------------------------------------------------------------

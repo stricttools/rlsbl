@@ -11,7 +11,7 @@ import re
 import sys
 
 from ...strictcli_detect import detect_strictcli
-from ...utils import run_gh
+from ...utils import run_gh, working_tree_paths
 
 
 class ReleaseValidationError(Exception):
@@ -350,8 +350,7 @@ def is_tool_owned_state_path(path) -> bool:
     reports it. The two canonical homes (see
     :func:`rlsbl.release_file.get_releases_dir`) are:
 
-    - ``[<member>/].rlsbl/releases/<file>`` -- standalone projects and
-      implicit-monorepo packages
+    - ``[<member>/].rlsbl/releases/<file>`` -- standalone projects
     - ``.rlsbl-monorepo/releasables/<name>/releases/<file>`` -- releasables
 
     ``unreleased.plan.json`` and the ``unreleased.toml`` family share those
@@ -379,14 +378,11 @@ def validate_clean_tree(flags):
     Returns set of pre-existing dirty file paths.
     Raises ReleaseValidationError if tree is dirty and --allow-dirty not set.
     """
-    from . import run, is_clean_tree
+    from . import is_clean_tree
 
     pre_existing_dirty = set()
     if flags.get("allow-dirty"):
-        dirty_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
-        if dirty_output:
-            pre_existing_dirty = parse_porcelain_paths(dirty_output)
-        return pre_existing_dirty
+        return set(working_tree_paths())
 
     if is_clean_tree():
         return pre_existing_dirty
@@ -401,7 +397,7 @@ def validate_clean_tree(flags):
     # cannot be classified per-file (and must NOT be exempted wholesale --
     # unreleased.toml lives there and is deliberately committed).
     try:
-        dirty_output = run("git", ["--no-optional-locks", "status", "--porcelain", "--untracked-files=all"])
+        dirty_paths = working_tree_paths(untracked="all")
     except Exception:
         # Fail closed: an unreadable status is never "clean enough".
         raise ReleaseValidationError(
@@ -409,7 +405,7 @@ def validate_clean_tree(flags):
         )
 
     blocking = sorted(
-        path for path in parse_porcelain_paths(dirty_output or "")
+        path for path in dirty_paths
         if not is_tool_owned_state_path(path)
     )
     if blocking:
@@ -495,13 +491,12 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
 
     Returns (monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name).
     All values are None/False/None when not in a monorepo.
-    ``releasable_name`` is a string when the project explicitly belongs to a
-    named releasable (``releasable = "name"``), or None in implicit mode.
+    ``releasable_name`` is a string when the project belongs to a named
+    releasable (``releasable = "name"``), or None when it belongs to none.
     Raises ReleaseValidationError if inside a monorepo but not a recognized project,
     or if the project is non-releasable.
     """
     from . import resolve_project
-    from ...workspace import is_explicit_mode
 
     if not monorepo_root:
         return None, None, False, False, None
@@ -525,13 +520,12 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
             "releasable = false to confirm it is non-releasable."
         )
 
-    # In explicit mode, the project's releasable field names the releasable
-    # whose version file is the canonical version source.
+    # The project's releasable field names the releasable whose version file
+    # is the canonical version source.
     releasable_name = None
-    if is_explicit_mode(str(monorepo_root)):
-        rel_val = project.releasable
-        if isinstance(rel_val, str):
-            releasable_name = rel_val
+    rel_val = project.releasable
+    if isinstance(rel_val, str):
+        releasable_name = rel_val
 
     return monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name
 
@@ -564,25 +558,24 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
                             project_dir=None):
     """Compute current and new version, bump type, and tag.
 
-    In explicit releasable mode (when ``workspace_root`` and ``releasable_name``
-    are both provided), the version is read from the releasable's version file
-    at ``.rlsbl-monorepo/releasables/<name>/version`` instead of from the
+    When ``workspace_root`` and ``releasable_name`` are both provided, the
+    version is read from the releasable's version file at
+    ``.rlsbl-monorepo/releasables/<name>/version`` instead of from the
     target's manifest file. This is the canonical version source for
     multi-package releasables.
 
-    When ``releasable_tag_fmt`` is provided (explicit mode), tags are
-    constructed from the releasable's tag format instead of the target's
-    monorepo tag format.
+    When ``releasable_tag_fmt`` is provided, tags are constructed from the
+    releasable's tag format instead of the target's monorepo tag format.
 
-    In implicit mode (the default, when either parameter is None), the version
-    is read from the target's manifest as before.
+    When either parameter is None (a standalone repo), the version is read
+    from the target's manifest instead.
 
     ``project_dir`` locates the project's ``.rlsbl/`` state -- the release
     archives that decide whether this version already shipped, and the changes
     directory the destroyed-tag guard reads (see
     :func:`_abort_on_destroyed_tag`). When omitted it falls back to
     ``primary_path``, which coincides with the project root for standalone
-    repos and implicit-mode monorepo projects.
+    repos.
 
     Whether this is a first release is decided by the LEDGER, not by the tag
     namespace. A tag read is still consulted, but only as corroboration, and
@@ -1081,26 +1074,6 @@ def print_resume_dry_run_summary(log, saved_state, *, verified_sha=None,
 
 
 _SCHEMA_DUMP_TIMEOUT = 30
-
-
-def parse_porcelain_paths(porcelain_output):
-    """Parse file paths from `git status --porcelain` output.
-
-    Handles the case where run() strips stdout, potentially removing a
-    leading space from the first line. Uses lstrip().split(None, 1) to
-    robustly extract the status code and path regardless.
-
-    Returns a set of file paths found in the output.
-    """
-    dirty_files = set()
-    for line in porcelain_output.splitlines():
-        parts = line.lstrip().split(None, 1)
-        if len(parts) < 2:
-            continue
-        # Handle rename notation: "R old -> new"
-        file_path = parts[1].split(" -> ")[-1]
-        dirty_files.add(file_path)
-    return dirty_files
 
 
 def _selfdoc_version_args(version):

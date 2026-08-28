@@ -1996,7 +1996,7 @@ def _run_release_mutating(state: ReleaseState):
         _cleanup_release_artifacts,
         upload_release_assets,
         _print_stale_dep_advisory,
-        parse_porcelain_paths,
+        working_tree_paths,
         ReleaseValidationError,
         HookError,
         _read_release_metadata_full,
@@ -2045,8 +2045,7 @@ def _run_release_mutating(state: ReleaseState):
     if _previewing:
         baseline_dirty = set(state.pre_existing_dirty or ())
     else:
-        baseline_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
-        baseline_dirty = parse_porcelain_paths(baseline_output) if baseline_output else set()
+        baseline_dirty = set(working_tree_paths())
 
     if commit_msg is None:
         commit_msg = tag
@@ -2325,10 +2324,10 @@ def _run_release_mutating(state: ReleaseState):
         defensively).
         """
         try:
-            residual = run("git", ["--no-optional-locks", "status", "--porcelain"]).strip()
+            residual_paths = working_tree_paths()
         except Exception:
             return
-        if not residual:
+        if not residual_paths:
             return
         # Transient paths that are not rollback residuals, as absolute paths.
         _transient_abs = {
@@ -2336,7 +2335,7 @@ def _run_release_mutating(state: ReleaseState):
             os.path.abspath(_state_path),
         }
         leftover_paths = []
-        for _p in parse_porcelain_paths(residual):
+        for _p in residual_paths:
             _abs = os.path.abspath(os.path.join(_git_root, _p.rstrip("/")))
             if _abs in _transient_abs:
                 continue
@@ -2671,11 +2670,9 @@ def _run_release_mutating(state: ReleaseState):
             # per-version .md files. Include any it actually modified so the
             # release leaves a clean working tree. Only files git reports as
             # changed are added (passing unchanged files to safegit may error).
-            md_status = run("git", ["--no-optional-locks", "status", "--porcelain", "--", changes_dir])
-            if md_status:
-                for md_path in sorted(parse_porcelain_paths(md_status)):
-                    if md_path.endswith(".md") and md_path not in finalize_files:
-                        finalize_files.append(md_path)
+            for md_path in sorted(working_tree_paths(paths=[changes_dir])):
+                if md_path.endswith(".md") and md_path not in finalize_files:
+                    finalize_files.append(md_path)
             commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
             _track_release_commit(_state_path)
             log(f"Committed finalized changelog files")

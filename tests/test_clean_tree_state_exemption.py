@@ -170,16 +170,50 @@ class TestValidateCleanTreeStateExemption:
         assert "unreleased.toml" in message
         assert "in-progress.json" not in message
 
+    def test_a_dirty_unicode_path_is_named_as_it_is_on_disk(self, mock_git_repo):
+        """The refusal must name the file, not git's C-escaped spelling of it.
+
+        ``git status --porcelain`` quotes any path outside plain ASCII, so a
+        parser that reads the default output reports
+        ``"docs/na\\303\\257ve note.md"`` -- a name no filesystem has, which the
+        operator cannot copy, paste or find.
+        """
+        _write(mock_git_repo, os.path.join("docs", "naïve note.md"), "wip\n")
+
+        with pytest.raises(ReleaseValidationError) as exc:
+            validate_clean_tree({})
+
+        message = str(exc.value)
+        assert "docs/naïve note.md" in message
+        assert "\\303" not in message
+        assert '"' not in message
+
+    def test_allow_dirty_baseline_carries_the_real_unicode_path(self, mock_git_repo):
+        """The baseline set feeds the unexpected-files guard and the commit.
+
+        An escaped spelling in it makes the guard compare two different names
+        for the same file and flag the release's own work as foreign.
+        """
+        (mock_git_repo / "naïve note.md").write_text("wip\n")
+
+        dirty = validate_clean_tree({"allow-dirty": True})
+
+        assert dirty == {"naïve note.md"}
+
     def test_unreadable_status_fails_closed(self, mock_git_repo, monkeypatch):
-        """If the porcelain read fails, refuse -- never assume the tree is clean."""
-        import rlsbl.commands.release as release_pkg
+        """If the porcelain read fails, refuse -- never assume the tree is clean.
+
+        The read is the shared ``working_tree_paths`` helper, so that is what
+        this pins: whatever it raises must come out as a refusal.
+        """
+        import rlsbl.commands.release.validate as validate_mod
 
         _write(mock_git_repo, STATE_REL)
 
-        def _boom(cmd, args=None, **kwargs):
+        def _boom(*args, **kwargs):
             raise subprocess.CalledProcessError(128, ["git"])
 
-        monkeypatch.setattr(release_pkg, "run", _boom)
+        monkeypatch.setattr(validate_mod, "working_tree_paths", _boom)
         with pytest.raises(ReleaseValidationError):
             validate_clean_tree({})
 

@@ -25,7 +25,7 @@ from ...release_file import (
 )
 from ...errors import ConfigError, GitError, ReleaseFileError
 from ...lock import rlsbl_lock
-from ...utils import commit_files, run
+from ...utils import commit_files, run, working_tree_paths
 from ...workspace import find_workspace_root, load_workspace, is_explicit_mode
 from ...workspace_graph import CycleError, WorkspaceGraph
 from ..watch import wait_for_ci_green
@@ -53,7 +53,6 @@ from ..release.validate import (
     HookError,
     _run_selfdoc_gen,
     _run_selfdoc_check,
-    parse_porcelain_paths,
     validate_branch_and_remote,
     validate_clean_tree,
     validate_gh_cli,
@@ -83,8 +82,7 @@ def _run_root_selfdoc(flags, workspace_root, log):
     # ``git status``/commit here once walked up from a TMPDIR-inside-repo
     # fixture into the real repo and committed junk (the Jul junk-commit
     # incidents); the explicit cwd makes the target repo unambiguous.
-    pre_output = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=workspace_root)
-    pre_dirty = parse_porcelain_paths(pre_output) if pre_output else set()
+    pre_dirty = set(working_tree_paths(cwd=workspace_root))
 
     _run_selfdoc_gen(flags, project_dir=workspace_root)
     _run_selfdoc_check(flags, project_dir=workspace_root)
@@ -93,8 +91,7 @@ def _run_root_selfdoc(flags, workspace_root, log):
         return
 
     # Commit any files selfdoc generated (diff against pre-selfdoc snapshot)
-    post_output = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=workspace_root)
-    post_dirty = parse_porcelain_paths(post_output) if post_output else set()
+    post_dirty = set(working_tree_paths(cwd=workspace_root))
     selfdoc_generated = post_dirty - pre_dirty
     if selfdoc_generated:
         commit_files(

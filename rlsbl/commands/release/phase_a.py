@@ -72,6 +72,7 @@ import dataclasses
 import os
 
 from ... import effects
+from ...utils import parse_status_paths, status_argv
 
 
 # The one value that crosses the Phase-A seam.
@@ -654,7 +655,7 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
             "expected": _expected_dirty_files(inp, files_to_commit),
             "baseline": set(inp.baseline_dirty or ()),
         },
-        capture=("dirty", ["git", "--no-optional-locks", "status", "--porcelain"], None),
+        capture=("dirty", status_argv(), None),
         marks=("VERSION_BUMPED",),
     ))
 
@@ -1005,17 +1006,25 @@ class _Executor:
         captured: the step issued a recorded effect, not a real one, so the
         honest stand-in is the carrier that effect returned (see
         :meth:`_resolve`).
-        """
-        from . import run
 
+        The output is returned RAW, not trimmed. One capture is a
+        ``git status --porcelain -z`` read, whose first record begins with a
+        space when the change is unstaged (`` M path``); trimming the output
+        would shift that record's columns and eat the first character of its
+        path. The consumer that wants a bare token (:meth:`_settle`, threading
+        a SHA) strips it there.
+        """
         name, argv, cwd = step.capture
         try:
-            out = run(argv[0], list(argv[1:]), cwd=cwd)
+            result = effects.run(
+                list(argv), cwd=cwd, capture_output=True, text=True,
+                check=True, timeout=120,
+            )
         except Exception:
             return None
-        if effects.unsettled(out) or not isinstance(out, str):
+        if effects.unsettled(result):
             return None
-        return out
+        return result.stdout
 
     # -- value threading ----------------------------------------------------
 
@@ -1231,12 +1240,11 @@ class _Executor:
 
     def _do_guard_unexpected_files(self, step):
         from .execute import ReleaseAbortError
-        from .validate import parse_porcelain_paths
 
         porcelain = self._capture(step)
         if not porcelain:
             return None
-        dirty = parse_porcelain_paths(porcelain)
+        dirty = set(parse_status_paths(porcelain))
         expected = set(step.payload["expected"]) | set(self._written)
         unexpected = dirty - expected - step.payload["baseline"]
         if unexpected:

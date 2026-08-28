@@ -437,7 +437,7 @@ _FULL_FLOW_PATCHES = (
     patch("rlsbl.commands.release.resolve_target_paths", return_value={}),
     patch("rlsbl.commands.release.compute_release_version", return_value=("1.0.0", "1.0.1", "patch", "v1.0.1")),
     patch("rlsbl.commands.release.extract_changelog_entry_from_text", return_value="- test"),
-    patch("rlsbl.commands.release.parse_porcelain_paths", return_value=set()),
+    patch("rlsbl.commands.release.working_tree_paths", return_value=[]),
     patch("rlsbl.commands.release.build_hook_env", return_value={}),
     patch("rlsbl.commands.release.get_hook_timeout", return_value=30),
     patch("rlsbl.commands.release._run_strictcli_schema_dump"),

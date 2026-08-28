@@ -53,6 +53,7 @@ from ...utils import (
     run_gh_unscoped,
     tag_exists_locally,
     tag_exists_on_remote,
+    working_tree_paths,
 )
 from ..watch import (  # noqa: F401  (re-exported for execute.py's late-bound imports)
     CI_GREEN,
@@ -69,7 +70,6 @@ from ...ci_checks import (  # noqa: F401  (same late-bound re-export path)
 from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfblog_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config
 from .validate import (
-    parse_porcelain_paths,
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
     _abort_on_cross_repo_sources, _abort_on_version_skew,
     _abort_on_npm_provenance,
@@ -885,8 +885,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if effects.previewing():
         pre_hook_dirty = set()
     else:
-        pre_hook_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
-        pre_hook_dirty = parse_porcelain_paths(pre_hook_output) if pre_hook_output else set()
+        pre_hook_dirty = set(working_tree_paths())
 
     # Build hook environment
     hook_env = build_hook_env(
@@ -948,8 +947,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # selfdoc generates (excluding anything dirtied by pre-checks hooks or
     # strictcli schema dump).  Only needed in non-dry-run mode.
     if not flags.get("dry-run", False):
-        _pre_selfdoc_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
-        _pre_selfdoc_dirty = parse_porcelain_paths(_pre_selfdoc_output) if _pre_selfdoc_output else set()
+        _pre_selfdoc_dirty = set(working_tree_paths())
 
     # Pass the about-to-be-released version: the bump has not been written to
     # disk yet, so without it every version-bearing generated line is one
@@ -973,8 +971,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # steps fail.  Compare dirty snapshot against _pre_selfdoc_dirty to isolate
     # files produced by selfdoc gen/check/post_generate only.
     if not flags.get("dry-run", False):
-        _post_selfdoc_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
-        _post_selfdoc_dirty = parse_porcelain_paths(_post_selfdoc_output) if _post_selfdoc_output else set()
+        _post_selfdoc_dirty = set(working_tree_paths())
         _selfdoc_generated = _post_selfdoc_dirty - _pre_selfdoc_dirty
         if _selfdoc_generated:
             commit_files(
@@ -1189,8 +1186,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if effects.previewing():
         hook_generated = set()
     else:
-        post_hook_output = run("git", ["--no-optional-locks", "status", "--porcelain"])
-        post_hook_dirty = parse_porcelain_paths(post_hook_output) if post_hook_output else set()
+        post_hook_dirty = set(working_tree_paths())
         hook_generated = post_hook_dirty - pre_hook_dirty
 
     # In explicit mode, commit message uses releasable name;

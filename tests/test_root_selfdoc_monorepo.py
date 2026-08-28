@@ -45,8 +45,8 @@ class TestRunRootSelfdoc:
             "rlsbl.commands.monorepo.batch_release.run",
             return_value="",
         ), patch(
-            "rlsbl.commands.monorepo.batch_release.parse_porcelain_paths",
-            return_value=set(),
+            "rlsbl.commands.monorepo.batch_release.working_tree_paths",
+            return_value=[],
         ):
             _run_root_selfdoc(flags, str(tmp_path), lambda m: log_msgs.append(m))
 
@@ -62,13 +62,13 @@ class TestRunRootSelfdoc:
         call_count = [0]
 
         def fake_run(tool, args, **kwargs):
-            if tool == "git" and args == ["--no-optional-locks", "status", "--porcelain"]:
-                call_count[0] += 1
-                if call_count[0] == 1:
-                    return ""  # pre-selfdoc: clean
-                else:
-                    return " M README.md\n?? docs/api.md\n"  # post-selfdoc
             return ""
+
+        def fake_status(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return []  # pre-selfdoc: clean
+            return ["README.md", "docs/api.md"]  # post-selfdoc
 
         commit_calls = []
 
@@ -86,10 +86,9 @@ class TestRunRootSelfdoc:
             "rlsbl.commands.monorepo.batch_release.commit_files",
             side_effect=fake_commit,
         ):
-            from rlsbl.commands.release.validate import parse_porcelain_paths as real_parse
             with patch(
-                "rlsbl.commands.monorepo.batch_release.parse_porcelain_paths",
-                side_effect=real_parse,
+                "rlsbl.commands.monorepo.batch_release.working_tree_paths",
+                side_effect=fake_status,
             ):
                 _run_root_selfdoc(flags, str(tmp_path), lambda m: None)
 
@@ -113,6 +112,9 @@ class TestRunRootSelfdoc:
             side_effect=lambda *a, **k: commit_calls.append(1),
         ), patch(
             "rlsbl.commands.monorepo.batch_release.run", return_value="",
+        ), patch(
+            "rlsbl.commands.monorepo.batch_release.working_tree_paths",
+            return_value=[],
         ):
             _run_root_selfdoc(flags, str(tmp_path), lambda m: None)
 
@@ -133,9 +135,9 @@ class TestRunRootSelfdoc:
             "rlsbl.commands.monorepo.batch_release.run",
             return_value="",
         ), patch(
-            "rlsbl.commands.monorepo.batch_release.parse_porcelain_paths",
-            return_value=set(),
-        ) as mock_parse, patch(
+            "rlsbl.commands.monorepo.batch_release.working_tree_paths",
+            return_value=[],
+        ) as mock_status, patch(
             "rlsbl.commands.monorepo.batch_release.commit_files"
         ) as mock_commit:
             _run_root_selfdoc(flags, str(tmp_path), lambda m: None)
@@ -154,6 +156,9 @@ class TestRunRootSelfdoc:
             side_effect=HookError("selfdoc gen failed"),
         ), patch(
             "rlsbl.commands.monorepo.batch_release.run", return_value="",
+        ), patch(
+            "rlsbl.commands.monorepo.batch_release.working_tree_paths",
+            return_value=[],
         ):
             with pytest.raises(HookError, match="selfdoc gen failed"):
                 _run_root_selfdoc(flags, str(tmp_path), lambda m: None)
