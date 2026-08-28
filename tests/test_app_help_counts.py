@@ -1,14 +1,26 @@
-"""The app help's command-count sentence must match the live registry.
+"""The app help's derived counts must match the live registries.
 
-The counts are derived at registration time (rlsbl/__init__.py), never
-hand-maintained. This test independently recounts the registry and parses
-the numbers out of the help sentence, so any regression to hand-written
-literals -- or a registration added after the derivation point -- fails here.
+Two families of count appear in rlsbl's help text: how many commands are
+registered, and how many release targets exist. Both are derived at
+registration time (rlsbl/__init__.py), never hand-maintained. This test
+independently recounts each registry and parses the numbers out of the help
+sentences, so any regression to hand-written literals -- or a registration
+added after the derivation point -- fails here.
+
+The target counts had already drifted before they were derived: the app help
+said "17 release targets" while the monorepo group help said "18", and
+`dev install` claimed a hand-typed set of targets per install mode.
 """
 
 import re
 
 from rlsbl import app
+from rlsbl.targets import TARGETS
+
+# The go target reads go.mod and .rlsbl/config.json when handed a real Go
+# project, so the support probe must be run against a directory that is not
+# one -- the same reason rlsbl/__init__.py probes a non-project path.
+NOT_A_PROJECT = "/nonexistent/rlsbl-help-count-probe"
 
 
 def _leaf_count(groups):
@@ -57,6 +69,81 @@ def test_monorepo_group_help_lists_every_subcommand_and_subgroup():
     assert subs, f"monorepo help lacks the subgroup sentence: {group.help!r}"
     assert int(subs.group(1)) == len(group._groups)
     assert [n.strip() for n in subs.group(2).split(",")] == list(group._groups)
+
+
+def _dev_install_support(mode):
+    return [
+        name for name, target in TARGETS.items()
+        if target.dev_install_command(NOT_A_PROJECT).get(mode) is not None
+    ]
+
+
+def _dev_uninstall_support():
+    names = []
+    for name, target in TARGETS.items():
+        specs = target.dev_install_command(NOT_A_PROJECT)
+        if any(
+            (specs.get(mode) or {}).get("uninstall_args_template") is not None
+            for mode in ("global", "venv")
+        ):
+            names.append(name)
+    return names
+
+
+def _parse_count_and_names(help_text, lead):
+    m = re.search(lead + r" (\d+) [a-z ]*targets?: ([^.]+)\.", help_text)
+    assert m, f"help lacks a {lead!r} target sentence: {help_text!r}"
+    return int(m.group(1)), [n.strip() for n in m.group(2).split(",")]
+
+
+def test_app_help_target_count_matches_the_registry():
+    count, names = _parse_count_and_names(app.help, "Covers")
+    assert count == len(TARGETS)
+    assert names == list(TARGETS)
+
+
+def test_monorepo_help_target_count_matches_the_registry():
+    """Regression: this literal said 18 while the app help said 17."""
+    m = re.search(r"Supports all (\d+) release targets", app._groups["monorepo"].help)
+    assert m, f"monorepo help lacks the target-count sentence: {app._groups['monorepo'].help!r}"
+    assert int(m.group(1)) == len(TARGETS)
+
+
+def test_dev_install_help_lists_the_targets_each_mode_supports():
+    """Regression: the mode target lists were hand-typed beside a '7 targets'."""
+    help_text = app._groups["dev"].commands["install"].help
+
+    count, names = _parse_count_and_names(help_text, r"--target global is supported by")
+    expected = _dev_install_support("global")
+    assert (count, names) == (len(expected), expected)
+
+    count, names = _parse_count_and_names(help_text, r"--target venv is supported by")
+    expected = _dev_install_support("venv")
+    assert (count, names) == (len(expected), expected)
+
+    count, names = _parse_count_and_names(
+        help_text, r"--uninstall reverses a previous install on"
+    )
+    expected = _dev_uninstall_support()
+    assert (count, names) == (len(expected), expected)
+
+
+def test_no_help_string_carries_a_hand_written_target_count():
+    """Every "N ... targets" claim anywhere in the help must be the live count."""
+    texts = [app.help]
+    for group in app._groups.values():
+        texts.append(group.help)
+        for command in group.commands.values():
+            texts.append(command.help)
+    for command in app._commands.values():
+        texts.append(command.help)
+
+    for text in texts:
+        for m in re.finditer(r"(\d+) release targets", text or ""):
+            assert int(m.group(1)) == len(TARGETS), (
+                f"help claims {m.group(1)} release targets but "
+                f"{len(TARGETS)} are registered: {text!r}"
+            )
 
 
 def test_no_group_help_carries_a_hand_written_subcommand_count():

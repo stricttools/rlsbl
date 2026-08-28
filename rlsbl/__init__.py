@@ -206,6 +206,63 @@ def _opt_default(value, fallback):
     return fallback if value is None else value
 
 
+# ---------------------------------------------------------------------------
+# Derived target facts for help strings
+# ---------------------------------------------------------------------------
+#
+# The target counts in help text used to be hand-typed literals. They drifted:
+# the app help said "17 release targets" while the monorepo group help said
+# "18", and neither was recounted when a target was added. These helpers answer
+# from the live registry instead, so a new target updates every sentence that
+# mentions targets by the act of being registered.
+#
+# The registry import is local to each helper on purpose: rlsbl.targets imports
+# back into this package, so importing it at module top would close a cycle.
+
+# A path that is deliberately not a project directory. The go target reads
+# go.mod and .rlsbl/config.json when its argument IS a Go project (and can
+# hard-error there on an undeclared install_paths), so probing the real cwd
+# would make a help string depend on where the user is standing -- and could
+# make `rlsbl --help` fail inside a Go repository. Every target answers its
+# generic shape for a non-project directory.
+_NOT_A_PROJECT_DIR = os.path.join(os.path.dirname(__file__), "__not_a_project__")
+
+
+def _target_names():
+    """Every registered release target, in registration order."""
+    from .targets import TARGETS
+    return list(TARGETS)
+
+
+def _dev_install_targets(mode):
+    """Targets whose `rlsbl dev install --target <mode>` has something to run."""
+    from .targets import TARGETS
+    return [
+        name for name, target in TARGETS.items()
+        if target.dev_install_command(_NOT_A_PROJECT_DIR).get(mode) is not None
+    ]
+
+
+def _dev_uninstall_targets():
+    """Targets whose dev install can be reversed by `--uninstall`."""
+    from .targets import TARGETS
+    names = []
+    for name, target in TARGETS.items():
+        specs = target.dev_install_command(_NOT_A_PROJECT_DIR)
+        if any(
+            (specs.get(mode) or {}).get("uninstall_args_template") is not None
+            for mode in ("global", "venv")
+        ):
+            names.append(name)
+    return names
+
+
+def _count_and_names(names, noun="target"):
+    """Render a derived count plus its enumeration: "3 targets: a, b, c"."""
+    plural = noun if len(names) == 1 else noun + "s"
+    return f"{len(names)} {plural}: {', '.join(names)}"
+
+
 def _resolve_target(target):
     """Validate and resolve a --target flag value.
 
@@ -237,10 +294,11 @@ def _resolve_target(target):
 app = strictcli.App(
     name="rlsbl",
     version=__version__,
-    # The command-count sentence is appended after all registrations (see
-    # "Derived help counts" near the bottom of this module) so it is computed
-    # from the live registry instead of hand-maintained literals that drift.
-    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more).",
+    # The command-count and release-target sentences are appended after all
+    # registrations (see "Derived help counts" near the bottom of this module)
+    # so both are computed from the live registries instead of hand-maintained
+    # literals that drift.
+    help="Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding.",
     # --dry-run, --approve-consequential, --quiet and --verbose are
     # framework-owned: strictcli registers them on every app, strips them from
     # argv, and delivers them on the Context (ctx.dry_run /
@@ -1635,7 +1693,10 @@ def cmd_chlog_remap(ctx, map_file, from_journal, stdin):
 
 # Same derived-count treatment as the release group: the literal said "16
 # monorepo subcommands" while 18 were registered.
-mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml.")
+# The "supports all N release targets" sentence is appended from the live
+# registry at the bottom of this module, not written here -- the literal it
+# replaces said 18 while the app help said 17.
+mono = app.group("monorepo", help="Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs.")
 
 
 @strictcli.choice(
@@ -2158,7 +2219,24 @@ def cmd_mono_rename_releasable(ctx, old_name, new_name):
 dev = app.group("dev", help="Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).")
 
 
-@dev.command(name="install", help="Install the project locally for development by running each detected target's own install command. --target is required and names the install mode. --target global is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --target venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.", effect="mutating")
+# strictcli's Command is frozen, so this help cannot be rewritten after
+# registration the way app.help and a group's help are. The target lists are
+# therefore derived HERE, in the decorator call, from the same registry probe:
+# they used to be hand-typed and are the kind of list a new target silently
+# falsifies.
+@dev.command(name="install", help=(
+    "Install the project locally for development by running each detected "
+    "target's own install command. --target is required and names the install "
+    "mode: global installs onto the machine (pypi via `uv tool install -e`, "
+    "npm via `npm link`), venv installs into the project's local environment "
+    "instead; a target that does not support the chosen mode is skipped with a "
+    "reason. --target global is supported by "
+    f"{_count_and_names(_dev_install_targets('global'))}. --target venv is "
+    f"supported by {_count_and_names(_dev_install_targets('venv'))}. "
+    f"--uninstall reverses a previous install on "
+    f"{_count_and_names(_dev_uninstall_targets())}. In monorepo mode, pair "
+    "with --all, --include, or --exclude."
+), effect="mutating")
 @strictcli.flag(name="all", type=bool, presence="optional", help="In monorepo mode, install every project in the workspace")
 @strictcli.flag(name="include", type=str, presence="optional", help="In monorepo mode, comma-separated project names to include")
 @strictcli.flag(name="exclude", type=str, presence="optional", help="In monorepo mode, comma-separated project names to exclude")
@@ -2264,6 +2342,7 @@ app.help = (
     f"{app.help} Ships {_total_commands} commands organized into "
     f"{len(app._commands)} top-level commands and {len(app._groups)} "
     f"command groups ({', '.join(app._groups)})."
+    f" Covers {_count_and_names(_target_names(), 'release target')}."
 )
 
 
@@ -2288,6 +2367,15 @@ def _append_subcommand_sentence(group, noun):
 
 _append_subcommand_sentence(release_group, "subcommands")
 _append_subcommand_sentence(mono, "monorepo subcommands")
+
+# One workspace.toml can hold every registered target, so this sentence is the
+# registry's own count -- the literal it replaced said 18 while the app help
+# said 17, and both were hand-maintained.
+_all_targets = _target_names()
+mono.help = (
+    f"{mono.help} Supports all {len(_all_targets)} release targets in a "
+    f"single workspace.toml (the app help enumerates them)."
+)
 
 
 # ---------------------------------------------------------------------------

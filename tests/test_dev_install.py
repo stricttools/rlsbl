@@ -864,7 +864,7 @@ def test_dev_install_help_matches_the_real_supported_sets():
     supports_global, supports_venv, supports_uninstall = _install_modes()
 
     assert f"{len(supports_global)} targets" in help_text
-    global_part, venv_part = help_text.split("--target venv installs", 1)
+    global_part, venv_part = help_text.split("--target venv is supported by", 1)
     for name in supports_global:
         assert name in global_part, f"{name} supports --target global but is unlisted"
 
