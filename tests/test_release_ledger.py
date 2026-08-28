@@ -608,11 +608,31 @@ class TestTheBackfillItselfIsNotBlocked:
     """
 
     def test_the_script_imports_no_guarded_read(self):
-        script = (
+        """The script never IMPORTS or CALLS the ledger module.
+
+        Asserted against the script's code, not its prose: a comment may
+        legitimately explain what the ledger would do with the files this pass
+        writes, and a bare word search made that a failure.
+        """
+        import ast
+
+        path = (
             pathlib.Path(__file__).resolve().parent.parent
             / "scripts" / "backfill_release_anchors.py"
-        ).read_text()
-        assert "ledger" not in script.replace("release anchors", "")
+        )
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert "ledger" not in alias.name, alias.name
+            elif isinstance(node, ast.ImportFrom):
+                assert "ledger" not in (node.module or ""), node.module
+                for alias in node.names:
+                    assert "ledger" not in alias.name, alias.name
+            elif isinstance(node, ast.Attribute):
+                assert node.attr != "ledger"
+            elif isinstance(node, ast.Name):
+                assert node.id != "ledger"
 
     def test_the_script_runs_on_an_unbackfilled_repository(self, unbackfilled):
         import importlib.util

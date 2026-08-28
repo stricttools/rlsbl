@@ -466,3 +466,49 @@ def test_commit_message_names_the_repo_relative_scope(tmp_path):
     )
     assert ".rlsbl/releases" in message
     assert "2 archive(s)" in message
+
+
+class TestArchiveNameGrammar:
+    """The script and the ledger read the same directory, so they must agree
+    on which files in it ARE archives, and in what order they stand.
+
+    They did not: the script matched an arbitrary semver prerelease suffix and
+    sorted prerelease identifiers as strings, while the ledger recognized only
+    rlsbl's own preid vocabulary and ordered counters numerically. Both are
+    now the one recognizer and the one ordering that live in
+    ``rlsbl.release_file``.
+    """
+
+    def _scope(self, tmp_path):
+        releases = tmp_path / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        return backfill.Scope(
+            label="standalone",
+            releases_dir=str(releases),
+            changes_dir=str(tmp_path / ".rlsbl" / "changes"),
+            changelog_md=str(tmp_path / "CHANGELOG.md"),
+            released_paths=["."],
+            tag_formats=["v{version}"],
+        ), releases
+
+    def test_the_same_files_are_archives_for_both(self, tmp_path):
+        from rlsbl.release_file import list_archived_versions
+
+        scope, releases = self._scope(tmp_path)
+        for name in ("v1.2.3.toml", "v1.2.4-rc.1.toml", "v1.2.5-dev.1.toml",
+                     "notes.toml", "unreleased.toml"):
+            (releases / name).write_text("bump = \"patch\"\n", encoding="utf-8")
+
+        assert set(backfill.archived_versions(scope)) == set(
+            list_archived_versions(str(releases))
+        )
+        assert "1.2.5-dev.1" not in backfill.archived_versions(scope)
+
+    def test_prerelease_counters_order_numerically(self):
+        from rlsbl.release_file import archive_sort_key
+
+        versions = ["1.0.0-alpha.10", "1.0.0-alpha.2", "1.0.0", "1.0.0-rc.1"]
+        assert sorted(versions, key=backfill.archive_sort_key) == [
+            "1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-rc.1", "1.0.0",
+        ]
+        assert backfill.archive_sort_key is archive_sort_key

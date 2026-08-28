@@ -51,14 +51,28 @@ _GIT_OBJECT_HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
 # suffix. Strict, and anchored on both ends, so nothing else that happens to
 # live in a releases directory (``unreleased.toml``, ``in-progress.json``, a
 # batch plan sidecar) can be mistaken for a released version.
+#
+# The grammar is rlsbl's OWN version vocabulary, not semver at large, and the
+# preid alternation is derived from :data:`VALID_PREIDS` rather than restated:
+# the release flow is the only thing that names a version, it produces
+# ``X.Y.Z`` or ``X.Y.Z-{preid}.{N}``, and ``"stable"`` is the promotion
+# instruction that STRIPS the suffix rather than a suffix itself. The backfill
+# pass materializes archives only for versions it discovered from an existing
+# archive or a finalized changelog file, both of which carry the same
+# vocabulary -- so a file named outside it was never written by rlsbl and is
+# not an archive here, in the backfill, or in the changelog file lister.
+_SUFFIX_PREIDS = tuple(preid for preid in VALID_PREIDS if preid != "stable")
 _ARCHIVE_NAME_RE = re.compile(
-    r"^v(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?\.toml$"
+    r"^v(\d+)\.(\d+)\.(\d+)(?:-("
+    + "|".join(_SUFFIX_PREIDS)
+    + r")\.(\d+))?\.toml$"
 )
 
 # Pre-release channel ranks, for ordering archives. A stable version sorts
 # after every pre-release of the same base -- the same ordering the changelog
-# file lister uses.
-_PREID_RANK = {"alpha": 0, "beta": 1, "rc": 2}
+# file lister uses -- and within a channel the counter is compared as a NUMBER,
+# so alpha.10 follows alpha.2.
+_PREID_RANK = {preid: rank for rank, preid in enumerate(_SUFFIX_PREIDS)}
 
 
 def archived_release_path(releases_dir: str, version: str) -> str:
@@ -70,16 +84,54 @@ def archived_release_path(releases_dir: str, version: str) -> str:
     return os.path.join(releases_dir, f"v{version}.toml")
 
 
-def _archive_sort_key(name: str):
-    """Sort key for an archive filename, or None when it is not one."""
-    m = _ARCHIVE_NAME_RE.match(name)
-    if not m:
+def archive_version(name: str) -> str | None:
+    """The version *name* archives, or None when *name* is not an archive name.
+
+    The one recognizer for "is this file in a releases directory an archive?".
+    Exported because the backfill pass reads the same directories and must
+    agree with the ledger about which files in them are archives -- it used to
+    carry a looser pattern of its own, so it discovered, sorted and repaired
+    "archives" the ledger then ignored entirely.
+    """
+    if _ARCHIVE_NAME_RE.match(name) is None:
         return None
+    return name[1:-len(".toml")]
+
+
+def archive_sort_key(version: str):
+    """Ascending order key for an archived *version*.
+
+    The one ordering: by numeric ``major.minor.patch``, then every pre-release
+    of that base before the base itself, then by channel (alpha, beta, rc) and
+    finally by the counter compared as a number.
+
+    Raises ``ValueError`` for a string that is not an archivable version. A
+    caller sorts versions it discovered through :func:`archive_version` or the
+    changelog file lister, both of which speak this same vocabulary, so an
+    unparsable version there is a bug to surface rather than an ordering to
+    guess at.
+    """
+    m = _ARCHIVE_NAME_RE.match(f"v{version}.toml")
+    if m is None:
+        raise ValueError(f"not an archivable version: {version!r}")
     major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
     preid = m.group(4)
     if preid is None:
         return (major, minor, patch, 1, 0, 0)
     return (major, minor, patch, 0, _PREID_RANK[preid], int(m.group(5)))
+
+
+def _archive_sort_key(name: str):
+    """:func:`archive_sort_key` asked of an archive FILENAME, or None.
+
+    One remaining caller (``monorepo absorb``'s version ordering) synthesizes
+    an archive name to ask for the ordering; it should ask
+    :func:`archive_sort_key` for the version directly, at which point this
+    adapter goes away. It is an adapter, not a second opinion: both the
+    recognizer and the ordering are the ones above.
+    """
+    version = archive_version(name)
+    return None if version is None else archive_sort_key(version)
 
 
 def list_archived_versions(releases_dir: str) -> list[str]:
@@ -98,13 +150,9 @@ def list_archived_versions(releases_dir: str) -> list[str]:
         names = os.listdir(releases_dir)
     except OSError:
         return []
-    keyed = []
-    for name in names:
-        key = _archive_sort_key(name)
-        if key is not None:
-            keyed.append((key, name[1:-len(".toml")]))
-    keyed.sort(key=lambda pair: pair[0], reverse=True)
-    return [version for _key, version in keyed]
+    versions = [v for v in (archive_version(name) for name in names) if v is not None]
+    versions.sort(key=archive_sort_key, reverse=True)
+    return versions
 
 
 # Project identification: "slug" is the machine identifier (URL-safe, lowercase,

@@ -58,6 +58,8 @@ from rlsbl.changelog.files import list_versioned_files  # noqa: E402
 from rlsbl.release_file import (  # noqa: E402
     ANCHOR_FIELDS,
     UNANCHORABLE_FIELD,
+    archive_sort_key,
+    archive_version,
     write_archived_release_file,
     write_release_anchor,
     write_unanchorable_marker,
@@ -71,9 +73,6 @@ from rlsbl.utils import commit_files, extract_changelog_entry_from_text  # noqa:
 # one that fails.
 GIT_TIMEOUT = 60
 GH_TIMEOUT = 30
-
-# Archive filename: v{semver}.toml, prerelease suffix included.
-_ARCHIVE_RE = re.compile(r"^v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\.toml$")
 
 # The strictspec gate, stamped verbatim onto archives written before the gate
 # existed. Prepended as text rather than through a tomlkit round-trip so every
@@ -266,23 +265,21 @@ def discover_scopes(repo: str) -> list[Scope]:
 # ---------------------------------------------------------------------------
 
 
-def _semver_key(version: str):
-    """Sort key: (major, minor, patch, is_stable, prerelease-string)."""
-    core, _, pre = version.partition("-")
-    parts = core.split(".")
-    nums = tuple(int(p) for p in parts[:3])
-    return (*nums, 0 if pre else 1, pre)
-
-
 def archived_versions(scope: Scope) -> dict[str, str]:
     """Map version -> archive path for every ``v{X}.toml`` in the scope."""
     result: dict[str, str] = {}
     if not os.path.isdir(scope.releases_dir):
         return result
     for name in os.listdir(scope.releases_dir):
-        m = _ARCHIVE_RE.match(name)
-        if m:
-            result[m.group(1)] = os.path.join(scope.releases_dir, name)
+        # rlsbl.release_file owns both the archive-name grammar and the order
+        # archives stand in; this pass reads the very directories the ledger
+        # reads, so a second opinion here about which files are archives (or
+        # which of two prereleases came first) would make the pass repair
+        # files the ledger ignores and derive a bump from the wrong
+        # predecessor.
+        version = archive_version(name)
+        if version is not None:
+            result[version] = os.path.join(scope.releases_dir, name)
     return result
 
 
@@ -503,7 +500,7 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
     for scope in scopes:
         archives = archived_versions(scope)
         changelogs = changelog_versions(scope)
-        versions = sorted(set(archives) | set(changelogs), key=_semver_key)
+        versions = sorted(set(archives) | set(changelogs), key=archive_sort_key)
         include = None  # detected lazily, only when something is materialized
 
         for index, version in enumerate(versions):
