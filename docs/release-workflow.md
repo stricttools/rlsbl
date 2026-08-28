@@ -458,7 +458,7 @@ The command:
 5. Regenerates the changelog and asserts the output is byte-identical to what is on disk. A diff is a hard error (something else is wrong — e.g. a hand-edited CHANGELOG.md); the diff is shown and the on-disk originals are restored.
 6. Invalidates validation caches and commits the scrub artifacts: the audit archive, tracked `.validated` deletions, and any journal-repaired files. Changelog files are not part of the commit — HEAD is already consistent.
 7. Force-pushes the branch and affected tags, each with an explicit `--force-with-lease` expectation captured from the actual remote (`git ls-remote`) before the rewrite. safegit's `pre_rewrite_remotes` (the local tracking snapshot) is only cross-checked informationally — it may be stale and is never the lease authority.
-8. Recreates GitHub Releases for affected tags with updated changelog notes
+8. Rewrites the GitHub Release document of every affected tag **in place** — the notes, the `rlsbl-ci-sha` marker taken from the (already remapped) ledger anchor, and the pre-release flag. A Release is never deleted and made again, so a failure here leaves the previous document standing rather than a tag with no Release at all; a tag carrying no Release gets one created, and a tag that parses as no version tag under any scheme is skipped without a lookup.
 
 The command carries two selectors, each electing exactly one of its members, and the framework -- not the command -- refuses a wrong combination:
 
