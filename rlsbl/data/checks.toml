@@ -121,8 +121,10 @@ depends_on = []
 # publish job dies with ENEEDAUTH after the release has already tagged, pushed
 # and created the GitHub Release. WHICH secrets those are is each pipeline's own
 # declaration (ci_secret_names), never a pipeline type tested by name -- npm
-# declares NPM_TOKEN, a pypi pipeline declares none because it authenticates
-# through OIDC trusted publishing. Presence only -- a secret's value is not
+# declares NPM_TOKEN, maven-central declares its Central Portal credentials and
+# GPG signing key, hex declares HEX_API_KEY, and a pypi pipeline declares none
+# because it authenticates through OIDC trusted publishing. Presence only -- a
+# secret's value is not
 # retrievable through the API, and rlsbl never puts a credential on a pipe.
 [checks.ci-publish-secrets]
 tags = ["release"]

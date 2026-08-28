@@ -2,10 +2,12 @@
 
 Which secrets those are is each PIPELINE's own answer -- ``ci_secret_names()``,
 declared on the pipeline class beside the workflow templates that read the
-secret -- so this module never tests a pipeline type by name. Today only the
-npm pipeline declares one (``NPM_TOKEN``); a pypi pipeline declares none,
+secret -- so this module never tests a pipeline type by name. npm declares
+``NPM_TOKEN``, maven-central declares its Central Portal credentials and GPG
+signing key, hex declares ``HEX_API_KEY``; a pypi pipeline declares none,
 because its workflow authenticates through OIDC trusted publishing and
-demanding a token there would be wrong.
+demanding a token there would be wrong, and neither does the GitHub Packages
+maven pipeline, whose workflow uses the automatic ``secrets.GITHUB_TOKEN``.
 
 
 A publish pipeline that authenticates with a repository secret fails at the
@@ -86,9 +88,10 @@ def secret_remedy(slug, secret):
     """The command that sets *secret* on *slug* from the local credential.
 
     ``NPM_TOKEN`` has a documented one-liner that reads the token out of the
-    developer's own ``~/.npmrc``; any other secret gets the same command with
-    the value left for the operator to supply, since rlsbl knows no source for
-    it and must not invent one.
+    developer's own ``~/.npmrc``; any other secret -- the Maven Central
+    credentials, a GPG signing key, a hex.pm API key -- gets the same command
+    with the value left for the operator to supply, since rlsbl knows no source
+    for it and must not invent one.
     """
     if secret == NPM_TOKEN:
         return (

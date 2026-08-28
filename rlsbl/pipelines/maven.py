@@ -21,6 +21,11 @@ class MavenPipeline(BasePipeline):
     the presence of a ``gradlew`` script or ``pom.xml``.
     """
 
+    # No ci_secret_vars: rlsbl/templates/maven/publish.yml.tpl authenticates
+    # against GitHub Packages with `secrets.GITHUB_TOKEN`, which Actions
+    # supplies to every job. Declaring it would make the ci-publish-secrets
+    # check demand a repository secret nobody can or should set.
+
     def template_dir(self) -> str | None:
         """Return the Maven CI templates directory."""
         return os.path.join(
@@ -103,6 +108,19 @@ class MavenCentralPipeline(BasePipeline):
 
     Optional: ORG_GRADLE_PROJECT_signingInMemoryKeyId (for specific GPG subkey)
     """
+
+    # rlsbl/templates/maven/publish-central.yml.tpl reads these four repository
+    # secrets and passes them to Gradle as the ORG_GRADLE_PROJECT_* variables
+    # above. The repository secret names differ from the env var names on
+    # purpose -- the workflow does the translation -- so these are the names an
+    # operator sets with `gh secret set`, not the local publish env vars that
+    # ``required_env_vars`` answers.
+    ci_secret_vars = (
+        "SONATYPE_USERNAME",
+        "SONATYPE_PASSWORD",
+        "GPG_SIGNING_KEY",
+        "GPG_SIGNING_KEY_PASSWORD",
+    )
 
     def template_dir(self) -> str | None:
         """Return the Maven CI templates directory."""

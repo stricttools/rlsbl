@@ -61,6 +61,10 @@
       "name": "publisher_setup_url"
     },
     {
+      "doc": "Whether a reconcile may recreate a released version's missing refs unconditionally, or must refuse when a recorded identity transition puts that version under a different published identity.",
+      "name": "release_materialization_policy"
+    },
+    {
       "doc": "Reads a package name from its manifest (overrides read_name).",
       "name": "supports_read_name"
     },
@@ -393,6 +397,8 @@
     "ci-publish-secrets": {
       "kind": "targets",
       "targets": [
+        "hex",
+        "maven",
         "npm"
       ]
     },
@@ -1266,6 +1272,10 @@
           "Where a repository-bound publisher is registered; empty when none is."
         ],
         [
+          "release_materialization_policy",
+          "Whether a reconcile may recreate a released version's missing refs unconditionally, or must refuse when a recorded identity transition puts that version under a different published identity."
+        ],
+        [
           "supports_read_name",
           "Reads a package name from its manifest (overrides read_name)."
         ],
@@ -1338,6 +1348,7 @@
         "go",
         "npm",
         "dart",
+        "hex",
         "maven"
       ],
       "rows": [
@@ -1347,7 +1358,8 @@
           "no",
           "yes",
           "no",
-          "no"
+          "yes",
+          "yes"
         ],
         [
           "circular-deps",
@@ -1355,11 +1367,13 @@
           "n/a",
           "yes",
           "yes",
+          "no",
           "yes"
         ],
         [
           "cross-repo-path-sources",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1371,6 +1385,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1379,6 +1394,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1386,6 +1402,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "no"
         ],
@@ -1395,6 +1412,7 @@
           "yes",
           "yes",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1403,6 +1421,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1411,6 +1430,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1419,6 +1439,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1427,11 +1448,13 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "yes"
         ],
         [
           "dev-overlay-drift",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1443,11 +1466,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "format",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1459,12 +1484,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "go-module-identity",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no"
@@ -1475,11 +1502,13 @@
           "yes",
           "yes",
           "no",
+          "no",
           "yes"
         ],
         [
           "lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1491,10 +1520,12 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "maven-central-metadata",
+          "no",
           "no",
           "no",
           "no",
@@ -1507,11 +1538,13 @@
           "no",
           "yes",
           "no",
+          "no",
           "no"
         ],
         [
           "ruff-lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1523,6 +1556,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1530,6 +1564,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "yes"
         ],
@@ -1539,11 +1574,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "type-check-scope-guard",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1898,6 +1935,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "dart",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": true,
       "supports_dep_floors": false,
@@ -1955,6 +1993,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "deno",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -1993,6 +2032,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "docker",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2029,6 +2069,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "flutter",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2077,6 +2118,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "pkg.go.dev",
+      "release_materialization_policy": "refuse-identity-transition",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": true,
@@ -2129,6 +2171,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "hex",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2169,6 +2212,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "maven",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": true,
       "supports_dep_floors": false,
@@ -2205,6 +2249,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "native-android",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2241,6 +2286,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "native-ios",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2297,6 +2343,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "npm",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": true,
       "supports_dep_floors": true,
@@ -2335,6 +2382,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "pgdesign",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2371,6 +2419,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "plain",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2434,6 +2483,7 @@
       "publisher_binds_to_repository": true,
       "publisher_setup_url": "https://pypi.org/manage/account/publishing/",
       "registry_display_name": "PyPI",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": true,
       "supports_circular_dep_analysis": true,
       "supports_dep_floors": true,
@@ -2472,6 +2522,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "spec",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2517,6 +2568,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "swift",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2553,6 +2605,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "swift-apple",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,
@@ -2600,6 +2653,7 @@
       "publisher_binds_to_repository": false,
       "publisher_setup_url": "",
       "registry_display_name": "zig",
+      "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_circular_dep_analysis": false,
       "supports_dep_floors": false,

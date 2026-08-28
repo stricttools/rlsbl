@@ -21,16 +21,21 @@ class BasePipeline:
     Subclasses override specific methods to implement their publish mechanism.
     """
 
-    #: The GitHub Actions repository secret this pipeline's CI publish job
-    #: authenticates with, when it uses one. Empty by default: a pipeline that
-    #: publishes through OIDC trusted publishing (pypi) or through no
-    #: credential at all needs no repository secret, and claiming one would
-    #: make a check demand a secret that must not exist.
+    #: The GitHub Actions repository secrets this pipeline's CI publish job
+    #: authenticates with. Empty by default: a pipeline that publishes through
+    #: OIDC trusted publishing (pypi) or through no credential at all needs no
+    #: repository secret, and claiming one would make a check demand a secret
+    #: that must not exist.
     #:
-    #: It is a CLASS attribute rather than a config key because the name is
+    #: A tuple rather than a single name because a workflow may read several
+    #: (maven-central reads Central Portal credentials and a GPG signing key);
+    #: a pipeline reading exactly one declares a one-element tuple.
+    #:
+    #: It is a CLASS attribute rather than a config key because the names are
     #: written into this pipeline's workflow templates -- the workflow and the
-    #: declaration cannot disagree.
-    ci_secret_var: str = ""
+    #: declaration cannot disagree. ``secrets.GITHUB_TOKEN`` is never declared:
+    #: Actions supplies it to every job, so no operator has to set it.
+    ci_secret_vars: tuple[str, ...] = ()
 
     def __init__(self, name: str, pipeline_type: str, local: bool, config: dict):
         """Initialize with pipeline identity, local-publish flag, and config dict."""
@@ -97,9 +102,9 @@ class BasePipeline:
         developer's own environment, which is what ``required_env_vars``
         answers -- and empty when the workflow needs no repository secret.
         """
-        if self.local or not self.ci_secret_var:
+        if self.local:
             return []
-        return [self.ci_secret_var]
+        return list(self.ci_secret_vars)
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
         """Publish the package. No-op by default; subclasses override."""

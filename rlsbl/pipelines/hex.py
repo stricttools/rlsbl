@@ -13,6 +13,11 @@ class HexPipeline(TokenPipeline):
 
     _default_token_var = "HEX_API_KEY"
 
+    # rlsbl/templates/hex/publish.yml.tpl passes `secrets.HEX_API_KEY` to
+    # `mix hex.publish`, so a CI publish fails to authenticate against hex.pm
+    # unless the repository carries it.
+    ci_secret_vars = ("HEX_API_KEY",)
+
     def template_dir(self) -> str | None:
         """Return the Hex CI templates directory."""
         return os.path.join(

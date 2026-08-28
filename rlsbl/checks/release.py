@@ -290,11 +290,11 @@ def register_networked_release_checks(app):
 
         WHICH secrets are owed is each pipeline's own declaration
         (``ci_secret_names``), not a pipeline type tested by name here: npm
-        declares ``NPM_TOKEN``, pypi declares none because its workflow
-        authenticates through OIDC trusted publishing, and a ``local: true``
-        pipeline declares none because it authenticates from the developer's
-        own environment. The check is named for that behavior rather than for
-        the one secret that exists today.
+        declares ``NPM_TOKEN``, maven-central declares its Central Portal
+        credentials and GPG signing key, hex declares ``HEX_API_KEY``, pypi
+        declares none because its workflow authenticates through OIDC trusted
+        publishing, and a ``local: true`` pipeline declares none because it
+        authenticates from the developer's own environment.
         """
         from ..ci_secrets import evaluate_ci_secret_presence
         from ..utils import get_github_repo

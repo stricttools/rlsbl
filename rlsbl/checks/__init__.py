@@ -82,10 +82,12 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "unpublished-refs": None,
     "branch-sync": None,
     # ci-publish-secrets probes for the credentials the configured CI publish
-    # pipelines authenticate with. npm is the only target whose pipeline
-    # declares one today (ci_secret_names), so it is the only target the check
-    # can find anything for.
-    "ci-publish-secrets": frozenset({"npm"}),
+    # pipelines authenticate with. The targets listed are the ones whose
+    # pipelines declare any (ci_secret_names): npm (NPM_TOKEN), maven (the
+    # maven-central pipeline's Central Portal credentials and GPG signing key)
+    # and hex (HEX_API_KEY). A pypi pipeline publishes through OIDC trusted
+    # publishing and declares none, so the check can find nothing there.
+    "ci-publish-secrets": frozenset({"npm", "maven", "hex"}),
     # Both lineage-derived follow-ups read a record no target decides the shape
     # of; go-deprecation-published then probes the Go module proxy, but which
     # transitions exist is the record's answer, not a target's.

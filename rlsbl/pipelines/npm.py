@@ -16,7 +16,7 @@ class NpmPipeline(TokenPipeline):
     # Every npm publish workflow template in rlsbl/templates/npm/ reads
     # `secrets.NPM_TOKEN`, so a CI publish fails with ENEEDAUTH unless the
     # repository carries it.
-    ci_secret_var = "NPM_TOKEN"
+    ci_secret_vars = ("NPM_TOKEN",)
 
     def template_dir(self) -> str | None:
         """Return the npm CI templates directory."""
