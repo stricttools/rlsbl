@@ -1,5 +1,5 @@
 ---
-description: "JSONL changelog reference: entry schema, the format_version gate, adding entries and the auto-commit's HEAD move, the validation checks, caching, generation."
+description: "JSONL changelog reference: the entry schema, the format_version gate, adding and amending entries, the validation checks and cache, and CHANGELOG output."
 ---
 
 # JSONL changelog
@@ -124,7 +124,7 @@ rlsbl changelog add --commits HEAD --description "..." --type fix
 git commit --amend                 # amends the CHANGELOG commit, not the fix
 ```
 
-The amend lands on the wrong commit and has to be unwound by hand. Two ways to
+The amend attaches to the wrong commit and has to be unwound by hand. Two ways to
 avoid it, both explicit:
 
 - **Finish the code commit first.** Treat `changelog add` as the last step for

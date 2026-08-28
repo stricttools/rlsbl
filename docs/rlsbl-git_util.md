@@ -1,8 +1,7 @@
 ---
 title: rlsbl.git_util
-description: "Shared git utilities: commit ancestry, and commit-level file attribution."
+description: "The single implementation of git's is-A-an-ancestor-of-B question, plus the commit-level half of file attribution and the subtree-remote SSH host check."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 90
 ---

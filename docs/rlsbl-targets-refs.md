@@ -1,8 +1,7 @@
 ---
 title: rlsbl.targets.refs
-description: "The value types ``expected_refs`` speaks: what a version's ref set is, and everything needed to derive it."
+description: "The value types expected_refs speaks: a version's primary tag, the companion tags its ecosystem requires, and the aliases a rename or conversion recorded."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 171
 ---

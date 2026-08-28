@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.monorepo.absorb_cmd
-description: "Absorb an external repository into a workspace, as a releasable."
+description: "Absorbs an external repository into a workspace as a releasable -- history rewritten under the destination path, tags imported, release state moved in."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 40
 ---

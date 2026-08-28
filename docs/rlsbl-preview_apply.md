@@ -1,8 +1,7 @@
 ---
 title: rlsbl.preview_apply
-description: "The command-neutral observe -> preview -> apply skeleton."
+description: "The command-neutral observe, preview, apply skeleton every rlsbl reconciler is built on: keyed verdict items, one ordered preview, and a single renderer."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 135
 ---

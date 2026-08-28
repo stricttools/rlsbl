@@ -1,8 +1,7 @@
 ---
 title: rlsbl.lint.languages
-description: "The single table of languages the library linter knows about."
+description: "The single table of languages the library linter knows, kept apart from the release-target taxonomy: a language is written, a target is published."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 103
 ---

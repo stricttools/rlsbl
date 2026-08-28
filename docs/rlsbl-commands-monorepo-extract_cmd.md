@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.monorepo.extract_cmd
-description: "Extract a releasable out of a workspace into its own repository."
+description: "Extracts a releasable into its own repository, filtering an unmirrored one with git-filter-repo and promoting a mirrored one from the mirror it has."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 46
 ---

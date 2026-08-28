@@ -1,8 +1,7 @@
 ---
 title: rlsbl.router_filters
-description: "The generated CI router's path filters: how they are derived, and how they are read."
+description: "Both halves of the CI router's path filters: what the workspace derives for each member, and whether a diff matches them under the action's own semantics."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 143
 ---

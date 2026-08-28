@@ -1,8 +1,7 @@
 ---
 title: rlsbl.ownership
-description: "File ownership: the tool-owned exempt set, and single-owner attribution."
+description: "The two questions answered here alone: whether a path is rlsbl's own tool-owned bookkeeping, and which workspace member owns it -- most specific path wins."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 120
 ---

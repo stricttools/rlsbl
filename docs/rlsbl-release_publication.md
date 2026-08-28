@@ -1,8 +1,7 @@
 ---
 title: rlsbl.release_publication
-description: "The one place a GitHub Release's body, marker and pre-release flag are decided."
+description: "The one place a GitHub Release's notes, its rlsbl-ci-sha marker and its pre-release flag are decided, so the flow and the reconciler write one document."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 141
 ---

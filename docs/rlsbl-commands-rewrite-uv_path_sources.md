@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.rewrite.uv_path_sources
-description: "Convert path/workspace-sourced dependencies into registry floors."
+description: "Converts path- and workspace-sourced dependencies into registry floors at the version the lock resolves, deleting the source entry that overrode them."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 71
 ---

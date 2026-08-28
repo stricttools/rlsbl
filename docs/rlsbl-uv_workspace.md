@@ -1,8 +1,7 @@
 ---
 title: rlsbl.uv_workspace
-description: "Where the one ``uv.lock`` that resolves a given manifest lives."
+description: "Where the one uv.lock that resolves a given manifest lives: beside it, or at the nearest ancestor whose uv workspace globs claim the project directory."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 181
 ---

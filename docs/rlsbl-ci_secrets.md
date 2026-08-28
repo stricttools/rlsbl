@@ -1,8 +1,7 @@
 ---
 title: rlsbl.ci_secrets
-description: "Does the repository carry the CI secrets its publish pipelines need?"
+description: "Does the repository carry the CI secrets its publish pipelines declare? Presence only, never a value, and fail-closed: an unanswerable probe is unknown."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 26
 ---

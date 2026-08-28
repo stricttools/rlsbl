@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.rewrite.abort
-description: "What an aborted apply says about the writes it already performed."
+description: "What an aborted apply says about the writes it already performed. There is no rollback, so the message is honest about the half-done tree it leaves behind."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 69
 ---

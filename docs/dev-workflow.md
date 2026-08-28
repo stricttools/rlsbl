@@ -94,7 +94,7 @@ Every problem is a hard error, never a silent no-op: missing file (the error sho
 
 ### How an overlay is detected (`rlsbl dev status`, `dev-overlay-drift`)
 
-`rlsbl dev status` and the `dev-overlay-drift` check compare the sentinel against the environment uv actually manages for the project. Whether an install is editable is read from the installed distribution's PEP 610 `direct_url.json` (`dir_info.editable`, plus the `file://` checkout the URL names), through `importlib.metadata`. Nothing in the file layout is consulted: an editable install writes a dist-info and a `.pth` import hook whose name and content vary by build backend, and never creates a package directory in `site-packages`, so a directory-shaped test would report a healthy overlay as missing.
+`rlsbl dev status` and the `dev-overlay-drift` check compare the sentinel against the environment uv actually manages for the project. Whether an install is editable is read from the installed distribution's PEP 610 `direct_url.json` (`dir_info.editable`, plus the `file://` checkout the URL names), through `importlib.metadata`. Nothing in the file layout is consulted: an editable install writes a dist-info and a `.pth` import hook whose name and content vary by build backend, and never creates a package directory in `site-packages`, so a test that inspected the directory layout would report a healthy overlay as missing.
 
 The environment is resolved the way uv resolves it, not as "a `.venv` beside the project":
 

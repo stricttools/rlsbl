@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.rewrite
-description: "The ``rlsbl rewrite`` command group: working-tree rewrites, previewed first."
+description: "The rlsbl rewrite command group: working-tree rewrites previewed per file, whose occurrence counts are the contract an apply re-derives before it writes."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 68
 ---

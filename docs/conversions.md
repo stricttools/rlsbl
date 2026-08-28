@@ -1,5 +1,5 @@
 ---
-description: "Moving a releasable between repositories: extract and absorb, tag policy, tree and anchor verification, splitting a shared releasable, lineage records."
+description: "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and anchor verification, splitting a releasable, and lineage."
 ---
 
 # Repository conversions
@@ -111,7 +111,7 @@ A conversion changes which repository a release history belongs to, so it has to
 
 ### Translation
 
-Extract translates the releasable's **own** tags -- those matching the glob derived from its `tag_format` and name -- into the destination's scheme. Nothing translates when the format does not change, which is the case for a multi-member extract: the new workspace keeps `{name}@v{version}`, so every tag arrives under the name it already had. A single-member extract lands in a standalone repository whose format is `v{version}`, so `solo@v0.1.0` becomes `v0.1.0`. A tag that matches the glob but does not parse as a version tag is left alone rather than renamed into something arbitrary.
+Extract translates the releasable's **own** tags -- those matching the glob derived from its `tag_format` and name -- into the destination's scheme. Nothing translates when the format does not change, which is the case for a multi-member extract: the new workspace keeps `{name}@v{version}`, so every tag arrives under the name it already had. A single-member extract arrives in a standalone repository whose format is `v{version}`, so `solo@v0.1.0` becomes `v0.1.0`. A tag that matches the glob but does not parse as a version tag is left alone rather than renamed into something arbitrary.
 
 Absorb translates in the other direction: every source tag that parses as a version tag under any scheme is created at the mapped commit under the destination releasable's format, so `v0.4.0` becomes `thing@v0.4.0`. Source tags that are not version tags are never imported, and are named in the plan as skipped. A tag whose commit the rewrite did not carry over is not imported either, and says so on stderr.
 

@@ -1,8 +1,7 @@
 ---
 title: rlsbl.dep_locks
-description: "Does each lockfile still resolve the manifest beside it?"
+description: "Does each lockfile still resolve the manifest beside it? An offline, structural staleness check that never invokes a resolver and never reaches an index."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 82
 ---

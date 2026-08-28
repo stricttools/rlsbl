@@ -1,5 +1,5 @@
 ---
-description: "Reference for the rlsbl release flow: the untagged candidate and its CI check, the changelog validation step, bump types, the pre-release channel, publish gating, the scrub flow's safegit requirement, and the dry-run preview."
+description: "The rlsbl release flow: the untagged candidate and its CI check, the release anchor and what the ledger is authoritative over, and the bump types."
 ---
 
 # Release workflow
@@ -8,7 +8,7 @@ description: "Reference for the rlsbl release flow: the untagged candidate and i
 
 `rlsbl release run` orchestrates the full release lifecycle: validates the project state, bumps the version, runs quality checks, commits, **pushes the version-bump commit to the release branch untagged and waits for the repository's own CI to conclude on it**, and only then finalizes the changelog, tags that CI-verified commit, pushes, creates a GitHub Release, and publishes. The entire flow is driven by a release file (`.rlsbl/releases/unreleased.toml`) that declares the bump type, description, and optional context.
 
-This is **main-as-candidate ordering**, and it is the load-bearing property of the whole flow: the tag, the GitHub Release, the finalized changelog and every registry push happen strictly *after* a green CI verdict on the exact commit being released. A red (or unresolved) verdict leaves nothing behind but the candidate commit on the branch — no tag, no GitHub Release, no finalized changelog, nothing on any registry. The version number is therefore never burnt by a failure: the fix lands forward on the release branch at the *same* version and `rlsbl release resume` completes it.
+This is **main-as-candidate ordering**, and it is the property the whole flow rests on: the tag, the GitHub Release, the finalized changelog and every registry push happen strictly *after* a green CI verdict on the exact commit being released. A red (or unresolved) verdict leaves nothing behind but the candidate commit on the branch — no tag, no GitHub Release, no finalized changelog, nothing on any registry. The version number is therefore never burnt by a failure: the fix is committed forward on the release branch at the *same* version and `rlsbl release resume` completes it.
 
 Validation failures abort with no partial state left behind. Once the mutating phase starts, every step records a success or failure marker in an in-progress state file: a fatal failure preserves the state so `rlsbl release resume` can continue from where the release stopped, and non-fatal failures are recorded and loudly named in the completion summary while the release completes (see "Release state and resume" below). `rlsbl release undo` exists for a release that *completed* and turned out to be bad — not for a CI failure, which under this ordering never produces anything to undo.
 
@@ -199,7 +199,7 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 26 | Regenerate the monorepo snapshot post-hoc, if the pre-push slot at step 14 was forfeit | No (failure recorded and named in the completion summary) |
 | 27 | Print `Watch CI: rlsbl watch <sha>` | -- |
 
-The tag at step 19 is placed on the commit CI verified at step 16, **not** on HEAD: the finalization commits from steps 17-18 land on top of it and are pushed alongside it at step 20. This is what makes "the tag points at a CI-green tree" true rather than approximately true.
+The tag at step 19 is placed on the commit CI verified at step 16, **not** on HEAD: the finalization commits from steps 17-18 sit on top of it and are pushed alongside it at step 20. This is what makes "the tag points at a CI-green tree" true rather than approximately true.
 
 ### The release anchor
 
@@ -348,7 +348,7 @@ Sibling projects' paths-filtered (skipped) CI checks are outside the filter and 
 
 In explicit releasable mode, the CI router's paths filter for **every** member of a releasable ends with one shared extra entry: the releasable's own `CHANGELOG.md` under `.rlsbl-monorepo/releasables/<name>/`. This is deliberate, and it is what makes a releasable release gateable at all.
 
-A release commit can touch nothing under a member's own directory. That is guaranteed on a **first** release, where the version write is a no-op, and possible on any release whose per-member writes all land elsewhere. Without the shared entry, that member's CI job concludes `skipped` on the exact commit its tag points at -- and the gate refuses a skipped check, correctly, because a skipped check proves nothing about the commit. There is no recovery from that state either: re-running CI on the commit skips the job again, for the same reason it skipped the first time. The release commit always regenerates and commits the releasable `CHANGELOG.md` (it gains the new version's heading), so anchoring every member's filter on that one path makes the gated commit verifiable for all members.
+A release commit can touch nothing under a member's own directory. That is guaranteed on a **first** release, where the version write is a no-op, and possible on any release whose per-member writes all fall elsewhere. Without the shared entry, that member's CI job concludes `skipped` on the exact commit its tag points at -- and the gate refuses a skipped check, correctly, because a skipped check proves nothing about the commit. There is no recovery from that state either: re-running CI on the commit skips the job again, for the same reason it skipped the first time. The release commit always regenerates and commits the releasable `CHANGELOG.md` (it gains the new version's heading), so anchoring every member's filter on that one path makes the gated commit verifiable for all members.
 
 The cost is real and accepted: **releasing a releasable runs the full CI job set of every member of that releasable**, including members whose own code did not change. CI minutes are the price of never tagging a commit the gate cannot read a verdict for. The gate is not relaxed to accept `skipped` -- that would let a release publish on a commit nothing actually verified.
 
@@ -652,7 +652,7 @@ rlsbl release resume
 
 Do **not** start a new release at a higher version to escape a red CI, and do not re-run CI on the same commit expecting a different answer: a failure baked into the code fails identically every time. The same recipe applies to a batch (`rlsbl monorepo release run` — each member resumes at its own unchanged version) and to a timeout verdict, except that a timeout means the runs may still be in flight, so check them (`rlsbl watch <sha>`) before deciding there is anything to fix.
 
-> **Check `git log` before resuming.** `rlsbl release resume` deliberately re-pins at the *current* branch tip, because the whole point is to adopt the fix commit you just made. That means it adopts **every** commit landed since the failure, including another session's work sharing the worktree. Those commits ship under this version's changelog. Review the range before resuming, and move anything that does not belong onto a branch of its own.
+> **Check `git log` before resuming.** `rlsbl release resume` deliberately re-pins at the *current* branch tip, because the whole point is to adopt the fix commit you just made. That means it adopts **every** commit made since the failure, including another session's work sharing the worktree. Those commits ship under this version's changelog. Review the range before resuming, and move anything that does not belong onto a branch of its own.
 
 ### Recovering from a release that completed and was wrong
 

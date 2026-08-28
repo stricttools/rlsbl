@@ -1,8 +1,7 @@
 ---
 title: rlsbl.lineage_followup
-description: "What a recorded conversion still owes the outside world."
+description: "What a recorded conversion still owes the outside world: an unarchived absorb source, and an old Go module path that serves no deprecation notice."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 98
 ---

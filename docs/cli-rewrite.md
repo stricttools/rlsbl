@@ -1,8 +1,7 @@
 ---
 title: rlsbl rewrite
-description: "Sweeping rewrites of the current working tree, each previewed before it is performed."
+description: "Sweeping rewrites of the current working tree, each previewed per file first, with the preview's occurrence counts re-derived before anything is written."
 generated: true
-seeded: true
 nav_group: "CLI Reference"
 nav_order: 13
 ---

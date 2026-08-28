@@ -1,5 +1,5 @@
 ---
-description: "Guide to rlsbl monorepo workspaces: workspace.toml, dependency graph renderings, batch releases, impact analysis, snapshots, mirrors, CI router."
+description: "rlsbl monorepo workspaces: workspace.toml, the root member and loader refusals, the dependency graph, batch releases, mirrors, snapshots, the CI router."
 ---
 
 # Monorepo guide

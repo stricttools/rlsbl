@@ -1,5 +1,5 @@
 ---
-description: "Reference for every rlsbl check: metadata, severity, purity (which checks a preview runs), target applicability, overlay-preserving test runs, and the path-capable built-ins."
+description: "Every rlsbl check by tag: project, release, changelog, workspace, quality, prepush and untagged, plus check metadata, severity and target applicability."
 ---
 
 # Check system

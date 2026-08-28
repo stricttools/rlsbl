@@ -1,8 +1,7 @@
 ---
 title: rlsbl.go_identity
-description: "Does a ``go.mod``'s module path still name where the repository lives?"
+description: "Does a go.mod's module path still name where the repository lives? The expected path is origin plus the module's directory, major-version suffix included."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 91
 ---

@@ -1,8 +1,7 @@
 ---
 title: rlsbl.targets.outcomes
-description: "Structured outcomes returned by per-target protocol methods."
+description: "Structured outcomes for per-target protocol methods, so a target says 'I do not implement this' explicitly instead of being indistinguishable from success."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 166
 ---

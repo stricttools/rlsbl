@@ -312,7 +312,7 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Class:** `BasePipeline`
 - **Default token env var:** None (uses `CF_PAGES_API_TOKEN` and `CF_ACCOUNT_ID` env vars for local deploys).
 - **Auth pattern:** Requires `CF_ACCOUNT_ID` and `CF_PAGES_API_TOKEN` from the environment when publishing locally. These are reported by `required_env_vars()`.
-- **Publish command:** `selfdoc deploy --approve-consequential` (requires `selfdoc` on PATH). No Wrangler fallback. `selfdoc deploy` declares itself `consequential` — the deployment is live the moment it lands — so the pipeline passes the skip flag; the approval was already taken by `rlsbl release run` one level up.
+- **Publish command:** `selfdoc deploy --approve-consequential` (requires `selfdoc` on PATH). No Wrangler fallback. `selfdoc deploy` declares itself `consequential` — the deployment is live the moment it completes — so the pipeline passes the skip flag; the approval was already taken by `rlsbl release run` one level up.
 - **CI template:** Minimal — most Cloudflare Pages projects deploy locally from post-release hooks rather than CI.
 - **Quirks:** The simplest pipeline implementation. Primarily used for documentation sites that deploy alongside library releases. Requires `selfdoc` tool on PATH; errors if not found. 300-second timeout on the deploy command.
 
