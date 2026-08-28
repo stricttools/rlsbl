@@ -646,6 +646,33 @@ class TestApplyMultiMember:
             os.path.join(state, "releases", f"v{ns.initial_version}.toml")
         )
 
+    def test_the_transplanted_config_keeps_an_ordinary_readable_mode(
+        self, tmp_path,
+    ):
+        """A config file is a committed project file, not a secret.
+
+        The conversion used to pin 0600 on every config it wrote, which turned
+        an ordinary 644 config into an owner-only one on the way through.
+        """
+        ns = make_source(tmp_path)
+        target = tmp_path / "core_out"
+        source_config = os.path.join(
+            get_releasable_dir(str(ns.root), "core"), "config.json",
+        )
+        os.chmod(source_config, 0o644)
+
+        cmd_extract(str(ns.root), "core", str(target))
+
+        config = os.path.join(
+            get_releasable_dir(str(target), "core"), "config.json",
+        )
+        assert os.stat(config).st_mode & 0o777 == 0o644
+        # The source-side floor declaration goes through the same writer.
+        remaining = os.path.join(
+            get_releasable_dir(str(ns.root), "extras"), "config.json",
+        )
+        assert os.stat(remaining).st_mode & 0o777 == 0o644
+
     def test_changelog_hashes_resolve_in_the_new_repository(self, tmp_path):
         ns = make_source(tmp_path)
         target = tmp_path / "core_out"
@@ -942,7 +969,11 @@ class TestApplySingleMember:
         assert (
             target / ".rlsbl" / "releases" / f"v{ns.initial_version}.toml"
         ).is_file()
-        assert (target / ".rlsbl" / "config.json").is_file()
+        config = target / ".rlsbl" / "config.json"
+        assert config.is_file()
+        # The merged standalone config keeps the mode the member's own config
+        # arrived with, rather than a pinned owner-only one.
+        assert os.stat(str(config)).st_mode & 0o777 == 0o644
         # `.rlsbl/version` is the scaffolding version, not the project's, so
         # the releasable's version file is deliberately not carried over.
         version_file = target / ".rlsbl" / "version"

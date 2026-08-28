@@ -368,13 +368,21 @@ def _write_config(config_path, config):
     config this touches is the SOURCE ROOT's state home -- which is the root
     member's releasable directory when the root member belongs to one. The path
     is therefore passed in rather than derived from a project root.
+
+    MODES: a config that already exists keeps the mode it has, and a fresh one
+    is an ordinary readable file through the umask. Neither is pinned: a config
+    file is a committed, world-readable project file, and pinning 0600 here
+    turned an ordinary 644 config into an owner-only one every time a
+    conversion declared a dependency floor in it.
     """
     import json
 
     effects.makedirs(os.path.dirname(config_path), exist_ok=True)
-    effects.atomic_write_text(
-        config_path, json.dumps(config, indent=2) + "\n", file_mode=0o600,
-    )
+    body = json.dumps(config, indent=2) + "\n"
+    if os.path.isfile(config_path):
+        effects.atomic_write_text(config_path, body, preserve_mode=True)
+    else:
+        effects.atomic_write_text(config_path, body)
 
 
 def _root_state_dir(workspace_root, projects, releasables):
@@ -1352,14 +1360,13 @@ def _merge_standalone_config(dep, releasable_config, dest_config):
     ``.rlsbl/config.json`` overrides individual keys. A standalone successor has
     one config file where both used to live, so the same precedence is applied
     once, here, rather than left to whichever file happened to be copied last.
-    """
-    import json
 
+    The mode is the one the destination's own config already carries (or the
+    umask's, when there is none) -- see :func:`_write_config`.
+    """
     merged = read_json_config(releasable_config)
     merged.update(read_json_config(dest_config))
-    effects.atomic_write_text(
-        dest_config, json.dumps(merged, indent=2) + "\n", file_mode=0o600,
-    )
+    _write_config(dest_config, merged)
 
 
 def _remap_changelog(dep, run):
