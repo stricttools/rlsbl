@@ -12,6 +12,7 @@ import pytest
 from pathlib import Path
 
 import rlsbl.lock
+from githarness import canned_status_effects_run
 from rlsbl.context import ProjectContext
 
 from rlsbl.lock import acquire_lock, release_lock, rlsbl_lock
@@ -170,6 +171,11 @@ class TestMonorepoReleaseLockPlacement:
             return ""
 
         mock_run.side_effect = mock_run_side_effect
+        # The working tree is read through the shared helper on the effects
+        # chokepoint, which mock_run never sees: answer it as a clean tree so
+        # the fixture's own uncommitted files do not trip the release's
+        # concurrent-change guard.
+        monkeypatch.setattr("rlsbl.effects.run", canned_status_effects_run())
 
         # Mock resolve_monorepo_context to return a releasable name so that
         # the `if releasable_name` branch at line 159 of _run_cmd_inner executes.

@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 import rlsbl.commands.release as _release_mod
+from githarness import canned_status_effects_run
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.context import ProjectContext
 from rlsbl.deploy import DeployResult
@@ -20,11 +21,24 @@ from rlsbl.targets import TargetEntry
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _fake_expected_refs(self, version, context):
+    """The one ref this stand-in target claims: its own primary tag.
+
+    The real targets assemble this from tag_format plus companions and
+    recorded aliases; a deploy test only needs the release to have a ref set
+    to create.
+    """
+    from rlsbl.targets.refs import ExpectedRefs
+
+    return ExpectedRefs(version=version, primary=f"v{version}")
+
+
 _FakeTarget = type("FakeTarget", (), {
     "version_file": lambda self, dir_path=None: None,
     "write_version": lambda self, p, v, ctx=None: [],
     "build": lambda self, p, v, *, config=None: None,
     "tag_format": lambda self, v: f"v{v}",
+    "expected_refs": _fake_expected_refs,
 })
 
 
@@ -105,6 +119,11 @@ class TestReleaseWithDeployTargets:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        # The working tree is read through the shared helper on the effects
+        # chokepoint, which mock_run never sees: answer it as a clean tree so
+        # the fixture's own uncommitted files do not trip the release's
+        # concurrent-change guard.
+        monkeypatch.setattr("rlsbl.effects.run", canned_status_effects_run())
         monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
@@ -170,6 +189,11 @@ class TestReleaseDeployFailureContinues:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        # The working tree is read through the shared helper on the effects
+        # chokepoint, which mock_run never sees: answer it as a clean tree so
+        # the fixture's own uncommitted files do not trip the release's
+        # concurrent-change guard.
+        monkeypatch.setattr("rlsbl.effects.run", canned_status_effects_run())
         monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
@@ -258,6 +282,11 @@ class TestReleaseNoDeployConfig:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        # The working tree is read through the shared helper on the effects
+        # chokepoint, which mock_run never sees: answer it as a clean tree so
+        # the fixture's own uncommitted files do not trip the release's
+        # concurrent-change guard.
+        monkeypatch.setattr("rlsbl.effects.run", canned_status_effects_run())
         monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
@@ -324,6 +353,11 @@ class TestReleaseDeployConfigErrors:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        # The working tree is read through the shared helper on the effects
+        # chokepoint, which mock_run never sees: answer it as a clean tree so
+        # the fixture's own uncommitted files do not trip the release's
+        # concurrent-change guard.
+        monkeypatch.setattr("rlsbl.effects.run", canned_status_effects_run())
         monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)
@@ -389,6 +423,11 @@ class TestReleaseStopsAtFirstDeployFailure:
             return ""
 
         monkeypatch.setattr("rlsbl.commands.release.run", mock_run)
+        # The working tree is read through the shared helper on the effects
+        # chokepoint, which mock_run never sees: answer it as a clean tree so
+        # the fixture's own uncommitted files do not trip the release's
+        # concurrent-change guard.
+        monkeypatch.setattr("rlsbl.effects.run", canned_status_effects_run())
         monkeypatch.setattr("rlsbl.commands.release.run_gh", lambda args, **kw: "")
         monkeypatch.setattr("rlsbl.commands.release.commit_files", lambda msg, files, **kw: True)
         monkeypatch.setattr("rlsbl.commands.release.push_if_needed", lambda b, **kw: None)

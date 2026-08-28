@@ -352,6 +352,36 @@ def fake_run_dispatch(*, head_sha="abc123def456", toplevel="/tmp/fake-repo",
 _REAL_EFFECTS_RUN = _effects.run
 
 
+def _z_records(porcelain):
+    """The NUL-terminated records git emits for *porcelain* under ``-z``."""
+    return "".join(
+        line + "\0" for line in porcelain.splitlines() if line.strip()
+    )
+
+
+def canned_status_effects_run(porcelain=""):
+    """``rlsbl.effects.run`` stand-in answering ONLY the working-tree read.
+
+    rlsbl reads the working tree in one form -- ``git status --porcelain -z``,
+    issued on the effects chokepoint by ``rlsbl.utils.working_tree_status`` and
+    by the release executor's declared status capture. A test that fakes git by
+    patching ``rlsbl.commands.release.run`` never sees that read, so in a real
+    fixture repository the release observes the fixture's own uncommitted files
+    and its concurrent-change guard refuses.
+
+    This answers that one read from *porcelain* (default: a clean tree) and
+    delegates everything else -- every other git call, every non-git call -- to
+    the real ``effects.run``.
+    """
+    def fake(argv, **kwargs):
+        a = list(argv)
+        if a[:1] == ["git"] and "status" in a and "-z" in a:
+            return subprocess.CompletedProcess(a, 0, _z_records(porcelain), "")
+        return _REAL_EFFECTS_RUN(argv, **kwargs)
+
+    return fake
+
+
 def status_answering_effects_run(run_fake):
     """Stand-in for ``rlsbl.effects.run`` that answers git from *run_fake*.
 
@@ -381,11 +411,7 @@ def status_answering_effects_run(run_fake):
         if not a or a[0] != "git":
             return _REAL_EFFECTS_RUN(argv, **kwargs)
         if "status" in a and "-z" in a:
-            records = [
-                line for line in run_fake.porcelain_now().splitlines()
-                if line.strip()
-            ]
-            stdout = "".join(record + "\0" for record in records)
+            stdout = _z_records(run_fake.porcelain_now())
         elif "rev-parse" in a and a[-1] in ("HEAD", "--show-toplevel"):
             # The executor's declared HEAD capture and the git-root lookup,
             # answered from the canned values DIRECTLY. Asking *run_fake* would

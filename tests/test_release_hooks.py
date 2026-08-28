@@ -14,6 +14,8 @@ from rlsbl.release_file import ReleaseConfig
 from rlsbl.utils import get_hook_timeout
 from rlsbl.utils import run as real_run
 
+from githarness import fake_run_dispatch, status_answering_effects_run
+
 from githarness import write_covered_unreleased
 
 
@@ -313,6 +315,12 @@ class TestPostReleaseHookOutput:
             patch("rlsbl.utils.local_tag_state", new=tag_state_present),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
+            # Every working-tree read goes through the shared helper on the
+            # effects chokepoint, which the release package's mocked
+            # ``effects`` does not cover: answer it as a clean tree, and
+            # answer the executor's HEAD capture from the same stand-in.
+            patch("rlsbl.effects.run", side_effect=status_answering_effects_run(
+                fake_run_dispatch(head_sha="abc123"))),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.side_effect = fake_subprocess_run
@@ -419,6 +427,13 @@ class TestWatchSHABeforePostHook:
             patch("rlsbl.utils.local_tag_state", new=tag_state_present),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
+            # Every working-tree read goes through the shared helper on the
+            # effects chokepoint, which the release package's mocked
+            # ``effects`` does not cover: answer it as a clean tree, and
+            # answer the executor's HEAD capture from the same stand-in.
+            patch("rlsbl.effects.run", side_effect=status_answering_effects_run(
+                fake_run_dispatch(head_sha=pre_hook_sha,
+                                  toplevel="/tmp/fake-repo"))),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.side_effect = fake_subprocess_run
@@ -677,6 +692,12 @@ class TestHookCwdStandalone:
             patch("rlsbl.utils.local_tag_state", new=tag_state_present),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
+            # Every working-tree read goes through the shared helper on the
+            # effects chokepoint, which the release package's mocked
+            # ``effects`` does not cover: answer it as a clean tree, and
+            # answer the executor's HEAD capture from the same stand-in.
+            patch("rlsbl.effects.run", side_effect=status_answering_effects_run(
+                fake_run_dispatch(head_sha="abc123"))),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -916,6 +937,12 @@ class TestHookCwdMonorepo:
             patch("rlsbl.utils.local_tag_state", new=tag_state_present),
             patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False, False]),
             patch("rlsbl.commands.release.run", side_effect=fake_run),
+            # Every working-tree read goes through the shared helper on the
+            # effects chokepoint, which the release package's mocked
+            # ``effects`` does not cover: answer it as a clean tree, and
+            # answer the executor's HEAD capture from the same stand-in.
+            patch("rlsbl.effects.run", side_effect=status_answering_effects_run(
+                fake_run_dispatch(head_sha="abc123"))),
             patch("rlsbl.commands.release.effects") as mock_sp,
         ):
             mock_sp.run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
