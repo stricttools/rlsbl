@@ -23,7 +23,7 @@ from ..errors import RlsblError
 from ..evidence_gate import EvidenceKind, Verdict, run_evidence_gate, write_undo_audit
 from ..member_context import resolve_member_context
 from ..release_file import unfinalize_release_file
-from ..targets import TARGETS, detect_targets
+from ..targets import TARGETS
 from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
 from ..workspace import find_workspace_root, resolve_project
 

@@ -20,7 +20,6 @@ from ..utils import (
     extract_changelog_entry,
     get_current_branch,
     is_clean_tree,
-    run,
 )
 from ..workspace import find_workspace_root, load_workspace, resolve_project
 from .. import effects
