@@ -83,7 +83,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.117.2",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 53 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
   "proc_observe_allowlist": [
     [
       "git",
@@ -1345,7 +1345,7 @@
         },
         "scrub": {
           "name": "scrub",
-          "help": "Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.",
+          "help": "Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, re-points the tags, and rewrites each tag's GitHub Release document in place. A Release is never deleted, so a failure mid-step leaves the previous document standing rather than a tag with no Release at all.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -1836,7 +1836,7 @@
     },
     "monorepo": {
       "name": "monorepo",
-      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release.",
+      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release. Supports all 17 release targets in a single workspace.toml (the app help enumerates them).",
       "commands": {
         "init": {
           "name": "init",
@@ -2096,7 +2096,7 @@
         },
         "mirror": {
           "name": "mirror",
-          "help": "Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, behind, scaffold-missing, contract-violated, lineage-undetermined, or virgin) without writing.",
+          "help": "Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, scaffold-stale, behind, scaffold-missing, contract-violated, lineage-undetermined, or virgin) without writing.",
           "effect": "mutating",
           "consequential": true,
           "args": [
@@ -2556,7 +2556,7 @@
       "commands": {
         "install": {
           "name": "install",
-          "help": "Install the project locally for development by running each detected target's own install command. --target is required and names the install mode. --target global is supported by 7 targets: pypi (uv tool install -e), npm (npm link), go, deno, zig, swift, and hex. --target venv installs into the project's local environment instead and covers pypi, npm, deno, and hex; other targets are skipped with a reason. --uninstall reverses a previous install on pypi, npm, and deno. In monorepo mode, pair with --all, --include, or --exclude.",
+          "help": "Install the project locally for development by running each detected target's own install command. --target is required and names the install mode: global installs onto the machine (pypi via `uv tool install -e`, npm via `npm link`), venv installs into the project's local environment instead; a target that does not support the chosen mode is skipped with a reason. --target global is supported by 7 targets: npm, pypi, go, swift, hex, deno, zig. --target venv is supported by 4 targets: npm, pypi, hex, deno. --uninstall reverses a previous install on 3 targets: npm, pypi, deno. In monorepo mode, pair with --all, --include, or --exclude.",
           "effect": "mutating",
           "flags": [
             {
