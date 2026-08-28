@@ -15,6 +15,7 @@ what these tests originally asserted.
 
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 
@@ -26,10 +27,9 @@ from rlsbl.commands.monorepo import extract as extract_mod
 from rlsbl.commands.monorepo.extract import (
     ExtractError,
     require_filter_repo,
-    cmd_absorb,
-    validate_absorb_preconditions,
     _run_git,
 )
+from rlsbl.commands.monorepo.absorb_cmd import AbsorbError, cmd_absorb
 from rlsbl.commands.monorepo.extract_cmd import cmd_extract
 from rlsbl.changelog.schema import parse_jsonl as _parse_jsonl_hashes
 from rlsbl.workspace import (
@@ -325,8 +325,15 @@ class TestPackageLevelExtractMachineryIsGone:
 
 
 # ---------------------------------------------------------------------------
-# validate_absorb_preconditions
+# Absorb's preconditions, on the observation that replaced them
 # ---------------------------------------------------------------------------
+#
+# ``validate_absorb_preconditions`` is gone: the rebuilt conversion resolves and
+# refuses everything during OBSERVATION, so a ``--dry-run`` refuses exactly what
+# an apply would and neither has written anything by the time it does. Each
+# assertion below is its predecessor's, re-aimed at ``cmd_absorb(dry_run=True)``.
+# They need no git-filter-repo binary (``shutil.which`` is patched), which is why
+# they stay here rather than moving to ``tests/test_absorb_conversion.py``.
 
 
 def _clean_source(tmp_path, name="source"):
@@ -335,85 +342,108 @@ def _clean_source(tmp_path, name="source"):
     repo.mkdir()
     _init_git_repo(repo)
     _make_commit(repo, "main.py", "print('src')", "add main")
+    (repo / "pyproject.toml").write_text(
+        f'[project]\nname = "{name}"\nversion = "0.1.0"\n'
+    )
+    _make_commit(
+        repo, "pyproject.toml", (repo / "pyproject.toml").read_text(), "manifest",
+    )
     return repo
 
 
-class TestValidateAbsorbPreconditions:
+def _absorb_workspace(tmp_path, members=("existing",)):
+    """A committed workspace with the given members, ready to absorb into."""
+    root = tmp_path / "monorepo"
+    root.mkdir()
+    _init_git_repo(root)
+    for member in members:
+        (root / member).mkdir(exist_ok=True)
+        _make_commit(root, f"{member}/keep.txt", "keep\n", f"add {member}")
+    make_workspace(
+        str(root),
+        [WorkspaceProject({"path": m, "name": m}) for m in members],
+    )
+    subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-q", "-m", "workspace"], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    return root
+
+
+class TestAbsorbPreconditions:
     def test_valid_preconditions(self, tmp_path, monkeypatch):
         """Happy path: source clean git repo, path and name both free."""
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
         source = _clean_source(tmp_path)
 
-        projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
-        assert len(declared_members(projs)) == 1
+        preview = cmd_absorb(
+            str(root), str(source), "pkgs/new", name="new_pkg", dry_run=True,
+        )
+        assert preview.by_key("releasable").state == "create_releasable"
+        assert len(declared_members(load_workspace(str(root)))) == 1
 
     def test_no_filter_repo(self, tmp_path, monkeypatch):
         """Error when git-filter-repo is not installed."""
         monkeypatch.setattr(shutil, "which", lambda n: None)
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        root = _absorb_workspace(tmp_path)
         source = _clean_source(tmp_path)
 
         with pytest.raises(ExtractError, match="git-filter-repo is not installed"):
-            validate_absorb_preconditions(str(root), str(source), "new", "new_pkg")
+            cmd_absorb(str(root), str(source), "new", name="new_pkg", dry_run=True)
 
     def test_source_not_exists(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
 
-        with pytest.raises(ExtractError, match="does not exist"):
-            validate_absorb_preconditions(
-                str(root), str(tmp_path / "nonexistent"), "new", "pkg"
+        with pytest.raises(AbsorbError, match="does not exist"):
+            cmd_absorb(
+                str(root), str(tmp_path / "nonexistent"), "new", name="pkg",
+                dry_run=True,
             )
 
     def test_source_not_git_repo(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
         source = tmp_path / "source"
         source.mkdir()
 
-        with pytest.raises(ExtractError, match="not a git repository"):
-            validate_absorb_preconditions(str(root), str(source), "new", "pkg")
+        with pytest.raises(AbsorbError, match="not a git repository"):
+            cmd_absorb(str(root), str(source), "new", name="pkg", dry_run=True)
 
     def test_source_dirty_is_rejected(self, tmp_path, monkeypatch):
         """A source with uncommitted changes is a hard error (would be dropped)."""
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
         source = _clean_source(tmp_path)
         (source / "uncommitted.txt").write_text("dirty\n")
 
-        with pytest.raises(ExtractError, match="uncommitted changes"):
-            validate_absorb_preconditions(str(root), str(source), "new", "pkg")
+        with pytest.raises(AbsorbError, match="uncommitted changes"):
+            cmd_absorb(str(root), str(source), "new", name="pkg", dry_run=True)
 
     def test_duplicate_name(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
         source = _clean_source(tmp_path)
 
-        with pytest.raises(ExtractError, match="package 'existing' already exists"):
-            validate_absorb_preconditions(str(root), str(source), "different", "existing")
+        with pytest.raises(AbsorbError, match="package 'existing' already exists"):
+            cmd_absorb(
+                str(root), str(source), "different", name="existing", dry_run=True,
+            )
 
     def test_duplicate_path(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
         source = _clean_source(tmp_path)
 
-        with pytest.raises(ExtractError, match="path 'existing' already exists"):
-            validate_absorb_preconditions(str(root), str(source), "existing", "brand_new")
+        with pytest.raises(AbsorbError, match="path 'existing' already exists"):
+            cmd_absorb(
+                str(root), str(source), "existing", name="brand_new", dry_run=True,
+            )
+
+    def test_the_refusals_are_absorb_errors_and_still_extract_errors(self):
+        """One conversion error type, so a caller of either keeps catching it."""
+        assert issubclass(AbsorbError, ExtractError)
 
 
 # ---------------------------------------------------------------------------
@@ -554,9 +584,38 @@ def _make_multi_commit(repo, files, message):
     return out.stdout.strip()
 
 
+def _archive_anchored(repo, version):
+    """Archive ``version`` at HEAD, anchored to the commit and tree it ships.
+
+    A real released repository has one of these per version, and the absorb
+    carries them across -- remapping the commit through the rewrite and
+    recomputing the tree at the member's new path -- so the fixture writes them
+    the way a release does rather than leaving the state half-real.
+    """
+    from rlsbl.release_file import write_archived_release_file
+
+    sha = _run_git(str(repo), "rev-parse", "HEAD")
+    write_archived_release_file(
+        str(repo / ".rlsbl" / "releases"), version,
+        bump="minor", include=[], description=f"release {version}",
+        candidate_sha=sha,
+        tree_hashes={".": _run_git(str(repo), "rev-parse", "HEAD^{tree}")},
+    )
+    subprocess.run(["git", "add", ".rlsbl/releases"], cwd=str(repo),
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-q", "-m", f"chore: archive {version}"],
+                   cwd=str(repo), check=True, capture_output=True, text=True)
+    # The version tag stands on the ANCHORED commit, not on the archive commit
+    # that records it -- which is what a real release does (it tags the
+    # CI-verified candidate, and the finalization commits land on top of it),
+    # and what the ledger checks the two against each other for.
+    return sha
+
+
 def _setup_released_source_repo(tmp_path):
     """Build a released npm source repo: 2 version tags, finalized JSONL,
-    plus one unreleased entry. Returns (repo_path, {"0.1.0": ..., ...}).
+    anchored release archives, plus one unreleased entry.
+    Returns (repo_path, {"c1": ..., ...}).
     """
     repo = tmp_path / "widget_src"
     repo.mkdir()
@@ -583,7 +642,7 @@ def _setup_released_source_repo(tmp_path):
     ])
     _make_commit(repo, ".rlsbl/changes/0.1.0.jsonl",
                  (changes / "0.1.0.jsonl").read_text(), "changelog 0.1.0")
-    _git_tag(repo, "v0.1.0")
+    _git_tag(repo, "v0.1.0", ref=_archive_anchored(repo, "0.1.0"))
 
     # v0.2.0 feature commit
     c3 = _make_multi_commit(
@@ -600,7 +659,7 @@ def _setup_released_source_repo(tmp_path):
     ])
     _make_commit(repo, ".rlsbl/changes/0.2.0.jsonl",
                  (changes / "0.2.0.jsonl").read_text(), "changelog 0.2.0")
-    _git_tag(repo, "v0.2.0")
+    _git_tag(repo, "v0.2.0", ref=_archive_anchored(repo, "0.2.0"))
 
     # Unreleased work
     c5 = _make_commit(repo, "src/wip.js", "export const w = 3;\n", "feat: wip")
@@ -641,15 +700,22 @@ releasable = false
 @skip_no_filter_repo
 class TestCmdAbsorbDryRun:
     def test_dry_run_zero_mutations(self, tmp_path):
-        """Dry run reports tags to import but mutates nothing."""
+        """Dry run renders the plan and mutates nothing.
+
+        REWORKED: the command returns a Preview rather than a dict of what it
+        would have done, so the tags it would import are read off the plan's
+        own tag item instead of a ``tags_to_import`` key.
+        """
         root = _setup_plain_monorepo(tmp_path)
         source, _ = _setup_released_source_repo(tmp_path)
         head_before = _run_git(str(root), "rev-parse", "HEAD")
 
-        result = cmd_absorb(str(root), str(source), "packages/widget", dry_run=True)
-        assert result["dry_run"] is True
-        assert result["name"] == "widget"
-        assert set(result["tags_to_import"]) == {"0.1.0", "0.2.0"}
+        preview = cmd_absorb(
+            str(root), str(source), "packages/widget", dry_run=True,
+        )
+        facts = "\n".join(preview.by_key("tags").facts)
+        assert "v0.1.0 -> widget@v0.1.0" in facts
+        assert "v0.2.0 -> widget@v0.2.0" in facts
 
         # Nothing changed: no new commit, no new project, no new dir.
         assert _run_git(str(root), "rev-parse", "HEAD") == head_before
@@ -661,12 +727,18 @@ class TestCmdAbsorbDryRun:
 @skip_no_filter_repo
 class TestAbsorbHistoryRewrite:
     def test_full_history_rewrite(self, tmp_path, monkeypatch):
+        """REWORKED on two counts.
+
+        The changelog now lands in the releasable's state directory (an
+        absorbed repository arrives as a releasable, and its changelog has one
+        home), and the source's own ``v0.2.0`` is KEPT as the boundary alias
+        beside ``widget@v0.2.0`` rather than deleted -- the old code deleted
+        every bare tag it found, including tags the destination already owned.
+        """
         root = _setup_plain_monorepo(tmp_path)
         source, hashes = _setup_released_source_repo(tmp_path)
 
-        result = cmd_absorb(str(root), str(source), "packages/widget")
-        assert result["name"] == "widget"
-        assert set(result["tags_imported"]) == {"widget@v0.1.0", "widget@v0.2.0"}
+        cmd_absorb(str(root), str(source), "packages/widget")
 
         # 1. git log for the dest path shows full rewritten history.
         log = _run_git(str(root), "log", "--oneline", "--", "packages/widget")
@@ -679,7 +751,7 @@ class TestAbsorbHistoryRewrite:
         assert desc.startswith("widget@v0.2.0")
 
         # 3. every JSONL hash resolves in monorepo history.
-        changes_dir = root / "packages" / "widget" / ".rlsbl" / "changes"
+        changes_dir = pathlib.Path(get_releasable_changes_dir(str(root), "widget"))
         all_hashes = []
         for jf in changes_dir.glob("*.jsonl"):
             for entry in _parse_jsonl_hashes(str(jf)):
@@ -689,16 +761,24 @@ class TestAbsorbHistoryRewrite:
             # cat-file -e raises via check=True if the object is missing.
             _run_git(str(root), "cat-file", "-e", h + "^{commit}")
 
-        # 6. bare v* tags are absent (only monorepo-scheme tags remain).
+        # 4. the monorepo-scheme tags are there, and the pre-conversion name of
+        #    the CURRENT version stays resolvable as the boundary alias.
         tags = _run_git(str(root), "tag", "-l").split()
-        assert "v0.1.0" not in tags
-        assert "v0.2.0" not in tags
         assert "widget@v0.1.0" in tags
         assert "widget@v0.2.0" in tags
+        assert "v0.2.0" in tags
+        assert "v0.1.0" not in tags  # one alias, at the current version only
 
     def test_compute_release_version_bumps_forward(self, tmp_path, monkeypatch):
-        """With imported tags, the package computes a forward bump -- the
-        destroyed-tag guard does not fire."""
+        """With the imported tags and the migrated ledger, the next release is
+        a forward bump -- the destroyed-tag guard does not fire.
+
+        REWORKED: the absorbed unit is a RELEASABLE, so the version and the
+        ledger are read from the releasable's state directory and the tag comes
+        from its declared format. Under the old absorb this call read a
+        per-package manifest and a per-package releases directory that held no
+        archive at all.
+        """
         root = _setup_plain_monorepo(tmp_path)
         source, _ = _setup_released_source_repo(tmp_path)
         cmd_absorb(str(root), str(source), "packages/widget")
@@ -721,11 +801,13 @@ class TestAbsorbHistoryRewrite:
         cur, new, bump, tag = compute_release_version(
             target, entry.path, "patch", "widget", "packages/widget",
             lambda *a, **k: None, project_dir=dest_full,
+            workspace_root=str(root), releasable_name="widget",
+            releasable_tag_fmt="{name}@v{version}",
         )
         assert cur == "0.2.0"
         assert new == "0.2.1"  # patch bump forward, NOT a re-release of 0.2.0
         assert bump == "patch"
-        assert tag == target.monorepo_tag_format("widget", "0.2.1", path="packages/widget")
+        assert tag == "widget@v0.2.1"
 
     def test_changelog_coverage_passes(self, tmp_path, monkeypatch):
         """All unreleased package commits are covered with zero hand-fixups."""
@@ -740,29 +822,21 @@ class TestAbsorbHistoryRewrite:
         dest_full = os.path.join(str(root), "packages", "widget")
         entry_t = detect_targets(dest_full)[0]
         target = TARGETS[entry_t.name]
-        tag_glob = target.monorepo_tag_glob("widget", path="packages/widget")
+        # The glob is the RELEASABLE's now, not the member target's.
+        tag_glob = "widget@v*"
 
         members = load_workspace(str(root))
         proj = next((p for p in members if p.name == "widget"), None)
         assert proj is not None
 
-        changes_dir = root / "packages" / "widget" / ".rlsbl" / "changes"
+        changes_dir = pathlib.Path(get_releasable_changes_dir(str(root), "widget"))
         entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
 
-        # The unreleased range is bounded by the package's LEDGER. `absorb`
-        # imports the source's version tags but does not (yet) write release
-        # archives for them, so the last released commit is recorded here from
-        # the tag absorb imported -- which is the same commit an archive would
-        # have named.
-        from conftest import archive_release
-
-        released_tag = target.monorepo_tag_format(
-            "widget", "0.2.0", path="packages/widget",
-        )
-        released_sha = _run_git(str(root), "rev-parse", released_tag + "^{commit}")
-        archive_release(
-            os.path.join(str(changes_dir.parent), "releases"), "0.2.0", released_sha,
-        )
+        # FLIPPED: the range is bounded by the LEDGER, and absorb now MIGRATES
+        # the source's release archives rather than importing only its tags --
+        # so the ledger is already there, remapped onto the rewritten commits,
+        # and this test no longer has to fabricate one.
+        assert (changes_dir.parent / "releases" / "v0.2.0.toml").is_file()
 
         monkeypatch.chdir(str(root))
         # Coverage is asked of one member, and attribution needs the whole
@@ -780,7 +854,8 @@ class TestAbsorbHistoryRewrite:
         """Absorb self-commits: the working tree is clean afterward."""
         root = _setup_plain_monorepo(tmp_path)
         source, _ = _setup_released_source_repo(tmp_path)
-        cmd_absorb(str(root), str(source), "packages/widget", registry_name="widget-npm")
+        cmd_absorb(str(root), str(source), "packages/widget",
+                   registry_name="widget-npm")
 
         status = _run_git(str(root), "status", "--porcelain")
         assert status == ""
@@ -797,12 +872,94 @@ class TestAbsorbHistoryRewrite:
             cmd_absorb(str(root), str(source), "packages/widget")
 
 
+def _releasable_monorepo_for_absorb(tmp_path, name="core", version="0.0.1"):
+    """A committed workspace whose releasable ``core`` has REAL release state.
+
+    ``--releasable`` joins an existing group, and a group with no version file,
+    no changes directory and no archives is not a releasable this conversion
+    can absorb into -- it is one mid-migration. The version is deliberately
+    below the source's, so no version the source carries is already released
+    here.
+    """
+    root = tmp_path / "mono_rel"
+    root.mkdir()
+    _init_git_repo(root)
+    _write_workspace(root, f"""
+[[projects]]
+path = "existing"
+name = "existing"
+releasable = "{name}"
+""", releasables_toml=f"""
+[[releasables]]
+name = "{name}"
+""")
+    (root / "existing").mkdir()
+    _make_commit(root, "existing/keep.txt", "keep\n", "add existing")
+    make_releasable_state(root, name, version=version)
+    subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-q", "-m", "workspace"], cwd=str(root),
+                   check=True, capture_output=True, text=True)
+    return root
+
+
 @skip_no_filter_repo
 class TestAbsorbReleasable:
     def test_releasable_routing_and_residue_removal(self, tmp_path):
-        """--releasable routes the changelog to the releasable dir and removes
-        the per-package residue."""
-        root = tmp_path / "mono_rel"
+        """--releasable routes the whole release state to the releasable dir.
+
+        REWORKED: the old assertion was that the CHANGELOG was routed and the
+        per-package changes directory removed. The conversion now moves the
+        release archives too, and the residue it removes is the whole
+        per-package release state -- changes/, releases/ and the scaffolding
+        version file -- while the member's hooks and config stay.
+        """
+        root = _releasable_monorepo_for_absorb(tmp_path)
+        rel_changes = pathlib.Path(get_releasable_changes_dir(str(root), "core"))
+
+        source, _ = _setup_released_source_repo(tmp_path)
+        cmd_absorb(
+            str(root), str(source), "packages/widget",
+            releasable_name="core",
+        )
+
+        # Project assigned to the releasable.
+        proj = next(p for p in load_workspace(str(root)) if p.name == "widget")
+        assert proj.releasable == "core"
+
+        # Changelog routed into the releasable dir, released files and all.
+        entries = parse_jsonl(str(rel_changes / "unreleased.jsonl"))
+        assert "Work in progress" in [e.description for e in entries]
+        assert (rel_changes / "0.1.0.jsonl").is_file()
+        assert (rel_changes / "0.2.0.jsonl").is_file()
+
+        # The release archives came too, and they are locked.
+        releases = rel_changes.parent / "releases"
+        assert (releases / "v0.1.0.toml").is_file()
+        assert oct(os.stat(str(releases / "v0.2.0.toml")).st_mode & 0o777) == "0o444"
+
+        # Per-package residue removed; the member's own config stays.
+        member_rlsbl = root / "packages" / "widget" / ".rlsbl"
+        assert not (member_rlsbl / "changes").exists()
+        assert not (member_rlsbl / "releases").exists()
+        assert (member_rlsbl / "config.json").is_file()
+
+        # The existing releasable's version is its own: absorb never bumps it.
+        version_file = os.path.join(get_releasable_dir(str(root), "core"), "version")
+        assert open(version_file).read().strip() == "0.0.1"
+
+        # Self-committed: clean tree.
+        assert _run_git(str(root), "status", "--porcelain") == ""
+
+    def test_a_releasable_with_no_release_state_is_refused(self, tmp_path):
+        """FLIPPED: joining a group that has no state is a hard error.
+
+        The old command absorbed into a bare ``[[releasables]]`` entry and
+        appended the arriving changelog to a directory nothing else described,
+        leaving a releasable with a changelog and no version. The rebuilt one
+        refuses and names the migration that creates the state.
+        """
+        root = tmp_path / "mono_bare"
         root.mkdir()
         _init_git_repo(root)
         _write_workspace(root, """
@@ -816,33 +973,20 @@ name = "core"
 """)
         (root / "existing").mkdir()
         _make_commit(root, "existing/keep.txt", "keep\n", "add existing")
-        # Seed the releasable changes dir so routing appends into it.
-        rel_changes = root / ".rlsbl-monorepo" / "releasables" / "core" / "changes"
-        os.makedirs(str(rel_changes), exist_ok=True)
-        (rel_changes / "unreleased.jsonl").write_text("")
         subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
                        check=True, capture_output=True, text=True)
         subprocess.run(["git", "commit", "-q", "-m", "workspace"], cwd=str(root),
                        check=True, capture_output=True, text=True)
-
         source, _ = _setup_released_source_repo(tmp_path)
-        result = cmd_absorb(
-            str(root), str(source), "packages/widget",
-            releasable_name="core",
-        )
 
-        # Project assigned to the releasable.
-        proj = next(p for p in load_workspace(str(root)) if p.name == "widget")
-        assert proj.releasable == "core"
-
-        # Changelog routed into the releasable dir.
-        assert (rel_changes / "unreleased.jsonl").read_text().strip() != ""
-
-        # Per-package changes residue removed.
-        assert not (root / "packages" / "widget" / ".rlsbl" / "changes").exists()
-
-        # Self-committed: clean tree.
-        assert _run_git(str(root), "status", "--porcelain") == ""
+        with pytest.raises(AbsorbError) as exc:
+            cmd_absorb(
+                str(root), str(source), "packages/widget",
+                releasable_name="core", dry_run=True,
+            )
+        message = str(exc.value)
+        assert "no release state to absorb into" in message
+        assert "rlsbl monorepo migrate-releasable core" in message
 
 
 class TestAbsorbCliBinding:
@@ -1163,23 +1307,22 @@ class TestExtractOnTheReleasableStateLayout:
 def _absorb_into_releasable(tmp_path, name="widget"):
     """Absorb a released standalone repo as the sole member of a releasable.
 
-    The releasable is declared up front (a member must name one that exists) and
-    its version file is written afterwards, because absorb routes the changelog
-    into the releasable's state directory but does not decide its version.
+    REWORKED: the releasable is no longer declared up front and its version is
+    no longer written by hand afterwards. An absorb with no ``--releasable``
+    CREATES the singleton releasable for the arriving member, with the version
+    the source declares and its tag_format written explicitly -- so what comes
+    back out of the extract is a unit the absorb fully described.
     Returns ``(root, source)``.
     """
     root = tmp_path / "mono"
     root.mkdir()
     _init_git_repo(root)
     (root / "existing").mkdir()
-    _write_workspace(root, f"""
+    _write_workspace(root, """
 [[projects]]
 path = "existing"
 name = "existing"
 releasable = false
-""", releasables_toml=f"""
-[[releasables]]
-name = "{name}"
 """)
     _make_commit(root, "existing/keep.txt", "keep\n", "add existing")
     subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
@@ -1188,16 +1331,7 @@ name = "{name}"
                    check=True, capture_output=True, text=True)
 
     source, _ = _setup_released_source_repo(tmp_path)
-    cmd_absorb(str(root), str(source), f"packages/{name}", releasable_name=name)
-
-    version_path = os.path.join(get_releasable_dir(str(root), name), "version")
-    os.makedirs(os.path.dirname(version_path), exist_ok=True)
-    with open(version_path, "w", encoding="utf-8") as f:
-        f.write("0.2.0\n")
-    subprocess.run(["git", "add", WORKSPACE_DIR], cwd=str(root),
-                   check=True, capture_output=True, text=True)
-    subprocess.run(["git", "commit", "-q", "-m", "releasable version"],
-                   cwd=str(root), check=True, capture_output=True, text=True)
+    cmd_absorb(str(root), str(source), f"packages/{name}")
     return root, source
 
 
@@ -1247,22 +1381,36 @@ class TestExtractRoundTrip:
         for h in all_hashes:
             _run_git(str(out), "cat-file", "-e", h + "^{commit}")
 
-        # 5. Changelog coverage passes in the extracted repo. The range is
-        #    bounded by the LEDGER; this source repo predates release archives
-        #    entirely (absorb imported only its tags), so the released commit
-        #    is recorded here from the restored v0.2.0 tag -- the same commit
-        #    an archive would have named.
-        from conftest import archive_release
+        # 5. The RELEASE ANCHORS survive both directions. Each archive names a
+        #    commit and the tree of every path that version shipped; absorb
+        #    remapped both onto the rewritten monorepo history and re-keyed the
+        #    paths to the member's, and the extract mapped them back to a
+        #    repository root. FLIPPED: this test used to fabricate a ledger
+        #    entry here, because absorb imported only tags.
+        from rlsbl.release_file import read_release_file
+
+        releases_dir = changes_dir.parent / "releases"
+        for version in ("0.1.0", "0.2.0"):
+            archive = releases_dir / f"v{version}.toml"
+            assert archive.is_file()
+            anchor = read_release_file(str(archive))
+            _run_git(str(out), "cat-file", "-e", anchor.candidate_sha + "^{commit}")
+            # Back at the repository root, and the recorded tree is the one the
+            # commit really has there -- content-identical through two
+            # rewrites, since neither changed a byte of the released content.
+            assert list(anchor.tree_hashes) == ["."]
+            assert anchor.tree_hashes["."] == _run_git(
+                str(out), "rev-parse", f"{anchor.candidate_sha}^{{tree}}",
+            )
+            # The tag and the ledger still agree about that version.
+            assert _run_git(str(out), "rev-list", "-n", "1", f"v{version}") == (
+                anchor.candidate_sha
+            )
+
+        # 6. Changelog coverage passes in the extracted repo, over the ledger
+        #    the conversions carried rather than one the test wrote.
         from rlsbl.changelog.validate import check_coverage
 
-        archive_release(
-            os.path.join(str(changes_dir.parent), "releases"), "0.2.0",
-            _run_git(str(out), "rev-list", "-n", "1", "v0.2.0"),
-        )
-        # Committed, so the clean-tree assertion below still describes what
-        # the extraction produced rather than what this test added.
-        _run_git(str(out), "add", ".rlsbl/releases")
-        _run_git(str(out), "commit", "-q", "-m", "test: record the ledger")
         entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
         prev_cwd = os.getcwd()
         os.chdir(str(out))
@@ -1275,24 +1423,48 @@ class TestExtractRoundTrip:
             os.chdir(prev_cwd)
         assert ok, details
 
-        # 6. The extracted repo self-committed: clean working tree.
+        # 7. The extracted repo self-committed: clean working tree.
         assert _run_git(str(out), "status", "--porcelain") == ""
 
-        # 7. Source monorepo no longer lists the extracted package.
+        # 8. Source monorepo no longer lists the extracted package.
         assert "widget" not in [p.name for p in load_workspace(str(root))]
 
     def test_extract_translation_collision_is_hard_error(self, tmp_path):
         """A pre-existing standalone tag colliding with a translated tag aborts
-        the extract with a clear error naming both tags."""
+        the extract with a clear error naming both tags.
+
+        REWORKED: the absorb now leaves ``v0.2.0`` itself as the boundary alias
+        at the current version, and a tag standing at the very commit the
+        translation would produce is not a collision (the next test pins that).
+        The collision is a DIFFERENT commit under a name a translation wants,
+        which is what ``v0.1.0`` at HEAD is here.
+        """
         root, _ = _absorb_into_releasable(tmp_path)
-        # Plant a standalone v0.2.0 in the monorepo -- it will be cloned into
-        # the extracted repo and collide with the widget@v0.2.0 translation.
-        _git_tag(root, "v0.2.0")
+        _git_tag(root, "v0.1.0")
 
         out = tmp_path / "widget_out"
         with pytest.raises(ExtractError, match="collision"):
             cmd_extract(str(root), "widget", str(out))
         assert not out.exists()
+
+    def test_the_inbound_boundary_alias_is_not_a_collision(self, tmp_path):
+        """The round trip's own tag is not something to resolve.
+
+        Absorb keeps the source's ``v0.2.0`` beside ``widget@v0.2.0`` at one
+        commit. Extracting translates ``widget@v0.2.0`` back to ``v0.2.0`` --
+        the name that is already there, on that same commit. Refusing that
+        would make a repository unable to leave the workspace it entered.
+        """
+        root, _ = _absorb_into_releasable(tmp_path)
+        out = tmp_path / "widget_out"
+
+        preview = cmd_extract(str(root), "widget", str(out), dry_run=True)
+        assert preview.by_key("tags").state == "translate_tags"
+
+        cmd_extract(str(root), "widget", str(out))
+        assert _run_git(str(out), "rev-list", "-n", "1", "v0.2.0") == (
+            _run_git(str(out), "rev-list", "-n", "1", "widget@v0.2.0")
+        )
 
 
 @skip_no_filter_repo
@@ -1378,10 +1550,9 @@ class TestBrokenTargetDeclarationGuard:
     # --- absorb: validation level (no filter-repo needed) ---
 
     def test_validate_absorb_broken_source_config_rejected(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        """REWORKED onto the observation that replaced the validator."""
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
         source = _clean_source(tmp_path, name="broken_src")
         os.makedirs(str(source / ".rlsbl"), exist_ok=True)
         (source / ".rlsbl" / "config.json").write_text(
@@ -1389,19 +1560,22 @@ class TestBrokenTargetDeclarationGuard:
         )
         _commit_all(source, "add broken config")
 
-        with pytest.raises(ExtractError, match="broken target declaration"):
-            validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
+        with pytest.raises(AbsorbError, match="broken target declaration"):
+            cmd_absorb(
+                str(root), str(source), "pkgs/new", name="new_pkg", dry_run=True,
+            )
 
     def test_validate_absorb_no_config_source_ok(self, tmp_path, monkeypatch):
         """A source with NO .rlsbl/config.json auto-detects and passes."""
-        monkeypatch.setattr(shutil, "which", lambda n: "/usr/bin/git-filter-repo")
-        root = tmp_path / "monorepo"
-        root.mkdir()
-        make_workspace(str(root), [WorkspaceProject({"path": "existing", "name": "existing"})])
+        monkeypatch.setattr(shutil, "which", lambda n: f"/usr/bin/{n}")
+        root = _absorb_workspace(tmp_path)
         source = _clean_source(tmp_path)  # no .rlsbl at all
 
-        projs = validate_absorb_preconditions(str(root), str(source), "pkgs/new", "new_pkg")
-        assert len(declared_members(projs)) == 1
+        preview = cmd_absorb(
+            str(root), str(source), "pkgs/new", name="new_pkg", dry_run=True,
+        )
+        assert preview.by_key("source").state == "rewrite_history"
+        assert len(declared_members(load_workspace(str(root)))) == 1
 
     def test_absorb_broken_config_hard_errors_pre_mutation(self, tmp_path, monkeypatch):
         """End-to-end: a broken source config aborts before the monorepo is

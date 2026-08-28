@@ -487,6 +487,17 @@ def _other_member_globs(workspace_root, projects, releasables, *,
     return globs
 
 
+def _same_commit(repo, left, right):
+    """Do two tag names resolve to the same commit in ``repo``?"""
+    try:
+        return (
+            _run_git(repo, "rev-list", "-n", "1", left)
+            == _run_git(repo, "rev-list", "-n", "1", right)
+        )
+    except subprocess.CalledProcessError:
+        return False
+
+
 def _plan_tags(workspace_root, own_glob, foreign_globs,
                own_format, dest_format, releasable_name, version):
     """Classify every tag in the source repository. Never touches a tag.
@@ -519,12 +530,19 @@ def _plan_tags(workspace_root, own_glob, foreign_globs,
             if new_tag == tag:
                 continue
             if new_tag in all_tags and new_tag not in own_set:
-                raise ExtractError(
-                    f"tag translation collision: '{tag}' would be renamed to "
-                    f"'{new_tag}', but a tag named '{new_tag}' already exists "
-                    f"and is not this releasable's. Resolve the conflicting tag "
-                    f"before extracting."
-                )
+                if not _same_commit(workspace_root, tag, new_tag):
+                    raise ExtractError(
+                        f"tag translation collision: '{tag}' would be renamed "
+                        f"to '{new_tag}', but a tag named '{new_tag}' already "
+                        f"exists at a different commit and is not this "
+                        f"releasable's. Resolve the conflicting tag before "
+                        f"extracting."
+                    )
+                # Same name, same commit: this is the boundary alias an INBOUND
+                # conversion left behind -- the pre-conversion spelling of the
+                # very tag being translated. The translation it names has
+                # already happened, so there is nothing to resolve; the apply
+                # step keeps the existing tag rather than re-creating it.
             translations.append((tag, new_tag))
             if tag == current_old_tag:
                 # The one boundary alias: the current version keeps its
@@ -1564,7 +1582,20 @@ def _apply_tags(dep, item, run):
             )
             continue
         sha = _run_git(dep.target_path, "rev-list", "-n", "1", old)
-        _run_git(dep.target_path, "tag", new, sha)
+        if new in present:
+            # Already there, and observation established it stands at the same
+            # commit (an inbound conversion's boundary alias). Creating it
+            # again would fail; moving it is never this command's business.
+            at = _run_git(dep.target_path, "rev-list", "-n", "1", new)
+            if at != sha:
+                raise ExtractError(
+                    f"tag '{new}' exists at {at[:12]}, but the translation of "
+                    f"'{old}' maps to {sha[:12]}. A tag this conversion did "
+                    f"not create is never moved -- resolve it by hand."
+                )
+            print(f"  tag: '{new}' already at {sha[:12]}; kept.")
+        else:
+            _run_git(dep.target_path, "tag", new, sha)
         mappings.append(TagMapping(old_tag=old, new_tag=new, new_commit=sha))
     for old in dep.tag_plan.deletions:
         if old in present:
