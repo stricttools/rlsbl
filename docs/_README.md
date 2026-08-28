@@ -154,6 +154,18 @@ Reverts the last release:
 
 On partial failure, prints a structured summary table with remediation commands for each failed step.
 
+## Who writes which ref namespace
+
+Every ref rlsbl writes has one writer:
+
+| Namespace | Written by |
+|-----------|------------|
+| `origin` branch heads | Releases only. `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits; there is no dev-branch push path. |
+| `origin` tags and their GitHub Releases | The release's tag step, and `rlsbl release reconcile` when a rewrite or a partial release left them wrong -- both composing the Release through one module, so the notes and the `rlsbl-ci-sha` marker match either way. |
+| A subtree mirror's `main` | The mirror reconciler's converge (`rlsbl monorepo mirror`, and the release's mirror step, which calls the same code). Force-with-lease is its routine write; a commit it cannot account for is a contract violation it refuses. |
+| A subtree mirror's tags and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. A mirror's scaffold renders no publish workflow, so the mirror never releases itself. |
+| Rewritten history on any of the above | `rlsbl release scrub`, the one sanctioned rewrite write: it force-pushes, remaps the changelog hashes, moves the tags and recreates the Releases in a single pass. |
+
 ## Pre-push hook
 
 The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl check --tag prepush`, which enforces:

@@ -267,6 +267,18 @@ From the version bump onward, every step records a success or failure marker in 
 
 Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly named in the completion summary, and the release completes. The state file is cleared only when every step carries a marker and no fatal step failed; `rlsbl release run` auto-clears a provably-complete leftover state file instead of blocking.
 
+## Who writes which ref namespace
+
+Every ref rlsbl writes has exactly one writer. The table is the whole rule; anything not listed here is not written by rlsbl at all.
+
+| Namespace | Written by | Notes |
+| --- | --- | --- |
+| `origin` branch heads | **Releases only.** `rlsbl release run` pushes the untagged candidate (step 15) and, after the CI gate, the finalization commits (step 20). | There is no dev-branch push path: `rlsbl push` does not exist, and both release entry points hard-error when the current branch is not a release branch. The pre-push hook warns on a manual push to one. |
+| `origin` tags, and the GitHub Releases attached to them | **The release's tag step** (steps 19-21), and **`rlsbl release reconcile`** when a rewrite or a partial release left them wrong. | Both compose the Release through the one publication module, so the notes and the `rlsbl-ci-sha` marker are identical whichever wrote it. A released tag is never moved: the reconciler refuses a divergence no record explains rather than force-pushing. |
+| A subtree **mirror's `main`** | **The mirror reconciler's converge** -- `rlsbl monorepo mirror <project>`, and the release's mirror step, which calls the same code. | The mirror is a tool-owned derived artifact, so force-with-lease is its routine write. A commit the reconciler cannot account for is a contract violation and it refuses, touching nothing. |
+| A subtree **mirror's tags**, and their GitHub Releases | **The mirror publication module**, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a released version the mirror is missing. | The commit is derived, never the branch tip: it is the subtree split of that version's ledger anchor. A mirror's scaffold renders no publish workflow, so a mirror never releases itself. |
+| Rewritten history on any of the above | **`rlsbl release scrub`** (which wraps `safegit scrub`) -- the one sanctioned rewrite write. | It force-pushes with an explicit `--force-with-lease` captured from the actual remote, then remaps the changelog hashes, moves the tags and recreates the GitHub Releases in the same pass. A rewrite performed outside it leaves all three stale; `rlsbl release reconcile` is what heals that. |
+
 ## Publish gating
 
 Scaffolded publish workflows trigger on `release: published` and `workflow_dispatch`, which means they used to race CI on the same commit -- a broken artifact could publish before CI reported. Every scaffolded publish workflow (all targets, merged multi-target workflows, and the monorepo publish router) now begins with a `gate` job, and every publish job depends on it (`needs: gate`). No artifact is built or published until the gate passes.
