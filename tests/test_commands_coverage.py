@@ -961,11 +961,14 @@ class TestUnreleasedNonReleasable:
 
         from rlsbl.commands.unreleased import run_cmd
 
-        # The monorepo resolution moved to rlsbl.context.resolve_release_scope,
-        # which imports these lazily from rlsbl.workspace -- so the workspace
-        # module is where they are patched.
-        with patch("rlsbl.workspace.find_workspace_root", return_value="/ws"), \
-             patch("rlsbl.workspace.resolve_project", return_value=mock_proj), \
+        # The monorepo resolution moved to rlsbl.context.resolve_release_scope.
+        # It is patched WHOLE rather than through its workspace lookups: this
+        # test is about what run_cmd does with a non-releasable project, and a
+        # half-patched resolution (a workspace root that exists, a workspace
+        # file that does not) only loaded at all while that function swallowed
+        # every exception.
+        with patch("rlsbl.commands.unreleased.resolve_release_scope",
+                   return_value=(mock_proj, None, "/ws/devnode/.rlsbl/changes", None)), \
              patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
              patch("rlsbl.commands.unreleased.latest_release_fact",
                    return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
@@ -983,11 +986,14 @@ class TestUnreleasedNonReleasable:
 
         from rlsbl.commands.unreleased import run_cmd
 
-        # The monorepo resolution moved to rlsbl.context.resolve_release_scope,
-        # which imports these lazily from rlsbl.workspace -- so the workspace
-        # module is where they are patched.
-        with patch("rlsbl.workspace.find_workspace_root", return_value="/ws"), \
-             patch("rlsbl.workspace.resolve_project", return_value=mock_proj), \
+        # The monorepo resolution moved to rlsbl.context.resolve_release_scope.
+        # It is patched WHOLE rather than through its workspace lookups: this
+        # test is about what run_cmd does with a non-releasable project, and a
+        # half-patched resolution (a workspace root that exists, a workspace
+        # file that does not) only loaded at all while that function swallowed
+        # every exception.
+        with patch("rlsbl.commands.unreleased.resolve_release_scope",
+                   return_value=(mock_proj, None, "/ws/devnode/.rlsbl/changes", None)), \
              patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
              patch("rlsbl.commands.unreleased.latest_release_fact",
                    return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
