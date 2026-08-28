@@ -1546,15 +1546,22 @@ class TestScrubReleaseDeleteFails:
 
 class TestScrubVersionExtractFails:
     def test_bad_tag_name(self, tmp_path, capsys):
+        """A tag whose version cannot be read is skipped BEFORE any deletion.
+
+        Its Release cannot be rebuilt, so deleting it first would destroy the
+        only copy -- the tag is not even looked up on the forge.
+        """
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/not-a-version"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
-        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete (run_gh)
-        _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
-                    gh_auth=True, gh_installed=True,
-                    run_gh_side_effect=['{"body": "old"}', ""])
-        assert "cannot extract version" in capsys.readouterr().err
+        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); none at all (run_gh)
+        _mock_run, mock_run_gh = _scrub_full(
+            tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
+            gh_auth=True, gh_installed=True, run_gh_side_effect=[],
+        )
+        assert "not a version tag" in capsys.readouterr().err
+        assert mock_run_gh.call_count == 0
 
 
 class TestScrubGhReleaseCreateFails:
@@ -1579,13 +1586,26 @@ class TestScrubFallbackNotes:
         safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value=None)}
+
+        # The body is written to a notes FILE (the shared publication's own
+        # argv), so it is read at call time rather than off the recorded args.
+        seen = {}
+
+        def gh(args, **kwargs):
+            if args[:2] == ["release", "create"]:
+                path = args[args.index("--notes-file") + 1]
+                with open(path, encoding="utf-8") as f:
+                    seen["body"] = f.read()
+                return ""
+            if args[:2] == ["release", "view"]:
+                return '{"body": "old"}'
+            return ""
+
         # Calls: version, ls-remote, scrub, commit, rev-parse, branch_push, tag_push (run); gh_view, gh_delete, gh_create (run_gh)
         mock_run, mock_run_gh = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                                gh_auth=True, gh_installed=True, extra_patches=ep,
-                               run_gh_side_effect=['{"body": "old"}', "", ""])
-        # gh_create is the last run_gh call -- check "Release 1.0.0" in the args list
-        create_call = mock_run_gh.call_args_list[-1]
-        assert any("Release 1.0.0" in str(arg) for arg in create_call[0][0])
+                               run_gh_side_effect=gh)
+        assert "Release 1.0.0" in seen["body"]
 
 
 class TestScrubNoReleaseForTag:
