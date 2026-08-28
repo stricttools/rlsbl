@@ -916,3 +916,41 @@ class TestAnchorVerification:
         message = str(exc.value)
         assert "does not survive the rewrite" in message
         assert "content-addressed" in message
+
+
+# ---------------------------------------------------------------------------
+# Concurrency
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrency:
+    def test_the_workspace_lock_is_taken_and_refuses_a_held_one(self, tmp_path):
+        """The conversion takes the lock a release takes, and refuses to queue.
+
+        It is held for the whole apply -- the clone, the merge, the tags, the
+        state and the workspace edit are one operation, and a release starting
+        in the middle of it would see a half-absorbed repository.
+        """
+        import fcntl
+
+        from rlsbl.lock import LockHeldError
+        from rlsbl.workspace import WORKSPACE_DIR
+
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        lock_dir = ns.root / WORKSPACE_DIR
+        lock_dir.mkdir(exist_ok=True)
+        holder = open(lock_dir / "lock", "w")
+        fcntl.flock(holder, fcntl.LOCK_EX)
+        try:
+            # A held lock is only reached in the apply half; the plan itself is
+            # readable either way.
+            assert absorb(ns, source, dry_run=True) is not None
+            with pytest.raises(LockHeldError):
+                absorb(ns, source)
+        finally:
+            fcntl.flock(holder, fcntl.LOCK_UN)
+            holder.close()
+        # Nothing was written on the way to the refusal.
+        assert "widget" not in [p.name for p in load_workspace(str(ns.root))]
+        assert not (ns.root / "packages").exists()
