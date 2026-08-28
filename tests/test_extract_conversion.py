@@ -271,10 +271,12 @@ class TestRefusals:
         with pytest.raises(ExtractError, match="uncommitted changes"):
             cmd_extract(str(ns.root), "core", str(tmp_path / "out"))
 
-    def test_mirrored_releasable(self, tmp_path):
-        # The mirror binding is a releasable key, and only a SINGLE-member
-        # releasable may carry one, so `extras` (pkgC alone) is the mirrored
-        # unit here.
+    def test_mirrored_releasable_is_promoted_not_refused(self, tmp_path, capsys):
+        """A mirrored releasable is no longer a refusal: it routes through the
+        promotion engine, which adopts the mirror's history instead of
+        filtering a second one out of the monorepo."""
+        # Only a SINGLE-member releasable may carry a mirror binding, so
+        # `extras` (pkgC alone) is the mirrored unit here.
         ns = make_source(
             tmp_path,
             releasables=[
@@ -283,10 +285,14 @@ class TestRefusals:
                            subtree_remote="git@github.com:o/pkgc.git"),
             ],
         )
-        with pytest.raises(ExtractError) as exc:
-            cmd_extract(str(ns.root), "extras", str(tmp_path / "out"))
-        assert "mirrored" in str(exc.value)
-        assert "subtree_remote" in str(exc.value)
+        preview = cmd_extract(
+            str(ns.root), "extras", str(tmp_path / "out"), dry_run=True,
+        )
+        assert preview.by_key("releasable").state == "promote_mirror"
+        assert preview.by_key("trees").state == "verify_mirror_tree"
+        out = capsys.readouterr().out
+        assert "git@github.com:o/pkgc.git" in out
+        assert "nothing is filtered" in out
 
     def test_releasable_owning_the_root_member(self, tmp_path):
         ns = make_source(

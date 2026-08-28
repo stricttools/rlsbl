@@ -21,11 +21,6 @@ rendered: the preview IS the pipeline.
 Refusals happen during observation, so they cost nothing and fire identically
 under a preview:
 
-* the releasable is **mirrored** (it declares ``subtree_remote``). A
-  mirror is a tool-owned derived artifact of THIS repository; converting the
-  releasable out from under it would leave the mirror pointing at a subtree that
-  no longer exists. Promoting a mirror to the real repository is its own
-  operation; until it exists, remove the mirror binding first.
 * the releasable contains the **root member**. The root member owns every path
   no other member claims, and a workspace has exactly one -- extracting it would
   leave the source with no root. Restructure first.
@@ -33,28 +28,49 @@ under a preview:
   the moment the members leave, so the conversion refuses and names the exact
   ``rlsbl rewrite`` invocation that severs it. Extract never rewrites a manifest
   itself: the rewrite commands own that, and composing them is the design.
-* the usual preconditions: the target path exists, git-filter-repo is missing,
+* the usual preconditions: the target path exists, git-filter-repo is missing
+  (an unmirrored releasable only -- a promotion filters nothing),
   the source tree is dirty, a release is in flight, a translated tag would
   collide, or ``saferm`` is absent and ``--delete-with-rm`` was not passed.
+
+Two engines, chosen by whether the releasable is MIRRORED
+----------------------------------------------------------
+
+A releasable bound to a subtree mirror is **promoted**, not filtered. The mirror
+already holds this subtree's standalone history -- every commit that touched the
+member has a synthetic counterpart there, produced by the deterministic subtree
+split -- and consumers already resolve those commit ids. Filtering the monorepo
+again would build a SECOND standalone history of the same code, so the
+destination starts from the mirror instead: it is cloned, the monorepo-to-mirror
+correspondence is derived by splitting each commit the conversion has to
+translate, the deletion is justified by tree-hash equality against the mirror's
+pre-scaffold split commit, and the correspondence is persisted into the
+destination's lineage record as a ``promotion-split-map`` event. Everything
+below applies to both engines except where it names the filter.
 
 What an apply actually moves
 ----------------------------
 
-* **History**, via ``git-filter-repo`` on a fresh clone: the union of the member
-  paths, hoisted to the repository root when the releasable has a single member.
+* **History**: for an unmirrored releasable, via ``git-filter-repo`` on a fresh
+  clone -- the union of the member paths, hoisted to the repository root when
+  the releasable has a single member. For a mirrored one, the mirror's own
+  history, adopted whole.
 * **Tree-object identity is then VERIFIED per member**: the source's
   ``HEAD:<member>`` tree must equal the corresponding tree in the filtered
-  result. A mismatch is a hard error naming both hashes, and nothing further is
-  written. This is the one check that says the code that arrived is the code
-  that left.
+  result -- or, for a promotion, the root tree of the mirror's pre-scaffold
+  split commit. A mismatch is a hard error naming both hashes, and nothing
+  further is written. This is the one check that says the code that arrived is
+  the code that left, and for a promotion it is also what justifies deleting
+  the monorepo's copy.
 * **The whole release state**: the releasable's state directory -- version,
   ``changes/`` (locked JSONL and generated markdown), ``releases/`` (the
   archives, anchors included), ``config.json``, ``lint/``, ``hooks/`` and its own
   lineage record -- moves to wherever the destination keeps it: ``.rlsbl/`` for a
   standalone successor, ``.rlsbl-monorepo/releasables/<name>/`` for a workspace.
 * **The anchors and the changelog hashes are remapped** through filter-repo's
-  commit map, and the tree hashes recomputed at the new commits and paths. What
-  could not be mapped is NAMED in the output rather than silently left stale.
+  commit map (or, for a promotion, the subtree-split correspondence), and the
+  tree hashes recomputed at the new commits and paths. What could not be mapped
+  is NAMED in the output rather than silently left stale.
 * **Tags** translate to the destination's scheme, with one boundary alias at the
   current version so the pre-conversion name still resolves in the new
   repository. Another live member's tags are pruned; a tag matching no current
@@ -87,6 +103,8 @@ from ...lineage import (
     ConversionEvent,
     DepartedGlobsEvent,
     LineageEndpoint,
+    PromotionSplitMapEvent,
+    SplitMapping,
     TagMapEvent,
     TagMapping,
     append_events,
@@ -96,6 +114,7 @@ from ...lock import rlsbl_lock
 from ...ownership import find_root_member
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
 from ...release_file import read_release_file, write_release_anchor
+from ...release_publication import anchor_from_ledger
 from ...saferm import saferm_delete
 from ...snapshot import SNAPSHOT_FILE, generate_snapshot, write_snapshot
 from ...tag_glob import (
@@ -207,6 +226,15 @@ class Departure:
     #: directories the detection reads, so anything asked afterwards answers
     #: "none" and the operator loses the hint exactly when it applies.
     repo_bound_publishers: tuple = ()
+    #: The mirror this releasable is bound to, or ``""``. Non-empty selects the
+    #: PROMOTION engine: the destination starts from the mirror's own history
+    #: instead of a fresh filter of the monorepo's.
+    mirror_remote: str = ""
+
+    @property
+    def is_promotion(self) -> bool:
+        """Is this a mirror promotion rather than a filter-repo extraction?"""
+        return bool(self.mirror_remote)
 
     @property
     def member_paths(self) -> list:
@@ -245,6 +273,14 @@ class Applied:
     #: or thinned, whose markdown was re-rendered from what survived.
     pruned_versions: list = field(default_factory=list)
     state_commit: str = ""
+    #: ``(monorepo sha, mirror sha)`` pairs, in the order they were derived.
+    #: The promotion's whole translation, persisted into the destination's
+    #: lineage record so the extracted repository can explain its own hashes.
+    split_mappings: list = field(default_factory=list)
+    #: Monorepo commits whose mirror commit could not be derived, with why.
+    unmapped_splits: list = field(default_factory=list)
+    #: The mirror commit whose tree proves the monorepo subtree departed whole.
+    pre_scaffold_sha: str = ""
     stack: ExitStack | None = None
 
 
@@ -908,21 +944,15 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
 
     _check_member_contents(workspace_root, members)
 
-    if releasable.is_mirrored:
-        raise ExtractError(
-            f"releasable '{releasable_name}' is mirrored at "
-            f"{releasable.subtree_remote}. The mirror is a tool-owned artifact "
-            f"derived from THIS repository, and extracting the releasable "
-            f"would leave it deriving from a subtree that no longer exists. "
-            f"Promoting a mirror into the real repository is its own "
-            f"operation; until then, remove the subtree_remote binding (and "
-            f"the mirror remote) first."
-        )
-
     if os.path.exists(target_path):
         raise ExtractError(f"target path already exists: {target_path}")
 
-    require_filter_repo()
+    # A MIRRORED releasable is promoted rather than filtered: the mirror
+    # already IS this subtree's standalone history, so the destination starts
+    # from it (see the module docstring). Nothing is filtered, so filter-repo is
+    # not required for that path.
+    if not releasable.is_mirrored:
+        require_filter_repo()
 
     if not delete_with_rm and shutil.which("saferm") is None:
         raise ExtractError(
@@ -1007,6 +1037,7 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
         root_state_dir=_root_state_dir(workspace_root, projects, releasables),
         source_repo_url=_origin_url(workspace_root),
         repo_bound_publishers=_repository_bound_publishers(workspace_root, members),
+        mirror_remote=releasable.subtree_remote,
     )
 
 
@@ -1017,14 +1048,32 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
 
 def _next_steps(dep):
     """The steps rlsbl deliberately does NOT take on the operator's behalf."""
-    steps = [
-        f"create the remote repository and add it as origin in "
-        f"{dep.target_path}",
-        f"cd {dep.target_path} && rlsbl scaffold  (CI, hooks, workflows)",
-        f"review the regenerated CI router in {dep.workspace_root} before the "
-        f"next release (monorepo sync is re-run for you, but which jobs the "
-        f"remaining members need is yours to confirm)",
-    ]
+    if dep.is_promotion:
+        # A promotion inherits both: the mirror remote is already the
+        # destination's origin, and the mirror already carries a scaffold layer.
+        # What it does NOT inherit is a publish workflow -- a mirror's scaffold
+        # deliberately renders none, because its Releases came from the
+        # monorepo's release flow, which no longer publishes for it.
+        steps = [
+            f"the mirror remote {dep.mirror_remote} is now this repository's "
+            f"origin and is no longer a derived artifact -- nothing regenerates "
+            f"it, and a force-push to it is now destructive",
+            f"cd {dep.target_path} && rlsbl scaffold  (the mirror's scaffold "
+            f"layer renders no publish workflow; a repository that publishes "
+            f"needs one)",
+            f"review the regenerated CI router in {dep.workspace_root} before "
+            f"the next release (monorepo sync is re-run for you, but which jobs "
+            f"the remaining members need is yours to confirm)",
+        ]
+    else:
+        steps = [
+            f"create the remote repository and add it as origin in "
+            f"{dep.target_path}",
+            f"cd {dep.target_path} && rlsbl scaffold  (CI, hooks, workflows)",
+            f"review the regenerated CI router in {dep.workspace_root} before the "
+            f"next release (monorepo sync is re-run for you, but which jobs the "
+            f"remaining members need is yours to confirm)",
+        ]
     for target in dep.repo_bound_publishers:
         steps.append(
             f"{target.registry_display_name} publishing is authorized for a "
@@ -1130,25 +1179,49 @@ def observe(dep) -> Preview:
     items = []
 
     shape = "workspace" if dep.is_multi else "standalone repository"
-    items.append(VerdictItem(
-        key=ITEM_RELEASABLE,
-        state="extract_to_workspace" if dep.is_multi else "extract_to_standalone",
-        summary=(
-            f"releasable '{dep.releasable.name}' (version {dep.version}) "
-            f"becomes a {shape} at {dep.target_path}."
-        ),
-        facts=tuple(
-            [f"member: {m.name} at {m.path}/" for m in dep.members]
-            + [f"tag format: {dep.releasable.effective_tag_format} -> "
-               f"{dep.dest_tag_format}"]
-        ),
-        actions=(
-            f"apply would clone the source and run git-filter-repo keeping "
-            f"{', '.join(dep.member_paths)}"
-            + ("" if dep.is_multi else f", hoisting {dep.member_paths[0]}/ to "
-                                       f"the repository root"),
-        ),
-    ))
+    if dep.is_promotion:
+        items.append(VerdictItem(
+            key=ITEM_RELEASABLE,
+            state="promote_mirror",
+            summary=(
+                f"releasable '{dep.releasable.name}' (version {dep.version}) is "
+                f"mirrored, so its MIRROR becomes the standalone repository at "
+                f"{dep.target_path}."
+            ),
+            facts=(
+                f"member: {dep.members[0].name} at {dep.members[0].path}/",
+                f"mirror: {dep.mirror_remote}",
+                f"tag format: {dep.releasable.effective_tag_format} -> "
+                f"{dep.dest_tag_format}",
+                "the mirror already holds this subtree's standalone history, "
+                "so nothing is filtered: a second history of the same code "
+                "would carry commit ids no consumer resolves.",
+            ),
+            actions=(
+                "apply would clone the mirror as the destination and derive "
+                "the monorepo-to-mirror commit correspondence by subtree split.",
+            ),
+        ))
+    else:
+        items.append(VerdictItem(
+            key=ITEM_RELEASABLE,
+            state="extract_to_workspace" if dep.is_multi else "extract_to_standalone",
+            summary=(
+                f"releasable '{dep.releasable.name}' (version {dep.version}) "
+                f"becomes a {shape} at {dep.target_path}."
+            ),
+            facts=tuple(
+                [f"member: {m.name} at {m.path}/" for m in dep.members]
+                + [f"tag format: {dep.releasable.effective_tag_format} -> "
+                   f"{dep.dest_tag_format}"]
+            ),
+            actions=(
+                f"apply would clone the source and run git-filter-repo keeping "
+                f"{', '.join(dep.member_paths)}"
+                + ("" if dep.is_multi else f", hoisting {dep.member_paths[0]}/ to "
+                                           f"the repository root"),
+            ),
+        ))
 
     items.append(VerdictItem(
         key=ITEM_DEPENDENCIES,
@@ -1166,20 +1239,41 @@ def observe(dep) -> Preview:
         ),
     ))
 
-    items.append(VerdictItem(
-        key=ITEM_TREES,
-        state="verify_member_trees",
-        summary="every member's tree object must survive the filter unchanged.",
-        facts=tuple(
-            f"{m.name}: {dep.source_trees[m.name][:12]} at "
-            f"{m.path}/ -> {dep.dest_member_path(m) or '<repo root>'}"
-            for m in dep.members
-        ),
-        actions=(
-            "apply would compare each hash against the filtered result and "
-            "hard-error on any mismatch, naming both hashes.",
-        ),
-    ))
+    if dep.is_promotion:
+        member = dep.members[0]
+        items.append(VerdictItem(
+            key=ITEM_TREES,
+            state="verify_mirror_tree",
+            summary=(
+                "the mirror must already hold exactly the subtree the source "
+                "is about to lose."
+            ),
+            facts=(
+                f"{member.name}: {dep.source_trees[member.name][:12]} at "
+                f"{member.path}/ must equal the root tree of the mirror's "
+                f"pre-scaffold split commit",
+            ),
+            actions=(
+                "apply would compare the two tree hashes and hard-error on a "
+                "mismatch, naming both -- an out-of-date mirror stops the "
+                "promotion rather than losing the newer tree.",
+            ),
+        ))
+    else:
+        items.append(VerdictItem(
+            key=ITEM_TREES,
+            state="verify_member_trees",
+            summary="every member's tree object must survive the filter unchanged.",
+            facts=tuple(
+                f"{m.name}: {dep.source_trees[m.name][:12]} at "
+                f"{m.path}/ -> {dep.dest_member_path(m) or '<repo root>'}"
+                for m in dep.members
+            ),
+            actions=(
+                "apply would compare each hash against the filtered result and "
+                "hard-error on any mismatch, naming both hashes.",
+            ),
+        ))
 
     entries = _state_entries(dep)
     archives = _archived_versions(dep)
@@ -1199,7 +1293,9 @@ def observe(dep) -> Preview:
         ),
         actions=(
             "apply would remap every changelog hash and every release anchor "
-            "through filter-repo's commit map, and name what it could not map.",
+            + ("through the monorepo-to-mirror split correspondence"
+               if dep.is_promotion else "through filter-repo's commit map")
+            + ", and name what it could not map.",
         ),
     ))
 
@@ -1243,6 +1339,8 @@ def observe(dep) -> Preview:
         events.append("tag-map")
     if archives:
         events.append("anchor-remap")
+    if dep.is_promotion:
+        events.append("promotion-split-map")
     if plan.alias:
         events.append("boundary-alias")
     items.append(VerdictItem(
@@ -1362,6 +1460,235 @@ def _apply_filter(dep, item, run):
         f"  filter-repo mapped {len(run.sha_map)} commit(s); "
         f"{len(run.pruned_shas)} pruned."
     )
+
+
+# ---------------------------------------------------------------------------
+# Promotion: the engine for a MIRRORED releasable
+# ---------------------------------------------------------------------------
+#
+# A mirror already IS this subtree's standalone history: every commit that ever
+# touched the member has a synthetic counterpart there, produced by the
+# deterministic subtree split and pushed by the reconciler. Filtering the
+# monorepo again would build a SECOND standalone history of the same code, with
+# different commit ids from the one consumers already resolve -- so a mirrored
+# releasable is PROMOTED instead: the mirror stops being a derived artifact and
+# becomes the repository.
+#
+# The correspondence between the two histories is the same subtree split the
+# mirror was built from, asked per commit, and it is what carries the release
+# state across: the changelog hashes and the release anchors are monorepo
+# commits, and every one of them is translated through it. The map is persisted
+# into the destination's lineage record, so the promoted repository can explain
+# its own hashes without the monorepo.
+
+
+def _promotion_source_shas(dep):
+    """Every monorepo commit the promotion has to translate, HEAD first.
+
+    The ledger's anchors (which commit each released version shipped from), the
+    changelog's commit hashes, and the current HEAD -- the three things that
+    name a monorepo commit and travel with the conversion.
+    """
+    from ...changelog.files import _list_jsonl_files, parse_jsonl
+
+    shas = []
+    seen = set()
+
+    def add(sha):
+        sha = (sha or "").strip()
+        if sha and sha not in seen:
+            seen.add(sha)
+            shas.append(sha)
+
+    add(_run_git(dep.workspace_root, "rev-parse", "HEAD"))
+
+    releases_dir = os.path.join(dep.source_state_dir, "releases")
+    for name in _archived_versions(dep):
+        try:
+            add(read_release_file(os.path.join(releases_dir, name)).candidate_sha)
+        except Exception:
+            continue
+
+    changes_dir = os.path.join(dep.source_state_dir, "changes")
+    if os.path.isdir(changes_dir):
+        for path in _list_jsonl_files(changes_dir):
+            for entry in parse_jsonl(path):
+                for sha in entry.commits or ():
+                    add(sha)
+    return shas
+
+
+def _build_split_map(dep):
+    """``({monorepo sha: mirror sha}, [(sha, why)])`` for this promotion.
+
+    One ``git subtree split`` per distinct commit, so every entry is the split
+    git itself computed for that commit rather than an offset guessed from
+    another entry. A commit the split cannot answer for -- one that predates the
+    member's directory, or a hash the monorepo no longer has -- is NOT guessed:
+    it is left out of the map and named, and the ordinary unmapped-hash paths
+    (dropped changelog entries, an anchor left as recorded) handle it exactly as
+    they do for a filter that pruned a commit.
+    """
+    from ...mirror_publication import MirrorPublicationError, split_commit_for
+
+    mapping = {}
+    unmapped = []
+    for sha in _promotion_source_shas(dep):
+        try:
+            mapping[sha] = split_commit_for(
+                dep.workspace_root, dep.member_paths[0], sha,
+            )
+        except MirrorPublicationError as exc:
+            unmapped.append((sha, str(exc)))
+    return mapping, unmapped
+
+
+def _apply_promotion_clone(dep, item, run):
+    """Start the destination from the MIRROR's history, and map the two."""
+    run.stack.enter_context(
+        rlsbl_lock(WORKSPACE_DIR, project_root=dep.workspace_root, wait=False)
+    )
+    dirty = _dirty_paths(dep.workspace_root)
+    if dirty:
+        raise ExtractError(
+            f"the source working tree became dirty after the plan was made "
+            f"({', '.join(dirty)}); nothing was written. Commit or set aside "
+            f"the changes and re-run."
+        )
+
+    print(f"Cloning the mirror {dep.mirror_remote} -> {dep.target_path} ...")
+    try:
+        _run_git(dep.workspace_root, "clone", dep.mirror_remote, dep.target_path)
+    except subprocess.CalledProcessError as exc:
+        raise ExtractError(
+            f"could not clone the mirror at {dep.mirror_remote}: {exc}. A "
+            f"promotion starts the new repository FROM the mirror -- that is "
+            f"the history consumers already resolve -- so an unreachable "
+            f"mirror is a hard stop, not a reason to build a second history."
+        ) from exc
+    _ensure_git_identity(dep.target_path, dep.workspace_root)
+
+    run.sha_map, unmapped = _build_split_map(dep)
+    run.split_mappings = list(run.sha_map.items())
+    run.unmapped_splits = unmapped
+    print(
+        f"  split correspondence: {len(run.sha_map)} commit(s) mapped; "
+        f"{len(unmapped)} could not be."
+    )
+    for sha, why in unmapped:
+        print(f"  split: {sha[:12]} has no mirror commit ({why})", file=sys.stderr)
+
+    # The member's own config is what a standalone successor carries. On the
+    # mirror it exists only as the scaffold layer's DERIVED copy (with
+    # publish_mode forced to "none", because a mirror never publishes itself),
+    # so the authored one replaces it before the state transplant merges the
+    # releasable's config under it.
+    source_config = os.path.join(
+        dep.workspace_root, dep.member_paths[0], ".rlsbl", "config.json",
+    )
+    if os.path.isfile(source_config):
+        dest_config = os.path.join(dep.target_path, ".rlsbl", "config.json")
+        effects.makedirs(os.path.dirname(dest_config), exist_ok=True)
+        effects.copy_file(source_config, dest_config)
+
+
+def _apply_promotion_trees(dep, item, run):
+    """Prove the mirror carries exactly the subtree that is about to be deleted.
+
+    The proof is TREE-HASH EQUALITY: the monorepo's ``HEAD:<member>`` tree must
+    equal the root tree of the mirror's PRE-SCAFFOLD split commit -- the commit
+    under the scaffold layer, which is the split itself. A git tree hash is
+    content-addressed, so equality is not a heuristic: it says the bytes the
+    source is about to lose are the bytes the destination already has.
+
+    Only the tip and its first parent are considered, because those are the only
+    two shapes the mirror contract allows (a bare split, or exactly one scaffold
+    commit atop one). A mirror that is behind fails here and says so, rather
+    than promoting an older tree and taking the newer one out of the monorepo.
+    """
+    member = dep.members[0]
+    expected = dep.source_trees[member.name]
+
+    candidates = []
+    for rev in ("HEAD", "HEAD^"):
+        try:
+            commit = _run_git(dep.target_path, "rev-parse", rev)
+            tree = _run_git(dep.target_path, "rev-parse", f"{rev}^{{tree}}")
+        except subprocess.CalledProcessError:
+            continue
+        candidates.append((rev, commit, tree))
+        if tree == expected:
+            run.pre_scaffold_sha = commit
+            print(
+                f"  {member.name}: tree {expected[:12]} verified against the "
+                f"mirror's {rev} ({commit[:12]})."
+            )
+            return
+
+    observed = ", ".join(
+        f"{rev}={tree[:12]} ({commit[:12]})" for rev, commit, tree in candidates
+    ) or "(the mirror has no commits)"
+    raise ExtractError(
+        f"the mirror at {dep.mirror_remote} does not carry this releasable's "
+        f"current subtree: '{member.path}/' at HEAD is tree {expected}, and "
+        f"neither the mirror's tip nor its first parent has that tree "
+        f"({observed}). A promotion deletes the monorepo's copy on the "
+        f"strength of the mirror already holding it, so an out-of-date mirror "
+        f"is a hard stop. Run `rlsbl monorepo mirror {member.name}` to "
+        f"converge it and re-run; nothing has been written to the source and "
+        f"{dep.target_path} can be deleted."
+    )
+
+
+def _apply_promotion_tags(dep, item, run):
+    """Materialize each released version's destination tag from the ledger.
+
+    The mirror carries tags for the versions released since it was bound, and
+    nothing for the ones before. Both are handled by the same rule: the tag for
+    a version stands at the split of that version's ledger anchor. A tag already
+    there at that commit is kept; one standing anywhere else is a hard error,
+    because a released tag names what shipped and moving one is never this
+    conversion's decision.
+    """
+    # The SOURCE's archives, not the destination's: the state step ran before
+    # this one and has already rewritten the destination's anchors THROUGH the
+    # split map, so reading those would be mapping an already-mapped commit.
+    # The source's are untouched until the source step, which runs after this.
+    releases_dir = os.path.join(dep.source_state_dir, "releases")
+    present = set(_git_tag_names(dep.target_path))
+    mappings = []
+
+    for old, new in dep.tag_plan.translations:
+        parsed = parse_version_tag(old, mode=TagMode.PRERELEASE_INCLUSIVE)
+        if parsed is None:
+            continue
+        anchor = anchor_from_ledger(releases_dir, parsed.version)
+        commit = _map_sha(anchor, run.sha_map) if anchor else None
+        if commit is None:
+            print(
+                f"  tag: '{new}' not created -- version {parsed.version} has "
+                f"no mirror commit to stand at (no release anchor, or the "
+                f"anchor has no counterpart on the mirror).",
+                file=sys.stderr,
+            )
+            continue
+        if new in present:
+            at = _run_git(dep.target_path, "rev-list", "-n", "1", new)
+            if at != commit:
+                raise ExtractError(
+                    f"the mirror already carries tag '{new}' at {at[:12]}, but "
+                    f"version {parsed.version} shipped from a commit whose "
+                    f"mirror counterpart is {commit[:12]}. A released tag is "
+                    f"never moved -- resolve it by hand before promoting."
+                )
+            print(f"  tag: '{new}' already at {commit[:12]}; kept.")
+        else:
+            _run_git(dep.target_path, "tag", new, commit)
+            print(f"  tag: '{new}' created at {commit[:12]}.")
+        mappings.append(TagMapping(
+            old_tag=old, new_tag=new, new_commit=commit,
+        ))
+    run.tag_mappings = mappings
 
 
 def _apply_dependencies(dep, item, run):
@@ -1816,6 +2143,19 @@ def _apply_lineage(dep, item, run):
             mappings=run.anchor_mappings,
             related_to=stamped.id,
         ))
+    if dep.is_promotion and run.split_mappings:
+        # The promotion's whole translation, so the promoted repository can
+        # explain a monorepo hash in its own history without the monorepo.
+        followers.append(PromotionSplitMapEvent(
+            subtree_path=dep.member_paths[0],
+            mirror_remote=dep.mirror_remote,
+            promoted_version=dep.version,
+            mappings=[
+                SplitMapping(source_sha=old, split_sha=new)
+                for old, new in run.split_mappings
+            ],
+            related_to=stamped.id,
+        ))
     if dep.tag_plan.alias:
         new_tag, old_tag = dep.tag_plan.alias
         commit = _run_git(dep.target_path, "rev-list", "-n", "1", new_tag)
@@ -1989,12 +2329,33 @@ def _apply_next_steps(dep, item, run):
         print(f"  - {step}")
 
 
+def _apply_history(dep, item, run):
+    """Build the destination's history: a promotion clones, an extract filters."""
+    if dep.is_promotion:
+        return _apply_promotion_clone(dep, item, run)
+    return _apply_filter(dep, item, run)
+
+
+def _apply_identity(dep, item, run):
+    """Prove the code that arrives is the code that leaves."""
+    if dep.is_promotion:
+        return _apply_promotion_trees(dep, item, run)
+    return _apply_trees(dep, item, run)
+
+
+def _apply_tag_step(dep, item, run):
+    """Give the destination its tags."""
+    if dep.is_promotion:
+        return _apply_promotion_tags(dep, item, run)
+    return _apply_tags(dep, item, run)
+
+
 _APPLY_STEPS = {
-    ITEM_RELEASABLE: _apply_filter,
+    ITEM_RELEASABLE: _apply_history,
     ITEM_DEPENDENCIES: _apply_dependencies,
-    ITEM_TREES: _apply_trees,
+    ITEM_TREES: _apply_identity,
     ITEM_STATE: _apply_state,
-    ITEM_TAGS: _apply_tags,
+    ITEM_TAGS: _apply_tag_step,
     ITEM_DESTINATION: _apply_destination,
     ITEM_LINEAGE: _apply_lineage,
     ITEM_SOURCE: _apply_source,

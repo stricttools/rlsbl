@@ -354,9 +354,16 @@ Convergence never blindly overwrites the mirror. The remote tip must be **either
 
 > Note: `rlsbl monorepo sync` does **not** update mirror repositories. `sync` regenerates the monorepo's own `.github/workflows`. Mirrors are updated only by re-running `rlsbl monorepo mirror <project>` (for example after a release).
 
-### A mirrored releasable cannot be extracted
+### Extracting a mirrored releasable promotes the mirror
 
-Because the mirror derives from this repository, [extracting](conversions.md) the releasable a mirrored member belongs to would leave the mirror deriving from a subtree that no longer exists. `rlsbl monorepo extract` refuses that outright, during observation, and says to remove the `subtree_remote` binding (and the mirror remote) first. Turning a mirror into the real repository -- rather than deleting it and extracting -- is a separate operation.
+The mirror already holds this subtree's standalone history: every commit that touched the member has a synthetic counterpart there, produced by the deterministic subtree split, and consumers already resolve those commit ids. So [extracting](conversions.md) a mirrored releasable does not filter a second history out of the monorepo -- it **promotes** the mirror. Same command, different engine:
+
+- the destination is a clone of the mirror, whose remote becomes its origin;
+- the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release anchor is remapped through it;
+- deleting the monorepo's copy is justified by **tree-hash equality**: `HEAD:<member>` in the monorepo must equal the root tree of the mirror's pre-scaffold split commit. A mirror that is behind stops the promotion and says to run `rlsbl monorepo mirror <project>` first;
+- the correspondence is persisted into the extracted repository's lineage record as a `promotion-split-map` event, so the promoted repository can explain its own hashes without the monorepo.
+
+After a promotion the mirror is no longer a derived artifact: nothing regenerates it, and a force-push to it is destructive. It also carries no publish workflow (a mirror's scaffold renders none), so a repository that publishes needs `rlsbl scaffold` run in it.
 
 ## Sync
 

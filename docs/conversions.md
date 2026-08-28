@@ -67,7 +67,6 @@ Every refusal below is raised during observation, so it costs nothing and fires 
 
 | Direction | Refusal | Why, and what to do |
 | --------- | ------- | ------------------- |
-| extract | The releasable is **mirrored** (a member declares `subtree_remote`) | A [mirror](monorepo.md#mirror) is a tool-owned artifact derived from this repository; extracting would leave it deriving from a subtree that no longer exists. Remove the `subtree_remote` binding (and the mirror remote) first. Promoting a mirror into the real repository is a separate operation. |
 | extract | The releasable **owns the root member** (`path = "."`) | A workspace has exactly one root member and it owns every file no other member claims, so extracting it would leave the source with no root. Move the root member into a releasable that stays, or give the repository root a member of its own. |
 | extract | A **remaining member depends on a departing member** | The edge would dangle. Extract never rewrites somebody's manifest as a side effect, so it refuses and names the exact edit -- see [Severing an inbound edge](#severing-an-inbound-edge). |
 | extract | The releasable has **no state directory** | Its version, changelog and release archives are what the conversion moves. `rlsbl monorepo sync` creates the directory; if the releasable has already shipped, put its real version in the version file first. |
