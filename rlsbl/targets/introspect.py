@@ -165,6 +165,13 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         "Where a repository-bound publisher is registered; empty when none is.",
         _prop("publisher_setup_url"),
     ),
+    TargetAxis(
+        "release_materialization_policy",
+        "Whether a reconcile may recreate a released version's missing refs "
+        "unconditionally, or must refuse when a recorded identity transition "
+        "puts that version under a different published identity.",
+        _prop("release_materialization_policy"),
+    ),
     # --- manifest reading ---
     TargetAxis(
         "supports_read_name",

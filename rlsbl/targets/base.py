@@ -7,6 +7,17 @@ from typing import ClassVar
 # workflows. Its presence is what ``provides_ci_templates`` answers from.
 CI_TEMPLATE_FILENAME = "ci.yml.tpl"
 
+# The closed vocabulary of ``release_materialization_policy``. A ref the ledger
+# records but the remote does not carry may either be recreated unconditionally,
+# or only when the version's published identity still matches the repository's
+# current one.
+MATERIALIZE_ALWAYS = "materialize"
+MATERIALIZE_UNLESS_IDENTITY_CHANGED = "refuse-identity-transition"
+MATERIALIZATION_POLICIES = (
+    MATERIALIZE_ALWAYS,
+    MATERIALIZE_UNLESS_IDENTITY_CHANGED,
+)
+
 
 class TemplateVars(dict):
     """Dict subclass that auto-generates namespaced ``{target}.{key}`` entries.
@@ -71,6 +82,27 @@ class BaseTarget:
     hand-listed target sets the library-lint check used to carry.
 
     None means the target does not participate in library boundary lint.
+    """
+
+    release_materialization_policy: ClassVar[str] = MATERIALIZE_ALWAYS
+    """Whether a released version's MISSING refs may simply be recreated.
+
+    ``rlsbl release reconcile`` materializes a ref the ledger records as
+    released but the remote does not carry. For most ecosystems that is a pure
+    repair: the tag names a version, and pushing it publishes nothing that was
+    not already released.
+
+    For Go it is not. A Go tag IS the module's published artifact -- the proxy
+    resolves ``<module path>@<tag>`` and caches the result permanently -- so a
+    tag pushed under a module path the repository has since CHANGED publishes
+    an old version under the new identity, which was never released and can
+    never be withdrawn. Go therefore declares
+    :data:`MATERIALIZE_UNLESS_IDENTITY_CHANGED`, and the reconciler refuses to
+    materialize any version whose identity a recorded ``go-module-path``
+    transition places on the other side of the change.
+
+    Declared rather than introspected: it is a fact about what publishing means
+    in the ecosystem, not something the target's methods reveal.
     """
 
     @property

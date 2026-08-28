@@ -5,7 +5,11 @@ import json
 import os
 import re
 
-from .base import BaseTarget, TemplateVars
+from .base import (
+    MATERIALIZE_UNLESS_IDENTITY_CHANGED,
+    BaseTarget,
+    TemplateVars,
+)
 from ..go_introspect import (
     go_pipeline_artifact,
     go_pipeline_install_paths,
@@ -52,6 +56,13 @@ class GoTarget(BaseTarget):
     detection_files = ("go.mod",)
     lint_language = "go"
     ecosystem = "Go modules"
+
+    # A Go tag IS the published artifact: the module proxy resolves it and
+    # caches the answer permanently. Recreating a tag for a version released
+    # under a DIFFERENT module path would publish that version under the
+    # current identity for the first time, unwithdrawably -- so the reconciler
+    # refuses instead, and the operator decides.
+    release_materialization_policy = MATERIALIZE_UNLESS_IDENTITY_CHANGED
 
     @property
     def name(self):
