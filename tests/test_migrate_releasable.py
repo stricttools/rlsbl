@@ -7,7 +7,6 @@ Covers:
 - Full migration flow on a test monorepo (happy path)
 """
 
-import json
 import os
 import shutil
 import subprocess

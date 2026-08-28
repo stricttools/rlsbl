@@ -530,6 +530,39 @@ class TestApply:
         for h in hashes:
             gitout(ns.root, "cat-file", "-e", h + "^{commit}")
 
+    def test_an_unmappable_changelog_hash_is_named(self, tmp_path, capsys):
+        """What the remap could not map is said out loud, never left silent.
+
+        An entry whose commit the rewrite did not carry is reported and then
+        dropped -- the alternative is a changelog entry pointing at a hash that
+        resolves to nothing in the repository it now lives in.
+        """
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        changes = source / ".rlsbl" / "changes"
+        write_jsonl(
+            str(changes / "unreleased.jsonl"),
+            parse_jsonl(str(changes / "unreleased.jsonl")) + [
+                ChangelogEntry(
+                    commits=["0" * 40], user_facing=True,
+                    description="From a commit nobody has", type="fix",
+                ),
+            ],
+        )
+        run_git(source, "add", ".rlsbl")
+        run_git(source, "commit", "-q", "-m", "changelog: a stale hash")
+
+        absorb(ns, source)
+
+        err = capsys.readouterr().err
+        assert "could not be mapped" in err
+        assert "000000000000" in err
+        entries = parse_jsonl(os.path.join(
+            get_releasable_dir(str(ns.root), "widget"), "changes",
+            "unreleased.jsonl",
+        ))
+        assert "From a commit nobody has" not in [e.description for e in entries]
+
     def test_the_release_anchor_is_remapped_and_resolves(self, tmp_path):
         ns = make_destination(tmp_path)
         source = make_source(tmp_path)

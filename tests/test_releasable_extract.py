@@ -21,7 +21,7 @@ import subprocess
 
 import pytest
 
-from conftest import DEFAULT_RELEASE_FILE, declared_members, make_releasable_monorepo, make_releasable_state, with_root_member, workspace_toml, make_workspace
+from conftest import DEFAULT_RELEASE_FILE, declared_members, make_releasable_monorepo, make_releasable_state, workspace_toml, make_workspace
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
 from rlsbl.commands.monorepo import extract as extract_mod
 from rlsbl.commands.monorepo.extract import (
@@ -36,7 +36,6 @@ from rlsbl.workspace import (
     get_releasable_changes_dir,
     get_releasable_dir,
     load_workspace,
-    save_workspace,
     load_releasables,
     Releasable,
     WorkspaceProject,
@@ -817,11 +816,7 @@ class TestAbsorbHistoryRewrite:
 
         from rlsbl.changelog.validate import check_coverage
         from rlsbl.ownership import OwnershipScope
-        from rlsbl.targets import TARGETS, detect_targets
 
-        dest_full = os.path.join(str(root), "packages", "widget")
-        entry_t = detect_targets(dest_full)[0]
-        target = TARGETS[entry_t.name]
         # The glob is the RELEASABLE's now, not the member target's.
         tag_glob = "widget@v*"
 
