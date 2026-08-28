@@ -68,6 +68,16 @@ jobs:
       # migrate-releasable integration tests). That is desired coverage.
       - name: Install git-filter-repo
         run: sudo apt-get update && sudo apt-get install -y git-filter-repo
+      # saferm backs the conversion flows' deletion-consent design: absorb's
+      # residue sweep and extract's source-side deletion refuse without it
+      # unless --delete-with-rm is passed, and the tests exercising the sweep
+      # run with the real tool. Installed into /usr/local/bin so the sandbox's
+      # read-only /usr bind sees it (~/go/bin is not bound). @v0 per the
+      # internal-Go-tools convention -- never @latest.
+      - name: Install saferm
+        run: |
+          go install github.com/smm-h/saferm@v0
+          sudo cp "$(go env GOPATH)/bin/saferm" /usr/local/bin/saferm
       # Warm the uv cache for the FIXTURE projects' fresh, lockfile-less uv work.
       # The `uv sync --locked` above warms rlsbl's own wheels from the lockfile,
       # but a locked sync does NOT populate the simple-index METADATA buckets
