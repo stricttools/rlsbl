@@ -294,13 +294,18 @@ def _go_module_dirs(ctx):
 
     The target registry answers which directories those are, so a Go module
     reached through a ``targets`` entry with a ``path`` is found the same way
-    the release finds it.
+    the release finds it. WHICH targets those are is read from ``CHECK_TARGETS``
+    -- the one place this check's scope is written down -- rather than tested
+    by name here.
     """
+    from . import targets_for_check
     from ..targets import (
         detect_targets,
         resolve_releasable_config_dir,
         resolve_releasable_config_dir_for_ctx,
     )
+
+    scope = targets_for_check("go-module-identity")
 
     if isinstance(ctx, WorkspaceCheckContext) and ctx.projects:
         roots = [
@@ -324,7 +329,7 @@ def _go_module_dirs(ctx):
             # here it simply contributes no Go module.
             continue
         for entry in entries:
-            if entry.name == "go" and entry.path not in dirs:
+            if entry.name in scope and entry.path not in dirs:
                 dirs.append(entry.path)
     return dirs
 

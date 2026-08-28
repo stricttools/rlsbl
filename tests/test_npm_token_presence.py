@@ -17,10 +17,10 @@ import strictcli
 from rlsbl import app, effects
 from rlsbl.ci_secrets import (
     NPM_TOKEN,
-    evaluate_npm_token_presence,
-    npm_ci_pipelines,
-    npm_token_remedy,
+    evaluate_ci_secret_presence,
     probe_repo_secret,
+    required_ci_secrets,
+    secret_remedy,
 )
 
 from conftest import make_ctx
@@ -113,27 +113,35 @@ class TestProbe:
 
 class TestApplicability:
     def test_a_local_npm_pipeline_needs_no_repository_secret(self):
+        """A local publish authenticates from the developer's own ~/.npmrc."""
         pipelines = {"npm": {"type": "npm", "local": True, "target": "npm"}}
-        assert npm_ci_pipelines(pipelines and {"pipelines": pipelines}) == []
+        assert required_ci_secrets({"pipelines": pipelines}) == {}
 
-    def test_a_ci_npm_pipeline_is_in_scope(self):
-        assert npm_ci_pipelines({"pipelines": NPM_CI}) == ["npm"]
+    def test_a_ci_npm_pipeline_declares_its_secret(self):
+        assert required_ci_secrets({"pipelines": NPM_CI}) == {
+            NPM_TOKEN: ["npm"],
+        }
+
+    def test_a_pypi_pipeline_declares_no_secret(self):
+        """Trusted publishing (OIDC) needs no repository secret at all."""
+        pipelines = {"pypi": {"type": "pypi", "local": False, "target": "pypi"}}
+        assert required_ci_secrets({"pipelines": pipelines}) == {}
 
     def test_publish_mode_none_skips(self):
-        verdict = evaluate_npm_token_presence(
+        verdict = evaluate_ci_secret_presence(
             _config(pipelines=NPM_CI, publish_mode="none"), "owner/repo",
         )
         assert verdict.skip_reason is not None
 
-    def test_no_npm_pipeline_skips(self):
+    def test_a_project_whose_pipelines_need_no_secret_skips(self):
         pipelines = {"pypi": {"type": "pypi", "local": False, "target": "pypi"}}
-        verdict = evaluate_npm_token_presence(
+        verdict = evaluate_ci_secret_presence(
             _config(pipelines=pipelines), "owner/repo",
         )
         assert verdict.skip_reason is not None
 
     def test_no_repository_slug_skips(self):
-        verdict = evaluate_npm_token_presence(_config(pipelines=NPM_CI), None)
+        verdict = evaluate_ci_secret_presence(_config(pipelines=NPM_CI), None)
         assert verdict.skip_reason is not None
         assert "GitHub repository" in verdict.skip_reason
 
@@ -145,23 +153,23 @@ class TestApplicability:
 
 class TestVerdict:
     def test_a_present_secret_passes(self):
-        verdict = evaluate_npm_token_presence(
+        verdict = evaluate_ci_secret_presence(
             _config(pipelines=NPM_CI), "owner/repo",
             probe=lambda slug, name: {"status": "present"},
         )
         assert verdict.ok
 
     def test_an_absent_secret_names_the_remedy(self):
-        verdict = evaluate_npm_token_presence(
+        verdict = evaluate_ci_secret_presence(
             _config(pipelines=NPM_CI), "owner/repo",
             probe=lambda slug, name: {"status": "absent"},
         )
         assert not verdict.ok
-        assert npm_token_remedy("owner/repo") in verdict.problems[0]
+        assert secret_remedy("owner/repo", NPM_TOKEN) in verdict.problems[0]
 
     def test_an_unanswered_probe_is_an_error_not_a_pass(self):
         """Fail-closed: "we could not ask" is not evidence."""
-        verdict = evaluate_npm_token_presence(
+        verdict = evaluate_ci_secret_presence(
             _config(pipelines=NPM_CI), "owner/repo",
             probe=lambda slug, name: {"status": "unknown", "message": "no auth"},
         )
@@ -169,7 +177,7 @@ class TestVerdict:
         assert "no auth" in verdict.problems[0]
 
     def test_a_missing_publish_mode_is_reported(self):
-        verdict = evaluate_npm_token_presence(
+        verdict = evaluate_ci_secret_presence(
             {"pipelines": NPM_CI}, "owner/repo",
             probe=lambda slug, name: {"status": "present"},
         )
@@ -223,6 +231,6 @@ class TestRegisteredCheck:
 
 @pytest.mark.parametrize("slug", ["owner/repo", "org/other"])
 def test_the_remedy_reads_the_local_npmrc(slug):
-    remedy = npm_token_remedy(slug)
+    remedy = secret_remedy(slug, NPM_TOKEN)
     assert remedy.startswith(f"gh secret set {NPM_TOKEN} --repo {slug}")
     assert "~/.npmrc" in remedy

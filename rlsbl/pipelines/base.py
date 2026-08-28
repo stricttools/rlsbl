@@ -21,6 +21,17 @@ class BasePipeline:
     Subclasses override specific methods to implement their publish mechanism.
     """
 
+    #: The GitHub Actions repository secret this pipeline's CI publish job
+    #: authenticates with, when it uses one. Empty by default: a pipeline that
+    #: publishes through OIDC trusted publishing (pypi) or through no
+    #: credential at all needs no repository secret, and claiming one would
+    #: make a check demand a secret that must not exist.
+    #:
+    #: It is a CLASS attribute rather than a config key because the name is
+    #: written into this pipeline's workflow templates -- the workflow and the
+    #: declaration cannot disagree.
+    ci_secret_var: str = ""
+
     def __init__(self, name: str, pipeline_type: str, local: bool, config: dict):
         """Initialize with pipeline identity, local-publish flag, and config dict."""
         self.name = name
@@ -78,6 +89,17 @@ class BasePipeline:
             parts.append(str(exc.stderr))
         combined = " ".join(parts)
         return any(sig in combined for sig in _ALREADY_EXISTS_SIGNATURES)
+
+    def ci_secret_names(self) -> list[str]:
+        """Repository secrets this pipeline's CI publish job authenticates with.
+
+        Empty when the pipeline publishes LOCALLY -- the credential is then the
+        developer's own environment, which is what ``required_env_vars``
+        answers -- and empty when the workflow needs no repository secret.
+        """
+        if self.local or not self.ci_secret_var:
+            return []
+        return [self.ci_secret_var]
 
     def publish(self, dir_path: str, version: str, ctx) -> None:
         """Publish the package. No-op by default; subclasses override."""

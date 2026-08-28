@@ -34,3 +34,7 @@ class Pipeline(Protocol):
     def required_env_vars(self) -> list[str]:
         """Return env var names required for local publishing."""
         ...
+
+    def ci_secret_names(self) -> list[str]:
+        """Return the repository secrets the CI publish job authenticates with."""
+        ...

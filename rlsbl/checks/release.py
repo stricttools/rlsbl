@@ -287,11 +287,16 @@ def register_networked_release_checks(app):
         has already tagged, pushed and created the GitHub Release. Presence
         only: the value is not retrievable through the API and rlsbl never puts
         a credential on a pipe.
+
+        WHICH secret is owed is each pipeline's own declaration
+        (``ci_secret_names``), not a pipeline type tested by name here: npm
+        declares ``NPM_TOKEN``, pypi declares none because its workflow
+        authenticates through OIDC trusted publishing.
         """
-        from ..ci_secrets import evaluate_npm_token_presence
+        from ..ci_secrets import evaluate_ci_secret_presence
         from ..utils import get_github_repo
 
-        verdict = evaluate_npm_token_presence(
+        verdict = evaluate_ci_secret_presence(
             ctx.config, get_github_repo(ctx.config),
         )
         if verdict.skip_reason is not None:
