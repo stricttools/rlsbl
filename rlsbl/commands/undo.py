@@ -24,7 +24,7 @@ from ..evidence_gate import EvidenceKind, Verdict, run_evidence_gate, write_undo
 from ..member_context import resolve_member_context
 from ..release_file import unfinalize_release_file
 from ..targets import TARGETS
-from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree
+from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree, working_tree_paths
 from ..workspace import find_workspace_root, resolve_project
 
 # Status constants for step results
@@ -187,13 +187,12 @@ def _resolve_context(ctx):
         from ..targets import resolve_releasable_config_dir
         releasable_config_dir = resolve_releasable_config_dir(project, ws_root)
 
-        from ..workspace import is_explicit_mode, load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
-        if is_explicit_mode(ws_root):
-            ws_projects = _load_ws(ws_root)
-            releasables = load_releasables(ws_root, ws_projects)
-            rel = resolve_releasable_for_project(project, releasables)
-            if rel:
-                releasable_name = rel.name
+        from ..workspace import load_releasables, load_workspace as _load_ws, resolve_releasable_for_project
+        ws_projects = _load_ws(ws_root)
+        releasables = load_releasables(ws_root, ws_projects)
+        rel = resolve_releasable_for_project(project, releasables)
+        if rel:
+            releasable_name = rel.name
 
     project_path = os.path.join(ws_root, monorepo_project_path) if monorepo_name else str(ctx.project_root or ".")
     return SimpleNamespace(
@@ -263,13 +262,12 @@ def _build_tag_from_version(uc, version):
         return f"v{version}"
     target_obj = TARGETS[entries[0].name]
     if uc.releasable_name and uc.ws_root:
-        from ..workspace import load_releasables as _lr, load_workspace as _lw, is_explicit_mode as _ie
-        if _ie(uc.ws_root):
-            _rels = _lr(uc.ws_root, _lw(uc.ws_root))
-            _rel = next((r for r in _rels if r.name == uc.releasable_name), None)
-            if _rel and _rel.effective_tag_format:
-                from .release.validate import _format_releasable_tag
-                return _format_releasable_tag(_rel.effective_tag_format, uc.releasable_name, version)
+        from ..workspace import load_releasables as _lr, load_workspace as _lw
+        _rels = _lr(uc.ws_root, _lw(uc.ws_root))
+        _rel = next((r for r in _rels if r.name == uc.releasable_name), None)
+        if _rel and _rel.effective_tag_format:
+            from .release.validate import _format_releasable_tag
+            return _format_releasable_tag(_rel.effective_tag_format, uc.releasable_name, version)
         return target_obj.monorepo_tag_format(uc.monorepo_name, version, path=uc.monorepo_project_path)
     if uc.monorepo_name:
         return target_obj.monorepo_tag_format(uc.monorepo_name, version, path=uc.monorepo_project_path)
@@ -356,7 +354,6 @@ def _plan_companion_tags(uc, tag, version):
         from ..commands.release.execute import release_ref_context
         from ..workspace import (
             get_releasable_dir,
-            is_explicit_mode,
             load_releasables,
             load_workspace,
             members_of,
@@ -366,14 +363,12 @@ def _plan_companion_tags(uc, tag, version):
         member_paths = [p["path"] for p in members_of(uc.releasable_name, ws_projects)]
         rel_cfg_dir = get_releasable_dir(str(uc.ws_root), uc.releasable_name)
 
-        tag_fmt = None
-        if is_explicit_mode(uc.ws_root):
-            rel = next(
-                (r for r in load_releasables(uc.ws_root, ws_projects)
-                 if r.name == uc.releasable_name),
-                None,
-            )
-            tag_fmt = rel.effective_tag_format if rel else None
+        rel = next(
+            (r for r in load_releasables(uc.ws_root, ws_projects)
+             if r.name == uc.releasable_name),
+            None,
+        )
+        tag_fmt = rel.effective_tag_format if rel else None
 
         member = resolve_member_context(
             uc.start_path, releasable_config_dir=uc.releasable_config_dir,
@@ -636,8 +631,7 @@ def _restore_changelog(plan, uc, results):
         )
         unfinalize_version(changes_dir, plan.version)
         regenerate_changelog()
-        status = run("git", ["--no-optional-locks", "status", "--porcelain", "--", *add_paths]).strip()
-        if status:
+        if working_tree_paths(paths=add_paths):
             run("git", ["add", *add_paths])
             run("git", ["commit", "-m", f"chore: restore changelog after undo of {plan.tag}"])
             results.append(("Restore changelog", OK, "-"))

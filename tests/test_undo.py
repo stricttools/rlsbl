@@ -567,3 +567,57 @@ class TestEdgeCases:
             _run_undo(repo, {})
         assert exc.value.code == 1
         assert "no releases recorded" in capsys.readouterr().err.lower()
+
+
+class TestRestoreChangelogNamesRealPaths:
+    """The changelog restore reads and commits by path, in the project's repo.
+
+    A project directory outside plain ASCII is the case that breaks a
+    hand-rolled porcelain read: git's default output would C-quote the path,
+    and every path the restore then names would be a name no filesystem has.
+    The restore reads through the shared NUL-separated helper, so what it sees
+    is what is on disk.
+    """
+
+    def test_restore_commits_in_a_unicode_project_directory(
+        self, tmp_path, monkeypatch,
+    ):
+        from types import SimpleNamespace
+
+        from rlsbl.commands import undo as undo_mod
+
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        project = repo / "pkgé nom"
+        changes = project / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "1.0.0.jsonl").write_text(json.dumps(_ENTRY) + "\n")
+        (project / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.0\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "initial")
+        monkeypatch.chdir(repo)
+
+        def _regenerate():
+            (project / "CHANGELOG.md").write_text("# Changelog\n\n## Unreleased\n")
+
+        def _unfinalize(_changes_dir, _version):
+            (changes / "1.0.0.jsonl").rename(changes / "unreleased.jsonl")
+
+        add_paths = [str(changes), str(project / "CHANGELOG.md")]
+        plan = SimpleNamespace(
+            project_path=str(project), version="1.0.0",
+            releasable_name=None, tag="v1.0.0",
+        )
+        uc = SimpleNamespace(ws_root=None)
+        results = []
+
+        with patch.object(
+            undo_mod, "_resolve_undo_changelog_paths",
+            return_value=(str(changes), _regenerate, add_paths),
+        ), patch.object(undo_mod, "unfinalize_version", side_effect=_unfinalize):
+            undo_mod._restore_changelog(plan, uc, results)
+
+        assert results == [("Restore changelog", undo_mod.OK, "-")]
+        assert git(repo, "status", "--porcelain") == ""
+        assert (changes / "unreleased.jsonl").is_file()
+        assert "Unreleased" in (project / "CHANGELOG.md").read_text()

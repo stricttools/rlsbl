@@ -546,10 +546,14 @@ class TestUndoReleaseFileFinalize:
     @patch(f"{MOD_UNDO}.check_gh_auth", return_value=True)
     @patch(f"{MOD_UNDO}.check_gh_installed", return_value=True)
     @patch(f"{MOD_UNDO}.run_gh", return_value="")
+    @patch(f"{MOD_UNDO}.working_tree_paths", return_value=[])
     @patch(f"{MOD_UNDO}.run")
-    def test_release_file_finalize_at_head(self, mock_run, _run_gh, *_):
+    def test_release_file_finalize_at_head(self, mock_run, _paths, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
+        # The changelog restore asks its question through working_tree_paths
+        # (the shared working-tree read), not through ``run``, so a clean
+        # answer there means no add/commit follows it.
         mock_run.side_effect = [
             "v1.0.0",                                         # git describe
             "",                                                # git push origin :v1.0.0
@@ -563,7 +567,7 @@ class TestUndoReleaseFileFinalize:
         ]
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {}, ctx=_ctx())
-        assert mock_run.call_count == 9
+        assert mock_run.call_count == 8
 
 
 class TestUndoFinalizeOnlyReverted:
