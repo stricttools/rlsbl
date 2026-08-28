@@ -683,6 +683,29 @@ class TestUndoCoverageNeverPollutesRealRepo:
 MOD_STATUS = "rlsbl.commands.status"
 
 
+def _status_git_log(returncode=0, stdout=""):
+    """An ``effects.run`` stand-in answering status's own ``git log`` read.
+
+    ``rlsbl.commands.status`` counts unreleased commits with a ``git log``
+    issued on the effects chokepoint. The tests below are about what status
+    REPORTS around that read -- a branch it could not determine, a project
+    that is not releasable, the text rendering of an empty history -- so the
+    read is answered here and every other effect is delegated to the real
+    chokepoint. A non-zero return code is how git reports "no history here",
+    which is what these fixtures are.
+    """
+    from rlsbl import effects as _effects
+
+    real = _effects.run
+
+    def fake(argv, **kwargs):
+        if list(argv[:2]) == ["git", "log"]:
+            return subprocess.CompletedProcess(list(argv), returncode, stdout, "")
+        return real(argv, **kwargs)
+
+    return fake
+
+
 class TestStatusProjectNotFound:
     """Covers lines 41-42: target project does not exist."""
 
@@ -724,7 +747,8 @@ class TestStatusBranchException:
              patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(version=None, in_checkout=None)), \
-             patch(f"{MOD_STATUS}.run", side_effect=Exception("no tag")), \
+             patch(f"{MOD_STATUS}.effects.run",
+                   side_effect=_status_git_log(returncode=128)), \
              patch(f"{MOD_STATUS}.is_clean_tree", side_effect=Exception("no tree")):
             data = run_cmd("npm", [], {"json": True}, ctx=_ctx(root=tmp_path))
 
@@ -767,7 +791,8 @@ class TestStatusNonReleasableProject:
              patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(version=None, in_checkout=None)), \
-             patch(f"{MOD_STATUS}.run", return_value="v1.0.0"), \
+             patch(f"{MOD_STATUS}.effects.run",
+                   side_effect=_status_git_log()), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
             data = run_cmd("npm", [], {"json": True}, ctx=_ctx())
         assert data["jsonl_coverage"] == "non-releasable -- no changelog"
@@ -796,7 +821,8 @@ class TestStatusTextOutputPaths:
              patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(version=None, in_checkout=None)), \
-             patch(f"{MOD_STATUS}.run", side_effect=Exception("no tag")), \
+             patch(f"{MOD_STATUS}.effects.run",
+                   side_effect=_status_git_log(returncode=128)), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
             run_cmd("npm", [], {}, ctx=_ctx(root=tmp_path))
         out = capsys.readouterr().out
@@ -1901,23 +1927,44 @@ class TestSyncGithubRelease:
 
 
 class TestGetGeneratedFiles:
-    """Covers lines 724-749: _get_generated_files."""
+    """Covers _get_generated_files.
+
+    The working-tree read goes through ``rlsbl.utils.working_tree_status``,
+    which issues ``git status --porcelain -z`` on the effects chokepoint and
+    asks for ``--untracked-files=all`` (a project whose ``.rlsbl/changes/`` is
+    not tracked yet would otherwise report the directory alone, and every
+    generated ``.md`` inside it would go uncommitted). These tests answer that
+    one read with real ``-z`` output, so the shared parser runs for real.
+    """
+
+    @staticmethod
+    def _answering(porcelain):
+        """An ``effects.run`` stand-in answering the status read from *porcelain*."""
+        def fake(argv, **kwargs):
+            assert list(argv[:4]) == [
+                "git", "--no-optional-locks", "status", "--porcelain",
+            ], argv
+            assert "--untracked-files=all" in argv, argv
+            stdout = "".join(
+                line + "\0" for line in porcelain.splitlines() if line.strip()
+            )
+            return subprocess.CompletedProcess(list(argv), 0, stdout, "")
+
+        return fake
 
     def test_git_status_fails(self):
         from rlsbl.commands.changelog_cmd import _get_generated_files
 
-        with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "git")):
+        with patch("rlsbl.utils.effects.run",
+                   side_effect=subprocess.CalledProcessError(1, "git")):
             assert _get_generated_files(".") == []
 
     def test_parses_changed_files(self):
         from rlsbl.commands.changelog_cmd import _get_generated_files
 
-        result = subprocess.CompletedProcess(
-            args=[], returncode=0,
-            stdout=" M CHANGELOG.md\n M .rlsbl/changes/1.0.0.md\nA  src/main.py\n",
-            stderr="",
-        )
-        with patch("subprocess.run", return_value=result):
+        with patch("rlsbl.utils.effects.run", side_effect=self._answering(
+            " M CHANGELOG.md\n M .rlsbl/changes/1.0.0.md\nA  src/main.py\n"
+        )):
             files = _get_generated_files("/proj")
         assert any("CHANGELOG.md" in f for f in files)
         assert any("1.0.0.md" in f for f in files)
@@ -1927,12 +1974,8 @@ class TestGetGeneratedFiles:
     def test_short_lines_skipped(self):
         from rlsbl.commands.changelog_cmd import _get_generated_files
 
-        result = subprocess.CompletedProcess(
-            args=[], returncode=0,
-            stdout="??\nM\n M CHANGELOG.md\n",
-            stderr="",
-        )
-        with patch("subprocess.run", return_value=result):
+        with patch("rlsbl.utils.effects.run",
+                   side_effect=self._answering("??\nM\n M CHANGELOG.md\n")):
             files = _get_generated_files("/proj")
         assert len(files) == 1
 
