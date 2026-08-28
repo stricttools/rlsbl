@@ -30,7 +30,7 @@ rlsbl scaffold          # set up CI/CD, hooks, changelog, pipelines
 # ... develop, commit ...
 rlsbl release init      # scaffold .rlsbl/releases/unreleased.toml
 # ... edit bump type, targets, pipelines ...
-rlsbl release run       # bump, tag, push, publish, create GitHub Release
+rlsbl release run       # bump, push the candidate, wait for CI, tag, publish
 rlsbl watch <sha>       # monitor CI for that release
 ```
 
@@ -44,27 +44,25 @@ Global flags: `--help`, `--version`, `--dry-run`, `--approve-consequential`, `--
 
 ## Release flow
 
-When you run `rlsbl release run`:
+`rlsbl release run` reads `.rlsbl/releases/unreleased.toml` for the bump type, the
+description and the target selection, then:
 
-1. Reads `.rlsbl/releases/unreleased.toml` for bump type (patch/minor/major) and target selection
-2. Verifies `gh` CLI is installed and authenticated
-3. Checks working tree is clean (use `--allow-dirty` to override)
-4. Fetches origin and verifies local branch is not behind remote
-5. Reads the current version from the primary project file
-6. Computes the new version; confirms the tag does not already exist
-7. Validates JSONL changelog via the check system
-8. Runs `.rlsbl/hooks/pre-checks.sh` if present (user-owned, non-zero aborts)
-9. Runs built-in tests and lint
-10. Runs `.rlsbl/hooks/pre-release.sh` if present (scaffold-managed, non-zero aborts)
-11. Acquires advisory lockfile (`.rlsbl/lock`) to prevent concurrent operations
-12. Writes the new version to all detected project files and `.rlsbl/version`
-13. Commits the version bump (uses `safegit` if available)
-14. Tags and pushes to `origin`
-15. Finalizes JSONL changelog (renames `unreleased.jsonl`, generates CHANGELOG.md)
-16. Creates a GitHub Release with the changelog entry as notes
-17. Runs publish pipelines (configured in `.rlsbl/config.json` under `pipelines`)
-18. Runs `.rlsbl/hooks/post-release.sh` if present (non-fatal)
-19. Prints `Watch CI: rlsbl watch <sha>`
+1. Verifies `gh` auth and a clean working tree (`--allow-dirty` accepts a dirty one), computes the new version and confirms its tag does not exist
+2. Validates the JSONL changelog and regenerates CHANGELOG.md from it
+3. Runs `.rlsbl/hooks/pre-checks.sh` (user-owned), the strictcli schema dump, `selfdoc gen` and `selfdoc check`, the built-in tests and lint, and `.rlsbl/hooks/pre-release.sh` (scaffold-managed) -- any non-zero aborts
+4. Writes the new version to every detected target file and `.rlsbl/version`, commits it with the tag string as the message, and pushes that commit **untagged**: the release candidate
+5. Waits in-process for the repository's own push-triggered CI to conclude on that exact commit
+6. Finalizes the changelog (renames `unreleased.jsonl` to the version's file, opens a fresh one, regenerates CHANGELOG.md), archives the release file, tags the **CI-verified commit**, pushes the finalization commits and the tags, and creates the GitHub Release with the version's changelog section as notes
+7. Uploads assets, runs each pipeline's `publish` (configured in `.rlsbl/config.json`), deploys, runs `.rlsbl/hooks/post-release.sh` (non-fatal), and prints `Watch CI: rlsbl watch <sha>`
+
+Everything above the candidate push is reversible; everything below it is not. A red
+CI verdict therefore leaves nothing behind but a commit on the branch -- no tag, no
+GitHub Release, no finalized changelog, nothing on any registry. Fix forward on the
+release branch and `rlsbl release resume` completes the *same* version; a failed
+release never burns it.
+
+The step-by-step pipeline, including what each step does in monorepo and releasable
+mode, is in [docs/release-workflow.md](docs/release-workflow.md).
 
 Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
 would-do log rather than performed. A small set of commands declares itself `consequential`
@@ -83,9 +81,10 @@ Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
 ## Scaffold
 
 ```
-rlsbl scaffold              # create or update CI/CD for all detected registries
-rlsbl scaffold --force      # overwrite managed files (user-owned files still preserved)
-rlsbl scaffold --no-auto-commit  # skip auto-commit of scaffolded files
+rlsbl scaffold                    # create or update CI/CD for all detected registries
+rlsbl scaffold --target plain     # also cover a registry auto-detection cannot find
+rlsbl scaffold --no-auto-commit   # skip auto-commit of scaffolded files
+rlsbl scaffold --no-auto-tag      # skip the rlsbl GitHub topic tag on this run
 ```
 
 Created files are committed automatically by default.
@@ -107,7 +106,7 @@ Created files are committed automatically by default.
 
 **Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
 
-**User-owned files** (CHANGELOG.md, LICENSE, hooks) are never overwritten, even with `--force`.
+**User-owned files** (CHANGELOG.md, LICENSE, `.rlsbl/hooks/pre-checks.sh`, `.rlsbl/changes/unreleased.jsonl`) are never overwritten by a re-scaffold: there is no flag that makes scaffold clobber them.
 
 **Customizing CI without conflicts:** Instead of editing `ci.yml` or `publish.yml` (which can produce merge conflicts on re-scaffold), put extra jobs in a separate workflow file scaffold never touches:
 
@@ -122,15 +121,11 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 :-: check-count
 
-| Tag | Checks | Description |
-|-----|--------|-------------|
-| `project` | 14 | Version, name, license, description consistency; config schema; stale private hook; publish-mode workflow; npm mismatch; target/dunder version readability; selfdoc drift; scaffold conflicts |
-| `release` | 5 | Local/remote tag, GitHub Release, branch sync, scaffold conflicts |
-| `changelog` | 9 | Hash resolution, range, coverage, orphans, schema, user-facing, batch limits, entry |
-| `workspace` | 14 | CI router, CI sync, targets, unregistered, stale entries, dev-only/unversioned boundaries, dead packages, subtree remote, buildability, gitignore, root conflict, Go companion tags, workspace tests |
-| `quality` | 9 | Dead modules, circular deps, library/ruff lint, deps runtime-test-only/dev-in-lib, scaffold vars, test suite, Maven Central metadata |
-| `prepush` | 6 | Changelog coverage, gitignore guard, manual-push warning, tests, scaffold conflicts |
-| (untagged) | 4 | Layers violations, deps unused/undeclared/stale |
+Checks are grouped by tag -- `--tag` runs one family, `--name` runs a single check, and `--all` runs everything, including the checks that carry no tag:
+
+:-: table-check-tags
+
+What each tag's checks actually verify, one row per check with its severity, is in [docs/checks.md](docs/checks.md), which also says which tags the release pipeline runs on its own.
 
 ```
 rlsbl check --all              # run all checks
@@ -202,7 +197,7 @@ To disable:
 
 | Method | Scope |
 |--------|-------|
-| `--no-tag` flag | Single invocation |
+| `--no-auto-tag` flag | Single invocation |
 | `{"tag": false}` in `.rlsbl/config.json` | This project |
 | `{"tag": false}` in `~/.rlsbl/config.json` | All projects |
 
