@@ -124,6 +124,7 @@ order: 90
 - [rlsbl.lock](../rlsbl-lock/)
 - [rlsbl.maven_central](../rlsbl-maven_central/)
 - [rlsbl.member_context](../rlsbl-member_context/)
+- [rlsbl.mirror_publication](../rlsbl-mirror_publication/)
 - [rlsbl.module_paths](../rlsbl-module_paths/)
 - [rlsbl.npm_wrapper](../rlsbl-npm_wrapper/)
 - [rlsbl.observe_allowlist](../rlsbl-observe_allowlist/)

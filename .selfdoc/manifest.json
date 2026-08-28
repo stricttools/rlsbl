@@ -2701,8 +2701,8 @@
         },
         {
           "level": 3,
-          "text": "A mirrored releasable cannot be extracted",
-          "anchor": "a-mirrored-releasable-cannot-be-extracted"
+          "text": "Extracting a mirrored releasable promotes the mirror",
+          "anchor": "extracting-a-mirrored-releasable-promotes-the-mirror"
         },
         {
           "level": 2,
@@ -2828,6 +2828,16 @@
           "level": 3,
           "text": "`resolve_releasable_for_project`",
           "anchor": "resolve_releasable_for_project"
+        },
+        {
+          "level": 3,
+          "text": "`mirror_remote_for`",
+          "anchor": "mirror_remote_for"
+        },
+        {
+          "level": 3,
+          "text": "`mirrored_releasable_for`",
+          "anchor": "mirrored_releasable_for"
         },
         {
           "level": 3,
@@ -3252,6 +3262,11 @@
         },
         {
           "level": 2,
+          "text": "Who writes which ref namespace",
+          "anchor": "who-writes-which-ref-namespace"
+        },
+        {
+          "level": 2,
           "text": "Publish gating",
           "anchor": "publish-gating"
         },
@@ -3324,6 +3339,11 @@
           "level": 3,
           "text": "The five verdicts",
           "anchor": "the-five-verdicts"
+        },
+        {
+          "level": 3,
+          "text": "The ledger is healed before anything is judged",
+          "anchor": "the-ledger-is-healed-before-anything-is-judged"
         },
         {
           "level": 3,
@@ -6480,6 +6500,11 @@
         },
         {
           "level": 4,
+          "text": "`is_promotion`",
+          "anchor": "is_promotion"
+        },
+        {
+          "level": 4,
           "text": "`member_paths`",
           "anchor": "member_paths"
         },
@@ -6680,6 +6705,31 @@
         },
         {
           "level": 3,
+          "text": "`_promotion_source_shas`",
+          "anchor": "_promotion_source_shas"
+        },
+        {
+          "level": 3,
+          "text": "`_build_split_map`",
+          "anchor": "_build_split_map"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_promotion_clone`",
+          "anchor": "_apply_promotion_clone"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_promotion_trees`",
+          "anchor": "_apply_promotion_trees"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_promotion_tags`",
+          "anchor": "_apply_promotion_tags"
+        },
+        {
+          "level": 3,
           "text": "`_apply_dependencies`",
           "anchor": "_apply_dependencies"
         },
@@ -6772,6 +6822,21 @@
           "level": 3,
           "text": "`_apply_next_steps`",
           "anchor": "_apply_next_steps"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_history`",
+          "anchor": "_apply_history"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_identity`",
+          "anchor": "_apply_identity"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_tag_step`",
+          "anchor": "_apply_tag_step"
         },
         {
           "level": 3,
@@ -6906,6 +6971,11 @@
         },
         {
           "level": 3,
+          "text": "`scaffold_owned_files`",
+          "anchor": "scaffold_owned_files"
+        },
+        {
+          "level": 3,
           "text": "`MirrorError`",
           "anchor": "mirrorerror"
         },
@@ -6938,6 +7008,11 @@
           "level": 3,
           "text": "`classify_remote`",
           "anchor": "classify_remote"
+        },
+        {
+          "level": 3,
+          "text": "`classify_result`",
+          "anchor": "classify_result"
         },
         {
           "level": 3,
@@ -6976,6 +7051,21 @@
         },
         {
           "level": 3,
+          "text": "`MirrorTagPlan`",
+          "anchor": "mirrortagplan"
+        },
+        {
+          "level": 3,
+          "text": "`observe_tags`",
+          "anchor": "observe_tags"
+        },
+        {
+          "level": 3,
+          "text": "`tag_verdict_item`",
+          "anchor": "tag_verdict_item"
+        },
+        {
+          "level": 3,
           "text": "`_undetermined_detail`",
           "anchor": "_undetermined_detail"
         },
@@ -6991,6 +7081,11 @@
         },
         {
           "level": 3,
+          "text": "`_rewrite_identity`",
+          "anchor": "_rewrite_identity"
+        },
+        {
+          "level": 3,
           "text": "`_run_scaffold`",
           "anchor": "_run_scaffold"
         },
@@ -6998,6 +7093,26 @@
           "level": 3,
           "text": "`_converge`",
           "anchor": "_converge"
+        },
+        {
+          "level": 3,
+          "text": "`converge_branch`",
+          "anchor": "converge_branch"
+        },
+        {
+          "level": 3,
+          "text": "`_member_target`",
+          "anchor": "_member_target"
+        },
+        {
+          "level": 3,
+          "text": "`_observe_tags`",
+          "anchor": "_observe_tags"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_tag`",
+          "anchor": "_apply_tag"
         },
         {
           "level": 3,
@@ -8378,6 +8493,11 @@
         },
         {
           "level": 3,
+          "text": "`_ledger_dir_for_tag`",
+          "anchor": "_ledger_dir_for_tag"
+        },
+        {
+          "level": 3,
           "text": "`recreate_github_releases`",
           "anchor": "recreate_github_releases"
         },
@@ -8425,6 +8545,16 @@
           "level": 3,
           "text": "`collect_explanations`",
           "anchor": "collect_explanations"
+        },
+        {
+          "level": 3,
+          "text": "`dangling_anchors`",
+          "anchor": "dangling_anchors"
+        },
+        {
+          "level": 3,
+          "text": "`heal_dangling_anchors`",
+          "anchor": "heal_dangling_anchors"
         },
         {
           "level": 3,
@@ -8495,6 +8625,11 @@
           "level": 3,
           "text": "`read_plan`",
           "anchor": "read_plan"
+        },
+        {
+          "level": 3,
+          "text": "`check_plan_covers`",
+          "anchor": "check_plan_covers"
         },
         {
           "level": 3,
@@ -12014,6 +12149,83 @@
       ]
     },
     {
+      "path": "rlsbl-mirror_publication.md",
+      "title": "rlsbl.mirror_publication",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.mirror_publication",
+          "anchor": "rlsblmirror_publication"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.mirror_publication`",
+          "anchor": "rlsblmirror_publication"
+        },
+        {
+          "level": 3,
+          "text": "`MirrorPublicationError`",
+          "anchor": "mirrorpublicationerror"
+        },
+        {
+          "level": 3,
+          "text": "`split_commit_for`",
+          "anchor": "split_commit_for"
+        },
+        {
+          "level": 3,
+          "text": "`split_map_for`",
+          "anchor": "split_map_for"
+        },
+        {
+          "level": 3,
+          "text": "`mirror_tag`",
+          "anchor": "mirror_tag"
+        },
+        {
+          "level": 3,
+          "text": "`remote_refs`",
+          "anchor": "remote_refs"
+        },
+        {
+          "level": 3,
+          "text": "`parse_ls_remote`",
+          "anchor": "parse_ls_remote"
+        },
+        {
+          "level": 3,
+          "text": "`remote_tag_commits`",
+          "anchor": "remote_tag_commits"
+        },
+        {
+          "level": 3,
+          "text": "`push_tag`",
+          "anchor": "push_tag"
+        },
+        {
+          "level": 3,
+          "text": "`ensure_tag`",
+          "anchor": "ensure_tag"
+        },
+        {
+          "level": 3,
+          "text": "`publish_release`",
+          "anchor": "publish_release"
+        },
+        {
+          "level": 3,
+          "text": "`version_notes`",
+          "anchor": "version_notes"
+        },
+        {
+          "level": 3,
+          "text": "`publish_version`",
+          "anchor": "publish_version"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-module_paths.md",
       "title": "rlsbl.module_paths",
       "type": "doc",
@@ -14402,6 +14614,11 @@
         },
         {
           "level": 4,
+          "text": "`rewrite_mirror_identity`",
+          "anchor": "rewrite_mirror_identity"
+        },
+        {
+          "level": 4,
           "text": "`yank`",
           "anchor": "yank"
         }
@@ -14729,6 +14946,11 @@
           "level": 4,
           "text": "`name`",
           "anchor": "name"
+        },
+        {
+          "level": 4,
+          "text": "`rewrite_mirror_identity`",
+          "anchor": "rewrite_mirror_identity"
         },
         {
           "level": 4,
@@ -15934,6 +16156,11 @@
         },
         {
           "level": 4,
+          "text": "`rewrite_mirror_identity`",
+          "anchor": "rewrite_mirror_identity"
+        },
+        {
+          "level": 4,
           "text": "`yank`",
           "anchor": "yank"
         }
@@ -16554,6 +16781,16 @@
           "level": 3,
           "text": "`targets_sharing_workspace_environment`",
           "anchor": "targets_sharing_workspace_environment"
+        },
+        {
+          "level": 3,
+          "text": "`targets_consumed_by_repository_url`",
+          "anchor": "targets_consumed_by_repository_url"
+        },
+        {
+          "level": 3,
+          "text": "`mirror_identity_manifests`",
+          "anchor": "mirror_identity_manifests"
         },
         {
           "level": 3,
@@ -17247,6 +17484,16 @@
         },
         {
           "level": 3,
+          "text": "`mirror_remote_for`",
+          "anchor": "mirror_remote_for"
+        },
+        {
+          "level": 3,
+          "text": "`mirrored_releasable_for`",
+          "anchor": "mirrored_releasable_for"
+        },
+        {
+          "level": 3,
           "text": "`_get_releasable_value`",
           "anchor": "_get_releasable_value"
         },
@@ -17501,6 +17748,11 @@
         },
         {
           "level": 4,
+          "text": "`is_mirrored`",
+          "anchor": "is_mirrored"
+        },
+        {
+          "level": 4,
           "text": "`effective_tag_format`",
           "anchor": "effective_tag_format"
         },
@@ -17558,11 +17810,6 @@
           "level": 4,
           "text": "`registry_name`",
           "anchor": "registry_name"
-        },
-        {
-          "level": 4,
-          "text": "`subtree_remote`",
-          "anchor": "subtree_remote"
         },
         {
           "level": 4,
@@ -18377,6 +18624,11 @@
         },
         {
           "level": 4,
+          "text": "`rewrite_mirror_identity`",
+          "anchor": "rewrite_mirror_identity"
+        },
+        {
+          "level": 4,
           "text": "`yank`",
           "anchor": "yank"
         },
@@ -18639,6 +18891,11 @@
           "level": 4,
           "text": "`run_tests`",
           "anchor": "run_tests-1"
+        },
+        {
+          "level": 4,
+          "text": "`rewrite_mirror_identity`",
+          "anchor": "rewrite_mirror_identity-1"
         },
         {
           "level": 4,
@@ -19007,6 +19264,11 @@
         },
         {
           "level": 4,
+          "text": "`rewrite_mirror_identity`",
+          "anchor": "rewrite_mirror_identity-2"
+        },
+        {
+          "level": 4,
           "text": "`yank`",
           "anchor": "yank-2"
         }
@@ -19167,6 +19429,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-28T05:26:42.647497+00:00",
+  "last_gen": "2026-08-28T06:13:19.419818+00:00",
   "theme": "minimal"
 }

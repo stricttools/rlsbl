@@ -99,6 +99,20 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
   untouched, and `--unset-description`/`--unset-type` clear a field rather than writing
   an empty string to it.
 
+## Who writes which ref namespace
+
+Every ref rlsbl writes has exactly one writer, and no other part of the tool
+writes it. Reading this table is how you know whether something you are about
+to do belongs to you or to a command:
+
+| Namespace | Written by | Never written by |
+| --- | --- | --- |
+| `origin` branch heads | Releases only -- `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits. There is no dev-branch push path. | Anything else. There is no `rlsbl push`, and the pre-push hook refuses a manual push to a release branch. |
+| `origin` tags, and the GitHub Releases attached to them | The release's own tag step, and `rlsbl release reconcile` when a rewrite or a partial release left them wrong. Both compose the Release through the one publication module, so the notes and the `rlsbl-ci-sha` marker are identical either way. | Hand-created tags. A released tag is never moved. |
+| A subtree mirror's `main` | The mirror reconciler's converge -- `rlsbl monorepo mirror <project>`, and the release's mirror step, which calls the same code. Force-with-lease is its routine write, because the mirror is a derived artifact. | Anything that authors on the mirror. A commit the reconciler cannot account for is a contract violation and it refuses. |
+| A subtree mirror's tags, and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. | The mirror's own CI -- a mirror's scaffold renders no publish workflow, on purpose. |
+| Rewritten history on any of the above | `rlsbl release scrub` (which wraps `safegit scrub`), the ONE sanctioned rewrite write. It force-pushes, remaps the changelog hashes, moves the tags and recreates the GitHub Releases in one pass. | A bare `git push --force`. A rewrite performed outside it leaves the ledger, the tags and the Releases stale; `rlsbl release reconcile` is what heals that. |
+
 ## Release pipeline order
 
 During `rlsbl release run`, the validation and build steps run in this order:
