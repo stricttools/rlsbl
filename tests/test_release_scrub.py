@@ -516,7 +516,7 @@ class TestDryRunShowsPreviewNoMutations:
 
 
 class TestFullScrubFlow:
-    """End-to-end scrub: JSONL remap, CHANGELOG regen, push, release recreation."""
+    """End-to-end scrub: JSONL remap, CHANGELOG regen, push, Release rewrite."""
 
     @patch(f"{MOD}.release_lock")
     @patch(f"{MOD}.acquire_lock")

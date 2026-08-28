@@ -36,7 +36,7 @@ CONSEQUENTIAL = {
     "release deprecate":          "makes a public statement about a shipped version",
     "release yank":               "removes a published version from public registries",
     "release scrub":              "rewrites history and force-pushes it",
-    "release reconcile":          "force-pushes tags and recreates their Releases",
+    "release reconcile":          "force-pushes tags and rewrites their Releases",
     "monorepo mirror":            "force-pushes the mirror remote",
     "monorepo absorb":            "rewrites another repo's history and merges it in",
     "monorepo extract":           "deletes the extracted members and the releasable's release state from this repository, and commits that",

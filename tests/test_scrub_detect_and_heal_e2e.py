@@ -19,7 +19,8 @@ REAL safegit binary:
    error check) fails on the now-dangling hashes. Loud, not silent.
 4. HEAL -- ``rlsbl changelog remap --from-journal`` repairs the changelog from
    the journal, and ``rlsbl release reconcile`` re-pushes the tags the rewrite
-   moved and recreates their GitHub Releases.
+   moved and rewrites their GitHub Release documents in place, creating only
+   the ones origin lacks.
 
 The git side is real (real rewrite, real bare remote, real force-push with
 lease). Only the gh/network boundary is mocked, exactly as the scrub and
