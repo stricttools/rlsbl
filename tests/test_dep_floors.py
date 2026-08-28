@@ -284,6 +284,64 @@ class TestPypi:
         assert result.status == "pass"
         assert "uv.lock" in result.message
 
+
+class TestWorkspaceLockLocation:
+    """A uv workspace member's floors are compared against the ROOT lock.
+
+    The member has no lock of its own -- one lock at the workspace root
+    resolves every member. Reading only ``<member>/uv.lock`` made the check
+    report "no uv.lock" and pass with zero comparisons, so every declared
+    floor in every flat uv workspace went unpoliced.
+    """
+
+    def _workspace(self, tmp_path, *, members=("packages/*",), exclude=None):
+        lines = ['[tool.uv.workspace]', f"members = {list(members)!r}"]
+        if exclude is not None:
+            lines.append(f"exclude = {list(exclude)!r}")
+        (tmp_path / "pyproject.toml").write_text("\n".join(lines) + "\n")
+        member = tmp_path / "packages" / "app"
+        member.mkdir(parents=True)
+        return member
+
+    def test_member_floor_is_compared_against_the_root_lock(self, tmp_path):
+        member = self._workspace(tmp_path)
+        _pyproject(member, ["strictcli>=0.35.0"], name="app")
+        _uv_lock(tmp_path, {"strictcli": "0.36.0"}, project="app")
+        result = _run(member, _config())
+        assert result.status == "fail"
+        assert "strictcli>=0.36.0" in _text(result)
+
+    def test_member_floor_at_the_root_locked_version_passes(self, tmp_path):
+        member = self._workspace(tmp_path)
+        _pyproject(member, ["strictcli>=0.36.0"], name="app")
+        _uv_lock(tmp_path, {"strictcli": "0.36.0"}, project="app")
+        result = _run(member, _config())
+        assert result.status == "pass"
+
+    def test_a_lock_beside_the_manifest_wins(self, tmp_path):
+        member = self._workspace(tmp_path)
+        _pyproject(member, ["strictcli>=0.36.0"], name="app")
+        _uv_lock(member, {"strictcli": "0.36.0"}, project="app")
+        _uv_lock(tmp_path, {"strictcli": "9.0.0"}, project="app")
+        result = _run(member, _config())
+        assert result.status == "pass"
+
+    def test_a_directory_the_workspace_excludes_reaches_no_root_lock(self, tmp_path):
+        member = self._workspace(tmp_path, exclude=["packages/app"])
+        _pyproject(member, ["strictcli>=0.35.0"], name="app")
+        _uv_lock(tmp_path, {"strictcli": "0.36.0"}, project="app")
+        result = _run(member, _config())
+        assert result.status == "pass"
+        assert "no uv.lock" in result.message
+
+    def test_an_unreadable_root_lock_is_an_error_not_a_silent_pass(self, tmp_path):
+        member = self._workspace(tmp_path)
+        _pyproject(member, ["strictcli>=0.35.0"], name="app")
+        (tmp_path / "uv.lock").write_text("this is not toml [[[\n")
+        result = _run(member, _config())
+        assert result.status == "fail"
+        assert "could not be read" in _text(result)
+
     def test_equality_pin_counts_as_a_floor(self, tmp_path):
         _pyproject(tmp_path, ["strictcli==0.36.0"])
         _uv_lock(tmp_path, {"strictcli": "0.36.0"})

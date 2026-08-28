@@ -20,23 +20,12 @@ Where the lock is read from
 ---------------------------
 
 The floor is the version ``uv.lock`` resolves, and there is exactly ONE lock
-that resolves a given manifest.  Usually it sits beside the manifest.  In a uv
-WORKSPACE it does not: members have no lock of their own, and one lock at the
-workspace root resolves every member.  So the lock's LOCATION is resolved
-before it is read:
-
-1. ``<target>/uv.lock`` when it exists;
-2. otherwise the ``uv.lock`` of the nearest ancestor that declares
-   ``[tool.uv.workspace]`` and whose ``members``/``exclude`` globs claim the
-   target directory (see :func:`find_uv_workspace_root`);
-3. otherwise a hard error naming both locations probed.
-
-This is location resolution for one authoritative answer, NOT a try-A-then-B
-strategy with two different answers: a workspace member has no second lock that
-could disagree, so nothing degrades and nothing is chosen.  When both files do
-exist -- a member carrying a stale lock of its own -- the one beside the
-manifest wins outright, because that is the lock uv itself would use for a
-standalone project and the manifest being rewritten is that project's.
+that resolves a given manifest.  Which file that is comes from
+:func:`rlsbl.uv_workspace.locate_uv_lock` -- the shared locator this command
+originally grew and now shares with the ``dep-floors`` and ``dep-locks``
+checks: the lock beside the manifest, else the lock of the uv workspace root
+that claims the directory, else nothing.  A search that finds nothing is a hard
+error here, naming both locations probed.
 
 Whichever lock is read, the WRITES stay in the target directory: its own
 ``pyproject.toml`` and its own ``.rlsbl/config.json`` (created when absent).
@@ -70,17 +59,15 @@ apply re-counts them from disk before writing: a count that moved between
 preview and apply is a hard abort with nothing further written.
 """
 
-import glob
 import os
 import sys
-import tomllib
 from dataclasses import dataclass
 
 import tomlkit
 
 from ... import effects
 from ...config import _project_config, read_json_config
-from ...dep_floors import CONFIG_KEY, normalize_pypi_name, pypi_locked
+from ...dep_floors import CONFIG_KEY, normalize_pypi_name, pypi_locked_at
 from ...dep_rewrite import (
     SECTIONS_ALL,
     detect_path_deps_in,
@@ -91,6 +78,7 @@ from ...dep_rewrite import (
 )
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile, single
 from ...registry import query_pypi_release
+from ...uv_workspace import locate_uv_lock
 from .abort import already_written
 
 
@@ -140,154 +128,36 @@ def _read_doc(pyproject_path):
 
 
 # ---------------------------------------------------------------------------
-# Locating the lock
+# Locating and reading the lock
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class LockSource:
-    """The one lock that resolves the manifest being rewritten."""
-
-    path: str
-    #: The uv workspace root whose lock this is, or None when the lock sits
-    #: beside the manifest.
-    workspace_root: str | None = None
-
-    def label(self, project_root):
-        """How the lock is named in errors -- relative to the target."""
-        return os.path.relpath(self.path, str(project_root))
-
-    def describe(self, project_root):
-        """The plan's fact line naming which lock the floor came from."""
-        rel = self.label(project_root)
-        if self.workspace_root is None:
-            return f"floor read from {rel} (beside the manifest)"
-        return (
-            f"floor read from {rel} -- the uv workspace root at "
-            f"{os.path.relpath(self.workspace_root, str(project_root))} "
-            f"claims this directory as a member, and a member has no lock "
-            f"of its own"
-        )
-
-
-def uv_workspace_table(pyproject_path):
-    """``[tool.uv.workspace]`` of *pyproject_path*, or None when it has none."""
-    try:
-        with open(pyproject_path, "rb") as f:
-            data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
-        return None
-    table = (((data or {}).get("tool") or {}).get("uv") or {}).get("workspace")
-    return table if isinstance(table, dict) else None
-
-
-def _glob_claims(patterns, workspace_root, target):
-    """True when any glob in *patterns* expands to *target*.
-
-    Expanded against the real filesystem, which is how uv reads them: the
-    globs are relative to the workspace root, ``*`` stops at a directory
-    separator and ``**`` crosses them.
-    """
-    for pattern in patterns or ():
-        if not isinstance(pattern, str):
-            continue
-        for hit in glob.glob(pattern, root_dir=workspace_root, recursive=True):
-            if os.path.realpath(os.path.join(workspace_root, hit)) == target:
-                return True
-    return False
-
-
-def workspace_claims(workspace_root, table, target):
-    """uv's membership rule: a ``members`` glob hits, no ``exclude`` glob does."""
-    members = table.get("members")
-    if not isinstance(members, list):
-        return False
-    if not _glob_claims(members, workspace_root, target):
-        return False
-    exclude = table.get("exclude")
-    if isinstance(exclude, list) and _glob_claims(exclude, workspace_root, target):
-        return False
-    return True
-
-
-def find_uv_workspace_root(project_root):
-    """The uv workspace root that claims *project_root*, or None.
-
-    uv's own discovery, walked the same way: the FIRST ancestor declaring
-    ``[tool.uv.workspace]`` decides.  A directory that declaration does not
-    claim -- no ``members`` glob matches it, or an ``exclude`` glob does -- is
-    a standalone project, not a member of some further ancestor; uv forbids
-    nested workspaces, so there is never a second declaration to consult.
-    """
-    target = os.path.realpath(str(project_root))
-    current = os.path.dirname(target)
-    while True:
-        table = uv_workspace_table(os.path.join(current, "pyproject.toml"))
-        if table is not None:
-            return current if workspace_claims(current, table, target) else None
-        parent = os.path.dirname(current)
-        if parent == current:
-            return None
-        current = parent
-
-
-def _read_lock(directory):
-    """Resolved versions from ``<directory>/uv.lock``, or None when absent.
-
-    A lock that is present but unreadable is a hard error, never an absence:
-    treating it as absent would walk past it to a different lock, which is
-    exactly the silent switch this command must not make.
-    """
-    path = os.path.join(directory, "uv.lock")
-    if not os.path.isfile(path):
-        return None
-    locked = pypi_locked(directory)
-    if locked is None:
-        raise UvPathSourceError(
-            f"{path} exists but could not be read as TOML, so the version to "
-            f"floor at cannot be determined. Fix the lock (or run `uv lock`) "
-            f"and re-run."
-        )
-    return locked
-
-
 def resolve_lock(project_root):
-    """``(locked versions, LockSource)`` for the manifest in *project_root*.
+    """``(locked versions, LockLocation)`` for the manifest in *project_root*.
 
-    The precedence is stated in the module docstring: a lock beside the
-    manifest, else the lock of the uv workspace root that claims this
-    directory, else a hard error naming both locations probed.
+    The location comes from :func:`rlsbl.uv_workspace.locate_uv_lock`; this
+    function adds the two refusals that belong to READING it: no lock at all,
+    and a lock that is present but does not parse.  The second is a hard error
+    rather than an absence, because treating it as absent would walk past it to
+    a different lock -- exactly the silent switch this command must not make.
     """
     root = str(project_root)
-    beside = os.path.join(root, "uv.lock")
-
-    locked = _read_lock(root)
-    if locked is not None:
-        return locked, LockSource(path=beside)
-
-    workspace_root = find_uv_workspace_root(root)
-    if workspace_root is not None:
-        workspace_lock = os.path.join(workspace_root, "uv.lock")
-        locked = _read_lock(workspace_root)
-        if locked is not None:
-            return locked, LockSource(
-                path=workspace_lock, workspace_root=workspace_root,
-            )
-        probed = (
-            f"{beside} (absent) and {workspace_lock} (absent), the lock of the "
-            f"uv workspace root that claims this directory as a member"
+    search = locate_uv_lock(root)
+    if search.location is None:
+        raise UvPathSourceError(
+            f"no uv.lock for {root}: the floor is read from the lock's resolved "
+            f"version, so there is nothing to floor at. Probed {search.probed}. "
+            f"Run `uv lock` and re-run."
         )
-    else:
-        probed = (
-            f"{beside} (absent); no ancestor declares a [tool.uv.workspace] "
-            f"claiming this directory, so there is no workspace lock to read "
-            f"either"
+
+    locked = pypi_locked_at(search.location.path)
+    if locked is None:
+        raise UvPathSourceError(
+            f"{search.location.path} exists but could not be read as TOML, so "
+            f"the version to floor at cannot be determined. Fix the lock (or "
+            f"run `uv lock`) and re-run."
         )
-    raise UvPathSourceError(
-        f"no uv.lock for {root}: the floor is read from the lock's resolved "
-        f"version, so there is nothing to floor at. Probed {probed}. Run "
-        f"`uv lock` and re-run."
-    )
+    return locked, search.location
 
 
 def path_sourced_names(doc):

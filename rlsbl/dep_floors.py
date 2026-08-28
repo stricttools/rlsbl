@@ -19,6 +19,10 @@ What is compared, per ecosystem:
 | npm    | ``package.json`` dependencies / peerDependencies / optionalDependencies | ``package-lock.json`` |
 | go     | ``go.mod`` ``require``                                        | ``go.mod`` (same file) |
 
+Which ``uv.lock`` is read is :func:`rlsbl.uv_workspace.locate_uv_lock`'s answer,
+not "the one beside the project root": a uv workspace member has no lock of its
+own, and one lock at the workspace root resolves every member.
+
 Go is automatically satisfied and carries no comparison: a ``require`` line
 IS the declared minimum, and the go toolchain resolves builds by minimal
 version selection, so the build can never sit ahead of the declared floor.
@@ -44,6 +48,8 @@ import json
 import os
 import re
 import tomllib
+
+from .uv_workspace import locate_uv_lock
 
 # Config key that gates adoption AND names the cross-repo internal deps.
 CONFIG_KEY = "internal_dep_floors"
@@ -275,9 +281,14 @@ def pypi_declared(project_root):
     return declared
 
 
-def pypi_locked(project_root):
-    """Resolved versions from ``uv.lock``, or None when there is no lock."""
-    data = _load_toml(os.path.join(str(project_root), "uv.lock"))
+def pypi_locked_at(lock_path):
+    """Resolved versions from the ``uv.lock`` at *lock_path*.
+
+    Returns None when the file is absent or does not parse. WHICH file that is
+    is not decided here: a uv workspace member has no lock of its own, so the
+    location comes from :func:`rlsbl.uv_workspace.locate_uv_lock`.
+    """
+    data = _load_toml(str(lock_path))
     if data is None:
         return None
     locked = {}
@@ -383,9 +394,22 @@ def _evaluate_pypi(root, names):
     declared = pypi_declared(root)
     if declared is None:
         return [], []
-    locked = pypi_locked(root)
+
+    # A uv WORKSPACE member has no lock of its own: one lock at the workspace
+    # root resolves every member. Reading only ``<root>/uv.lock`` made this
+    # check pass with zero comparisons for every member of every flat uv
+    # workspace -- the declared floors went unpoliced while the check reported
+    # a clean bill of health.
+    search = locate_uv_lock(root)
+    if search.location is None:
+        return [], [f"pypi: no uv.lock -- probed {search.probed}"]
+    locked = pypi_locked_at(search.location.path)
     if locked is None:
-        return [], ["pypi: no uv.lock -- no locked versions to compare"]
+        return [
+            f"pypi: {search.location.path} exists but could not be read as "
+            f"TOML, so no floor could be compared against it. Fix the lock "
+            f"(or run `uv lock`) and re-run."
+        ], []
 
     problems = []
     for name in sorted({normalize_pypi_name(n) for n in names} & set(declared)):

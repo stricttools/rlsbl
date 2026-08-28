@@ -243,8 +243,8 @@ class TestObserve:
         doc = tomlkit.parse((root / "pyproject.toml").read_text())
         assert count_entries(doc, "core") == (3, 1)
 
-        from rlsbl.dep_floors import pypi_locked
-        conv = collect_conversions(doc, pypi_locked(str(root)))[0]
+        from rlsbl.dep_floors import pypi_locked_at
+        conv = collect_conversions(doc, pypi_locked_at(root / "uv.lock"))[0]
         assert conv.occurrences == 4
         assert conv.locked_version == "1.2.3"
         assert conv.constraint == ">=1.2.3"
