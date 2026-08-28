@@ -1070,10 +1070,10 @@ def register_workspace_checks(app):
     @app.error_check("go-companion-tags")
     def check_go_companion_tags(ctx, reporter):
         """Releasables with publishing Go members should have companion tags."""
-        from ..errors import ConfigError
-        from ..member_context import resolve_member_context
-        from ..targets import TARGETS, resolve_releasable_config_dir
-        from ..workspace import read_releasable_version
+        from ..errors import RlsblError
+        from ..targets.base import BaseTarget
+        from ..targets.refs import ref_context
+        from ..workspace import get_releasable_dir, read_releasable_version
 
         if not ctx.releasables:
             return reporter.skipped("no releasables defined")
@@ -1094,43 +1094,39 @@ def register_workspace_checks(app):
                 config_errors.append(f"{rel.name}: cannot read releasable version: {e}")
                 continue
 
-            for proj in member_projs:
-                pkg_path = proj["path"]
-                abs_pkg = os.path.join(root, pkg_path)
+            # Which refs a released version owns is ``expected_refs``' answer,
+            # never a second derivation here. This used to ask each member's
+            # target for ``companion_tags`` directly, which knows neither of
+            # the two rules the release flow applies: a primary tag that is
+            # already Go-compatible suppresses companions entirely, and a
+            # publish-suppressed member contributes none. The first one made
+            # this check demand a tag the release deliberately never creates.
+            # The receiver is a BaseTarget because it contributes nothing to
+            # the answer: the releasable's own tag_format names the primary,
+            # each member's own target names its companions, and
+            # ``expected_refs`` is not overridden by any target.
+            context = ref_context(
+                repo_root=root,
+                primary_tag_format=rel.effective_tag_format,
+                releasable_name=rel.name,
+                member_package_paths=[p["path"] for p in member_projs],
+                releasable_config_dir=get_releasable_dir(root, rel.name),
+            )
+            try:
+                companions = BaseTarget().expected_refs(version, context).companions
+            except RlsblError as e:
+                config_errors.append(f"{rel.name}: member config error: {e}")
+                continue
+            if not companions:
+                continue
 
-                rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
-                try:
-                    member = resolve_member_context(
-                        abs_pkg, releasable_config_dir=rel_dir,
+            checked_any = True
+
+            for expected_tag in companions:
+                if not tag_exists_locally(expected_tag, cwd=root):
+                    missing.append(
+                        f"{rel.name}: missing companion tag {expected_tag}"
                     )
-                    if member.publish_mode == "none":
-                        continue
-                    # Which tags a member needs alongside its primary release
-                    # tag is the target's own answer. This used to test the
-                    # target NAME and then re-derive the Go proxy tag format
-                    # by hand, a second copy of GoTarget.companion_tags.
-                    expected_tags = [
-                        tag
-                        for entry in member.targets
-                        if entry.name in TARGETS
-                        for tag in TARGETS[entry.name].companion_tags(
-                            proj["name"], version, path=pkg_path,
-                        )
-                    ]
-                except ConfigError as e:
-                    config_errors.append(f"{rel.name}/{proj['name']}: member config error: {e}")
-                    continue
-                if not expected_tags:
-                    continue
-
-                checked_any = True
-
-                for expected_tag in expected_tags:
-                    if not tag_exists_locally(expected_tag, cwd=root):
-                        missing.append(
-                            f"{rel.name}/{proj['name']}: missing companion tag "
-                            f"{expected_tag}"
-                        )
 
         if config_errors:
             for ce in config_errors:

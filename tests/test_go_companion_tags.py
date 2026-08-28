@@ -521,6 +521,58 @@ class TestGoCompanionTagsCheck:
         result = check_fn(ctx)
         assert result.status == "skip"
 
+    def test_skips_when_the_primary_tag_is_already_go_compatible(self, tmp_path):
+        """A path-scheme primary tag suppresses companions entirely.
+
+        ``expected_refs`` is the single authority for a version's ref set, and
+        it answers "no companions" when the primary tag already contains
+        ``/v`` -- a Go-shaped release does not duplicate its own tag. A check
+        that re-derives the member's ``companion_tags`` by hand does not know
+        that rule and demands a tag the release never creates separately.
+        """
+        from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
+
+        from conftest import capture_all_checks
+        checks = capture_all_checks()
+        check_fn = checks["go-companion-tags"]
+
+        repo = tmp_path / "workspace"
+        repo.mkdir()
+        _run_git(repo, "init")
+        _run_git(repo, "config", "user.name", "Test")
+        _run_git(repo, "config", "user.email", "test@test.com")
+
+        go_pkg = repo / "packages" / "golib"
+        go_pkg.mkdir(parents=True)
+        (go_pkg / "go.mod").write_text("module github.com/test/golib\n\ngo 1.21\n")
+        (go_pkg / ".rlsbl").mkdir()
+        (go_pkg / ".rlsbl" / "config.json").write_text(json.dumps({
+            "publish_mode": "ci",
+            "targets": ["go"],
+        }))
+
+        ws_dir = repo / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text("")
+        write_releasable_version(str(repo), "myrel", "1.0.0")
+
+        (repo / "README.md").write_text("test\n")
+        _run_git(repo, "add", ".")
+        _run_git(repo, "commit", "-m", "initial")
+
+        # The releasable's own tag IS the Go module proxy tag, so no separate
+        # companion exists to be missing -- and none is tagged here.
+        proj = WorkspaceProject({
+            "name": "golib",
+            "path": "packages/golib",
+            "releasable": "myrel",
+        })
+        rel = Releasable(name="myrel", tag_format="packages/golib/v{version}")
+        ctx = self._make_check_ctx(str(repo), [proj], [rel])
+
+        result = check_fn(ctx)
+        assert result.status == "skip"
+
     def test_fails_on_corrupt_member_config(self, tmp_path):
         """A corrupt member config.json must produce a check FAILURE naming
         the member, not a silent skip.
