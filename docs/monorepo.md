@@ -379,7 +379,7 @@ Observation reports one of the following for the mirror's **branch**, and, besid
 | `behind` | A scaffold layer atop an **older** split; a new split is available (shows old → new). | Force-push the new split (with lease), then re-scaffold. |
 | `scaffold-missing` | The tip is a bare split commit with no scaffold layer (the pre-scaffold-layer shape). May also be behind. | Add the scaffold commit (and push a new split first if behind). |
 | `contract-violated` | A foreign, hand-authored commit exists on the mirror. | **Hard error, touches nothing.** Lists the offending commit(s) and paths, and tells you to either port the change into the monorepo or reset the mirror branch, then re-run. |
-| `lineage-undetermined` | Git could not determine whether the mirror's commits descend from the current split (typically pruned or unfetched objects), and no split boundary could be confirmed. | **Hard error, touches nothing.** Names the unanswerable commit(s) and points at fetching/deepening the history, never at resetting the mirror. |
+| `lineage-undetermined` | Git could not determine whether the mirror's commits descend from the current split (typically objects that were pruned, or never fetched), and no split boundary could be confirmed. | **Hard error, touches nothing.** Names the unanswerable commit(s) and points at fetching/deepening the history, never at resetting the mirror. |
 | `remote-missing-or-empty` | Virgin remote. | Push the split, then scaffold CI. |
 
 Apply is **idempotent**: re-running on a converged mirror is a clean no-op, and an interrupted apply (killed between the split push and the scaffold commit) heals on the next run — it re-observes as `scaffold-missing` and adds the scaffold layer.

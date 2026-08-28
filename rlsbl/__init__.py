@@ -2095,7 +2095,7 @@ def cmd_mono_release_order(ctx):
 # bottom-up to compensate for the old reversal.
 @strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to extract, with every member it owns", presence="required")
 @strictcli.arg(name="target_path", help="Filesystem path where the new repository will be created (must not exist)", presence="required")
-@strictcli.flag(name="delete-with-rm", type=bool, presence="optional", help="Delete the departed members' directories with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.")
+@strictcli.flag(name="delete-with-rm", type=bool, presence="optional", help="Delete the departed members' directories with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.")
 @effects.handler
 def cmd_mono_extract(ctx, releasable_name, target_path, delete_with_rm):
     """Extract a releasable out of the monorepo into its own repository."""
@@ -2124,7 +2124,7 @@ def cmd_mono_extract(ctx, releasable_name, target_path, delete_with_rm):
 @strictcli.flag(name="registry-name", type=str, presence="optional", help="Package registry identity recorded in workspace.toml (used verbatim for name checks)")
 @strictcli.flag(name="releasable", type=str, presence="optional", help="An existing releasable group to join. When omitted, a singleton releasable named after the member is created for it.")
 @strictcli.flag(name="tag-format", type=str, presence="optional", help="The tag format of the releasable this command creates, e.g. \"{name}@v{version}\" or \"pkgs/thing/v{version}\". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal with --releasable, which brings its own format.")
-@strictcli.flag(name="delete-with-rm", type=bool, presence="optional", help="Delete the per-package release state that moves to the releasable with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.")
+@strictcli.flag(name="delete-with-rm", type=bool, presence="optional", help="Delete the per-package release state that moves to the releasable with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.")
 @effects.handler
 def cmd_mono_absorb(ctx, source_repo, dest_path, name, registry_name, releasable, tag_format, delete_with_rm):
     """Absorb an external repository into this workspace as a releasable."""
