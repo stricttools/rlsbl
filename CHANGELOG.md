@@ -162,6 +162,7 @@ conversion plans, and scripts/migrate_workspace_model.py migrates the rest.
 - **The scrub's step list no longer says it recreates GitHub Releases.** Step 8 rewrites each affected tag's Release document in place and creates only an absent one, which is what the guide now describes.
 - **Two batch-release error messages no longer call the plan file a "sidecar".** `rlsbl monorepo release run` now says "Missing plan file" and "delete the plan file and re-run" when it refuses a batch whose companion `unreleased.plan.json` is missing or stale.
 - **README corrections.** Its per-tag check table is now rendered from the check registry instead of hand-typed counts that had drifted far below what `rlsbl check` runs; it no longer documents `rlsbl scaffold --force` or `--no-tag`, neither of which exists (the live opt-outs are `--no-auto-commit` and `--no-auto-tag`); and its release-flow summary describes the real ordering -- the candidate commit is pushed untagged, CI is awaited in-process, and the tag goes on the CI-verified commit.
+- `rlsbl monorepo extract` now rewrites the clone in a single `git-filter-repo` run, so a single-member extract's release anchors, changelog hashes and tags remap correctly on filter-repo releases that do not compose commit maps across chained runs (2.38, the Ubuntu 24.04 package). Previously the hoist ran as a second invocation and every original commit silently missed: anchors were left as recorded and changelog entries were dropped as pruned.
 
 ## 0.117.2
 
