@@ -1,9 +1,13 @@
-"""Tests for the ``npm-token-presence`` check.
+"""Tests for the ``ci-publish-secrets`` check.
 
-The failure class: a repository whose CI publishes to npm has no ``NPM_TOKEN``
-secret, so the publish job dies with ``ENEEDAUTH`` -- after the release has
-already tagged, pushed and created the GitHub Release. The secret's presence is
-knowable long before that.
+The failure class: a repository whose CI publish job authenticates with a
+repository secret does not have it, so the job dies with ``ENEEDAUTH`` -- after
+the release has already tagged, pushed and created the GitHub Release. The
+secret's presence is knowable long before that.
+
+WHICH secrets are owed is each pipeline's own ``ci_secret_names`` declaration;
+npm's ``NPM_TOKEN`` is the only one any pipeline declares today, which is why
+this file's name still says so.
 
 Every probe here is stubbed at the ``effects.gh`` seam: no test contacts
 GitHub.
@@ -191,7 +195,7 @@ class TestVerdict:
 
 
 def _run(tmp_path, config):
-    return app._check_defs["npm-token-presence"].impl(make_ctx(tmp_path, config))
+    return app._check_defs["ci-publish-secrets"].impl(make_ctx(tmp_path, config))
 
 
 class TestRegisteredCheck:

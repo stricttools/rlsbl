@@ -2792,6 +2792,16 @@
       "needs_network": false,
       "depends_on": []
     },
+    "ci-publish-secrets": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": []
+    },
     "circular-deps": {
       "tags": [
         "quality"
@@ -3147,16 +3157,6 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
-    },
-    "npm-token-presence": {
-      "tags": [
-        "release"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": false,
-      "needs_network": true,
       "depends_on": []
     },
     "old-repo-archived": {

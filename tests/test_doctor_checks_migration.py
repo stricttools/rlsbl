@@ -30,7 +30,7 @@ EXPECTED_CHECKS = [
     "branch-sync",
     # Networked release checks: CI credential, and the follow-ups a recorded
     # conversion still owes the outside world
-    "npm-token-presence",
+    "ci-publish-secrets",
     "old-repo-archived",
     "go-deprecation-published",
     "changelog-entry",

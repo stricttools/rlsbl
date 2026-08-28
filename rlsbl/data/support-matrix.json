@@ -390,6 +390,12 @@
         "spec"
       ]
     },
+    "ci-publish-secrets": {
+      "kind": "targets",
+      "targets": [
+        "npm"
+      ]
+    },
     "circular-deps": {
       "excluded": {
         "go": "compiler rejects circular imports"
@@ -724,12 +730,6 @@
       ]
     },
     "npm-private-mismatch": {
-      "kind": "targets",
-      "targets": [
-        "npm"
-      ]
-    },
-    "npm-token-presence": {
       "kind": "targets",
       "targets": [
         "npm"
@@ -1342,6 +1342,14 @@
       ],
       "rows": [
         [
+          "ci-publish-secrets",
+          "no",
+          "no",
+          "yes",
+          "no",
+          "no"
+        ],
+        [
           "circular-deps",
           "yes",
           "n/a",
@@ -1495,14 +1503,6 @@
         ],
         [
           "npm-private-mismatch",
-          "no",
-          "no",
-          "yes",
-          "no",
-          "no"
-        ],
-        [
-          "npm-token-presence",
           "no",
           "no",
           "yes",

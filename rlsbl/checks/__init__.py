@@ -81,9 +81,11 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # --- release tag (universal) ---
     "unpublished-refs": None,
     "branch-sync": None,
-    # npm-token-presence probes for the credential an npm CI publish needs, so
-    # it applies wherever an npm pipeline can be configured.
-    "npm-token-presence": frozenset({"npm"}),
+    # ci-publish-secrets probes for the credentials the configured CI publish
+    # pipelines authenticate with. npm is the only target whose pipeline
+    # declares one today (ci_secret_names), so it is the only target the check
+    # can find anything for.
+    "ci-publish-secrets": frozenset({"npm"}),
     # Both lineage-derived follow-ups read a record no target decides the shape
     # of; go-deprecation-published then probes the Go module proxy, but which
     # transitions exist is the record's answer, not a target's.

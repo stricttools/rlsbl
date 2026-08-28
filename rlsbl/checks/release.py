@@ -1,6 +1,6 @@
 """Release checks (tag: release): the refs, the branch, the CI credentials, and the follow-ups a recorded conversion still owes the outside world.
 
-Checks: unpublished-refs, branch-sync, npm-token-presence, old-repo-archived,
+Checks: unpublished-refs, branch-sync, ci-publish-secrets, old-repo-archived,
 go-deprecation-published.
 
 Every check in this module reads something OUTSIDE the working tree -- the
@@ -279,19 +279,22 @@ def _followup_outcome(verdict, reporter, *, passed):
 def register_networked_release_checks(app):
     """Register the probing release-tag checks on *app*."""
 
-    @app.error_check("npm-token-presence")
-    def check_npm_token_presence(ctx, reporter):
-        """A repo whose CI publishes to npm must carry the NPM_TOKEN secret.
+    @app.error_check("ci-publish-secrets")
+    def check_ci_publish_secrets(ctx, reporter):
+        """Every secret the CI publish pipelines authenticate with must exist.
 
-        Without it the publish job dies with ``ENEEDAUTH`` -- after the release
+        Without one the publish job dies with ``ENEEDAUTH`` -- after the release
         has already tagged, pushed and created the GitHub Release. Presence
         only: the value is not retrievable through the API and rlsbl never puts
         a credential on a pipe.
 
-        WHICH secret is owed is each pipeline's own declaration
+        WHICH secrets are owed is each pipeline's own declaration
         (``ci_secret_names``), not a pipeline type tested by name here: npm
         declares ``NPM_TOKEN``, pypi declares none because its workflow
-        authenticates through OIDC trusted publishing.
+        authenticates through OIDC trusted publishing, and a ``local: true``
+        pipeline declares none because it authenticates from the developer's
+        own environment. The check is named for that behavior rather than for
+        the one secret that exists today.
         """
         from ..ci_secrets import evaluate_ci_secret_presence
         from ..utils import get_github_repo
@@ -303,7 +306,8 @@ def register_networked_release_checks(app):
             return reporter.skipped(verdict.skip_reason)
         if verdict.ok:
             return reporter.passed(
-                "; ".join(verdict.notes) or "the npm publish credential exists"
+                "; ".join(verdict.notes)
+                or "every CI publish credential exists"
             )
         for problem in verdict.problems:
             reporter.error(problem)
