@@ -222,6 +222,18 @@ Both fields are written by the flow and by nothing else. The editable `unrelease
 
 Archives written before anchoring existed carry neither field; readers treat absence as absence and never substitute a value.
 
+#### The stronger version that was deliberately not adopted
+
+Anchoring makes the archive the authority for what a version shipped from, and the Release body's `rlsbl-ci-sha` marker a projection of it. A stronger version of the same idea was considered and rejected: making the release records the **sole** identity of a release, with tags demoted to pure projections that any repair could regenerate from the ledger at will.
+
+That is not what rlsbl does. A tag stays a real git ref with an existence of its own, and the reconciler *converges* it rather than deriving it:
+
+- the **ledger** is the authority for what was released — the version, the commit, the trees, the description;
+- the **refs** are the published form of that release, and they have readers rlsbl does not control. A `git fetch` that already happened, a `go get` already resolved, a module proxy that has already cached a tag permanently — none of them will re-read a ledger;
+- so a ref that disagrees with the ledger is a **finding**, never a thing to overwrite on the ledger's word. `rlsbl release reconcile` pushes what origin is missing and re-points only what a recorded rewrite explains; a divergence no record explains aborts the whole reconcile (`refuse-foreign`), and one a lineage record forbids recreating is refused outright (`refuse-identity-mismatch`). See [the five verdicts](#the-five-verdicts).
+
+Under the rejected model every one of those refusals would be unnecessary — and a single mistaken ledger entry would be sufficient authority to rewrite a namespace consumers have already resolved. Keeping both, with the ledger authoritative over the *record* and the refs authoritative over *what was already published*, is precisely what lets the reconciler be fail-closed.
+
 #### Backfilling an existing repository
 
 `scripts/backfill_release_anchors.py` anchors a repository's history in one reviewed pass. For every archived version it resolves the version's tag under the repository's own tag spellings (`v{version}` standalone, the releasable's `tag_format` in a workspace), takes that tag's commit as `candidate_sha`, and records the tree of every released path at that commit. It also stamps the strictspec `format_version` gate onto archives written before the gate existed, and materializes an archive for a released version that never got one — recovering the description from the GitHub Release notes, then from the CHANGELOG.md section, and otherwise writing a placeholder that names the recovery obligation.
@@ -277,7 +289,7 @@ Every namespace has one **routine writer** -- the flow that puts refs there in t
 | `origin` tags, and the GitHub Releases attached to them | **The release's tag step** (steps 19-21). | `rlsbl release reconcile` repairs them when a rewrite or a partial release left them wrong; it composes the Release through the same publication module, so the notes and the `rlsbl-ci-sha` marker are identical whichever wrote it. A released tag is never *moved*: the reconciler refuses a divergence no record explains rather than force-pushing, and the retraction surfaces delete a tag or rewrite a Release body rather than relocating one. |
 | A subtree **mirror's `main`** | **The mirror reconciler's converge** -- `rlsbl monorepo mirror <project>`, and the release's mirror step, which calls the same code. | The mirror is a tool-owned derived artifact, so force-with-lease is its routine write. A commit the reconciler cannot account for is a contract violation and it refuses, touching nothing. |
 | A subtree **mirror's tags**, and their GitHub Releases | **The mirror publication module**, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a released version the mirror is missing. | The commit is derived, never the branch tip: it is the subtree split of that version's ledger anchor. A mirror's scaffold renders no publish workflow, and any publish workflow reaching the mirror another way is swept on the next convergence, so a mirror never releases itself. |
-| Rewritten history on any of the above | **`rlsbl release scrub`** (which wraps `safegit scrub`) -- the one sanctioned rewrite. | It force-pushes with an explicit `--force-with-lease` captured from the actual remote, then remaps the changelog hashes, moves the tags and recreates the GitHub Releases in the same pass. A rewrite performed outside it leaves all three stale; `rlsbl release reconcile` is what heals that. |
+| Rewritten history on any of the above | **`rlsbl release scrub`** (which wraps `safegit scrub`) -- the one sanctioned rewrite. | It force-pushes with an explicit `--force-with-lease` captured from the actual remote, then remaps the changelog hashes, re-points the tags and rewrites each tag's GitHub Release document in the same pass. A Release is edited in place, never deleted and made again, so a failure mid-pass leaves the previous document standing rather than a tag with no Release at all; only an absent Release is created. A rewrite performed outside this command leaves all three stale, and `rlsbl release reconcile` is what heals that. |
 
 ### The repair and retraction surfaces
 
@@ -286,7 +298,7 @@ Each of these writes one of the namespaces above deliberately, and the list is c
 | Command | What it writes | Namespace |
 | --- | --- | --- |
 | `rlsbl release undo` | Deletes the GitHub Release, deletes the tag (remote and local), reverts the version-bump commit and pushes the branch. With `--version`, a non-latest release only when it is provably unpublished, and then the Release and tag only. | branch heads, tags, Releases |
-| `rlsbl release reconcile` | Re-pushes the tags an out-of-band rewrite moved and recreates their GitHub Releases, driven by safegit's rewrite journal. Fail-closed: a divergence the journal does not explain is a hard error, never a force-push. | tags, Releases |
+| `rlsbl release reconcile` | Re-pushes the tags an out-of-band rewrite moved and writes their GitHub Release documents in place, creating only the ones origin does not have. Fail-closed: a divergence no record explains is a hard error, never a force-push. | tags, Releases |
 | `rlsbl release scrub` | The rewrite itself -- see the table above. | history, tags, Releases |
 | `rlsbl release edit` | Re-syncs one version's GitHub Release notes from CHANGELOG.md. | Releases |
 | `rlsbl release deprecate` | Prepends a deprecation notice to a Release's body and sets its pre-release flag. | Releases |
