@@ -68,6 +68,17 @@ from rlsbl.release_file import (  # noqa: E402
 from rlsbl.tag_glob import TagMode, parse_version_tag  # noqa: E402
 from rlsbl.utils import commit_files, extract_changelog_entry_from_text  # noqa: E402
 
+
+class BackfillError(Exception):
+    """The repository cannot be backfilled as it stands.
+
+    Raised for a condition the operator must resolve before the pass can run at
+    all -- a workspace file that exists but does not load, for instance. It
+    surfaces as a message and exit code 2 from ``main``, never as a run that
+    silently does less than it should.
+    """
+
+
 # Every subprocess in this script states its own timeout: a backfill that hangs
 # on a git or gh call in a repository with an unusual object store is worse than
 # one that fails.
@@ -189,9 +200,11 @@ class Scope:
 def discover_scopes(repo: str) -> list[Scope]:
     """Enumerate the repository's release-state scopes.
 
-    A workspace yields one scope per releasable (explicit mode) plus one per
-    package that keeps its own ``.rlsbl/releases/`` (implicit mode). Anything
-    else is a standalone repository with a single scope at the root.
+    A workspace yields one scope per releasable, plus one per member that
+    stands outside every releasable and still keeps its own
+    ``.rlsbl/releases/`` or ``.rlsbl/changes/``. A repository with no workspace
+    file at all is a standalone one with a single scope at the root; a
+    workspace file that exists but does not load is a hard error.
     """
     workspace_file = os.path.join(repo, ".rlsbl-monorepo", "workspace.toml")
     if not os.path.isfile(workspace_file):
@@ -206,16 +219,29 @@ def discover_scopes(repo: str) -> list[Scope]:
             )
         ]
 
-    from rlsbl.workspace import load_releasables, load_workspace, members_of
+    from rlsbl.workspace import (
+        WorkspaceError,
+        load_releasables,
+        load_workspace,
+        members_of,
+    )
 
-    projects = load_workspace(repo)
+    # A workspace file that is there but does not load is a hard error carrying
+    # the loader's own message. It used to be swallowed into an empty
+    # releasable list labelled "implicit mode", which was already wrong when it
+    # was written and is now impossible: a workspace with no [[releasables]]
+    # section is refused by ``load_workspace`` itself, so every failure this
+    # caught was a BROKEN workspace being quietly downgraded to a repository
+    # with no releasables -- whose archives the pass would then leave
+    # unrepaired while reporting that it had nothing to do.
+    try:
+        projects = load_workspace(repo)
+        releasables = load_releasables(repo, projects)
+    except (OSError, ValueError, WorkspaceError) as exc:
+        raise BackfillError(f"{workspace_file}: {exc}") from exc
+
     scopes: list[Scope] = []
     releasable_members: set[str] = set()
-
-    try:
-        releasables = load_releasables(repo, projects)
-    except Exception:
-        releasables = []  # implicit mode: no [[releasables]] section
 
     for rel in releasables:
         members = members_of(rel.name, projects)
@@ -832,12 +858,16 @@ def main(argv=None) -> int:
     if not os.path.isdir(os.path.join(repo, ".git")):
         print(f"error: {repo} is not a git repository", file=sys.stderr)
         return 2
-    return run(
-        repo,
-        dry_run=args.dry_run,
-        use_gh=not args.no_gh,
-        auto_commit=not args.no_commit,
-    )
+    try:
+        return run(
+            repo,
+            dry_run=args.dry_run,
+            use_gh=not args.no_gh,
+            auto_commit=not args.no_commit,
+        )
+    except BackfillError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

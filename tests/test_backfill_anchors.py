@@ -512,3 +512,97 @@ class TestArchiveNameGrammar:
             "1.0.0-alpha.2", "1.0.0-alpha.10", "1.0.0-rc.1", "1.0.0",
         ]
         assert backfill.archive_sort_key is archive_sort_key
+
+
+# ---------------------------------------------------------------------------
+# A workspace that exists but does not load
+# ---------------------------------------------------------------------------
+
+
+class TestBrokenWorkspaceIsRefused:
+    """A refused workspace must never be mistaken for a plain repository.
+
+    ``discover_scopes`` used to wrap the releasable load in a bare
+    ``except Exception`` that fell back to "implicit mode: no [[releasables]]
+    section". Implicit mode no longer exists -- ``load_workspace`` refuses such
+    a workspace itself -- so every failure that swallow caught was a broken
+    workspace being silently downgraded to a repository with no releasables,
+    whose archives the pass would then leave unrepaired while reporting
+    success.
+    """
+
+    def test_a_malformed_releasables_section_is_a_hard_error(self, tmp_path):
+        repo = tmp_path / "ws"
+        repo.mkdir()
+        init_repo(repo)
+        (repo / ".rlsbl-monorepo").mkdir()
+        (repo / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            'releasables = "not-a-list"\n\n'
+            '[[projects]]\npath = "."\nname = "root"\nreleasable = false\n',
+            encoding="utf-8",
+        )
+
+        with pytest.raises(backfill.BackfillError) as exc:
+            backfill.discover_scopes(str(repo))
+
+        assert "workspace.toml" in str(exc.value)
+        # The loader's own message, not a message this script invented.
+        assert "list of tables" in str(exc.value)
+
+    def test_unparseable_toml_is_a_hard_error(self, tmp_path):
+        repo = tmp_path / "ws"
+        repo.mkdir()
+        init_repo(repo)
+        (repo / ".rlsbl-monorepo").mkdir()
+        (repo / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            "[[projects]\npath =\n", encoding="utf-8"
+        )
+
+        with pytest.raises(backfill.BackfillError) as exc:
+            backfill.discover_scopes(str(repo))
+
+        assert "workspace.toml" in str(exc.value)
+
+    def test_a_member_standing_outside_every_releasable_still_gets_a_scope(
+        self, tmp_path
+    ):
+        """The non-releasable path is preserved: only the swallow is gone."""
+        repo = tmp_path / "ws"
+        repo.mkdir()
+        init_repo(repo)
+        (repo / "pkgs" / "tool").mkdir(parents=True)
+        (repo / "pkgs" / "tool" / ".rlsbl" / "releases").mkdir(parents=True)
+        make_workspace(
+            repo,
+            [
+                {"path": ".", "name": "root", "dev_only": True, "releasable": False},
+                {"path": "pkgs/tool", "name": "tool", "releasable": False},
+            ],
+            releasables=[{"name": "core"}],
+        )
+
+        labels = [s.label for s in backfill.discover_scopes(str(repo))]
+
+        assert "tool" in labels
+        assert "core" in labels
+
+    def test_no_workspace_file_is_still_a_standalone_repository(self, tmp_path):
+        repo = make_standalone(tmp_path)
+        scopes = backfill.discover_scopes(str(repo))
+        assert [s.label for s in scopes] == ["standalone"]
+
+    def test_main_reports_the_refusal_and_exits_nonzero(self, tmp_path, capsys):
+        repo = tmp_path / "ws"
+        repo.mkdir()
+        init_repo(repo)
+        (repo / ".rlsbl-monorepo").mkdir()
+        (repo / ".rlsbl-monorepo" / "workspace.toml").write_text(
+            'releasables = "not-a-list"\n\n'
+            '[[projects]]\npath = "."\nname = "root"\nreleasable = false\n',
+            encoding="utf-8",
+        )
+
+        code = backfill.main(["--repo", str(repo), "--dry-run", "--no-gh"])
+
+        assert code == 2
+        assert "workspace.toml" in capsys.readouterr().err
