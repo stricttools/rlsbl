@@ -2338,7 +2338,7 @@
           "flags": [
             {
               "name": "delete-with-rm",
-              "help": "Delete the departed members' directories with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.",
+              "help": "Delete the departed members' directories with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.",
               "value_schema": {
                 "type": "boolean"
               },
@@ -2405,7 +2405,7 @@
             },
             {
               "name": "delete-with-rm",
-              "help": "Delete the per-package release state that moves to the releasable with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.",
+              "help": "Delete the per-package release state that moves to the releasable with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.",
               "value_schema": {
                 "type": "boolean"
               },
