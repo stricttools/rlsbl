@@ -697,8 +697,8 @@ def dangling_anchors(releases_dir, *, git=None, cwd=None):
     }
 
 
-def heal_dangling_anchors(*, ctx, releases_dir, explanations, repo_root,
-                          workspace_projects=None, dry_run=False, log=print):
+def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
+                          dry_run=False, log=print):
     """Move the ledger's stale anchors through the recorded rewrite.
 
     The anchor half of detect-and-heal, and the counterpart to what the
@@ -725,11 +725,18 @@ def heal_dangling_anchors(*, ctx, releases_dir, explanations, repo_root,
     * the rewritten archives and the lineage events beside them are committed,
       because a rewritten read-only archive left in the working tree is
       breakage for every other command and every other session.
+
+    The heal is scoped to the ledger being reconciled, not to every ledger in
+    the repository: a reconcile answers for one project's published metadata,
+    and healing a sibling's archives (or being blocked by a content mismatch in
+    one) would be a wider write than the command was asked for.
     """
     from ..anchor_remap import (
         ON_CONTENT_CHANGE_REFUSE,
+        lineage_path_for_releases_dir,
         plan_anchor_remap,
-        repair_anchors,
+        record_anchor_remap,
+        remap_release_anchors,
     )
     from ..errors import RlsblError
 
@@ -795,13 +802,8 @@ def heal_dangling_anchors(*, ctx, releases_dir, explanations, repo_root,
         for remap in planned
     })) or "an out-of-band rewrite"
     try:
-        _remaps, touched = repair_anchors(
-            project_root=str(ctx.project_root),
-            commit_map=explanations.commit_map,
-            rewrite_id=rewrite_id,
-            workspace_root=ctx.workspace_root,
-            workspace_projects=workspace_projects,
-            cwd=repo_root,
+        remaps = remap_release_anchors(
+            releases_dir, explanations.commit_map, cwd=repo_root,
             on_content_change=ON_CONTENT_CHANGE_REFUSE,
         )
     except RlsblError as exc:
@@ -809,6 +811,12 @@ def heal_dangling_anchors(*, ctx, releases_dir, explanations, repo_root,
             f"the release ledger cannot be moved through the recorded "
             f"rewrite:\n{exc}"
         ) from exc
+    touched = [remap.path for remap in remaps]
+    lineage_path = record_anchor_remap(
+        lineage_path_for_releases_dir(releases_dir), rewrite_id, remaps,
+    )
+    if lineage_path:
+        touched.append(lineage_path)
     if touched:
         try:
             run("safegit", [
@@ -1615,16 +1623,10 @@ def run_cmd(flags, *, ctx):
     # through the same records that explain the divergence first. Outside the
     # observation, because it writes.
     try:
-        from ..workspace import load_workspace
-
         explanations = collect_explanations([releases_dir], lineage_paths)
         anchor_overrides = heal_dangling_anchors(
-            ctx=ctx, releases_dir=releases_dir, explanations=explanations,
+            releases_dir=releases_dir, explanations=explanations,
             repo_root=repo_root, dry_run=dry_run,
-            workspace_projects=(
-                load_workspace(str(ctx.workspace_root))
-                if ctx.workspace_root else None
-            ),
         )
     except ReconcileError as exc:
         print(f"Error: {exc}", file=sys.stderr)

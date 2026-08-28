@@ -19,8 +19,6 @@ Two properties are pinned here, both of them destructive-path properties:
 
 import subprocess
 
-import pytest
-
 from rlsbl.commands.release_reconcile import recreate_github_releases
 from rlsbl.release_file import write_archived_release_file
 from rlsbl.release_publication import publication
