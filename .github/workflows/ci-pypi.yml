@@ -87,7 +87,14 @@ jobs:
       # things uv must satisfy from scratch (and, in the sandbox, offline):
       #
       #   1. Built-in test step: `uv run python -m pytest` -> a fresh resolve of
-      #      the fixture's `dev = ["pytest"]` group. Needs pytest metadata+wheels.
+      #      the fixture's dev group. Needs pytest metadata+wheels for the EXACT
+      #      version the fixture asks for -- it pins `pytest=={pytest.__version__}`,
+      #      i.e. rlsbl's own locked pytest. An unpinned warm here caches whatever
+      #      the index calls newest instead, and the day that moves past the
+      #      locked version the fixture's pin is the one thing the offline cache
+      #      cannot serve ("Because pytest==X needs to be downloaded from a
+      #      registry ..."), taking the job red. So the pin is READ from the
+      #      running pytest, the same expression the fixture pins with.
       #   2. Build step: `uv build --out-dir dist` (rlsbl/pipelines/build.py).
       #      The fixtures declare NO [build-system], so uv uses the PEP 517
       #      default backend and resolves `setuptools>=40.8.0` + wheel for an
@@ -110,15 +117,18 @@ jobs:
         run: |
           set -euo pipefail
           WARM="$(mktemp -d)"
+          # The fixture's pin, read from the same place the fixture reads it.
+          PYTEST_PIN="$(uv run python -c 'import pytest; print(pytest.__version__)')"
+          echo "warming pytest==${PYTEST_PIN} (the fixture's pin)"
           # No [build-system] -> PEP 517 setuptools fallback, matching fixtures.
-          cat > "${WARM}/pyproject.toml" <<'EOF'
+          cat > "${WARM}/pyproject.toml" <<EOF
           [project]
           name = "rlsbl-fixture-cache-warm"
           version = "0.0.0"
           requires-python = ">=3.11"
 
           [dependency-groups]
-          dev = ["pytest"]
+          dev = ["pytest==${PYTEST_PIN}"]
           EOF
           # A trivial package so setuptools auto-discovery has something to build.
           mkdir -p "${WARM}/rlsbl_fixture_cache_warm"

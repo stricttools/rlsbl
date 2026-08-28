@@ -309,3 +309,65 @@ class TestPrereleaseFullFlowRealGit:
         assert "v0.43.0-alpha.0" in create_args, (
             f"gh release create should use tag v0.43.0-alpha.0, got: {create_args}"
         )
+
+
+class TestTheFixturePinIsWhatCiWarms:
+    """The fixture's pytest pin and the CI cache-warm must name one version.
+
+    ``_setup_releasable_pypi_project`` pins the fixture's dev group to the
+    pytest the suite is itself running under, and the release flow it drives
+    really does a FRESH, offline ``uv`` resolve of that group inside the
+    sandbox. A locked ``uv sync`` of rlsbl's own tree does not make that
+    resolvable -- it never populates the simple-index metadata a fresh resolve
+    reads -- so the CI job warms a throwaway project first. If that warm asks
+    for an unpinned ``pytest`` it caches whatever is newest on the index, and
+    the day the newest release moves past rlsbl's locked pytest the fixture's
+    exact pin is the one version the offline cache cannot serve:
+
+        Because pytest==<locked> needs to be downloaded from a registry
+        and test-pkg:dev depends on pytest==<locked>, ...
+
+    which surfaces as ``FAIL test-suite: pypi tests failed`` inside the
+    fixture's release flow and takes the whole job red. So the warm must
+    derive its pin from the same running pytest the fixture pins to.
+    """
+
+    WORKFLOW = (
+        Path(__file__).resolve().parent.parent
+        / ".github" / "workflows" / "ci-pypi.yml"
+    )
+
+    def _warm_step(self):
+        text = self.WORKFLOW.read_text()
+        marker = "Warm uv cache for fixture-project"
+        assert marker in text, (
+            f"{self.WORKFLOW} no longer has the fixture cache-warm step"
+        )
+        return text.split(marker, 1)[1].split("\n      - ", 1)[0]
+
+    def test_the_fixture_pins_the_running_pytest(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _git(repo, "init", "-q", ".")
+        _git(repo, "config", "user.email", "t@example.invalid")
+        _git(repo, "config", "user.name", "t")
+        _setup_releasable_pypi_project(repo)
+        assert (
+            f'dev = ["pytest=={pytest.__version__}"]'
+            in (repo / "pyproject.toml").read_text()
+        )
+
+    def test_the_ci_warm_pins_the_running_pytest_too(self):
+        warm = self._warm_step()
+        assert 'dev = ["pytest"]' not in warm, (
+            "the cache-warm asks for an unpinned pytest, so it caches whatever "
+            "the index calls newest instead of the version the fixture pins"
+        )
+        assert "import pytest; print(pytest.__version__)" in warm, (
+            "the cache-warm must read the pin from the running pytest, the "
+            "same expression the fixture pins with"
+        )
+        assert 'dev = ["pytest==${' in warm, (
+            "the cache-warm must interpolate the derived pin into the "
+            "throwaway project's dev group"
+        )
