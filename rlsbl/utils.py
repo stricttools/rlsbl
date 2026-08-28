@@ -171,39 +171,60 @@ def is_clean_tree(cwd=None):
 
 
 def working_tree_status(cwd=None):
-    """The porcelain status lines of the working tree at ``cwd``.
+    """The porcelain status records of the working tree at ``cwd``.
 
-    The raw lines, NOT stripped: each is ``XY <path>`` and the leading status
-    columns carry meaning. This deliberately does NOT go through :func:`run`,
-    which strips the whole output -- that eats the leading space of the FIRST
-    line whenever the first change is unstaged (`` D path``), and the parsed
-    path then loses its first character. :func:`working_tree_paths` is the
-    parsed form.
+    Each record is ``XY <path>``, NOT stripped: the leading status columns
+    carry meaning. :func:`working_tree_paths` is the parsed form.
+
+    Read in ``-z`` mode, which is the whole point. Git's default porcelain
+    output C-QUOTES any path it cannot print literally -- anything non-ASCII,
+    or holding a space, tab, quote or backslash -- so a file really named
+    ``pkgé/x.txt`` arrives as ``"pkg\\303\\251/x.txt"``. Every consumer here
+    feeds those paths straight back to git in a commit, where the escaped
+    spelling names nothing, and an operation that already deleted something is
+    then left half-done. ``-z`` emits NUL-terminated records with the paths
+    verbatim, so there is no quoting to decode and no decoder to get wrong.
+
+    A rename or copy emits its ORIGIN path as a second NUL field; that field is
+    consumed with the record it belongs to rather than returned as a record of
+    its own (it has no status columns and is not a path that changed). This
+    deliberately does NOT go through :func:`run`, which strips the whole output
+    -- that would eat the leading space of an unstaged record (`` D path``) and
+    the parsed path would lose its first character.
     """
     result = effects.run(
-        ["git", "--no-optional-locks", "status", "--porcelain"],
+        ["git", "--no-optional-locks", "status", "--porcelain", "-z"],
         cwd=cwd, capture_output=True, text=True, check=True, timeout=120,
     )
-    return [line for line in result.stdout.splitlines() if line.strip()]
+    fields = result.stdout.split("\0")
+    records = []
+    index = 0
+    while index < len(fields):
+        record = fields[index]
+        index += 1
+        if not record.strip():
+            continue  # the trailing empty field after the final NUL
+        records.append(record)
+        if len(record) >= 2 and (record[0] in "RC" or record[1] in "RC"):
+            index += 1  # skip this record's origin path
+    return records
 
 
 def working_tree_paths(cwd=None):
     """Every path the working tree at ``cwd`` reports a change for.
 
-    Parses the porcelain lines :func:`working_tree_status` returns into the
-    path list a commit can name: the ``XY `` status columns are dropped, a
-    rename's ``old -> new`` yields the new path, and quoting is removed.
+    The records :func:`working_tree_status` returns, minus their ``XY ``
+    status columns: exactly the path list a commit can name. A rename yields
+    the NEW path (its origin was already consumed), and nothing is unquoted
+    because ``-z`` output was never quoted.
     """
     paths = []
-    for line in working_tree_status(cwd=cwd):
-        if len(line) < 4:
+    for record in working_tree_status(cwd=cwd):
+        if len(record) < 4:
             continue
-        rest = line[3:]
-        if " -> " in rest:
-            rest = rest.split(" -> ", 1)[1]
-        rest = rest.strip().strip('"')
-        if rest:
-            paths.append(rest)
+        path = record[3:]
+        if path:
+            paths.append(path)
     return paths
 
 
