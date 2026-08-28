@@ -1414,6 +1414,153 @@
       ]
     },
     {
+      "path": "conversions.md",
+      "title": "Repository conversions",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "Repository conversions",
+          "anchor": "repository-conversions"
+        },
+        {
+          "level": 2,
+          "text": "The releasable is the portable unit",
+          "anchor": "the-releasable-is-the-portable-unit"
+        },
+        {
+          "level": 2,
+          "text": "Observe, then render or apply",
+          "anchor": "observe-then-render-or-apply"
+        },
+        {
+          "level": 2,
+          "text": "What a conversion refuses",
+          "anchor": "what-a-conversion-refuses"
+        },
+        {
+          "level": 2,
+          "text": "What rlsbl deliberately does not do",
+          "anchor": "what-rlsbl-deliberately-does-not-do"
+        },
+        {
+          "level": 2,
+          "text": "The tag policy",
+          "anchor": "the-tag-policy"
+        },
+        {
+          "level": 3,
+          "text": "Translation",
+          "anchor": "translation"
+        },
+        {
+          "level": 3,
+          "text": "The boundary alias",
+          "anchor": "the-boundary-alias"
+        },
+        {
+          "level": 3,
+          "text": "Pruning, and the conservative keep",
+          "anchor": "pruning-and-the-conservative-keep"
+        },
+        {
+          "level": 3,
+          "text": "Collisions",
+          "anchor": "collisions"
+        },
+        {
+          "level": 3,
+          "text": "Go's path scheme",
+          "anchor": "gos-path-scheme"
+        },
+        {
+          "level": 3,
+          "text": "Departed tags stay in the source",
+          "anchor": "departed-tags-stay-in-the-source"
+        },
+        {
+          "level": 2,
+          "text": "Verification",
+          "anchor": "verification"
+        },
+        {
+          "level": 3,
+          "text": "Member trees",
+          "anchor": "member-trees"
+        },
+        {
+          "level": 3,
+          "text": "Release anchors",
+          "anchor": "release-anchors"
+        },
+        {
+          "level": 3,
+          "text": "Reading back through rlsbl's own loader",
+          "anchor": "reading-back-through-rlsbls-own-loader"
+        },
+        {
+          "level": 2,
+          "text": "After the conversion",
+          "anchor": "after-the-conversion"
+        },
+        {
+          "level": 3,
+          "text": "The printed next steps",
+          "anchor": "the-printed-next-steps"
+        },
+        {
+          "level": 3,
+          "text": "Severing an inbound edge",
+          "anchor": "severing-an-inbound-edge"
+        },
+        {
+          "level": 3,
+          "text": "Dependency floors",
+          "anchor": "dependency-floors"
+        },
+        {
+          "level": 2,
+          "text": "Splitting one member out of a shared releasable",
+          "anchor": "splitting-one-member-out-of-a-shared-releasable"
+        },
+        {
+          "level": 2,
+          "text": "Healing and recovery",
+          "anchor": "healing-and-recovery"
+        },
+        {
+          "level": 3,
+          "text": "Absorb re-runs to completion",
+          "anchor": "absorb-re-runs-to-completion"
+        },
+        {
+          "level": 3,
+          "text": "Extract has no resume",
+          "anchor": "extract-has-no-resume"
+        },
+        {
+          "level": 2,
+          "text": "Lineage records",
+          "anchor": "lineage-records"
+        },
+        {
+          "level": 3,
+          "text": "Where a record lives",
+          "anchor": "where-a-record-lives"
+        },
+        {
+          "level": 3,
+          "text": "What gets recorded",
+          "anchor": "what-gets-recorded"
+        },
+        {
+          "level": 3,
+          "text": "Format and reading",
+          "anchor": "format-and-reading"
+        }
+      ]
+    },
+    {
       "path": "dep-validation.md",
       "title": "Dependency validation",
       "type": "doc",
@@ -2464,8 +2611,8 @@
         },
         {
           "level": 3,
-          "text": "Dev nodes (`dev_node = true`)",
-          "anchor": "dev-nodes-dev_node-true"
+          "text": "Dev nodes (`dev_only = true`, `releasable = false`)",
+          "anchor": "dev-nodes-dev_only-true-releasable-false"
         },
         {
           "level": 2,
@@ -2551,6 +2698,11 @@
           "level": 3,
           "text": "The tripwire",
           "anchor": "the-tripwire"
+        },
+        {
+          "level": 3,
+          "text": "A mirrored releasable cannot be extracted",
+          "anchor": "a-mirrored-releasable-cannot-be-extracted"
         },
         {
           "level": 2,
@@ -3595,6 +3747,11 @@
         },
         {
           "level": 3,
+          "text": "`_jsonl_lines`",
+          "anchor": "_jsonl_lines"
+        },
+        {
+          "level": 3,
           "text": "`unfinalize_version`",
           "anchor": "unfinalize_version"
         },
@@ -3815,6 +3972,11 @@
           "level": 3,
           "text": "`serialize_entry`",
           "anchor": "serialize_entry"
+        },
+        {
+          "level": 3,
+          "text": "`entry_content_key`",
+          "anchor": "entry_content_key"
         },
         {
           "level": 3,
@@ -4125,6 +4287,21 @@
         },
         {
           "level": 3,
+          "text": "`_go_module_dirs`",
+          "anchor": "_go_module_dirs"
+        },
+        {
+          "level": 3,
+          "text": "`_repo_root`",
+          "anchor": "_repo_root"
+        },
+        {
+          "level": 3,
+          "text": "`_origin_remote_url`",
+          "anchor": "_origin_remote_url"
+        },
+        {
+          "level": 3,
           "text": "`register_project_checks`",
           "anchor": "register_project_checks"
         }
@@ -4171,6 +4348,26 @@
           "level": 3,
           "text": "`register_release_checks`",
           "anchor": "register_release_checks"
+        },
+        {
+          "level": 3,
+          "text": "`_lineage_paths`",
+          "anchor": "_lineage_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_read_lineage`",
+          "anchor": "_read_lineage"
+        },
+        {
+          "level": 3,
+          "text": "`_followup_outcome`",
+          "anchor": "_followup_outcome"
+        },
+        {
+          "level": 3,
+          "text": "`register_networked_release_checks`",
+          "anchor": "register_networked_release_checks"
         },
         {
           "level": 3,
@@ -4447,6 +4644,53 @@
       ]
     },
     {
+      "path": "rlsbl-ci_secrets.md",
+      "title": "rlsbl.ci_secrets",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.ci_secrets",
+          "anchor": "rlsblci_secrets"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.ci_secrets`",
+          "anchor": "rlsblci_secrets"
+        },
+        {
+          "level": 3,
+          "text": "`probe_repo_secret`",
+          "anchor": "probe_repo_secret"
+        },
+        {
+          "level": 3,
+          "text": "`required_ci_secrets`",
+          "anchor": "required_ci_secrets"
+        },
+        {
+          "level": 3,
+          "text": "`secret_remedy`",
+          "anchor": "secret_remedy"
+        },
+        {
+          "level": 3,
+          "text": "`SecretVerdict`",
+          "anchor": "secretverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_ci_secret_presence`",
+          "anchor": "evaluate_ci_secret_presence"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-ci_yaml.md",
       "title": "rlsbl.ci_yaml",
       "type": "doc",
@@ -4607,6 +4851,16 @@
           "level": 3,
           "text": "`_build_entry`",
           "anchor": "_build_entry"
+        },
+        {
+          "level": 3,
+          "text": "`_entry_is_committed`",
+          "anchor": "_entry_is_committed"
+        },
+        {
+          "level": 3,
+          "text": "`_commit_appended_entry`",
+          "anchor": "_commit_appended_entry"
         },
         {
           "level": 3,
@@ -5477,8 +5731,8 @@
         },
         {
           "level": 4,
-          "text": "`touch`",
-          "anchor": "touch"
+          "text": "`record_path`",
+          "anchor": "record_path"
         },
         {
           "level": 3,
@@ -5544,6 +5798,16 @@
           "level": 3,
           "text": "`_resolve_version`",
           "anchor": "_resolve_version"
+        },
+        {
+          "level": 3,
+          "text": "`_arrival_version`",
+          "anchor": "_arrival_version"
+        },
+        {
+          "level": 3,
+          "text": "`_trailer_values`",
+          "anchor": "_trailer_values"
         },
         {
           "level": 3,
@@ -5642,8 +5906,13 @@
         },
         {
           "level": 3,
-          "text": "`_entry_ids`",
-          "anchor": "_entry_ids"
+          "text": "`_already_migrated`",
+          "anchor": "_already_migrated"
+        },
+        {
+          "level": 3,
+          "text": "`_entries_to_migrate`",
+          "anchor": "_entries_to_migrate"
         },
         {
           "level": 3,
@@ -6286,6 +6555,11 @@
           "level": 3,
           "text": "`_repository_bound_publishers`",
           "anchor": "_repository_bound_publishers"
+        },
+        {
+          "level": 3,
+          "text": "`_tag_verdict`",
+          "anchor": "_tag_verdict"
         },
         {
           "level": 3,
@@ -8322,46 +8596,6 @@
         },
         {
           "level": 3,
-          "text": "`LockSource`",
-          "anchor": "locksource"
-        },
-        {
-          "level": 4,
-          "text": "`label`",
-          "anchor": "label"
-        },
-        {
-          "level": 4,
-          "text": "`describe`",
-          "anchor": "describe"
-        },
-        {
-          "level": 3,
-          "text": "`uv_workspace_table`",
-          "anchor": "uv_workspace_table"
-        },
-        {
-          "level": 3,
-          "text": "`_glob_claims`",
-          "anchor": "_glob_claims"
-        },
-        {
-          "level": 3,
-          "text": "`workspace_claims`",
-          "anchor": "workspace_claims"
-        },
-        {
-          "level": 3,
-          "text": "`find_uv_workspace_root`",
-          "anchor": "find_uv_workspace_root"
-        },
-        {
-          "level": 3,
-          "text": "`_read_lock`",
-          "anchor": "_read_lock"
-        },
-        {
-          "level": 3,
           "text": "`resolve_lock`",
           "anchor": "resolve_lock"
         },
@@ -8550,8 +8784,38 @@
         },
         {
           "level": 3,
-          "text": "`_walk_release_commits`",
-          "anchor": "_walk_release_commits"
+          "text": "`_die`",
+          "anchor": "_die"
+        },
+        {
+          "level": 3,
+          "text": "`_release_anchor`",
+          "anchor": "_release_anchor"
+        },
+        {
+          "level": 3,
+          "text": "`_predecessor_anchor`",
+          "anchor": "_predecessor_anchor"
+        },
+        {
+          "level": 3,
+          "text": "`_log_commits`",
+          "anchor": "_log_commits"
+        },
+        {
+          "level": 3,
+          "text": "`_collect_release_commits`",
+          "anchor": "_collect_release_commits"
+        },
+        {
+          "level": 3,
+          "text": "`_commit_paths`",
+          "anchor": "_commit_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_foreign_work_above_anchor`",
+          "anchor": "_refuse_foreign_work_above_anchor"
         },
         {
           "level": 3,
@@ -8565,11 +8829,6 @@
         },
         {
           "level": 3,
-          "text": "`_previous_release_range`",
-          "anchor": "_previous_release_range"
-        },
-        {
-          "level": 3,
           "text": "`_build_plan`",
           "anchor": "_build_plan"
         },
@@ -8580,6 +8839,11 @@
         },
         {
           "level": 3,
+          "text": "`_print_plan`",
+          "anchor": "_print_plan"
+        },
+        {
+          "level": 3,
           "text": "`_restore_changelog`",
           "anchor": "_restore_changelog"
         },
@@ -8587,6 +8851,11 @@
           "level": 3,
           "text": "`_restore_release_file`",
           "anchor": "_restore_release_file"
+        },
+        {
+          "level": 3,
+          "text": "`_stop_on_conflicted_revert`",
+          "anchor": "_stop_on_conflicted_revert"
         },
         {
           "level": 3,
@@ -8619,11 +8888,6 @@
           "level": 3,
           "text": "`_get_commits_since`",
           "anchor": "_get_commits_since"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_scope`",
-          "anchor": "_resolve_scope"
         },
         {
           "level": 3,
@@ -9046,6 +9310,11 @@
           "level": 3,
           "text": "`create_context`",
           "anchor": "create_context"
+        },
+        {
+          "level": 3,
+          "text": "`resolve_release_scope`",
+          "anchor": "resolve_release_scope"
         }
       ]
     },
@@ -9116,8 +9385,8 @@
         },
         {
           "level": 3,
-          "text": "`pypi_locked`",
-          "anchor": "pypi_locked"
+          "text": "`pypi_locked_at`",
+          "anchor": "pypi_locked_at"
         },
         {
           "level": 3,
@@ -9143,6 +9412,88 @@
           "level": 3,
           "text": "`evaluate_dep_floors`",
           "anchor": "evaluate_dep_floors"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-dep_locks.md",
+      "title": "rlsbl.dep_locks",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.dep_locks",
+          "anchor": "rlsbldep_locks"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.dep_locks`",
+          "anchor": "rlsbldep_locks"
+        },
+        {
+          "level": 3,
+          "text": "`DepLockVerdict`",
+          "anchor": "deplockverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`normalize_specifier`",
+          "anchor": "normalize_specifier"
+        },
+        {
+          "level": 3,
+          "text": "`_declared_pypi_requirements`",
+          "anchor": "_declared_pypi_requirements"
+        },
+        {
+          "level": 3,
+          "text": "`_add_requirement`",
+          "anchor": "_add_requirement"
+        },
+        {
+          "level": 3,
+          "text": "`_locked_pypi_requirements`",
+          "anchor": "_locked_pypi_requirements"
+        },
+        {
+          "level": 3,
+          "text": "`_project_lock_entry`",
+          "anchor": "_project_lock_entry"
+        },
+        {
+          "level": 3,
+          "text": "`_compare_requirement_sets`",
+          "anchor": "_compare_requirement_sets"
+        },
+        {
+          "level": 3,
+          "text": "`parse_go_mod`",
+          "anchor": "parse_go_mod"
+        },
+        {
+          "level": 3,
+          "text": "`_record_replace`",
+          "anchor": "_record_replace"
+        },
+        {
+          "level": 3,
+          "text": "`_go_sum_keys`",
+          "anchor": "_go_sum_keys"
+        },
+        {
+          "level": 3,
+          "text": "`_find_go_work_sum`",
+          "anchor": "_find_go_work_sum"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_dep_locks`",
+          "anchor": "evaluate_dep_locks"
         }
       ]
     },
@@ -9594,6 +9945,16 @@
         },
         {
           "level": 3,
+          "text": "`append_lines`",
+          "anchor": "append_lines"
+        },
+        {
+          "level": 3,
+          "text": "`_newline_separator`",
+          "anchor": "_newline_separator"
+        },
+        {
+          "level": 3,
           "text": "`write_bytes`",
           "anchor": "write_bytes"
         },
@@ -9989,6 +10350,73 @@
           "level": 3,
           "text": "`detect_manual_push_branches`",
           "anchor": "detect_manual_push_branches"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-go_identity.md",
+      "title": "rlsbl.go_identity",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.go_identity",
+          "anchor": "rlsblgo_identity"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.go_identity`",
+          "anchor": "rlsblgo_identity"
+        },
+        {
+          "level": 3,
+          "text": "`RepoIdentity`",
+          "anchor": "repoidentity"
+        },
+        {
+          "level": 4,
+          "text": "`host_is_a_domain`",
+          "anchor": "host_is_a_domain"
+        },
+        {
+          "level": 3,
+          "text": "`parse_remote`",
+          "anchor": "parse_remote"
+        },
+        {
+          "level": 3,
+          "text": "`expected_module_path`",
+          "anchor": "expected_module_path"
+        },
+        {
+          "level": 3,
+          "text": "`strip_major_suffix`",
+          "anchor": "strip_major_suffix"
+        },
+        {
+          "level": 3,
+          "text": "`module_matches`",
+          "anchor": "module_matches"
+        },
+        {
+          "level": 3,
+          "text": "`GoIdentityVerdict`",
+          "anchor": "goidentityverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`read_module_line`",
+          "anchor": "read_module_line"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_go_module_identity`",
+          "anchor": "evaluate_go_module_identity"
         }
       ]
     },
@@ -10504,11 +10932,6 @@
         },
         {
           "level": 3,
-          "text": "`_newline_separator`",
-          "anchor": "_newline_separator"
-        },
-        {
-          "level": 3,
           "text": "`append_event`",
           "anchor": "append_event"
         },
@@ -10521,6 +10944,68 @@
           "level": 3,
           "text": "`read_events`",
           "anchor": "read_events"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-lineage_followup.md",
+      "title": "rlsbl.lineage_followup",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.lineage_followup",
+          "anchor": "rlsbllineage_followup"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.lineage_followup`",
+          "anchor": "rlsbllineage_followup"
+        },
+        {
+          "level": 3,
+          "text": "`FollowupVerdict`",
+          "anchor": "followupverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`absorbed_sources`",
+          "anchor": "absorbed_sources"
+        },
+        {
+          "level": 3,
+          "text": "`github_slug`",
+          "anchor": "github_slug"
+        },
+        {
+          "level": 3,
+          "text": "`go_module_transitions`",
+          "anchor": "go_module_transitions"
+        },
+        {
+          "level": 3,
+          "text": "`probe_repo_archived`",
+          "anchor": "probe_repo_archived"
+        },
+        {
+          "level": 3,
+          "text": "`_gh_error`",
+          "anchor": "_gh_error"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_old_repo_archived`",
+          "anchor": "evaluate_old_repo_archived"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_go_deprecation_published`",
+          "anchor": "evaluate_go_deprecation_published"
         }
       ]
     },
@@ -11623,6 +12108,11 @@
         },
         {
           "level": 4,
+          "text": "`ci_secret_names`",
+          "anchor": "ci_secret_names"
+        },
+        {
+          "level": 4,
           "text": "`publish`",
           "anchor": "publish"
         },
@@ -12140,6 +12630,11 @@
           "level": 4,
           "text": "`required_env_vars`",
           "anchor": "required_env_vars"
+        },
+        {
+          "level": 4,
+          "text": "`ci_secret_names`",
+          "anchor": "ci_secret_names"
         }
       ]
     },
@@ -12482,6 +12977,26 @@
         },
         {
           "level": 3,
+          "text": "`escape_module_path`",
+          "anchor": "escape_module_path"
+        },
+        {
+          "level": 3,
+          "text": "`query_go_mod`",
+          "anchor": "query_go_mod"
+        },
+        {
+          "level": 3,
+          "text": "`go_mod_deprecation`",
+          "anchor": "go_mod_deprecation"
+        },
+        {
+          "level": 3,
+          "text": "`query_go_module_deprecation`",
+          "anchor": "query_go_module_deprecation"
+        },
+        {
+          "level": 3,
           "text": "`query_registry_version`",
           "anchor": "query_registry_version"
         }
@@ -12561,8 +13076,18 @@
         },
         {
           "level": 3,
-          "text": "`_archive_sort_key`",
-          "anchor": "_archive_sort_key"
+          "text": "`archive_version`",
+          "anchor": "archive_version"
+        },
+        {
+          "level": 3,
+          "text": "`is_release_version`",
+          "anchor": "is_release_version"
+        },
+        {
+          "level": 3,
+          "text": "`archive_sort_key`",
+          "anchor": "archive_sort_key"
         },
         {
           "level": 3,
@@ -13025,6 +13550,58 @@
           "level": 3,
           "text": "`_detect_go_strictcli`",
           "anchor": "_detect_go_strictcli"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-strictspec_floor.md",
+      "title": "rlsbl.strictspec_floor",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.strictspec_floor",
+          "anchor": "rlsblstrictspec_floor"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.strictspec_floor`",
+          "anchor": "rlsblstrictspec_floor"
+        },
+        {
+          "level": 3,
+          "text": "`StrictspecFloorVerdict`",
+          "anchor": "strictspecfloorverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`parse_version`",
+          "anchor": "parse_version"
+        },
+        {
+          "level": 3,
+          "text": "`declared_floor`",
+          "anchor": "declared_floor"
+        },
+        {
+          "level": 3,
+          "text": "`read_generated_by`",
+          "anchor": "read_generated_by"
+        },
+        {
+          "level": 3,
+          "text": "`declared_targets`",
+          "anchor": "declared_targets"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_strictspec_floor`",
+          "anchor": "evaluate_strictspec_floor"
         }
       ]
     },
@@ -15847,6 +16424,11 @@
         },
         {
           "level": 3,
+          "text": "`find_sub_project_root`",
+          "anchor": "find_sub_project_root"
+        },
+        {
+          "level": 3,
           "text": "`detect_uv_workspace_root`",
           "anchor": "detect_uv_workspace_root"
         },
@@ -16109,6 +16691,68 @@
           "level": 3,
           "text": "`read_go_module_path`",
           "anchor": "read_go_module_path"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-uv_workspace.md",
+      "title": "rlsbl.uv_workspace",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.uv_workspace",
+          "anchor": "rlsbluv_workspace"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.uv_workspace`",
+          "anchor": "rlsbluv_workspace"
+        },
+        {
+          "level": 3,
+          "text": "`LockLocation`",
+          "anchor": "locklocation"
+        },
+        {
+          "level": 4,
+          "text": "`label`",
+          "anchor": "label"
+        },
+        {
+          "level": 4,
+          "text": "`describe`",
+          "anchor": "describe"
+        },
+        {
+          "level": 3,
+          "text": "`LockSearch`",
+          "anchor": "locksearch"
+        },
+        {
+          "level": 3,
+          "text": "`uv_workspace_table`",
+          "anchor": "uv_workspace_table"
+        },
+        {
+          "level": 3,
+          "text": "`_glob_claims`",
+          "anchor": "_glob_claims"
+        },
+        {
+          "level": 3,
+          "text": "`workspace_claims`",
+          "anchor": "workspace_claims"
+        },
+        {
+          "level": 3,
+          "text": "`find_uv_workspace_root`",
+          "anchor": "find_uv_workspace_root"
+        },
+        {
+          "level": 3,
+          "text": "`locate_uv_lock`",
+          "anchor": "locate_uv_lock"
         }
       ]
     },
@@ -18064,6 +18708,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-28T01:39:13.619701+00:00",
+  "last_gen": "2026-08-28T04:00:25.421196+00:00",
   "theme": "minimal"
 }
