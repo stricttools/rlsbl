@@ -727,11 +727,23 @@ def render_plan(plan: Plan, out=None) -> None:
     print("", file=out)
 
     changed = plan.changed_versions
+    # Attribute counts, deliberately not a parenthesised breakdown: the three
+    # are independent properties of the same archives, so they neither sum to
+    # the total nor stay under it, and a partition rendering invites the reader
+    # to do arithmetic that does not hold.
     print(
-        f"TOTAL: {len(changed)} archive(s) to write "
-        f"({sum(1 for v in changed if v.materialize)} materialized, "
-        f"{sum(1 for v in changed if v.stamp_format_version)} stamped, "
-        f"{sum(1 for v in changed if v.unanchorable)} unanchorable)",
+        f"TOTAL: {len(changed)} archive(s) to write -- "
+        f"materialized: {sum(1 for v in changed if v.materialize)}, "
+        f"format-version stamped: {sum(1 for v in changed if v.stamp_format_version)}, "
+        f"unanchorable: {sum(1 for v in changed if v.unanchorable)}",
+        file=out,
+    )
+    print(
+        "  (the three are independent attributes, not parts of a split: one "
+        "archive can carry several of them -- a materialized archive for a "
+        "version with no recoverable commit is both materialized and "
+        "unanchorable -- and an existing archive that only gains its anchor "
+        "carries none, so the counts need not add up to the total)",
         file=out,
     )
 

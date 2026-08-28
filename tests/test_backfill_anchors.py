@@ -458,6 +458,74 @@ class TestIdempotency:
         assert not (repo / ".rlsbl" / "releases" / "v0.1.0.toml").exists()
 
 
+class TestTotalLine:
+    """The closing TOTAL line counts ATTRIBUTES, not parts of a partition.
+
+    ``materialized``, ``format-version stamped`` and ``unanchorable`` are
+    independent properties of the archives the pass will write: one archive can
+    carry two of them (a materialized archive for a version with no recoverable
+    commit is materialized AND unanchorable), and an existing, already-stamped
+    archive that only gains its anchor carries none. Their sum is therefore
+    neither the total nor bounded by it, and a rendering that reads as a
+    breakdown of the total is a lie about arithmetic the reader will do.
+    """
+
+    STAMPED_ARCHIVE = 'format_version = 1\n' + UNSTAMPED_ARCHIVE
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        repo = make_standalone(tmp_path)
+        changes = repo / ".rlsbl" / "changes"
+        releases = repo / ".rlsbl" / "releases"
+        # 0.1.0: an archive that already carries the gate and only needs its
+        # anchor -- none of the three attributes.
+        commit_file(repo, "a.txt", "a\n", "v0.1.0")
+        git(repo, "tag", "v0.1.0")
+        write_changelog_jsonl(changes, "0.1.0")
+        write_archive(releases, "0.1.0", self.STAMPED_ARCHIVE)
+        # 0.2.0: an archive predating the gate -- stamped, not materialized.
+        commit_file(repo, "b.txt", "b\n", "v0.2.0")
+        git(repo, "tag", "v0.2.0")
+        write_changelog_jsonl(changes, "0.2.0")
+        write_archive(releases, "0.2.0")
+        # 0.3.0: no archive at all -- materialized, not stamped.
+        commit_file(repo, "c.txt", "c\n", "v0.3.0")
+        git(repo, "tag", "v0.3.0")
+        write_changelog_jsonl(changes, "0.3.0")
+        return repo
+
+    def test_the_counts_do_not_sum_to_the_total(self, repo):
+        """The fixture's own arithmetic, asserted so the rendering is tested
+        against a case where a partition reading would be wrong."""
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        changed = plan.changed_versions
+        assert len(changed) == 3
+        assert sum(1 for v in changed if v.materialize) == 1
+        assert sum(1 for v in changed if v.stamp_format_version) == 1
+        assert sum(1 for v in changed if v.unanchorable) == 0
+
+    def test_each_count_is_named_as_an_attribute(self, repo):
+        _code, output = run_backfill(repo, dry_run=True)
+        assert "TOTAL: 3 archive(s) to write" in output
+        assert "materialized: 1" in output
+        assert "format-version stamped: 1" in output
+        assert "unanchorable: 0" in output
+
+    def test_the_reader_is_told_they_are_independent(self, repo):
+        _code, output = run_backfill(repo, dry_run=True)
+        total_line = next(
+            line for line in output.splitlines() if line.startswith("TOTAL:")
+        )
+        rest = output.split(total_line, 1)[1]
+        assert "independent" in rest
+
+    def test_the_old_partition_rendering_is_gone(self, repo):
+        """``(a materialized, b stamped, c unanchorable)`` in parentheses right
+        after the count read as a breakdown of it."""
+        _code, output = run_backfill(repo, dry_run=True)
+        assert "(1 materialized," not in output
+
+
 def test_commit_message_names_the_repo_relative_scope(tmp_path):
     repo = make_standalone(tmp_path)
     plan = backfill.Plan(repo=str(repo), scopes=[])
