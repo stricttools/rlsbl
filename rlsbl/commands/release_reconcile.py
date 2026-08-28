@@ -417,8 +417,13 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
                     gh(args, config=ctx.config)
             recreated += 1
         except Exception as e:
-            print(f"Warning: failed to recreate release {tag_name}: {e}",
-                  file=sys.stderr)
+            print(
+                f"Warning: failed to recreate release {tag_name}: {e}\n"
+                f"  The old Release was already deleted, so {tag_name} now has "
+                f"NONE. Re-run this command (it is idempotent) or create it "
+                f"from the version's CHANGELOG.md section.",
+                file=sys.stderr,
+            )
     return recreated
 
 

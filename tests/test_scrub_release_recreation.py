@@ -151,7 +151,12 @@ class TestNothingIsDeletedThatCannotBeRecreated:
             extract_entry=lambda _p, _v: "notes",
         )
         assert recreated == 1
-        assert "v1.0.0" in capsys.readouterr().err
+        err = capsys.readouterr().err
+        assert "v1.0.0" in err
+        assert "now has NONE" in err, (
+            "a failure between the delete and the create leaves the tag with "
+            "no Release at all, and the warning has to say so"
+        )
 
 
 class TestTheRecreatedDocument:
