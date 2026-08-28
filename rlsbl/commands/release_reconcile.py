@@ -234,6 +234,38 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
     return None
 
 
+def _ledger_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index):
+    """The release-archive directory whose ledger anchors *tag_name*'s version.
+
+    The same resolution :func:`_notes_for_tag` performs for the CHANGELOG, so
+    the notes and the anchor a recreated Release carries describe the same
+    project. Returns None when no project owns the tag -- the marker then has
+    no anchor to project, which the caller reports rather than guesses at.
+    """
+    if not ctx.workspace_root:
+        return os.path.join(str(project_root), ".rlsbl", "releases")
+
+    from .release.release_state import resolve_releasable_dir
+
+    ws_root = str(ctx.workspace_root)
+    matched_proj = None
+    for prefix, proj in (tag_prefix_index or {}).items():
+        if tag_name.startswith(prefix):
+            matched_proj = proj
+            break
+    if matched_proj is None:
+        parsed = parse_version_tag(tag_name, mode=TagMode.PRERELEASE_INCLUSIVE)
+        if parsed and parsed.scheme == "standalone":
+            return os.path.join(ws_root, ".rlsbl", "releases")
+        return None
+
+    proj_path = os.path.join(ws_root, matched_proj.path)
+    releasable_dir = resolve_releasable_dir(proj_path, ws_root)
+    if releasable_dir:
+        return os.path.join(str(releasable_dir), "releases")
+    return os.path.join(proj_path, ".rlsbl", "releases")
+
+
 def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
                              tag_prefix_index, gh=None, gh_installed=None,
                              gh_auth=None, extract_entry=None):
@@ -241,14 +273,39 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
 
     A Release is attached to the remote tag, so once the tag moves the Release
     still points at a commit that no longer exists. Each existing Release is
-    deleted and recreated with notes taken from the owning project's
-    CHANGELOG.md. Tags without a Release are left alone -- this reconciles,
-    it does not publish.
+    deleted and recreated with the document
+    :mod:`rlsbl.release_publication` decides -- the version's CHANGELOG.md
+    section, the ``rlsbl-ci-sha`` marker taken from the ledger's anchor, and
+    the pre-release flag the version earns. Tags without a Release are left
+    alone: this reconciles, it does not publish.
+
+    **Nothing is deleted that cannot be recreated.** The version is read off
+    the tag BEFORE the delete, and pre-release tags are first-class here
+    (``PRERELEASE_INCLUSIVE``): a tag that is not a version tag at all is
+    skipped whole, with its Release untouched. Parsing after the delete is how
+    a ``-rc.1`` Release was once deleted and never recreated.
+
+    The anchor comes from the ledger, which the scrub's ``ANCHORS_REMAPPED``
+    step has already moved through the same rewrite by the time this runs, so
+    the marker names the rewritten commit. A version whose archive holds no
+    anchor -- released before the ledger existed, or recorded unanchorable --
+    gets its Release back WITHOUT a marker, and the omission is stated on
+    stderr rather than hidden.
 
     Individual failures are warnings: a partially reconciled forge is better
     than an aborted reconcile that leaves the rest untouched, and re-running
     the command is idempotent.
     """
+    from ..release_publication import (
+        anchor_from_ledger,
+        create_release,
+        delete_args,
+        is_prerelease,
+        notes_file,
+        publication,
+        view_body_args,
+    )
+
     gh = gh or run_gh
     gh_installed = gh_installed or check_gh_installed
     gh_auth = gh_auth or check_gh_auth
@@ -267,37 +324,82 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
             )
             continue
 
-        try:
-            gh(["release", "view", tag_name, "--json", "body"], config=ctx.config)
-        except Exception:
-            continue  # No Release for this tag -- nothing to reconcile.
-
-        try:
-            gh(["release", "delete", tag_name, "--yes"], config=ctx.config)
-        except Exception as e:
-            print(f"Warning: failed to delete release {tag_name}: {e}",
-                  file=sys.stderr)
-            continue
-
-        # Extract the version from the tag name (final releases only -- a
-        # prerelease suffix disqualifies the tag). Handles standalone
-        # "v1.2.3", monorepo "project@v1.2.3", and path "project/v1.2.3".
-        parsed_tag = parse_version_tag(tag_name, mode=TagMode.FINAL_ONLY)
+        # Everything the recreation needs is resolved FIRST. A tag whose
+        # version cannot be read is a Release that cannot be rebuilt, and the
+        # delete below would destroy the only copy of it.
+        parsed_tag = parse_version_tag(
+            tag_name, mode=TagMode.PRERELEASE_INCLUSIVE,
+        )
         if not parsed_tag:
-            print(f"Warning: cannot extract version from tag {tag_name}",
-                  file=sys.stderr)
+            print(
+                f"Warning: {tag_name} is not a version tag under any known "
+                f"scheme, so its GitHub Release cannot be rebuilt. Leaving it "
+                f"exactly as it is -- it now describes the pre-rewrite commit.",
+                file=sys.stderr,
+            )
             continue
         version = parsed_tag.version
+
+        try:
+            gh(view_body_args(tag_name), config=ctx.config)
+        except Exception:
+            continue  # No Release for this tag -- nothing to reconcile.
 
         notes = _notes_for_tag(
             tag_name, version, ctx=ctx, project_root=project_root,
             workspace_projects=workspace_projects,
             tag_prefix_index=tag_prefix_index, extract_entry=extract_entry,
-        ) or f"Release {version}"
+        ) or ""
+
+        ledger_dir = _ledger_dir_for_tag(
+            tag_name, ctx=ctx, project_root=project_root,
+            tag_prefix_index=tag_prefix_index,
+        )
+        anchor = None
+        if ledger_dir and os.path.isdir(ledger_dir):
+            try:
+                anchor = anchor_from_ledger(ledger_dir, version)
+            except Exception as exc:
+                print(
+                    f"Warning: the release archive for {version} could not be "
+                    f"read ({exc}); its Release is recreated without an "
+                    f"rlsbl-ci-sha marker.",
+                    file=sys.stderr,
+                )
+        pub = (
+            publication(tag=tag_name, version=version, candidate_sha=anchor,
+                        notes=notes)
+            if anchor else None
+        )
+        if pub is None:
+            print(
+                f"Warning: the release ledger holds no anchor for {version}, "
+                f"so its recreated Release carries no rlsbl-ci-sha marker. "
+                f"The publish workflow reads that marker to learn which commit "
+                f"CI proved green; record the version's anchor and re-run "
+                f"`rlsbl release reconcile --plan` to put it back.",
+                file=sys.stderr,
+            )
 
         try:
-            gh(["release", "create", tag_name, "--title", tag_name,
-                "--notes", notes], config=ctx.config)
+            gh(delete_args(tag_name), config=ctx.config)
+        except Exception as e:
+            print(f"Warning: failed to delete release {tag_name}: {e}",
+                  file=sys.stderr)
+            continue
+
+        try:
+            if pub is not None:
+                create_release(pub, gh=gh, config=ctx.config,
+                               directory=str(project_root))
+            else:
+                body = (notes or f"Release {version}").rstrip("\n") + "\n"
+                with notes_file(body, directory=str(project_root)) as path:
+                    args = ["release", "create", tag_name, "--title", tag_name,
+                            "--notes-file", path]
+                    if is_prerelease(version):
+                        args.append("--prerelease")
+                    gh(args, config=ctx.config)
             recreated += 1
         except Exception as e:
             print(f"Warning: failed to recreate release {tag_name}: {e}",
