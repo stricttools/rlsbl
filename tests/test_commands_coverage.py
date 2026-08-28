@@ -98,6 +98,23 @@ def _latest_release_stub(uc):
     return ("1.0.0", "v1.0.0")
 
 
+# The commit these mocked undo runs pretend the release shipped from. undo
+# reads it out of the release ARCHIVE (the ledger), which these fixtures do not
+# have on disk, so the two archive reads are stubbed alongside
+# ``_find_latest_release``.
+_UNDO_ANCHOR_SHA = "a" * 40
+
+
+def _undo_anchor_stub(_uc, _version, _tag):
+    """Stand-in for the version's own ledger anchor."""
+    return _UNDO_ANCHOR_SHA
+
+
+def _undo_predecessor_stub(_uc, _version):
+    """Stand-in for the predecessor's anchor: there is no earlier release."""
+    return None
+
+
 class TestUndoPrintSummary:
     """_print_summary is called only when at least one step FAILed."""
 
@@ -192,7 +209,7 @@ class TestUndoHasNoOwnPrompt:
         )
 
 
-def _undo_run_stub(*, fail_on=None, release_sha=None):
+def _undo_run_stub(*, fail_on=None, release_sha=None, commits=None, record=None):
     """A ``run`` stand-in for the undo flow, driven by argv rather than order.
 
     These tests used to script ``run`` with a positional ``side_effect`` list,
@@ -200,24 +217,31 @@ def _undo_run_stub(*, fail_on=None, release_sha=None):
     ``git commit`` consumed the entries meant for the tag deletion, so a test
     named for a failing ``git tag -d`` really exercised a failing audit commit
     -- and the entries meant for ``git log`` / ``git revert`` were never
-    reached at all, since the walk collected no commits. Selecting the failing
-    call by its argv keeps each test on the step it names.
+    reached at all. Selecting the failing call by its argv keeps each test on
+    the step it names.
 
-    ``fail_on`` is a predicate over the argv list. ``release_sha``, when given,
-    makes the release-commit walk find one version-bump commit, so the revert
-    step actually runs.
+    ``fail_on`` is a predicate over the argv list. ``commits`` is the release's
+    own commits as ``(sha, subject)`` pairs, answered to the ledger-range
+    ``git log``; it defaults to the single version-bump commit, because a
+    release with no locatable version bump is now refused outright. ``record``,
+    when given, is a list every argv is appended to.
     """
+    if commits is None:
+        commits = [(release_sha or _UNDO_ANCHOR_SHA, "v1.0.0")]
+    log_output = "\n".join(f"{sha}\x1f{subject}" for sha, subject in commits)
+
     def _run(cmd, args=None, **kwargs):
         argv = list(args or [])
+        if record is not None:
+            record.append(argv)
         if fail_on is not None and fail_on(argv):
             raise Exception(f"{' '.join(['git'] + argv[:2])} failed")
         if argv[:1] == ["describe"]:
             return "v1.0.0"
-        if release_sha:
-            if argv[:3] == ["rev-list", "-n", "1"]:
-                return release_sha
-            if argv[:1] == ["log"]:
-                return "v1.0.0"  # the version-bump commit's subject
+        if argv[:3] == ["rev-list", "-n", "1"]:
+            return release_sha or _UNDO_ANCHOR_SHA
+        if argv[:1] == ["log"]:
+            return log_output
         return ""
     return _run
 
@@ -234,6 +258,8 @@ class TestUndoGhDeleteFails:
     """Covers lines 118-120: gh release delete fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -261,6 +287,8 @@ class TestUndoRemoteTagDeleteFails:
     """Covers lines 128-130: git push origin :tag fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -286,6 +314,8 @@ class TestUndoLocalTagDeleteFails:
     """Covers lines 136-138: git tag -d fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -308,7 +338,12 @@ class TestUndoLocalTagDeleteFails:
 
 
 class TestUndoRevertException:
-    """Covers lines 202-204: git revert throws exception.
+    """A failing ``git revert`` STOPS the undo.
+
+    It used to record FAILED and carry on, which let the changelog restore's
+    own ``git add``/``git commit`` conclude a conflicted revert and push it.
+    The flow now aborts the in-progress revert and exits, with the failure in
+    the printed summary.
 
     Regression: this class previously mocked ``run``/``run_gh`` but NOT
     ``push_if_needed``/``get_current_branch``. With ``flags={}`` the
@@ -321,6 +356,8 @@ class TestUndoRevertException:
     """
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -333,16 +370,27 @@ class TestUndoRevertException:
     def test_revert_exception(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
+        issued = []
         mock_run.side_effect = _undo_run_stub(
-            release_sha="a" * 40,
-            fail_on=lambda argv: argv[:1] == ["revert"],
+            record=issued,
+            fail_on=lambda argv: argv[:2] == ["revert", "--no-edit"],
         )
         with patch("sys.stdout", new_callable=StringIO) as out:
-            with patch("sys.stderr", new_callable=StringIO):
-                run_cmd("npm", [], {}, ctx=_ctx())
+            with patch("sys.stderr", new_callable=StringIO) as err:
+                with pytest.raises(SystemExit) as exc:
+                    run_cmd("npm", [], {}, ctx=_ctx())
+        assert exc.value.code == 1
         assert "FAILED" in _summary_row(out.getvalue(), "Revert commits")
+        assert ["revert", "--abort"] in issued, (
+            "the in-progress revert must be aborted, not left for the next commit"
+        )
+        assert "conflict" in err.getvalue().lower()
+        assert not any(a[:1] == ["commit"] for a in issued[issued.index(
+            ["revert", "--abort"]):]), "nothing may be committed after the stop"
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -364,12 +412,7 @@ class TestUndoRevertException:
         """
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "",                                # git push origin :v1.0.0 (tag delete)
-            "",                                # git tag -d
-            "v1.0.0",                         # git log
-            "",                                # git revert -> OK
-        ]
+        mock_run.side_effect = _undo_run_stub()
 
         real_popen = subprocess.Popen
         pushes = []
@@ -395,6 +438,8 @@ class TestUndoChangelogRestoreFails:
     """Covers lines 216-218: changelog restoration exception."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.generate_changelog", side_effect=Exception("gen failed"))
     @patch(f"{MOD_UNDO}.unfinalize_version", return_value=["unreleased.jsonl"])
     @patch(f"{MOD_UNDO}.get_changes_dir", return_value="/fake/.rlsbl/changes")
@@ -410,14 +455,10 @@ class TestUndoChangelogRestoreFails:
     def test_changelog_restore_failure_in_summary(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "",                                           # git push origin :v1.0.0
-            "",                                           # git tag -d
-            "chore: finalize changelog for 1.0.0",       # git log (finalize commit)
-            "",                                           # git revert (finalize)
-            "v1.0.0",                                    # git log (version-bump)
-            "",                                           # git revert (version-bump)
-        ]
+        mock_run.side_effect = _undo_run_stub(commits=[
+            ("b" * 40, "chore: finalize changelog for 1.0.0"),
+            (_UNDO_ANCHOR_SHA, "v1.0.0"),
+        ])
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {}, ctx=_ctx())
@@ -430,6 +471,8 @@ class TestUndoReleaseFileRestoreFails:
     """Covers lines 232-234: release file restore exception."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", side_effect=Exception("bad"))
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -442,12 +485,7 @@ class TestUndoReleaseFileRestoreFails:
     def test_release_file_restore_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "",         # git push origin :v1.0.0
-            "",         # git tag -d
-            "v1.0.0",   # git log
-            "",         # git revert
-        ]
+        mock_run.side_effect = _undo_run_stub()
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {}, ctx=_ctx())
@@ -458,6 +496,8 @@ class TestUndoPushDeclined:
     """Covers lines 240-244: user declines push after revert."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
@@ -469,12 +509,7 @@ class TestUndoPushDeclined:
     def test_push_declined_by_user(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "",         # git push origin :v1.0.0
-            "",         # git tag -d
-            "v1.0.0",   # git log
-            "",         # git revert
-        ]
+        mock_run.side_effect = _undo_run_stub()
         # First input is the undo confirmation ("y"), second is the push prompt ("n")
         with patch("builtins.input", side_effect=["y", "n"]):
             with patch("sys.stdout", new_callable=StringIO):
@@ -482,6 +517,8 @@ class TestUndoPushDeclined:
         # No push_if_needed called -- verified by no push call in mock_run
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
@@ -493,12 +530,7 @@ class TestUndoPushDeclined:
     def test_push_eof_at_prompt(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "",         # git push origin :v1.0.0
-            "",         # git tag -d
-            "v1.0.0",   # git log
-            "",         # git revert
-        ]
+        mock_run.side_effect = _undo_run_stub()
         # First input is undo confirmation ("y"), second is push prompt (EOF)
         with patch("builtins.input", side_effect=["y", EOFError]):
             with patch("sys.stdout", new_callable=StringIO):
@@ -509,6 +541,8 @@ class TestUndoPushFails:
     """Covers lines 255-257: push_if_needed fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed", side_effect=Exception("push boom"))
@@ -521,12 +555,7 @@ class TestUndoPushFails:
     def test_push_fails_shows_failure(self, mock_run, _run_gh, *_):
         from rlsbl.commands.undo import run_cmd
 
-        mock_run.side_effect = [
-            "",         # git push origin :v1.0.0
-            "",         # git tag -d
-            "v1.0.0",   # git log
-            "",         # git revert
-        ]
+        mock_run.side_effect = _undo_run_stub()
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
                 run_cmd("npm", [], {}, ctx=_ctx())
@@ -538,6 +567,8 @@ class TestUndoReleaseFileFinalize:
     """Covers lines 179-182: release-file finalize commit at HEAD is peeled."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=["unreleased.toml"])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -553,30 +584,44 @@ class TestUndoReleaseFileFinalize:
 
         # The changelog restore asks its question through working_tree_paths
         # (the shared working-tree read), not through ``run``, so a clean
-        # answer there means no add/commit follows it.
-        mock_run.side_effect = [
-            "v1.0.0",                                         # git describe
-            "",                                                # git push origin :v1.0.0
-            "",                                                # git tag -d
-            "chore: finalize release file for 1.0.0",         # git log (release-file finalize)
-            "",                                                # git revert (release-file finalize)
-            "v1.0.0",                                         # git log (version-bump)
-            "",                                                # git revert (version-bump)
-            "",                                                # git add (release file restore)
-            "",                                                # git commit (release file restore)
-        ]
+        # answer there means no add/commit follows it. The release-file
+        # finalize commit IS among the release commits here, so reverting it
+        # already undid the rename and the separate restore is skipped.
+        issued = []
+        mock_run.side_effect = _undo_run_stub(record=issued, commits=[
+            ("b" * 40, "chore: finalize release file for 1.0.0"),
+            (_UNDO_ANCHOR_SHA, "v1.0.0"),
+        ])
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {}, ctx=_ctx())
-        assert mock_run.call_count == 8
+
+        reverted = [a[-1] for a in issued if a[:2] == ["revert", "--no-edit"]]
+        assert reverted == ["b" * 40, _UNDO_ANCHOR_SHA], (
+            "both release commits are reverted, newest first"
+        )
+        commit_msgs = [a[2] for a in issued if a[:2] == ["commit", "-m"]]
+        assert not any("restore release file after undo" in m for m in commit_msgs), (
+            "the reverted finalize commit already restored the release file"
+        )
+        assert not any("restore changelog after undo" in m for m in commit_msgs), (
+            "a clean working tree means the changelog restore commits nothing"
+        )
 
 
 class TestUndoFinalizeOnlyReverted:
-    """A release whose tag points at a finalize-changelog commit sitting on a
-    non-release-shaped boundary (no matching version-bump commit): the walk
-    collects and reverts the finalize commit only, then reconciles, and undo
-    completes cleanly. Real git; only run_gh and the registry gate are mocked.
+    """A release with no locatable version-bump commit is REFUSED.
+
+    The archive anchors the release at a finalize-changelog commit and nothing
+    in the release's range carries the version-bump subject. This used to be
+    treated as a legitimate "finalize-only release": undo reverted the finalize
+    commit, deleted the tag and the GitHub Release, and reported success -- the
+    same shape that, on a resumed release, left the version files bumped. It is
+    now a hard error that destroys nothing. Real git; only run_gh and the
+    registry gate are mocked.
     """
 
+    # No anchor stubs here: this fixture has a REAL archive on disk, and the
+    # anchor it records is the whole point.
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -614,12 +659,17 @@ class TestUndoFinalizeOnlyReverted:
         add_remote(repo, repo.parent / "finalize-remote.git")
 
         monkeypatch.chdir(repo)
-        with patch("sys.stdout", new_callable=StringIO) as out:
-            run_cmd("npm", [], {}, ctx=_ctx(repo, {"publish_mode": "ci"}))
-        assert "Undo of v1.0.0 complete" in out.getvalue()
-        # The finalize was undone: the finalized JSONL is gone again.
-        assert not (repo / ".rlsbl" / "changes" / "1.0.0.jsonl").exists()
-        assert "v1.0.0" not in _ghgit(repo, "tag", "-l").split()
+        head_before = _ghgit(repo, "rev-parse", "HEAD")
+        with patch("sys.stdout", new_callable=StringIO):
+            with patch("sys.stderr", new_callable=StringIO) as err:
+                with pytest.raises(SystemExit) as exc:
+                    run_cmd("npm", [], {}, ctx=_ctx(repo, {"publish_mode": "ci"}))
+        assert exc.value.code == 1
+        assert "version-bump commit" in err.getvalue()
+        # Nothing was destroyed: the tag, the finalized JSONL and HEAD stand.
+        assert (repo / ".rlsbl" / "changes" / "1.0.0.jsonl").exists()
+        assert "v1.0.0" in _ghgit(repo, "tag", "-l").split()
+        assert _ghgit(repo, "rev-parse", "HEAD") == head_before
 
 
 class TestUndoCoverageNeverPollutesRealRepo:
@@ -634,6 +684,8 @@ class TestUndoCoverageNeverPollutesRealRepo:
     """
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
+    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
+    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
@@ -653,12 +705,7 @@ class TestUndoCoverageNeverPollutesRealRepo:
         j_before = journal.read_bytes()
         c_before = changelog.read_bytes()
 
-        def fake_run(_cmd, args, **_kw):
-            if args[:1] == ["describe"] or args[:2] == ["log", "-1"]:
-                return "v1.0.0"
-            return ""
-
-        mock_run.side_effect = fake_run
+        mock_run.side_effect = _undo_run_stub()
 
         try:
             with patch("sys.stdout", new_callable=StringIO), \
