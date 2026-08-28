@@ -190,3 +190,77 @@ class TestSyncNoCommit:
             f"default sync should produce one commit when files are written, "
             f"got {after - before}"
         )
+
+
+class TestSyncCommitsIntoTheWorkspaceItWasHanded:
+    """sync's auto-commit belongs to the workspace argument, not the cwd.
+
+    ``_cmd_sync`` takes the project root it should sync as an argument and
+    resolves the workspace root from it, so the commit it makes must go to
+    THAT repository. It used to run the commit from the process cwd instead,
+    which made auto-commit unusable for any caller pointing sync at a
+    workspace other than the one it happens to be standing in -- and, when the
+    cwd was itself a git repo, made git refuse paths outside it.
+    """
+
+    def _build_workspace(self, root):
+        """init + one project with a CI workflow, committed, inside *root*."""
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(root), check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.local"], cwd=str(root), check=True,
+        )
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=str(root), check=True)
+        (root / "README.md").write_text("# other\n")
+        subprocess.run(["git", "add", "README.md"], cwd=str(root), check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(root), check=True)
+
+        cwd = os.getcwd()
+        os.chdir(str(root))
+        try:
+            _cmd_init({"root-dev-node": True}, project_root=".")
+            _make_npm_project(root, "pkg-a", with_ci=True)
+            _cmd_add(["pkg-a"], {"releasable": "false"}, project_root=".")
+        finally:
+            os.chdir(cwd)
+
+        subprocess.run(["git", "add", "-A"], cwd=str(root), check=True)
+        if subprocess.run(
+            ["git", "diff", "--cached", "--quiet"], cwd=str(root),
+        ).returncode != 0:
+            subprocess.run(["git", "commit", "-q", "-m", "setup"], cwd=str(root), check=True)
+
+        # Remove the synced workflows so the next sync has files to write.
+        wf = root / ".github" / "workflows"
+        if wf.exists():
+            for f in list(wf.iterdir()):
+                f.chmod(0o644)
+                f.unlink()
+            subprocess.run(["git", "add", "-A"], cwd=str(root), check=True)
+            if subprocess.run(
+                ["git", "diff", "--cached", "--quiet"], cwd=str(root),
+            ).returncode != 0:
+                subprocess.run(
+                    ["git", "commit", "-q", "-m", "remove synced"],
+                    cwd=str(root), check=True,
+                )
+
+    def test_commit_goes_to_the_workspace_not_the_cwd(self, mock_git_repo):
+        other = mock_git_repo.parent / "other-workspace"
+        other.mkdir()
+        self._build_workspace(other)
+
+        before_other = _git_log_count(other)
+        before_cwd = _git_log_count(mock_git_repo)
+
+        _cmd_sync({}, project_root=str(other))
+
+        assert _git_log_count(other) > before_other, (
+            "sync must commit into the workspace it was handed"
+        )
+        assert _git_log_count(mock_git_repo) == before_cwd, (
+            "sync must not commit into the process cwd's repository"
+        )
+        assert subprocess.run(
+            ["git", "status", "--porcelain"], cwd=str(other),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip() == "", "sync left the workspace dirty"

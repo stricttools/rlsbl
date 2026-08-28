@@ -429,10 +429,9 @@ def _build_project_template_vars(project_dir, root):
 
 
 def scaffold_releasable_dirs(workspace_root):
-    """Create the directory structure for each releasable in explicit mode.
+    """Create the directory structure for each releasable in the workspace.
 
-    In explicit mode (when ``[[releasables]]`` exists in workspace.toml),
-    each releasable gets:
+    Every releasable declared in ``[[releasables]]`` gets:
 
     - ``.rlsbl-monorepo/releasables/{name}/version`` (user-owned, never overwritten)
     - ``.rlsbl-monorepo/releasables/{name}/changes/unreleased.jsonl`` (user-owned)
@@ -447,11 +446,8 @@ def scaffold_releasable_dirs(workspace_root):
     Returns:
         A list of file paths that were created or updated (for commit tracking).
     """
-    from ...workspace import is_explicit_mode, load_releasables, load_workspace
+    from ...workspace import load_releasables, load_workspace
     from ...workspace import get_releasable_dir, get_releasable_version_path, get_releasable_changes_dir
-
-    if not is_explicit_mode(workspace_root):
-        return []
 
     projects = load_workspace(workspace_root)
     releasables = load_releasables(workspace_root, projects)
@@ -584,6 +580,7 @@ def _cmd_sync(flags, project_root):
                 "monorepo: auto-populate import_name",
                 [ws_path],
                 skip_message=None,
+                cwd=root,
             )
         # Re-load projects so the rest of sync sees the updated import_names
         projects = load_workspace(root)
@@ -597,6 +594,7 @@ def _cmd_sync(flags, project_root):
             "monorepo: scaffold releasable directories",
             releasable_files,
             skip_message=None,
+            cwd=root,
         )
 
     workflows_dir = os.path.join(root, ".github", "workflows")
@@ -735,9 +733,9 @@ def _cmd_sync(flags, project_root):
     # Releasables drive BOTH routers: the CI router's paths filters (each
     # project's releasable finalize artifact) and the publish router's tag
     # prefixes. Loaded once, before either is generated.
-    # Unconditional: load_workspace above already refused an implicit-mode
-    # workspace, so by here every workspace declares its releasables and a
-    # mode test would only be a second spelling of a question already
+    # Unconditional: load_workspace above already refused a workspace with no
+    # [[releasables]], so by here every workspace declares its releasables and
+    # a mode test would only be a second spelling of a question already
     # answered. The release-time simulation of these same filters
     # (rlsbl.commands.release.execute) loads them the same way.
     from ...workspace import load_releasables
@@ -848,7 +846,11 @@ def _cmd_sync(flags, project_root):
             quoted = " ".join(all_files)
             print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {quoted}` manually.")
         else:
-            commit_files_if_changed("monorepo: sync CI workflows", all_files, skip_message="No workflow changes to commit.")
+            commit_files_if_changed(
+                "monorepo: sync CI workflows", all_files,
+                skip_message="No workflow changes to commit.",
+                cwd=root,
+            )
 
     inlined_count = sum(len(p.get('_ci_docs', [])) for p in projects_with_ci)
     router_count = 1 + (1 if projects_with_publish else 0)
