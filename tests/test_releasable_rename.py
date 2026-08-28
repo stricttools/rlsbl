@@ -405,6 +405,77 @@ class TestNeverReleasedNoSourceTag:
         assert rr._is_clean_tree(str(root))
 
 
+class TestAliasIsRecordedInLineage:
+    """The alias tag a rename creates is a lineage FACT, not only a git ref.
+
+    ``expected_refs`` reads recorded aliases from the lineage record, so a
+    rename that creates an alias tag without recording it would leave the ref
+    set with a second, undiscoverable source. One source: the lineage record.
+    """
+
+    def _aliases(self, root, name):
+        from rlsbl.lineage import KIND_BOUNDARY_ALIAS, get_lineage_path, read_events
+        from rlsbl.workspace import get_releasable_dir
+
+        path = get_lineage_path(
+            str(root), releasable_dir=get_releasable_dir(str(root), name),
+        )
+        if not os.path.isfile(path):
+            return []
+        out = []
+        for event in read_events(path, kinds=[KIND_BOUNDARY_ALIAS]):
+            out.extend(event.aliases)
+        return out
+
+    def test_the_created_alias_is_recorded(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        rr.rename_releasable(str(root), "beta", "beta2")
+
+        aliases = self._aliases(root, "beta2")
+        assert len(aliases) == 1
+        alias = aliases[0]
+        assert alias.alias_tag == "beta2@v0.1.0"
+        assert alias.aliased_tag == "beta@v0.1.0"
+        assert alias.commit == _git(root, "rev-list", "-n", "1", "beta2@v0.1.0")
+        # Recorded means committed: the record is repository state.
+        assert rr._is_clean_tree(str(root))
+
+    def test_re_running_appends_no_duplicate(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        rr.rename_releasable(str(root), "beta", "beta2")
+        rr.rename_releasable(str(root), "beta", "beta2")
+
+        assert len(self._aliases(root, "beta2")) == 1
+
+    def test_no_source_tag_records_nothing(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root, create_tag=False)
+
+        rr.rename_releasable(str(root), "beta", "beta2")
+
+        assert self._aliases(root, "beta2") == []
+
+    def test_name_only_rename_records_nothing(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root, tag_format="v{version}")
+
+        rr.rename_releasable(str(root), "beta", "beta2")
+
+        assert self._aliases(root, "beta2") == []
+
+
 class TestPreflight:
     """Preflight hard-errors use the multi_releasable fixture (git repo)."""
 

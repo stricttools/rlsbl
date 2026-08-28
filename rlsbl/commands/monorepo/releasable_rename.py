@@ -15,13 +15,19 @@ Renaming a releasable is a coordinated, idempotent operation:
 
 Then, last, when the releasable's ``tag_format`` contains ``{name}`` (so the
 tag prefix actually changes), a boundary alias tag for the current version is
-created at the commit the old current-version tag points to and pushed. This
-is the single sanctioned remote action. Historical releases stay under the old
-prefix and are no longer managed by ``rlsbl release edit/deprecate/yank``.
+created at the commit the old current-version tag points to, RECORDED as a
+``boundary-alias`` event in the releasable's lineage record, and pushed. The
+push is the single sanctioned remote action. Historical releases stay under the
+old prefix and are no longer managed by ``rlsbl release edit/deprecate/yank``.
+
+The lineage record is what makes the alias discoverable: ``expected_refs``
+(the single authority for a version's full ref set) reads recorded aliases from
+there, and it is the same event kind a conversion writes for the same fact.
 
 The flow is idempotent: a crash between the local commit and the tag push is
 healed by re-running the command, which detects the already-renamed state and
-finishes the tag step.
+finishes the tag step. The lineage append is idempotent by content, so a re-run
+never duplicates the record.
 """
 
 import os
@@ -228,8 +234,50 @@ def _push_timeout_for(root, name):
     return get_push_timeout(read_project_config(root, get_releasable_dir(root, name)))
 
 
-def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout):
-    """Create the boundary alias tag and push it, idempotently.
+def _record_alias_in_lineage(root, releasable_name, alias_tag, aliased_tag, commit):
+    """Append the boundary alias to the releasable's lineage record and commit it.
+
+    An alias tag created here and a boundary alias recorded by a conversion are
+    the same kind of fact -- a pre-rename version made addressable under the
+    post-rename naming -- so they are recorded in the same place.  ``expected_refs``
+    reads that one place; an alias that exists only as a git ref would be a
+    second, undiscoverable source for the same question.
+
+    Idempotent by CONTENT: an alias already recorded under this ``alias_tag`` is
+    not appended again, so every crash window (and a plain re-run) heals without
+    duplicating the record.
+    """
+    from ...lineage import (
+        KIND_BOUNDARY_ALIAS,
+        BoundaryAlias,
+        BoundaryAliasEvent,
+        append_events,
+        get_lineage_path,
+        read_events,
+    )
+
+    path = get_lineage_path(
+        root, releasable_dir=get_releasable_dir(root, releasable_name),
+    )
+    for event in read_events(path, kinds=[KIND_BOUNDARY_ALIAS]):
+        if any(a.alias_tag == alias_tag for a in event.aliases):
+            return False
+
+    append_events(path, [BoundaryAliasEvent(aliases=[BoundaryAlias(
+        alias_tag=alias_tag, aliased_tag=aliased_tag, commit=commit,
+    )])])
+    commit_files_if_changed(
+        f"monorepo: record the {releasable_name} rename boundary alias",
+        [os.path.relpath(path, root)],
+        skip_message="alias lineage already committed; nothing to commit.",
+        cwd=root,
+    )
+    return True
+
+
+def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout,
+                      releasable_name=None):
+    """Create the boundary alias tag, record it, and push it, idempotently.
 
     Returns a status dict describing what was (or would have been) done.
     """
@@ -246,6 +294,16 @@ def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout):
             # at this version. Nothing to carry forward.
             return {"status": "no_source_tag", "old_tag": old_tag, "tag": new_tag}
         run("git", ["tag", new_tag, commit], cwd=root)
+
+    # Record the alias BEFORE the push: a crash between the two leaves a
+    # recorded alias whose ref is local-only, which the unpublished-refs check
+    # reports. The reverse order would leave a pushed ref no record names.
+    if releasable_name is not None:
+        commit = _resolve_tag_commit(root, new_tag)
+        if commit is not None:
+            _record_alias_in_lineage(
+                root, releasable_name, new_tag, old_tag, commit,
+            )
 
     # Push ONLY the alias tag -- the single sanctioned remote action.
     # --no-verify: the pre-push hook is a changelog-coverage guard for branch
@@ -392,6 +450,7 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
             result["tag"] = _finish_alias_tag(
                 root, old_tag, new_tag, remote,
                 push_timeout=_push_timeout_for(root, new_name),
+                releasable_name=new_name,
             )
         else:
             result["name_only"] = True
@@ -499,6 +558,7 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         tag_result = _finish_alias_tag(
             root, old_tag, new_tag, remote,
             push_timeout=_push_timeout_for(root, new_name),
+            releasable_name=new_name,
         )
         result["tag"] = tag_result
         result["note"] = _unmanaged_history_note(
