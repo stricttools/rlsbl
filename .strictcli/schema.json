@@ -1488,7 +1488,7 @@
     },
     "changelog": {
       "name": "changelog",
-      "help": "Structured changelog management using JSONL entries with 3 entry types (feature, fix, breaking). Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
+      "help": "Structured changelog management using JSONL entries, each typed feature, fix or breaking. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.",
       "commands": {
         "add": {
           "name": "add",
@@ -2464,7 +2464,7 @@
       "groups": {
         "release": {
           "name": "release",
-          "help": "Release commands for monorepo workspaces. Provides 3 subcommands: run (batch release), init (scaffold release file), and order (topological release order).",
+          "help": "Release commands for monorepo workspaces. Provides 3 subcommands: run (batch release), init (scaffold release file), order (topological release order).",
           "commands": {
             "run": {
               "name": "run",
