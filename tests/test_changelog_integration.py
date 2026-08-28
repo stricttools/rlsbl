@@ -359,7 +359,7 @@ class TestStatusWithJsonl:
 
         from rlsbl.commands.status import _collect_status
 
-        data = _collect_status("npm", ctx=make_ctx("."))
+        data, _latest = _collect_status("npm", ctx=make_ctx("."))
         # jsonl_coverage should be set (non-None)
         assert data["jsonl_coverage"] is not None
         assert "covered" in data["jsonl_coverage"] or "entries" in data["jsonl_coverage"]
@@ -421,7 +421,7 @@ class TestStatusWithoutJsonl:
 
         from rlsbl.commands.status import _collect_status
 
-        data = _collect_status("npm", ctx=make_ctx("."))
+        data, _latest = _collect_status("npm", ctx=make_ctx("."))
         assert data["jsonl_coverage"] == "not set up"
 
     def test_text_output_shows_not_set_up(self, mock_git_repo, capsys):

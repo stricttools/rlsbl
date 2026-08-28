@@ -914,8 +914,11 @@ class TestUnreleasedNonReleasable:
 
         from rlsbl.commands.unreleased import run_cmd
 
-        with patch("rlsbl.commands.unreleased.find_workspace_root", return_value="/ws"), \
-             patch("rlsbl.commands.unreleased.resolve_project", return_value=mock_proj), \
+        # The monorepo resolution moved to rlsbl.context.resolve_release_scope,
+        # which imports these lazily from rlsbl.workspace -- so the workspace
+        # module is where they are patched.
+        with patch("rlsbl.workspace.find_workspace_root", return_value="/ws"), \
+             patch("rlsbl.workspace.resolve_project", return_value=mock_proj), \
              patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
              patch("rlsbl.commands.unreleased.latest_release_fact",
                    return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
@@ -933,8 +936,11 @@ class TestUnreleasedNonReleasable:
 
         from rlsbl.commands.unreleased import run_cmd
 
-        with patch("rlsbl.commands.unreleased.find_workspace_root", return_value="/ws"), \
-             patch("rlsbl.commands.unreleased.resolve_project", return_value=mock_proj), \
+        # The monorepo resolution moved to rlsbl.context.resolve_release_scope,
+        # which imports these lazily from rlsbl.workspace -- so the workspace
+        # module is where they are patched.
+        with patch("rlsbl.workspace.find_workspace_root", return_value="/ws"), \
+             patch("rlsbl.workspace.resolve_project", return_value=mock_proj), \
              patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
              patch("rlsbl.commands.unreleased.latest_release_fact",
                    return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
