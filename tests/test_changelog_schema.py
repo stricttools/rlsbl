@@ -7,6 +7,7 @@ import pytest
 
 from rlsbl.changelog.schema import (
     ChangelogEntry,
+    entry_content_key,
     parse_entry,
     parse_jsonl,
     serialize_entry,
@@ -289,3 +290,49 @@ class TestParseJsonl:
         path.write_text("")
         entries = parse_jsonl(str(path))
         assert entries == []
+
+
+class TestEntryContentKey:
+    """The identity of an entry that carries no ``id``.
+
+    ``id`` is optional on read, so a historical entry has none and can only be
+    identified by what it says. The key exists so a copy of an entry can be
+    recognized as a copy -- and so two entries that say different things are
+    never mistaken for one.
+    """
+
+    def _entry(self, **kwargs):
+        base = dict(
+            commits=["a1b2c3"], user_facing=True,
+            description="Something", type="fix",
+        )
+        base.update(kwargs)
+        return ChangelogEntry(**base)
+
+    def test_two_entries_saying_the_same_thing_share_a_key(self):
+        assert entry_content_key(self._entry()) == entry_content_key(self._entry())
+
+    def test_commit_order_is_not_part_of_the_identity(self):
+        one = self._entry(commits=["a1b2c3", "d4e5f6"])
+        other = self._entry(commits=["d4e5f6", "a1b2c3"])
+        assert entry_content_key(one) == entry_content_key(other)
+
+    @pytest.mark.parametrize("field,value", [
+        ("commits", ["999999"]),
+        ("user_facing", False),
+        ("description", "Something else"),
+        ("type", "feature"),
+        ("release_type", "ota"),
+    ])
+    def test_every_field_that_carries_meaning_separates_two_entries(
+        self, field, value,
+    ):
+        assert entry_content_key(self._entry()) != entry_content_key(
+            self._entry(**{field: value})
+        )
+
+    def test_the_id_is_not_part_of_the_key(self):
+        """The key is the FALLBACK for entries that have no id."""
+        assert entry_content_key(self._entry(id="x" * 48)) == entry_content_key(
+            self._entry()
+        )
