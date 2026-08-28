@@ -145,6 +145,40 @@ class TestObserveTags:
         assert plans["0.9.0"].state == "unanchored"
         assert plans["0.9.0"].split_sha is None
 
+    def test_an_anchor_with_no_mirror_commit_is_unanchored_not_fatal(
+        self, tmp_path,
+    ):
+        """An anchor that predates the member's directory must not kill the run.
+
+        A version absorbed from an era before this subtree existed has a real
+        ledger anchor, but no ``git subtree split`` of the member path can
+        answer for that commit. That is one version's problem: it becomes an
+        ``unanchored`` item carrying the reason, and every other version -- and
+        the branch itself -- is judged as usual.
+        """
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+
+        # A commit from before the member's directory existed: no split of
+        # 'mylib' can answer for it.
+        empty_tree = subprocess.run(
+            ["git", "mktree"], cwd=str(root), input="",
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        absorbed = _git(root, "commit-tree", empty_tree, "-m", "pre-mylib era")
+
+        state = get_releasable_dir(str(root), "mylib")
+        archive_release(f"{state}/releases", "0.9.0", absorbed)
+
+        plans = {p.version: p for p in _tag_plans(root, remote)}
+        assert plans["0.9.0"].state == "unanchored"
+        assert plans["0.9.0"].split_sha is None
+        assert plans["0.9.0"].anchor_sha == absorbed
+        assert plans["0.9.0"].reason, "the reason the split failed is reported"
+        # The version that CAN be derived is unaffected.
+        assert plans["1.0.0"].state == "materialize"
+
     def test_a_releasable_with_no_archives_has_no_tag_plans(self, tmp_path):
         remote = _bare(tmp_path / "mirror.git")
         root = tmp_path / "mono"
@@ -215,6 +249,49 @@ class TestThroughTheCommand:
         out = capsys.readouterr().out
         assert "the mirror carries v1.0.0" in out
 
+
+    def test_one_underivable_version_does_not_stop_the_branch(
+        self, tmp_path, capsys, monkeypatch,
+    ):
+        """A version the split cannot answer for costs that version only.
+
+        The anchor of an absorbed-era release predates the member's directory,
+        so no subtree split of that path can name a mirror commit for it. That
+        used to raise out of observation, and with it went the branch: nothing
+        converged, and the command reported the split failure as if the whole
+        mirror were unreachable.
+        """
+        from rlsbl.commands.monorepo.mirror_cmd import observe
+
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+        empty_tree = subprocess.run(
+            ["git", "mktree"], cwd=str(root), input="",
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        absorbed = _git(root, "commit-tree", empty_tree, "-m", "pre-mylib era")
+        archive_release(
+            f"{get_releasable_dir(str(root), 'mylib')}/releases",
+            "0.9.0", absorbed,
+        )
+        gh = _FakeGh()
+        monkeypatch.setattr(
+            mirror_cmd, "validate_subtree_remote_ssh_host",
+            lambda remote, root: None,
+        )
+        monkeypatch.setattr(
+            "rlsbl.utils.run_gh_unscoped", lambda args, **kwargs: gh(args),
+        )
+
+        _cmd_mirror({"project": "mylib", "dry-run": True}, project_root=root)
+        out = capsys.readouterr().out
+        assert "tag:v0.9.0" in out and "unanchored" in out
+        assert "tag:v1.0.0" in out
+
+        _cmd_mirror({"project": "mylib", "dry-run": False}, project_root=root)
+        assert observe(remote, str(root), "mylib").state == "converged"
+        assert "v1.0.0" in remote_tag_commits(remote_refs(remote, str(root)))
 
     def test_the_converged_mirror_carries_no_publish_workflow(
         self, tmp_path, monkeypatch,

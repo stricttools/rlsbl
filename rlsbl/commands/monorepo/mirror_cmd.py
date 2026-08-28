@@ -626,8 +626,12 @@ class MirrorTagPlan:
       * ``"materialize"`` -- the mirror has no such tag; the split of the
         version's ledger anchor is what an apply would push it at.
       * ``"present"``     -- the mirror already carries the tag.
-      * ``"unanchored"``  -- the version's archive records no commit, so there
-        is nothing to derive a mirror commit from. Reported, never guessed.
+      * ``"unanchored"``  -- no mirror commit for this version can be derived.
+        Two ways that happens, and ``reason`` says which: the version's archive
+        records no commit at all, or it records one the subtree split cannot
+        answer for (a commit predating the member's directory -- an absorbed-era
+        release -- or one the monorepo no longer has). Reported, never guessed,
+        and never fatal to the rest of the reconciliation.
     """
 
     version: str
@@ -637,6 +641,9 @@ class MirrorTagPlan:
     split_sha: str | None = None
     remote_commit: str | None = None
     notes: str = ""
+    #: Why an ``unanchored`` version has no derivable mirror commit. Empty for
+    #: the archive-records-nothing case, where the state says it all.
+    reason: str = ""
 
 
 def observe_tags(remote, root, project_path, *, releases_dir, changes_dir,
@@ -686,10 +693,23 @@ def observe_tags(remote, root, project_path, *, releases_dir, changes_dir,
                 version=version, tag=tag, state="unanchored",
             ))
             continue
+        # The split is asked PER VERSION and its failure is scoped to that
+        # version. An anchor the split cannot answer for -- one predating the
+        # member's directory, or a commit the monorepo no longer has -- used to
+        # raise out of the whole observation, taking the branch's verdict with
+        # it: nothing converged because one old release could not be derived.
+        try:
+            split_sha = split_commit_for(root, project_path, anchor)
+        except MirrorPublicationError as exc:
+            plans.append(MirrorTagPlan(
+                version=version, tag=tag, state="unanchored",
+                anchor_sha=anchor, reason=str(exc),
+            ))
+            continue
         plans.append(MirrorTagPlan(
             version=version, tag=tag, state="materialize",
             anchor_sha=anchor,
-            split_sha=split_commit_for(root, project_path, anchor),
+            split_sha=split_sha,
             notes=version_notes(changes_dir, version),
         ))
     return plans
@@ -717,6 +737,25 @@ def tag_verdict_item(plan):
             actions=(
                 f"apply would push {plan.tag} at {plan.split_sha[:12]} and "
                 f"create the mirror's GitHub Release for it.",
+            ),
+            **common,
+        )
+    if plan.reason:
+        return VerdictItem(
+            label="unanchored",
+            summary=(
+                f"released {plan.version} is anchored at "
+                f"{(plan.anchor_sha or '')[:12]}, but the subtree split cannot "
+                f"name a mirror commit for it."
+            ),
+            facts=(f"split: {plan.reason}",),
+            detail=(
+                "  Nothing is guessed and nothing is written for this "
+                "version; every other version and the branch itself are\n"
+                "  reconciled as usual. The usual cause is an anchor that "
+                "predates this member's directory (a release absorbed from\n"
+                "  another repository), which has no counterpart on the mirror "
+                "and never will."
             ),
             **common,
         )
@@ -1167,10 +1206,15 @@ def _apply_tag(plan, remote, root, project_path):
         print(f"Mirror already carries {plan.tag}.")
         return
     if plan.state == "unanchored":
+        why = (
+            f"the subtree split cannot name a mirror commit for its anchor "
+            f"{(plan.anchor_sha or '')[:12]} ({plan.reason})"
+            if plan.reason
+            else "it records no commit in its release archive"
+        )
         print(
-            f"Skipping {plan.tag}: released {plan.version} records no commit "
-            f"in its release archive, so the mirror's commit for it cannot be "
-            f"derived. Nothing was written.",
+            f"Skipping {plan.tag}: released {plan.version} cannot be "
+            f"materialized on the mirror -- {why}. Nothing was written.",
             file=sys.stderr,
         )
         return
