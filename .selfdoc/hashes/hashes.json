@@ -58,7 +58,7 @@
     "schema_hash": "63051ca6feb717547434aa33f97fbb1b4565809886e4c59edc33d192396e7c03"
   },
   "en/cli-index.md": {
-    "content": "1f986ed30af65f2c4a5fe129d9b642d1118852e95edd30cf450c008028749b44",
+    "content": "e8106a2cd5dd89fd9ce7ba34d1bcab8c91cbe36903d5550df2ca37c84fcf3eaf",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -390,7 +390,8 @@
   "en/rlsbl-commands-monorepo-extract_cmd.md": {
     "content": "ea9cb488b975dba368c53a3bb7028b00f87cb3beef16301474bf797ebab25403",
     "description": "8e49607eb41110f54bb22945efdc78b973a06757dd878e43ff38511871086afc",
-    "seed_hash": "8e49607eb41110f54bb22945efdc78b973a06757dd878e43ff38511871086afc"
+    "seed_hash": "8e49607eb41110f54bb22945efdc78b973a06757dd878e43ff38511871086afc",
+    "source_docstring": "5882ad2c374cd07c71c258f94cba7255f22b908fff3772a72d22305150de4562"
   },
   "en/rlsbl-commands-monorepo-graph.md": {
     "content": "1f200f176106e861e0c7fb1c6f83d8cfe4ccc4a9b281c84e34ab08ab3f7a4eb7",
@@ -523,7 +524,7 @@
     "content": "0043ad5f49363706a655b10e1074720f49998dd8eba05759957056b265f7e9cc",
     "description": "49cbbfbd4b0674da3c0ecf39e6d038f9ee924dac70576a6a72eda14d06645596",
     "seed_hash": "49cbbfbd4b0674da3c0ecf39e6d038f9ee924dac70576a6a72eda14d06645596",
-    "source_docstring": "54456d85d201907cb184e49c62e3d1a57e33660f375d43de09b6224dd2e961d5"
+    "source_docstring": "3840fc3823e8921c7213039914f719b6cad80d61da424539cfa46a6d8d3acf80"
   },
   "en/rlsbl-commands-rewrite.md": {
     "content": "a20393e46e8d46a73447b3d188fa1652170ebad552983bfdcb770a079f33a362",
@@ -655,7 +656,7 @@
     "content": "7b89aa5393a84a8d247f452e9f984fd59846106a051ce3a6483d245396ef1658",
     "description": "f0b219549a4abcc7bd392c486eec7221b0a3e7cd1b57b086b63268967e28c82a",
     "seed_hash": "f0b219549a4abcc7bd392c486eec7221b0a3e7cd1b57b086b63268967e28c82a",
-    "source_docstring": "c1de5e987d7850e0c1897d2bc9073af68040445eb858ea0464d2088dadbfea18"
+    "source_docstring": "78ea6e9fb2a2d53d2375f0b1e38ba3438fbb8d4f480a8d7572cd22d5d7ffafca"
   },
   "en/rlsbl-lint-config.md": {
     "content": "e3eb509c95993db475febef8c8069844175a44b0a2c25b8ec6f01960ff52f05a",
