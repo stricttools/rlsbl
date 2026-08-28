@@ -1531,25 +1531,34 @@ class TestScrubNoGhForReleases:
         assert mock_run.call_count == 7
 
 
-class TestScrubReleaseDeleteFails:
-    def test_gh_release_delete_fail(self, tmp_path, capsys):
+class TestScrubReleaseEditFails:
+    def test_gh_release_edit_fail_leaves_the_old_release(self, tmp_path, capsys):
+        """A failed edit is a warning, and it strands nothing: the previous
+        Release is still attached to the tag, because nothing was deleted."""
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
-        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete(fail) (run_gh)
-        _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
-                    gh_auth=True, gh_installed=True,
-                    run_gh_side_effect=['{"body": "old"}', Exception("delete failed")])
-        assert "delete failed" in capsys.readouterr().err
+        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_edit(fail) (run_gh)
+        _mock_run, mock_run_gh = _scrub_full(
+            tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
+            gh_auth=True, gh_installed=True,
+            run_gh_side_effect=['{"body": "old"}', Exception("edit failed")],
+        )
+        err = capsys.readouterr().err
+        assert "edit failed" in err
+        assert "still carries its previous Release" in err
+        assert not [
+            c for c in mock_run_gh.call_args_list if "delete" in c[0][0]
+        ]
 
 
 class TestScrubVersionExtractFails:
     def test_bad_tag_name(self, tmp_path, capsys):
-        """A tag whose version cannot be read is skipped BEFORE any deletion.
+        """A tag whose version cannot be read is skipped whole.
 
-        Its Release cannot be rebuilt, so deleting it first would destroy the
-        only copy -- the tag is not even looked up on the forge.
+        There is no version, so there is no document to write -- the tag is not
+        even looked up on the forge, and its Release is left exactly as it is.
         """
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
@@ -1571,11 +1580,15 @@ class TestScrubGhReleaseCreateFails:
         safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="notes")}
-        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view, gh_delete, gh_create(fail) (run_gh)
+        # The tag carries NO Release, so the missing one is created -- and the
+        # creation fails.
+        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view(fail), gh_create(fail) (run_gh)
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                     gh_auth=True, gh_installed=True, extra_patches=ep,
-                    run_gh_side_effect=['{"body": "old"}', "", Exception("create failed")])
-        assert "create failed" in capsys.readouterr().err
+                    run_gh_side_effect=[Exception("no release"), Exception("create failed")])
+        err = capsys.readouterr().err
+        assert "create failed" in err
+        assert "carries no GitHub Release, exactly as before" in err
 
 
 class TestScrubFallbackNotes:
@@ -1592,7 +1605,7 @@ class TestScrubFallbackNotes:
         seen = {}
 
         def gh(args, **kwargs):
-            if args[:2] == ["release", "create"]:
+            if args[:2] in (["release", "edit"], ["release", "create"]):
                 path = args[args.index("--notes-file") + 1]
                 with open(path, encoding="utf-8") as f:
                     seen["body"] = f.read()
@@ -1601,7 +1614,7 @@ class TestScrubFallbackNotes:
                 return '{"body": "old"}'
             return ""
 
-        # Calls: version, ls-remote, scrub, commit, rev-parse, branch_push, tag_push (run); gh_view, gh_delete, gh_create (run_gh)
+        # Calls: version, ls-remote, scrub, commit, rev-parse, branch_push, tag_push (run); gh_view, gh_edit (run_gh)
         mock_run, mock_run_gh = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                                gh_auth=True, gh_installed=True, extra_patches=ep,
                                run_gh_side_effect=gh)
@@ -1609,17 +1622,20 @@ class TestScrubFallbackNotes:
 
 
 class TestScrubNoReleaseForTag:
-    def test_no_release_for_tag(self, tmp_path):
+    def test_a_tag_without_a_release_gets_one_created(self, tmp_path):
+        """A moved tag missing its Release is a gap the scrub closes."""
         (tmp_path / ".rlsbl" / "changes").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         safegit_result = _safegit_envelope({"rewrites": {"old": "new"}, "tags": [{"refname": "refs/tags/v1.0.0"}], "new_head": "abc"})
         flags = {"pattern": "secret", "replace": "XXX", "reason": "test", "entire-history": True}
-        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view(fail) (run_gh)
+        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view(fail), gh_create (run_gh)
         mock_run, mock_run_gh = _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                     gh_auth=True, gh_installed=True,
-                    run_gh_side_effect=[Exception("not found")])
+                    run_gh_side_effect=[Exception("not found"), ""])
         assert mock_run.call_count == 7
-        assert mock_run_gh.call_count == 1
+        creates = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
+        assert len(creates) == 1
+        assert "v1.0.0" in creates[0][0][0]
 
 
 class TestScrubNoRefname:

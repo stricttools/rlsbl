@@ -1,4 +1,4 @@
-"""Release scrub command: wraps safegit scrub with in-history JSONL hash remapping (--remap-shas-in), CHANGELOG verification, tag updates, and GitHub Release recreation."""
+"""Release scrub command: wraps safegit scrub with in-history JSONL hash remapping (--remap-shas-in), CHANGELOG verification, tag updates, and GitHub Release updates."""
 
 import difflib
 import json
@@ -33,7 +33,7 @@ from ..workspace import load_workspace
 from .release_reconcile import (
     push_ref_with_lease as _push_ref_with_lease_impl,
     push_rewritten_tags,
-    recreate_github_releases,
+    update_github_releases,
     snapshot_remote_refs as _snapshot_remote_refs_impl,
 )
 from .. import effects
@@ -477,7 +477,7 @@ def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
         "them too:\n"
         "    rlsbl release reconcile --dry-run   # plan\n"
         "    rlsbl release reconcile             # re-push moved tags, "
-        "recreate their Releases"
+        "repair their Releases"
     )
     return True
 
@@ -1211,11 +1211,11 @@ def run_cmd(flags, *, ctx):
             )
             _save_step(scrub_result_path, scrub_data, "TAGS_PUSHED")
 
-        # -- Recreate GitHub Releases --
+        # -- Rewrite the GitHub Release documents (never delete one) --
         if "RELEASES_UPDATED" not in completed:
             # Persisted, so a resumed run reports the figure this step
             # produced rather than recomputing it from the tag list.
-            scrub_data["releases_recreated"] = recreate_github_releases(
+            scrub_data["releases_updated"] = update_github_releases(
                 tags, ctx=ctx, project_root=project_root,
                 workspace_projects=workspace_projects,
                 tag_prefix_index=tag_prefix_index,
@@ -1229,10 +1229,10 @@ def run_cmd(flags, *, ctx):
         if os.path.exists(scrub_result_path):
             effects.remove(scrub_result_path)
 
-        # What the recreation step actually did, not how many tags looked like
-        # they might have a Release: a tag can carry no Release at all, and one
-        # whose version cannot be read is skipped with its Release untouched.
-        releases_count = scrub_data.get("releases_recreated", 0)
+        # What the Release step actually wrote, not how many tags looked like
+        # they might carry a Release: a tag whose version cannot be read is
+        # skipped with its Release untouched.
+        releases_count = scrub_data.get("releases_updated", 0)
         repaired_count = len(scrub_data.get("remapped_files", []))
         repaired_note = (
             f" {repaired_count} changelog file(s) repaired from the rewrite "
@@ -1241,7 +1241,7 @@ def run_cmd(flags, *, ctx):
         )
         print(f"\nScrub complete. {len(rewrites)} commits rewritten, "
               f"{len(tags)} tags updated, {releases_count} releases "
-              f"recreated.{repaired_note}")
+              f"updated.{repaired_note}")
 
     finally:
         release_lock()

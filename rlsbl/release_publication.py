@@ -193,6 +193,22 @@ def edit_notes_args(tag, notes_path, *, repo=None):
             *_repo_args(repo)]
 
 
+def edit_all_args(tag, notes_path, *, title=None, prerelease=False, repo=None):
+    """argv rewriting one Release's whole document: notes, title, flag.
+
+    The pre-release flag is stated in BOTH directions (``--prerelease`` and
+    ``--prerelease=false``), never merely omitted: an edit that left it out
+    would keep a Release wrongly marked pre-release marked that way, and the
+    point of this argv is that what the forge ends up carrying is decided here
+    rather than inherited from whatever was there before.
+    """
+    args = ["release", "edit", tag, "--notes-file", notes_path]
+    if title is not None:
+        args += ["--title", title]
+    args.append("--prerelease" if prerelease else "--prerelease=false")
+    return args + _repo_args(repo)
+
+
 def delete_args(tag, *, repo=None):
     """argv deleting one Release."""
     return ["release", "delete", tag, "--yes", *_repo_args(repo)]
@@ -226,6 +242,26 @@ def create_release(pub: ReleasePublication, *, gh, config=None, repo=None,
     """Create the Release *pub* describes. Returns the argv that was run."""
     with notes_file(pub.body, directory=directory) as path:
         args = create_args(pub, path, repo=repo)
+        gh(args, config=config)
+    return args
+
+
+def update_release(pub: ReleasePublication, *, gh, config=None, repo=None,
+                   directory="."):
+    """Rewrite an EXISTING Release to exactly the document *pub* describes.
+
+    The edit counterpart of :func:`create_release`, and the same document: a
+    Release whose tag was moved by a rewrite keeps its name and its attachment,
+    so only the body, the title and the pre-release flag have to be restated.
+    Nothing is deleted, so a failure here leaves the old Release in place.
+
+    Returns the argv that was run.
+    """
+    with notes_file(pub.body, directory=directory) as path:
+        args = edit_all_args(
+            pub.tag, path, title=pub.release_title,
+            prerelease=pub.prerelease, repo=repo,
+        )
         gh(args, config=config)
     return args
 

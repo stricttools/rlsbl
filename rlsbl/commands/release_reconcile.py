@@ -221,7 +221,7 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
             return None
         # PRERELEASE_INCLUSIVE: the question here is which SCHEME the tag
         # follows, and a pre-release suffix does not change that. It also has
-        # to answer the same way _ledger_dir_for_tag does, or a recreated
+        # to answer the same way _ledger_dir_for_tag does, or a rewritten
         # Release would take its notes from one project and its anchor from
         # another.
         parsed = parse_version_tag(tag_name, mode=TagMode.PRERELEASE_INCLUSIVE)
@@ -253,7 +253,7 @@ def _ledger_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index):
     """The release-archive directory whose ledger anchors *tag_name*'s version.
 
     The same resolution :func:`_notes_for_tag` performs for the CHANGELOG, so
-    the notes and the anchor a recreated Release carries describe the same
+    the notes and the anchor a written Release carries describe the same
     project. Returns None when no project owns the tag -- the marker then has
     no anchor to project, which the caller reports rather than guesses at.
     """
@@ -281,43 +281,51 @@ def _ledger_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index):
     return os.path.join(proj_path, ".rlsbl", "releases")
 
 
-def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
-                             tag_prefix_index, gh=None, gh_installed=None,
-                             gh_auth=None, extract_entry=None):
-    """Recreate the GitHub Release for every rewritten tag that had one.
+def update_github_releases(tags, *, ctx, project_root, workspace_projects,
+                           tag_prefix_index, gh=None, gh_installed=None,
+                           gh_auth=None, extract_entry=None):
+    """Rewrite the GitHub Release document for every rewritten tag.
 
-    A Release is attached to the remote tag, so once the tag moves the Release
-    still points at a commit that no longer exists. Each existing Release is
-    deleted and recreated with the document
-    :mod:`rlsbl.release_publication` decides -- the version's CHANGELOG.md
-    section, the ``rlsbl-ci-sha`` marker taken from the ledger's anchor, and
-    the pre-release flag the version earns. Tags without a Release are left
-    alone: this reconciles, it does not publish.
+    A GitHub Release follows its tag NAME, and by the time this step runs the
+    tags have already been re-pointed -- so every Release is already attached
+    to the rewritten commit. What does NOT follow the tag is the document: the
+    notes, the ``rlsbl-ci-sha`` marker the publish workflow reads, and the
+    pre-release flag. Those are written in place, from the one document
+    :mod:`rlsbl.release_publication` decides.
 
-    **Nothing is deleted that cannot be recreated.** The version is read off
-    the tag BEFORE the delete, and pre-release tags are first-class here
-    (``PRERELEASE_INCLUSIVE``): a tag that is not a version tag at all is
-    skipped whole, with its Release untouched. Parsing after the delete is how
-    a ``-rc.1`` Release was once deleted and never recreated.
+    **Nothing is ever deleted.** An earlier shape deleted each Release and
+    created it again, which left a window in which a transient failure stranded
+    a tag with no Release at all. There is no such window here: an edit that
+    fails leaves the previous Release exactly where it was, and a re-run
+    repairs it. A tag carrying NO Release gets one created -- the same
+    materialize shape ``rlsbl release reconcile`` performs -- so a rewrite can
+    close that gap too rather than only preserve it.
+
+    A tag that is not a version tag under any known scheme is skipped whole,
+    without so much as a lookup: there is no version, therefore no document to
+    write. Pre-release tags are first-class (``PRERELEASE_INCLUSIVE``).
 
     The anchor comes from the ledger, which the scrub's ``ANCHORS_REMAPPED``
     step has already moved through the same rewrite by the time this runs, so
     the marker names the rewritten commit. A version whose archive holds no
     anchor -- released before the ledger existed, or recorded unanchorable --
-    gets its Release back WITHOUT a marker, and the omission is stated on
-    stderr rather than hidden.
+    gets its document WITHOUT a marker, and the omission is stated on stderr
+    rather than hidden.
 
     Individual failures are warnings: a partially reconciled forge is better
     than an aborted reconcile that leaves the rest untouched, and re-running
     the command is idempotent.
+
+    Returns the number of Releases written (edited or created).
     """
     from ..release_publication import (
         anchor_from_ledger,
         create_release,
-        delete_args,
+        edit_all_args,
         is_prerelease,
         notes_file,
         publication,
+        update_release,
         view_body_args,
     )
 
@@ -327,7 +335,7 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
     if not (gh_installed() and gh_auth()):
         return 0
 
-    recreated = 0
+    written = 0
     for tag_info in tags:
         refname = tag_info.get("refname", "")
         tag_name = tag_name_from_refname(refname)
@@ -339,17 +347,15 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
             )
             continue
 
-        # Everything the recreation needs is resolved FIRST. A tag whose
-        # version cannot be read is a Release that cannot be rebuilt, and the
-        # delete below would destroy the only copy of it.
         parsed_tag = parse_version_tag(
             tag_name, mode=TagMode.PRERELEASE_INCLUSIVE,
         )
         if not parsed_tag:
             print(
                 f"Warning: {tag_name} is not a version tag under any known "
-                f"scheme, so its GitHub Release cannot be rebuilt. Leaving it "
-                f"exactly as it is -- it now describes the pre-rewrite commit.",
+                f"scheme, so there is no version whose document could be "
+                f"written. Leaving its GitHub Release exactly as it is -- its "
+                f"notes now describe the pre-rewrite commit.",
                 file=sys.stderr,
             )
             continue
@@ -357,8 +363,9 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
 
         try:
             gh(view_body_args(tag_name), config=ctx.config)
+            exists = True
         except Exception:
-            continue  # No Release for this tag -- nothing to reconcile.
+            exists = False
 
         notes = _notes_for_tag(
             tag_name, version, ctx=ctx, project_root=project_root,
@@ -377,7 +384,7 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
             except Exception as exc:
                 print(
                     f"Warning: the release archive for {version} could not be "
-                    f"read ({exc}); its Release is recreated without an "
+                    f"read ({exc}); its Release is written without an "
                     f"rlsbl-ci-sha marker.",
                     file=sys.stderr,
                 )
@@ -389,7 +396,7 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
         if pub is None:
             print(
                 f"Warning: the release ledger holds no anchor for {version}, "
-                f"so its recreated Release carries no rlsbl-ci-sha marker. "
+                f"so its Release carries no rlsbl-ci-sha marker. "
                 f"The publish workflow reads that marker to learn which commit "
                 f"CI proved green; record the version's anchor and re-run "
                 f"`rlsbl release reconcile --plan` to put it back.",
@@ -397,34 +404,49 @@ def recreate_github_releases(tags, *, ctx, project_root, workspace_projects,
             )
 
         try:
-            gh(delete_args(tag_name), config=ctx.config)
-        except Exception as e:
-            print(f"Warning: failed to delete release {tag_name}: {e}",
-                  file=sys.stderr)
-            continue
-
-        try:
             if pub is not None:
-                create_release(pub, gh=gh, config=ctx.config,
-                               directory=str(project_root))
+                if exists:
+                    update_release(pub, gh=gh, config=ctx.config,
+                                   directory=str(project_root))
+                else:
+                    create_release(pub, gh=gh, config=ctx.config,
+                                   directory=str(project_root))
             else:
+                # Markerless: the same document minus the anchor it does not
+                # have, through the same two argv builders.
                 body = (notes or f"Release {version}").rstrip("\n") + "\n"
                 with notes_file(body, directory=str(project_root)) as path:
-                    args = ["release", "create", tag_name, "--title", tag_name,
-                            "--notes-file", path]
-                    if is_prerelease(version):
-                        args.append("--prerelease")
+                    if exists:
+                        args = edit_all_args(
+                            tag_name, path, title=tag_name,
+                            prerelease=is_prerelease(version),
+                        )
+                    else:
+                        args = ["release", "create", tag_name, "--title",
+                                tag_name, "--notes-file", path]
+                        if is_prerelease(version):
+                            args.append("--prerelease")
                     gh(args, config=ctx.config)
-            recreated += 1
+            written += 1
         except Exception as e:
-            print(
-                f"Warning: failed to recreate release {tag_name}: {e}\n"
-                f"  The old Release was already deleted, so {tag_name} now has "
-                f"NONE. Re-run this command (it is idempotent) or create it "
-                f"from the version's CHANGELOG.md section.",
-                file=sys.stderr,
-            )
-    return recreated
+            if exists:
+                print(
+                    f"Warning: failed to update release {tag_name}: {e}\n"
+                    f"  Nothing was deleted, so {tag_name} still carries its "
+                    f"previous Release -- with the pre-rewrite notes and "
+                    f"marker. Re-run this command (it is idempotent) to write "
+                    f"the current document.",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"Warning: failed to create release {tag_name}: {e}\n"
+                    f"  The tag carries no GitHub Release, exactly as before. "
+                    f"Re-run this command (it is idempotent) or create it from "
+                    f"the version's CHANGELOG.md section.",
+                    file=sys.stderr,
+                )
+    return written
 
 
 # ---------------------------------------------------------------------------

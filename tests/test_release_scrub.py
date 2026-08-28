@@ -562,9 +562,9 @@ class TestFullScrubFlow:
         # safegit scrub result with rewrites
         safegit_result = _safegit_envelope({
             "rewrites": {"old_hash_1": "new_hash_1", "old_hash_2": "new_hash_2"},
-            # v2.0.0 is a rewritten tag carrying NO GitHub Release, so nothing
-            # is deleted or recreated for it -- and the summary must count what
-            # the recreation step DID, not how many tags looked like versions.
+            # v2.0.0 is a rewritten tag carrying NO GitHub Release, so its
+            # missing one is CREATED while v1.0.0's existing one is edited in
+            # place -- two writes, and not one delete between them.
             "tags": [
                 {"refname": "refs/tags/v1.0.0"},
                 {"refname": "refs/tags/v2.0.0"},
@@ -672,19 +672,25 @@ class TestFullScrubFlow:
         ]
         assert len(force_tag_calls) == 1
 
-        # gh release delete + create (via run_gh)
+        # gh release edit, and NO delete anywhere (via run_gh). The tag has
+        # already been re-pointed, so its Release is already on the rewritten
+        # commit: only the document is rewritten, in place.
         gh_all = mock_run_gh.call_args_list
         gh_delete_calls = [c for c in gh_all if "delete" in c[0][0]]
-        assert len(gh_delete_calls) == 1
-        assert "v1.0.0" in gh_delete_calls[0][0][0]
+        assert gh_delete_calls == []
 
+        gh_edit_calls = [c for c in gh_all if "edit" in c[0][0]]
+        assert len(gh_edit_calls) == 1
+        assert "v1.0.0" in gh_edit_calls[0][0][0]
+
+        # The tag that carried no Release gets one, rather than being left
+        # without: the same materialize shape the reconcile performs.
         gh_create_calls = [c for c in gh_all if "create" in c[0][0]]
         assert len(gh_create_calls) == 1
-        assert "v1.0.0" in gh_create_calls[0][0][0]
+        assert "v2.0.0" in gh_create_calls[0][0][0]
 
-        # 6. The summary counts what the recreation step did -- one Release --
-        # not the two rewritten tags that merely LOOK like released versions.
-        assert "1 releases recreated" in capsys.readouterr().out
+        # 6. The summary counts what the Release step actually wrote.
+        assert "2 releases updated" in capsys.readouterr().out
 
 
 # ===========================================================================
@@ -820,9 +826,9 @@ class TestResumeFromScrubResult:
         ]
         assert len(force_tag_calls) == 1
 
-        # Release recreated (via run_gh)
-        gh_create_calls = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
-        assert len(gh_create_calls) == 1
+        # Release document rewritten in place (via run_gh)
+        gh_edit_calls = [c for c in mock_run_gh.call_args_list if "edit" in c[0][0]]
+        assert len(gh_edit_calls) == 1
 
 
 # ===========================================================================
@@ -2479,17 +2485,17 @@ class TestMonorepoTagCorrectProject:
         assert alpha_cl in extract_calls, f"Expected alpha CHANGELOG to be queried, got {extract_calls}"
         assert beta_cl in extract_calls, f"Expected beta CHANGELOG to be queried, got {extract_calls}"
 
-        # Verify the create calls used the correct notes (via run_gh)
-        gh_create_calls = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
-        assert len(gh_create_calls) == 2
+        # Verify the edit calls used the correct notes (via run_gh)
+        gh_edit_calls = [c for c in mock_run_gh.call_args_list if "edit" in c[0][0]]
+        assert len(gh_edit_calls) == 2
 
-        # First create: alpha@v1.0.0 with alpha notes
-        alpha_create = gh_create_calls[0]
-        assert "alpha@v1.0.0" in alpha_create[0][0]
+        # First edit: alpha@v1.0.0 with alpha notes
+        alpha_edit = gh_edit_calls[0]
+        assert "alpha@v1.0.0" in alpha_edit[0][0]
 
-        # Second create: beta@v1.0.0 with beta notes
-        beta_create = gh_create_calls[1]
-        assert "beta@v1.0.0" in beta_create[0][0]
+        # Second edit: beta@v1.0.0 with beta notes
+        beta_edit = gh_edit_calls[1]
+        assert "beta@v1.0.0" in beta_edit[0][0]
 
 
 # ===========================================================================
@@ -2589,10 +2595,10 @@ class TestStandaloneTagNoPrefix:
         proj_changelogs = [c for c in extract_calls if "packages" in c]
         assert len(proj_changelogs) == 0, f"Project CHANGELOGs should not be queried for standalone tags: {proj_changelogs}"
 
-        # Verify the release was created with root changelog notes (via run_gh)
-        gh_create_calls = [c for c in mock_run_gh.call_args_list if "create" in c[0][0]]
-        assert len(gh_create_calls) == 1
-        assert "v1.0.0" in gh_create_calls[0][0][0]
+        # Verify the release was rewritten with root changelog notes (run_gh)
+        gh_edit_calls = [c for c in mock_run_gh.call_args_list if "edit" in c[0][0]]
+        assert len(gh_edit_calls) == 1
+        assert "v1.0.0" in gh_edit_calls[0][0][0]
 
 
 class TestSafegitEnvelopeParsing:
