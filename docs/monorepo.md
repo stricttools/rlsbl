@@ -103,6 +103,34 @@ Each `[[projects]]` block declares the project's identity, release target, inter
 | `registry_name` | no | string | Override package name on the registry (e.g., scoped npm name) |
 | `description` | no | string | Short project description for documentation |
 
+### The root member
+
+Every workspace declares the repository root itself as a member, at `path = "."`. It exists so that **no tracked file falls outside the ownership model**: territory is derived from declared member paths and never enumerated, so every file belongs to the member with the most specific declared path, and the root member owns everything no other member claims. That residual territory is exactly what the router renders for it — `**`, narrowed by a negated exclude of every other member's territory (see [Router paths filters](#router-paths-filters)).
+
+Its name is `root`, and the spelling is not a preference. Job keys, router filters and check regexes are all derived from it, so it cannot vary from repository to repository: the root member may be named nothing else, no other member may take the name, and omitting `name` on the root member applies it automatically.
+
+Its **kind** is a choice, and `rlsbl monorepo init` makes it a required one rather than picking for you:
+
+| Kind | Declaration | What it means |
+| --- | --- | --- |
+| Dev node | `dev_only = true`, `releasable = false` — `rlsbl monorepo init --root-dev-node` | The root files need no changelog coverage, and stand outside every releasable. |
+| Releasable member | `releasable = "<name>"` — `rlsbl monorepo init --root-releasable <name> --tag-format <format>` | The root files get changelog coverage under that releasable, which must then declare `tag_format` explicitly. |
+
+### What the loader refuses
+
+`workspace.toml` is validated as a whole every time it is loaded, and each refusal carries its own remedy. Structural facts about the member list are reported before per-member key errors, so a remedy for a stray key never presumes a member list that is itself unsound.
+
+| Refusal | Remedy |
+| --- | --- |
+| No `[[releasables]]` section at all — the retired implicit mode | Add the section and give every releasable member a `releasable` key (a name, or `false`). The error also names the last rlsbl version that reads such a workspace, for a repository that genuinely cannot convert right now. |
+| More than one root member, or two members whose paths normalize to the same territory | Keep one and give the other a path of its own. Two members cannot own one territory. |
+| No root member | Add one, choosing its kind. The error prints both declarations in full. |
+| A `watch` key on any member | Delete it. Territory is derived from declared paths, never enumerated. A member that genuinely needs to own files outside its own directory declares that directory as a member of its own. |
+| A `subtree_remote` key on any member | Move the line into that member's `[[releasables]]` entry. A mirror's destination belongs to the unit that owns a version, a changelog and a tag scheme. |
+| A root member named anything but `root` | Set `name = "root"`, or omit `name` entirely. |
+| A non-root member named `root` | Rename it, or give it `path = "."` in place of the root member declared today. Which member owns the repository root is your decision, and rlsbl will not guess it. |
+| A releasable that owns the root member and declares no `tag_format` | Declare it: `v{version}` for bare version tags, `{name}@v{version}` to keep the workspace scheme. The repository's existing tags decide which, and only you can read them. |
+
 ### Releasables section
 
 `[[releasables]]` names the units of versioning. Each entry has a `name` and two optional keys, `tag_format` and `subtree_remote`:
