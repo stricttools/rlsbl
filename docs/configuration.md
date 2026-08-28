@@ -1,12 +1,12 @@
 ---
-description: "Configuration reference: config.json pipelines, batch limits, the sandboxed test runner, internal dependency floors, freeform external_checks, the path-capable checks block, and workspace.toml."
+description: "Configuration reference: config.json pipelines, batch limits, the sandboxed test runner, dependency floors, external checks, and workspace.toml."
 ---
 
 # Configuration reference
 
 ## .rlsbl/config.json
 
-Project-level configuration file created by `rlsbl config init` or `rlsbl scaffold`. This JSON file controls release behavior such as which targets to use (chosen from 18 supported registries) and whether ecosystem tagging is enabled. Settings here override user-level defaults in `~/.rlsbl/config.json` but are themselves overridden by CLI flags passed at release time, forming a 3-layer precedence chain (CLI > project > user).
+Project-level configuration file created by `rlsbl scaffold`. This JSON file controls release behavior such as which targets to use (chosen from the [supported registries](targets.md)) and whether ecosystem tagging is enabled. Settings here override user-level defaults in `~/.rlsbl/config.json` but are themselves overridden by CLI flags passed at release time, forming a 3-layer precedence chain (CLI > project > user).
 
 :-: table-config path=".rlsbl/config.json"
 

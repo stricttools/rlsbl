@@ -4,7 +4,7 @@ description: "rlsbl monorepo workspaces: workspace.toml, the root member and loa
 
 # Monorepo guide
 
-rlsbl supports monorepo workflows via the `rlsbl monorepo` command family. A monorepo workspace manages multiple independently-versioned projects sharing one git repository, coordinated through a single `.rlsbl-monorepo/workspace.toml` file at the repository root. A single workspace can contain any mix of the 18 supported release targets.
+rlsbl supports monorepo workflows via the `rlsbl monorepo` command family. A monorepo workspace manages multiple independently-versioned projects sharing one git repository, coordinated through a single `.rlsbl-monorepo/workspace.toml` file at the repository root. A single workspace can contain any mix of the [supported release targets](targets.md).
 
 ## Getting started
 

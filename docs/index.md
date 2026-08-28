@@ -35,7 +35,7 @@ Install rlsbl via `uv tool install rlsbl` (Python) or `npx rlsbl` (npm wrapper).
 ## Reference
 
 - [Configuration](configuration.md) -- `.rlsbl/config.json` format and all keys
-- [Release targets](targets.md) -- the 18 supported ecosystems
+- [Release targets](targets.md) -- every supported ecosystem, and what each one supports
 - [Monorepo](monorepo.md) -- workspace management, subtree publishing, batch releases
 - [Repository conversions](conversions.md) -- extracting a releasable into its own repository, absorbing one in
 - [CI customization](ci-customization.md) -- custom workflow files that survive scaffold
