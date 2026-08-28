@@ -34,13 +34,12 @@ Site                                                 Was
 ``rlsbl/commands/unreleased.py`` ``run_cmd``          ``git describe`` +
                                                      ``git log <tag>..HEAD``
 ``rlsbl/commands/monorepo/commands.py``               ``git tag -l <glob>
-``_latest_tag_for_glob`` (status coverage)           --sort=-v:refname``
+``_coverage_column`` (both status tables)            --sort=-v:refname``
 ``rlsbl/commands/monorepo/batch_release_init.py``     the same tag-list dialect
+``_get_unreleased_commit_count``
 ===================================================  ==========================
 
-Latest-release FACT -- MIGRATED to the absolute highest archived version,
-annotated when the checkout does not contain it
-(``ledger.latest_release_fact``):
+Latest-release FACT -- MIGRATED to the absolute highest archived version:
 
 ======================================================  =======================
 Site                                                    Was
@@ -48,30 +47,42 @@ Site                                                    Was
 ``rlsbl/commands/status.py`` last-release line          unscoped
                                                         ``git describe
                                                         --tags --abbrev=0``
-``rlsbl/commands/unreleased.py`` header / payload tag   ``git describe``
+``rlsbl/commands/unreleased.py`` header / payload       ``git describe``
+``rlsbl/commands/monorepo/commands.py`` Released        ``git tag -l <glob>
+column (both status tables)                             --sort=-v:refname``
 ``rlsbl/commands/watch.py`` commit labeling and         ``git describe
 release-page URL                                        --exact-match``
-``rlsbl/commands/undo.py`` ``_find_latest_release``      ``git describe
+``rlsbl/commands/undo.py`` ``_find_latest_release``     ``git describe
 (which release is being undone)                         --tags --abbrev=0``
-``rlsbl/commands/undo.py`` predecessor boundary         ``git describe
-                                                        --tags --abbrev=0
+``rlsbl/commands/undo.py``                              ``git describe
+``_previous_release_range``                             --tags --abbrev=0
                                                         <tag>^``
 ======================================================  =======================
 
-``undo`` reads only which VERSION is latest (an archive-existence scan), then
-translates it into a tag: everything after that point -- the commit walk, the
-tag deletion, the revert -- operates on the tag namespace, so undo is an
-observe-and-repair layer over tags in the same sense ``release reconcile`` is,
-and refusing to start on a tag/anchor disagreement would refuse exactly the
-repair the operator came for. It DOES read the predecessor's anchor, because
-that decides which commits belong to the release being undone.
+``status``, ``unreleased`` and both monorepo status tables go through
+``ledger.latest_release_fact``, which annotates the version when the checkout
+does not contain it. ``watch`` asks ``ledger.release_at_commit`` -- which
+release a given commit IS -- and that costs one archive read, not a scan.
+
+``undo`` reads only which VERSION is latest (an archive-existence scan through
+``list_archived_versions``), then translates it into a tag: everything after
+that point -- the commit walk, the tag deletion, the revert -- operates on the
+tag namespace, so undo is an observe-and-repair layer over tags in the same
+sense ``release reconcile`` is, and refusing to start on a tag/anchor
+disagreement would refuse exactly the repair the operator came for. It DOES
+read the predecessor's anchor, because that decides which commits belong to
+the release being undone.
 
 Release preparation -- MIGRATED to the ledger:
 
 * ``rlsbl/commands/release/validate.py`` ``compute_release_version`` decided
-  "first release vs bump" from ``tag_exists_locally``; it now decides from the
-  ledger, and ``_abort_on_destroyed_tag`` diagnoses a destroyed tag from the
-  archive rather than from the finalized changelog alone.
+  "first release vs bump" from ``tag_exists_locally``; it now decides from
+  ``ledger.version_is_archived``, and consults the tag only as corroboration
+  through the new tri-state ``rlsbl.utils.local_tag_state`` -- whose UNKNOWN
+  answer (a preview past its first recorded mutation) may no longer be read as
+  "not released". ``_abort_on_destroyed_tag`` names the archive as its
+  evidence, falling back to the finalized changelog for repositories whose
+  releases predate archiving.
 * ``rlsbl/commands/release/validate.py`` gained
   ``ledger.require_checkout_contains_latest``: preparing a release on a
   checkout that does not contain the latest release's candidate is a hard
@@ -79,9 +90,10 @@ Release preparation -- MIGRATED to the ledger:
 
 Legitimately still tag-based, with the reason:
 
-* ``rlsbl/utils.py`` ``tag_exists_locally`` / ``tag_exists_on_remote`` /
-  ``remote_tag_commit`` -- tag EXISTENCE, asked to refuse a colliding tag
-  before creating one.  Not a question about which version is current.
+* ``rlsbl/utils.py`` ``tag_exists_locally`` / ``local_tag_state`` /
+  ``tag_exists_on_remote`` / ``remote_tag_commit`` -- tag EXISTENCE, asked to
+  refuse a colliding tag before creating one, and to tell a destroyed tag from
+  a missing release.  Not a question about which version is current.
 * ``rlsbl/ledger.py`` ``tag_for_version`` -- tag TRANSLATION, the inverse of
   the glob construction.  Names the tag a version carries; never picks a
   version.
