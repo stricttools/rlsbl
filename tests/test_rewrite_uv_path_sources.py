@@ -11,6 +11,12 @@ refusals are as important as the rewrite, and they are pinned here:
   not evidence of publication);
 * a package the lock does not resolve is a hard error;
 * a count that moved between preview and apply aborts with nothing written.
+
+The other half pinned here is WHERE the lock is read from. A uv workspace
+member has no lock of its own -- one lock at the workspace root resolves the
+whole workspace -- so the lock location is resolved by walking up to the
+workspace root that claims the target directory. A lock beside the manifest
+always wins, and neither location having a lock keeps the hard error.
 """
 
 import json
@@ -612,3 +618,171 @@ class TestCommandEntryPoint:
             cmd_uv_path_sources({"dry-run": True}, project_root=root)
         assert exc.value.code == 1
         assert "Release core first" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Where the lock is read from
+# ---------------------------------------------------------------------------
+
+
+MEMBER_MANIFEST = """\
+    [project]
+    name = "app"
+    dependencies = ["core", "requests>=2.0"]
+
+    [tool.uv.sources]
+    core = { path = "../core" }
+"""
+
+#: A root lock resolving a DIFFERENT version, so precedence is observable.
+ROOT_LOCK_AHEAD = """\
+    version = 1
+
+    [[package]]
+    name = "core"
+    version = "9.9.9"
+"""
+
+
+def _workspace(
+    tmp_path,
+    *,
+    members,
+    exclude=None,
+    root_lock=LOCK,
+    member_lock=None,
+    member_rel="packages/app",
+    manifest=MEMBER_MANIFEST,
+    config=None,
+):
+    """A uv workspace: root manifest + root lock, one member, no member lock."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    table = "[tool.uv.workspace]\nmembers = " + json.dumps(members) + "\n"
+    if exclude is not None:
+        table += "exclude = " + json.dumps(exclude) + "\n"
+    _write(ws, "pyproject.toml", table)
+    if root_lock is not None:
+        _write(ws, "uv.lock", textwrap.dedent(root_lock))
+    member = ws / member_rel
+    _write(member, "pyproject.toml", textwrap.dedent(manifest))
+    _write(ws, "packages/core/pyproject.toml", '[project]\nname = "core"\n')
+    if member_lock is not None:
+        _write(member, "uv.lock", textwrap.dedent(member_lock))
+    if config is not None:
+        _write(member, ".rlsbl/config.json", config)
+    return ws, member
+
+
+class TestLockLocation:
+    def test_a_workspace_member_reads_the_root_lock(self, tmp_path):
+        """The member has no lock of its own; the workspace root's lock rules."""
+        ws, member = _workspace(tmp_path, members=["packages/*"])
+        preview = observe(member, probe=_published)
+        assert preview.keys == ("core", CONFIG_ITEM_KEY)
+        for item in preview.items:
+            apply_item(item, member)
+
+        doc = tomlkit.parse((member / "pyproject.toml").read_text())
+        assert [str(d) for d in doc["project"]["dependencies"]] == [
+            "core>=1.2.3", "requests>=2.0",
+        ]
+        assert "tool" not in doc
+        # The rewrite stays inside the member: the workspace root is only read.
+        assert "[tool.uv.workspace]" in (ws / "pyproject.toml").read_text()
+
+    def test_the_member_config_is_created_with_the_floors_key(self, tmp_path):
+        ws, member = _workspace(tmp_path, members=["packages/*"])
+        assert not (member / ".rlsbl" / "config.json").exists()
+        for item in observe(member, probe=_published).items:
+            apply_item(item, member)
+        config = json.loads((member / ".rlsbl" / "config.json").read_text())
+        assert config == {"internal_dep_floors": ["core"]}
+
+    def test_the_plan_names_the_lock_it_read(self, tmp_path):
+        ws, member = _workspace(tmp_path, members=["packages/*"])
+        item = observe(member, probe=_published).by_key("core")
+        facts = "\n".join(item.facts)
+        assert "uv.lock" in facts
+        assert "workspace root" in facts
+
+    def test_a_lock_beside_the_manifest_wins(self, tmp_path):
+        """Both locks exist and disagree: the one beside the manifest decides."""
+        ws, member = _workspace(
+            tmp_path, members=["packages/*"], root_lock=ROOT_LOCK_AHEAD,
+            member_lock=LOCK,
+        )
+        for item in observe(member, probe=_published).items:
+            apply_item(item, member)
+        doc = tomlkit.parse((member / "pyproject.toml").read_text())
+        assert [str(d) for d in doc["project"]["dependencies"]] == [
+            "core>=1.2.3", "requests>=2.0",
+        ]
+
+    def test_a_literal_member_path_matches(self, tmp_path):
+        ws, member = _workspace(tmp_path, members=["packages/app"])
+        assert observe(member, probe=_published).by_key("core") is not None
+
+    def test_a_recursive_glob_matches(self, tmp_path):
+        ws, member = _workspace(
+            tmp_path, members=["packages/**"], member_rel="packages/py/app",
+        )
+        assert observe(member, probe=_published).by_key("core") is not None
+
+    def test_a_member_glob_does_not_cross_a_directory_separator(self, tmp_path):
+        """``packages/*`` claims ``packages/app``, never ``packages/py/app``."""
+        ws, member = _workspace(
+            tmp_path, members=["packages/*"], member_rel="packages/py/app",
+        )
+        with pytest.raises(UvPathSourceError, match="no uv.lock"):
+            observe(member, probe=_published)
+
+    def test_an_excluded_directory_does_not_reach_the_root_lock(self, tmp_path):
+        ws, member = _workspace(
+            tmp_path, members=["packages/*"], exclude=["packages/app"],
+        )
+        with pytest.raises(UvPathSourceError, match="no uv.lock") as exc:
+            observe(member, probe=_published)
+        assert "workspace" in str(exc.value)
+
+    def test_a_directory_no_member_glob_claims_does_not_reach_the_root_lock(
+        self, tmp_path,
+    ):
+        ws, member = _workspace(tmp_path, members=["other/*"])
+        with pytest.raises(UvPathSourceError, match="no uv.lock"):
+            observe(member, probe=_published)
+
+    def test_the_both_absent_error_names_both_locations(self, tmp_path):
+        ws, member = _workspace(
+            tmp_path, members=["packages/*"], root_lock=None,
+        )
+        with pytest.raises(UvPathSourceError) as exc:
+            observe(member, probe=_published)
+        message = str(exc.value)
+        assert str(member / "uv.lock") in message
+        assert str(ws / "uv.lock") in message
+
+    def test_no_workspace_above_names_the_one_location_probed(self, tmp_path):
+        root = _project(tmp_path, MEMBER_MANIFEST, LOCK)
+        (root / "uv.lock").unlink()
+        with pytest.raises(UvPathSourceError) as exc:
+            observe(root, probe=_published)
+        message = str(exc.value)
+        assert str(root / "uv.lock") in message
+        assert "workspace" in message
+
+    def test_an_unreadable_lock_is_not_treated_as_an_absent_one(self, tmp_path):
+        """A broken lock beside the manifest refuses -- it never walks past it."""
+        ws, member = _workspace(
+            tmp_path, members=["packages/*"], root_lock=ROOT_LOCK_AHEAD,
+            member_lock="this is not toml [[[\n",
+        )
+        with pytest.raises(UvPathSourceError, match="could not be read as TOML"):
+            observe(member, probe=_published)
+
+    def test_an_ancestor_without_a_workspace_table_is_not_a_root(self, tmp_path):
+        """A parent that merely has a pyproject.toml and a lock is not a root."""
+        ws, member = _workspace(tmp_path, members=["packages/*"])
+        _write(ws, "pyproject.toml", '[project]\nname = "ws"\n')
+        with pytest.raises(UvPathSourceError, match="no uv.lock"):
+            observe(member, probe=_published)
