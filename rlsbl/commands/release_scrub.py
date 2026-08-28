@@ -30,7 +30,6 @@ from ..utils import (
     get_push_timeout,
 )
 from ..workspace import load_workspace
-from ..tag_glob import TagMode, parse_version_tag
 from .release_reconcile import (
     push_ref_with_lease as _push_ref_with_lease_impl,
     push_rewritten_tags,
@@ -1214,7 +1213,9 @@ def run_cmd(flags, *, ctx):
 
         # -- Recreate GitHub Releases --
         if "RELEASES_UPDATED" not in completed:
-            recreate_github_releases(
+            # Persisted, so a resumed run reports the figure this step
+            # produced rather than recomputing it from the tag list.
+            scrub_data["releases_recreated"] = recreate_github_releases(
                 tags, ctx=ctx, project_root=project_root,
                 workspace_projects=workspace_projects,
                 tag_prefix_index=tag_prefix_index,
@@ -1228,10 +1229,10 @@ def run_cmd(flags, *, ctx):
         if os.path.exists(scrub_result_path):
             effects.remove(scrub_result_path)
 
-        releases_count = sum(
-            1 for t in tags
-            if parse_version_tag(t.get("refname", ""), mode=TagMode.FINAL_ONLY)
-        )
+        # What the recreation step actually did, not how many tags looked like
+        # they might have a Release: a tag can carry no Release at all, and one
+        # whose version cannot be read is skipped with its Release untouched.
+        releases_count = scrub_data.get("releases_recreated", 0)
         repaired_count = len(scrub_data.get("remapped_files", []))
         repaired_note = (
             f" {repaired_count} changelog file(s) repaired from the rewrite "

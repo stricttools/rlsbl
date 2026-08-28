@@ -219,7 +219,12 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
             if os.path.exists(changelog_path):
                 return extract_entry(changelog_path, version)
             return None
-        parsed = parse_version_tag(tag_name, mode=TagMode.FINAL_ONLY)
+        # PRERELEASE_INCLUSIVE: the question here is which SCHEME the tag
+        # follows, and a pre-release suffix does not change that. It also has
+        # to answer the same way _ledger_dir_for_tag does, or a recreated
+        # Release would take its notes from one project and its anchor from
+        # another.
+        parsed = parse_version_tag(tag_name, mode=TagMode.PRERELEASE_INCLUSIVE)
         if parsed and parsed.scheme == "standalone":
             changelog_path = os.path.join(str(ctx.workspace_root), "CHANGELOG.md")
             if os.path.exists(changelog_path):

@@ -532,7 +532,7 @@ class TestFullScrubFlow:
     def test_full_flow(self, mock_run, mock_run_gh, _req_tool, mock_gen_changelog,
                        _extract_cl, _push_timeout, _get_branch,
                        _gh_installed, _gh_auth, _acquire_lock, _release_lock,
-                       tmp_path):
+                       tmp_path, capsys):
         # -- Set up project structure --
         changes_dir = tmp_path / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
@@ -562,7 +562,13 @@ class TestFullScrubFlow:
         # safegit scrub result with rewrites
         safegit_result = _safegit_envelope({
             "rewrites": {"old_hash_1": "new_hash_1", "old_hash_2": "new_hash_2"},
-            "tags": [{"refname": "refs/tags/v1.0.0"}],
+            # v2.0.0 is a rewritten tag carrying NO GitHub Release, so nothing
+            # is deleted or recreated for it -- and the summary must count what
+            # the recreation step DID, not how many tags looked like versions.
+            "tags": [
+                {"refname": "refs/tags/v1.0.0"},
+                {"refname": "refs/tags/v2.0.0"},
+            ],
             "old_head": "cafebabe5678",
             "new_head": "deadbeef1234",
         })
@@ -580,6 +586,8 @@ class TestFullScrubFlow:
         # gh calls go through run_gh
         def run_gh_effect(args, **kwargs):
             if args[:2] == ["release", "view"]:
+                if args[2] == "v2.0.0":
+                    raise Exception("release not found")
                 return '{"body": "old notes"}'
             return ""
 
@@ -673,6 +681,10 @@ class TestFullScrubFlow:
         gh_create_calls = [c for c in gh_all if "create" in c[0][0]]
         assert len(gh_create_calls) == 1
         assert "v1.0.0" in gh_create_calls[0][0][0]
+
+        # 6. The summary counts what the recreation step did -- one Release --
+        # not the two rewritten tags that merely LOOK like released versions.
+        assert "1 releases recreated" in capsys.readouterr().out
 
 
 # ===========================================================================
