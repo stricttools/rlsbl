@@ -282,3 +282,4 @@
 {"format_version":1,"id":"18cfe98f6ba62b34d617d0aa7feb43c2aa88917fc5bcb50f","commits":["00e90cf0d16ad3484479e0b67ff5eeaae7460677"],"user_facing":false}
 {"format_version":1,"id":"18cfe9cb8303b3305578a60c21f94bfaa5b6a2ab771cf315","commits":["8e2c566e518ef6423060b0111e117df9bf366c7b"],"user_facing":false}
 {"format_version":1,"id":"18cfe9fb7b609d90662aa5ae66024053b909014cd733f01d","commits":["6d28920b0162bdda2f763eca8985ac1c7fecc303"],"user_facing":false}
+{"format_version":1,"id":"18cfea9099e64a04cf28aaf1ff0b490a8e1422f99946d53c","commits":["9981c88a315fbb165bbf32347be76903b93061ba","8d103e64bc0f5ac8884e8f45a778ec65b19df5d1"],"user_facing":true,"description":"**Accurate README check table.** The README's per-tag check counts are now rendered from the check registry instead of hand-typed, so they can no longer drift below what `rlsbl check` actually runs.","type":"fix"}
