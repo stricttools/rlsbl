@@ -462,6 +462,14 @@
         "pypi"
       ]
     },
+    "dep-locks": {
+      "kind": "targets",
+      "targets": [
+        "go",
+        "npm",
+        "pypi"
+      ]
+    },
     "deps-dev-in-lib": {
       "kind": "targets",
       "targets": [
@@ -1305,6 +1313,14 @@
         ],
         [
           "dep-floors",
+          "yes",
+          "yes",
+          "yes",
+          "no",
+          "no"
+        ],
+        [
+          "dep-locks",
           "yes",
           "yes",
           "yes",

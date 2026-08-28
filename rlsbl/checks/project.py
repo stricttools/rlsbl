@@ -732,6 +732,39 @@ def register_project_checks(app):
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} lagging dep floor(s)")
 
+    @app.error_check("dep-locks")
+    def check_dep_locks(ctx, reporter):
+        """Every lockfile must still resolve the manifest beside it.
+
+        The question underneath ``dep-floors``: not "is the declared floor
+        behind the lock" but "does the lock resolve THIS manifest at all". A
+        dependency added, removed or re-constrained after the lock was written
+        leaves ``uv sync`` / ``npm ci`` installing the old set while the
+        manifest advertises the new one.
+
+        Structural and offline -- no package manager runs and nothing is
+        resolved; see :mod:`rlsbl.dep_locks` for why ``uv lock --check`` was
+        not used.
+        """
+        skip_reason = _virtual_root_skip_reason(ctx)
+        if skip_reason is not None:
+            return reporter.skipped(skip_reason)
+
+        from ..dep_locks import evaluate_dep_locks
+
+        verdict = evaluate_dep_locks(str(ctx.project_root))
+        if verdict.skip_reason is not None:
+            return reporter.skipped(verdict.skip_reason)
+
+        if verdict.ok:
+            if verdict.notes:
+                return reporter.passed("; ".join(verdict.notes[:3]))
+            return reporter.passed("every lockfile resolves its manifest")
+
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(f"{len(verdict.problems)} stale-lock finding(s)")
+
     @app.error_check("requires-services")
     def check_requires_services(ctx, reporter):
         """CI service containers declared in config must be provisioned on disk.

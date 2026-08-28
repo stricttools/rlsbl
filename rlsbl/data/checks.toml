@@ -761,3 +761,19 @@ fast = true
 pure = true
 needs_network = false
 depends_on = ["config-schema"]
+
+# dep-locks: the question underneath dep-floors -- does each lockfile still
+# resolve the manifest beside it? uv.lock and package-lock.json both record the
+# requirements they resolved FROM, so a dependency added, removed or
+# re-constrained after the lock was written is visible without resolving
+# anything; go.sum is compared for coverage of go.mod's require lines. Pure and
+# offline by construction: no package manager is invoked (see rlsbl/dep_locks.py
+# for why `uv lock --check` was rejected). In "preflight" so a stale lock blocks
+# the release whose bump would otherwise silently rewrite it.
+[checks.dep-locks]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []

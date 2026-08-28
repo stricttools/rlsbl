@@ -67,6 +67,10 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # go.mod. Which ecosystems those are is the targets' own answer
     # (supports_dep_floors), not a list restated here.
     "dep-floors": targets_with_dep_floors(),
+    # dep-locks names the lockfile FORMATS its readers understand, which is a
+    # fact about this check rather than about the ecosystems: gradle also has a
+    # lockfile, and there is no reader for it here.
+    "dep-locks": frozenset({"pypi", "npm", "go"}),
     "license-file": None,
     # --- release tag (universal) ---
     "unpublished-refs": None,
