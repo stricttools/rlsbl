@@ -538,10 +538,10 @@ class TestMonorepoDirectWiring:
 # handler formats it into a status line after the (patched) call returns.
 #
 # strictcli binds positionals in @arg-decorator registration order (bottom
-# decorator = first positional). extract / absorb / extract-releasable /
-# rename-releasable all stack their two @arg decorators bottom-first so the
-# binding matches the documented `<first> <second>` usage in each command's
-# help text. The assertions below lock that correct wiring.
+# decorator = first positional). extract / absorb / rename-releasable all
+# stack their two @arg decorators bottom-first so the binding matches the
+# documented `<first> <second>` usage in each command's help text. The
+# assertions below lock that correct wiring.
 
 _FAKE_WS = "/fake/workspace"
 
@@ -703,3 +703,36 @@ class TestRewriteWiring:
         )
         assert result.exit_code == 0, result.stderr
         assert _flags(m) == {"dry-run": True}
+
+
+# ---------------------------------------------------------------------------
+# The committed coverage manifest
+# ---------------------------------------------------------------------------
+
+
+class TestTheCommittedCoverageManifest:
+    """``.strictcli/test-coverage.json`` is committed, and it goes stale silently.
+
+    The framework's check unions the manifest with the local shard files and
+    never subtracts, so a command that is REMOVED stays recorded as covered
+    forever -- the manifest is monotonic by design, and only a deliberate
+    regeneration prunes it. This test is that deliberateness: an entry naming a
+    command the app no longer registers is a stale manifest, not coverage.
+    """
+
+    def test_it_names_only_commands_the_app_still_registers(self):
+        import json
+        import pathlib
+
+        manifest_path = (
+            pathlib.Path(__file__).resolve().parents[1]
+            / ".strictcli" / "test-coverage.json"
+        )
+        recorded = set(json.loads(manifest_path.read_text(encoding="utf-8")))
+        live = rlsbl.app._collect_all_command_paths()
+        assert sorted(recorded - live) == [], (
+            "stale entries in .strictcli/test-coverage.json: these commands no "
+            "longer exist. Delete the manifest and the local shards under "
+            ".strictcli/coverage/, re-run the suite, and re-run "
+            "`rlsbl check --name cli-test-coverage` to rewrite it."
+        )

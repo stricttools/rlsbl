@@ -876,7 +876,9 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
     if mirrored:
         raise ExtractError(
             f"releasable '{releasable_name}' is mirrored: "
-            f"{', '.join(mirrored)} declare a subtree_remote. The mirror is a "
+            f"{', '.join(mirrored)} "
+            f"{'declares' if len(mirrored) == 1 else 'declare'} a "
+            f"subtree_remote. The mirror is a "
             f"tool-owned artifact derived from THIS repository, and extracting "
             f"the releasable would leave it deriving from a subtree that no "
             f"longer exists. Promoting a mirror into the real repository is its "
