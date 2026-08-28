@@ -1321,14 +1321,17 @@ class TestYankCoverageNoArgs:
 class TestYankCoverageMonorepoContext:
     """Cover monorepo detection and tag formatting in the new yank."""
 
+    @patch("rlsbl.workspace.load_workspace", return_value=[])
+    @patch("rlsbl.workspace.load_releasables", return_value=[])
     @patch(f"{MOD_YANK}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_YANK}.resolve_project")
     @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
     @patch(f"{MOD_YANK}.check_gh_auth", return_value=True)
     @patch(f"{MOD_YANK}.run_gh")
-    def test_monorepo_plain_tag(self, mock_run, _auth, _inst, _targets, mock_resolve, _ws):
-        """Monorepo without releasable uses target.monorepo_tag_format."""
+    def test_monorepo_plain_tag(self, mock_run, _auth, _inst, _targets, mock_resolve,
+                                _ws, _rels, _projs):
+        """A member belonging to no releasable uses target.monorepo_tag_format."""
         proj = {"name": "mylib", "path": "packages/mylib"}
         mock_resolve.return_value = proj
         mock_run.side_effect = [
@@ -1339,6 +1342,8 @@ class TestYankCoverageMonorepoContext:
             from rlsbl.commands.yank import run_cmd
             run_cmd(["1.0.0"], {}, project_root=Path("/ws/packages/mylib"))
 
+    @patch("rlsbl.workspace.load_workspace", return_value=[])
+    @patch("rlsbl.workspace.load_releasables", return_value=[])
     @patch(f"{MOD_YANK}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_YANK}.resolve_project")
     @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
@@ -1454,13 +1459,16 @@ class TestDeprecateCoverageNoArgs:
 class TestDeprecateCoverageMonorepoContext:
     """Cover monorepo detection and tag formatting in deprecate."""
 
+    @patch("rlsbl.workspace.load_workspace", return_value=[])
+    @patch("rlsbl.workspace.load_releasables", return_value=[])
     @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_DEPRECATE}.resolve_project")
     @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_DEPRECATE}.check_gh_installed", return_value=True)
     @patch(f"{MOD_DEPRECATE}.check_gh_auth", return_value=True)
     @patch(f"{MOD_DEPRECATE}.run_gh")
-    def test_monorepo_plain_tag(self, mock_run, _auth, _inst, _targets, mock_resolve, _ws):
+    def test_monorepo_plain_tag(self, mock_run, _auth, _inst, _targets, mock_resolve,
+                                _ws, _rels, _projs):
         proj = {"name": "mylib", "path": "packages/mylib"}
         mock_resolve.return_value = proj
         mock_run.side_effect = [
@@ -1471,6 +1479,8 @@ class TestDeprecateCoverageMonorepoContext:
             from rlsbl.commands.deprecate import run_cmd
             run_cmd(["1.0.0"], {}, project_root=Path("/ws/packages/mylib"))
 
+    @patch("rlsbl.workspace.load_workspace", return_value=[])
+    @patch("rlsbl.workspace.load_releasables", return_value=[])
     @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value="/ws")
     @patch(f"{MOD_DEPRECATE}.resolve_project")
     @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))
