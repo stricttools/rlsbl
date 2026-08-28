@@ -41,7 +41,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 | `project` | Project-level metadata, config schema, version consistency | 25 |
 | `release` | Released-version refs, branch sync, CI credentials, and conversion follow-ups | 6 |
 | `changelog` | JSONL changelog validation and structure | 11 |
-| `workspace` | Monorepo workspace integrity and dependency rules | 18 |
+| `workspace` | Monorepo workspace integrity and dependency rules | 19 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 16 |
 | `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push warning, tests | 6 |
 
