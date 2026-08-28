@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.118.1
+
+Fixes the workspace-ci-synced check wrongly failing every migrated workspace on its root member: a member with no CI workflow of its own is now skipped with a note, generated routers are never read as a member's own workflows, and members with several workflow files are checked against their real derived job keys.
+
+### Fixes
+
+- `rlsbl check --tag workspace` no longer reports a workspace as unsynced when a member ships no CI workflow of its own -- most visibly the mandated root member, whose `.github/workflows/` holds the generated routers rather than its own CI. Such a member is skipped with a note; a member whose real workflow is missing from the router still errors.
+
 ## 0.118.0
 
 The conversion, ownership and ledger release: repository conversions become verified move-outs and move-ins on releasables with lineage records; workspaces gain single-owner attribution with a mandatory root member and derived CI filters; release archives become the anchored ledger every range, status and undo read; the publication reconciler repairs tags and Releases from recorded facts; mirrors carry release tags and Releases and can be promoted to standalone repos.
