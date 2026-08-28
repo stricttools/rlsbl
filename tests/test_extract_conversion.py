@@ -223,6 +223,29 @@ class TestPreview:
         assert "rlsbl release retry" in facts
         assert "rlsbl scaffold" in facts
 
+    def test_a_releasable_owning_no_tag_does_not_claim_its_format_is_kept(
+        self, tmp_path,
+    ):
+        """A freshly split releasable owns no tag, and the format still changes.
+
+        The single-member destination tags under ``v{version}`` whether or not
+        anything translated, so the summary must not say the destination keeps
+        the source's ``{name}@v{version}`` -- the item's own facts show that
+        format change one line above.
+        """
+        ns = make_source(tmp_path)
+        run_git(ns.root, "tag", "-d", "extras@v0.1.0")
+
+        preview = cmd_extract(
+            str(ns.root), "extras", str(tmp_path / "extras_out"), dry_run=True,
+        )
+
+        item = preview.by_key(ITEM_TAGS)
+        assert item.state == "no_tag_to_translate"
+        assert "keeps this releasable's tag format" not in item.summary
+        assert "owns no tag" in item.summary
+        assert "v{version}" in item.summary
+
 
 # ---------------------------------------------------------------------------
 # Refusals -- every one of them fires during observation, before any write
@@ -616,6 +639,23 @@ class TestApplyMultiMember:
         assert (target / "pkgA" / "main.py").is_file()
         assert (target / "pkgB" / "main.py").is_file()
         assert gitout(target, "status", "--porcelain") == ""
+
+    def test_apply_prints_the_trusted_publisher_step(self, tmp_path, capsys):
+        """The APPLY says it, not only the preview.
+
+        The hint used to be re-derived from the member directories, which the
+        apply has already deleted by the time it prints -- so the one run that
+        actually needs the reminder was the one run that never got it.
+        """
+        ns = make_source(tmp_path)
+        target = tmp_path / "core_out"
+
+        cmd_extract(str(ns.root), "core", str(target))
+
+        out = capsys.readouterr().out
+        assert "Next steps" in out
+        assert "pypi.org/manage/account/publishing/" in out
+        assert "rlsbl release retry" in out
 
     def test_member_trees_survive_the_filter_unchanged(self, tmp_path):
         ns = make_source(tmp_path)

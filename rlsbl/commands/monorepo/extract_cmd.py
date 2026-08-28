@@ -172,6 +172,10 @@ class TagPlan:
     pruned: tuple = ()
     #: (new_tag, old_tag) kept side by side at the current version.
     alias: tuple | None = None
+    #: Every source tag matching this releasable's own glob, translated or not.
+    #: Empty means the releasable has never been tagged, which is a different
+    #: fact from "its tags keep their names" and must not be reported as one.
+    own_tags: tuple = ()
 
     @property
     def changes_names(self) -> bool:
@@ -198,6 +202,11 @@ class Departure:
     departed_globs: list
     root_state_dir: str | None  # the source root's state home (releasable dir)
     source_repo_url: str
+    #: Departing targets whose publisher is bound to a repository, resolved at
+    #: observation. Not re-derived later: the apply deletes the very member
+    #: directories the detection reads, so anything asked afterwards answers
+    #: "none" and the operator loses the hint exactly when it applies.
+    repo_bound_publishers: tuple = ()
 
     @property
     def member_paths(self) -> list:
@@ -559,6 +568,7 @@ def _plan_tags(workspace_root, own_glob, foreign_globs,
         deletions=tuple(deletions),
         pruned=tuple(pruned),
         alias=alias,
+        own_tags=tuple(sorted(own_set)),
     )
 
 
@@ -999,6 +1009,7 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
         departed_globs=[own_glob],
         root_state_dir=_root_state_dir(workspace_root, projects, releasables),
         source_repo_url=_origin_url(workspace_root),
+        repo_bound_publishers=_repository_bound_publishers(workspace_root, members),
     )
 
 
@@ -1017,7 +1028,7 @@ def _next_steps(dep):
         f"next release (monorepo sync is re-run for you, but which jobs the "
         f"remaining members need is yours to confirm)",
     ]
-    for target in _repository_bound_publishers(dep):
+    for target in dep.repo_bound_publishers:
         steps.append(
             f"{target.registry_display_name} publishing is authorized for a "
             f"REPOSITORY, not for the package, so it does not follow the code: "
@@ -1028,12 +1039,17 @@ def _next_steps(dep):
     return steps
 
 
-def _repository_bound_publishers(dep):
+def _repository_bound_publishers(workspace_root, members):
     """The departing members' targets whose publisher names the repository.
 
     Asked of the target rather than derived from its name: which registries
     bind publishing to a repository is the registry's fact, and the target
     registry is where rlsbl keeps those.
+
+    Called once, during observation, while the members are still on disk: the
+    result is a set of per-target DECLARATIONS, so it is settled the moment the
+    plan is made and is carried on the ``Departure`` from there. Re-detecting it
+    at apply time reads directories the apply itself has already deleted.
 
     A member whose targets cannot be detected contributes no hint. That is
     deliberate: the hint is guidance, and a broken declaration on a DEPARTING
@@ -1043,12 +1059,12 @@ def _repository_bound_publishers(dep):
     from ...targets import TARGETS, detect_targets, resolve_releasable_config_dir
 
     seen = {}
-    for member in dep.members:
+    for member in members:
         try:
             entries = detect_targets(
-                os.path.join(dep.workspace_root, member.path),
+                os.path.join(workspace_root, member.path),
                 releasable_config_dir=resolve_releasable_config_dir(
-                    member, dep.workspace_root,
+                    member, workspace_root,
                 ),
             )
         except ConfigError:
@@ -1057,7 +1073,38 @@ def _repository_bound_publishers(dep):
             target = TARGETS.get(entry.name)
             if target is not None and target.publisher_binds_to_repository:
                 seen.setdefault(entry.name, target)
-    return [seen[name] for name in sorted(seen)]
+    return tuple(seen[name] for name in sorted(seen))
+
+
+def _tag_verdict(dep, plan):
+    """``(state, summary)`` for the tag item -- three outcomes, not two.
+
+    "Nothing translated" has two very different causes, and collapsing them
+    reports a falsehood for one of them. A releasable that owns no tag yet --
+    the freshly split one the manual-split procedure produces -- translates
+    nothing because there is nothing to translate, while its format still
+    changes on the way out; saying the destination "keeps this releasable's tag
+    format" there contradicts the format change the same item's facts show.
+    """
+    if plan.changes_names:
+        return "translate_tags", (
+            f"{len(plan.translations)} tag(s) translate to {dep.dest_tag_format}."
+        )
+    if not plan.own_tags:
+        return "no_tag_to_translate", (
+            f"this releasable owns no tag in the source, so nothing translates; "
+            f"the destination tags under {dep.dest_tag_format} from its first "
+            f"release there."
+        )
+    if dep.releasable.effective_tag_format != dep.dest_tag_format:
+        return "tags_unchanged", (
+            f"none of this releasable's {len(plan.own_tags)} tag(s) needs a new "
+            f"name under {dep.dest_tag_format}."
+        )
+    return "tags_unchanged", (
+        f"the destination keeps this releasable's tag format "
+        f"({dep.dest_tag_format}), so no tag changes name."
+    )
 
 
 def _state_entries(dep):
@@ -1160,16 +1207,11 @@ def observe(dep) -> Preview:
     ))
 
     plan = dep.tag_plan
+    tag_state, tag_summary = _tag_verdict(dep, plan)
     items.append(VerdictItem(
         key=ITEM_TAGS,
-        state="translate_tags" if plan.changes_names else "tags_unchanged",
-        summary=(
-            f"{len(plan.translations)} tag(s) translate to "
-            f"{dep.dest_tag_format}."
-            if plan.changes_names else
-            f"the destination keeps this releasable's tag format "
-            f"({dep.dest_tag_format}), so no tag changes name."
-        ),
+        state=tag_state,
+        summary=tag_summary,
         facts=tuple(
             [f"{old} -> {new}" for old, new in plan.translations]
             + ([f"boundary alias: {plan.alias[1]} is KEPT beside "
