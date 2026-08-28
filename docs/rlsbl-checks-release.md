@@ -1,6 +1,6 @@
 ---
 title: rlsbl.checks.release
-description: "Release checks (tag: release) verifying that local and remote git tags exist, the GitHub Release was created, and the branch is in sync."
+description: "The checks that read outside the working tree: the remote's refs, the branch, the CI publish credentials, and the follow-ups a conversion still owes."
 generated: true
 nav_group: "API Reference"
 nav_order: 20

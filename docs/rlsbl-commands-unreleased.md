@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.unreleased
-description: "Unreleased command that lists commits since the last tag and checks whether each one is covered by a corresponding changelog entry."
+description: "Lists the commits since the release the ledger anchors this checkout to, and reports whether each one is covered by a changelog entry."
 generated: true
 nav_group: "API Reference"
 nav_order: 75

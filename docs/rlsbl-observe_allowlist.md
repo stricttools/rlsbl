@@ -1,6 +1,6 @@
 ---
 title: rlsbl.observe_allowlist
-description: "The list of argv prefixes a preview may really execute, the written standard every entry satisfies -- no user-visible mutation -- and the category each one declares."
+description: "The argv prefixes a preview may really execute, the written standard every entry satisfies -- no user-visible mutation -- and the category each declares."
 generated: true
 nav_group: "API Reference"
 nav_order: 118

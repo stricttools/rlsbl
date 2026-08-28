@@ -1,6 +1,6 @@
 ---
 title: rlsbl.changelog.home
-description: "Single source of truth for where generated CHANGELOG.md files live, resolving the correct directory for standalone, implicit, and releasable modes."
+description: "The one resolver for where a generated CHANGELOG.md belongs: the project root for a standalone repository, the releasable's own directory in a workspace."
 generated: true
 nav_group: "API Reference"
 nav_order: 9

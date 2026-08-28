@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.release_scrub
-description: "Release scrub command: wraps safegit scrub with JSONL hash remapping, CHANGELOG regeneration, tag updates, and GitHub Release recreation."
+description: "Wraps safegit scrub with in-history JSONL hash remapping, CHANGELOG verification, tag re-pointing, and GitHub Release documents rewritten in place."
 generated: true
 nav_group: "API Reference"
 nav_order: 67

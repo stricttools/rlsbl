@@ -1,6 +1,6 @@
 ---
 title: rlsbl.releasable_cleanup
-description: "Cleanup utilities for per-package .rlsbl/ directories after releasable model migration, removing orphaned changelog and release state files from the old..."
+description: "Removes the per-package .rlsbl/ changelog and release state a member is left holding under an older layout. Run only by rlsbl monorepo cleanup."
 generated: true
 nav_group: "API Reference"
 nav_order: 139

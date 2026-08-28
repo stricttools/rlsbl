@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.extract
-description: "Extract and absorb operations for moving packages in and out of monorepos, including history migration, changelog transfer, and workspace.toml updates."
+description: "The primitives both repository conversions share -- neither conversion is here: the shared error type, the filter-repo runners, dangling-entry pruning."
 generated: true
 nav_group: "API Reference"
 nav_order: 45

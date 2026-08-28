@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.monorepo.mirror_cmd
-description: "Monorepo mirror reconciler that converges a projects subtree mirror to a tool-owned derived state with dry-run planning and a foreign-commit tripwire."
+description: "The mirror reconciler: converges a subtree mirror's branch to its derived state, materializes every released version's tag, and refuses foreign commits."
 generated: true
 nav_group: "API Reference"
 nav_order: 49
