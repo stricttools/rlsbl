@@ -11,7 +11,7 @@ import pytest
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 
-from githarness import fake_run_dispatch
+from githarness import fake_run_dispatch, status_answering_effects_run
 
 
 from conftest import tag_state_present
@@ -146,7 +146,8 @@ class TestMultiTargetRelease:
         with open("version.json", "w") as f:
             json.dump({"version": "1.0.0"}, f)
 
-        mock_run.side_effect = fake_run_dispatch(head_sha="pre123")
+        run_fake = fake_run_dispatch(head_sha="pre123")
+        mock_run.side_effect = run_fake
 
         # Mock the spec target's build to track calls
         from rlsbl.targets import TARGETS
@@ -155,7 +156,9 @@ class TestMultiTargetRelease:
 
         from rlsbl.commands.release import run_cmd
 
-        with patch("sys.stdout", StringIO()):
+        with patch("sys.stdout", StringIO()), \
+             patch("rlsbl.effects.run",
+                   side_effect=status_answering_effects_run(run_fake)):
             run_cmd(_rc(include=["npm", "spec"]), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
 
         # Verify spec target build was called with config kwarg

@@ -18,7 +18,7 @@ from rlsbl.context import ProjectContext
 
 from rlsbl.release_file import ReleaseConfig
 
-from githarness import fake_run_dispatch
+from githarness import fake_run_dispatch, status_answering_effects_run
 
 
 from conftest import tag_state_present
@@ -96,11 +96,14 @@ class TestReleaseValidatedCache:
         # along with the expected package.json (from version bump)
         porcelain_recheck = " M .rlsbl/changes/.validated\n M package.json"
 
-        mock_run.side_effect = fake_run_dispatch(
+        run_fake = fake_run_dispatch(
             head_sha="abc123def456", porcelain_after_bump=porcelain_recheck,
         )
+        mock_run.side_effect = run_fake
 
-        with patch("sys.stdout", new_callable=StringIO):
+        with patch("sys.stdout", new_callable=StringIO), \
+             patch("rlsbl.effects.run",
+                   side_effect=status_answering_effects_run(run_fake)):
             # Should NOT raise SystemExit -- .validated is expected
             run_cmd(_rc(), {
                 "quiet": False,

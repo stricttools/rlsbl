@@ -12,7 +12,11 @@ from rlsbl.context import ProjectContext
 
 from rlsbl.release_file import ReleaseConfig
 
-from githarness import fake_run_dispatch, write_covered_unreleased
+from githarness import (
+    fake_run_dispatch,
+    status_answering_effects_run,
+    write_covered_unreleased,
+)
 
 
 from conftest import tag_state_present
@@ -81,14 +85,18 @@ class TestReleaseAllowDirty:
         """With --allow-dirty, a dirty tree should not block the release (dry-run)."""
         from rlsbl.commands.release import run_cmd
 
-        # 1. git status --porcelain (capture pre-existing dirty files)
-        # 2. git fetch origin --quiet
-        # 3. git rev-list --count HEAD..origin/main
-        # 4. git status --porcelain (pre-hook snapshot)
-        # 5. git status --porcelain (post-hook snapshot)
-        mock_run.side_effect = [" M notes.txt", "", "0", " M notes.txt", " M notes.txt"]
+        # Through ``run``:
+        # 1. git fetch origin --quiet
+        # 2. git rev-list --count HEAD..origin/main
+        # Every working-tree read (the --allow-dirty baseline, the pre- and
+        # post-hook snapshots) goes through the shared helper on the effects
+        # chokepoint instead, and is answered by the canned porcelain below.
+        mock_run.side_effect = ["", "0"]
+        run_fake = fake_run_dispatch(porcelain=" M notes.txt")
 
-        with patch("sys.stdout", new_callable=StringIO):
+        with patch("sys.stdout", new_callable=StringIO), \
+             patch("rlsbl.effects.run",
+                   side_effect=status_answering_effects_run(run_fake)):
             # Should not raise SystemExit
             run_cmd(_rc(), {
                 "allow-dirty": True,
@@ -140,12 +148,15 @@ class TestReleaseAllowDirty:
         # and the expected release file (package.json)
         porcelain_recheck = f" M {dirty_file}\n M package.json"
 
-        mock_run.side_effect = fake_run_dispatch(
+        run_fake = fake_run_dispatch(
             head_sha="abc123def456",
             porcelain=porcelain_dirty, porcelain_after_bump=porcelain_recheck,
         )
+        mock_run.side_effect = run_fake
 
-        with patch("sys.stdout", new_callable=StringIO):
+        with patch("sys.stdout", new_callable=StringIO), \
+             patch("rlsbl.effects.run",
+                   side_effect=status_answering_effects_run(run_fake)):
             # Should not raise SystemExit -- the re-check guard must not
             # treat the pre-existing dirty file as unexpected.
             run_cmd(_rc(), {
@@ -191,12 +202,15 @@ class TestReleaseAllowDirty:
         # Re-check shows a NEW unexpected file that wasn't dirty before
         porcelain_recheck = " M notes.txt\n M package.json\n?? surprise.txt"
 
-        mock_run.side_effect = fake_run_dispatch(
+        run_fake = fake_run_dispatch(
             head_sha="abc123def456",
             porcelain=porcelain_dirty, porcelain_after_bump=porcelain_recheck,
         )
+        mock_run.side_effect = run_fake
 
-        with patch("sys.stdout", new_callable=StringIO):
+        with patch("sys.stdout", new_callable=StringIO), \
+             patch("rlsbl.effects.run",
+                   side_effect=status_answering_effects_run(run_fake)):
             with pytest.raises(SystemExit) as exc_info:
                 run_cmd(_rc(), {
                     "allow-dirty": True,

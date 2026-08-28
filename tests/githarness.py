@@ -25,6 +25,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from rlsbl import effects as _effects
+
 # The stricttest floor exports a throwaway commit identity in the ENVIRONMENT as
 # well as in the throwaway global git config, so a git invocation that ignores
 # the config file still cannot commit as the real developer. Environment
@@ -302,6 +304,17 @@ def fake_run_dispatch(*, head_sha="abc123def456", toplevel="/tmp/fake-repo",
     seen_head = {"v": False}
     after = porcelain if porcelain_after_bump is None else porcelain_after_bump
 
+    def porcelain_now():
+        """The canned working-tree answer at this point in the flow.
+
+        Exposed on the returned stand-in so a test can answer the SHARED
+        working-tree read (``rlsbl.utils.working_tree_paths`` and the release
+        executor's declared status capture, both of which go through
+        ``rlsbl.effects.run``) from the same canned text -- see
+        :func:`status_answering_effects_run`.
+        """
+        return after if seen_head["v"] else porcelain
+
     def fake(cmd, args=None, timeout=None, env=None, cwd=None, **kwargs):
         a = list(args or [])
         if cmd != "git" or not a:
@@ -313,7 +326,7 @@ def fake_run_dispatch(*, head_sha="abc123def456", toplevel="/tmp/fake-repo",
             if not a:
                 return ""
         if a[0] == "status":
-            return after if seen_head["v"] else porcelain
+            return porcelain_now()
         if a[0] == "rev-parse":
             if "--show-toplevel" in a:
                 return toplevel
@@ -328,5 +341,66 @@ def fake_run_dispatch(*, head_sha="abc123def456", toplevel="/tmp/fake-repo",
         if a[0] == "log":
             return log_subject
         return ""
+
+    fake.porcelain_now = porcelain_now
+    fake.head_sha = head_sha
+    fake.toplevel = toplevel
+    return fake
+
+
+# The real effects entry point, captured before any test patches it.
+_REAL_EFFECTS_RUN = _effects.run
+
+
+def status_answering_effects_run(run_fake):
+    """Stand-in for ``rlsbl.effects.run`` that answers git from *run_fake*.
+
+    A release-flow test fakes git by patching ``rlsbl.commands.release.run``,
+    but two reads do not go through it: the shared working-tree read
+    (``rlsbl.utils.working_tree_status``, issued as ``git status --porcelain
+    -z``) and the release executor's declared result captures. Both are issued
+    on the effects chokepoint, and in a fixture directory that is not a git
+    repository the real ones fail.
+
+    So every ``git`` argv is answered by *run_fake* (a
+    :func:`fake_run_dispatch` stand-in) and wrapped in a
+    ``CompletedProcess``; the ``-z`` working-tree read gets the canned
+    porcelain converted into the NUL-terminated records git emits under that
+    flag. Everything that is not git is delegated to the real ``effects.run``.
+
+    Usage::
+
+        run_fake = fake_run_dispatch(porcelain=" M notes.txt")
+        with patch("rlsbl.commands.release.run", side_effect=run_fake), \\
+             patch("rlsbl.effects.run",
+                   side_effect=status_answering_effects_run(run_fake)):
+            ...
+    """
+    def fake(argv, **kwargs):
+        a = list(argv)
+        if not a or a[0] != "git":
+            return _REAL_EFFECTS_RUN(argv, **kwargs)
+        if "status" in a and "-z" in a:
+            records = [
+                line for line in run_fake.porcelain_now().splitlines()
+                if line.strip()
+            ]
+            stdout = "".join(record + "\0" for record in records)
+        elif "rev-parse" in a and a[-1] in ("HEAD", "--show-toplevel"):
+            # The executor's declared HEAD capture and the git-root lookup,
+            # answered from the canned values DIRECTLY. Asking *run_fake* would
+            # advance its pre/post-bump flip, which belongs to the release
+            # flow's own ``run`` calls and not to this stand-in. A rev-parse of
+            # anything else is a hash resolution the changelog validators own,
+            # and is left to the real read.
+            stdout = (
+                run_fake.toplevel if a[-1] == "--show-toplevel"
+                else run_fake.head_sha
+            ) + "\n"
+        else:
+            # Everything else is somebody else's read (the changelog
+            # validators resolve real hashes, for one): leave it alone.
+            return _REAL_EFFECTS_RUN(argv, **kwargs)
+        return subprocess.CompletedProcess(a, 0, stdout, "")
 
     return fake
