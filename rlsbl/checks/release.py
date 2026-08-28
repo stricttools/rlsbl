@@ -128,8 +128,9 @@ def register_release_checks(app):
                     reporter.error(
                         f"{version}: the ref {ref} points at {local_commit} but "
                         f"the release anchored {anchor}. The archive is the "
-                        f"record of what shipped and is read-only from the "
-                        f"instant it was written, so the ref moved. {_REMEDY}"
+                        f"record the release flow wrote, and rlsbl rewrites one "
+                        f"only through its own documented unlock paths, so the "
+                        f"ref moved. {_REMEDY}"
                     )
 
                 if remote is None:

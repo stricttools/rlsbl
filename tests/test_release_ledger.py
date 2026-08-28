@@ -278,6 +278,26 @@ class TestReadEntry:
         assert repo.shas["0.2.0"] in text         # the anchor's commit
         assert "v0.2.0" in text                   # the tag name
 
+    def test_the_disagreement_does_not_argue_from_the_file_mode(self, repo):
+        """The archive's authority is that the release flow authored it.
+
+        The message used to argue "read-only from the instant the release
+        wrote it", which is a premise the repository cannot carry: git records
+        no read-only bit, so every fresh clone has writable archives (this
+        repository's own were 0644 in bulk when that wording was written). The
+        guarantee is that rlsbl rewrites an archive only through its own
+        documented unlock paths; the local file mode is hygiene. Both remedies
+        stay named either way.
+        """
+        other = repo.shas["0.1.0"]
+        _git(repo, "tag", "-f", "v0.2.0", other)
+        with pytest.raises(LedgerError) as exc:
+            ledger.read_entry(_releases(repo), "0.2.0")
+        text = str(exc.value)
+        assert "read-only from" not in text
+        assert f"git tag -f\n  v0.2.0 {repo.shas['0.2.0']}" in text
+        assert "rlsbl release reconcile" in text
+
     def test_disagreement_uses_the_monorepo_tag_scheme(self, tmp_path, monkeypatch):
         r = _init_repo(tmp_path / "mono")
         monkeypatch.chdir(r)
