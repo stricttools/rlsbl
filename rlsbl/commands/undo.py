@@ -866,8 +866,9 @@ def _stop_on_conflicted_revert(plan, sha, subject, done, results):
     results.append(("Revert commits", FAILED, f"git revert {sha[:10]} (conflicted)"))
 
     print(
-        f"\nError: reverting {sha[:12]} (\"{subject}\") conflicted, so the undo "
-        f"of {plan.tag} stopped there.",
+        f"\nError: git could not revert {sha[:12]} (\"{subject}\") -- a "
+        f"conflict with later work is the usual cause -- so the undo of "
+        f"{plan.tag} stopped there.",
         file=sys.stderr,
     )
     if aborted:
