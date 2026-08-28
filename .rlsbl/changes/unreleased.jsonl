@@ -223,3 +223,4 @@
 {"format_version":1,"id":"18cfdd823bf85e01968af8ee612a422a9a4b59762cf4cf4a","commits":["9f0e9f0697e81006e4244102333ae11228180894"],"user_facing":false}
 {"format_version":1,"id":"18cfddab8c81af543e156e80d5904543918c4c24b7ddc5ea","commits":["fd8c9f76b03d4917e2b7de5562fb6f3343e00401"],"user_facing":false}
 {"format_version":1,"id":"18cfddc7edcb47fe7dd9f8e523bc46dbbae8a6996b28a035","commits":["eec41bf1040b944087668f8bc2b81bcfeb1db7ed"],"user_facing":true,"description":"**A Go module path with a capital letter is now probed correctly.** `rlsbl release yank` and `rlsbl status --registry` asked the Go module proxy for the latest version at an unescaped URL, which the proxy does not serve, so a published module with an uppercase letter in its path reported as never published.","type":"fix"}
+{"format_version":1,"id":"18cfddf2c0681097cd81d633ce734321862b2996c772c3ae","commits":["4976bd26a54d3f47a54263d878c66759d1acde27"],"user_facing":false}
