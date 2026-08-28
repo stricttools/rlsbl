@@ -366,12 +366,26 @@ Convergence never blindly overwrites the mirror. The remote tip must be **either
 
 The mirror carries every released version under its own **standalone** tag name (`v1.2.3`, not the workspace's `{name}@v1.2.3`, which is exactly what a consumer resolving the mirror by URL cannot read). The commit each tag stands at is derived, never guessed: it is the subtree split of the commit that version's release archive anchors -- the commit CI verified.
 
-That makes the tags a second dimension of the same reconciliation. A mirror can be perfectly converged on `main` and still carry none of its releasable's tags (a mirror bound after the fact, a tag push that failed at release time, a mirror that was reset), so the plan names every released version the mirror is missing and an apply materializes it: the tag, and the mirror's GitHub Release with that version's notes. A tag standing at a **different** commit is never moved -- that is a hard error naming both commits.
+That makes the tags a second dimension of the same reconciliation. A mirror can be perfectly converged on `main` and still carry none of its releasable's tags (a mirror bound after the fact, a tag push that failed at release time, a mirror that was reset), so observation reports one item per released version beside the branch's own verdict:
+
+| State | Meaning | What apply does |
+| --- | --- | --- |
+| `present` | The mirror already carries the tag. | Nothing. |
+| `materialize` | The mirror has no such tag. The subtree split of the version's ledger anchor is the commit it belongs at. | Push the tag at that commit, then create the mirror's GitHub Release with that version's notes. |
+| `unanchored` | No mirror commit for this version can be derived: its release archive records no commit at all, or records one the subtree split cannot answer for — typically an anchor predating the member's own directory, from a release absorbed out of another repository. | **Nothing, and nothing is guessed.** The version is named with the reason it could not be derived; the branch and every other version reconcile as usual. |
+
+A tag standing at a **different** commit is never moved. That is a hard error naming both commits: a released tag names what shipped, and choosing which commit a version shipped from is never the reconciler's decision.
 
 Two invariants follow:
 
 - **A mirror never releases itself.** Its scaffold deliberately renders no publish workflow, and every convergence sweeps any publish workflow that reached the mirror another way — a leftover in an older scaffold layer, or one that rode in through the subtree split because the member's own directory carries it. (The member keeps its copy in the monorepo; only the mirror's is swept.) A mirror's Releases are written by the monorepo's release flow, or by this command materializing what the flow missed.
 - **A mirrored package's identity manifests name the mirror.** The scaffold commit rewrites them -- Go's `go.mod` `module` directive is the case that exists, since it IS the fetch URL -- and those files are scaffold-owned on the mirror as a result. A mirror remote whose URL names no module host is a hard error rather than a `go.mod` nobody can `go get`.
+
+### The release flow's own mirror steps
+
+Releasing a releasable that declares a `subtree_remote` does both halves without a separate command. After the primary release is published, `rlsbl release run` converges the mirror's branch through the same reconciler this chapter describes, then publishes that version's tag and GitHub Release on the mirror. The tag's commit is the subtree split of the release's **ledger anchor** — the CI-verified candidate — not the mirror's branch tip, so the mirror's tag names the same code the monorepo's does even though the finalization commits have moved `main` on since.
+
+Both steps are **non-fatal**: the primary release has already shipped and nothing is rolled back. A failure is still recorded on the release state, so the run exits non-zero, stays resumable, and names its healer — `rlsbl monorepo mirror <project>` for the mirror, `rlsbl release reconcile` for this repository's own release refs.
 
 ### Extracting a mirrored releasable promotes the mirror
 
