@@ -23,15 +23,33 @@ from conftest import workspace_toml
 
 
 class _Capture:
-    """Record subprocess.run calls without executing them."""
+    """Record the command's subprocess effects without executing them.
+
+    Read-only ``git rev-parse`` queries are let through to the real git: they
+    are questions the command asks before it decides anything (which repository
+    is this?), and a stub that answered nothing would silently disable the
+    scope guard some of the tests below assert on. Everything else -- the uv
+    sync and install runs these tests are about -- is recorded and stubbed.
+    """
 
     def __init__(self, returncode=0):
         self.returncode = returncode
         self.calls = []
 
     def __call__(self, cmd, *args, **kwargs):
+        if list(cmd[:2]) == ["git", "rev-parse"]:
+            return subprocess.run(  # noqa: S603 -- the real read, in the test
+                list(cmd),
+                cwd=kwargs.get("cwd"),
+                capture_output=kwargs.get("capture_output", False),
+                text=kwargs.get("text", False),
+                timeout=kwargs.get("timeout"),
+            )
         self.calls.append({"cmd": cmd, "kwargs": kwargs})
-        return subprocess.CompletedProcess(args=cmd, returncode=self.returncode)
+        # A captured run always yields strings, never None.
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=self.returncode, stdout="", stderr="",
+        )
 
 
 @pytest.fixture

@@ -264,17 +264,22 @@ class Applied:
     entries_migrated: int = 0
     entries_already_present: int = 0
     #: Repo-relative paths this run wrote or deleted, for the scoped commit.
-    touched: list = field(default_factory=list)
+    written: list = field(default_factory=list)
     state_commit: str = ""
     alias_commit: str = ""
     stack: ExitStack | None = None
 
-    def touch(self, workspace_root, *paths):
-        """Record repo-relative paths for the commit this run will make."""
+    def record_path(self, workspace_root, *paths):
+        """Record repo-relative paths for the commit this run will make.
+
+        Deliberately not spelled ``touch``: that name is a filesystem mutation
+        everywhere else in this codebase, and the chokepoint scanner reads it
+        as one -- a bookkeeping method has no business borrowing it.
+        """
         for path in paths:
             rel = os.path.relpath(path, workspace_root)
-            if rel not in self.touched:
-                self.touched.append(rel)
+            if rel not in self.written:
+                self.written.append(rel)
 
 
 # ---------------------------------------------------------------------------
@@ -1422,7 +1427,7 @@ def _migrate_changes(arr, run, changes_dir):
             body = "".join(serialize_entry(e) + "\n" for e in new_entries)
             effects.append_text(target, body)
             run.entries_migrated += len(new_entries)
-        run.touch(arr.workspace_root, target)
+        run.record_path(arr.workspace_root, target)
 
     for name in sorted(os.listdir(changes_dir)):
         if name == "unreleased.jsonl":
@@ -1452,7 +1457,7 @@ def _migrate_changes(arr, run, changes_dir):
             # inherits whatever the source's mode was, so the lock is stated
             # here rather than assumed.
             effects.chmod(target, 0o444)
-        run.touch(arr.workspace_root, target)
+        run.record_path(arr.workspace_root, target)
 
 
 def _migrate_releases(arr, run, releases_dir):
@@ -1482,7 +1487,7 @@ def _migrate_releases(arr, run, releases_dir):
             continue
         effects.copy_file(source, target)
         effects.chmod(target, 0o444)
-        run.touch(arr.workspace_root, target)
+        run.record_path(arr.workspace_root, target)
 
 
 def _migrate_identity(arr, run):
@@ -1493,7 +1498,7 @@ def _migrate_identity(arr, run):
     write_releasable_version(
         arr.workspace_root, arr.releasable_name, arr.version,
     )
-    run.touch(arr.workspace_root, os.path.join(arr.releasable_dir, "version"))
+    run.record_path(arr.workspace_root, os.path.join(arr.releasable_dir, "version"))
 
     source_config = os.path.join(arr.member_rlsbl_dir, "config.json")
     target_config = os.path.join(arr.releasable_dir, "config.json")
@@ -1501,7 +1506,7 @@ def _migrate_identity(arr, run):
         merged = read_json_config(target_config)
         merged.update(read_json_config(source_config))
         _write_json(target_config, merged)
-        run.touch(arr.workspace_root, target_config)
+        run.record_path(arr.workspace_root, target_config)
 
 
 def _remove_residue(arr, run, changes_dir, releases_dir):
@@ -1540,7 +1545,7 @@ def _remove_residue(arr, run, changes_dir, releases_dir):
             ),
             delete_with_rm=arr.delete_with_rm,
         )
-        run.touch(arr.workspace_root, path)
+        run.record_path(arr.workspace_root, path)
 
 
 def _apply_workspace(arr, item, run):
@@ -1565,7 +1570,7 @@ def _apply_workspace(arr, item, run):
                 Releasable(name=arr.releasable_name, tag_format=arr.tag_format)
             )
         save_workspace(arr.workspace_root, projects, releasables=releasables)
-        run.touch(arr.workspace_root, workspace_file)
+        run.record_path(arr.workspace_root, workspace_file)
 
     projects = load_workspace(arr.workspace_root)
     graph = WorkspaceGraph(arr.workspace_root, projects)
@@ -1573,14 +1578,14 @@ def _apply_workspace(arr, item, run):
         arr.workspace_root,
         generate_snapshot(arr.workspace_root, projects, graph),
     )
-    run.touch(
+    run.record_path(
         arr.workspace_root,
         os.path.join(arr.workspace_root, WORKSPACE_DIR, SNAPSHOT_FILE),
     )
 
     commit_files(
         f"monorepo: absorb {arr.name}",
-        sorted(run.touched),
+        sorted(run.written),
         cwd=arr.workspace_root,
     )
     run.state_commit = _run_git(arr.workspace_root, "rev-parse", "HEAD")

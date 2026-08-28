@@ -76,7 +76,10 @@ def _repo_root(project_root):
     import subprocess
 
     try:
-        result = subprocess.run(
+        # Through the effects seam like every other subprocess here: ``git
+        # rev-parse`` is on the observe allowlist, so the read really runs
+        # inside a preview instead of returning an unsettled stand-in.
+        result = effects.run(
             ["git", "rev-parse", "--show-toplevel"],
             cwd=str(project_root), capture_output=True, text=True, timeout=30,
         )
