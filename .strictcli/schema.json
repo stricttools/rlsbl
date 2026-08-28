@@ -1454,13 +1454,29 @@
         },
         "reconcile": {
           "name": "reconcile",
-          "help": "Reconcile release metadata with a rewritten history: re-push the tags a rewrite moved and recreate the GitHub Releases attached to them. Reads safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) to determine what moved, so it works after ANY out-of-band rewrite, not just one driven by rlsbl release scrub. Fail-closed: a tag whose divergence from the remote the journal does not explain is a hard error, never a force-push.",
+          "help": "Reconcile this project's published release metadata with what its own records say it released: push the refs origin is missing, re-point the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Merges four explanation sources -- safegit's rewrite journal, the release ledger's anchors, the lineage records, and the committed scrub archives -- into one preview whose verdicts are materialize, already-correct, re-point-with-lease, refuse-foreign, or refuse-identity-mismatch. Fail-closed: one ref origin holds that no record explains aborts the whole reconcile, and nothing anywhere is repaired. Consent is file-driven: --plan writes the plan, --apply performs it.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
             {
+              "name": "mode",
+              "help": "Which half of the reconcile to run: write the plan, or perform it. Exactly one must be elected.",
+              "presence": "required",
+              "choices": [
+                {
+                  "name": "plan",
+                  "help": "Observe origin and write the reconcile plan to .rlsbl/releases/reconcile-plan.toml. Writes nothing to origin."
+                },
+                {
+                  "name": "apply",
+                  "help": "Perform the plan in .rlsbl/releases/reconcile-plan.toml, after re-observing origin and refusing if it moved since the plan was written."
+                }
+              ],
+              "elect_by": "member-flags"
+            },
+            {
               "name": "push-timeout",
-              "help": "Timeout in seconds for each tag push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.",
+              "help": "Timeout in seconds for each ref push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.",
               "value_schema": {
                 "type": "integer"
               },
@@ -1876,7 +1892,7 @@
         },
         "add": {
           "name": "add",
-          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, subtree remote URL, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.",
+          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.",
           "effect": "mutating",
           "flags": [
             {
@@ -1890,14 +1906,6 @@
             {
               "name": "target",
               "help": "Registry this project publishes to (e.g. npm, pypi, go)",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "optional"
-            },
-            {
-              "name": "subtree-remote",
-              "help": "Git remote URL for split-publishing this project as a standalone repo",
               "value_schema": {
                 "type": "string"
               },
@@ -3127,6 +3135,17 @@
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace:non_dev_node"
+    },
+    "mirror-required": {
+      "tags": [
+        "workspace"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "scope": "workspace"
     },
     "mixed-tag-schemes": {
       "tags": [

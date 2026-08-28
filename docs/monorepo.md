@@ -97,7 +97,6 @@ Each `[[projects]]` block declares the project's identity, release target, inter
 | `releasable` | yes | string or `false` | The `[[releasables]]` entry this project is versioned under, or `false` to opt out of versioning entirely |
 | `name` | no | string | Project name (defaults to basename of `path`; the member at `path = "."` must be named `root`) |
 | `target` | no | string | Release target (auto-detected if omitted) |
-| `subtree_remote` | no | string | Git remote URL for subtree mirror publishing |
 | `depends_on` | no | list of strings | Explicit intra-workspace dependencies (project names) |
 | `library` | no | bool | Mark as a shared library (enables library-lint check) |
 | `dev_only` | no | bool | Mark as a dev-only project (no changelog, no CHANGELOG.md). A dev-only project outside every releasable is a **dev node** |
@@ -106,7 +105,7 @@ Each `[[projects]]` block declares the project's identity, release target, inter
 
 ### Releasables section
 
-`[[releasables]]` names the units of versioning. Each entry has a `name` and an optional `tag_format`:
+`[[releasables]]` names the units of versioning. Each entry has a `name` and two optional keys, `tag_format` and `subtree_remote`:
 
 ```toml
 [[releasables]]
@@ -115,7 +114,13 @@ name = "core"
 [[releasables]]
 name = "app"
 tag_format = "v{version}"
+
+[[releasables]]
+name = "uikit"
+subtree_remote = "git@github.com:owner/uikit.git"
 ```
+
+`subtree_remote` binds the releasable to a standalone [mirror](#mirror). It is a releasable key, not a member key: a mirror carries one subtree's whole history, its tags and its GitHub Releases, and the releasable is the unit that owns a version, a changelog and a tag scheme. A member still carrying the key is a hard error at load time naming the exact edit, and **a releasable with more than one member may not declare one at all** -- there would be no single subtree to mirror.
 
 `tag_format` is **explicit or absent**, never implicitly filled in. An entry that omits it tags with the workspace scheme, `{name}@v{version}`; an entry that declares it tags with what it declared. Absence is carried through loading and saving, so a rewrite of `workspace.toml` neither invents the key nor deletes a line an operator wrote — including one that spells out the default.
 
@@ -322,7 +327,7 @@ Treat mirror repositories as read-only downstreams. To change a project, change 
 
 ### Requirements
 
-- The project must have `subtree_remote` configured in workspace.toml
+- The releasable the project belongs to must declare `subtree_remote` in workspace.toml, and that releasable must have exactly one member
 - SSH host must be consistent between `subtree_remote` and origin
 - Recommended: enable **branch protection** on the mirror's `main` for humans while allowing the automation identity to force-push, so the tool-owned contract is enforced at the remote too
 
@@ -335,7 +340,7 @@ The mirror command follows an observe-then-converge reconciliation pattern. In d
 
 The desired state of the mirror's `main` is exactly one scaffold commit atop the **current split-lineage commit**, where that commit is the deterministic branchless `git subtree split` of the project's current history, and the scaffold commit touches only scaffold-owned paths.
 
-Observation reports one of:
+Observation reports one of the following for the mirror's **branch**, and, beside it, one item per released version for the mirror's **tags** (see [Release tags on the mirror](#release-tags-on-the-mirror)):
 
 | State | Meaning | What apply does |
 | --- | --- | --- |
@@ -353,6 +358,17 @@ Apply is **idempotent**: re-running on a converged mirror is a clean no-op, and 
 Convergence never blindly overwrites the mirror. The remote tip must be **either** a bare split-lineage commit (the current split SHA or an older one — this covers legacy mirrors that never received a scaffold layer) **or** exactly one commit atop a split-lineage commit whose changed paths are all scaffold-owned (`.rlsbl/`, `.github/`, and a small set of root files like `CHANGELOG.md`). Anything else is a foreign commit: apply refuses and reports it. This makes contract violations *loud* instead of silently force-erased.
 
 > Note: `rlsbl monorepo sync` does **not** update mirror repositories. `sync` regenerates the monorepo's own `.github/workflows`. Mirrors are updated only by re-running `rlsbl monorepo mirror <project>` (for example after a release).
+
+### Release tags on the mirror
+
+The mirror carries every released version under its own **standalone** tag name (`v1.2.3`, not the workspace's `{name}@v1.2.3`, which is exactly what a consumer resolving the mirror by URL cannot read). The commit each tag stands at is derived, never guessed: it is the subtree split of the commit that version's release archive anchors -- the commit CI verified.
+
+That makes the tags a second dimension of the same reconciliation. A mirror can be perfectly converged on `main` and still carry none of its releasable's tags (a mirror bound after the fact, a tag push that failed at release time, a mirror that was reset), so the plan names every released version the mirror is missing and an apply materializes it: the tag, and the mirror's GitHub Release with that version's notes. A tag standing at a **different** commit is never moved -- that is a hard error naming both commits.
+
+Two invariants follow:
+
+- **A mirror never releases itself.** Its scaffold deliberately renders no publish workflow; its Releases are written by the monorepo's release flow, or by this command materializing what the flow missed.
+- **A mirrored package's identity manifests name the mirror.** The scaffold commit rewrites them -- Go's `go.mod` `module` directive is the case that exists, since it IS the fetch URL -- and those files are scaffold-owned on the mirror as a result. A mirror remote whose URL names no module host is a hard error rather than a `go.mod` nobody can `go get`.
 
 ### Extracting a mirrored releasable promotes the mirror
 
