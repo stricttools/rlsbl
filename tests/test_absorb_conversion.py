@@ -580,6 +580,38 @@ class TestApply:
 
         assert gitout(ns.root, "--no-optional-locks", "status", "--porcelain") == ""
 
+    def test_the_workspace_checks_gain_no_failure(self, tmp_path, monkeypatch):
+        """The conversion introduces no new workspace-check failure.
+
+        Compared against the same checks run BEFORE the absorb rather than
+        against green: the fixture's members carry no CI workflows, so
+        ``workspace-ci-synced`` is red either way, and a test that demanded
+        green would be asserting something about the fixture instead of about
+        the conversion.
+        """
+        from rlsbl import app
+
+        def failing():
+            result = app.test(["check", "--tag", "workspace"])
+            return {
+                line.split()[1]
+                for line in result.stdout.splitlines()
+                if line.startswith("FAIL ")
+            }
+
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        monkeypatch.chdir(ns.root)
+        # Sync once first, so the before-state and the after-state are asked
+        # the same set of questions.
+        app.test(["monorepo", "sync"])
+        before = failing()
+
+        absorb(ns, source)
+
+        after = failing()
+        assert after <= before, f"new failures: {sorted(after - before)}"
+
     def test_the_snapshot_is_regenerated(self, tmp_path):
         ns = make_destination(tmp_path)
         source = make_source(tmp_path)

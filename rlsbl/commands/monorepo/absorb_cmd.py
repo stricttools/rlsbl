@@ -1588,6 +1588,7 @@ def _apply_workspace(arr, item, run):
     )
 
     _scaffold_member(arr)
+    _sweep_member_rlsbl(arr)
     _commit_step_output(arr, f"monorepo: scaffold {arr.name} as a member")
     _sync_workspace(arr)
     _commit_step_output(arr, "monorepo: sync CI workflows")
@@ -1632,6 +1633,18 @@ def _scaffold_member(arr):
     half-scaffolded is a repository nobody can release, and finding that out
     later costs more than stopping here.
     """
+    # The releasable model keeps merge bases at the releasable, so a member's
+    # own `.rlsbl/bases/` is residue (see _sweep_member_rlsbl) -- and a scaffold
+    # run against a member that has `managed-files.json` but no `bases/` refuses
+    # with a one-line heal: create the directory and re-run, and it reconstructs
+    # each base from the last scaffold commit. Doing that heal here is what
+    # makes a re-run of this conversion reach the scaffold at all, since the
+    # previous run's sweep is exactly what removed the directory.
+    bases = os.path.join(arr.member_rlsbl_dir, "bases")
+    managed = os.path.join(arr.member_rlsbl_dir, "managed-files.json")
+    if os.path.isfile(managed) and not os.path.isdir(bases):
+        effects.makedirs(bases, exist_ok=True)
+
     # --no-auto-tag: adding a GitHub topic is an act on an external system, and
     # this conversion administers none. The scaffold's own auto-commit is left
     # on, so the files it writes are committed by the step that wrote them.
@@ -1643,6 +1656,41 @@ def _scaffold_member(arr):
             f"{result.returncode}). The history, the tags and the release "
             f"state are already in this repository; fix the failure and re-run "
             f"the absorb -- it detects what is done and completes the rest."
+        )
+
+
+def _sweep_member_rlsbl(arr):
+    """Remove what the scaffold wrote that a releasable member may not keep.
+
+    ``rlsbl scaffold`` writes a standalone project's ``.rlsbl/``: a scaffolding
+    ``version`` marker and a ``bases/`` directory of merge bases. Under a
+    releasable those belong to the releasable, and the ``releasable-residue``
+    check errors on a member that keeps them -- so an absorb that ran the
+    scaffold and stopped would hand back a workspace failing its own checks.
+
+    The rule is not restated here: :func:`verify_minimal_rlsbl` is the one
+    place that says what a member's ``.rlsbl/`` may hold, and this removes
+    exactly what it names, the same set ``rlsbl monorepo cleanup`` removes.
+    """
+    from ...releasable_cleanup import verify_minimal_rlsbl
+
+    removed = []
+    for entry in verify_minimal_rlsbl(arr.dest_full):
+        path = os.path.join(arr.member_rlsbl_dir, entry)
+        _delete_path(
+            path,
+            description=(
+                f"Per-package release state the scaffold wrote for member "
+                f"'{arr.name}', which belongs to releasable "
+                f"'{arr.releasable_name}' (rlsbl monorepo absorb)"
+            ),
+            delete_with_rm=arr.delete_with_rm,
+        )
+        removed.append(entry)
+    if removed:
+        print(
+            f"  member: removed scaffold residue {', '.join(removed)} from "
+            f"{arr.dest_path}/.rlsbl/ (it belongs to the releasable)."
         )
 
 
