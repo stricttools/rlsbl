@@ -2866,6 +2866,17 @@
         "config-schema"
       ]
     },
+    "dep-locks": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
     "deps-dev-in-lib": {
       "tags": [
         "quality"
@@ -2989,6 +3000,27 @@
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace"
+    },
+    "go-deprecation-published": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": []
+    },
+    "go-module-identity": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
     },
     "layers-violations": {
       "tags": [],
@@ -3115,6 +3147,26 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
+      "depends_on": []
+    },
+    "npm-token-presence": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": []
+    },
+    "old-repo-archived": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
       "depends_on": []
     },
     "prepush-changelog-coverage": {
@@ -3278,6 +3330,17 @@
       "depends_on": [
         "config-schema"
       ]
+    },
+    "strictspec-generated-floor": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
     },
     "stricttest-floor": {
       "tags": [
