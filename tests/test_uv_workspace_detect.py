@@ -1,15 +1,20 @@
-"""Tests for detect_uv_workspace_root."""
+"""Tests for the one uv-workspace locator, rlsbl.uv_workspace.
+
+These cases were written against a second, divergent copy of this walk-up
+that used to live in rlsbl.utils; they moved to the surviving locator when
+the two were reconciled, and every one of them still holds.
+"""
 
 import os
 import textwrap
 
 import pytest
 
-from rlsbl.utils import detect_uv_workspace_root
+from rlsbl.uv_workspace import find_uv_workspace_root
 
 
 class TestDetectUvWorkspaceRoot:
-    """Tests for detect_uv_workspace_root(project_dir)."""
+    """Tests for find_uv_workspace_root(project_dir)."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path):
@@ -31,7 +36,7 @@ class TestDetectUvWorkspaceRoot:
             [tool.uv.workspace]
             members = ["packages/core"]
         """)
-        result = detect_uv_workspace_root(project)
+        result = find_uv_workspace_root(project)
         assert result == workspace
 
     def test_glob_member(self):
@@ -43,7 +48,7 @@ class TestDetectUvWorkspaceRoot:
             [tool.uv.workspace]
             members = ["packages/*"]
         """)
-        result = detect_uv_workspace_root(project)
+        result = find_uv_workspace_root(project)
         assert result == workspace
 
     def test_not_a_member(self):
@@ -56,7 +61,7 @@ class TestDetectUvWorkspaceRoot:
             [tool.uv.workspace]
             members = ["packages/*"]
         """)
-        result = detect_uv_workspace_root(project)
+        result = find_uv_workspace_root(project)
         assert result is None
 
     def test_excluded_member(self):
@@ -69,7 +74,7 @@ class TestDetectUvWorkspaceRoot:
             members = ["packages/*"]
             exclude = ["packages/internal"]
         """)
-        result = detect_uv_workspace_root(project)
+        result = find_uv_workspace_root(project)
         assert result is None
 
     def test_no_workspace_root(self):
@@ -81,7 +86,7 @@ class TestDetectUvWorkspaceRoot:
             [project]
             name = "top-level"
         """)
-        result = detect_uv_workspace_root(project)
+        result = find_uv_workspace_root(project)
         assert result is None
 
     def test_workspace_root_itself(self):
@@ -92,7 +97,7 @@ class TestDetectUvWorkspaceRoot:
             [tool.uv.workspace]
             members = ["packages/*"]
         """)
-        result = detect_uv_workspace_root(workspace)
+        result = find_uv_workspace_root(workspace)
         assert result is None
 
     def test_nested_two_levels_up(self):
@@ -104,5 +109,5 @@ class TestDetectUvWorkspaceRoot:
             [tool.uv.workspace]
             members = ["libs/python/*"]
         """)
-        result = detect_uv_workspace_root(project)
+        result = find_uv_workspace_root(project)
         assert result == workspace

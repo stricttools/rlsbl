@@ -632,7 +632,8 @@ def register_workspace_checks(app):
             resolve_releasable_config_dir,
             targets_sharing_workspace_environment,
         )
-        from ..utils import detect_uv_workspace_root, is_virtual_uv_root
+        from ..utils import is_virtual_uv_root
+        from ..uv_workspace import find_uv_workspace_root
 
         # Buildability is a question about the ONE environment a uv workspace
         # resolves into, so it applies to the targets that share one. The
@@ -651,9 +652,13 @@ def register_workspace_checks(app):
         if not pypi_projects:
             return reporter.skipped("no pypi-target projects in workspace")
 
-        root_abs = os.path.abspath(root)
+        # realpath, not abspath: the locator resolves symlinks (it has to --
+        # it compares expanded member globs against a target directory), so a
+        # repository checked out under a symlinked path would otherwise stop
+        # matching its own workspace root and silently switch strategies.
+        root_real = os.path.realpath(root)
         root_is_uv_workspace = is_virtual_uv_root(root) or any(
-            detect_uv_workspace_root(d) == root_abs for _name, d in pypi_projects
+            find_uv_workspace_root(d) == root_real for _name, d in pypi_projects
         )
 
         if root_is_uv_workspace:

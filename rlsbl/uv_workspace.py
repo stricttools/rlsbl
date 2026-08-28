@@ -23,10 +23,36 @@ parse is still the location; refusing to read it is the reader's job, and a
 locator that walked past an unreadable lock would silently answer from a
 different file.
 
-Three callers share this: ``rlsbl rewrite uv-path-sources`` (which built it),
-the ``dep-floors`` check, and the ``dep-locks`` check.  Before it was shared,
-``dep-floors`` looked only beside the project root, so every member of a uv
-workspace reported "no uv.lock" and its declared floors went unpoliced.
+The one locator
+---------------
+
+Everything that asks "is this directory a uv workspace member, and whose?"
+asks :func:`find_uv_workspace_root` here -- the lock readers
+(``rlsbl rewrite uv-path-sources``, ``dep-floors``, ``dep-locks``), the test
+runner's uv invocation, the tool-group resolver, the overlay environment
+locator and the ``workspace-unbuildable`` check.  There used to be a SECOND
+copy of this walk-up in ``rlsbl.utils``, and it answered differently in four
+ways; where they disagreed, uv's own rules decide, so this one is what
+survived:
+
+* the walk starts at the project's PARENT.  A directory is never a member of
+  the workspace it declares itself, so starting at the project could only
+  produce an answer uv never gives.
+* the FIRST ancestor declaring ``[tool.uv.workspace]`` decides.  When its
+  globs do not claim the directory the answer is None, not "keep looking
+  higher": uv forbids nested workspaces, so a second declaration further up is
+  not a fallback, it is a repository that is already invalid.
+* member globs are expanded RECURSIVELY, so ``**`` crosses directory
+  separators the way uv reads it.  Expanded without that, ``packages/**``
+  quietly behaved like ``packages/*`` and a member one level deeper was not
+  found.
+* paths are compared with symlinks resolved, so a checkout reached through a
+  symlinked path resolves to the same workspace as the same checkout reached
+  directly.
+
+Before the lock location was shared, ``dep-floors`` looked only beside the
+project root, so every member of a uv workspace reported "no uv.lock" and its
+declared floors went unpoliced.
 """
 
 import glob

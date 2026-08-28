@@ -47,7 +47,7 @@ class TestPypiTarget:
         )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -67,7 +67,7 @@ class TestPypiTarget:
         (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -92,7 +92,7 @@ class TestPypiTarget:
         (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -116,7 +116,7 @@ class TestPypiTarget:
         (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -181,7 +181,7 @@ class TestPypiMarkers:
         )
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -201,7 +201,7 @@ class TestPypiMarkers:
         )
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -222,7 +222,7 @@ class TestPypiMarkers:
         )
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -242,7 +242,7 @@ class TestPypiMarkers:
         (ws_root / "pyproject.toml").write_text("[project]\nname = 'ws'\nversion = '0.1.0'\n")
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -285,7 +285,7 @@ class TestPypiMarkers:
         )
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -343,7 +343,7 @@ class TestDevOverlayPreservation:
 
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -369,7 +369,7 @@ class TestDevOverlayPreservation:
 
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -395,7 +395,7 @@ class TestDevOverlayPreservation:
 
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -418,7 +418,7 @@ class TestDevOverlayPreservation:
 
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
@@ -433,7 +433,7 @@ class TestDevOverlayPreservation:
 
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -451,7 +451,7 @@ class TestDevOverlayPreservation:
 
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
@@ -473,7 +473,7 @@ class TestDevOverlayPreservation:
 
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
@@ -723,7 +723,7 @@ class TestWorkspaceRoot:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=workspace),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=workspace),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -750,7 +750,7 @@ class TestWorkspaceRoot:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(tmp_project)),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=str(tmp_project)),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -777,7 +777,7 @@ class TestWorkspaceRoot:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -958,7 +958,7 @@ class TestResolvePytestInvocation:
 
     def test_workspace_member(self, tmp_project):
         """Workspace members get plain uv run pytest."""
-        with patch("rlsbl.testing.detect_uv_workspace_root", return_value="/ws"):
+        with patch("rlsbl.testing.find_uv_workspace_root", return_value="/ws"):
             result = _resolve_pytest_invocation(str(tmp_project), "/ws")
         assert result == ["uv", "run", "python", "-P", "-m", "pytest"]
 
@@ -968,7 +968,7 @@ class TestResolvePytestInvocation:
             '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
             '[dependency-groups]\ndev = ["pytest>=8.0"]\n'
         )
-        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+        with patch("rlsbl.testing.find_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
         assert result == ["uv", "run", "python", "-P", "-m", "pytest"]
 
@@ -978,7 +978,7 @@ class TestResolvePytestInvocation:
             '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
             '[dependency-groups]\ntest = ["pytest"]\n'
         )
-        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+        with patch("rlsbl.testing.find_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
         assert result == ["uv", "run", "--group", "test", "python", "-P", "-m", "pytest"]
 
@@ -988,7 +988,7 @@ class TestResolvePytestInvocation:
             '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
             '[project.optional-dependencies]\ntest = ["pytest>=7.0"]\n'
         )
-        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+        with patch("rlsbl.testing.find_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
         assert result == ["uv", "run", "--extra", "test", "python", "-P", "-m", "pytest"]
 
@@ -998,7 +998,7 @@ class TestResolvePytestInvocation:
             '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
             '[tool.uv]\ndev-dependencies = ["pytest"]\n'
         )
-        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+        with patch("rlsbl.testing.find_uv_workspace_root", return_value=None):
             result = _resolve_pytest_invocation(str(tmp_project), None)
         assert result == ["uv", "run", "python", "-P", "-m", "pytest"]
 
@@ -1008,7 +1008,7 @@ class TestResolvePytestInvocation:
             '[project]\nname = "pkg"\nversion = "0.1.0"\n\n'
             '[dependency-groups]\ndev = ["ruff"]\n'
         )
-        with patch("rlsbl.testing.detect_uv_workspace_root", return_value=None):
+        with patch("rlsbl.testing.find_uv_workspace_root", return_value=None):
             with pytest.raises(ConfigError, match="pytest is not declared"):
                 _resolve_pytest_invocation(str(tmp_project), None)
 
@@ -1042,7 +1042,7 @@ class TestTimeoutHint:
         )
         with (
             patch("rlsbl.testing.require_tool", return_value="/usr/bin/uv"),
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run", side_effect=self._timeout),
         ):
             result = run_project_tests("pypi", project_dir=str(tmp_project))
@@ -1134,7 +1134,7 @@ class TestPypiIntegration:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=str(ws_root)),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=str(ws_root)),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -1161,7 +1161,7 @@ class TestPypiIntegration:
         )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -1181,7 +1181,7 @@ class TestPypiIntegration:
         )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"
@@ -1201,7 +1201,7 @@ class TestPypiIntegration:
         )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
         ):
             mock_tool.return_value = "/usr/bin/uv"
 
@@ -1216,7 +1216,7 @@ class TestPypiIntegration:
         )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch("rlsbl.effects.run") as mock_run,
         ):
             mock_tool.return_value = "/usr/bin/uv"

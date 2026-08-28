@@ -20,7 +20,7 @@ import tomllib
 from importlib.metadata import Distribution, DistributionFinder, MetadataPathFinder
 from urllib.parse import unquote, urlparse
 
-from .utils import detect_uv_workspace_root
+from .uv_workspace import find_uv_workspace_root
 
 
 class MalformedSentinelError(Exception):
@@ -238,7 +238,7 @@ def project_environment(project_root):
       not rlsbl configuration.
     """
     root = os.path.abspath(str(project_root))
-    base = detect_uv_workspace_root(root) or root
+    base = find_uv_workspace_root(root) or root
     override = os.environ.get("UV_PROJECT_ENVIRONMENT")
     if override:
         return override if os.path.isabs(override) else os.path.join(base, override)

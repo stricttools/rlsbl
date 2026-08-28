@@ -77,6 +77,96 @@ class TestWorkspaceUnbuildableSkips:
         assert "uv is not installed" in result.message
 
 
+class TestRootWorkspaceRecognition:
+    """Which strategy the check picks comes from ONE uv-workspace locator.
+
+    A root that declares ``[tool.uv.workspace]`` AND ``[project]`` is not a
+    virtual root, so the layout question is answered entirely by resolving a
+    member up to it -- which is the locator's job, and the reason there is now
+    only one of them.
+    """
+
+    def _package_root(self, root, members):
+        """A root that is both a distributable package and a workspace root."""
+        member_list = ", ".join(f'"{m}"' for m in members)
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "rootpkg"\nversion = "0.1.0"\n\n'
+            f"[tool.uv.workspace]\nmembers = [{member_list}]\n"
+        )
+
+    def _member(self, root, relpath, name):
+        directory = root / relpath
+        directory.mkdir(parents=True)
+        (directory / "pyproject.toml").write_text(
+            f'[project]\nname = "{name}"\nversion = "0.1.0"\n'
+        )
+        return directory
+
+    def _ctx(self, project_root, workspace_root, relpath, name):
+        return WorkspaceCheckContext(
+            project_root=project_root,
+            workspace_root=workspace_root,
+            config={},
+            projects=[{"path": relpath, "name": name}],
+            graph=None,
+        )
+
+    def _calls(self, ctx):
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append((list(argv), kwargs.get("cwd")))
+            return subprocess.CompletedProcess(
+                args=argv, returncode=0, stdout="", stderr="",
+            )
+
+        with patch("subprocess.run", side_effect=fake_run):
+            result = app._check_defs["workspace-unbuildable"].impl(ctx)
+        return result, calls
+
+    def test_a_recursive_members_glob_claims_its_member(self, mock_git_repo):
+        """``**`` crosses directory separators, which is how uv reads it.
+
+        Expanding it without ``recursive=True`` made it behave like ``*``, so a
+        member one level deeper than the glob's first segment did not resolve
+        up to the root and the whole workspace was synced project by project.
+        """
+        self._package_root(mock_git_repo, ["packages/**"])
+        self._member(mock_git_repo, "packages/group/pylib", "pylib")
+
+        result, calls = self._calls(
+            self._ctx(
+                mock_git_repo, mock_git_repo, "packages/group/pylib", "pylib",
+            )
+        )
+        assert result.status == "pass"
+        assert calls == [
+            (["uv", "sync", "--all-packages", "--dry-run"], str(mock_git_repo))
+        ], calls
+
+    def test_a_workspace_reached_through_a_symlink_is_still_the_root(
+        self, mock_git_repo,
+    ):
+        """The locator resolves symlinks, so the comparison must too.
+
+        A repository checked out under a symlinked path (a symlinked home, a
+        symlinked temp directory) would otherwise stop being recognized as its
+        own workspace root and silently switch to the per-project strategy.
+        """
+        self._package_root(mock_git_repo, ["packages/*"])
+        self._member(mock_git_repo, "packages/pylib", "pylib")
+        link = mock_git_repo.parent / "linked-repo"
+        link.symlink_to(mock_git_repo, target_is_directory=True)
+
+        result, calls = self._calls(
+            self._ctx(link, link, "packages/pylib", "pylib")
+        )
+        assert result.status == "pass"
+        assert calls == [
+            (["uv", "sync", "--all-packages", "--dry-run"], str(link))
+        ], calls
+
+
 class TestWorkspaceUnbuildablePass:
     """The check passes when uv sync --all-packages --dry-run succeeds."""
 

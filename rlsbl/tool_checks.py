@@ -50,9 +50,9 @@ from collections import namedtuple
 
 from . import effects
 from .utils import (
-    detect_uv_workspace_root,
     get_check_timeout,
 )
+from .uv_workspace import find_uv_workspace_root
 
 #: Config key holding the per-check blocks.
 CONFIG_KEY = "checks"
@@ -212,7 +212,7 @@ def resolve_tool_group_flags(project_dir, tool_binary):
     Non-default dependency groups yield ``["--group", name]`` and optional
     extras yield ``["--extra", name]``.
     """
-    if detect_uv_workspace_root(project_dir) is not None:
+    if find_uv_workspace_root(project_dir) is not None:
         return []
     location = probe_tool_location(project_dir, tool_binary)
     if location is None:

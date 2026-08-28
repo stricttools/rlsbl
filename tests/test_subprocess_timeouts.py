@@ -149,7 +149,7 @@ class TestPypiTestsTimeout:
         )
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch(
                 "rlsbl.effects.run",
             ) as mock_run,
@@ -177,7 +177,7 @@ class TestPypiTestsTimeout:
 
         with (
             patch("rlsbl.testing.require_tool") as mock_tool,
-            patch("rlsbl.testing.detect_uv_workspace_root", return_value=None),
+            patch("rlsbl.testing.find_uv_workspace_root", return_value=None),
             patch(
                 "rlsbl.effects.run",
                 return_value=mock_result,

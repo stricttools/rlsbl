@@ -16,7 +16,8 @@ from .overlay_state import (
     OverlayModeConflictError,
     active_overlays,
 )
-from .utils import detect_uv_workspace_root, get_check_timeout, require_tool
+from .utils import get_check_timeout, require_tool
+from .uv_workspace import find_uv_workspace_root
 from . import effects
 
 # Shared remediation hint appended to every "command timed out" failure message
@@ -188,7 +189,7 @@ def _resolve_pytest_invocation(
 
     Raises ConfigError if pytest is not declared anywhere in pyproject.toml.
     """
-    uv_ws_root = detect_uv_workspace_root(project_dir)
+    uv_ws_root = find_uv_workspace_root(project_dir)
     if uv_ws_root is not None:
         return ["uv", "run", "python", "-P", "-m", "pytest"]
 
@@ -335,7 +336,7 @@ def _run_pypi_tests(
     if require_tool("uv", fatal=False):
         is_workspace_member = (
             workspace_root is not None
-            and detect_uv_workspace_root(effective_dir) is not None
+            and find_uv_workspace_root(effective_dir) is not None
         )
         # `uv run` auto-syncs (exactly) before running, which would undo the
         # overlay-preserving sync between the two commands. The flag scopes the
