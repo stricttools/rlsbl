@@ -12,6 +12,7 @@ from rlsbl.commands.unreleased import (
     _get_commits_since,
     run_cmd,
 )
+from rlsbl.errors import LedgerError
 from rlsbl.ledger import range_anchor
 
 from conftest import (
@@ -42,9 +43,21 @@ class TestBaselineReleaseSelection:
     def test_returns_none_when_nothing_released(self, mock_git_repo):
         assert range_anchor(ledger_dir(mock_git_repo)) is None
 
-    def test_a_tag_with_no_archive_selects_nothing(self, mock_git_repo):
+    def test_a_tag_with_no_archive_does_not_move_the_selection(self, mock_git_repo):
+        # A hand-made tag above the newest release. `git describe` would have
+        # picked it; the ledger answers from the archives, so it changes
+        # nothing.
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
+        subprocess.run(["git", "tag", "v9.9.9"], cwd=str(mock_git_repo), check=True)
+        assert range_anchor(ledger_dir(mock_git_repo)).version == "1.0.0"
+
+    def test_version_tags_with_no_archive_at_all_are_a_hard_error(self,
+                                                                  mock_git_repo):
+        # A repository that HAS released and was never backfilled. This used to
+        # select nothing and report the entire history as unreleased.
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        assert range_anchor(ledger_dir(mock_git_repo)) is None
+        with pytest.raises(LedgerError, match="backfill_release_anchors"):
+            range_anchor(ledger_dir(mock_git_repo))
 
     def test_returns_the_highest_archived_release(self, mock_git_repo):
         archive_release(ledger_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
@@ -105,6 +118,9 @@ class TestRunCmd:
     def test_errors_without_jsonl_setup(self, mock_git_repo, capsys):
         """Without .rlsbl/changes/, exits with error."""
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
+        # Archived as well as tagged: a tag with no archive behind it is its own
+        # hard error, and this test is about the missing changes directory.
+        archive_release(ledger_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
         (mock_git_repo / "a.txt").write_text("a")
         subprocess.run(["git", "add", "a.txt"], cwd=str(mock_git_repo), check=True)
         subprocess.run(

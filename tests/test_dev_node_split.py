@@ -11,7 +11,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from conftest import make_commit, make_workspace, run_git, workspace_toml
+from conftest import (
+    archive_release,
+    git_head,
+    make_commit,
+    make_workspace,
+    run_git,
+    workspace_toml,
+)
 from rlsbl.workspace import WorkspaceProject, WORKSPACE_DIR
 
 
@@ -149,7 +156,8 @@ def split_monorepo(tmp_path, monkeypatch):
         '[[projects]]\n'
         'path = "regular"\n'
         'name = "regular"\n'
-        '\n')
+        'releasable = "regular"\n'
+        '\n', releasables=["tools", "regular"])
     )
 
     # Create project directories with minimal structure
@@ -170,8 +178,14 @@ def split_monorepo(tmp_path, monkeypatch):
         run_git(tmp_path, "add", subdir)
     run_git(tmp_path, "commit", "-q", "-m", "add projects")
 
+    # Tagged AND archived: a project carrying a version tag over an empty
+    # release ledger is one that shipped and was never backfilled, and the
+    # ledger refuses to answer any range question for it.
     for subdir in ("dev-rel", "dev-norel", "legacy", "regular"):
         run_git(tmp_path, "tag", f"{subdir}@v0.1.0")
+        archive_release(
+            tmp_path / subdir / ".rlsbl" / "releases", "0.1.0", git_head(tmp_path),
+        )
 
     yield SimpleNamespace(root=tmp_path)
 

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import run_git, make_commit, make_workspace
+from conftest import archive_release, git_head, run_git, make_commit, make_workspace
 
 
 def _capture_all_checks():
@@ -109,9 +109,16 @@ def dev_node_monorepo(tmp_path, monkeypatch):
     run_git(tmp_path, "add", "regular-pkg")
     run_git(tmp_path, "commit", "-q", "-m", "add monorepo projects")
 
-    # Tag both projects
+    # Tag both projects, and record the regular one's release in its LEDGER:
+    # a project carrying a version tag with an empty release ledger is a
+    # repository that shipped and was never backfilled, which is a hard error.
     run_git(tmp_path, "tag", "mypkg-internal@v0.1.0")
     run_git(tmp_path, "tag", "mypkg-regular@v0.1.0")
+    archive_release(
+        regular_dir / ".rlsbl" / "releases", "0.1.0", git_head(tmp_path),
+    )
+    run_git(tmp_path, "add", "regular-pkg/.rlsbl/releases")
+    run_git(tmp_path, "commit", "-q", "-m", "archive regular-pkg 0.1.0")
 
     yield SimpleNamespace(
         root=tmp_path,

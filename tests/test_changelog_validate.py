@@ -17,6 +17,7 @@ from conftest import (
 from rlsbl.changelog.schema import ChangelogEntry
 from rlsbl.changelog.files import append_entry, read_unreleased
 from rlsbl.changelog.resolve import _git_log_hashes
+from rlsbl.errors import LedgerError
 from rlsbl.ledger import range_anchor, unreleased_range
 from rlsbl.changelog.validate import (
     ExemptionStats,
@@ -630,14 +631,26 @@ class TestRangeAnchorSelection:
         anchor = range_anchor(_ledger_dir(git_repo))
         assert (anchor.version, anchor.candidate_sha) == ("0.1.0", sha)
 
-    def test_a_tag_with_no_archive_behind_it_anchors_nothing(self, git_repo):
+    def test_a_stray_tag_above_the_newest_release_anchors_nothing(self, git_repo):
         """The tag namespace alone no longer selects anything.
 
-        `git describe` answered "v0.1.0" here. The ledger answers "nothing has
-        been released", because nothing has.
+        `git describe` answered "v9.9.9" here. The ledger answers with the
+        newest ARCHIVED release, because that is what shipped.
+        """
+        sha = _git_head(git_repo)
+        _archive_release(_ledger_dir(git_repo), "0.1.0", sha)
+        _run_git(git_repo, "tag", "v9.9.9")
+        assert range_anchor(_ledger_dir(git_repo)).version == "0.1.0"
+
+    def test_version_tags_over_an_empty_ledger_are_a_hard_error(self, git_repo):
+        """Released, never backfilled -- previously answered "nothing released".
+
+        Answering that would have reported every commit in the repository as
+        unreleased.
         """
         _run_git(git_repo, "tag", "v0.1.0")
-        assert range_anchor(_ledger_dir(git_repo)) is None
+        with pytest.raises(LedgerError, match="backfill_release_anchors"):
+            range_anchor(_ledger_dir(git_repo))
 
     def test_each_project_reads_its_own_ledger(self, git_repo):
         """A releasable's archives live under its own state directory, so a
@@ -699,9 +712,16 @@ class TestUnreleasedRange:
         _run_git(git_repo, "tag", "-d", "v0.1.0")
         assert unreleased_range(_ledger_dir(git_repo)) == f"{sha}..HEAD"
 
-    def test_a_tag_with_no_archive_does_not_bound_the_range(self, git_repo):
+    def test_a_stray_tag_does_not_bound_the_range(self, git_repo):
+        sha = _git_head(git_repo)
+        _archive_release(_ledger_dir(git_repo), "0.1.0", sha)
+        _run_git(git_repo, "tag", "v9.9.9")
+        assert unreleased_range(_ledger_dir(git_repo)) == f"{sha}..HEAD"
+
+    def test_version_tags_over_an_empty_ledger_are_a_hard_error(self, git_repo):
         _run_git(git_repo, "tag", "v0.1.0")
-        assert unreleased_range(_ledger_dir(git_repo)) == "HEAD"
+        with pytest.raises(LedgerError, match="backfill_release_anchors"):
+            unreleased_range(_ledger_dir(git_repo))
 
 
 class TestMonorepoValidation:

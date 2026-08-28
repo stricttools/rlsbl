@@ -70,7 +70,7 @@ class TestReleaseWithJsonl:
         _setup_rlsbl_config(repo)
 
         # Create a baseline version tag before making unreleased commits
-        subprocess.run(["git", "tag", "v0.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v0.0.0")
 
         sha1 = _make_commit(repo, "feat1.txt", "feat: first feature")
         sha2 = _make_commit(repo, "feat2.txt", "feat: second feature")
@@ -130,7 +130,7 @@ class TestReleaseJsonlValidationFails:
         _setup_rlsbl_config(repo)
 
         # Create a baseline version tag before the unreleased commit
-        subprocess.run(["git", "tag", "v0.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v0.0.0")
 
         # Now make a new commit that's ahead of the tag
         _make_commit(repo, "feat.txt", "feat: something")
@@ -318,7 +318,7 @@ class TestUnreleasedWithoutJsonl:
     def test_errors_without_jsonl(self, mock_git_repo, capsys):
         """Without .rlsbl/changes/, unreleased exits with error."""
         repo = mock_git_repo
-        subprocess.run(["git", "tag", "v1.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v1.0.0")
 
         _make_commit(repo, "feat.txt", "feat: add widget support")
 
@@ -347,7 +347,7 @@ class TestStatusWithJsonl:
         _setup_npm_project(repo)
 
         # Create a baseline version tag before unreleased commits
-        subprocess.run(["git", "tag", "v0.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v0.0.0")
 
         sha = _make_commit(repo, "feat.txt", "feat: something")
 
@@ -370,7 +370,7 @@ class TestStatusWithJsonl:
         _setup_npm_project(repo)
 
         # Create a baseline version tag before unreleased commits
-        subprocess.run(["git", "tag", "v0.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v0.0.0")
 
         sha = _make_commit(repo, "feat.txt", "feat: something")
 
@@ -391,7 +391,7 @@ class TestStatusWithJsonl:
         _setup_npm_project(repo)
 
         # Create a baseline version tag before unreleased commits
-        subprocess.run(["git", "tag", "v0.0.0"], cwd=str(repo), check=True)
+        _tag_and_archive(repo, "v0.0.0")
 
         sha = _make_commit(repo, "feat.txt", "feat: something")
 

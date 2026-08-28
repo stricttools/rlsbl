@@ -42,8 +42,8 @@ file.  (Measured on rlsbl's own 224 archives: reading all of them through
 ``read_release_file`` takes ~340ms, so eagerly loading the ledger on every
 command was never an option.)
 
-The three read errors
----------------------
+The four read errors
+--------------------
 
 They fire where the ledger is READ FOR USE, never while scanning:
 
@@ -55,6 +55,23 @@ They fire where the ledger is READ FOR USE, never while scanning:
 * **Missing anchor** -- an archive carrying neither the anchor nor the
   ``unanchorable`` marker, i.e. one written before anchoring existed and never
   backfilled.  The error prints the complete single-version recovery.
+* **Empty ledger, tagged repository** -- no archive at all, yet the tag
+  namespace carries tags that parse under this project's version-tag scheme.
+  That is a project that HAS released and was never backfilled, and reading its
+  empty ledger would report the entire history as unreleased.  A project with
+  no version tags is a project before its first release, and its empty ledger
+  is the correct answer -- so the two states are told apart by the tags, and
+  only the first one raises.
+
+Who does NOT go through these
+-----------------------------
+
+``scripts/backfill_release_anchors.py`` -- the remedy the fourth error names --
+reads archives and tags directly and never calls the guarded reads, so it can
+run on exactly the repository the guard refuses.  So does
+``rlsbl release reconcile``, whose observe layer is the tag namespace itself.
+Neither needs a bypass, and neither is given one: the structure is what keeps
+them clear.
 """
 
 from __future__ import annotations
@@ -72,6 +89,7 @@ from .release_file import (
     list_archived_versions,
     read_release_file,
 )
+from .tag_glob import TagMode, parse_version_tag
 
 
 # A git object name as the anchor records it: 7 to 40 hex characters.
@@ -216,19 +234,110 @@ def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
     )
 
 
+# How many matching tags the empty-ledger error prints as evidence. A handful
+# names the namespace concretely; the full list is the operator's `git tag -l`
+# away, and a count would be a number this message has no reason to carry.
+_TAG_EVIDENCE = 3
+
+
+def _scheme_tags(tag_glob: str | None, cwd: str | None, *,
+                 timeout: int = 10) -> list[str]:
+    """Local tags matching this project's version-tag scheme, highest first.
+
+    Two filters, because neither alone is the scheme: the glob selects the
+    project's own namespace (``v*``, ``lib@v*``, ``pkg/dir/v*``), and
+    :func:`~rlsbl.tag_glob.parse_version_tag` keeps only what really parses as
+    a version under one of the three schemes -- so ``vNext`` and ``lib@vlatest``
+    match the glob and are still not version tags.
+
+    An unanswerable listing (no git, a timeout, a preview past its first
+    recorded mutation) yields the empty list, the same reading
+    :func:`_resolve_ref` gives an unanswerable resolve: the caller's guard then
+    declines to fire rather than accusing a repository on evidence it could not
+    read.
+    """
+    glob = tag_glob or "v*"
+    try:
+        result = effects.run(
+            ["git", "tag", "-l", glob, "--sort=-v:refname"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return []
+    if effects.unsettled(result) or getattr(result, "returncode", 1) != 0:
+        return []
+    return [
+        tag
+        for tag in ((line.strip() for line in (result.stdout or "").split("\n")))
+        if tag
+        and parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE) is not None
+    ]
+
+
+def _unbackfilled_ledger_error(releases_dir: str, tag_glob: str | None,
+                               tags: list[str]) -> LedgerError:
+    """Build the EMPTY-LEDGER error for a repository that has clearly released.
+
+    The remedy is the whole-repository backfill rather than the single-version
+    recovery the missing-anchor error prints: there is no archive to edit here,
+    and the versions to materialize are however many the repository shipped.
+    """
+    glob = tag_glob or "v*"
+    evidence = ", ".join(tags[:_TAG_EVIDENCE])
+    more = " (and others)" if len(tags) > _TAG_EVIDENCE else ""
+    return LedgerError(
+        f"the release ledger is empty, but this repository has version tags: "
+        f"{releases_dir}\n"
+        f"  No release archive exists there, so the ledger records nothing -- and\n"
+        f'  yet the tag namespace carries tags parsing under this project\'s scheme\n'
+        f'  ("{glob}"), which is what a project that HAS released and was never\n'
+        f"  backfilled looks like.\n"
+        f"  Matching tags: {evidence}{more}\n"
+        f"  Answering from an empty ledger here would report this repository's\n"
+        f"  ENTIRE history as unreleased and silently widen every range computed\n"
+        f"  from it, so rlsbl refuses instead of answering.\n"
+        f"  Backfill the archives -- preview first, then write:\n"
+        f"    uv run python scripts/backfill_release_anchors.py --dry-run\n"
+        f"    uv run python scripts/backfill_release_anchors.py\n"
+        f"  (the script ships in the rlsbl repository: run it from a checkout of\n"
+        f"  rlsbl with --repo pointing at this repository's root.)\n"
+        f"  A project that has genuinely never released carries no tag under its\n"
+        f"  scheme and is unaffected: there, an empty ledger IS the answer."
+    )
+
+
+def _require_backfilled_ledger(releases_dir: str, versions: list[str],
+                               tag_glob: str | None, cwd: str | None) -> None:
+    """Refuse an empty ledger in a repository whose tags say it has released.
+
+    A no-op the instant the ledger holds anything: a repository mid-backfill,
+    or one whose archives predate anchoring, is the missing-anchor error's
+    business, not this one's.
+    """
+    if versions:
+        return
+    tags = _scheme_tags(tag_glob, cwd)
+    if not tags:
+        return
+    raise _unbackfilled_ledger_error(releases_dir, tag_glob, tags)
+
+
 def version_is_archived(releases_dir: str, version: str) -> bool:
     """Does the ledger record *version* as released?
 
     A scan, not a read: the archive's mere existence is the record that the
-    release completed, and answering it opens no file. The three read errors
-    belong to the callers that go on to USE the entry.
+    release completed, and answering it opens no file. The read errors belong
+    to the callers that go on to USE the entry.
     """
     return os.path.isfile(archived_release_path(releases_dir, version))
 
 
 def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
                cwd: str | None = None) -> LedgerEntry:
-    """Read one archived release FOR USE, with all three read errors live.
+    """Read one archived release FOR USE, with its read errors live.
 
     Raises :class:`~rlsbl.errors.LedgerError` when the archive carries no
     anchor and no ``unanchorable`` marker, and when the version's tag exists
@@ -298,12 +407,16 @@ def range_anchor(releases_dir: str, *, tag_glob: str | None = None,
 
     Returns None when the ledger records nothing this checkout contains: a
     project before its first release, or a checkout that predates every
-    release it knows about.
+    release it knows about.  "Before its first release" is required to look
+    like it -- an empty ledger in a repository carrying version tags raises
+    instead of widening the range to the whole history.
 
-    Raises :class:`~rlsbl.errors.LedgerError` for any of the three read errors,
+    Raises :class:`~rlsbl.errors.LedgerError` for any of the read errors,
     including an ancestry git cannot decide.
     """
-    for version in list_archived_versions(releases_dir):
+    versions = list_archived_versions(releases_dir)
+    _require_backfilled_ledger(releases_dir, versions, tag_glob, cwd)
+    for version in versions:
         entry = read_entry(releases_dir, version, tag_glob=tag_glob, cwd=cwd)
         if entry.unanchorable:
             continue
@@ -359,8 +472,13 @@ def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
     history.  When the checkout does not contain its commit, the fact still
     names that version and records the discrepancy, so a display can annotate
     it rather than quietly reporting an older release as the latest.
+
+    The "no release yet" fact is reported only for a repository that looks like
+    one: an empty ledger under a tagged version namespace raises rather than
+    reporting ``(none)`` for a project that has plainly released.
     """
     versions = list_archived_versions(releases_dir)
+    _require_backfilled_ledger(releases_dir, versions, tag_glob, cwd)
     if not versions:
         return LatestReleaseFact(version=None, in_checkout=None)
 

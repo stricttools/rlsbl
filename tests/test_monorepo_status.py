@@ -121,11 +121,18 @@ class TestMonorepoStatus:
         _make_npm_project(mock_git_repo, "beta", version="2.0.0")
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
-        # Tag only alpha
+        # Release only alpha -- tag AND archive, since a tagged project with no
+        # archive is a repository that was never backfilled, and the ledger
+        # refuses to answer for one.
+        from conftest import archive_release, git_head, ledger_dir
+
         subprocess.run(
             ["git", "tag", "alpha@v1.0.0"],
             cwd=str(mock_git_repo),
             check=True,
+        )
+        archive_release(
+            ledger_dir(mock_git_repo / "alpha"), "1.0.0", git_head(mock_git_repo),
         )
         capsys.readouterr()
         _cmd_status({}, project_root=".")
