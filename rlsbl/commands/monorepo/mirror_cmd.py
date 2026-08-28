@@ -19,6 +19,20 @@ Desired state of the mirror's ``main``:
   split of the project's current history, and
 * the scaffold commit touches only scaffold-owned paths.
 
+One path is swept out of the mirror on every convergence regardless of where it
+came from: a publish workflow under ``.github/workflows/``. A mirror never
+releases itself -- its tags and Releases are written by the monorepo's release
+flow through :mod:`rlsbl.mirror_publication`, and a publish workflow on the
+mirror would be a second, unsynchronized publisher of the same versions,
+triggered by the reconciler's own pushes. Scaffold's ``publish_mode: "none"``
+covers the workflow scaffold would have rendered; the sweep covers the two it
+cannot see -- a leftover from an older scaffold layer, and one that rode in
+through the subtree split because the member's own directory carries it. A
+member that genuinely carries a publish workflow KEEPS IT IN THE MONOREPO,
+where it is that member's CI; only the mirror's copy is swept. A tip that still
+carries one is classified ``scaffold_stale`` rather than ``converged``, so the
+next apply rebuilds the layer without it.
+
 A tripwire enforces the contract with no heuristics: the remote tip must be
 EITHER a bare split-lineage commit (the current split SHA or an older one --
 covers pre-scaffold-layer mirrors) OR exactly one commit atop a split-lineage
@@ -149,6 +163,11 @@ class MirrorPlan:
 
     ``state`` is one of:
       * ``"converged"``          -- scaffold commit atop the current split; nothing to do.
+      * ``"scaffold_stale"``     -- a scaffold layer atop the CURRENT split, but the
+                                    tip carries something the current scaffold would
+                                    not leave there: a publish workflow (see
+                                    :func:`is_publish_workflow`). Re-scaffolding
+                                    sweeps it.
       * ``"behind"``             -- a scaffold layer exists atop an OLDER split; a new
                                     split is available.
       * ``"scaffold_missing"``   -- the tip is a bare split-lineage commit (no scaffold
@@ -175,11 +194,20 @@ class MirrorPlan:
     #: Raw ``git ls-remote`` output, carried so the tags dimension reads the
     #: mirror's tag refs from the SAME listing that classified the branch.
     remote_refs_text: str = ""
+    #: Publish workflows found on the mirror's tip. Non-empty is what makes a
+    #: tip that is otherwise converged ``scaffold_stale``.
+    publish_workflows: list = field(default_factory=list)
 
     @property
     def split_push_needed(self) -> bool:
-        """Whether converging requires pushing a fresh bare split to ``main``."""
-        if self.state == "virgin":
+        """Whether converging requires pushing a fresh bare split to ``main``.
+
+        ``scaffold_stale`` needs one even though the lineage is already the
+        current split: the layer to be swept IS the tip, so it is discarded by
+        re-pushing the bare split and rebuilding the layer on top -- which is
+        also what keeps the result exactly one commit above the boundary.
+        """
+        if self.state in ("virgin", "scaffold_stale"):
             return True
         return self.split_lineage_sha != self.split_sha
 
@@ -336,6 +364,64 @@ def _commit_paths(clone_dir, commit):
     return [p for p in r.stdout.splitlines() if p.strip()]
 
 
+# ---------------------------------------------------------------------------
+# The one path the mirror must never carry: a publish workflow
+# ---------------------------------------------------------------------------
+#
+# A mirror never releases itself. Its tags and its GitHub Releases are written
+# by the monorepo's release flow through rlsbl.mirror_publication; a publish
+# workflow on the mirror would be a SECOND, unsynchronized publisher of the
+# same versions, triggered by the very pushes the reconciler makes.
+#
+# Two ways one arrives, and the scaffold's own orphan sweep covers neither:
+#
+#   * in the mirror's scaffold layer, written by an older scaffold that ran
+#     before publish suppression -- the sweep only removes what the CURRENT
+#     manifest tracks, and an unmanaged leftover is invisible to it;
+#   * through the SPLIT, when the member's own directory carries
+#     ``.github/workflows/`` in the monorepo -- those files are the subtree's
+#     content, so no scaffold sweep has ever looked at them.
+#
+# The whole ``.github/`` prefix is already scaffold territory on a mirror (the
+# tripwire's SCAFFOLD_OWNED_PREFIXES says so: a commit touching it is a
+# legitimate scaffold layer, never a foreign one), so the sweep below is aligned
+# with an ownership rule that already existed rather than claiming a new one.
+# It runs on the MIRROR CLONE only: the member's own publish workflow stays
+# exactly where it is in the monorepo, where it belongs to the member's CI.
+WORKFLOWS_PREFIX = ".github/workflows/"
+
+
+def is_publish_workflow(path):
+    """Whether *path* is a publish workflow under ``.github/workflows/``.
+
+    Named, not sniffed: a workflow file whose NAME says publish. That is every
+    spelling rlsbl itself renders (``publish.yml``, ``docker-publish.yml``) and
+    the spellings a hand-written one uses. Reading a workflow's body to decide
+    whether it publishes would be a heuristic; a name is a fact.
+    """
+    if not path.startswith(WORKFLOWS_PREFIX):
+        return False
+    name = path[len(WORKFLOWS_PREFIX):]
+    if "/" in name:
+        return False
+    return "publish" in name.lower()
+
+
+def publish_workflows_in(tree_dir):
+    """The publish workflows present in a checked-out tree, as repo paths."""
+    workflows = os.path.join(tree_dir, ".github", "workflows")
+    if not os.path.isdir(workflows):
+        return []
+    found = []
+    for name in sorted(os.listdir(workflows)):
+        path = f"{WORKFLOWS_PREFIX}{name}"
+        if is_publish_workflow(path) and os.path.isfile(
+            os.path.join(workflows, name)
+        ):
+            found.append(path)
+    return found
+
+
 def _load_owned_predicate(clone_dir):
     """Build the ``is scaffold-owned?`` predicate for this mirror.
 
@@ -468,6 +554,21 @@ def observe(remote, root, project_path):
             foreign_paths = [p for p in changed if not owned(p)]
             if not foreign_paths:
                 if boundary == split_sha:
+                    # Converged on the split, but the tip may still carry a
+                    # publish workflow -- from an older scaffold layer, or
+                    # through the split from the member's own directory. A
+                    # mirror never releases itself, so that is a stale layer to
+                    # re-scaffold, not a converged mirror.
+                    stale = publish_workflows_in(clone_dir)
+                    if stale:
+                        return MirrorPlan(
+                            state="scaffold_stale",
+                            split_sha=split_sha,
+                            remote_tip=tip,
+                            split_lineage_sha=boundary,
+                            publish_workflows=stale,
+                            remote_refs_text=refs_text,
+                        )
                     return MirrorPlan(
                         state="converged",
                         split_sha=split_sha,
@@ -700,6 +801,24 @@ def verdict_item(plan, remote, project_path, project_name):
                      f"scaffold layer present)."),
             **common,
         )
+    if plan.state == "scaffold_stale":
+        return VerdictItem(
+            summary=(
+                "the mirror is at the current split but carries a publish "
+                "workflow."
+            ),
+            facts=(
+                f"split: {plan.split_sha[:12]} (current)",
+                "publish workflow(s) on the tip: "
+                + ", ".join(plan.publish_workflows),
+            ),
+            actions=(
+                "apply would re-push the split (with lease) and rebuild the "
+                "scaffold layer without them -- a mirror never releases "
+                "itself; its Releases come from the release flow.",
+            ),
+            **common,
+        )
     if plan.state == "behind":
         return VerdictItem(
             summary="a new split is available.",
@@ -869,6 +988,33 @@ def _run_scaffold(clone_dir, sub_config_path, remote):
         )
 
 
+def _sweep_publish_workflows(clone_dir):
+    """Delete every publish workflow from the mirror clone, whatever its origin.
+
+    Scaffold's own orphan sweep removes only what the CURRENT manifest tracks,
+    so it never sees a leftover from an older scaffold layer nor a workflow that
+    rode in through the subtree split from the member's own directory. This one
+    covers the whole ``.github/workflows/`` prefix -- already scaffold territory
+    on a mirror by the tripwire's rules -- because the invariant it serves has
+    nothing to do with who wrote the file: a mirror never releases itself.
+
+    Only the MIRROR's copy is swept. A member that genuinely carries a publish
+    workflow in its own subtree keeps it in the monorepo, where it is the
+    member's CI; the deletion happens in the throwaway clone and lands in the
+    scaffold commit.
+    """
+    removed = []
+    for path in publish_workflows_in(clone_dir):
+        effects.remove(os.path.join(clone_dir, path))
+        removed.append(path)
+    if removed:
+        print(
+            "Removed publish workflow(s) from the mirror "
+            f"({', '.join(removed)}): a mirror never releases itself."
+        )
+    return removed
+
+
 def _converge(plan, remote, root, project_path, sub_config_path):
     """Bring the mirror to the desired state. Idempotent; interrupted runs heal."""
     split_sha = plan.split_sha
@@ -907,6 +1053,7 @@ def _converge(plan, remote, root, project_path, sub_config_path):
         _rewrite_identity(clone_dir, remote, sub_config_path)
         print("Scaffolding CI in mirror...")
         _run_scaffold(clone_dir, sub_config_path, remote)
+        _sweep_publish_workflows(clone_dir)
 
         _git_ok(["add", "-A"], cwd=clone_dir)
         status = _git_ok(["--no-optional-locks", "status", "--porcelain"], cwd=clone_dir)
