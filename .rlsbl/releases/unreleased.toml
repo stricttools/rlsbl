@@ -2,9 +2,9 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "Fixes the workspace-ci-synced check wrongly failing every migrated workspace on its root member: a member with no CI workflow of its own is now skipped with a note, generated routers are never read as a member's own workflows, and members with several workflow files are checked against their real derived job keys."
 # Optional context explaining why these changes were made
 context = ""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
