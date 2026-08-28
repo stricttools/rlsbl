@@ -22,7 +22,9 @@ comparison never depends on how the remote was cloned.
 
 A major-version suffix is part of the module path, not a mismatch: Go requires
 ``/v2`` and up on the module path itself, so ``github.com/owner/repo/v2`` is
-accepted where ``github.com/owner/repo`` is expected.
+accepted where ``github.com/owner/repo`` is expected. Go's other major-version
+layout -- a ``v2/`` DIRECTORY inside the repository -- already puts that element
+in the expected path, and the suffix is then not accepted a second time.
 
 What it refuses to guess
 ------------------------
@@ -111,12 +113,33 @@ def module_matches(actual, expected_full, expected_tail, *, host_verified):
     When the host could not be derived from the remote (an SSH alias), the
     module's own first segment is accepted as the host and only the tail is
     compared -- see the module docstring.
+
+    A ``/vN`` element is accepted on top of the expected path, because Go
+    requires it on the module path and the repository layout does not have to
+    carry it. It is NOT accepted twice: when the module already sits in a
+    ``vN/`` DIRECTORY the expected path ends in that element already, and
+    ``.../repo/v2/v2`` is not a spelling of anything.
     """
-    base = strip_major_suffix(actual)
-    if host_verified:
-        return base == expected_full
-    _host, _, rest = base.partition("/")
-    return rest == expected_tail
+    expected = expected_full if host_verified else expected_tail
+    candidate = actual if host_verified else actual.partition("/")[2]
+    if candidate == expected:
+        return True
+    if _MAJOR_SUFFIX.search(expected):
+        return False
+    return strip_major_suffix(candidate) == expected
+
+
+def with_major_suffix(expected, actual):
+    """*expected* carrying the ``/vN`` element *actual* declares, if it may.
+
+    The suffix is Go's, not the repository's, so a rewrite has to preserve it
+    -- unless the expected path already ends in one, which is the major
+    subdirectory layout and would otherwise be doubled.
+    """
+    suffix = _MAJOR_SUFFIX.search(actual or "")
+    if suffix is None or _MAJOR_SUFFIX.search(expected):
+        return expected
+    return expected + suffix.group(0)
 
 
 class GoIdentityVerdict:
@@ -192,13 +215,12 @@ def evaluate_go_module_identity(repo_root, module_dirs, remote_url):
             actual, expected_full, expected_tail, host_verified=host_verified,
         ):
             continue
-        suffix = _MAJOR_SUFFIX.search(actual)
-        remedy_target = expected_full + (suffix.group(0) if suffix else "")
-        if not host_verified:
+        if host_verified:
+            remedy_target = with_major_suffix(expected_full, actual)
+        else:
             actual_host = actual.partition("/")[0]
             remedy_target = (
-                actual_host + "/" + expected_tail
-                + (suffix.group(0) if suffix else "")
+                actual_host + "/" + with_major_suffix(expected_tail, actual)
             )
         problems.append(
             f"{_label(rel)}: go.mod declares module {actual}, but origin "

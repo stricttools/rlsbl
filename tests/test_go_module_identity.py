@@ -138,6 +138,29 @@ class TestEvaluation:
         )
         assert verdict.ok
 
+    def test_the_major_version_subdirectory_layout_passes(self, tmp_path):
+        """Go's own layout for a v2+ module: a ``v2/`` directory in the repo.
+
+        The subdirectory is part of the module path AND the major suffix at the
+        same time, so ``github.com/owner/repo/v2`` is exactly right there --
+        expecting ``.../v2/v2`` and printing that as the rewrite target was the
+        check misreading a standard layout.
+        """
+        member = _go_mod(tmp_path / "v2", "github.com/owner/repo/v2")
+        verdict = evaluate_go_module_identity(
+            tmp_path, [str(member)], "https://github.com/owner/repo.git",
+        )
+        assert verdict.ok, verdict.problems
+
+    def test_a_moved_module_in_a_major_subdirectory_still_errors(self, tmp_path):
+        member = _go_mod(tmp_path / "v2", "github.com/olduser/oldname/v2")
+        verdict = evaluate_go_module_identity(
+            tmp_path, [str(member)], "https://github.com/owner/repo.git",
+        )
+        assert not verdict.ok
+        assert "--to-module github.com/owner/repo/v2" in verdict.problems[0]
+        assert "/v2/v2" not in verdict.problems[0]
+
     def test_a_major_suffix_is_preserved_in_the_remedy(self, tmp_path):
         _go_mod(tmp_path, "github.com/olduser/oldname/v2")
         verdict = evaluate_go_module_identity(
