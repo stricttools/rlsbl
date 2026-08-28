@@ -132,3 +132,44 @@ class TestMirrorDryRunThroughTheCli:
             "the would-do log names the observation's scratch directory, which "
             f"no apply would ever create:\n{combined}"
         )
+
+
+class TestTheDryRunEpilogueIsHonest:
+    """The framework's would-do header must not trail off into nothing.
+
+    ``rlsbl monorepo mirror`` is a ``mutating`` command, so a dry run always
+    ends with strictcli's would-do log. Observation records no effects (it may
+    not: it runs above the no-writes line) and the apply never runs, so the log
+    was empty -- the run finished by announcing "Would do:" and then saying
+    nothing at all, while the actual answer, the plan, sat above it.
+    """
+
+    def _lines(self, result):
+        return [line for line in result.stdout.splitlines() if line.strip()]
+
+    def test_the_would_do_header_is_followed_by_the_plan(
+        self, tmp_path, monkeypatch,
+    ):
+        remote = _init_bare(tmp_path / "mirror.git")
+        root = _make_monorepo(tmp_path / "mono", remote)
+
+        result = _run_dry(monkeypatch, root)
+
+        lines = self._lines(result)
+        header = [i for i, line in enumerate(lines) if "Would do:" in line]
+        assert header, f"the dry run must render a would-do log:\n{result.stdout}"
+        assert header[0] != len(lines) - 1, (
+            "the would-do header is the last thing printed, so it announces a "
+            f"list that is not there:\n{result.stdout}"
+        )
+        assert any(
+            "apply would push split" in line for line in lines[header[0] + 1:]
+        ), result.stdout
+
+    def test_the_log_is_rendered_once(self, tmp_path, monkeypatch):
+        remote = _init_bare(tmp_path / "mirror.git")
+        root = _make_monorepo(tmp_path / "mono", remote)
+
+        result = _run_dry(monkeypatch, root)
+
+        assert result.stdout.count("Would do:") == 1, result.stdout

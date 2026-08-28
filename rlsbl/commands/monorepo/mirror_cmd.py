@@ -1364,6 +1364,13 @@ def _cmd_mirror(flags, project_root):
     # keyless list would not say which line judged what. (This is why the plan
     # names the project even when there is nothing but the branch to report.)
     reconciler = Reconciler(observe=_observe, apply_item=_apply, show_keys=True)
+    # A preview's whole answer is the plan below, and this command records no
+    # effects on the way to it (observation runs above the no-writes line, and
+    # the apply does not run at all). Emitting the framework's would-do log
+    # here makes its header introduce the plan instead of trailing after it
+    # with nothing underneath.
+    if dry_run:
+        effects.render_would_do_log()
     try:
         reconcile(reconciler, dry_run=dry_run)
     except (MirrorError, MirrorPublicationError) as e:

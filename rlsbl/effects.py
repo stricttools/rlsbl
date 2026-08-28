@@ -144,6 +144,27 @@ def previewing():
     return _handle() is not None
 
 
+def render_would_do_log():
+    """Emit strictcli's would-do log HERE instead of at the end of the dispatch.
+
+    The framework prints that log on every dry run, and a handler whose whole
+    answer is a rendered plan otherwise finishes by announcing "Would do:" with
+    nothing under it -- the plan it means sits ABOVE the header, because
+    observation may record nothing (it runs above the no-writes line) and the
+    apply never runs.  Calling this first puts the header where it belongs: at
+    the top, introducing the plan.
+
+    ``render_log()`` both claims and produces the log (strictcli contract
+    §19.7), so the framework's own end-of-dispatch emission is suppressed and
+    the log appears exactly once.  Anything recorded AFTER this call would
+    therefore not be rendered, so this belongs at the point a handler knows its
+    remaining output is the plan itself.  A no-op outside preview mode.
+    """
+    handle = _handle()
+    if handle is not None:
+        handle.render_log()
+
+
 def _handle():
     """The strictcli effects handle to mint on, or None to execute directly."""
     ctx = _CTX.get()
