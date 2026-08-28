@@ -104,6 +104,62 @@ def _setup_released_repo(env):
     return repo
 
 
+def _setup_released_repo_with_ledger(env):
+    """The same repository, plus the release ledger a real project carries.
+
+    ``_setup_released_repo`` has no archives at all. That is a repository
+    released before the ledger existed, and it stays that way on purpose: the
+    tripwire tests judge a repo whose tags are the only record. A project
+    released by rlsbl today carries one archive per version, and the archive
+    names the commit that version shipped from -- so an out-of-band rewrite
+    leaves the ledger naming commits the repository no longer has, which is a
+    different situation and gets its own fixture.
+
+    The secret leaves the tree BEFORE the release, which is the ordinary shape
+    of a leak: it is removed when it is discovered, and scrubbed out of history
+    later. The released tree is therefore byte-identical after the rewrite --
+    the archive records the tree each released path carried, and re-anchoring
+    onto content the version never shipped is refused.
+    """
+    from rlsbl.release_file import write_archived_release_file
+
+    repo = env / "repo"
+    init_repo(repo, email="e2e@test.local", name="E2E")
+
+    c1 = _commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
+    _git(repo, "rm", "-q", "config.env")
+    _git(repo, "commit", "-q", "-m", "drop the leaked config file")
+
+    changes = repo / ".rlsbl" / "changes"
+    changes.mkdir(parents=True)
+    (changes / "1.0.0.jsonl").write_text(
+        _jsonl_line([c1], description="**Ship it.** The first release.",
+                    type_="feature")
+    )
+    (changes / "unreleased.jsonl").write_text("")
+    _git(repo, "add", ".rlsbl/changes/1.0.0.jsonl",
+         ".rlsbl/changes/unreleased.jsonl")
+    _git(repo, "commit", "-q", "-m", "changelog")
+    generate_changelog(str(repo))
+    _git(repo, "add", "CHANGELOG.md", ".rlsbl")
+    _git(repo, "commit", "-q", "-m", "generate changelog")
+
+    released = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "tag", "-a", "v1.0.0", "-m", "release v1.0.0")
+    write_archived_release_file(
+        str(repo / ".rlsbl" / "releases"), "1.0.0", bump="minor",
+        include=["plain"], description="The first release.",
+        candidate_sha=released,
+        tree_hashes={".": _git(repo, "rev-parse", "HEAD^{tree}")},
+    )
+    _git(repo, "add", ".rlsbl/releases")
+    _git(repo, "commit", "-q", "-m", "archive the release file")
+
+    _add_remote(repo, env / "remote")
+    _git(repo, "push", "--no-verify", "origin", "v1.0.0")
+    return repo
+
+
 def _raw_safegit_scrub(repo):
     """Rewrite history OUT OF BAND: raw safegit, no rlsbl orchestration.
 
@@ -308,6 +364,111 @@ class TestReconcileAfterRawRewrite:
             _run_reconcile(repo, mode="apply")
         assert exc.value.code == 1
         assert "the world changed" in capsys.readouterr().err
+
+
+class TestTheLedgerAfterAnOutOfBandRewrite:
+    """The scenario the command documents, in a repository that has archives.
+
+    An out-of-band rewrite moves the local tags and prunes the commits the
+    archives name. The ledger is the authority for where a released ref
+    belongs, so every released ref then reads as disagreeing with it and the
+    tripwire aborts the whole reconcile -- refusing exactly the repair it
+    exists to perform. The ledger is healed first, from the same records that
+    explain the divergence, and only then are the verdicts computed.
+    """
+
+    def _archive_anchor(self, repo):
+        from rlsbl.release_publication import anchor_from_ledger
+
+        return anchor_from_ledger(str(repo / ".rlsbl" / "releases"), "1.0.0")
+
+    def test_a_dangling_anchor_the_journal_explains_is_healed(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        repo = _setup_released_repo_with_ledger(e2e_env)
+        monkeypatch.chdir(repo)
+        pre_rewrite_anchor = self._archive_anchor(repo)
+
+        _raw_safegit_scrub(repo)
+        assert self._archive_anchor(repo) == pre_rewrite_anchor, (
+            "a raw rewrite does not touch the archives -- that is the state "
+            "being repaired"
+        )
+
+        _run_reconcile(repo, mode="plan")
+
+        out = capsys.readouterr().out
+        assert "re-point-with-lease" in out
+        assert self._archive_anchor(repo) == _git(
+            repo, "rev-parse", "refs/tags/v1.0.0^{}",
+        ), "the ledger must name the commit the rewrite produced"
+        assert os.path.exists(plan_path(repo / ".rlsbl" / "releases"))
+
+    def test_the_healed_ledger_is_committed(self, e2e_env, monkeypatch):
+        repo = _setup_released_repo_with_ledger(e2e_env)
+        monkeypatch.chdir(repo)
+        _raw_safegit_scrub(repo)
+
+        _run_reconcile(repo, mode="plan")
+
+        dirty = _git(repo, "status", "--porcelain")
+        assert ".rlsbl/releases/v1.0.0.toml" not in dirty, (
+            "a rewritten archive left uncommitted pollutes the tree for every "
+            "other command and every other session"
+        )
+
+    def test_the_repaired_tag_is_then_pushed(self, e2e_env, monkeypatch):
+        repo = _setup_released_repo_with_ledger(e2e_env)
+        monkeypatch.chdir(repo)
+        _raw_safegit_scrub(repo)
+        new_local = _git(repo, "rev-parse", "refs/tags/v1.0.0")
+
+        _plan_then_apply(repo)
+
+        assert _remote_ref(repo, "refs/tags/v1.0.0") == new_local
+
+    def test_a_dry_run_heals_nothing_and_still_judges_truthfully(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        """--dry-run writes nothing at all, including the ledger -- and the
+        preview is still the one a real run would compute, because the healed
+        anchors are known without being written."""
+        repo = _setup_released_repo_with_ledger(e2e_env)
+        monkeypatch.chdir(repo)
+        _raw_safegit_scrub(repo)
+        stale = self._archive_anchor(repo)
+
+        _run_reconcile(repo, mode="plan", flags={"dry-run": True})
+
+        out = capsys.readouterr().out
+        assert "re-point-with-lease" in out, (
+            "a dry run that reported the un-healed verdicts would preview a "
+            "refusal the real run does not produce"
+        )
+        assert self._archive_anchor(repo) == stale
+        assert _git(repo, "status", "--porcelain") == ""
+
+    def test_a_dangling_anchor_nothing_explains_is_refused(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        """The heal is driven by a record, never by inference: with no journal,
+        no lineage event and no committed scrub archive, the ledger names a
+        commit nobody can account for and the reconcile refuses."""
+        repo = _setup_released_repo_with_ledger(e2e_env)
+        monkeypatch.chdir(repo)
+        _raw_safegit_scrub(repo)
+        os.remove(repo / ".git" / "safegit" / "rewrite-maps.jsonl")
+
+        with pytest.raises(SystemExit) as exc:
+            _run_reconcile(repo, mode="plan")
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "no record explains where they went" in err
+        assert "1.0.0" in err
+        assert not os.path.exists(plan_path(repo / ".rlsbl" / "releases"))
+        assert _git(repo, "status", "--porcelain") == "", (
+            "a refused heal writes nothing at all"
+        )
 
 
 class TestTheApplyIsHeldToThePlan:

@@ -637,6 +637,198 @@ def collect_explanations(releases_dirs, lineage_paths):
 
 
 # ---------------------------------------------------------------------------
+# The ledger heal: detect-and-heal, before any verdict is computed
+# ---------------------------------------------------------------------------
+
+
+def dangling_anchors(releases_dir, *, git=None, cwd=None):
+    """Archived versions whose anchor names a commit this repository lacks.
+
+    Returns ``{version: anchor}``, empty when every anchor resolves.
+
+    This is the state an out-of-band rewrite leaves behind: the local tags
+    followed the rewrite, the archives did not, and the commits they name were
+    pruned. The ledger is the authority for where a released ref belongs, so
+    until this is repaired every released ref reads as disagreeing with it.
+
+    One ``git rev-list --no-walk --ignore-missing`` answers for the whole
+    ledger, so a repository with a hundred versions pays one git call rather
+    than a hundred. An archive that cannot be read is skipped rather than
+    guessed at: :func:`build_preview` reads the same file and raises its own
+    error naming it.
+    """
+    from ..errors import RlsblError
+    from ..release_file import (
+        archived_release_path,
+        list_archived_versions,
+        read_release_file,
+    )
+
+    git = git or run
+    anchors = {}
+    for version in list_archived_versions(releases_dir):
+        try:
+            archive = read_release_file(
+                archived_release_path(releases_dir, version),
+            )
+        except (RlsblError, OSError):
+            continue
+        if archive.unanchorable:
+            continue
+        anchor = (archive.candidate_sha or "").strip()
+        if anchor:
+            anchors[version] = anchor
+    if not anchors:
+        return {}
+
+    out = git(
+        "git",
+        ["rev-list", "--no-walk", "--ignore-missing", *sorted(set(anchors.values()))],
+        cwd=cwd,
+    )
+    if not isinstance(out, str):
+        # A recorded run: nothing was asked, so nothing is known, and a heal
+        # decided from an unanswered question would be a guess.
+        return {}
+    present = [line.strip() for line in out.splitlines() if line.strip()]
+    return {
+        version: anchor for version, anchor in anchors.items()
+        if not any(_same_commit(anchor, found) for found in present)
+    }
+
+
+def heal_dangling_anchors(*, ctx, releases_dir, explanations, repo_root,
+                          workspace_projects=None, dry_run=False, log=print):
+    """Move the ledger's stale anchors through the recorded rewrite.
+
+    The anchor half of detect-and-heal, and the counterpart to what the
+    changelog side has done since scrubbing existed. It runs BEFORE the
+    verdicts are computed, because the verdicts are computed AGAINST the
+    ledger: with the archives naming pruned commits, every released ref is
+    classified ``refuse-foreign`` and the tripwire aborts the reconcile --
+    refusing precisely the repair the command exists to perform.
+
+    Returns ``{version: healed anchor}``, which the caller passes to
+    :func:`build_preview` as ``anchor_overrides``. Outside a dry run the
+    archives on disk are rewritten (and committed) as well, so the two agree;
+    under ``--dry-run`` nothing is written and the mapping is what keeps the
+    preview truthful about a world that WOULD be healed first.
+
+    Three rules, none of them inferred:
+
+    * a dangling anchor no record explains is a hard error naming the version
+      -- the heal is driven by the journal, a lineage anchor-remap event or a
+      committed scrub archive, never by resemblance;
+    * the content check is ``refuse``: this command did not perform the
+      rewrite, so it cannot state that a released tree changing is intended.
+      ``rlsbl release scrub`` is the caller that can, and it declares so;
+    * the rewritten archives and the lineage events beside them are committed,
+      because a rewritten read-only archive left in the working tree is
+      breakage for every other command and every other session.
+    """
+    from ..anchor_remap import (
+        ON_CONTENT_CHANGE_REFUSE,
+        plan_anchor_remap,
+        repair_anchors,
+    )
+    from ..errors import RlsblError
+
+    dangling = dangling_anchors(releases_dir, cwd=repo_root)
+    if not dangling:
+        return {}
+
+    try:
+        planned = plan_anchor_remap(
+            releases_dir, explanations.commit_map, cwd=repo_root,
+            on_content_change=ON_CONTENT_CHANGE_REFUSE,
+        )
+    except RlsblError as exc:
+        raise ReconcileError(
+            f"the release ledger cannot be moved through the recorded "
+            f"rewrite:\n{exc}"
+        ) from exc
+
+    healed = {remap.version: remap.new_sha for remap in planned}
+    unexplained = {
+        version: anchor for version, anchor in dangling.items()
+        if version not in healed
+    }
+    if unexplained:
+        listed = "".join(
+            f"  {version}: anchored at {anchor}\n"
+            for version, anchor in sorted(unexplained.items())
+        )
+        raise ReconcileError(
+            f"the release ledger names commits this repository no longer has, "
+            f"and no record explains where they went:\n{listed}"
+            f"  An archive's candidate_sha is the commit that version shipped "
+            f"from, and the ledger is the authority for where every released "
+            f"ref belongs -- so\n"
+            f"  nothing can be judged against it while it names a pruned "
+            f"commit. safegit's rewrite journal, a lineage anchor-remap event "
+            f"or a committed\n"
+            f"  scrub archive would explain the move; none of them does. "
+            f"Restore the commits, or repair the archives, and re-run."
+        )
+
+    log(
+        f"The release ledger names {len(dangling)} commit(s) this repository "
+        f"no longer has, and the recorded rewrite explains them:"
+    )
+    for remap in planned:
+        origin = explanations.origins.get(
+            remap.old_sha, "a recorded rewrite",
+        )
+        log(
+            f"  {remap.version}: {remap.old_sha[:12]} -> "
+            f"{remap.new_sha[:12]} ({origin})"
+        )
+    if dry_run:
+        log(
+            "  Dry run: the archives were NOT rewritten. The verdicts below "
+            "are the ones a real run would compute, after healing them."
+        )
+        return healed
+
+    rewrite_id = "; ".join(sorted({
+        explanations.origins.get(remap.old_sha, "an out-of-band rewrite")
+        for remap in planned
+    })) or "an out-of-band rewrite"
+    try:
+        _remaps, touched = repair_anchors(
+            project_root=str(ctx.project_root),
+            commit_map=explanations.commit_map,
+            rewrite_id=rewrite_id,
+            workspace_root=ctx.workspace_root,
+            workspace_projects=workspace_projects,
+            cwd=repo_root,
+            on_content_change=ON_CONTENT_CHANGE_REFUSE,
+        )
+    except RlsblError as exc:
+        raise ReconcileError(
+            f"the release ledger cannot be moved through the recorded "
+            f"rewrite:\n{exc}"
+        ) from exc
+    if touched:
+        try:
+            run("safegit", [
+                "commit", "-m",
+                "reconcile: re-anchor the release ledger through the recorded "
+                "rewrite",
+                "--",
+            ] + sorted(set(touched)))
+        except Exception as exc:
+            raise ReconcileError(
+                f"the release ledger was re-anchored, but the rewritten "
+                f"archives could not be committed ({exc}). They are read-only "
+                f"files every other command reads; commit or restore them "
+                f"before re-running."
+            ) from exc
+        log(f"  Committed {len(set(touched))} re-anchored ledger file(s).")
+    return healed
+
+
+# ---------------------------------------------------------------------------
 # The observation
 # ---------------------------------------------------------------------------
 
@@ -946,7 +1138,8 @@ def _release_verdict(*, tag, version, anchor, observation):
     )
 
 
-def build_preview(*, observation, explanations, target, ref_ctx, releases_dir):
+def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
+                  anchor_overrides=None):
     """One merged preview over every subject this repository owns.
 
     Subjects come from two places and are judged in one pass:
@@ -963,6 +1156,13 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir):
 
     An ``unanchorable`` version is skipped entirely: it has no commit, so there
     is nothing to compare a ref against and nothing to create one at.
+
+    *anchor_overrides* is :func:`heal_dangling_anchors`' answer: the anchors
+    the ledger WOULD carry once healed, keyed by version. Outside a dry run the
+    archives already say the same thing (they were rewritten before this ran),
+    so it changes nothing; under ``--dry-run``, where nothing may be written,
+    it is what keeps the preview from judging every released ref against a
+    commit that no longer exists.
     """
     from ..errors import RlsblError
     from ..release_file import (
@@ -988,7 +1188,10 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir):
         if archive.unanchorable:
             unanchorable.append(version)
             continue
-        anchor = (archive.candidate_sha or "").strip()
+        anchor = (
+            (anchor_overrides or {}).get(version)
+            or (archive.candidate_sha or "").strip()
+        )
         if not anchor:
             raise ReconcileError(
                 f"the release archive for {version} carries neither an anchor "
@@ -1405,15 +1608,36 @@ def run_cmd(flags, *, ctx):
     )
 
     state = {}
+    repo_root = str(ctx.workspace_root or ctx.project_root)
+
+    # Detect-and-heal, before anything is judged: the verdicts are computed
+    # AGAINST the ledger, so a ledger naming pruned commits has to be moved
+    # through the same records that explain the divergence first. Outside the
+    # observation, because it writes.
+    try:
+        from ..workspace import load_workspace
+
+        explanations = collect_explanations([releases_dir], lineage_paths)
+        anchor_overrides = heal_dangling_anchors(
+            ctx=ctx, releases_dir=releases_dir, explanations=explanations,
+            repo_root=repo_root, dry_run=dry_run,
+            workspace_projects=(
+                load_workspace(str(ctx.workspace_root))
+                if ctx.workspace_root else None
+            ),
+        )
+    except ReconcileError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     def _observe():
-        explanations = collect_explanations([releases_dir], lineage_paths)
         observation = observe_world(ctx=ctx)
         state["observation"] = observation
         state["explanations"] = explanations
         preview = build_preview(
             observation=observation, explanations=explanations,
             target=target, ref_ctx=ref_ctx, releases_dir=releases_dir,
+            anchor_overrides=anchor_overrides,
         )
         if mode == "apply":
             plan = read_plan(path_of_plan)

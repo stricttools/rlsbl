@@ -430,9 +430,9 @@ The command carries two selectors, each electing exactly one of its members, and
 
 Error recovery: if the command fails partway, `scrub-result.json` preserves the safegit output at `.rlsbl/releases/scrub-result.json` (for releasable releases: `.rlsbl-monorepo/releasables/<name>/releases/scrub-result.json`). Re-running the command resumes from the last completed step without re-running safegit.
 
-The scrub also moves the **release ledger's anchors**. Each archived release records the commit that version shipped from (`candidate_sha`) plus the git tree of every released path. A rewrite moves those commits, and until it moved the archives too, a scrub left the tag pointing at the rewritten commit while the archive still named the old one — so every guarded ledger read hard-errored with a message accusing the tag of having moved, which was the one thing the scrub had repaired. The anchors now go through the same commit map, each released path's tree is recomputed at the rewritten commit and any change is printed, and an `anchor-remap` lineage event records the move so a fresh clone can explain it without safegit's journal (which lives under `.git`). The same repair runs from the journal for a rewrite performed outside rlsbl.
+The scrub also moves the **release ledger's anchors**. Each archived release records the commit that version shipped from (`candidate_sha`) plus the git tree of every released path. A rewrite moves those commits, and until it moved the archives too, a scrub left the tag pointing at the rewritten commit while the archive still named the old one — so every guarded ledger read hard-errored with a message accusing the tag of having moved, which was the one thing the scrub had repaired. The anchors now go through the same commit map, each released path's tree is recomputed at the rewritten commit and any change is printed, and an `anchor-remap` lineage event records the move so a fresh clone can explain it without safegit's journal (which lives under `.git`). A rewrite performed outside rlsbl gets the same repair from two places: a scrub that finds nothing to rewrite heals the anchors from the journal on the spot, and `rlsbl release reconcile` heals them from its own merged records before it judges anything (see below).
 
-A direct `safegit scrub` in an rlsbl-managed repository is not blocked, but it leaves rlsbl's release metadata behind: the JSONL changelogs keep pre-rewrite hashes, the ledger's anchors name pruned commits, the remote's tags still point at them, and the GitHub Releases go stale. `rlsbl release scrub` does the rewrite and that repair in one pass; after an out-of-band rewrite, `rlsbl release reconcile` repairs what is published.
+A direct `safegit scrub` in an rlsbl-managed repository is not blocked, but it leaves rlsbl's release metadata behind: the JSONL changelogs keep pre-rewrite hashes, the ledger's anchors name pruned commits, the remote's tags still point at them, and the GitHub Releases go stale. `rlsbl release scrub` does the rewrite and that repair in one pass; after an out-of-band rewrite, `rlsbl release reconcile` heals the ledger's anchors and repairs what is published, and `rlsbl changelog remap --from-journal` repairs the changelog hashes.
 
 ## Reconciling published metadata
 
@@ -463,6 +463,16 @@ Successive rewrites chain: a commit rewritten twice is followed through both map
 
 An `unanchorable` version is skipped entirely — it has no commit, so there is nothing to compare against and nothing to create a ref at.
 
+### The ledger is healed before anything is judged
+
+The verdicts are computed *against* the ledger, so the ledger has to be true before they mean anything. An out-of-band rewrite moves the local tags and prunes the commits the archives name — and an archive naming a pruned commit makes every released ref read as disagreeing with the ledger, so the tripwire aborts the whole reconcile and refuses exactly the repair the command exists to perform.
+
+So the reconcile detects that state first — an archived `candidate_sha` that no longer resolves — and, when its own merged records explain the rewrite, moves every stale anchor through the same map before computing a single verdict. The rewritten archives and the `anchor-remap` lineage events beside them are committed, because a rewritten read-only archive left in the working tree is breakage for every other command. Three properties:
+
+- a dangling anchor **no record explains** is a hard error naming the version — the heal is driven by the journal, a lineage `anchor-remap` event, or a committed scrub archive, never by resemblance;
+- the content check is `refuse`: the reconcile did not perform the rewrite, so it cannot state that a released tree changing is intended (`rlsbl release scrub` is the caller that can, and it declares so);
+- `--dry-run` writes nothing, ledger included, and still previews the verdicts a real run would compute — the healed anchors are known without being written.
+
 ### File-driven consent
 
 The command has one required choice, and neither half is a default:
@@ -472,7 +482,16 @@ rlsbl release reconcile --plan
 rlsbl release reconcile --apply --approve-consequential
 ```
 
-`--plan` observes origin once (one `git ls-remote`, one `gh release list`), prints the preview, and writes `.rlsbl/releases/reconcile-plan.toml` — that file *is* the preview's output artifact. It stamps a digest of the world it judged. `--apply` reads the plan, re-observes, and refuses when the digest no longer matches: the plan names force-push leases captured from remote values that have since changed. `--dry-run` renders and writes nothing at all — under `--plan` the plan file is not written, and under `--apply` the plan is checked and the writes are only described.
+`--plan` observes origin once (one `git ls-remote`, one `gh release list`), prints the preview, and writes `.rlsbl/releases/reconcile-plan.toml` — that file *is* the preview's output artifact. It stamps a digest of the world it judged, and it is written even when it found nothing, so applying an empty plan is a clean no-op rather than an instruction to run the plan you just ran. `--dry-run` renders and writes nothing at all — under `--plan` the plan file is not written, and under `--apply` the plan is checked and the writes are only described.
+
+`--apply` performs **exactly the repairable items the plan named**. It re-observes and refuses on two different grounds:
+
+- the plan's `world_digest` no longer matches — origin moved, and the plan's force-push leases were captured from values that no longer hold;
+- the fresh observation disagrees with the plan's own item list. `world_digest` covers the *remote*, by design (it is the lease material), so a purely **local** change between plan and apply — a tag fetched, created, or moved — leaves the digest valid while enlarging what a freshly derived preview would touch. A subject the plan does not name, a planned subject whose verdict changed, and a planned subject whose lease or target commit moved are each a hard refusal naming what was seen. Planned items that became correct on their own are reported as no-ops.
+
+The whole command is `consequential`, so `--plan` prompts too. That is deliberate: consent is for running the command, and making it depend on which half was elected would put a flag in charge of whether a human is asked.
+
+The GitHub Release listing is capped, and `gh release list` reports no total and offers no pagination — so a listing that comes back at the cap is a hard error naming it, never a set of unlisted Releases judged absent and proposed for creation.
 
 Release **presence** is checked here rather than by a standing check, and it is anchored to the ledger: an archived version whose tag exists but whose GitHub Release does not gets a `materialize` verdict, and the Release the reconcile creates carries the same body the release flow itself would have written.
 

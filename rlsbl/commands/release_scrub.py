@@ -495,8 +495,15 @@ def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
     every guarded ledger read therefore refuses.
 
     Returns the repo paths a commit must carry, empty when there is no journal
-    or nothing moved. Shared with ``rlsbl release reconcile``, which calls it
-    for exactly the same situation reached from the other direction.
+    or nothing moved.
+
+    This is the journal-shaped entry point, and the scrub's no-match path is
+    its caller. ``rlsbl release reconcile`` reaches the same repair through
+    :func:`rlsbl.anchor_remap.repair_anchors` -- the shared core both go
+    through -- but drives it from its own MERGED commit map (the journal plus
+    the lineage anchor-remap events plus the committed scrub archives), so it
+    can still heal in a fresh clone, where the journal under ``.git`` is not
+    there to read.
     """
     # Asked before the journal is read: a repository with no release archive
     # has no anchor to move, and reading the journal for it would be a git
