@@ -56,6 +56,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 
+from .extract import _ensure_git_identity
 from ...git_util import Ancestry, ancestry, validate_subtree_remote_ssh_host
 from ...mirror_publication import MirrorPublicationError
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile, single
@@ -892,6 +893,13 @@ def _converge(plan, remote, root, project_path, sub_config_path):
                 f"failed to clone mirror for scaffolding: "
                 f"{r.stderr.strip() or r.stdout.strip()}"
             )
+
+        # The clone commits the scaffold layer, and `git clone` carries over
+        # none of the monorepo's LOCAL user.name/user.email. On a machine that
+        # configures no global identity the commit below would fail -- AFTER
+        # the bare split was force-pushed, leaving the mirror stripped of its
+        # scaffold layer. Same fix the conversions use for the same reason.
+        _ensure_git_identity(clone_dir, root)
 
         # 3. Move the identity manifests onto the mirror, scaffold (hard error
         #    on failure), then commit + push the layer. Identity first: the

@@ -449,6 +449,157 @@ class TestScaffoldFailureHardError:
         assert "scaffold failed" in capsys.readouterr().err
 
 
+class TestConvergeWithoutAnAmbientGitIdentity:
+    """The scaffold commit must not depend on a machine-wide git identity.
+
+    The reconciler clones the mirror into a throwaway directory and commits the
+    scaffold layer there. ``git clone`` carries over none of the source's LOCAL
+    ``user.name`` / ``user.email``, so on a machine that configures no global
+    identity the commit fails -- and it fails AFTER the bare split has been
+    force-pushed, leaving the mirror stripped of its scaffold layer.
+
+    The suite never saw it because the test floor pins a throwaway identity in
+    both the environment and a global config file, so every clone inherits one.
+    These tests take that away for the length of the run: no identity env vars,
+    and a global/system config that carries ``user.useConfigOnly`` so git
+    refuses to invent one from the hostname.
+    """
+
+    def _no_ambient_identity(self, monkeypatch, tmp_path):
+        gitconfig = tmp_path / "identityless.gitconfig"
+        gitconfig.write_text(
+            "[user]\n"
+            "\tuseConfigOnly = true\n"
+            '[protocol "ssh"]\n'
+            "\tallow = never\n"
+            "[init]\n"
+            "\tdefaultBranch = main\n"
+        )
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(gitconfig))
+        monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(gitconfig))
+        for var in (
+            "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL",
+            "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+    def test_converge_succeeds_and_leaves_the_scaffold_layer(
+        self, mono, tmp_path, monkeypatch,
+    ):
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        self._no_ambient_identity(monkeypatch, tmp_path)
+
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+
+        plan = observe(remote, str(mono), "mylib")
+        assert plan.state == "converged", (
+            "the convergence died after the split push, so the mirror is a "
+            f"bare split with no scaffold layer: {plan}"
+        )
+
+    def test_a_failed_commit_never_strands_a_stripped_mirror(
+        self, mono, tmp_path, monkeypatch,
+    ):
+        """The second convergence is the one the bug used to destroy."""
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+        self._no_ambient_identity(monkeypatch, tmp_path)
+
+        _advance_monorepo(mono)
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+
+        assert observe(remote, str(mono), "mylib").state == "converged"
+
+
+class TestPublishWorkflowNeverSurvivesOnAMirror:
+    """A mirror never releases itself, whichever way a publish workflow arrives.
+
+    Its tags and Releases are written by the release flow through the mirror
+    publication module. A publish workflow on the mirror would be a second,
+    unsynchronized publisher of the same versions, triggered by the pushes the
+    reconciler itself makes -- so a converged mirror carries none, whether the
+    workflow came from an older scaffold layer or rode in through the subtree
+    split from the member's own directory.
+    """
+
+    def _workflows(self, remote, tmp_path, name="inspect"):
+        work = tmp_path / name
+        _git(tmp_path, "clone", "-q", remote, str(work))
+        wf = work / ".github" / "workflows"
+        return sorted(p.name for p in wf.iterdir()) if wf.is_dir() else []
+
+    def test_a_publish_workflow_in_the_scaffold_layer_is_swept(
+        self, mono, tmp_path,
+    ):
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+
+        # A mirror scaffolded before publish suppression: its layer carries a
+        # publish workflow the orphan sweep does not know about.
+        work = tmp_path / "stale"
+        _git(tmp_path, "clone", "-q", remote, str(work))
+        _git(work, "config", "user.email", "t@t.local")
+        _git(work, "config", "user.name", "Test")
+        wf = work / ".github" / "workflows"
+        wf.mkdir(parents=True, exist_ok=True)
+        (wf / "publish.yml").write_text("name: publish\non: [push]\njobs: {}\n")
+        _git(work, "add", "-A")
+        _git(work, "commit", "-q", "--amend", "--no-edit")
+        _git(work, "push", "-q", "--force", "origin", "main")
+        assert "publish.yml" in self._workflows(remote, tmp_path, "before-a")
+
+        plan = observe(remote, str(mono), "mylib")
+        assert plan.state != "converged", (
+            "a mirror carrying a publish workflow is not converged -- it is a "
+            f"stale scaffold layer the next apply must sweep: {plan}"
+        )
+
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+
+        assert "publish.yml" not in self._workflows(remote, tmp_path, "after-a")
+        assert observe(remote, str(mono), "mylib").state == "converged"
+
+    def test_a_publish_workflow_from_the_split_is_swept(self, mono, tmp_path):
+        """The member's own subtree carries one; only the MIRROR copy goes."""
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        member_wf = mono / "mylib" / ".github" / "workflows"
+        member_wf.mkdir(parents=True)
+        (member_wf / "publish.yml").write_text(
+            "name: publish\non: [push]\njobs: {}\n"
+        )
+        _git(mono, "add", "-A")
+        _git(mono, "commit", "-q", "-m", "member carries its own publish workflow")
+
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+
+        assert "publish.yml" not in self._workflows(remote, tmp_path, "after-b")
+        assert observe(remote, str(mono), "mylib").state == "converged"
+        # The monorepo's own copy is untouched: the sweep is about the mirror.
+        assert (member_wf / "publish.yml").is_file()
+
+    def test_the_swept_mirror_stays_converged_on_a_second_run(
+        self, mono, tmp_path,
+    ):
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        member_wf = mono / "mylib" / ".github" / "workflows"
+        member_wf.mkdir(parents=True)
+        (member_wf / "publish.yml").write_text(
+            "name: publish\non: [push]\njobs: {}\n"
+        )
+        _git(mono, "add", "-A")
+        _git(mono, "commit", "-q", "-m", "member carries its own publish workflow")
+
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+        tip1 = _remote_main(remote)
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+        assert _remote_main(remote) == tip1
+
+
 class TestStrandedScaffoldCommitRegression:
     """Regression against the old lost-scaffold-commit bug.
 
