@@ -90,9 +90,9 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
   rlsbl's opt-out booleans (`--auto-commit`, `--auto-tag`, `--user-facing`,
   `--validate-hashes`) declare `optional` and name their fallback in their own help.
   A flag that is simply omitted arrives at the handler AS absent, never as `""` or `0`.
-- Exactly-one selections are choice flags, not mutex groups. `release scrub` has two:
-  the mode (`--pattern`/`--file`/`--recipe`) and the commit range
-  (`--from-commit`/`--entire-history`). `--replace` and `--mangle` live inside the
+- Exactly-one selections are choice flags, not mutex groups. `release scrub` uses them
+  for the mode (`--pattern`/`--file`/`--recipe`) and for the commit range
+  (`--from-commit`/`--entire-history`). `--replace` and `--mangle` sit inside the
   `--pattern` scope, so passing one under another mode names both sides.
 - `changelog edit` is a declared sparse update of one `changelog-entry`: at least one of
   `--description`/`--type`/`--user-facing` is required, an unsupplied property is
