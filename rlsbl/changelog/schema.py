@@ -240,6 +240,27 @@ def serialize_entry(entry: ChangelogEntry) -> str:
     return json.dumps(data, separators=(",", ":"))
 
 
+def entry_content_key(entry: ChangelogEntry) -> tuple:
+    """The identity of an entry that carries no ``id``: what the entry SAYS.
+
+    ``id`` is optional on read, so a historical line has none and cannot be
+    recognized by it. The fallback is the same identity the changelog's own
+    consolidation dedup uses -- the commit SET plus the fields that carry
+    meaning -- which is what makes "have I already copied this entry?"
+    answerable for a line that predates entry ids.
+
+    The commits are a frozenset because order is not part of an entry's
+    identity: the same commits listed in another order are the same entry.
+    """
+    return (
+        frozenset(entry.commits),
+        bool(entry.user_facing),
+        entry.description,
+        entry.type,
+        entry.release_type,
+    )
+
+
 def parse_jsonl(path: str, *, enforce_format_version: bool = False) -> list[ChangelogEntry]:
     """Read a .jsonl file and return a list of ChangelogEntry objects.
 

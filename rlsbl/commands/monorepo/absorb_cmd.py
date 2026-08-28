@@ -59,10 +59,19 @@ Re-running a crashed absorb
 ---------------------------
 
 Every step is detected before it is repeated: the merge by its own trailer plus
-the source's root-commit identity, a tag by already existing at the mapped
-commit, the workspace entry by its content, and a changelog entry by its id. A
-run interrupted anywhere can be re-run to completion without duplicating what
-already happened.
+the source's root-commit identity AND the releasable it recorded, a tag by
+already existing at the mapped commit, the workspace entry by its content, and
+a changelog entry by its id -- or, for an entry that carries none, by its
+content. A run interrupted anywhere can be re-run to completion without
+duplicating what already happened.
+
+A heal re-derives NOTHING. Every value it writes comes from what the first run
+recorded: the trailers and the state already migrated. The re-run's source
+repository answers one question -- is this the same conversion? -- so a fork
+whose manifest moved on cannot overwrite the version this conversion shipped.
+A re-run aimed at a DIFFERENT releasable is not that conversion at all and is
+refused, because healing skips the version-overlap check on exactly the ground
+that the target is unchanged.
 
 What it does NOT do: push anything (the tags it creates are local), touch the
 source repository, or administer any external system. Those are next steps.
@@ -77,7 +86,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass, field
 
 from ...changelog.files import load_filter_repo_commit_map, remap_jsonl_hashes
-from ...changelog.schema import parse_jsonl, serialize_entry
+from ...changelog.schema import entry_content_key, parse_jsonl, serialize_entry
 from ...config import read_json_config
 from ...errors import ConfigError
 from ...lineage import (
@@ -155,6 +164,12 @@ ABSORB_TRAILER = "Rlsbl-Absorb"
 #: The trailer key carrying the SOURCE's identity -- its root commit, which no
 #: rename, move or re-clone of the source repository changes.
 SOURCE_TRAILER = "Rlsbl-Absorb-Source"
+
+#: The trailer key naming the RELEASABLE the absorb targeted. It is part of the
+#: heal identity, not decoration: healing skips the version-overlap check on the
+#: grounds that a re-run is the same conversion, and "the same conversion" is
+#: only true if it targets the same releasable.
+RELEASABLE_TRAILER = "Rlsbl-Absorb-Releasable"
 
 #: Where the working clone is made: inside the workspace's own git directory,
 #: which is neither part of the working tree nor anybody else's scratch.
@@ -498,13 +513,58 @@ def _resolve_version(source_repo, entries, version_tags):
     )
 
 
-def _find_merge(workspace_root, name, dest_path, source_root_shas):
+def _arrival_version(workspace_root, source_repo, entries, version_tags, *,
+                     releasable_name, healing, creates_releasable):
+    """The version the absorbed unit arrives at -- RECORDED before derived.
+
+    A heal re-derives nothing. The first run already wrote this unit's version
+    into the releasable it created, and that record is what every later step
+    reads; asking the re-run's source again would let a fork with a bumped
+    manifest overwrite the recorded version with one this conversion never
+    shipped. The re-run's source repository answers the identity question (is
+    this the same conversion?) and nothing else.
+
+    Only a releasable this absorb CREATED has a version it recorded. When the
+    member joined an existing releasable, that releasable's version is its own
+    and the absorb never writes it, so there is nothing recorded to prefer and
+    the source is asked as on a first run.
+    """
+    if healing and creates_releasable:
+        try:
+            recorded = read_releasable_version(workspace_root, releasable_name)
+        except Exception:
+            recorded = None
+        if recorded:
+            return str(recorded).strip()
+    return _resolve_version(source_repo, entries, version_tags)
+
+
+def _trailer_values(body, key):
+    """Every value the commit message ``body`` records under trailer ``key``."""
+    return [
+        line.split(":", 1)[1].strip()
+        for line in body.splitlines()
+        if line.startswith(key + ":")
+    ]
+
+
+def _find_merge(workspace_root, name, dest_path, source_root_shas, releasable):
     """The commit of a previous absorb of this unit, or None.
 
-    Detection is the trailer this command writes PLUS the source's identity:
-    the same name and destination path absorbed from a DIFFERENT repository is
-    not a re-run of this conversion, it is a collision, and it is refused
-    rather than healed.
+    Detection is the trailer this command writes PLUS two identities the
+    trailers carry:
+
+    * the SOURCE's root commit -- the same name and destination path absorbed
+      from a DIFFERENT repository is not a re-run of this conversion, it is a
+      collision, and it is refused rather than healed;
+    * the target RELEASABLE -- healing skips :func:`_check_version_overlap` on
+      the grounds that a re-run is the same conversion, so a re-run aimed at
+      another releasable must not be classified as one. It would skip exactly
+      the check that guards the releasable it is newly pointing at.
+
+    A merge that carries no releasable trailer cannot answer the second
+    question, so it is refused rather than guessed at. That state only exists
+    for a merge written before the trailer did.
     """
     marker = f"{ABSORB_TRAILER}: {name} {dest_path}"
     try:
@@ -521,11 +581,7 @@ def _find_merge(workspace_root, name, dest_path, source_root_shas):
         sha, _, body = record.partition("\x00")
         if marker not in body:
             continue
-        recorded = [
-            line.split(":", 1)[1].strip()
-            for line in body.splitlines()
-            if line.startswith(SOURCE_TRAILER + ":")
-        ]
+        recorded = _trailer_values(body, SOURCE_TRAILER)
         if recorded and not set(recorded) & set(source_root_shas):
             raise AbsorbError(
                 f"'{dest_path}' was already absorbed as '{name}' by commit "
@@ -534,6 +590,27 @@ def _find_merge(workspace_root, name, dest_path, source_root_shas):
                 f"{source_root_shas[0][:12]}). Two repositories cannot occupy "
                 f"one member path. Absorb this one under another name and "
                 f"path, or remove the existing member first."
+            )
+        targeted = _trailer_values(body, RELEASABLE_TRAILER)
+        if not targeted:
+            raise AbsorbError(
+                f"'{dest_path}' was already absorbed as '{name}' by commit "
+                f"{sha[:12]}, but that merge records no "
+                f"{RELEASABLE_TRAILER} trailer, so which releasable it targeted "
+                f"is not knowable. Completing it would skip the version-overlap "
+                f"check against a releasable this run merely assumes -- so it "
+                f"is refused. Finish that absorption by hand, or reset this "
+                f"repository to before {sha[:12]} and absorb again."
+            )
+        if releasable not in targeted:
+            raise AbsorbError(
+                f"'{dest_path}' was already absorbed as '{name}' by commit "
+                f"{sha[:12]}, targeting releasable '{targeted[0]}'; this run "
+                f"targets '{releasable}'. A re-run completes the SAME "
+                f"conversion -- it skips the version-overlap check on exactly "
+                f"that ground -- so it may not be re-aimed. Re-run with "
+                f"--releasable {targeted[0]} to complete it, or undo that "
+                f"absorption before absorbing into '{releasable}'."
             )
         return sha.strip()
     return None
@@ -743,8 +820,13 @@ def resolve_arrival(workspace_root, source_repo, dest_path, *, name,
     releasables = load_releasables(workspace_root, projects)
 
     source_root_shas = _root_commits(source_repo)
+    # The releasable this run targets, resolved here rather than below because
+    # it is part of the heal identity: without --releasable the created
+    # singleton is named after the member, which is the same answer the branch
+    # below arrives at.
+    target_releasable = releasable_name or name
     merge_commit = _find_merge(
-        workspace_root, name, dest_path, source_root_shas,
+        workspace_root, name, dest_path, source_root_shas, target_releasable,
     )
     healing = merge_commit is not None
 
@@ -872,7 +954,12 @@ def resolve_arrival(workspace_root, source_repo, dest_path, *, name,
         )
         if parsed is not None
     ]
-    version = _resolve_version(source_repo, entries, source_version_tags)
+    version = _arrival_version(
+        workspace_root, source_repo, entries, source_version_tags,
+        releasable_name=releasable_name,
+        healing=healing,
+        creates_releasable=creates_releasable,
+    )
 
     source_state = _read_source_state(source_repo)
     if not healing:
@@ -1026,6 +1113,7 @@ def observe(arr) -> Preview:
         facts=(
             f"merge trailer: {ABSORB_TRAILER}: {arr.name} {arr.dest_path}",
             f"source identity: {SOURCE_TRAILER}: {arr.source_root_sha}",
+            f"target releasable: {RELEASABLE_TRAILER}: {arr.releasable_name}",
         ),
     ))
 
@@ -1202,6 +1290,7 @@ def _apply_history(arr, item, run):
         f"Autogenerated: true\n"
         f"{ABSORB_TRAILER}: {arr.name} {arr.dest_path}\n"
         f"{SOURCE_TRAILER}: {arr.source_root_sha}\n"
+        f"{RELEASABLE_TRAILER}: {arr.releasable_name}\n"
     )
     _run_git(
         arr.workspace_root, "merge", "--allow-unrelated-histories",
@@ -1399,11 +1488,40 @@ def _dest_anchor_path(arr, old_path):
     return os.path.join(arr.dest_path, old_path)
 
 
-def _entry_ids(path):
-    """The entry ids already recorded in a JSONL file."""
+def _already_migrated(path):
+    """How to recognize an entry the file at ``path`` already holds.
+
+    Two indexes, because ``id`` is optional on read: an entry that carries one
+    is identified by it, and one that does not falls back to its CONTENT --
+    the only identity a line without an id has. Identifying id-less entries by
+    id alone made every historical entry unrecognizable, so a re-run appended a
+    second copy of what it had already migrated.
+    """
     if not os.path.isfile(path):
-        return set()
-    return {entry.id for entry in parse_jsonl(path) if entry.id}
+        return set(), set()
+    present = parse_jsonl(path)
+    return (
+        {entry.id for entry in present if entry.id},
+        {entry_content_key(entry) for entry in present if not entry.id},
+    )
+
+
+def _entries_to_migrate(arriving, known_ids, known_content):
+    """The arriving entries the target does not already hold.
+
+    Neither index is extended while iterating, deliberately: the arriving file
+    is copied as it stands, so two identical lines in it stay two lines, and a
+    re-run recognizes both of them at once.
+    """
+    new_entries = []
+    for entry in arriving:
+        if entry.id:
+            if entry.id in known_ids:
+                continue
+        elif entry_content_key(entry) in known_content:
+            continue
+        new_entries.append(entry)
+    return new_entries
 
 
 def _migrate_changes(arr, run, changes_dir):
@@ -1418,10 +1536,12 @@ def _migrate_changes(arr, run, changes_dir):
     arriving = os.path.join(changes_dir, "unreleased.jsonl")
     if os.path.isfile(arriving):
         target = os.path.join(rel_changes, "unreleased.jsonl")
-        known = _entry_ids(target)
-        new_entries = [e for e in parse_jsonl(arriving) if e.id not in known]
+        arriving_entries = parse_jsonl(arriving)
+        new_entries = _entries_to_migrate(
+            arriving_entries, *_already_migrated(target),
+        )
         run.entries_already_present += (
-            len(parse_jsonl(arriving)) - len(new_entries)
+            len(arriving_entries) - len(new_entries)
         )
         if new_entries:
             body = "".join(serialize_entry(e) + "\n" for e in new_entries)

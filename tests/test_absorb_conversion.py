@@ -24,6 +24,7 @@ from githarness import git as gitout
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
 from rlsbl.commands.monorepo.absorb_cmd import (
     ABSORB_TRAILER,
+    RELEASABLE_TRAILER,
     ITEM_HISTORY,
     ITEM_RELEASABLE,
     ITEM_SOURCE,
@@ -886,6 +887,223 @@ class TestHealing:
         other = make_source(tmp_path / "second", name="gadget")
         with pytest.raises(AbsorbError, match="DIFFERENT repository"):
             absorb(ns, other, name="widget", dry_run=True)
+
+
+# ---------------------------------------------------------------------------
+# What a heal must not do: duplicate, re-target, or re-derive
+# ---------------------------------------------------------------------------
+
+
+def _kill_inside_state(monkeypatch, func_name):
+    """Make the state step die where ``func_name`` would have run.
+
+    The state step migrates the arriving changelog and THEN removes the
+    per-package directory it came from. A crash between those two is the one
+    that leaves an already-migrated entry sitting in its source directory for
+    the re-run to find a second time -- the state a kill after the whole step
+    cannot produce.
+    """
+    from rlsbl.commands.monorepo import absorb_cmd
+
+    def die(*args, **kwargs):
+        raise _KillSwitch(func_name)
+
+    monkeypatch.setattr(absorb_cmd, func_name, die)
+
+
+def _unreleased_entries(root, releasable):
+    return parse_jsonl(os.path.join(
+        get_releasable_dir(str(root), releasable), "changes", "unreleased.jsonl",
+    ))
+
+
+def _crash_between_migrate_and_cleanup(ns, source, monkeypatch, **kwargs):
+    """Run an absorb that dies with the migrated state still in both places."""
+    _kill_inside_state(monkeypatch, "_remove_residue")
+    with pytest.raises(_KillSwitch):
+        absorb(ns, source, **kwargs)
+    monkeypatch.undo()
+    _commit_absorb_leftovers(ns.root, "wip: interrupted absorb")
+
+
+class TestHealingDoesNotDuplicateEntries:
+    """A re-run appends a changelog entry it already migrated exactly never."""
+
+    def test_an_id_less_entry_is_migrated_once(self, tmp_path, monkeypatch):
+        """``id`` is optional on read, so identity falls back to CONTENT.
+
+        A historical entry carries no ``id``. Deduplicating on the id alone
+        makes every such entry unrecognizable on a re-run, and the heal appends
+        a second copy of what it already migrated.
+        """
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        assert [e.id for e in parse_jsonl(
+            str(source / ".rlsbl" / "changes" / "unreleased.jsonl")
+        )] == [None]
+        _crash_between_migrate_and_cleanup(ns, source, monkeypatch)
+        assert [e.description for e in _unreleased_entries(ns.root, "widget")] == [
+            "Work in progress",
+        ]
+
+        absorb(ns, source)
+
+        assert [e.description for e in _unreleased_entries(ns.root, "widget")] == [
+            "Work in progress",
+        ]
+
+    def test_an_entry_with_an_id_is_migrated_once(self, tmp_path, monkeypatch):
+        """The id path keeps working, and is still what identifies an entry."""
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        changes = source / ".rlsbl" / "changes"
+        write_jsonl(
+            str(changes / "unreleased.jsonl"),
+            [ChangelogEntry(
+                commits=[gitout(source, "rev-parse", "HEAD")],
+                user_facing=True, description="Work in progress",
+                type="feature", id="0" * 48,
+            )],
+        )
+        run_git(source, "add", ".rlsbl")
+        run_git(source, "commit", "-q", "-m", "changelog: an identified entry")
+        _crash_between_migrate_and_cleanup(ns, source, monkeypatch)
+
+        absorb(ns, source)
+
+        entries = _unreleased_entries(ns.root, "widget")
+        assert [e.description for e in entries] == ["Work in progress"]
+        assert [e.id for e in entries] == ["0" * 48]
+
+    def test_two_entries_that_differ_only_in_content_both_arrive(
+        self, tmp_path, monkeypatch,
+    ):
+        """The content key identifies, it does not collapse distinct entries."""
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        changes = source / ".rlsbl" / "changes"
+        head = gitout(source, "rev-parse", "HEAD")
+        write_jsonl(
+            str(changes / "unreleased.jsonl"),
+            [
+                ChangelogEntry(commits=[head], user_facing=True,
+                               description="Work in progress", type="feature"),
+                ChangelogEntry(commits=[head], user_facing=True,
+                               description="Work in progress", type="fix"),
+            ],
+        )
+        run_git(source, "add", ".rlsbl")
+        run_git(source, "commit", "-q", "-m", "changelog: two on one commit")
+        _crash_between_migrate_and_cleanup(ns, source, monkeypatch)
+
+        absorb(ns, source)
+
+        entries = _unreleased_entries(ns.root, "widget")
+        assert [(e.description, e.type) for e in entries] == [
+            ("Work in progress", "feature"),
+            ("Work in progress", "fix"),
+        ]
+
+
+class TestHealIdentityIncludesTheReleasable:
+    """A heal must land in the releasable the first run targeted."""
+
+    def test_the_merge_records_the_target_releasable(self, tmp_path):
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+
+        absorb(ns, source)
+
+        body = gitout(ns.root, "log", "--format=%B", "-n", "20")
+        assert f"{RELEASABLE_TRAILER}: widget" in body
+
+    def test_a_re_run_naming_another_releasable_is_refused(
+        self, tmp_path, monkeypatch,
+    ):
+        """Re-targeting is a new conversion, not the completion of this one.
+
+        Classifying it as a heal skips ``_check_version_overlap``, which is
+        precisely the check that would refuse this: ``core`` has already
+        released 0.1.0 and the source carries it.
+        """
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        _kill_after(monkeypatch, ITEM_HISTORY)
+        with pytest.raises(_KillSwitch):
+            absorb(ns, source)
+        monkeypatch.undo()
+        _commit_absorb_leftovers(ns.root, "wip: interrupted absorb")
+
+        with pytest.raises(AbsorbError) as exc:
+            absorb(ns, source, releasable_name="core", dry_run=True)
+        message = str(exc.value)
+        assert "widget" in message and "core" in message
+        # Nothing was written on the way to the refusal.
+        assert gitout(ns.root, "--no-optional-locks", "status", "--porcelain") == ""
+
+    def test_a_merge_without_the_trailer_is_refused_rather_than_guessed(
+        self, tmp_path, monkeypatch,
+    ):
+        """A heal candidate that does not say what it targeted is a hard error.
+
+        An absorb merge written before the trailer existed cannot be completed
+        safely: the re-run would skip the version-overlap check on a releasable
+        it merely assumed.
+        """
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        _kill_after(monkeypatch, ITEM_HISTORY)
+        with pytest.raises(_KillSwitch):
+            absorb(ns, source)
+        monkeypatch.undo()
+        body = gitout(ns.root, "log", "--format=%B", "-n", "1")
+        stripped = "\n".join(
+            line for line in body.splitlines()
+            if not line.startswith(RELEASABLE_TRAILER + ":")
+        )
+        run_git(ns.root, "commit", "-q", "--amend", "-m", stripped)
+        _commit_absorb_leftovers(ns.root, "wip: interrupted absorb")
+
+        with pytest.raises(AbsorbError) as exc:
+            absorb(ns, source, dry_run=True)
+        assert RELEASABLE_TRAILER in str(exc.value)
+
+
+class TestHealReDerivesNothing:
+    """Every value a heal writes comes from the first run's record."""
+
+    def test_a_forks_bumped_manifest_does_not_move_the_recorded_version(
+        self, tmp_path, monkeypatch,
+    ):
+        """A re-run's source answers the identity question and nothing else.
+
+        A fork keeps the root commit, so it IS the same conversion -- but its
+        manifest says a different version, and the releasable's version is
+        already recorded. The record wins.
+        """
+        ns = make_destination(tmp_path)
+        source = make_source(tmp_path)
+        _kill_after(monkeypatch, ITEM_STATE)
+        with pytest.raises(_KillSwitch):
+            absorb(ns, source)
+        monkeypatch.undo()
+        _commit_absorb_leftovers(ns.root, "wip: interrupted absorb")
+        version_file = os.path.join(
+            get_releasable_dir(str(ns.root), "widget"), "version",
+        )
+        assert open(version_file).read().strip() == "0.1.0"
+
+        fork = tmp_path / "widget_fork"
+        shutil.copytree(str(source), str(fork))
+        (fork / "package.json").write_text(
+            json.dumps({"name": "widget", "version": "9.9.9"}) + "\n"
+        )
+        run_git(fork, "add", "package.json")
+        run_git(fork, "commit", "-q", "-m", "chore: bump to 9.9.9")
+
+        absorb(ns, fork)
+
+        assert open(version_file).read().strip() == "0.1.0"
 
 
 # ---------------------------------------------------------------------------
