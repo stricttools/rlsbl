@@ -14,6 +14,8 @@ said "17 release targets" while the monorepo group help said "18", and
 
 import re
 
+import pytest
+
 from rlsbl import app
 from rlsbl.targets import TARGETS
 
@@ -69,6 +71,50 @@ def test_monorepo_group_help_lists_every_subcommand_and_subgroup():
     assert subs, f"monorepo help lacks the subgroup sentence: {group.help!r}"
     assert int(subs.group(1)) == len(group._groups)
     assert [n.strip() for n in subs.group(2).split(",")] == list(group._groups)
+
+
+def test_monorepo_release_subgroup_help_lists_every_subcommand():
+    """Regression: this subgroup's literal said '3 subcommands' by hand.
+
+    It is the one group whose sentence carries a parenthetical per subcommand;
+    the count and the names are still the registry's, and the parentheticals
+    are checked to be present so the map cannot silently lose one.
+    """
+    group = app._groups["monorepo"]._groups["release"]
+    count, entries = _parse_subcommand_sentence(group.help)
+    assert count == len(group.commands)
+    assert [e.split(" (")[0] for e in entries] == list(group.commands)
+    for entry in entries:
+        assert re.fullmatch(r"[a-z-]+ \([^()]+\)", entry), entry
+
+
+class _StubGroup:
+    """The shape `_append_subcommand_sentence` reads off a strictcli group."""
+
+    def __init__(self, commands):
+        self.name = "stub"
+        self.help = "Stub group."
+        self.commands = {name: object() for name in commands}
+        self._groups = {}
+
+
+def test_a_summary_map_that_misses_a_subcommand_is_refused():
+    """A subcommand added without a parenthetical raises, never renders bare."""
+    from rlsbl import _append_subcommand_sentence
+
+    group = _StubGroup(["run", "init"])
+    with pytest.raises(ValueError, match=r"missing \['init'\]"):
+        _append_subcommand_sentence(group, "subcommands", summaries={"run": "a"})
+
+
+def test_a_summary_for_a_removed_subcommand_is_refused():
+    from rlsbl import _append_subcommand_sentence
+
+    group = _StubGroup(["run"])
+    with pytest.raises(ValueError, match=r"stale \['gone'\]"):
+        _append_subcommand_sentence(
+            group, "subcommands", summaries={"run": "a", "gone": "b"}
+        )
 
 
 def _dev_install_support(mode):
@@ -146,9 +192,21 @@ def test_no_help_string_carries_a_hand_written_target_count():
             )
 
 
+def _all_groups(groups, prefix=""):
+    """Every group and subgroup, as (dotted name, group) pairs."""
+    for name, group in groups.items():
+        path = f"{prefix}{name}"
+        yield path, group
+        yield from _all_groups(group._groups, prefix=f"{path}.")
+
+
 def test_no_group_help_carries_a_hand_written_subcommand_count():
-    """Any group help stating a count must state the derived one."""
-    for name, group in app._groups.items():
+    """Any group help stating a count must state the derived one.
+
+    Subgroups are walked too: `monorepo release` kept a hand-written
+    '3 subcommands' precisely because this test only looked one level down.
+    """
+    for name, group in _all_groups(app._groups):
         for m in re.finditer(r"(\d+) (?:[a-z]+ )?subcommands", group.help):
             assert int(m.group(1)) == len(group.commands), (
                 f"{name} group help claims {m.group(1)} subcommands but "

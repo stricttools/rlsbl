@@ -1510,7 +1510,7 @@ def cmd_commit(ctx, message):
 # changelog group
 # ---------------------------------------------------------------------------
 
-chlog = app.group("changelog", help="Structured changelog management using JSONL entries with 3 entry types (feature, fix, breaking). Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.")
+chlog = app.group("changelog", help="Structured changelog management using JSONL entries, each typed feature, fix or breaking. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.")
 
 
 @chlog.command(name="add", help="Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed by default. Use --no-user-facing to mark internal changes that should not appear in the published changelog.", effect="mutating")
@@ -2023,7 +2023,7 @@ def cmd_mono_impact(ctx, depth=None, since=None):
         ctx.payload(impact_data)
 
 
-mono_release = mono.group("release", help="Release commands for monorepo workspaces. Provides 3 subcommands: run (batch release), init (scaffold release file), and order (topological release order).")
+mono_release = mono.group("release", help="Release commands for monorepo workspaces.")
 
 
 @mono_release.command(
@@ -2346,16 +2346,33 @@ app.help = (
 )
 
 
-def _append_subcommand_sentence(group, noun):
+def _append_subcommand_sentence(group, noun, summaries=None):
     """Append a derived 'Provides N subcommands: ...' sentence to a group help.
 
     Same rationale as the app-level sentence: the release group's literal said
     "9 subcommands" and omitted `reconcile`, and the monorepo group's said 16
     when 18 were registered. Both are now recounted from the live registry.
+
+    ``summaries`` maps each subcommand name to the parenthetical that follows
+    it, for a group whose sentence says what each subcommand is for. The map
+    must name exactly the registered subcommands: a subcommand registered
+    without one, or a summary for a subcommand that no longer exists, raises
+    here rather than rendering a sentence that has quietly gone wrong.
     """
     names = list(group.commands)
+    if summaries is None:
+        rendered = names
+    else:
+        missing = [n for n in names if n not in summaries]
+        stale = [n for n in summaries if n not in names]
+        if missing or stale:
+            raise ValueError(
+                f"{group.name} help summaries do not match its subcommands: "
+                f"missing {missing}, stale {stale}"
+            )
+        rendered = [f"{name} ({summaries[name]})" for name in names]
     sentence = (
-        f" Provides {len(names)} {noun}: {', '.join(names)}."
+        f" Provides {len(names)} {noun}: {', '.join(rendered)}."
         if names else ""
     )
     subgroups = list(group._groups)
@@ -2367,6 +2384,18 @@ def _append_subcommand_sentence(group, noun):
 
 _append_subcommand_sentence(release_group, "subcommands")
 _append_subcommand_sentence(mono, "monorepo subcommands")
+# The batch-release subgroup names what each of its subcommands is for. The
+# count and the order stay derived; only the parentheticals are written here,
+# and a subcommand added without one raises above.
+_append_subcommand_sentence(
+    mono_release,
+    "subcommands",
+    summaries={
+        "run": "batch release",
+        "init": "scaffold release file",
+        "order": "topological release order",
+    },
+)
 
 # One workspace.toml can hold every registered target, so this sentence is the
 # registry's own count -- the literal it replaced said 18 while the app help
