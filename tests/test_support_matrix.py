@@ -21,15 +21,16 @@ from rlsbl.targets.introspect import (
     AXIS_NAMES,
     MATRIX_FORMAT_VERSION,
     MATRIX_RELPATH,
+    NON_AXIS_ATTRIBUTES,
     TARGET_AXES,
     TargetAxis,
     assert_axis_inventory_is_complete,
     assert_every_target_answers_every_axis,
     build_matrix,
-    declared_support_surfaces,
     matrix_path,
     render_matrix,
     target_axis_answers,
+    unclassified_attributes,
     write_matrix,
 )
 
@@ -151,9 +152,42 @@ class TestCompletenessOfTheTargetDirection:
 
 
 class TestCompletenessOfTheAxisDirection:
+    """Every public attribute of the protocol is classified, not just the
+    ones whose NAME happens to start with a support-sounding prefix.
 
-    def test_the_live_inventory_covers_every_declared_support_surface(self):
-        assert declared_support_surfaces() <= set(AXIS_NAMES)
+    The prefix rule policed ``supports_``/``provides_``/``has_``/``shares_``
+    and nothing else, so a per-target fact named anything else --
+    ``lint_language``, ``publisher_binds_to_repository`` -- could be added to
+    the protocol and never appear in the matrix. The rule is inverted: every
+    public attribute is either an axis's source or an explicitly excluded
+    operation, and an unclassified one is an error.
+    """
+
+    def test_every_public_attribute_is_classified(self):
+        assert unclassified_attributes() == frozenset()
+
+    def test_a_new_fact_with_no_axis_is_an_error_whatever_it_is_called(self):
+        class _WithANewFact(BaseTarget):
+            #: No support-sounding prefix anywhere in the name.
+            registry_charges_money = False
+
+        assert "registry_charges_money" in unclassified_attributes(cls=_WithANewFact)
+        with pytest.raises(RuntimeError, match="registry_charges_money"):
+            assert_axis_inventory_is_complete(cls=_WithANewFact)
+
+    def test_the_two_publisher_properties_are_axes(self):
+        for name in ("publisher_binds_to_repository", "publisher_setup_url"):
+            assert name in AXIS_NAMES
+
+    def test_every_excluded_attribute_states_why(self):
+        for name, reason in NON_AXIS_ATTRIBUTES.items():
+            assert reason.strip(), name
+
+    def test_an_exclusion_naming_nothing_is_an_error(self):
+        with pytest.raises(RuntimeError, match="gone_attribute"):
+            assert_axis_inventory_is_complete(
+                excluded={**NON_AXIS_ATTRIBUTES, "gone_attribute": "no such thing"},
+            )
 
     def test_a_new_support_surface_without_an_axis_is_an_error(self):
         class _WithANewAxis(BaseTarget):
@@ -172,7 +206,9 @@ class TestCompletenessOfTheAxisDirection:
 
         with pytest.raises(RuntimeError) as exc:
             assert_axis_inventory_is_complete(cls=_WithANewAxis)
-        assert "TARGET_AXES" in str(exc.value)
+        # Both ways out are named: give it an axis, or exclude it with a reason.
+        assert "TargetAxis" in str(exc.value)
+        assert "NON_AXIS_ATTRIBUTES" in str(exc.value)
         assert "generate_support_matrix" in str(exc.value)
 
     def test_every_axis_name_is_unique(self):

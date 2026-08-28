@@ -94,7 +94,15 @@ target itself, one property per axis, so the answer cannot disagree with the
 code that implements it. The axes are declared once, in
 `rlsbl.targets.introspect`, and every registered target must answer every one
 of them — a target that cannot, or an axis added to the protocol without a
-declaration here, is an error at import time:
+declaration here, is an error at import time.
+
+Completeness is stated by exclusion, so no naming convention can hide a fact:
+every public attribute of `BaseTarget` must be either the source of an axis or
+listed in `NON_AXIS_ATTRIBUTES` with the one line saying why it is not a
+per-target fact (almost all of them are operations — `build`, `read_name`,
+`yank` — whose "can this target do it at all?" is itself an axis). An
+unclassified attribute, and an exclusion naming an attribute that no longer
+exists, are both errors at import time:
 
 :-: table-target-axes
 

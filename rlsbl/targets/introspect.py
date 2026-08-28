@@ -58,11 +58,23 @@ class TargetAxis:
         name: the axis identifier, used as the key in the artifact.
         doc: one line saying what the axis means and how it is answered.
         answer: called with a target, returns a JSON-serializable answer.
+        attr: the ``BaseTarget`` attribute this axis reads, when it is not
+            spelled the same as the axis. The completeness assertion walks the
+            protocol's attributes and looks each one up here, so an axis whose
+            name differs from its source (``build_timeout_default`` reads
+            ``BUILD_TIMEOUT_DEFAULT``) must say so or its source reads as
+            unclassified.
     """
 
     name: str
     doc: str
     answer: Callable[[object], object]
+    attr: str = ""
+
+    @property
+    def source_attr(self) -> str:
+        """The protocol attribute this axis answers from."""
+        return self.attr or self.name
 
 
 def _prop(name: str):
@@ -87,6 +99,7 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         "content_based_detection",
         "Whether detection inspects file content (the target overrides detect).",
         lambda t: type(t).detect is not BaseTarget.detect,
+        attr="detect",
     ),
     TargetAxis(
         "version_file",
@@ -132,6 +145,25 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         "build_timeout_default",
         "Seconds allowed for this target's build before it is a timeout.",
         lambda t: t.BUILD_TIMEOUT_DEFAULT,
+        attr="BUILD_TIMEOUT_DEFAULT",
+    ),
+    TargetAxis(
+        "project_init_hint",
+        "What a user is told to run to create a project of this target.",
+        lambda t: t.get_project_init_hint(),
+        attr="get_project_init_hint",
+    ),
+    # --- publishing authorization ---
+    TargetAxis(
+        "publisher_binds_to_repository",
+        "Whether publishing is authorized for a REPOSITORY rather than for the "
+        "package, so moving the code requires re-authorizing.",
+        _prop("publisher_binds_to_repository"),
+    ),
+    TargetAxis(
+        "publisher_setup_url",
+        "Where a repository-bound publisher is registered; empty when none is.",
+        _prop("publisher_setup_url"),
     ),
     # --- manifest reading ---
     TargetAxis(
@@ -221,36 +253,114 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
 
 AXIS_NAMES: tuple[str, ...] = tuple(axis.name for axis in TARGET_AXES)
 
-# Name prefixes that mark a support surface on the protocol. Every attribute on
-# ``BaseTarget`` whose name starts with one of these must have an axis, so a new
-# support question cannot be added to the protocol and left out of the matrix.
-SUPPORT_PREFIXES: tuple[str, ...] = ("supports_", "provides_", "has_", "shares_")
+# Every PUBLIC attribute of the protocol that is deliberately NOT an axis, each
+# with the one line saying why. This is the whole exclusion list: the
+# completeness assertion walks ``BaseTarget``'s public attributes and demands
+# that each one is either an axis's source or named here.
+#
+# The polarity used to be the other way round -- only names starting with
+# ``supports_``/``provides_``/``has_``/``shares_`` were policed -- so a
+# per-target FACT named anything else (``lint_language`` historically, and the
+# two ``publisher_*`` properties later) could be added to the protocol and never
+# reach the matrix, with nothing failing. Naming what is excluded rather than
+# guessing what is included cannot miss a fact by how it was spelled.
+#
+# Almost every entry is an OPERATION: something a target DOES, whose per-target
+# fact (can it do it at all?) is an axis of its own.
+NON_AXIS_ATTRIBUTES: dict[str, str] = {
+    "name": "the target's own identity -- the matrix's row key, not a cell.",
+    "build": "operation: builds the artifact.",
+    "check_project_exists": "operation: asks a directory whether it holds this "
+                            "kind of project (the fact is detection_files).",
+    "claim_placeholder": "operation: publishes a placeholder to claim a name "
+                         "(the fact is supports_name_claim).",
+    "find_circular_dependencies": "operation: scans sources for import cycles "
+                                  "(the fact is supports_circular_dep_analysis).",
+    "find_dead_modules": "operation: scans sources for unreachable modules "
+                         "(the fact is supports_import_analysis).",
+    "normalize_package_name": "operation: folds one name into the form this "
+                              "registry compares by; a function of its input.",
+    "publication_probe": "operation: asks the registry about one version "
+                         "(the fact is supports_publication_probe).",
+    "query_latest_version": "operation: asks the registry for the latest "
+                            "version (the fact is supports_version_query).",
+    "read_metadata": "operation: reads one project's manifest "
+                     "(the fact is supports_read_metadata).",
+    "read_name": "operation: reads one project's manifest "
+                 "(the fact is supports_read_name).",
+    "run_tests": "operation: runs one project's tests "
+                 "(the fact is has_builtin_test_runner).",
+    "shared_template_dir": "operation: resolves the shared scaffold templates "
+                           "(the fact is provides_ci_templates).",
+    "shared_template_mappings": "operation: builds one project's shared "
+                                "template-to-file mappings.",
+    "template_dir": "operation: resolves this target's scaffold templates "
+                    "(the fact is provides_ci_templates).",
+    "template_mappings": "operation: builds one project's target-specific "
+                         "template-to-file mappings.",
+    "template_vars": "operation: extracts one project's scaffold variables.",
+    "write_version": "operation: writes a version into one project's files "
+                     "(the fact is version_file).",
+    "yank": "operation: removes a published version (the fact is supports_yank).",
+}
 
 
-def declared_support_surfaces(cls=BaseTarget) -> frozenset[str]:
-    """Public attributes of *cls* whose names mark a support axis."""
-    return frozenset(
-        name
-        for name in dir(cls)
-        if not name.startswith("_") and name.startswith(SUPPORT_PREFIXES)
-    )
+def public_attributes(cls=BaseTarget) -> frozenset[str]:
+    """Every public attribute of *cls* -- the set that must be classified."""
+    return frozenset(name for name in dir(cls) if not name.startswith("_"))
 
 
-def assert_axis_inventory_is_complete(cls=BaseTarget, axes=TARGET_AXES) -> None:
-    """Every support surface the protocol declares must have an axis.
+def axis_source_attributes(axes=TARGET_AXES) -> frozenset[str]:
+    """The protocol attributes the axes read."""
+    return frozenset(axis.source_attr for axis in axes)
 
-    This is the "a new axis must cover every target" direction: adding a
-    ``supports_*`` property to the base class without adding it here is an
-    error at import time, not a column that quietly never appears.
+
+def unclassified_attributes(
+    cls=BaseTarget, axes=TARGET_AXES, excluded=None,
+) -> frozenset[str]:
+    """Public attributes of *cls* that are neither an axis source nor excluded."""
+    if excluded is None:
+        excluded = NON_AXIS_ATTRIBUTES
+    return public_attributes(cls) - axis_source_attributes(axes) - set(excluded)
+
+
+def assert_axis_inventory_is_complete(
+    cls=BaseTarget, axes=TARGET_AXES, excluded=None,
+) -> None:
+    """Every public attribute of the protocol is an axis or an excluded operation.
+
+    This is the "a new fact must reach the matrix" direction, and it is stated
+    by exclusion so that no naming convention can hide one: adding anything
+    public to the base class without either giving it an axis or excluding it
+    with a reason is an error at import time, not a column that quietly never
+    appears. An exclusion naming an attribute that no longer exists is an error
+    too -- a stale exclusion is an unpoliced surface waiting to be re-added.
     """
-    axis_names = {axis.name for axis in axes}
-    missing = sorted(declared_support_surfaces(cls) - axis_names)
-    if missing:
+    if excluded is None:
+        excluded = NON_AXIS_ATTRIBUTES
+    unclassified = sorted(unclassified_attributes(cls, axes, excluded))
+    if unclassified:
         raise RuntimeError(
-            f"support surfaces on {cls.__name__} with no axis in TARGET_AXES: "
-            f"{', '.join(missing)}. Add a TargetAxis for each in "
-            f"rlsbl/targets/introspect.py, then regenerate the matrix with "
-            f"`{MATRIX_REGEN_COMMAND}`."
+            f"public attributes on {cls.__name__} that are neither a matrix "
+            f"axis nor an excluded operation: {', '.join(unclassified)}. Add a "
+            f"TargetAxis for each fact and regenerate the matrix with "
+            f"`{MATRIX_REGEN_COMMAND}`, or add it to NON_AXIS_ATTRIBUTES in "
+            f"rlsbl/targets/introspect.py with the one line saying why it is "
+            f"not a per-target fact."
+        )
+    stale = sorted(set(excluded) - public_attributes(cls))
+    if stale:
+        raise RuntimeError(
+            f"NON_AXIS_ATTRIBUTES names attributes {cls.__name__} does not "
+            f"have: {', '.join(stale)}. Remove them -- an exclusion that "
+            f"matches nothing polices nothing."
+        )
+    missing_reason = sorted(name for name, why in excluded.items() if not why.strip())
+    if missing_reason:
+        raise RuntimeError(
+            f"NON_AXIS_ATTRIBUTES entries with no justification: "
+            f"{', '.join(missing_reason)}. Every exclusion states why the "
+            f"attribute is not a per-target fact."
         )
 
 
