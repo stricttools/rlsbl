@@ -67,7 +67,7 @@ class TestDetachedHead:
         )
 
         ctx = create_context(mock_git_repo)
-        data = _collect_status("pypi", ".", ctx=ctx)
+        data, _latest = _collect_status("pypi", ".", ctx=ctx)
         assert data["branch"] == "(detached HEAD)"
 
 

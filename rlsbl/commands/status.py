@@ -65,7 +65,13 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     When flags contains "registry": True, queries the package registry
     for the latest published version and computes drift.
 
-    Returns None and prints an error if the project does not exist.
+    Returns ``(data, latest)`` -- the machine payload and the
+    :class:`~rlsbl.ledger.LatestReleaseFact` it was built from. The fact comes
+    back because the payload flattens it into two nullable fields, and the
+    human line is rendered by the fact's OWN renderer (``label()``) rather
+    than by a second annotation pass over those fields.
+
+    Exits and prints an error if the project does not exist.
     """
     if flags is None:
         flags = {}
@@ -240,7 +246,7 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
         "publish": publish,
         "registry_version": registry_version,
         "drift": drift,
-    }
+    }, latest
 
 
 def run_cmd(registry, args, flags, ctx):
@@ -320,7 +326,7 @@ def run_cmd(registry, args, flags, ctx):
         else:
             status_scope = OwnershipScope.for_member(ws_projects, monorepo_project)
 
-    data = _collect_status(
+    data, latest = _collect_status(
         registry, primary_path, tag_glob=tag_glob,
         ctx=ctx, project=monorepo_project, flags=flags,
         changes_dir=releasable_changes_dir, scope=status_scope,
@@ -361,16 +367,12 @@ def run_cmd(registry, args, flags, ctx):
     else:
         print("Branch:    (not a git repo)")
 
-    # Latest release, annotated when this checkout does not contain it
-    if data["latest_release"] is None:
-        print("Released:  (none)")
-    elif data["latest_release_in_checkout"] is False:
-        print(
-            f"Released:  {data['latest_release']} "
-            f"(not in this checkout's history)"
-        )
-    else:
-        print(f"Released:  {data['latest_release']}")
+    # Latest release, annotated by the fact's own renderer: "(none)", the
+    # bare version, "(not in this checkout's history)", or "(commit not
+    # recoverable)" for a version recorded unanchorable. Rendering it here
+    # from the payload's two flattened fields dropped that last case, since
+    # the payload cannot express it.
+    print(f"Released:  {latest.label()}")
 
     # Clean tree
     if data["clean"] is not None:

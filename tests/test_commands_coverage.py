@@ -830,6 +830,71 @@ class TestStatusTextOutputPaths:
         assert "Changelog: (not found)" in out
         assert "Released:  (none)" in out
 
+    def test_unanchorable_latest_is_annotated(self, capsys, tmp_path):
+        """An unanchorable latest release says so on the status line.
+
+        ``LatestReleaseFact.label()`` is the one renderer of this annotation;
+        status re-implemented it by hand and knew only the
+        not-in-this-checkout case, so a version whose commit is permanently
+        unrecoverable was reported as a plain version number.
+        """
+        from rlsbl.commands.status import run_cmd
+
+        mock_target = MagicMock()
+        mock_target.check_project_exists.return_value = True
+        mock_target.read_version.return_value = "1.0.0"
+        mock_target.template_vars.return_value = {"name": "test"}
+        mock_target.version_file.return_value = "package.json"
+
+        entry = MagicMock()
+        entry.name = "npm"
+        entry.path = "."
+
+        with patch(f"{MOD_STATUS}.find_workspace_root", return_value=None), \
+             patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
+             patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
+             patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
+             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.latest_release_fact",
+                   return_value=LatestReleaseFact(
+                       version="1.0.0", in_checkout=None, unanchorable=True)), \
+             patch(f"{MOD_STATUS}.effects.run",
+                   side_effect=_status_git_log(returncode=128)), \
+             patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
+            run_cmd("npm", [], {}, ctx=_ctx(root=tmp_path))
+        out = capsys.readouterr().out
+        assert "Released:  1.0.0 (commit not recoverable)" in out
+
+    def test_latest_not_in_this_checkout_is_annotated(self, capsys, tmp_path):
+        """The not-in-this-checkout annotation still comes out, from the same
+        renderer."""
+        from rlsbl.commands.status import run_cmd
+
+        mock_target = MagicMock()
+        mock_target.check_project_exists.return_value = True
+        mock_target.read_version.return_value = "1.0.0"
+        mock_target.template_vars.return_value = {"name": "test"}
+        mock_target.version_file.return_value = "package.json"
+
+        entry = MagicMock()
+        entry.name = "npm"
+        entry.path = "."
+
+        with patch(f"{MOD_STATUS}.find_workspace_root", return_value=None), \
+             patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
+             patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
+             patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
+             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.latest_release_fact",
+                   return_value=LatestReleaseFact(
+                       version="2.0.0", in_checkout=False)), \
+             patch(f"{MOD_STATUS}.effects.run",
+                   side_effect=_status_git_log(returncode=128)), \
+             patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
+            run_cmd("npm", [], {}, ctx=_ctx(root=tmp_path))
+        out = capsys.readouterr().out
+        assert "Released:  2.0.0 (not in this checkout's history)" in out
+
 
 # ============================================================================
 # rlsbl.commands.unreleased -- uncovered lines: 32-33, 42, 71-76, 85-86,
