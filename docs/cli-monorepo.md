@@ -176,7 +176,7 @@ Extract a releasable out of the monorepo into its own repository. The releasable
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the departed members' directories with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
+| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the departed members' directories with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
 
 ### Arguments
 
@@ -199,7 +199,7 @@ Absorb an external repository into this workspace as a releasable. The source's 
 | `--registry-name` |  | str | optional |  | Package registry identity recorded in workspace.toml (used verbatim for name checks) |
 | `--releasable` |  | str | optional |  | An existing releasable group to join. When omitted, a singleton releasable named after the member is created for it. |
 | `--tag-format` |  | str | optional |  | The tag format of the releasable this command creates, e.g. "{name}@v{version}" or "pkgs/thing/v{version}". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal with --releasable, which brings its own format. |
-| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the per-package release state that moves to the releasable with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
+| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the per-package release state that moves to the releasable with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
 
 ### Arguments
 
