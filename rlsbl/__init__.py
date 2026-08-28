@@ -2057,7 +2057,7 @@ def cmd_mono_release_run(ctx, allow_dirty, watch, push_timeout, ci_timeout, chec
 
 @mono_release.command(
     name="init",
-    help="Scaffold a batch release file for all workspace projects by auto-detecting each project's release targets and generating per-package configuration sections. Creates .rlsbl-monorepo/releases/unreleased.toml with a [packages.<name>] section for each non-dev-node project, pre-populated with bump type, description, and include lists. Packages with no unreleased commits since their last tag are rendered as commented-out sections.",
+    help="Scaffold a batch release file for the workspace's releasables by auto-detecting each releasable's release targets and generating one configuration section per releasable. Creates .rlsbl-monorepo/releases/unreleased.toml with a [releasables.<name>] section for each releasable declared in workspace.toml, carrying an empty bump type and description for you to fill in and the detected include list. A releasable with no unreleased commits since its last tag is rendered as a commented-out section; one with no members or no detected targets is skipped with a warning.",
     effect="mutating",
     dry_run_supported=False,
     dry_run_unsupported_reason=(
@@ -2066,7 +2066,7 @@ def cmd_mono_release_run(ctx, allow_dirty, watch, push_timeout, ci_timeout, chec
         "nothing to edit"
     ),
 )
-@strictcli.flag(name="packages", type=str, presence="optional", help="Comma-separated package names to include (every package when omitted)")
+@strictcli.flag(name="packages", type=str, presence="optional", help="Comma-separated releasable names to include (every releasable when omitted)")
 @effects.handler
 def cmd_mono_release_init(ctx, packages):
     """Scaffold a batch release file for all workspace projects."""
@@ -2089,7 +2089,7 @@ def cmd_mono_release_order(ctx):
 # The old classification rested on the claim that the source is barely touched
 # -- true of the previous implementation, which only dropped a workspace.toml
 # entry, and false of this one, which completes the move.
-@mono.command(name="extract", help="Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their anchors, config and hooks -- is transplanted, the anchors and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. Refuses a mirrored releasable, one owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
+@mono.command(name="extract", help="Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their anchors, config and hooks -- is transplanted, the anchors and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. A mirrored releasable is extracted by promotion instead of by filtering: the destination is cloned from the mirror and adopts the standalone history consumers already resolve, with the monorepo-to-mirror commit correspondence derived by subtree split and recorded in the destination's lineage. A promotion refuses a mirror whose contract is violated or whose split lineage cannot be established, and one whose tree is behind the source. Refuses a releasable owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
 # Positional order is declaration order (top decorator first) since strictcli
 # 0.41 fixed the stacked-@arg binding; these stacks used to be written
 # bottom-up to compensate for the old reversal.
