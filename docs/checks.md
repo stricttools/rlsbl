@@ -145,6 +145,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `unversioned-boundary` | error | No releasable project has a runtime dependency on an unversioned project (`releasable = false`, not dev-only) |
 | `dead-workspace-packages` | warn | Detects workspace packages with no commits since their last release |
 | `subtree-remote-reachable` | error | Configured subtree remote URLs are reachable (requires network) |
+| `mirror-required` | error | Every member whose target is consumed by repository URL (SPM) belongs to a releasable that declares a `subtree_remote`; such a package is unresolvable from a monorepo without a standalone mirror |
 | `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only); also tagged `preflight`, so a manifest that stopped resolving blocks the release rather than only narrowing the router's derived filters |
 | `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
 | `root-rlsbl-conflict` | error | Root `.rlsbl/` does not coexist with `.rlsbl-monorepo/` |

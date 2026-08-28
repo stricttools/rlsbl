@@ -67,11 +67,14 @@ def _make_monorepo(root, subtree_remote=None, project_path="mylib", name="mylib"
         json.dumps({"targets": ["npm"], "publish_mode": "none"}, indent=2) + "\n"
     )
 
-    proj = {"path": project_path, "name": name}
+    # The mirror destination is a RELEASABLE-level key, so the binding goes on
+    # the releasable this single member belongs to.
+    proj = {"path": project_path, "name": name, "releasable": name}
+    releasable = {"name": name}
     if subtree_remote:
-        proj["subtree_remote"] = subtree_remote
+        releasable["subtree_remote"] = subtree_remote
     (root / WORKSPACE_DIR).mkdir(exist_ok=True)
-    make_workspace(str(root), [proj])
+    make_workspace(str(root), [proj], releasables=[releasable])
 
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial monorepo")
@@ -119,7 +122,7 @@ class TestEarlyErrors:
         _make_monorepo(mono, subtree_remote=None)
         with pytest.raises(SystemExit):
             _cmd_mirror({"project": "mylib"}, project_root=mono)
-        assert "no subtree_remote" in capsys.readouterr().err
+        assert "declares no subtree_remote" in capsys.readouterr().err
 
     def test_unknown_project_message(self, mono, capsys):
         _make_monorepo(mono, subtree_remote=None)

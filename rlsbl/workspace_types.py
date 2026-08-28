@@ -116,6 +116,7 @@ class Releasable:
 
     name: str
     tag_format: str | None = field(default=TAG_FORMAT_ABSENT)
+    subtree_remote: str = ""
 
     def __post_init__(self):
         if not self.name:
@@ -125,6 +126,20 @@ class Releasable:
     def declares_tag_format(self) -> bool:
         """Did workspace.toml state a ``tag_format`` for this releasable?"""
         return self.tag_format is not TAG_FORMAT_ABSENT
+
+    @property
+    def is_mirrored(self) -> bool:
+        """Is this releasable bound to a standalone subtree mirror?
+
+        The binding is the mirror's DESTINATION, and it belongs to the
+        releasable rather than to a member package: a mirror carries one
+        subtree's whole history, its tags and its GitHub Releases, and the unit
+        that owns a version, a changelog and a tag scheme is the releasable. A
+        releasable with more than one member therefore cannot declare one at
+        all -- the loader refuses that outright, because there would be no one
+        subtree to mirror.
+        """
+        return bool(self.subtree_remote)
 
     @property
     def effective_tag_format(self) -> str:
@@ -235,13 +250,10 @@ class WorkspaceProject:
     def registry_name(self) -> str:
         return self._data.get("registry_name", "")
 
-    @property
-    def subtree_remote(self) -> str:
-        """URL of the standalone mirror repository for this project.
-
-        Empty string when the project has no subtree mirror configured.
-        """
-        return self._data.get("subtree_remote", "")
+    # There is no ``subtree_remote`` here. The mirror's destination is a
+    # RELEASABLE-level key (:attr:`Releasable.subtree_remote`); a member
+    # carrying it is refused at load time. Ask
+    # :func:`rlsbl.workspace.mirror_remote_for` for a member's mirror.
 
     def get(self, key, default=None):
         """Dict-like access for backward compatibility."""

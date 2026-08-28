@@ -181,7 +181,7 @@ def _bump_and_tag(repo, version="1.0.1"):
 
 def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
                             version="1.0.1"):
-    """A monorepo whose only project declares a ``subtree_remote``, staged at
+    """A monorepo whose only releasable declares a ``subtree_remote``, staged at
     the point a resume re-enters the post-GitHub-Release phase.
 
     Returns the project directory. The release is already tagged and its
@@ -199,11 +199,14 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
     (proj_dir / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "none", "targets": ["npm"]}) + "\n"
     )
-    make_workspace(str(repo), [{
-        "path": project_path,
-        "name": name,
-        "subtree_remote": "https://github.com/example/mylib.git",
-    }])
+    make_workspace(
+        str(repo),
+        [{"path": project_path, "name": name, "releasable": name}],
+        releasables=[{
+            "name": name,
+            "subtree_remote": "https://github.com/example/mylib.git",
+        }],
+    )
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", f"{name}@v{version}")
     tag = f"{name}@v{version}"

@@ -15,6 +15,13 @@ class SwiftTarget(BaseTarget):
     detection_files = ("Package.swift",)
     ecosystem = "Swift (SPM)"
 
+    # SPM has no registry: a consumer writes the package's git URL and a
+    # version requirement, and the resolver reads plain vX.Y.Z tags off that
+    # repository. A monorepo member is therefore unconsumable without a
+    # standalone mirror -- the workspace's tags carry a package prefix SPM does
+    # not understand, and the repository root is not the package.
+    consumed_by_repository_url = True
+
     @property
     def name(self):
         return "swift"

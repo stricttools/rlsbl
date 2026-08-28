@@ -61,6 +61,14 @@
       "name": "publisher_setup_url"
     },
     {
+      "doc": "Whether consumers resolve this target by repository URL and git tag rather than from a registry, so a monorepo member of this kind requires a standalone mirror to be consumable at all.",
+      "name": "consumed_by_repository_url"
+    },
+    {
+      "doc": "Manifests naming the repository the package lives in, which the mirror's scaffold commit rewrites to the mirror's own identity.",
+      "name": "mirror_identity_files"
+    },
+    {
       "doc": "Whether a reconcile may recreate a released version's missing refs unconditionally, or must refuse when a recorded identity transition puts that version under a different published identity.",
       "name": "release_materialization_policy"
     },
@@ -713,6 +721,13 @@
       "kind": "workspace",
       "targets": []
     },
+    "mirror-required": {
+      "kind": "targets",
+      "targets": [
+        "swift",
+        "swift-apple"
+      ]
+    },
     "mixed-tag-schemes": {
       "kind": "workspace",
       "targets": []
@@ -1276,6 +1291,14 @@
           "Where a repository-bound publisher is registered; empty when none is."
         ],
         [
+          "consumed_by_repository_url",
+          "Whether consumers resolve this target by repository URL and git tag rather than from a registry, so a monorepo member of this kind requires a standalone mirror to be consumable at all."
+        ],
+        [
+          "mirror_identity_files",
+          "Manifests naming the repository the package lives in, which the mirror's scaffold commit rewrites to the mirror's own identity."
+        ],
+        [
           "release_materialization_policy",
           "Whether a reconcile may recreate a released version's missing refs unconditionally, or must refuse when a recorded identity transition puts that version under a different published identity."
         ],
@@ -1357,6 +1380,8 @@
         "npm",
         "dart",
         "hex",
+        "swift",
+        "swift-apple",
         "maven"
       ],
       "rows": [
@@ -1367,6 +1392,8 @@
           "yes",
           "no",
           "yes",
+          "no",
+          "no",
           "yes"
         ],
         [
@@ -1376,11 +1403,15 @@
           "yes",
           "yes",
           "no",
+          "no",
+          "no",
           "yes"
         ],
         [
           "cross-repo-path-sources",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
@@ -1394,6 +1425,8 @@
           "yes",
           "yes",
           "no",
+          "no",
+          "no",
           "yes"
         ],
         [
@@ -1403,6 +1436,8 @@
           "yes",
           "yes",
           "no",
+          "no",
+          "no",
           "yes"
         ],
         [
@@ -1410,6 +1445,8 @@
           "yes",
           "yes",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no"
@@ -1421,6 +1458,8 @@
           "yes",
           "no",
           "no",
+          "no",
+          "no",
           "no"
         ],
         [
@@ -1429,6 +1468,8 @@
           "yes",
           "yes",
           "yes",
+          "no",
+          "no",
           "no",
           "yes"
         ],
@@ -1439,6 +1480,8 @@
           "yes",
           "yes",
           "no",
+          "no",
+          "no",
           "yes"
         ],
         [
@@ -1447,6 +1490,8 @@
           "yes",
           "yes",
           "yes",
+          "no",
+          "no",
           "no",
           "yes"
         ],
@@ -1457,11 +1502,15 @@
           "yes",
           "yes",
           "no",
+          "no",
+          "no",
           "yes"
         ],
         [
           "dev-overlay-drift",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
@@ -1475,11 +1524,15 @@
           "no",
           "no",
           "no",
+          "no",
+          "no",
           "no"
         ],
         [
           "format",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
@@ -1493,12 +1546,16 @@
           "no",
           "no",
           "no",
+          "no",
+          "no",
           "no"
         ],
         [
           "go-module-identity",
           "no",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
@@ -1511,11 +1568,15 @@
           "yes",
           "no",
           "no",
+          "no",
+          "no",
           "yes"
         ],
         [
           "lint",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
@@ -1529,6 +1590,8 @@
           "no",
           "no",
           "no",
+          "no",
+          "no",
           "no"
         ],
         [
@@ -1538,7 +1601,20 @@
           "no",
           "no",
           "no",
+          "no",
+          "no",
           "yes"
+        ],
+        [
+          "mirror-required",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "yes",
+          "yes",
+          "no"
         ],
         [
           "npm-private-mismatch",
@@ -1547,11 +1623,15 @@
           "yes",
           "no",
           "no",
+          "no",
+          "no",
           "no"
         ],
         [
           "ruff-lint",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
@@ -1565,6 +1645,8 @@
           "no",
           "no",
           "no",
+          "no",
+          "no",
           "no"
         ],
         [
@@ -1572,6 +1654,8 @@
           "yes",
           "yes",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "yes"
@@ -1583,11 +1667,15 @@
           "no",
           "no",
           "no",
+          "no",
+          "no",
           "no"
         ],
         [
           "type-check-scope-guard",
           "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
@@ -1924,6 +2012,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [
         "pubspec.yaml"
@@ -1936,6 +2025,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "",
@@ -1964,6 +2054,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": false,
       "detection_files": [
         "deno.json",
@@ -1995,6 +2086,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Run \"deno init\" first",
@@ -2023,6 +2115,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": false,
       "detection_files": [
         "Dockerfile"
@@ -2035,6 +2128,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Create a Dockerfile first",
@@ -2063,6 +2157,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [],
       "dev_install_command": {
@@ -2073,6 +2168,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "",
@@ -2103,6 +2199,7 @@
       "companion_tags": [
         "{path}/v{version}"
       ],
+      "consumed_by_repository_url": false,
       "content_based_detection": false,
       "detection_files": [
         "go.mod"
@@ -2123,6 +2220,9 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": true,
       "lint_language": "go",
+      "mirror_identity_files": [
+        "go.mod"
+      ],
       "monorepo_tag_format": "{path}/v{version}",
       "monorepo_tag_glob": "{path}/v*",
       "project_init_hint": "Run \"go mod init <module-path>\" first",
@@ -2151,6 +2251,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": false,
       "detection_files": [
         "mix.exs"
@@ -2177,6 +2278,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Run \"mix new <project_name>\" first",
@@ -2205,6 +2307,7 @@
       "build_timeout_default": 300,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [
         "build.gradle.kts",
@@ -2219,6 +2322,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": true,
       "lint_language": "maven",
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Run \"gradle init\" or create a pom.xml first",
@@ -2247,6 +2351,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [],
       "dev_install_command": {
@@ -2257,6 +2362,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "",
@@ -2285,6 +2391,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [],
       "dev_install_command": {
@@ -2295,6 +2402,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "",
@@ -2325,6 +2433,7 @@
         "NPM_TOKEN"
       ],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": false,
       "detection_files": [
         "package.json"
@@ -2353,6 +2462,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": true,
       "lint_language": "npm",
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Run \"npm init\" first",
@@ -2381,6 +2491,7 @@
       "build_timeout_default": 60,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [
         "pgdesign.toml"
@@ -2393,6 +2504,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "",
@@ -2421,6 +2533,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [],
       "dev_install_command": {
@@ -2431,6 +2544,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "",
@@ -2462,6 +2576,7 @@
         "UV_PUBLISH_TOKEN"
       ],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [
         "pyproject.toml"
@@ -2496,6 +2611,7 @@
       "format_version": "1.2.3rc1",
       "has_builtin_test_runner": true,
       "lint_language": "python",
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Run \"uv init\" first",
@@ -2524,6 +2640,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": true,
       "detection_files": [
         "version.json"
@@ -2536,6 +2653,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "",
@@ -2564,6 +2682,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": true,
       "content_based_detection": false,
       "detection_files": [
         "Package.swift"
@@ -2583,6 +2702,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Run \"swift package init\" first",
@@ -2611,6 +2731,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": true,
       "content_based_detection": true,
       "detection_files": [],
       "dev_install_command": {
@@ -2621,6 +2742,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Add 'swift-apple' to the 'targets' array in .rlsbl/config.json",
@@ -2649,6 +2771,7 @@
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
       "companion_tags": [],
+      "consumed_by_repository_url": false,
       "content_based_detection": false,
       "detection_files": [
         "build.zig.zon",
@@ -2670,6 +2793,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
       "project_init_hint": "Run \"zig init\" first, or create a build.zig.zon manually",

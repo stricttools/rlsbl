@@ -117,13 +117,14 @@ class TestAdd:
         assert len(projects) == 1
         assert "watch" not in projects[0].to_dict()
 
-    def test_subtree_remote_flag(self, mock_git_repo, capsys):
+    def test_no_subtree_remote_is_written_on_the_member(self, mock_git_repo, capsys):
+        """The mirror destination is a releasable key, so `add` never writes one."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "myproject")
-        _cmd_add(["myproject"], {"releasable": "false", "subtree-remote": "git@github.com:user/pkg.git"}, project_root=".")
+        _cmd_add(["myproject"], {"releasable": "false"}, project_root=".")
         projects = _added(mock_git_repo)
         assert len(projects) == 1
-        assert projects[0]["subtree_remote"] == "git@github.com:user/pkg.git"
+        assert "subtree_remote" not in projects[0].to_dict()
 
     def test_depends_on_flag(self, mock_git_repo, capsys):
         _cmd_init({"root-dev-node": True}, project_root=".")

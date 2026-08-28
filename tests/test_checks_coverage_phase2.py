@@ -2470,7 +2470,7 @@ class TestSubtreeRemoteReachable:
         result = _run_check("subtree-remote-reachable", ctx)
         assert result.status == "skip"
 
-    def test_no_subtree_remotes_skips(self, tmp_path, monkeypatch):
+    def test_no_mirrored_releasable_skips(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -2491,13 +2491,15 @@ class TestSubtreeRemoteReachable:
         monkeypatch.chdir(repo)
         _init_repo(repo)
 
-        from rlsbl.workspace import WorkspaceProject
+        from rlsbl.workspace import Releasable, WorkspaceProject
 
         projects = [WorkspaceProject({
-            "name": "alpha", "path": "alpha",
-            "subtree_remote": "https://nonexistent.invalid/repo.git",
+            "name": "alpha", "path": "alpha", "releasable": "alpha",
         })]
-        ctx = _make_ws_ctx(repo, projects)
+        ctx = _make_ws_ctx(repo, projects, releasables=[Releasable(
+            name="alpha",
+            subtree_remote="https://nonexistent.invalid/repo.git",
+        )])
 
         with patch("rlsbl.utils.run", side_effect=subprocess.CalledProcessError(1, "git")):
             result = app._check_defs["subtree-remote-reachable"].impl(ctx)
@@ -2510,13 +2512,14 @@ class TestSubtreeRemoteReachable:
         monkeypatch.chdir(repo)
         _init_repo(repo)
 
-        from rlsbl.workspace import WorkspaceProject
+        from rlsbl.workspace import Releasable, WorkspaceProject
 
         projects = [WorkspaceProject({
-            "name": "alpha", "path": "alpha",
-            "subtree_remote": "https://github.com/test/repo.git",
+            "name": "alpha", "path": "alpha", "releasable": "alpha",
         })]
-        ctx = _make_ws_ctx(repo, projects)
+        ctx = _make_ws_ctx(repo, projects, releasables=[Releasable(
+            name="alpha", subtree_remote="https://github.com/test/repo.git",
+        )])
 
         with patch("rlsbl.utils.run", return_value=""):
             result = app._check_defs["subtree-remote-reachable"].impl(ctx)

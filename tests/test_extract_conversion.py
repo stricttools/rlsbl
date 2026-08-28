@@ -272,17 +272,19 @@ class TestRefusals:
             cmd_extract(str(ns.root), "core", str(tmp_path / "out"))
 
     def test_mirrored_releasable(self, tmp_path):
+        # The mirror binding is a releasable key, and only a SINGLE-member
+        # releasable may carry one, so `extras` (pkgC alone) is the mirrored
+        # unit here.
         ns = make_source(
             tmp_path,
-            projects=[
-                {"path": "pkgA", "name": "pkgA", "releasable": "core",
-                 "subtree_remote": "git@github.com:o/pkga.git"},
-                {"path": "pkgB", "name": "pkgB", "releasable": "core"},
-                {"path": "pkgC", "name": "pkgC", "releasable": "extras"},
+            releasables=[
+                Releasable(name="core"),
+                Releasable(name="extras",
+                           subtree_remote="git@github.com:o/pkgc.git"),
             ],
         )
         with pytest.raises(ExtractError) as exc:
-            cmd_extract(str(ns.root), "core", str(tmp_path / "out"))
+            cmd_extract(str(ns.root), "extras", str(tmp_path / "out"))
         assert "mirrored" in str(exc.value)
         assert "subtree_remote" in str(exc.value)
 

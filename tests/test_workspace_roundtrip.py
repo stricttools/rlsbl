@@ -102,7 +102,7 @@ class TestPreservesProjectData:
 path = "libs/foo"
 name = "foo"
 custom_globs = ["src/**"]
-subtree_remote = "git@example.com:foo.git"
+owner = "platform-team"
 library = true
 """
         ws_dir = tmp_project / WORKSPACE_DIR
@@ -114,7 +114,7 @@ library = true
 
         reloaded = load_workspace(str(tmp_project))
         assert reloaded[0]["custom_globs"] == ["src/**"]
-        assert reloaded[0]["subtree_remote"] == "git@example.com:foo.git"
+        assert reloaded[0]["owner"] == "platform-team"
         assert reloaded[0]["library"] is True
 
     def test_project_data_matches_after_roundtrip(self, tmp_project):

@@ -573,7 +573,6 @@ _WORKSPACE_PROJECT_KEYS = frozenset({
     "depends_on",
     "import_name",
     "registry_name",
-    "subtree_remote",
 })
 
 
@@ -668,7 +667,8 @@ def workspace_toml(body="", *, releasables=(), root_member=ROOT_MEMBER_TOML):
     Args:
         body: the test's own TOML (typically ``[[projects]]`` blocks).
         releasables: the releasables to declare. Each item is a name string or
-            a ``{"name": ..., "tag_format": ...}`` dict. Empty (the default)
+            a ``{"name": ..., "tag_format": ..., "subtree_remote": ...}``
+            dict. Empty (the default)
             writes ``releasables = []`` -- an explicit-mode workspace with no
             releasables yet.
         root_member: the root-member block to append after *body*, or ``""``
@@ -704,6 +704,8 @@ def workspace_toml(body="", *, releasables=(), root_member=ROOT_MEMBER_TOML):
                 block = f'[[releasables]]\nname = "{rel["name"]}"\n'
                 if rel.get("tag_format"):
                     block += f'tag_format = "{rel["tag_format"]}"\n'
+                if rel.get("subtree_remote"):
+                    block += f'subtree_remote = "{rel["subtree_remote"]}"\n'
                 tail.append(block)
         else:
             head.append("releasables = []\n")
@@ -754,14 +756,17 @@ def make_workspace(root, projects, releasables=None):
         projects: list of project dicts. Every key ``save_workspace``
             serializes is accepted -- ``path``, ``name``, ``library``,
             ``dev_node``, ``dev_only``, ``releasable``, ``depends_on``,
-            ``import_name``, ``registry_name`` and ``subtree_remote`` -- and any
+            ``import_name`` and ``registry_name`` -- and any
             other key is a ``ValueError``. A project may declare the repository
             root itself as a member with ``path = "."`` (``""`` and ``"./"``
             are accepted spellings of it); at most one root member is allowed.
+            ``subtree_remote`` is NOT a member key: the mirror's destination
+            belongs to the releasable, so declare it there.
         releasables: an explicit-mode ``[[releasables]]`` section, emitted ahead
             of the projects. Each item may be a ``Releasable``, a dict
-            (``{"name": ..., "tag_format": ...}``) or a bare name string.
-            ``tag_format`` is written only when it differs from the default.
+            (``{"name": ..., "tag_format": ..., "subtree_remote": ...}``) or a
+            bare name string. ``tag_format`` is written only when it differs
+            from the default; ``subtree_remote`` only when non-empty.
             Omit it to have one derived per releasable member.
 
     In explicit mode every releasable project must carry a ``releasable``
@@ -778,6 +783,7 @@ def make_workspace(root, projects, releasables=None):
                 rels.append(Releasable(
                     name=rel["name"],
                     tag_format=rel.get("tag_format", DEFAULT_TAG_FORMAT),
+                    subtree_remote=rel.get("subtree_remote", ""),
                 ))
             else:
                 rels.append(rel)

@@ -3,7 +3,7 @@
 Checks: router-filters-fresh, workspace-ci-router, workspace-ci-synced, workspace-targets,
 workspace-unregistered, workspace-stale-entries, dev-only-boundary,
 unversioned-boundary, dead-workspace-packages, subtree-remote-reachable,
-workspace-unbuildable, layers-violations, deps-unused, deps-undeclared,
+mirror-required, workspace-unbuildable, layers-violations, deps-unused, deps-undeclared,
 deps-runtime-test-only, deps-dev-in-lib, deps-stale, root-rlsbl-conflict,
 test-suite-workspace.
 """
@@ -587,29 +587,111 @@ def register_workspace_checks(app):
 
     @app.error_check("subtree-remote-reachable")
     def check_subtree_remote_reachable(ctx, reporter):
-        """Every project with subtree_remote must have a reachable remote."""
+        """Every mirrored releasable must have a reachable mirror remote."""
         from ..utils import run as _run
 
         errors = []
         checked = 0
-        for proj in ctx.projects:
-            remote = proj.get("subtree_remote", "")
-            if not remote:
+        for rel in ctx.releasables:
+            if not rel.is_mirrored:
                 continue
             checked += 1
             try:
-                _run("git", ["ls-remote", remote], cwd=str(ctx.workspace_root))
+                _run(
+                    "git", ["ls-remote", rel.subtree_remote],
+                    cwd=str(ctx.workspace_root),
+                )
             except subprocess.CalledProcessError:
-                errors.append(f"{proj['name']}: subtree remote unreachable: {remote}")
+                errors.append(
+                    f"{rel.name}: subtree remote unreachable: "
+                    f"{rel.subtree_remote}"
+                )
 
         if checked == 0:
-            return reporter.skipped("no projects have subtree_remote")
+            return reporter.skipped("no releasable declares a subtree_remote")
 
         if errors:
             for err in errors:
                 reporter.error(err)
             return reporter.found(f"{len(errors)} unreachable subtree remote(s)")
         return reporter.passed(f"all {checked} subtree remote(s) reachable")
+
+    @app.error_check("mirror-required")
+    def check_mirror_required(ctx, reporter):
+        """A registry-less member's releasable must declare a mirror.
+
+        Some ecosystems publish nothing anywhere: an SPM consumer writes the
+        package's git URL and a version requirement, and the resolver reads
+        plain ``vX.Y.Z`` tags off that repository. Inside a monorepo there is
+        no such repository -- the workspace's tags carry a package prefix the
+        resolver does not understand, and the repository root is not the
+        package -- so a member of that kind is unconsumable until its
+        releasable is bound to a standalone mirror.
+
+        WHICH targets those are is the targets' own answer
+        (``consumed_by_repository_url``), read through ``CHECK_TARGETS``, which
+        stays the one place this check's scope is written down.
+        """
+        from . import targets_for_check
+        from ..targets import detect_targets, resolve_releasable_config_dir
+        from ..workspace import mirror_remote_for, resolve_releasable_for_project
+
+        scope = targets_for_check("mirror-required")
+        root = str(ctx.workspace_root)
+
+        in_scope = []
+        for proj in ctx.projects:
+            try:
+                entries = detect_targets(
+                    os.path.join(root, proj["path"]),
+                    releasable_config_dir=resolve_releasable_config_dir(proj, root),
+                )
+            except Exception:
+                # An unreadable config is `workspace-targets`' finding, not
+                # this one's; here it contributes no member.
+                continue
+            names = sorted({e.name for e in entries} & set(scope))
+            if names:
+                in_scope.append((proj, names))
+
+        if not in_scope:
+            return reporter.skipped(
+                "no member declares a target consumed by repository URL"
+            )
+
+        unmirrored = []
+        for proj, names in in_scope:
+            if mirror_remote_for(proj, ctx.releasables):
+                continue
+            unmirrored.append(proj)
+            rel = resolve_releasable_for_project(proj, ctx.releasables)
+            rel_name = rel.name if rel is not None else None
+            where = (
+                f"releasable '{rel_name}'" if rel_name
+                else "the releasable it belongs to (it belongs to none)"
+            )
+            reporter.error(
+                f"{proj['name']} ({', '.join(names)}) is consumed by "
+                f"repository URL, but {where} declares no subtree_remote. "
+                f"Consumers resolve this package by cloning a repository and "
+                f"reading its version tags, and this monorepo is not that "
+                f"repository: its tags carry a package prefix the resolver "
+                f"does not understand. Bind the releasable to a standalone "
+                f"mirror in .rlsbl-monorepo/workspace.toml:\n"
+                f"    [[releasables]]\n"
+                f"    name = \"{rel_name or '<name>'}\"\n"
+                f"    subtree_remote = \"<mirror repository URL>\"\n"
+                f"then run `rlsbl monorepo mirror {proj['name']}` to create it."
+            )
+
+        if unmirrored:
+            return reporter.found(
+                f"{len(unmirrored)} member(s) consumed by repository URL with "
+                f"no mirror"
+            )
+        return reporter.passed(
+            f"all {len(in_scope)} repository-URL-consumed member(s) are mirrored"
+        )
 
     @app.error_check("workspace-unbuildable")
     def check_workspace_unbuildable(ctx, reporter):

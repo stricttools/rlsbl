@@ -49,7 +49,13 @@ from dataclasses import dataclass, field
 
 from ...git_util import Ancestry, ancestry, validate_subtree_remote_ssh_host
 from ...preview_apply import Reconciler, VerdictItem, reconcile, single
-from ...workspace import find_workspace_root, load_workspace
+from ...workspace import (
+    find_workspace_root,
+    load_releasables,
+    load_workspace,
+    mirror_remote_for,
+    resolve_releasable_for_project,
+)
 from ... import effects
 
 
@@ -718,10 +724,31 @@ def _cmd_mirror(flags, project_root):
         )
         sys.exit(1)
 
-    subtree_remote = project.subtree_remote
+    # The mirror's destination is the RELEASABLE's, not the member's: a mirror
+    # carries one subtree's whole history, tags and Releases, and the
+    # releasable is the unit that owns a version, a changelog and a tag scheme.
+    releasables = load_releasables(root, projects)
+    subtree_remote = mirror_remote_for(project, releasables)
     if not subtree_remote:
-        print(f"Error: project '{project_name}' has no subtree_remote configured.", file=sys.stderr)
-        print("Set it with: rlsbl monorepo add --subtree-remote <url> <path>", file=sys.stderr)
+        releasable = resolve_releasable_for_project(project, releasables)
+        where = (
+            f"releasable '{releasable.name}'" if releasable is not None
+            else f"project '{project_name}' (which belongs to no releasable)"
+        )
+        print(
+            f"Error: {where} declares no subtree_remote, so "
+            f"'{project_name}' has no mirror.",
+            file=sys.stderr,
+        )
+        print(
+            "Declare it on the releasable in "
+            ".rlsbl-monorepo/workspace.toml:\n"
+            "\n"
+            "  [[releasables]]\n"
+            f"  name = \"{releasable.name if releasable is not None else '<name>'}\"\n"
+            "  subtree_remote = \"<mirror repository URL>\"",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # SSH host consistency (hard error on mismatch).

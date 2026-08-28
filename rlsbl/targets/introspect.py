@@ -166,6 +166,19 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         _prop("publisher_setup_url"),
     ),
     TargetAxis(
+        "consumed_by_repository_url",
+        "Whether consumers resolve this target by repository URL and git tag "
+        "rather than from a registry, so a monorepo member of this kind "
+        "requires a standalone mirror to be consumable at all.",
+        _prop("consumed_by_repository_url"),
+    ),
+    TargetAxis(
+        "mirror_identity_files",
+        "Manifests naming the repository the package lives in, which the "
+        "mirror's scaffold commit rewrites to the mirror's own identity.",
+        lambda t: list(t.mirror_identity_files),
+    ),
+    TargetAxis(
         "release_materialization_policy",
         "Whether a reconcile may recreate a released version's missing refs "
         "unconditionally, or must refuse when a recorded identity transition "
@@ -310,6 +323,9 @@ NON_AXIS_ATTRIBUTES: dict[str, str] = {
                      "(the fact is supports_read_metadata).",
     "read_name": "operation: reads one project's manifest "
                  "(the fact is supports_read_name).",
+    "rewrite_mirror_identity": "operation: rewrites one clone's identity "
+                               "manifests onto a mirror's repository identity "
+                               "(the fact is mirror_identity_files).",
     "run_tests": "operation: runs one project's tests "
                  "(the fact is has_builtin_test_runner).",
     "shared_template_dir": "operation: resolves the shared scaffold templates "

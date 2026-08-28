@@ -1045,9 +1045,12 @@ def _mirror_workspace(mock_git_repo, tmp_path):
         json.dumps({"name": "mylib", "version": "0.1.0"})
     )
 
-    proj = {"path": "mylib", "name": "mylib", "subtree_remote": str(bare_repo)}
+    proj = {"path": "mylib", "name": "mylib", "releasable": "mylib"}
     (mock_git_repo / WORKSPACE_DIR).mkdir(exist_ok=True)
-    make_workspace(str(mock_git_repo), [proj])
+    make_workspace(
+        str(mock_git_repo), [proj],
+        releasables=[{"name": "mylib", "subtree_remote": str(bare_repo)}],
+    )
 
     run_git(mock_git_repo, "add", "mylib")
     run_git(mock_git_repo, "add", WORKSPACE_DIR)

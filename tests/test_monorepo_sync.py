@@ -545,10 +545,15 @@ class TestSyncRefusesAnUnreadableManifest:
 
 
 class TestSwiftSubtreeWarning:
-    """Tests for the Swift subtree_remote warning in monorepo sync."""
+    """`monorepo sync` says nothing about a Swift member's mirror binding.
 
-    def test_warns_swift_without_subtree_remote(self, mock_git_repo, capsys):
-        """Sync warns when a Swift project lacks subtree_remote."""
+    The requirement is the `mirror-required` check's -- a hard error asked of
+    the target registry -- not an advisory warning printed by sync, which an
+    agent reads past.
+    """
+
+    def test_sync_does_not_warn_swift_without_subtree_remote(self, mock_git_repo, capsys):
+        """Sync stays silent; the check is what refuses."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         # Create a Swift project (Package.swift triggers swift target detection)
         proj_dir = os.path.join(str(mock_git_repo), "swiftpkg")
@@ -573,10 +578,8 @@ class TestSwiftSubtreeWarning:
         with patch("rlsbl.utils.find_commit_tool", return_value="git"):
             _cmd_sync({}, project_root=".")
         captured = capsys.readouterr()
-        assert "Warning" in captured.err
-        assert "swiftpkg" in captured.err
-        assert "subtree_remote" in captured.err
-        assert "SPM" in captured.err
+        assert "subtree_remote" not in captured.err
+        assert "SPM" not in captured.err
 
 
 class TestAutoCommit:

@@ -3187,13 +3187,20 @@ def _run_release_mutating(state: ReleaseState):
         # Subtree publishing for monorepo projects with subtree_remote configured
         if release_created and monorepo_name and monorepo_project_path:
             try:
+                from ...workspace import load_releasables, mirror_remote_for
+
                 projects = load_workspace(monorepo_root)
                 proj_dict = None
                 for p in projects:
                     if p["name"] == monorepo_name:
                         proj_dict = p
                         break
-                subtree_remote = proj_dict.get("subtree_remote") if proj_dict else None
+                subtree_remote = (
+                    mirror_remote_for(
+                        proj_dict, load_releasables(monorepo_root, projects),
+                    )
+                    if proj_dict else None
+                )
             except Exception as e:
                 from ...utils import warn_exception
                 warn_exception("could not load workspace for subtree publishing", e)

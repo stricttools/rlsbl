@@ -404,7 +404,7 @@ class TestSubtreePublish:
     def _setup_monorepo_with_subtree(self, repo_root, project_name="tooling",
                                      project_path="tooling", version="1.0.0",
                                      changelog_version=None, subtree_remote=None):
-        """Create a monorepo workspace with optional subtree_remote."""
+        """Create a monorepo workspace whose releasable optionally has a mirror."""
         if changelog_version is None:
             changelog_version = version
 
@@ -414,10 +414,12 @@ class TestSubtreePublish:
             f'[[projects]]\npath = "{project_path}"\nname = "{project_name}"\n'
             f'releasable = "{project_name}"\n'
         )
+        # The mirror destination is declared by the releasable.
+        releasable = {"name": project_name}
         if subtree_remote:
-            ws_content += f'subtree_remote = "{subtree_remote}"\n'
+            releasable["subtree_remote"] = subtree_remote
         (ws_dir / "workspace.toml").write_text(
-            workspace_toml(ws_content, releasables=[project_name])
+            workspace_toml(ws_content, releasables=[releasable])
         )
         from conftest import make_releasable_state
         make_releasable_state(repo_root, project_name, version=version)

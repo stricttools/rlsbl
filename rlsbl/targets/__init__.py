@@ -63,6 +63,33 @@ def targets_sharing_workspace_environment():
     )
 
 
+def targets_consumed_by_repository_url():
+    """Targets whose consumers resolve a package by repository URL and tag.
+
+    The mirror requirement's scope: a monorepo member declaring one of these
+    is unconsumable until its releasable is bound to a standalone mirror.
+    """
+    return frozenset(
+        name
+        for name, target in TARGETS.items()
+        if target.consumed_by_repository_url
+    )
+
+
+def mirror_identity_manifests():
+    """Every manifest any target rewrites to a mirror's own identity.
+
+    The mirror's scaffold layer writes these files, so they are scaffold-owned
+    on a mirror -- derived here rather than pinned beside the reconciler's
+    other owned paths, so a target that gains an identity manifest cannot
+    become a foreign-commit false positive.
+    """
+    files = set()
+    for target in TARGETS.values():
+        files.update(target.mirror_identity_files)
+    return frozenset(files)
+
+
 def targets_with_import_analysis():
     """Targets whose sources rlsbl can read to follow imports.
 

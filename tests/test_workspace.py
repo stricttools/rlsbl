@@ -209,7 +209,7 @@ class TestWorkspaceExtraKeys:
                 "path": "libs/bar",
                 "name": "bar",
                 "watch": ["src/**"],
-                "subtree_remote": "git@example.com:bar.git",
+                "owner": "platform-team",
             }
         ]
         save_workspace(str(tmp_project), with_root_member(projects))
@@ -218,9 +218,9 @@ class TestWorkspaceExtraKeys:
         # path must come before name, name before extras, extras sorted
         path_pos = content.index("path")
         name_pos = content.index("name")
-        subtree_pos = content.index("subtree_remote")
+        owner_pos = content.index("owner")
         watch_pos = content.index("watch")
-        assert path_pos < name_pos < subtree_pos < watch_pos
+        assert path_pos < name_pos < owner_pos < watch_pos
 
 
 class TestResolveProject:

@@ -714,20 +714,26 @@ class TestMonorepoStatusWatch:
 
 
 class TestMonorepoStatusRemote:
-    """Tests for subtree_remote display in monorepo status."""
+    """Tests for mirror-destination display in monorepo status.
+
+    The destination is declared by the RELEASABLE a member belongs to, and the
+    column shows it against the member.
+    """
 
     def test_status_shows_remote_column(self, mock_git_repo, capsys):
-        """Project with subtree_remote shows Remote column with URL."""
+        """A member of a mirrored releasable shows the URL in Remote."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
         _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
 
-        # Add subtree_remote to workspace
         projects = load_workspace(".")
         for p in projects:
             if p["name"] == "tooling":
-                p["subtree_remote"] = "git@github.com:user/tooling.git"
-        make_workspace(".", projects)
+                p["releasable"] = "tooling"
+        make_workspace(".", projects, releasables=[
+            {"name": "tooling",
+             "subtree_remote": "git@github.com:user/tooling.git"},
+        ])
 
         capsys.readouterr()
         _cmd_status({}, project_root=".")
@@ -736,19 +742,22 @@ class TestMonorepoStatusRemote:
         assert "git@github.com:user/tooling.git" in captured.out
 
     def test_status_no_remote_shows_dash(self, mock_git_repo, capsys):
-        """Project without subtree_remote shows '-' when Remote column is present."""
+        """A member of an unmirrored releasable shows '-' in Remote."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
         _make_npm_project(mock_git_repo, "core", version="1.0.0")
         _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         _cmd_add(["core"], {"releasable": "false"}, project_root=".")
 
-        # Add subtree_remote only to tooling
         projects = load_workspace(".")
         for p in projects:
-            if p["name"] == "tooling":
-                p["subtree_remote"] = "git@github.com:user/tooling.git"
-        make_workspace(".", projects)
+            if p["name"] in ("tooling", "core"):
+                p["releasable"] = p["name"]
+        make_workspace(".", projects, releasables=[
+            {"name": "tooling",
+             "subtree_remote": "git@github.com:user/tooling.git"},
+            {"name": "core"},
+        ])
 
         capsys.readouterr()
         _cmd_status({}, project_root=".")
@@ -928,12 +937,15 @@ class TestMonorepoStatusDeps:
         """Deps/Rdeps columns appear after Unreleased but before Remote."""
         _setup_workspace_with_deps(mock_git_repo)
 
-        # Add a subtree remote to lib-a (the watch key is no longer legal)
+        # Mirror lib-a's releasable (the watch key is no longer legal, and the
+        # mirror destination is a releasable key)
         projects = load_workspace(".")
-        for p in projects:
-            if p["name"] == "lib-a":
-                p["subtree_remote"] = "git@github.com:user/lib-a.git"
-        make_workspace(".", projects)
+        make_workspace(".", projects, releasables=[
+            {"name": "lib-a",
+             "subtree_remote": "git@github.com:user/lib-a.git"},
+            {"name": "lib-b"},
+            {"name": "lib-c"},
+        ])
 
         capsys.readouterr()
         _cmd_status({}, project_root=".")

@@ -84,6 +84,43 @@ class BaseTarget:
     None means the target does not participate in library boundary lint.
     """
 
+    consumed_by_repository_url: ClassVar[bool] = False
+    """Whether consumers resolve this target by REPOSITORY URL and git tag.
+
+    True for the ecosystems that have no package registry at all: an SPM
+    consumer writes the package's git URL and a version requirement, and the
+    resolver reads plain ``vX.Y.Z`` tags off that repository. There is nothing
+    else to publish to, so a member of this kind inside a monorepo is
+    unconsumable as it stands -- the monorepo's tags carry a package prefix the
+    resolver does not understand, and the repository root is not the package.
+    A standalone MIRROR is what makes it consumable, which is why a monorepo
+    member with such a target requires its releasable to declare one (the
+    ``mirror-required`` check).
+
+    False for a registry-published ecosystem: an npm or PyPI consumer names a
+    package, and where its source lives changes nothing about resolving it.
+
+    Declared rather than introspected: it is a fact about how the ecosystem
+    distributes, not something the target's methods reveal.
+    """
+
+    mirror_identity_files: ClassVar[tuple[str, ...]] = ()
+    """Manifest files whose contents name the REPOSITORY the package lives in.
+
+    A subtree mirror is a different repository from the monorepo, so a manifest
+    that spells the monorepo's identity is wrong the moment it arrives there.
+    Go is the case: ``go.mod``'s ``module`` directive IS the fetch URL, so a
+    mirrored Go package whose go.mod still says
+    ``host/owner/mono/packages/lib`` cannot be fetched from the mirror at all.
+
+    The files named here are rewritten to the mirror's own identity by
+    :meth:`rewrite_mirror_identity` as part of the mirror's SCAFFOLD COMMIT,
+    and they join the mirror's scaffold-owned path set -- the tripwire's
+    allow-list -- because the tool, not an operator, is what writes them there.
+
+    Empty for a target whose manifest names no repository.
+    """
+
     release_materialization_policy: ClassVar[str] = MATERIALIZE_ALWAYS
     """Whether a released version's MISSING refs may simply be recreated.
 
@@ -721,6 +758,21 @@ class BaseTarget:
             status=SuiteRunStatus.SKIPPED,
             message=f"target '{self.name}' has no built-in test runner",
         )
+
+    def rewrite_mirror_identity(self, clone_dir, mirror_remote):
+        """Rewrite this target's identity manifests to the MIRROR's identity.
+
+        Called inside the mirror clone, before the scaffold commit is made, for
+        every target that declares :attr:`mirror_identity_files`. Returns the
+        repository-relative paths it rewrote (empty when nothing needed
+        changing), and raises when the mirror's identity cannot be derived --
+        never silently leaves a manifest naming the monorepo, which is a
+        manifest that does not resolve from the mirror.
+
+        The default does nothing, which is right for every target whose
+        manifest names no repository.
+        """
+        return []
 
     def yank(self, project_dir, version, tag, *, reason=None, dry_run=False):
         """Remove a published version from this target's registry.

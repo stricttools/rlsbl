@@ -100,10 +100,6 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
     "rlsbl/commands/monorepo/batch_release_init.py": {
         ("compare", ('flutter',)): 1,
     },
-    "rlsbl/commands/monorepo/sync.py": {
-        ("compare", ('swift', 'swift-apple')): 1,
-        ("dispatch_key", ('swift', 'swift-apple')): 1,
-    },
     "rlsbl/commands/release/phase_a.py": {
         # A real target-name conditional, NOT a collision: the ecosystem
         # keyword tagger picks between ensure_npm_keyword and

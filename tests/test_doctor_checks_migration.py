@@ -70,6 +70,7 @@ EXPECTED_CHECKS = [
     "ruff-lint",
     "dead-workspace-packages",
     "subtree-remote-reachable",
+    "mirror-required",
     "workspace-unbuildable",
     "circular-deps",
     # Phase 12 project checks

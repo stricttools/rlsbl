@@ -130,15 +130,26 @@ class TestMakeWorkspaceProjectKeys:
         assert by_name["app"].depends_on == ["lib"]
         assert by_name["lib"].depends_on == []
 
-    def test_subtree_remote_round_trips(self, tmp_path):
+    def test_subtree_remote_round_trips_on_the_releasable(self, tmp_path):
+        """The mirror destination is a releasable key, not a member key."""
+        from rlsbl.workspace import load_releasables
+
         make_workspace(
             tmp_path,
-            [{"path": "a", "name": "a",
-              "subtree_remote": "git@github.com:o/a.git"}],
+            [{"path": "a", "name": "a", "releasable": "a"}],
+            releasables=[{"name": "a",
+                          "subtree_remote": "git@github.com:o/a.git"}],
         )
-        assert declared_members(load_workspace(str(tmp_path)))[0].subtree_remote == (
-            "git@github.com:o/a.git"
-        )
+        rels = {r.name: r for r in load_releasables(str(tmp_path))}
+        assert rels["a"].subtree_remote == "git@github.com:o/a.git"
+
+    def test_subtree_remote_is_refused_as_a_member_key(self, tmp_path):
+        with pytest.raises(ValueError, match="subtree_remote"):
+            make_workspace(
+                tmp_path,
+                [{"path": "a", "name": "a",
+                  "subtree_remote": "git@github.com:o/a.git"}],
+            )
 
     def test_registry_and_import_names_round_trip(self, tmp_path):
         make_workspace(
@@ -189,7 +200,7 @@ class TestMakeWorkspaceProjectKeys:
             [{
                 "path": "a", "name": "a", "library": True,
                 "dev_only": False, "dev_node": False, "releasable": "core",
-                "depends_on": [], "subtree_remote": "", "registry_name": "a",
+                "depends_on": [], "registry_name": "a",
                 "import_name": "a",
             }],
             releasables=["core"],

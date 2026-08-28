@@ -15,6 +15,7 @@ import os
 
 from ..targets import (
     TARGETS,
+    targets_consumed_by_repository_url,
     targets_with_builtin_tests,
     targets_with_circular_dep_analysis,
     targets_with_dep_floors,
@@ -118,6 +119,11 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "deps-stale": "workspace",
     "dead-workspace-packages": "workspace",
     "subtree-remote-reachable": "workspace",
+    # mirror-required's scope is the ecosystems with no registry at all: their
+    # consumers resolve a package by repository URL, so a monorepo member of
+    # that kind is unconsumable without a mirror. The set is the targets' own
+    # answer, never a name list restated here.
+    "mirror-required": targets_consumed_by_repository_url(),
     "workspace-unbuildable": "workspace",
     # --- workspace + language-specific import scanners ---
     # All five sets below are the targets' own answers, derived from the

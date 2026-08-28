@@ -237,9 +237,10 @@ def validate_workspace_model(data, projects):
     3. two members whose paths normalize to the same territory;
     4. no root member;
     5. a ``watch`` key on any member;
-    6. a root member named anything but ``root``;
-    7. a non-root member named ``root``;
-    8. a releasable owning the root member with no explicit ``tag_format``.
+    6. a ``subtree_remote`` key on any member;
+    7. a root member named anything but ``root``;
+    8. a non-root member named ``root``;
+    9. a releasable owning the root member with no explicit ``tag_format``.
 
     Structural facts about the member list (2-4) precede per-member key
     errors (5-7): a remedy for a stray key presumes the member list itself
@@ -308,6 +309,27 @@ def validate_workspace_model(data, projects):
                 f"`watch = [...]` line; if this member genuinely needs to own "
                 f"files outside its own directory, declare that directory as "
                 f"a member of its own. " + _MIGRATION_NOTE
+            )
+
+    # -- the mirror destination moved onto the releasable --------------------
+    for i, proj in enumerate(projects):
+        if "subtree_remote" in proj:
+            raise WorkspaceError(
+                f"projects[{i}] ('{proj['name']}'): the 'subtree_remote' key "
+                f"is no longer a member key. A mirror carries one subtree's "
+                f"whole history, its tags and its GitHub Releases, and the "
+                f"unit that owns a version, a changelog and a tag scheme is "
+                f"the releasable -- so the mirror's destination is declared "
+                f"there. Move the line into this member's [[releasables]] "
+                f"entry:\n"
+                f"\n"
+                f"  [[releasables]]\n"
+                f"  name = \"<the releasable '{proj['name']}' belongs to>\"\n"
+                f"  subtree_remote = {proj['subtree_remote']!r}\n"
+                f"\n"
+                f"and delete it from this member. A releasable with more than "
+                f"one member cannot declare one at all: there would be no "
+                f"single subtree to mirror. " + _MIGRATION_NOTE
             )
 
     # -- (b)/(c) the reserved name ------------------------------------------
@@ -430,7 +452,37 @@ def _load_explicit_releasables(raw_releasables, projects):
                 f"releasables[{i}] ('{{name}}'): tag_format must be a string"
                 .format(name=name)
             )
-        releasables.append(Releasable(name=name, tag_format=tag_format))
+        # The mirror's destination. Absence is the empty string rather than a
+        # carried None: unlike tag_format, nothing downstream has to tell "not
+        # declared" from "declared empty" -- a releasable is mirrored or it is
+        # not, and an empty URL is not a mirror.
+        subtree_remote = raw.get("subtree_remote", "")
+        if not isinstance(subtree_remote, str):
+            raise WorkspaceError(
+                f"releasables[{i}] ('{name}'): subtree_remote must be a "
+                f"string (the mirror repository's git URL)"
+            )
+        releasables.append(Releasable(
+            name=name, tag_format=tag_format, subtree_remote=subtree_remote,
+        ))
+
+    # A mirror mirrors ONE subtree. A releasable with several members has no
+    # single subtree to split, so the binding cannot be honoured and is refused
+    # rather than silently applied to whichever member came first.
+    for rel in releasables:
+        if not rel.is_mirrored:
+            continue
+        member_names = [p["name"] for p in members_of(rel.name, projects)]
+        if len(member_names) > 1:
+            raise WorkspaceError(
+                f"releasable '{rel.name}' declares a subtree_remote but has "
+                f"{len(member_names)} members ({', '.join(member_names)}). A "
+                f"mirror is the standalone repository ONE subtree is split "
+                f"into, so a mirrored releasable has exactly one member -- "
+                f"there is no single subtree to mirror otherwise. Either drop "
+                f"the subtree_remote line, or split this releasable so the "
+                f"mirrored member owns a releasable of its own."
+            )
 
     # Validate project membership: every releasable project must declare releasable.
     defined_names = {r.name for r in releasables}
@@ -500,6 +552,28 @@ def resolve_releasable_for_project(proj, releasables):
     return None
 
 
+def mirror_remote_for(proj, releasables) -> str:
+    """The mirror destination a project's releasable declares, or ``""``.
+
+    The ONE resolution of "is this member mirrored, and where": the binding
+    lives on the releasable, so every reader that used to read a member's own
+    ``subtree_remote`` asks this instead. A member outside every releasable, or
+    one whose releasable declares no mirror, answers the empty string.
+    """
+    rel = resolve_releasable_for_project(proj, releasables)
+    if rel is None:
+        return ""
+    return rel.subtree_remote
+
+
+def mirrored_releasable_for(proj, releasables):
+    """The mirrored :class:`Releasable` *proj* belongs to, or None."""
+    rel = resolve_releasable_for_project(proj, releasables)
+    if rel is None or not rel.is_mirrored:
+        return None
+    return rel
+
+
 def _get_releasable_value(proj):
     """Extract the releasable value from a project (WorkspaceProject or dict).
 
@@ -536,12 +610,15 @@ def _build_project_table(d):
 def _build_releasable_table(d):
     """Build a fresh tomlkit table for a releasable desired-dict.
 
-    ``d`` carries ``name`` and (optionally) ``tag_format``.
+    ``d`` carries ``name`` and (optionally) ``tag_format`` and
+    ``subtree_remote``.
     """
     table = tomlkit.table()
     table.add("name", d["name"])
     if "tag_format" in d:
         table.add("tag_format", d["tag_format"])
+    if "subtree_remote" in d:
+        table.add("subtree_remote", d["subtree_remote"])
     return table
 
 
@@ -648,6 +725,8 @@ def save_workspace(root, projects, releasables=None):
             d = {"name": rel.name}
             if rel.declares_tag_format:
                 d["tag_format"] = rel.tag_format
+            if rel.is_mirrored:
+                d["subtree_remote"] = rel.subtree_remote
             desired_rels.append(d)
 
         if not desired_rels:

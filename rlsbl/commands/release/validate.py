@@ -925,9 +925,14 @@ def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
     if monorepo_name:
         target = TARGETS[registry]
         try:
+            from ...workspace import load_releasables, mirror_remote_for
+
             projects = load_workspace(monorepo_root)
             proj_dict = next((p for p in projects if p["name"] == monorepo_name), None)
-            subtree_remote = proj_dict.get("subtree_remote") if proj_dict else None
+            subtree_remote = (
+                mirror_remote_for(proj_dict, load_releasables(monorepo_root, projects))
+                if proj_dict else None
+            )
         except Exception as e:
             from ...utils import warn_exception
             warn_exception("could not load workspace for subtree info", e)

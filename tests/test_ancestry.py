@@ -230,7 +230,11 @@ class TestMirrorTripwireMapping:
         remote.mkdir()
         subprocess.run(["git", "init", "-q", "--bare"], cwd=str(remote), check=True)
         (root / WORKSPACE_DIR).mkdir(exist_ok=True)
-        make_workspace(str(root), [{"path": "mylib", "name": "mylib", "subtree_remote": str(remote)}])
+        make_workspace(
+            str(root),
+            [{"path": "mylib", "name": "mylib", "releasable": "mylib"}],
+            releasables=[{"name": "mylib", "subtree_remote": str(remote)}],
+        )
         _git(root, "add", "-A")
         _git(root, "commit", "-q", "-m", "initial monorepo")
 

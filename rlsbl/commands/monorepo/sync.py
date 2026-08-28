@@ -862,14 +862,7 @@ def _cmd_sync(flags, project_root):
         msg += f" Removed {stale_removed} stale workflow(s)."
     print(msg)
 
-    # Warn about Swift projects without subtree_remote
-    for proj in projects:
-        rel_dir = resolve_releasable_config_dir(proj, root)
-        proj_targets = detect_targets(os.path.join(root, proj["path"]), releasable_config_dir=rel_dir)
-        if any(te.name in ("swift", "swift-apple") for te in proj_targets):
-            if not proj.get("subtree_remote"):
-                print(
-                    f"Warning: Swift project '{proj['name']}' has no subtree_remote configured. "
-                    "SPM consumers won't be able to resolve monorepo tags.",
-                    file=sys.stderr,
-                )
+    # A member consumed by repository URL (SPM) needs a mirror to be
+    # resolvable at all. That is the `mirror-required` check's finding, a hard
+    # error asked of the target registry rather than a target-name literal and
+    # an advisory warning here.

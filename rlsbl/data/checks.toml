@@ -370,6 +370,19 @@ needs_network = true
 depends_on = []
 scope = "workspace"
 
+# mirror-required: a member whose ecosystem has no registry is consumed by
+# repository URL, so inside a monorepo it is unconsumable until its releasable
+# declares a mirror. Structural and offline -- it reads workspace.toml and the
+# members' declared targets, nothing else.
+[checks.mirror-required]
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
 # workspace-unbuildable: a member whose manifest `uv sync` cannot resolve is
 # also a member whose manifest the dependency scanners cannot read, and the CI
 # router's paths filters are derived from what those scanners find. A manifest

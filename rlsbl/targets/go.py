@@ -64,9 +64,73 @@ class GoTarget(BaseTarget):
     # refuses instead, and the operator decides.
     release_materialization_policy = MATERIALIZE_UNLESS_IDENTITY_CHANGED
 
+    # go.mod's ``module`` directive IS the fetch URL, so a mirrored Go package
+    # whose go.mod still names the monorepo cannot be fetched from the mirror.
+    # The mirror's scaffold commit rewrites it (see rewrite_mirror_identity).
+    mirror_identity_files = ("go.mod",)
+
     @property
     def name(self):
         return "go"
+
+    def rewrite_mirror_identity(self, clone_dir, mirror_remote):
+        """Move this clone's module path onto the mirror repository's identity.
+
+        The new path is what the MIRROR's remote states -- ``host/owner/repo``
+        -- because that is the URL ``go get`` will resolve against once the
+        mirror is the package's public home. The rewrite itself is the one
+        ``rlsbl rewrite go-module-path`` performs: the ``module`` directive,
+        every cross-module reference to it, and every import site, all
+        token-anchored so a neighbouring module whose path merely starts with
+        the same letters is left alone.
+
+        Two refusals, both hard, because either would leave a go.mod that does
+        not resolve:
+
+        * a mirror remote whose URL names no module host (a local path, an SSH
+          alias with no dot in it) -- there is no identity to rewrite TO;
+        * a clone with no go.mod declaring a module path -- there is nothing to
+          rewrite FROM.
+        """
+        from ..commands.rewrite.go_module_path import (
+            GoModuleRewriteError,
+            apply_item,
+            declared_modules,
+            find_go_mod_files,
+            observe,
+        )
+        from ..go_identity import RepoIdentity, expected_module_path, parse_remote
+
+        identity: RepoIdentity | None = parse_remote(mirror_remote)
+        if identity is None or not identity.host_is_a_domain:
+            raise GoModuleRewriteError(
+                f"the mirror remote {mirror_remote!r} names no module host, so "
+                f"this Go package's module path cannot be moved onto the "
+                f"mirror's identity. A Go module path IS its fetch URL: "
+                f"leaving go.mod naming the monorepo would publish a mirror "
+                f"nobody can `go get`. Give the mirror a remote whose URL "
+                f"states a host and an owner/repo path."
+            )
+        new_path, _tail = expected_module_path(identity, "")
+
+        declared = declared_modules(find_go_mod_files(clone_dir))
+        root_mod = os.path.join(clone_dir, "go.mod")
+        old_path = declared.get(root_mod)
+        if not old_path:
+            raise GoModuleRewriteError(
+                f"the mirror clone has no go.mod declaring a module path at "
+                f"its root, so there is nothing to move onto the mirror's "
+                f"identity ({new_path})."
+            )
+        if old_path == new_path:
+            return []
+
+        rewritten = []
+        for item in observe(clone_dir, old_path, new_path):
+            if item.data is None:
+                continue
+            apply_item(item, old_path, new_path, rewritten)
+        return rewritten
 
     def read_name(self, dir_path, ctx):
         """Read the last segment of the module path from go.mod."""

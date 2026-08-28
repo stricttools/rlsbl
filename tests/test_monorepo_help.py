@@ -43,7 +43,9 @@ class TestSubcommandHelp:
         # There is no --watch: what CI reacts to is derived from the
         # workspace, never declared per project.
         assert "--watch" not in result.stdout
-        assert "--subtree-remote" in result.stdout
+        # There is no --subtree-remote either: the mirror destination is a
+        # releasable-level key, declared in workspace.toml.
+        assert "--subtree-remote" not in result.stdout
 
     def test_init_help(self):
         result = app.test(["monorepo", "init", "--help"])

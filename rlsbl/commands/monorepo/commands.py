@@ -4,7 +4,6 @@ import os
 import sys
 import time
 
-from ...git_util import validate_subtree_remote_ssh_host
 from ...ownership import OwnershipScope
 from ...utils import commit_files
 from ...workspace import find_workspace_root, load_workspace, save_workspace, WorkspaceProject, WORKSPACE_DIR, WORKSPACE_FILE
@@ -138,7 +137,6 @@ def _cmd_add(args, flags, project_root, dry_run=False):
             )
             sys.exit(1)
 
-    subtree_remote = flags.get("subtree-remote")
     depends_on_raw = flags.get("depends-on")
     library_raw = flags.get("library")
     dev_only_raw = flags.get("dev_only")
@@ -226,13 +224,7 @@ def _cmd_add(args, flags, project_root, dry_run=False):
                 print(f"Error: Dependency '{dep_name}' does not exist in workspace.", file=sys.stderr)
                 sys.exit(1)
 
-    # Validate SSH host consistency between subtree_remote and origin
-    if subtree_remote:
-        validate_subtree_remote_ssh_host(subtree_remote, root)
-
     project = {"path": path, "name": name}
-    if subtree_remote:
-        project["subtree_remote"] = subtree_remote
     if depends_on:
         project["depends_on"] = depends_on
     if library is True:
@@ -526,7 +518,11 @@ def _cmd_status(flags, project_root):
     graph = WorkspaceGraph(root, projects)
 
     # Releasable membership, for the column display
-    from ...workspace import load_releasables, resolve_releasable_for_project
+    from ...workspace import (
+        load_releasables,
+        mirror_remote_for,
+        resolve_releasable_for_project,
+    )
     releasable_map = {}  # project name -> releasable name
     releasables = load_releasables(root, projects)
     for proj in projects:
@@ -585,8 +581,8 @@ def _cmd_status(flags, project_root):
         # Dev-only flag
         dev_only_str = "yes" if proj.dev_only else ""
 
-        # Subtree remote
-        remote = proj.get("subtree_remote", "")
+        # Subtree remote -- declared by the releasable this member belongs to
+        remote = mirror_remote_for(proj, releasables)
         remote_str = remote if remote else "-"
 
         # Releasable membership

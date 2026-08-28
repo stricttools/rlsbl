@@ -21,7 +21,7 @@ rendered: the preview IS the pipeline.
 Refusals happen during observation, so they cost nothing and fire identically
 under a preview:
 
-* the releasable is **mirrored** (a member declares ``subtree_remote``). A
+* the releasable is **mirrored** (it declares ``subtree_remote``). A
   mirror is a tool-owned derived artifact of THIS repository; converting the
   releasable out from under it would leave the mirror pointing at a subtree that
   no longer exists. Promoting a mirror to the real repository is its own
@@ -908,17 +908,14 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
 
     _check_member_contents(workspace_root, members)
 
-    mirrored = [m.name for m in members if m.subtree_remote]
-    if mirrored:
+    if releasable.is_mirrored:
         raise ExtractError(
-            f"releasable '{releasable_name}' is mirrored: "
-            f"{', '.join(mirrored)} "
-            f"{'declares' if len(mirrored) == 1 else 'declare'} a "
-            f"subtree_remote. The mirror is a "
-            f"tool-owned artifact derived from THIS repository, and extracting "
-            f"the releasable would leave it deriving from a subtree that no "
-            f"longer exists. Promoting a mirror into the real repository is its "
-            f"own operation; until then, remove the subtree_remote binding (and "
+            f"releasable '{releasable_name}' is mirrored at "
+            f"{releasable.subtree_remote}. The mirror is a tool-owned artifact "
+            f"derived from THIS repository, and extracting the releasable "
+            f"would leave it deriving from a subtree that no longer exists. "
+            f"Promoting a mirror into the real repository is its own "
+            f"operation; until then, remove the subtree_remote binding (and "
             f"the mirror remote) first."
         )
 

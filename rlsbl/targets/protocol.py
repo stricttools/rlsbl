@@ -108,6 +108,20 @@ class ReleaseTarget(Protocol):
     publisher_setup_url: str
     """Where a repository-bound publisher is registered. Empty when none is."""
 
+    consumed_by_repository_url: bool
+    """Whether consumers resolve this target by repository URL and git tag.
+
+    True where the ecosystem has no registry (SPM), so a monorepo member is
+    unconsumable without a standalone mirror to point consumers at.
+    """
+
+    mirror_identity_files: tuple[str, ...]
+    """Manifests naming the repository the package lives in.
+
+    Rewritten to the mirror's own identity by :meth:`rewrite_mirror_identity`
+    as part of the mirror's scaffold commit, and scaffold-owned there.
+    """
+
     auto_detectable: str
     """Whether this target can be auto-detected: 'yes', 'no', or 'conditional'."""
 
@@ -390,6 +404,17 @@ class ReleaseTarget(Protocol):
         skip rather than a passing step for a suite that never ran.
         """
         ...
+
+    # --- Optional: Mirror identity ---
+
+    def rewrite_mirror_identity(self, clone_dir: str, mirror_remote: str) -> list:
+        """Rewrite ``mirror_identity_files`` onto the mirror's own identity.
+
+        Returns the repository-relative paths rewritten. Raises when the
+        mirror's identity cannot be derived: a manifest still naming the
+        monorepo is one that does not resolve from the mirror.
+        """
+        return []
 
     # --- Optional: Registry removal ---
 
