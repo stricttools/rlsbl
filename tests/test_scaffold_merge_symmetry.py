@@ -234,7 +234,7 @@ class TestWorkingDirectoryRewriteSymmetry:
         _scaffold_multi(mock_git_repo)
 
         ci = mock_git_repo / ".github" / "workflows" / "ci-pypi.yml"
-        assert "working-directory: ./py" in ci.read_text()
+        assert "working-directory: py" in ci.read_text()
         base = (
             mock_git_repo / ".rlsbl" / "bases"
             / ".github" / "workflows" / "ci-pypi.yml"
@@ -262,4 +262,4 @@ class TestWorkingDirectoryRewriteSymmetry:
         after = ci.read_text()
         assert "<<<<<<<" not in after, "re-scaffold produced merge conflict markers"
         assert "# pinned" in after, "the local edit was lost"
-        assert "working-directory: ./py" in after
+        assert "working-directory: py" in after
