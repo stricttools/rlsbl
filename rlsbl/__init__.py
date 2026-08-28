@@ -1130,7 +1130,7 @@ class ScrubEntireHistory:
     # Rewrites git history and force-pushes it. Every clone of the repo is
     # invalidated and the old history is gone from the remote.
     consequential=True,
-    help="Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, and recreates GitHub Releases on the new tags.",
+    help="Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, re-points the tags, and rewrites each tag's GitHub Release document in place. A Release is never deleted, so a failure mid-step leaves the previous document standing rather than a tag with no Release at all.",
 )
 @strictcli.choice_flag(
     "mode", help="Which scrub mode to run: match a regex, rewrite one file, or execute a recipe TOML. Exactly one must be elected, and the elected one decides which further flags exist.",

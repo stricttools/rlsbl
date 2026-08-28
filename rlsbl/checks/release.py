@@ -21,9 +21,10 @@ import subprocess
 from ._common import _resolve_release_identity
 
 # One remedy for every finding this module reports. `rlsbl release reconcile`
-# re-pushes the tags a rewrite moved and recreates their GitHub Releases from
-# safegit's rewrite journal, and it is fail-closed: a divergence the journal
-# does not explain is a hard error there rather than a force-push.
+# re-pushes the tags a rewrite moved and writes their GitHub Release documents
+# in place (creating only the ones that are absent), driven by safegit's
+# rewrite journal, and it is fail-closed: a divergence the journal does not
+# explain is a hard error there rather than a force-push.
 _REMEDY = "Repair the release metadata with `rlsbl release reconcile`."
 
 # Reading the whole tag namespace on both sides costs a fixed number of
