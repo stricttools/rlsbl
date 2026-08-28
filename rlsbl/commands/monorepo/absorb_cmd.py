@@ -473,13 +473,17 @@ def _derive_tag_format(source_repo, entries, name, dest_path):
 def _version_key(version):
     """Order two version strings, pre-releases before their stable base.
 
-    The archive lister's own key, asked of a synthesized archive name, so
-    "which of these versions is the newest" has one answer in the tool rather
-    than a second ordering written here.
+    The release archives' own ordering, so "which of these versions is the
+    newest" has one answer in the tool rather than a second ordering written
+    here. A source repository's tags are not rlsbl's to name, so a version
+    outside that vocabulary sorts lowest rather than refusing: it is a
+    candidate for ``max`` here, never a version rlsbl records.
     """
-    from ...release_file import _archive_sort_key
+    from ...release_file import archive_sort_key, is_release_version
 
-    return _archive_sort_key(f"v{version}.toml") or (0, 0, 0, 0, 0, 0)
+    if not is_release_version(version):
+        return (0, 0, 0, 0, 0, 0)
+    return archive_sort_key(version)
 
 
 def _resolve_version(source_repo, entries, version_tags):

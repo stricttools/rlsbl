@@ -10,7 +10,9 @@ from rlsbl.release_file import (
     ReleaseConfig,
     VALID_BUMP_TYPES,
     VALID_PREIDS,
+    archive_sort_key,
     get_release_file_path,
+    is_release_version,
     read_batch_release_file,
     read_release_file,
     unfinalize_release_file,
@@ -595,3 +597,43 @@ class TestStrictspecReleaseFileGate:
         )
         with pytest.raises(ReleaseFileError, match="description must be set"):
             read_release_file(p)
+
+
+class TestReleaseVersionGrammar:
+    """One version vocabulary names archives AND changelog files.
+
+    The release flow names ``v{version}.toml`` and ``{version}.jsonl`` for the
+    same version, so the recognizer and the ordering are one thing. The JSONL
+    changelog file lister used to restate both, which is why a channel added to
+    :data:`VALID_PREIDS` could be recognized in one place and not the other.
+    """
+
+    def test_recognizes_what_the_flow_names(self):
+        assert is_release_version("0.43.0")
+        assert is_release_version("0.43.0-alpha.0")
+        assert is_release_version("1.0.0-beta.3")
+        assert is_release_version("2.1.0-rc.7")
+
+    def test_refuses_a_channel_the_flow_never_names(self):
+        assert not is_release_version("1.0.0-gamma.0")
+        # "stable" is the promotion instruction that STRIPS the suffix, never
+        # a suffix itself.
+        assert not is_release_version("1.0.0-stable.0")
+        assert not is_release_version("unreleased")
+        assert not is_release_version("1.0")
+
+    def test_prereleases_sort_before_their_own_stable(self):
+        assert archive_sort_key("0.43.0-rc.7") < archive_sort_key("0.43.0")
+        assert archive_sort_key("0.43.0-alpha.0") < archive_sort_key("0.43.0-beta.0")
+        assert archive_sort_key("0.43.0-alpha.2") < archive_sort_key("0.43.0-alpha.10")
+
+    def test_the_changelog_lister_orders_by_this_same_key(self):
+        from rlsbl.changelog.files import _parse_semver
+
+        assert _parse_semver("0.43.0-rc.7.jsonl") == archive_sort_key("0.43.0-rc.7")
+        assert _parse_semver("unreleased.jsonl") is None
+        assert _parse_semver("1.0.0-gamma.0.jsonl") is None
+
+    def test_an_unnamable_version_refuses_rather_than_guesses(self):
+        with pytest.raises(ValueError, match="not an archivable version"):
+            archive_sort_key("1.0.0-gamma.0")

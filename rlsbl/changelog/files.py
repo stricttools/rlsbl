@@ -6,21 +6,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 import os
-import re
 import stat
 import sys
 
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
 from ..errors import ChangelogError, ConfigError
+from ..release_file import archive_sort_key, is_release_version
 from .. import effects
-
-_VERSION_RE = re.compile(
-    r"^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?\.jsonl$"
-)
-
-# Maps pre-release identifiers to sort rank.  Stable versions use
-# is_stable=1 which sorts after all pre-releases (is_stable=0).
-_PREID_RANK = {"alpha": 0, "beta": 1, "rc": 2}
 
 # Sort key type: (major, minor, patch, is_stable, preid_rank, counter)
 _SemverKey = tuple[int, int, int, int, int, int]
@@ -90,22 +82,26 @@ def can_remap_hash(h: str, sha_map: dict) -> bool:
 
 
 def _parse_semver(filename: str) -> _SemverKey | None:
-    """Extract a sort key from a versioned filename, or None.
+    """Extract a sort key from a versioned ``{version}.jsonl`` filename, or None.
 
-    Returns ``(major, minor, patch, is_stable, preid_rank, counter)``
-    where ``is_stable`` is 1 for stable versions (so they sort after
-    pre-releases) and ``preid_rank`` maps alpha=0, beta=1, rc=2.
+    The version vocabulary and the ordering are :mod:`rlsbl.release_file`'s --
+    the same grammar the release archives are named and ordered by, because the
+    same release flow names both files for the same version. This carries only
+    what is specific to a changelog file: the ``.jsonl`` extension. It used to
+    restate the pattern, the pre-release channel ranks and the ordering, so a
+    new channel had to be added in two places to be recognized in both.
+
+    Returns ``(major, minor, patch, is_stable, preid_rank, counter)`` where
+    ``is_stable`` is 1 for stable versions, so they sort after every
+    pre-release of the same base.
     """
-    m = _VERSION_RE.match(filename)
-    if not m:
+    suffix = ".jsonl"
+    if not filename.endswith(suffix):
         return None
-    major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    preid = m.group(4)
-    if preid is None:
-        # Stable version — sorts after all pre-releases of the same base.
-        return (major, minor, patch, 1, 0, 0)
-    counter = int(m.group(5))
-    return (major, minor, patch, 0, _PREID_RANK[preid], counter)
+    version = filename[: -len(suffix)]
+    if not is_release_version(version):
+        return None
+    return archive_sort_key(version)
 
 
 def get_changes_dir(project_path: str) -> str:

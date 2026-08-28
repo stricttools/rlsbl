@@ -98,6 +98,18 @@ def archive_version(name: str) -> str | None:
     return name[1:-len(".toml")]
 
 
+def is_release_version(version: str) -> bool:
+    """True when *version* is a version rlsbl's release flow could have named.
+
+    The version-level half of :func:`archive_version`, for callers holding a
+    version string rather than an archive filename -- the JSONL changelog file
+    lister, whose files are named ``{version}.jsonl`` by the same flow. It is
+    what makes :func:`archive_sort_key` askable without catching its refusal:
+    check first, then order.
+    """
+    return _ARCHIVE_NAME_RE.match(f"v{version}.toml") is not None
+
+
 def archive_sort_key(version: str):
     """Ascending order key for an archived *version*.
 
@@ -119,19 +131,6 @@ def archive_sort_key(version: str):
     if preid is None:
         return (major, minor, patch, 1, 0, 0)
     return (major, minor, patch, 0, _PREID_RANK[preid], int(m.group(5)))
-
-
-def _archive_sort_key(name: str):
-    """:func:`archive_sort_key` asked of an archive FILENAME, or None.
-
-    One remaining caller (``monorepo absorb``'s version ordering) synthesizes
-    an archive name to ask for the ordering; it should ask
-    :func:`archive_sort_key` for the version directly, at which point this
-    adapter goes away. It is an adapter, not a second opinion: both the
-    recognizer and the ordering are the ones above.
-    """
-    version = archive_version(name)
-    return None if version is None else archive_sort_key(version)
 
 
 def list_archived_versions(releases_dir: str) -> list[str]:
