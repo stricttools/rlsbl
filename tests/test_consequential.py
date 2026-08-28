@@ -57,7 +57,7 @@ MUST_NOT_PROMPT = [
     "changelog add", "changelog generate", "changelog amend", "changelog edit",
     "release init", "release edit",
     "monorepo init", "monorepo add", "monorepo sync", "monorepo snapshot",
-    "monorepo cleanup", "monorepo migrate-releasable",
+    "monorepo cleanup",
     "monorepo rename-releasable", "monorepo release init",
     "dev install", "dev sync", "dev status",
     # The rewrite group sweeps the working tree and nothing else. Both

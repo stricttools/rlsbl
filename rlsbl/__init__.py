@@ -288,16 +288,11 @@ def _check_context_factory():
     workspace_root = find_workspace_root()
     if workspace_root is not None:
         from .workspace_graph import WorkspaceGraph
-        from .workspace import is_explicit_mode, load_releasables
+        from .workspace import load_releasables
 
         projects = load_workspace(workspace_root)
         graph = WorkspaceGraph(workspace_root, projects)
-        # load_releasables raises WorkspaceError when [[releasables]] is
-        # missing (implicit mode).  Only call it in explicit mode.
-        if is_explicit_mode(workspace_root):
-            releasables = load_releasables(workspace_root, projects=projects)
-        else:
-            releasables = []
+        releasables = load_releasables(workspace_root, projects=projects)
         ctx = create_context(Path.cwd(), workspace_root=Path(workspace_root))
         wctx = WorkspaceCheckContext(
             project_root=ctx.project_root,
@@ -2069,33 +2064,10 @@ def cmd_mono_absorb(ctx, source_repo, dest_path, name, registry_name, releasable
     )
 
 
-@mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.", effect="mutating")
+@mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Detect residue first with `rlsbl check --name releasable-residue`.", effect="mutating")
 @effects.handler
 def cmd_mono_cleanup(ctx):
     """Remove per-package release-state residue from releasable members."""
-    dry_run = ctx.dry_run
-    root = _require_project_root()
-    from .workspace import find_workspace_root, is_explicit_mode
-    ws_root = find_workspace_root(str(root))
-    if ws_root is None:
-        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
-        sys.exit(1)
-    if not is_explicit_mode(ws_root):
-        print(
-            "Error: cleanup only applies to explicit-mode workspaces "
-            "([[releasables]] in workspace.toml).",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    from .releasable_cleanup import run_cleanup_command
-    run_cleanup_command(ws_root, dry_run=dry_run)
-
-
-@mono.command(name="migrate-releasable", help="Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).", effect="mutating")
-@strictcli.arg(name="releasable_name", help="Name of the releasable group in workspace.toml to migrate", presence="required")
-@effects.handler
-def cmd_mono_migrate_releasable(ctx, releasable_name):
-    """Migrate a releasable from per-package state to the releasable model."""
     dry_run = ctx.dry_run
     root = _require_project_root()
     from .workspace import find_workspace_root
@@ -2103,55 +2075,8 @@ def cmd_mono_migrate_releasable(ctx, releasable_name):
     if ws_root is None:
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
-    from .releasable_migration import cmd_migrate_releasable
-    try:
-        result = cmd_migrate_releasable(
-            ws_root, releasable_name, dry_run=dry_run,
-        )
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    if dry_run:
-        members = ", ".join(result.get("members", []))
-        print(f"Would migrate releasable '{releasable_name}'")
-        print(f"  Members: {members}")
-        print(f"  Tag format: {result.get('tag_format', 'N/A')}")
-        # Summarize state
-        state = result.get("state", {})
-        for proj in state.get("projects", []):
-            if proj.get("has_changelog"):
-                print(f"  {proj['name']}: {proj['unreleased_entry_count']} unreleased entries")
-    else:
-        changelogs = result.get("changelogs") or {}
-        versions = result.get("versions") or {}
-        tag = result.get("tag") or {}
-        cleanup = result.get("cleanup") or []
-
-        print(f"Migrated releasable '{releasable_name}'")
-        # entries_merged counts everything now in the releasable's
-        # unreleased.jsonl -- its own pre-existing entries plus the member
-        # contributions -- while source_projects lists only the members that
-        # contributed, which can be empty.
-        entry_count = changelogs.get("entries_merged", 0)
-        sources = changelogs.get("source_projects") or []
-        if sources:
-            print(f"  Changelogs: {entry_count} unreleased entries, "
-                  f"including contributions from {', '.join(sources)}")
-        elif entry_count:
-            print(f"  Changelogs: {entry_count} unreleased entries, "
-                  "all pre-existing in the releasable (no member contributed)")
-        else:
-            print("  Changelogs: no unreleased entries to merge")
-        print(f"  Version: {versions.get('version', 'N/A')} ({versions.get('status', 'N/A')})")
-        if tag.get("tag"):
-            print(f"  Tag created: {tag['tag']} (from {tag.get('source_tag', 'N/A')})")
-        elif tag.get("status") == "no_tags":
-            print("  Tag: no per-package tags found, skipped")
-        if tag.get("skipped_members"):
-            print(f"  Skipped members (no scoped tag): {', '.join(tag['skipped_members'])}")
-        if cleanup:
-            print(f"  Cleaned up: {len(cleanup)} per-package directories")
+    from .releasable_cleanup import run_cleanup_command
+    run_cleanup_command(ws_root, dry_run=dry_run)
 
 
 @mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: re-running heals a crash between the commit and the tag push.", effect="mutating")

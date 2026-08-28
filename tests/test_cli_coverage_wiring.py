@@ -626,28 +626,22 @@ class TestMonorepoWorkspaceGatedWiring:
         result, m = _dispatch(
             ["--dry-run", "monorepo", "cleanup"],
             "rlsbl.releasable_cleanup.run_cleanup_command",
-            extra={
-                "rlsbl.workspace.find_workspace_root": _FAKE_WS,
-                "rlsbl.workspace.is_explicit_mode": True,
-            },
+            extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
         )
         assert result.exit_code == 0, result.stderr
         # run_cleanup_command(ws_root, dry_run=...)
         assert m.call_args[0][0] == _FAKE_WS
         assert m.call_args.kwargs["dry_run"] is True
 
-    def test_migrate_releasable(self):
-        result, m = _dispatch(
-            ["--dry-run", "monorepo", "migrate-releasable", "myrel"],
-            "rlsbl.releasable_migration.cmd_migrate_releasable",
-            ret={"members": ["m"], "tag_format": "v{version}", "state": {"projects": []}},
-            extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
-        )
-        assert result.exit_code == 0, result.stderr
-        # cmd_migrate_releasable(ws_root, releasable_name, dry_run=...)
-        assert m.call_args[0][0] == _FAKE_WS
-        assert m.call_args[0][1] == "myrel"
-        assert m.call_args.kwargs["dry_run"] is True
+    def test_migrate_releasable_is_gone(self):
+        """migrate-releasable is deleted: implicit mode is refused at load.
+
+        Nothing in this tree can produce the per-package release state the
+        migration consumed, so the command registration is gone too.
+        """
+        assert "migrate-releasable" not in app._groups["monorepo"].commands
+        result = app.test(["monorepo", "migrate-releasable", "myrel"])
+        assert result.exit_code != 0
 
     def test_rename_releasable(self):
         result, m = _dispatch(

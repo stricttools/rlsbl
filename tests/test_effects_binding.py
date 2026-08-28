@@ -79,7 +79,6 @@ EXPECTED_EFFECTS = {
     "monorepo.extract": "mutating",
     "monorepo.absorb": "mutating",
     "monorepo.cleanup": "mutating",
-    "monorepo.migrate-releasable": "mutating",
     "monorepo.rename-releasable": "mutating",
     "monorepo.release.run": "mutating",
     "monorepo.release.init": "mutating",

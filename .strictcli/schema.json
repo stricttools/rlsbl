@@ -83,7 +83,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.117.2",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 54 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite).",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding across 17 release targets (npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, Dart, Flutter, and more). Ships 53 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite).",
   "proc_observe_allowlist": [
     [
       "git",
@@ -422,7 +422,7 @@
     },
     "status": {
       "name": "status",
-      "help": "Display the current project version, branch, last release tag, unreleased commit count, and changelog coverage. Outputs plain text by default or structured JSON with the --json flag.",
+      "help": "Display the current project version, branch, latest release, unreleased commit count, and changelog coverage. The latest release comes from the project's release archives and is annotated when this checkout does not contain it. Outputs plain text by default or structured JSON with the --json flag.",
       "effect": "read_only",
       "payload_schema": {
         "type": "object",
@@ -445,9 +445,15 @@
               "null"
             ]
           },
-          "tag": {
+          "latest_release": {
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "latest_release_in_checkout": {
+            "type": [
+              "boolean",
               "null"
             ]
           },
@@ -472,7 +478,7 @@
               "null"
             ]
           },
-          "commits_ahead_tag": {
+          "range_anchor_tag": {
             "type": [
               "string",
               "null"
@@ -515,12 +521,13 @@
           "version",
           "target",
           "branch",
-          "tag",
+          "latest_release",
+          "latest_release_in_checkout",
           "clean",
           "changelog",
           "jsonl_coverage",
           "commits_ahead",
-          "commits_ahead_tag",
+          "range_anchor_tag",
           "ci",
           "publish",
           "registry_version",
@@ -914,12 +921,24 @@
     },
     "unreleased": {
       "name": "unreleased",
-      "help": "List commits between the latest release tag and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.",
+      "help": "List the commits between the release this checkout is anchored to and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.",
       "effect": "read_only",
       "payload_schema": {
         "type": "object",
         "properties": {
-          "tag": {
+          "latest_release": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latest_release_in_checkout": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "range_anchor_version": {
             "type": [
               "string",
               "null"
@@ -991,7 +1010,9 @@
           }
         },
         "required": [
-          "tag",
+          "latest_release",
+          "latest_release_in_checkout",
+          "range_anchor_version",
           "commits"
         ],
         "additionalProperties": false
@@ -1799,7 +1820,7 @@
     },
     "monorepo": {
       "name": "monorepo",
-      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 18 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, migrate-releasable, rename-releasable. Plus 1 subgroup: release.",
+      "help": "Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Supports all 18 release targets in a single workspace.toml. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release.",
       "commands": {
         "init": {
           "name": "init",
@@ -2338,13 +2359,13 @@
         },
         "absorb": {
           "name": "absorb",
-          "help": "Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.",
+          "help": "Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their anchors, config and version -- moves into a releasable's state directory with every hash and anchor remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
             {
               "name": "name",
-              "help": "Workspace project name for the absorbed package (the basename of the destination path when omitted)",
+              "help": "Workspace member name for the absorbed package (the basename of the destination path when omitted)",
               "value_schema": {
                 "type": "string"
               },
@@ -2360,11 +2381,28 @@
             },
             {
               "name": "releasable",
-              "help": "Releasable group to assign the absorbed package to",
+              "help": "An existing releasable group to join. When omitted, a singleton releasable named after the member is created for it.",
               "value_schema": {
                 "type": "string"
               },
               "presence": "optional"
+            },
+            {
+              "name": "tag-format",
+              "help": "The tag format of the releasable this command creates, e.g. \"{name}@v{version}\" or \"pkgs/thing/v{version}\". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal with --releasable, which brings its own format.",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "delete-with-rm",
+              "help": "Delete the per-package release state that moves to the releasable with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
             }
           ],
           "args": [
@@ -2378,7 +2416,7 @@
             },
             {
               "name": "dest_path",
-              "help": "Destination directory (and workspace path) the source repo's history is rewritten under",
+              "help": "Destination directory (and workspace member path) the source repo's history is rewritten under",
               "value_schema": {
                 "type": "string"
               },
@@ -2390,21 +2428,6 @@
           "name": "cleanup",
           "help": "Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.",
           "effect": "mutating"
-        },
-        "migrate-releasable": {
-          "name": "migrate-releasable",
-          "help": "Migrate a releasable from per-package release state to the releasable model. Detects current state, consolidates per-package changelogs and versions into the releasable directory, creates a releasable-format migration tag, and removes orphaned per-package .rlsbl/changes/ and .rlsbl/releases/ directories. Requires the workspace to be in explicit mode (with [[releasables]] in workspace.toml).",
-          "effect": "mutating",
-          "args": [
-            {
-              "name": "releasable_name",
-              "help": "Name of the releasable group in workspace.toml to migrate",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "required"
-            }
-          ]
         },
         "rename-releasable": {
           "name": "rename-releasable",
@@ -2956,18 +2979,6 @@
       "needs_network": false,
       "depends_on": []
     },
-    "github-release": {
-      "tags": [
-        "release"
-      ],
-      "severity": "error",
-      "fast": false,
-      "pure": false,
-      "needs_network": true,
-      "depends_on": [
-        "remote-tag"
-      ]
-    },
     "go-companion-tags": {
       "tags": [
         "workspace"
@@ -3041,18 +3052,6 @@
       "pure": true,
       "needs_network": false,
       "depends_on": []
-    },
-    "local-tag": {
-      "tags": [
-        "release"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "version-consistency"
-      ]
     },
     "lock": {
       "tags": [
@@ -3178,18 +3177,6 @@
       "needs_network": false,
       "depends_on": [],
       "scope": "workspace"
-    },
-    "remote-tag": {
-      "tags": [
-        "release"
-      ],
-      "severity": "warn",
-      "fast": true,
-      "pure": false,
-      "needs_network": true,
-      "depends_on": [
-        "local-tag"
-      ]
     },
     "requires-services": {
       "tags": [
@@ -3386,6 +3373,18 @@
       "pure": true,
       "needs_network": false,
       "depends_on": []
+    },
+    "unpublished-refs": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [
+        "version-consistency"
+      ]
     },
     "unversioned-boundary": {
       "tags": [

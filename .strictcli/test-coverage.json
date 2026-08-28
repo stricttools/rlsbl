@@ -22,7 +22,6 @@
   "monorepo.impact",
   "monorepo.init",
   "monorepo.list",
-  "monorepo.migrate-releasable",
   "monorepo.mirror",
   "monorepo.outdated",
   "monorepo.release.init",
