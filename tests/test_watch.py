@@ -1630,3 +1630,94 @@ class TestRetryReachesTheEffectsRegime:
             len(e.argv) <= len(argv) and tuple(argv[: len(e.argv)]) == e.argv
             for e in oa.OBSERVE_ALLOWLIST
         ), "gh run watch matches no observe prefix"
+
+
+class TestReleaseLabelResolution:
+    """`_release_at` reads the ledger of the project the watch runs IN.
+
+    It used to join ".rlsbl/releases" onto the process cwd, so every
+    invocation from a subdirectory -- and every invocation inside a releasable
+    member, whose archives live under the releasable rather than the package
+    -- silently found no archives and labelled a released commit with its
+    short hash.
+    """
+
+    @staticmethod
+    def _git(repo, *args):
+        return subprocess.run(
+            ["git", *args], cwd=str(repo), check=True,
+            capture_output=True, text=True, timeout=30,
+        ).stdout.strip()
+
+    def _repo(self, path):
+        path.mkdir(parents=True, exist_ok=True)
+        self._git(path, "init", "-q", "-b", "main")
+        self._git(path, "config", "user.email", "test@test.local")
+        self._git(path, "config", "user.name", "Test")
+        (path / "README.md").write_text("test\n")
+        self._git(path, "add", "README.md")
+        self._git(path, "commit", "-q", "-m", "initial")
+        return self._git(path, "rev-parse", "HEAD")
+
+    @staticmethod
+    def _archive(releases_dir, version, sha):
+        from rlsbl.release_file import write_archived_release_file
+
+        os.makedirs(str(releases_dir), exist_ok=True)
+        return write_archived_release_file(
+            str(releases_dir), version,
+            bump="patch", include=["pypi"], description=f"release {version}",
+            candidate_sha=sha, tree_hashes={".": "b" * 40},
+        )
+
+    def test_labels_from_a_subdirectory(self, tmp_path, monkeypatch):
+        from rlsbl.commands.watch import _release_at
+
+        repo = tmp_path / "standalone"
+        sha = self._repo(repo)
+        self._archive(repo / ".rlsbl" / "releases", "1.4.0", sha)
+        sub = repo / "src" / "deep"
+        sub.mkdir(parents=True)
+        monkeypatch.chdir(sub)
+
+        entry = _release_at(sha)
+        assert entry is not None
+        assert entry.version == "1.4.0"
+
+    def test_labels_a_releasable_members_release(self, tmp_path, monkeypatch):
+        from rlsbl.commands.watch import _release_at
+
+        repo = tmp_path / "mono"
+        repo.mkdir(parents=True)
+        member = repo / "packages" / "golib"
+        member.mkdir(parents=True)
+        (member / ".rlsbl").mkdir()
+        (member / ".rlsbl" / "config.json").write_text(json.dumps({
+            "publish_mode": "ci", "targets": ["go"],
+        }))
+        ws_dir = repo / ".rlsbl-monorepo"
+        ws_dir.mkdir()
+        (ws_dir / "workspace.toml").write_text(
+            '[[projects]]\nname = "root"\npath = "."\nreleasable = false\n\n'
+            '[[projects]]\nname = "golib"\npath = "packages/golib"\n'
+            'releasable = "golib"\n\n'
+            '[[releasables]]\nname = "golib"\ntag_format = "{name}@v{version}"\n'
+        )
+        sha = self._repo(repo)
+        self._archive(
+            ws_dir / "releasables" / "golib" / "releases", "2.1.0", sha,
+        )
+        monkeypatch.chdir(member)
+
+        entry = _release_at(sha)
+        assert entry is not None
+        assert entry.version == "2.1.0"
+
+    def test_outside_an_rlsbl_project_there_is_no_label(self, tmp_path, monkeypatch):
+        from rlsbl.commands.watch import _release_at
+
+        bare = tmp_path / "bare"
+        sha = self._repo(bare)
+        monkeypatch.chdir(bare)
+
+        assert _release_at(sha) is None

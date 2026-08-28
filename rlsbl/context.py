@@ -161,3 +161,75 @@ def create_context(
         config=config,
         project=project,
     )
+
+def resolve_release_scope(root):
+    """Resolve the release/changelog context of the project at *root*.
+
+    Returns ``(project, tag_glob, changes_dir, scope)``:
+
+    - ``project`` is the WorkspaceProject (None in standalone mode).
+    - ``tag_glob`` scopes tag-namespace questions to this project's own
+      releases.
+    - ``changes_dir`` is the releasable-aware JSONL directory, and therefore
+      also names the ledger (``.../releases/``) that records what this project
+      released. A releasable member's entries live under
+      ``.rlsbl-monorepo/releasables/<name>/``, NOT under the member package --
+      resolving it per-package made every releasable member report "JSONL
+      changelog not set up" and read an empty ledger.
+    - ``scope`` is the ownership scope commits are attributed against: the
+      whole releasable when the project is in one, the single member
+      otherwise, and ``None`` outside a workspace.
+
+    Shared by every command that answers a question about this project's
+    releases -- listing unreleased commits, labelling a watched commit with
+    the release it is -- so they all read the same directory and the same tag
+    scheme for the same checkout.
+    """
+    from .changelog import get_changes_dir
+    from .workspace import find_workspace_root, load_workspace, resolve_project
+
+    root_str = str(root)
+    project = None
+    tag_glob = None
+    changes_dir = get_changes_dir(root_str)
+    scope = None
+    try:
+        ws_root = find_workspace_root(root_str)
+        if ws_root is None:
+            return project, tag_glob, changes_dir, scope
+        project = resolve_project(ws_root, root_str)
+        if project is None:
+            return project, tag_glob, changes_dir, scope
+
+        from .ownership import OwnershipScope
+        from .tag_glob import releasable_tag_glob
+        from .targets import TARGETS, detect_targets, resolve_releasable_config_dir
+        from .workspace import (
+            get_releasable_changes_dir,
+            load_releasables,
+            members_of,
+            resolve_releasable_for_project,
+        )
+
+        ws_projects = load_workspace(ws_root)
+        releasables = load_releasables(ws_root, ws_projects)
+        rel = resolve_releasable_for_project(project, releasables)
+
+        if rel is not None:
+            tag_glob = releasable_tag_glob(rel.effective_tag_format, rel.name)
+            changes_dir = get_releasable_changes_dir(ws_root, rel.name)
+            scope = OwnershipScope.for_members(
+                ws_projects, members_of(rel.name, ws_projects),
+            )
+        else:
+            scope = OwnershipScope.for_member(ws_projects, project)
+            rel_dir = resolve_releasable_config_dir(project, ws_root)
+            targets = detect_targets(root_str, releasable_config_dir=rel_dir)
+            if targets:
+                target = TARGETS[targets[0].name]
+                tag_glob = target.monorepo_tag_glob(
+                    project["name"], path=project["path"],
+                )
+    except Exception:
+        pass
+    return project, tag_glob, changes_dir, scope

@@ -19,13 +19,32 @@ def _release_at(commit_sha):
     """The release *commit_sha* is, from the ledger, or None.
 
     ``rlsbl watch`` takes a bare commit and runs from wherever it is invoked,
-    so the ledger it reads is the current project's ``.rlsbl/releases/``. A
-    directory with no archives answers None -- nothing was released here --
-    while a ledger that CANNOT answer (a tag disagreeing with an anchor, an
-    ancestry git cannot decide) raises, because a label derived from a ledger
-    rlsbl could not read would be a guess presented as a fact.
+    so the ledger is resolved from the PROJECT the cwd is in -- the same
+    resolution every other command's project root goes through -- and not by
+    joining ``.rlsbl/releases`` onto the process cwd. That relative path
+    answered "nothing was released here" for every invocation from a
+    subdirectory, and for every releasable member, whose archives live under
+    the releasable rather than under the package.
+
+    Outside an rlsbl project there is no ledger to read and no label to give:
+    None. A directory whose ledger holds no archive answers None too --
+    nothing was released here -- while a ledger that CANNOT answer (a tag
+    disagreeing with an anchor, an ancestry git cannot decide) raises, because
+    a label derived from a ledger rlsbl could not read would be a guess
+    presented as a fact.
     """
-    return release_at_commit(os.path.join(".rlsbl", "releases"), commit_sha)
+    from ..context import resolve_release_scope
+    from ..ledger import releases_dir_for_changes_dir
+    from ..utils import find_sub_project_root
+
+    root, _project, _ws_root = find_sub_project_root()
+    if root is None:
+        return None
+    _proj, tag_glob, changes_dir, _scope = resolve_release_scope(root)
+    return release_at_commit(
+        releases_dir_for_changes_dir(changes_dir), commit_sha,
+        tag_glob=tag_glob, cwd=root,
+    )
 
 
 def _open_url(url):

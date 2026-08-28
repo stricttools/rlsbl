@@ -4,16 +4,15 @@ import os
 import subprocess
 import sys
 
-from ..changelog import get_changes_dir, read_unreleased, resolve_hashes
+from ..changelog import read_unreleased, resolve_hashes
 from ..changelog.validate import filter_exempt_commits
+from ..context import resolve_release_scope
 from ..git_util import filter_commits_for_scope
-from ..targets import TARGETS, detect_targets
 from ..ledger import (
     latest_release_fact,
     range_anchor,
     releases_dir_for_changes_dir,
 )
-from ..workspace import find_workspace_root, load_workspace, resolve_project
 from .. import effects
 
 
@@ -59,68 +58,6 @@ def _get_commits_since(anchor_sha):
     return commits
 
 
-def _resolve_scope(root_str):
-    """Resolve the monorepo/releasable context for the project at *root_str*.
-
-    Returns ``(project, tag_glob, changes_dir, members)``:
-
-    - ``project`` is the WorkspaceProject (None in standalone mode).
-    - ``tag_glob`` scopes the "last release tag" lookup.
-    - ``changes_dir`` is the releasable-aware JSONL directory. A releasable
-      member's entries live under ``.rlsbl-monorepo/releasables/<name>/``,
-      NOT under the member package -- resolving it per-package made every
-      releasable member report "JSONL changelog not set up".
-    - ``scope`` is the ownership scope commits are attributed against: the
-      whole releasable when the project is in one, the single member
-      otherwise, and ``None`` outside a workspace.
-    """
-    project = None
-    tag_glob = None
-    changes_dir = get_changes_dir(root_str)
-    scope = None
-    try:
-        ws_root = find_workspace_root(root_str)
-        if ws_root is None:
-            return project, tag_glob, changes_dir, scope
-        project = resolve_project(ws_root, root_str)
-        if project is None:
-            return project, tag_glob, changes_dir, scope
-
-        from ..workspace import (
-            get_releasable_changes_dir,
-            load_releasables,
-            members_of,
-            resolve_releasable_for_project,
-        )
-
-        from ..ownership import OwnershipScope
-
-        ws_projects = load_workspace(ws_root)
-        releasables = load_releasables(ws_root, ws_projects)
-        rel = resolve_releasable_for_project(project, releasables)
-
-        if rel is not None:
-            from ..commands.release.validate import _releasable_tag_glob
-            tag_glob = _releasable_tag_glob(rel.effective_tag_format, rel.name)
-            changes_dir = get_releasable_changes_dir(ws_root, rel.name)
-            scope = OwnershipScope.for_members(
-                ws_projects, members_of(rel.name, ws_projects),
-            )
-        else:
-            scope = OwnershipScope.for_member(ws_projects, project)
-            from ..targets import resolve_releasable_config_dir
-            rel_dir = resolve_releasable_config_dir(project, ws_root)
-            targets = detect_targets(root_str, releasable_config_dir=rel_dir)
-            if targets:
-                target = TARGETS[targets[0].name]
-                tag_glob = target.monorepo_tag_glob(
-                    project["name"], path=project["path"],
-                )
-    except Exception:
-        pass
-    return project, tag_glob, changes_dir, scope
-
-
 def run_cmd(registry, args, flags, project_root):
     """List unreleased commits and their changelog coverage.
 
@@ -131,7 +68,7 @@ def run_cmd(registry, args, flags, project_root):
     """
     root_str = str(project_root)
 
-    monorepo_project, tag_glob, changes_dir, scope = _resolve_scope(root_str)
+    monorepo_project, tag_glob, changes_dir, scope = resolve_release_scope(root_str)
 
     ledger_dir = releases_dir_for_changes_dir(changes_dir)
     anchor = range_anchor(ledger_dir, tag_glob=tag_glob, cwd=root_str)

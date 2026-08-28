@@ -80,6 +80,42 @@ def find_project_root(start=None):
         current = parent
 
 
+def find_sub_project_root(start=None):
+    """Resolve which PROJECT *start* (default: cwd) is in, monorepo-aware.
+
+    Returns ``(root, project, workspace_root)``:
+
+    - ``root`` is the sub-project directory in a monorepo and the project root
+      otherwise, or None when *start* is in no rlsbl project at all.
+    - ``project`` is the :class:`~rlsbl.workspace.WorkspaceProject` *start*
+      resolves to, or None outside a workspace (and, in the one case the
+      workspace loader can still produce, when no member claims *start*).
+    - ``workspace_root`` is the enclosing workspace, or None.
+
+    The monorepo half is why this is not :func:`find_project_root`: a member
+    whose per-package ``.rlsbl/`` was cleaned up has no marker of its own, so
+    walking up finds the workspace root and answers with the wrong project.
+    Membership is decided by the workspace, which owns the mapping.
+
+    This is the resolution the CLI applies before handing a command its
+    project root; it is exposed here so a command that must degrade rather
+    than exit (``rlsbl watch`` runs in any git repository) can ask the same
+    question without the CLI's error paths.
+    """
+    root = find_project_root(start)
+    if root is None:
+        return None, None, None
+    from .workspace import find_workspace_root, resolve_project
+
+    ws_root = find_workspace_root(root)
+    if not ws_root:
+        return root, None, None
+    project = resolve_project(ws_root, os.path.realpath(start or "."))
+    if project is None:
+        return root, None, ws_root
+    return os.path.join(ws_root, project["path"]), project, ws_root
+
+
 def detect_uv_workspace_root(project_dir: str) -> str | None:
     """Walk up from project_dir to find a uv workspace root that includes it as a member.
 

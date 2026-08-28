@@ -100,23 +100,26 @@ def _require_sub_project_root():
     Side effect: sets module-level ``_resolved_project`` to the
     WorkspaceProject when in monorepo mode, or None in standalone mode.
     Command handlers can pass this to ``create_context(project=...)``.
+
+    The resolution itself is :func:`rlsbl.utils.find_sub_project_root`; this
+    is the require-or-exit face of it, so a command that must degrade instead
+    of exiting asks the shared resolver directly.
     """
     global _resolved_project
     _resolved_project = None
-    root = _require_project_root()
-    from .workspace import find_workspace_root, resolve_project
-    ws_root = find_workspace_root(str(root))
-    if ws_root:
-        project = resolve_project(ws_root, str(Path.cwd()))
-        if project:
-            _resolved_project = project
-            sub_path = Path(ws_root) / project["path"]
-            return sub_path
+    from .utils import find_sub_project_root
+
+    root, project, ws_root = find_sub_project_root(Path.cwd())
+    if root is None:
+        print("Error: not in an rlsbl project (no .rlsbl/ found in any ancestor directory).", file=sys.stderr)
+        sys.exit(1)
+    if ws_root and project is None:
         # CWD is inside the monorepo but not in any registered project
         print(f"Error: CWD is inside monorepo at {ws_root} but not inside any registered project.", file=sys.stderr)
         print("Run 'rlsbl monorepo add <path>' to register this project.", file=sys.stderr)
         sys.exit(1)
-    return root
+    _resolved_project = project
+    return Path(root)
 
 
 def _at_workspace_root(workspace_root):
