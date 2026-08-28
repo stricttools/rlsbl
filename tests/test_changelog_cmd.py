@@ -525,3 +525,67 @@ class TestCmdGenerate:
         with pytest.raises(SystemExit) as exc_info:
             cmd_generate({"dry-run": False}, project_root=tmp_path)
         assert exc_info.value.code == 1
+
+
+class TestGeneratedFileDiscoverySurvivesGitQuoting:
+    """The files a regeneration commits are named as they are on disk.
+
+    Both discovery helpers read ``git status`` and hand what they find straight
+    to ``commit_files``. Read in git's default porcelain form, any path outside
+    plain ASCII arrives C-quoted (``"cor\\303\\251/x.md"``), and a commit naming
+    that literal names a file no filesystem has: the regenerated changelog is
+    then silently left uncommitted.
+    """
+
+    def _repo(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+        return repo
+
+    def test_filter_dirty_files_names_a_unicode_path_verbatim(self, tmp_path):
+        """A releasable whose directory is not plain ASCII still commits."""
+        from rlsbl.commands.changelog_cmd import _filter_dirty_files
+
+        repo = self._repo(tmp_path)
+        changes = repo / ".rlsbl-monorepo" / "releasables" / "coré ext" / "changes"
+        changes.mkdir(parents=True)
+        md = changes / "0.1.0.md"
+        md.write_text("## 0.1.0\n")
+        changelog = repo / "CHANGELOG.md"
+        changelog.write_text("# Changelog\n")
+
+        found = _filter_dirty_files([str(md), str(changelog)], str(repo))
+
+        assert sorted(found) == sorted([str(md), str(changelog)])
+        assert all(os.path.exists(p) for p in found), found
+
+    def test_generated_files_are_reported_as_they_are_on_disk(
+        self, tmp_path, monkeypatch,
+    ):
+        """The per-version .md sweep reports real paths, not quoted spellings.
+
+        The name here carries a space and a non-ASCII character because that is
+        what git quotes; what is pinned is that the helper reports whatever git
+        reports, unchanged, so the commit can find it.
+        """
+        from rlsbl.commands.changelog_cmd import _get_generated_files
+
+        repo = self._repo(tmp_path)
+        changes = repo / ".rlsbl" / "changes"
+        changes.mkdir(parents=True)
+        (changes / "0.1.0 é.md").write_text("## 0.1.0\n")
+        (repo / "CHANGELOG.md").write_text("# Changelog\n")
+        monkeypatch.chdir(repo)
+
+        found = _get_generated_files(str(repo))
+
+        assert sorted(found) == sorted([
+            str(repo / "CHANGELOG.md"), str(changes / "0.1.0 é.md"),
+        ])
+        assert all(os.path.exists(p) for p in found), found

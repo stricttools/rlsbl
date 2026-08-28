@@ -23,12 +23,11 @@ from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
 from ..git_util import filter_commits_for_scope
 from ..ownership import OwnershipError, OwnershipScope
-from ..utils import commit_files
+from ..utils import commit_files, working_tree_paths
 from ..workspace import (
     find_workspace_root,
     get_releasable_changes_dir,
     get_releasable_dir,
-    is_explicit_mode,
     load_releasables,
     load_workspace,
     members_of,
@@ -104,15 +103,13 @@ def _resolve_workspace_project(project_root):
         print("Error: non-releasable projects don't use changelogs.", file=sys.stderr)
         sys.exit(1)
 
-    # Check for explicit releasable mode
+    # Resolve the releasable this member belongs to.
     projects = load_workspace(ws_root)
-    releasable = None
     member_projects = []
-    if is_explicit_mode(ws_root):
-        releasables = load_releasables(ws_root, projects=projects)
-        releasable = resolve_releasable_for_project(project, releasables)
-        if releasable is not None:
-            member_projects = members_of(releasable.name, projects)
+    releasables = load_releasables(ws_root, projects=projects)
+    releasable = resolve_releasable_for_project(project, releasables)
+    if releasable is not None:
+        member_projects = members_of(releasable.name, projects)
 
     return _ResolvedContext(
         project=project,
@@ -1115,47 +1112,35 @@ def _filter_dirty_files(paths: list[str], repo_root: str) -> list[str]:
 
     Paths are returned as absolute paths. Used by releasable-mode changelog
     generation where the generated files live outside the member project.
+
+    ``untracked="all"`` so a brand-new generated file inside a wholly untracked
+    directory is reported by name: git's default collapses such a directory
+    into one record, which names no file to commit.
     """
     try:
-        result = effects.run(
-            ["git", "--no-optional-locks", "status", "--porcelain", "--", *paths],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=repo_root,
-        )
+        dirty = working_tree_paths(cwd=repo_root, paths=paths, untracked="all")
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-    dirty = []
-    for line in result.stdout.splitlines():
-        if len(line) < 4:
-            continue
-        filepath = line[3:].strip()
-        dirty.append(os.path.join(repo_root, filepath))
-    return dirty
+    return [os.path.join(repo_root, filepath) for filepath in dirty]
 
 
 def _get_generated_files(project_path: str) -> list[str]:
     """Return paths of files modified or created by generate_changelog.
 
     Checks git status for CHANGELOG.md and .rlsbl/changes/*.md files.
+    ``untracked="all"`` for the same reason as :func:`_filter_dirty_files`:
+    on a project whose ``.rlsbl/changes/`` is not tracked yet, the default
+    output names only the directory, and every generated ``.md`` inside it
+    would go uncommitted.
     """
     try:
-        result = effects.run(
-            ["git", "--no-optional-locks", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        dirty = working_tree_paths(untracked="all")
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
     files = []
-    for line in result.stdout.splitlines():
-        if len(line) < 4:
-            continue
-        filepath = line[3:].strip()
+    for filepath in dirty:
         # Match CHANGELOG.md or .rlsbl/changes/*.md
         if filepath == "CHANGELOG.md":
             files.append(os.path.join(project_path, filepath))
