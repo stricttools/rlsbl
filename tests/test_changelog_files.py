@@ -23,6 +23,7 @@ from rlsbl.changelog.files import (
     is_read_only,
     list_versioned_files,
     read_unreleased,
+    unfinalize_version,
 )
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
 from rlsbl.errors import ChangelogError
@@ -261,6 +262,83 @@ class TestFinalizeVersion:
         assert not (os.stat(str(existing)).st_mode & stat.S_IWUSR)
         # unreleased.jsonl still exists with its original content
         assert unreleased.read_text() == unreleased_content
+
+
+class TestUnfinalizeVersionMerges:
+    """Un-finalizing must MERGE the released entries back, never overwrite.
+
+    Between a release and the undo of that release, work accumulates in the
+    fresh ``unreleased.jsonl``. Renaming ``{version}.jsonl`` over it destroyed
+    every one of those entries silently -- the undo that did it reported
+    success.
+    """
+
+    def _released(self, changes, version, lines):
+        path = changes / f"{version}.jsonl"
+        path.write_text("".join(json.dumps(x) + "\n" for x in lines))
+        os.chmod(str(path), 0o444)
+        return path
+
+    def test_post_release_entries_are_kept(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        self._released(changes, "1.0.0", [
+            {"format_version": 1, "commits": ["aaa"], "user_facing": True,
+             "description": "released thing", "type": "feature",
+             "id": "released-id"},
+        ])
+        unreleased = changes / "unreleased.jsonl"
+        unreleased.write_text(json.dumps({
+            "format_version": 1, "commits": ["bbb"], "user_facing": True,
+            "description": "later thing", "type": "fix", "id": "later-id",
+        }) + "\n")
+
+        changed = unfinalize_version(str(changes), "1.0.0")
+
+        entries = parse_jsonl(str(unreleased))
+        assert [e.commits for e in entries] == [["aaa"], ["bbb"]], (
+            "released entries come back FIRST, post-release entries follow"
+        )
+        assert [e.id for e in entries] == ["released-id", "later-id"], (
+            "entry ids survive the merge"
+        )
+        assert not (changes / "1.0.0.jsonl").exists()
+        assert str(unreleased) in changed
+        # The merged file must be writable -- it is the live unreleased file.
+        assert not is_read_only(str(unreleased))
+
+    def test_empty_unreleased_is_replaced_not_padded(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        self._released(changes, "1.0.0", [
+            {"format_version": 1, "commits": ["aaa"], "user_facing": False},
+        ])
+        unreleased = changes / "unreleased.jsonl"
+        unreleased.write_text("")
+
+        unfinalize_version(str(changes), "1.0.0")
+
+        assert unreleased.read_text() == (
+            json.dumps({"format_version": 1, "commits": ["aaa"],
+                        "user_facing": False}) + "\n"
+        )
+
+    def test_merge_tolerates_a_missing_trailing_newline(self, tmp_path):
+        changes = tmp_path / "changes"
+        changes.mkdir()
+        versioned = changes / "1.0.0.jsonl"
+        versioned.write_text(json.dumps({
+            "format_version": 1, "commits": ["aaa"], "user_facing": False,
+        }))  # no trailing newline
+        os.chmod(str(versioned), 0o444)
+        (changes / "unreleased.jsonl").write_text(json.dumps({
+            "format_version": 1, "commits": ["bbb"], "user_facing": False,
+        }) + "\n")
+
+        unfinalize_version(str(changes), "1.0.0")
+
+        entries = parse_jsonl(str(changes / "unreleased.jsonl"))
+        assert [e.commits for e in entries] == [["aaa"], ["bbb"]]
 
 
 class TestFinalizeVersionStaleWarning:

@@ -405,15 +405,35 @@ def finalize_version(
     effects.open_write(src, "w", encoding="utf-8").close()
 
 
+def _jsonl_lines(path: str) -> list[str]:
+    """The non-blank lines of a JSONL file, verbatim and without newlines.
+
+    Read as TEXT rather than parsed: an un-finalize puts lines back exactly as
+    they were written, so a field this version of the parser does not model --
+    or would re-serialize differently -- survives untouched.
+    """
+    if not os.path.isfile(path):
+        return []
+    with open(path, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
+
+
 def unfinalize_version(changes_dir: str, version: str) -> list[str]:
     """Reverse a finalize_version: restore x.y.z.jsonl back to unreleased.jsonl.
 
     1. Makes the versioned file writable.
-    2. Renames it to unreleased.jsonl.
+    2. MERGES its entries back into unreleased.jsonl -- released entries first,
+       then whatever accumulated after the release -- and removes it.
     3. Deletes the per-version .md file if present.
     4. Returns the list of changed file paths (for committing).
 
     Returns an empty list if the versioned file doesn't exist.
+
+    The merge is the whole point of step 2. Between a release and the undo of
+    that release, entries land in the fresh ``unreleased.jsonl``; renaming the
+    versioned file over it destroyed every one of them, and the undo that did
+    it reported success. Order is released-then-new, which is the order the two
+    sets of commits were made in.
     """
     versioned = os.path.join(changes_dir, f"{version}.jsonl")
     unreleased = os.path.join(changes_dir, "unreleased.jsonl")
@@ -423,7 +443,18 @@ def unfinalize_version(changes_dir: str, version: str) -> list[str]:
         return []
 
     effects.chmod(versioned, 0o644)
-    effects.rename(versioned, unreleased)
+
+    post_release = _jsonl_lines(unreleased)
+    if post_release:
+        merged = "".join(
+            line + "\n" for line in _jsonl_lines(versioned) + post_release
+        )
+        # 0o644, never the versioned file's lock: the result is the LIVE
+        # unreleased file that the next `changelog add` appends to.
+        effects.atomic_write_text(unreleased, merged, file_mode=0o644)
+        effects.remove(versioned)
+    else:
+        effects.rename(versioned, unreleased)
 
     changed: list[str] = [unreleased]
 
