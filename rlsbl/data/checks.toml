@@ -770,6 +770,20 @@ depends_on = ["config-schema"]
 # offline by construction: no package manager is invoked (see rlsbl/dep_locks.py
 # for why `uv lock --check` was rejected). In "preflight" so a stale lock blocks
 # the release whose bump would otherwise silently rewrite it.
+# go-module-identity: a go.mod module path IS the URL the toolchain fetches
+# from, so a renamed repo, a new owner or an absorb that moved the module under
+# a subdirectory leaves a module nobody can `go get`. Compared against the
+# origin remote's own identity; a repo with no origin skips rather than guessing
+# one. Pure (reads go.mod plus read-only local git). In "preflight" so a module
+# path the repository no longer serves cannot be published.
+[checks.go-module-identity]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 [checks.dep-locks]
 tags = ["project", "preflight"]
 severity = "error"

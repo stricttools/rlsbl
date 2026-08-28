@@ -4,13 +4,15 @@ Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
 publish-mode-workflow, npm-private-mismatch, target-version-readable,
 dunder-version-missing, selfdoc-version-drift, scaffold-conflicts,
-cross-repo-path-sources, stricttest-floor.
+cross-repo-path-sources, stricttest-floor, dep-floors, dep-locks,
+go-module-identity, strictspec-generated-floor.
 """
 
 import json
 import os
 import tomllib
 
+from ..check_context import WorkspaceCheckContext
 from ..errors import ConfigError
 from ._common import exception_text
 
@@ -285,6 +287,68 @@ def _virtual_root_skip_reason(ctx):
     if is_virtual_uv_root(str(ctx.project_root)):
         return "virtual uv workspace root (no [project] table -- not a release target)"
     return None
+
+
+def _go_module_dirs(ctx):
+    """Every directory a Go target occupies, workspace-wide when there is one.
+
+    The target registry answers which directories those are, so a Go module
+    reached through a ``targets`` entry with a ``path`` is found the same way
+    the release finds it.
+    """
+    from ..targets import (
+        detect_targets,
+        resolve_releasable_config_dir,
+        resolve_releasable_config_dir_for_ctx,
+    )
+
+    if isinstance(ctx, WorkspaceCheckContext) and ctx.projects:
+        roots = [
+            (
+                os.path.join(str(ctx.workspace_root), proj["path"]),
+                resolve_releasable_config_dir(proj, ctx.workspace_root),
+            )
+            for proj in ctx.projects
+        ]
+    else:
+        roots = [(str(ctx.project_root), resolve_releasable_config_dir_for_ctx(ctx))]
+
+    dirs = []
+    for root, releasable_config_dir in roots:
+        try:
+            entries = detect_targets(
+                root, releasable_config_dir=releasable_config_dir,
+            )
+        except Exception:
+            # An unreadable or targets-less config is another check's finding;
+            # here it simply contributes no Go module.
+            continue
+        for entry in entries:
+            if entry.name == "go" and entry.path not in dirs:
+                dirs.append(entry.path)
+    return dirs
+
+
+def _repo_root(ctx):
+    """The git worktree root that module paths are relative to."""
+    from ..utils import run
+
+    start = str(ctx.project_root)
+    try:
+        return run("git", ["rev-parse", "--show-toplevel"], cwd=start)
+    except Exception:
+        return str(ctx.workspace_root or ctx.project_root)
+
+
+def _origin_remote_url(cwd):
+    """The origin remote URL, or None when the repository has no origin."""
+    from ..utils import run
+
+    try:
+        url = run("git", ["remote", "get-url", "origin"], cwd=cwd)
+    except Exception:
+        return None
+    return url.strip() or None
 
 
 def register_project_checks(app):
@@ -731,6 +795,36 @@ def register_project_checks(app):
         for problem in verdict.problems:
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} lagging dep floor(s)")
+
+    @app.error_check("go-module-identity")
+    def check_go_module_identity(ctx, reporter):
+        """Every go.mod's module path must name where the repository lives.
+
+        A renamed repository, a new owner, or an absorb that moved a module
+        under a subdirectory leaves the old module path declared -- and a
+        module published under a path that no longer resolves cannot be
+        fetched. The remedy every finding names is ``rlsbl rewrite
+        go-module-path``, which performs exactly this rewrite.
+        """
+        from ..go_identity import evaluate_go_module_identity
+
+        module_dirs = _go_module_dirs(ctx)
+        if not module_dirs:
+            return reporter.skipped("no Go target detected")
+
+        repo_root = _repo_root(ctx)
+        verdict = evaluate_go_module_identity(
+            repo_root, module_dirs, _origin_remote_url(str(ctx.project_root)),
+        )
+        if verdict.skip_reason is not None:
+            return reporter.skipped(verdict.skip_reason)
+        if verdict.ok:
+            return reporter.passed(
+                "; ".join(verdict.notes) or "every module path matches origin"
+            )
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(f"{len(verdict.problems)} module path mismatch(es)")
 
     @app.error_check("dep-locks")
     def check_dep_locks(ctx, reporter):

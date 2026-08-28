@@ -568,6 +568,12 @@
       "kind": "workspace",
       "targets": []
     },
+    "go-module-identity": {
+      "kind": "targets",
+      "targets": [
+        "go"
+      ]
+    },
     "layers-violations": {
       "kind": "workspace",
       "targets": []
@@ -1387,6 +1393,14 @@
           "format-scope-guard",
           "yes",
           "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "go-module-identity",
+          "no",
+          "yes",
           "no",
           "no",
           "no"

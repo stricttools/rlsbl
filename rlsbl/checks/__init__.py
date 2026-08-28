@@ -71,6 +71,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # fact about this check rather than about the ecosystems: gradle also has a
     # lockfile, and there is no reader for it here.
     "dep-locks": frozenset({"pypi", "npm", "go"}),
+    # go-module-identity compares a go.mod module path against the repository's
+    # own origin identity, which only Go has.
+    "go-module-identity": frozenset({"go"}),
     "license-file": None,
     # --- release tag (universal) ---
     "unpublished-refs": None,

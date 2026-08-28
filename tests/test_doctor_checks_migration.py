@@ -106,6 +106,8 @@ EXPECTED_CHECKS = [
     "dep-floors",
     # every lockfile still resolves the manifest beside it
     "dep-locks",
+    # a go.mod module path names where the repository actually lives
+    "go-module-identity",
     # committed target support matrix freshness (regenerate-and-compare)
     "target-matrix-fresh",
     # Path-capable tool checks and their competing-scope guards
