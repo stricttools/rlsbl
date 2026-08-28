@@ -2036,45 +2036,37 @@ def cmd_mono_extract(ctx, releasable_name, target_path, delete_with_rm):
     )
 
 
-@mono.command(name="absorb", help="Absorb an external repository as a package in the monorepo. Rewrites the source's history to live under the destination path, fetch-merges it (preserving full history with rewritten paths), imports its version tags under the monorepo tag scheme, and remaps its JSONL changelog hashes to the new commits.", effect="mutating", consequential=True)  # rewrites another repo's history and merges it in
-@strictcli.flag(name="name", type=str, presence="optional", help="Workspace project name for the absorbed package (the basename of the destination path when omitted)")
-@strictcli.flag(name="registry-name", type=str, presence="optional", help="Package registry identity recorded in workspace.toml (used verbatim for name checks)")
-@strictcli.flag(name="releasable", type=str, presence="optional", help="Releasable group to assign the absorbed package to")
+# Consequential: it rewrites another repository's history, merges it into the
+# one you are standing in, creates tags and moves release state -- and the
+# merge is not something a `git reset` walks back once it is pushed.
+@mono.command(name="absorb", help="Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their anchors, config and version -- moves into a releasable's state directory with every hash and anchor remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
+# Positional order is declaration order (top decorator first): `absorb
+# <source_repo> <dest_path>`, as the help text documents it.
 @strictcli.arg(name="source_repo", help="Filesystem path to the external git repository to absorb", presence="required")
-@strictcli.arg(name="dest_path", help="Destination directory (and workspace path) the source repo's history is rewritten under", presence="required")
+@strictcli.arg(name="dest_path", help="Destination directory (and workspace member path) the source repo's history is rewritten under", presence="required")
+@strictcli.flag(name="name", type=str, presence="optional", help="Workspace member name for the absorbed package (the basename of the destination path when omitted)")
+@strictcli.flag(name="registry-name", type=str, presence="optional", help="Package registry identity recorded in workspace.toml (used verbatim for name checks)")
+@strictcli.flag(name="releasable", type=str, presence="optional", help="An existing releasable group to join. When omitted, a singleton releasable named after the member is created for it.")
+@strictcli.flag(name="tag-format", type=str, presence="optional", help="The tag format of the releasable this command creates, e.g. \"{name}@v{version}\" or \"pkgs/thing/v{version}\". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal with --releasable, which brings its own format.")
+@strictcli.flag(name="delete-with-rm", type=bool, presence="optional", help="Delete the per-package release state that moves to the releasable with a plain rm -rf instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete.")
 @effects.handler
-def cmd_mono_absorb(ctx, name, registry_name, releasable, source_repo, dest_path):
-    """Absorb an external repository as a monorepo package with history rewriting."""
-    dry_run = ctx.dry_run
+def cmd_mono_absorb(ctx, source_repo, dest_path, name, registry_name, releasable, tag_format, delete_with_rm):
+    """Absorb an external repository into this workspace as a releasable."""
     root = _require_project_root()
-    from .workspace import find_workspace_root
-    ws_root = find_workspace_root(str(root))
-    if ws_root is None:
-        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
-        sys.exit(1)
-    from .commands.monorepo import cmd_absorb
-    try:
-        result = cmd_absorb(
-            ws_root, source_repo, dest_path,
-            name=name,
-            registry_name=registry_name or "",
-            releasable_name=releasable,
-            dry_run=dry_run,
-        )
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-    if dry_run:
-        tags = ", ".join(result["tags_to_import"]) or "none"
-        print(f"Would absorb '{result['name']}' from {result['source_path']} into {result['dest_path']}")
-        print(f"  Version tags to import: {tags}")
-    else:
-        print(f"Absorbed '{result['name']}' from {result['source_path']} into {result['dest_path']}")
-        print(f"  Changelog: {result['entries_migrated']} entries migrated")
-        print(f"  Tags imported: {', '.join(result['tags_imported']) or 'none'}")
-        skipped = result.get("skipped_tags") or []
-        if skipped:
-            print(f"  Skipped {len(skipped)} non-version tag(s): {', '.join(skipped)}")
+    from .commands.monorepo.absorb_cmd import _cmd_absorb
+    _cmd_absorb(
+        {
+            "source-repo": source_repo,
+            "dest-path": dest_path,
+            "name": name,
+            "registry-name": registry_name,
+            "releasable": releasable,
+            "tag-format": tag_format,
+            "delete-with-rm": bool(delete_with_rm),
+            "dry-run": ctx.dry_run,
+        },
+        project_root=root,
+    )
 
 
 @mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Requires an explicit-mode workspace ([[releasables]] in workspace.toml). Detect residue first with `rlsbl check --name releasable-residue`.", effect="mutating")

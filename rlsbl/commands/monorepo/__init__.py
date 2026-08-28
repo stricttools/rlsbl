@@ -27,12 +27,12 @@ from .snapshot_cmd import _cmd_snapshot, _cmd_snapshot_check
 
 from .extract import (
     require_filter_repo,
-    cmd_absorb,
     ExtractError,
-    validate_absorb_preconditions,
 )
 
 from .extract_cmd import cmd_extract, _cmd_extract
+
+from .absorb_cmd import AbsorbError, cmd_absorb, _cmd_absorb
 
 from .sync import (
     _cmd_sync,
@@ -72,8 +72,9 @@ __all__ = [
     "cmd_extract",
     "_cmd_extract",
     "cmd_absorb",
+    "_cmd_absorb",
+    "AbsorbError",
     "ExtractError",
-    "validate_absorb_preconditions",
     "_evaluate_constraint",
     "_parse_version_tuple",
     # sync
