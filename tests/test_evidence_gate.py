@@ -342,15 +342,18 @@ class TestNonLatestUndoIntegration:
             assert "cannot undo" in err.getvalue()
 
 
-class TestGoModuleProxySource:
-    """The Go module proxy is the second Go evidence source, and it never clears.
+class TestCachedRegistrySource:
+    """The registry-side second opinion, and why it never clears.
 
-    The Go target's own ``publication_probe`` asks the git REMOTE whether the
-    version's tag exists. That is the right question for "did we tag this?" and
-    the wrong one for "is this out in the world?": the proxy caches a module
-    version permanently the first time anyone resolves it, so a tag deleted
-    after someone fetched it is gone from the remote and served by
-    ``proxy.golang.org`` forever.
+    A target's primary ``publication_probe`` does not have to ask the registry.
+    The Go target's asks the git REMOTE whether the version's tag exists -- the
+    right question for "did we tag this?" and the wrong one for "is this out in
+    the world?": the proxy caches a module version permanently the first time
+    anyone resolves it, so a tag deleted after someone fetched it is gone from
+    the remote and served by ``proxy.golang.org`` forever.
+
+    Which targets have the second probe is the TARGET's answer, not a name this
+    source knows.
     """
 
     def _go_target(self):
@@ -359,20 +362,26 @@ class TestGoModuleProxySource:
         return TARGETS["go"]
 
     def _gather(self, proxy_answer, monkeypatch, *, module_path="example.com/m"):
-        from rlsbl import evidence_gate as gate_mod
-        from rlsbl.evidence_gate import GoModuleProxySource
+        from rlsbl.evidence_gate import CachedRegistrySource
 
         monkeypatch.setattr(
             "rlsbl.registry.query_go_mod",
             lambda path, version: proxy_answer,
         )
+        # The Go target binds read_go_module_path at import time, so the
+        # patch has to name it where the target reads it.
         monkeypatch.setattr(
-            "rlsbl.utils.read_go_module_path", lambda d: module_path,
+            "rlsbl.targets.go.read_go_module_path", lambda d: module_path,
         )
-        assert gate_mod  # the source is registered on the module under test
-        return GoModuleProxySource().gather(
+        return CachedRegistrySource().gather(
             [self._go_target()], "/fake", "1.0.0",
         )
+
+    def test_the_target_declares_whether_it_has_one(self):
+        from rlsbl.targets import TARGETS
+
+        assert TARGETS["go"].supports_cached_registry_probe is True
+        assert TARGETS["npm"].supports_cached_registry_probe is False
 
     def test_a_served_version_is_published(self, monkeypatch):
         evidence = self._gather(
@@ -401,16 +410,16 @@ class TestGoModuleProxySource:
         )
         assert [e.kind for e in evidence] == [EvidenceKind.INCONCLUSIVE]
 
-    def test_non_go_targets_produce_nothing(self):
-        from rlsbl.evidence_gate import GoModuleProxySource
+    def test_a_target_without_a_second_probe_produces_nothing(self):
+        from rlsbl.evidence_gate import CachedRegistrySource
         from rlsbl.targets import TARGETS
 
-        assert GoModuleProxySource().gather(
+        assert CachedRegistrySource().gather(
             [TARGETS["npm"]], "/fake", "1.0.0",
         ) == []
 
 
-class TestTheTwoGoSourcesCombine:
+class TestTheTwoSourcesCombine:
     """Fail-closed: either source saying PUBLISHED blocks; proxy lag never clears."""
 
     def _sources(self, tag_status, proxy_status):
@@ -421,12 +430,12 @@ class TestTheTwoGoSourcesCombine:
                 return [Evidence("registry_probe", "go", tag_status, "tag probe")]
 
         class FakeProxy:
-            name = "go_module_proxy"
+            name = "cached_registry"
 
             def gather(self, targets, project_dir, version, ctx=None):
                 if proxy_status is None:
                     return []
-                return [Evidence("go_module_proxy", "go", proxy_status, "proxy")]
+                return [Evidence("cached_registry", "go", proxy_status, "proxy")]
 
         return [FakeTagProbe(), FakeProxy()]
 
@@ -471,4 +480,4 @@ class TestTheTwoGoSourcesCombine:
     def test_the_proxy_source_is_wired_into_the_defaults(self):
         from rlsbl.evidence_gate import DEFAULT_SOURCES
 
-        assert "go_module_proxy" in [s.name for s in DEFAULT_SOURCES]
+        assert "cached_registry" in [s.name for s in DEFAULT_SOURCES]

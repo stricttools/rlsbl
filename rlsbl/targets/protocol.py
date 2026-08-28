@@ -29,6 +29,22 @@ class ReleaseTarget(Protocol):
         ...
 
     @property
+    def supports_cached_registry_probe(self) -> bool:
+        """Whether ``cached_registry_probe`` gives a real answer for this target."""
+        ...
+
+    @property
+    def release_materialization_policy(self) -> str:
+        """Whether a reconcile may recreate this target's missing release refs.
+
+        ``"materialize"`` -- recreating a released version's absent ref is a
+        pure repair. ``"refuse-identity-transition"`` -- the target's tags ARE
+        its published artifact, so a version whose published identity has since
+        changed must not have its refs recreated under the new one.
+        """
+        ...
+
+    @property
     def supports_read_name(self) -> bool:
         """Whether ``read_name`` reads a real name for this target."""
         ...
@@ -270,6 +286,16 @@ class ReleaseTarget(Protocol):
 
         Returns a PublicationProbeResult (PUBLISHED, UNPUBLISHED, or UNPROBEABLE).
         Default: UNPROBEABLE.
+        """
+        ...
+
+    def cached_registry_probe(self, dir_path: str, version: str, ctx=None):
+        """Ask the REGISTRY ITSELF whether a version is out in the world.
+
+        The second probe, for a target whose primary one answers from somewhere
+        other than the registry. Two-valued: PUBLISHED or UNPROBEABLE, never
+        UNPUBLISHED -- a lazily-indexed registry's silence is not evidence.
+        Default: UNPROBEABLE. The fact is ``supports_cached_registry_probe``.
         """
         ...
 

@@ -143,6 +143,63 @@ class GoTarget(BaseTarget):
         #     return PublicationProbeResult(
         #         status=PublicationStatus.UNPROBEABLE, ...)
 
+    def cached_registry_probe(self, dir_path, version, ctx=None):
+        """Ask proxy.golang.org whether it serves this module version.
+
+        The counterpart to :meth:`publication_probe`, which asks the git remote
+        about the tag. The proxy is a permanent cache: once anyone resolves a
+        module version it is served forever, whatever later happens to the tag.
+        So the proxy serving a version is decisive evidence that it is out in
+        the world, and the proxy NOT serving one is no evidence at all -- it
+        indexes lazily, and a genuinely published version nobody has fetched is
+        absent from it.
+        """
+        from ..publication_probe import PublicationProbeResult, PublicationStatus
+        from ..registry import query_go_mod
+
+        module_path = read_go_module_path(dir_path)
+        if not module_path:
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="go", version=version,
+                message=(
+                    f"no module path could be read from go.mod in {dir_path}, "
+                    f"so the module proxy could not be asked"
+                ),
+            )
+
+        result = query_go_mod(module_path, f"v{version}")
+        status = result.get("status")
+        if status == "found":
+            return PublicationProbeResult(
+                status=PublicationStatus.PUBLISHED,
+                registry="go", version=version,
+                message=(
+                    f"proxy.golang.org serves {module_path}@v{version}; the "
+                    f"module proxy is permanent, so this version remains "
+                    f"downloadable whatever happens to the tag"
+                ),
+            )
+        if status == "not_found":
+            return PublicationProbeResult(
+                status=PublicationStatus.UNPROBEABLE,
+                registry="go", version=version,
+                message=(
+                    f"proxy.golang.org does not serve {module_path}@v{version}, "
+                    f"which is not evidence that it was never published: the "
+                    f"proxy indexes lazily and a version nobody has fetched is "
+                    f"absent from it"
+                ),
+            )
+        return PublicationProbeResult(
+            status=PublicationStatus.UNPROBEABLE,
+            registry="go", version=version,
+            message=(
+                f"the module proxy could not be asked about {module_path}@"
+                f"v{version}: {result.get('message') or 'unknown error'}"
+            ),
+        )
+
     def _is_library(self, dir_path, config=None):
         """Return True when the project publishes a Go module, not a binary.
 

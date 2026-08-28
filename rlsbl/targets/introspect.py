@@ -190,6 +190,12 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         _prop("supports_publication_probe"),
     ),
     TargetAxis(
+        "supports_cached_registry_probe",
+        "Has a second, registry-side publication probe, because its primary "
+        "one answers from somewhere other than the registry.",
+        _prop("supports_cached_registry_probe"),
+    ),
+    TargetAxis(
         "supports_version_query",
         "Its registry answers a latest-version query.",
         _prop("supports_version_query"),
@@ -292,6 +298,10 @@ NON_AXIS_ATTRIBUTES: dict[str, str] = {
                          "(the fact is supports_import_analysis).",
     "normalize_package_name": "operation: folds one name into the form this "
                               "registry compares by; a function of its input.",
+    "cached_registry_probe": "operation: asks the registry itself about one "
+                             "version, for a target whose primary probe does "
+                             "not (the fact is "
+                             "supports_cached_registry_probe).",
     "publication_probe": "operation: asks the registry about one version "
                          "(the fact is supports_publication_probe).",
     "query_latest_version": "operation: asks the registry for the latest "

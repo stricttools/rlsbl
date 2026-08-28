@@ -9,8 +9,9 @@ the EvidenceSource protocol and registering them in the sources list.
 Current sources:
 - RegistryProbeSource: uses publication_probe() from target implementations
   (npm, pypi, go)
-- GoModuleProxySource: asks the Go module proxy directly, because the Go
-  target's own probe asks the git remote instead (see the class docstring)
+- CachedRegistrySource: asks the registry itself, for targets whose primary
+  probe answers from somewhere else (Go's asks the git remote; see the class
+  docstring)
 
 Future sources (not yet implemented):
 - CIPublishRunSource: checks GitHub Actions workflow conclusions
@@ -137,99 +138,62 @@ class RegistryProbeSource:
         return evidence
 
 
-class GoModuleProxySource:
-    """Evidence source asking the Go module proxy about one version.
+class CachedRegistrySource:
+    """Evidence source asking the registry itself, for targets that have a second probe.
 
-    The Go target's own ``publication_probe`` asks the GIT REMOTE whether the
-    version's tag exists, not the proxy. That is the right question for "did we
-    tag this?", and the wrong one for "is this out in the world?": the proxy
-    caches a module version PERMANENTLY the first time anyone resolves it, so a
-    tag that was deleted after someone fetched it is gone from the remote and
-    still served by ``proxy.golang.org`` forever. Reading the tag's absence as
-    "never published" is how a destructive operation gets cleared for a version
-    that consumers can still download today.
+    A target's primary ``publication_probe`` does not have to ask the registry.
+    Go's asks the GIT REMOTE whether the version's tag exists -- the right
+    question for "did we tag this?", and the wrong one for "is this out in the
+    world?": ``proxy.golang.org`` caches a module version PERMANENTLY the first
+    time anyone resolves it, so a tag deleted after someone fetched it is gone
+    from the remote and still served by the proxy forever. Reading the tag's
+    absence as "never published" is how a destructive operation gets cleared
+    for a version consumers can still download today.
 
-    This source answers only two ways, never three:
+    Which targets have such a second probe is the target's own answer
+    (``supports_cached_registry_probe``), not a name this module knows.
 
-    * **PUBLISHED** -- the proxy serves the version's ``go.mod``. Under the
-      gate's rule that alone blocks, which is the whole point.
-    * **INCONCLUSIVE** -- the proxy does not serve it, or could not be asked.
+    The source contributes only two kinds, never three:
 
-    Absence on the proxy is deliberately NOT reported as UNPUBLISHED. The proxy
-    indexes lazily: a genuinely published version nobody has fetched yet is
-    absent from it, so proxy lag alone must never be the evidence that clears a
-    deletion. Something that really did observe the version's absence -- the
-    tag probe -- has to say so.
+    * **PUBLISHED** -- the registry serves it. Under the gate's rule that alone
+      blocks, which is the whole point.
+    * **INCONCLUSIVE** -- it does not, or could not be asked.
+
+    Absence is deliberately never reported as UNPUBLISHED: a lazily-indexed
+    registry is absent-by-default for a version nobody has fetched, so registry
+    lag alone must never be the evidence that clears a deletion. Something that
+    really did observe the version's absence has to say so.
     """
 
     @property
     def name(self):
-        return "go_module_proxy"
+        return "cached_registry"
 
     def gather(self, targets, project_dir, version, ctx=None):
-        from .registry import query_go_mod
-        from .utils import read_go_module_path
+        from .publication_probe import PublicationStatus
 
         evidence = []
         for target in targets:
-            if target.name != "go":
+            if not target.supports_cached_registry_probe:
                 continue
-            module_path = read_go_module_path(project_dir)
-            if not module_path:
-                evidence.append(Evidence(
-                    source=self.name,
-                    target=target.name,
-                    kind=EvidenceKind.INCONCLUSIVE,
-                    message=(
-                        f"no module path could be read from go.mod in "
-                        f"{project_dir}, so the module proxy could not be asked"
-                    ),
-                ))
-                continue
-
-            result = query_go_mod(module_path, f"v{version}")
-            status = result.get("status")
-            if status == "found":
-                evidence.append(Evidence(
-                    source=self.name,
-                    target=target.name,
-                    kind=EvidenceKind.PUBLISHED,
-                    message=(
-                        f"proxy.golang.org serves {module_path}@v{version}; "
-                        f"the module proxy is permanent, so this version "
-                        f"remains downloadable whatever happens to the tag"
-                    ),
-                ))
-            elif status == "not_found":
-                evidence.append(Evidence(
-                    source=self.name,
-                    target=target.name,
-                    kind=EvidenceKind.INCONCLUSIVE,
-                    message=(
-                        f"proxy.golang.org does not serve {module_path}@"
-                        f"v{version}, which is not evidence that it was never "
-                        f"published: the proxy indexes lazily and a version "
-                        f"nobody has fetched is absent from it"
-                    ),
-                ))
-            else:
-                evidence.append(Evidence(
-                    source=self.name,
-                    target=target.name,
-                    kind=EvidenceKind.INCONCLUSIVE,
-                    message=(
-                        f"the module proxy could not be asked about "
-                        f"{module_path}@v{version}: "
-                        f"{result.get('message') or 'unknown error'}"
-                    ),
-                ))
+            result = target.cached_registry_probe(project_dir, version, ctx)
+            evidence.append(Evidence(
+                source=self.name,
+                target=target.name,
+                kind=(
+                    EvidenceKind.PUBLISHED
+                    if result.status == PublicationStatus.PUBLISHED
+                    else EvidenceKind.INCONCLUSIVE
+                ),
+                message=result.message,
+            ))
         return evidence
 
 
 # Default evidence sources -- extensible by appending to this list
 DEFAULT_SOURCES = [
     RegistryProbeSource(),
-    GoModuleProxySource(),
+    CachedRegistrySource(),
 ]
 
 

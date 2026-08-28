@@ -181,7 +181,8 @@ class TestReleaseGroupWiring:
         result, m = _dispatch(
             # The documented shape: the reserved flag follows the command.
             # strictcli recognizes the quartet anywhere in argv.
-            ["release", "reconcile", "--push-timeout", "45", "--dry-run"],
+            ["release", "reconcile", "--plan", "--push-timeout", "45",
+             "--dry-run"],
             "rlsbl.commands.release_reconcile.run_cmd",
         )
         assert result.exit_code == 0, result.stderr
@@ -189,11 +190,29 @@ class TestReleaseGroupWiring:
         assert flags["push-timeout"] == 45
         assert flags["dry-run"] is True
         assert flags["quiet"] is False
+        assert flags["mode"] == "plan"
+
+    def test_reconcile_apply_elects_the_other_half(self):
+        result, m = _dispatch(
+            ["release", "reconcile", "--apply"],
+            "rlsbl.commands.release_reconcile.run_cmd",
+        )
+        assert result.exit_code == 0, result.stderr
+        assert m.call_args[0][0]["mode"] == "apply"
+
+    def test_reconcile_requires_a_mode(self):
+        """Which half of a force-pushing repair you run is never implicit."""
+        result, _m = _dispatch(
+            ["release", "reconcile"],
+            "rlsbl.commands.release_reconcile.run_cmd",
+        )
+        assert result.exit_code != 0
+        assert "--plan" in result.stderr or "mode" in result.stderr
 
     def test_reconcile_zero_push_timeout_means_unset(self):
         """0 is the "use the configured default" sentinel, not a real timeout."""
         result, m = _dispatch(
-            ["release", "reconcile"],
+            ["release", "reconcile", "--plan"],
             "rlsbl.commands.release_reconcile.run_cmd",
         )
         assert result.exit_code == 0, result.stderr

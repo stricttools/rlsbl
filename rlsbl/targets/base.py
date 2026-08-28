@@ -478,6 +478,37 @@ class BaseTarget:
             message=f"target '{self.name}' does not support publication probing",
         )
 
+    def cached_registry_probe(self, dir_path, version, ctx=None):
+        """Ask the REGISTRY ITSELF whether a version is out in the world.
+
+        A second probe, deliberately narrower than :meth:`publication_probe`.
+        It exists because a target's primary probe does not have to ask the
+        registry: Go's asks the git remote whether the version's tag exists,
+        which is the right question for "did we tag this?" and the wrong one
+        for "can anyone still download this?" -- ``proxy.golang.org`` caches a
+        module version permanently the first time it is resolved, so a deleted
+        tag reads as never-published while the proxy goes on serving it.
+
+        THE CONTRACT IS TWO-VALUED, not three: PUBLISHED, or UNPROBEABLE.
+        This probe only ever ADDS positive evidence. A registry that indexes
+        lazily is absent-by-default for a version nobody has fetched yet, so
+        its silence must never be reported as UNPUBLISHED -- that would let
+        registry lag clear a destructive operation.
+
+        The default returns UNPROBEABLE. The fact is
+        ``supports_cached_registry_probe``.
+        """
+        from ..publication_probe import PublicationProbeResult, PublicationStatus
+        return PublicationProbeResult(
+            status=PublicationStatus.UNPROBEABLE,
+            registry=self.name,
+            version=version,
+            message=(
+                f"target '{self.name}' has no registry-side probe beyond its "
+                f"primary one"
+            ),
+        )
+
     def dev_install_command(self, project_dir):
         """Specs for local install via `rlsbl dev install`, keyed by mode.
 
@@ -509,6 +540,14 @@ class BaseTarget:
     def supports_publication_probe(self):
         """Whether this target can ask its registry if a version is published."""
         return type(self).publication_probe is not BaseTarget.publication_probe
+
+    @property
+    def supports_cached_registry_probe(self):
+        """Whether this target has a registry-side probe beyond its primary one."""
+        return (
+            type(self).cached_registry_probe
+            is not BaseTarget.cached_registry_probe
+        )
 
     @property
     def supports_read_name(self):
