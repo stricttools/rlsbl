@@ -170,11 +170,84 @@ def is_clean_tree(cwd=None):
     return len(working_tree_status(cwd=cwd)) == 0
 
 
-def working_tree_status(cwd=None):
+#: The one argv every working-tree status read in rlsbl issues. Its
+#: ``git --no-optional-locks status`` prefix is what puts it on the observe
+#: allowlist, so the read really happens inside a preview.
+STATUS_ARGV = ["git", "--no-optional-locks", "status", "--porcelain", "-z"]
+
+_UNTRACKED_MODES = ("no", "normal", "all")
+
+
+def status_argv(*, paths=None, untracked=None):
+    """The argv for a ``git status --porcelain -z`` read.
+
+    ``untracked`` is one of ``no``/``normal``/``all`` (None leaves git's
+    default); ``paths`` become a pathspec, which narrows the answer to those
+    paths without changing the record format. An unknown ``untracked`` mode is
+    a hard error rather than a silently-ignored word.
+    """
+    argv = list(STATUS_ARGV)
+    if untracked is not None:
+        if untracked not in _UNTRACKED_MODES:
+            raise ValueError(
+                f"unknown untracked mode {untracked!r}; "
+                f"expected one of {', '.join(_UNTRACKED_MODES)}"
+            )
+        argv.append(f"--untracked-files={untracked}")
+    if paths:
+        argv.append("--")
+        argv.extend(os.fspath(p) for p in paths)
+    return argv
+
+
+def parse_status_records(stdout):
+    """The status records in raw ``git status --porcelain -z`` *stdout*.
+
+    Split out from :func:`working_tree_status` so a caller that already holds
+    the output -- the release executor's declared result capture, which runs
+    the read itself -- parses it the same way as everyone else instead of
+    hand-rolling a second parser.
+
+    *stdout* must be the UNSTRIPPED output: an unstaged record starts with a
+    space (`` D path``), and stripping it shifts every column.
+    """
+    fields = stdout.split("\0")
+    records = []
+    index = 0
+    while index < len(fields):
+        record = fields[index]
+        index += 1
+        if not record.strip():
+            continue  # the trailing empty field after the final NUL
+        records.append(record)
+        if len(record) >= 2 and (record[0] in "RC" or record[1] in "RC"):
+            index += 1  # skip this record's origin path
+    return records
+
+
+def parse_status_paths(stdout):
+    """The changed paths in raw ``git status --porcelain -z`` *stdout*.
+
+    The records of :func:`parse_status_records`, minus their ``XY `` status
+    columns: exactly the path list a commit can name.
+    """
+    paths = []
+    for record in parse_status_records(stdout):
+        if len(record) < 4:
+            continue
+        path = record[3:]
+        if path:
+            paths.append(path)
+    return paths
+
+
+def working_tree_status(cwd=None, *, paths=None, untracked=None):
     """The porcelain status records of the working tree at ``cwd``.
 
     Each record is ``XY <path>``, NOT stripped: the leading status columns
-    carry meaning. :func:`working_tree_paths` is the parsed form.
+    carry meaning. :func:`working_tree_paths` is the parsed form. ``paths``
+    and ``untracked`` are the read's two knobs, described on
+    :func:`status_argv`.
 
     Read in ``-z`` mode, which is the whole point. Git's default porcelain
     output C-QUOTES any path it cannot print literally -- anything non-ASCII,
@@ -193,39 +266,30 @@ def working_tree_status(cwd=None):
     the parsed path would lose its first character.
     """
     result = effects.run(
-        ["git", "--no-optional-locks", "status", "--porcelain", "-z"],
+        status_argv(paths=paths, untracked=untracked),
         cwd=cwd, capture_output=True, text=True, check=True, timeout=120,
     )
-    fields = result.stdout.split("\0")
-    records = []
-    index = 0
-    while index < len(fields):
-        record = fields[index]
-        index += 1
-        if not record.strip():
-            continue  # the trailing empty field after the final NUL
-        records.append(record)
-        if len(record) >= 2 and (record[0] in "RC" or record[1] in "RC"):
-            index += 1  # skip this record's origin path
-    return records
+    return parse_status_records(result.stdout)
 
 
-def working_tree_paths(cwd=None):
+def working_tree_paths(cwd=None, *, paths=None, untracked=None):
     """Every path the working tree at ``cwd`` reports a change for.
 
     The records :func:`working_tree_status` returns, minus their ``XY ``
     status columns: exactly the path list a commit can name. A rename yields
     the NEW path (its origin was already consumed), and nothing is unquoted
     because ``-z`` output was never quoted.
+
+    ``paths`` narrows the read to a pathspec (the answer still names paths
+    relative to the repo root, not to the pathspec), and ``untracked`` selects
+    how untracked content is reported -- ``"all"`` lists every untracked file
+    instead of collapsing a wholly-untracked directory into one record.
     """
-    paths = []
-    for record in working_tree_status(cwd=cwd):
-        if len(record) < 4:
-            continue
-        path = record[3:]
-        if path:
-            paths.append(path)
-    return paths
+    return [
+        record[3:]
+        for record in working_tree_status(cwd=cwd, paths=paths, untracked=untracked)
+        if len(record) >= 4 and record[3:]
+    ]
 
 
 def get_current_branch(*, cwd):

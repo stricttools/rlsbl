@@ -13,8 +13,11 @@ from rlsbl.utils import (
     commit_files_if_changed,
     has_staged_or_modified,
     is_clean_tree,
+    parse_status_paths,
+    parse_status_records,
     partition_stageable,
     remote_branch_exists,
+    status_argv,
     working_tree_paths,
     working_tree_status,
 )
@@ -340,3 +343,58 @@ class TestWorkingTreePathsSurviveGitQuoting:
         assert " M README.md" in records
         assert "?? naïve.txt" in records
         assert not is_clean_tree(cwd=str(mock_git_repo))
+
+
+class TestStatusReadSurface:
+    """The pathspec and untracked-mode knobs, and the pure parsers.
+
+    Every working-tree status read in rlsbl goes through these two helpers, so
+    the two questions the old hand-rolled parsers asked -- "only these paths"
+    and "every untracked file, not the collapsed directory" -- are answered
+    here rather than by a caller assembling its own argv.
+    """
+
+    def test_a_pathspec_narrows_the_answer(self, mock_git_repo):
+        (mock_git_repo / "wanted é.txt").write_text("x\n")
+        (mock_git_repo / "other.txt").write_text("x\n")
+
+        assert working_tree_paths(
+            cwd=str(mock_git_repo), paths=["wanted é.txt"],
+        ) == ["wanted é.txt"]
+
+    def test_a_pathspec_matching_nothing_is_not_an_error(self, mock_git_repo):
+        assert working_tree_paths(
+            cwd=str(mock_git_repo), paths=["never-existed.txt"],
+        ) == []
+
+    def test_untracked_all_lists_files_not_the_collapsed_directory(
+        self, mock_git_repo,
+    ):
+        pkg = mock_git_repo / "nouveau dossier"
+        pkg.mkdir()
+        (pkg / "é.txt").write_text("x\n")
+
+        assert working_tree_paths(cwd=str(mock_git_repo)) == ["nouveau dossier/"]
+        assert working_tree_paths(
+            cwd=str(mock_git_repo), untracked="all",
+        ) == ["nouveau dossier/é.txt"]
+
+    def test_an_unknown_untracked_mode_is_refused(self):
+        with pytest.raises(ValueError, match="unknown untracked mode"):
+            status_argv(untracked="everything")
+
+    def test_the_argv_keeps_the_observe_prefix(self):
+        argv = status_argv(paths=["a b.txt"], untracked="all")
+
+        assert argv[:3] == ["git", "--no-optional-locks", "status"]
+        assert argv[-2:] == ["--", "a b.txt"]
+
+    def test_the_parsers_read_raw_capture_output(self):
+        stdout = " M docs/naïve file.md\0?? un tracked/\0R  new é.txt\0old.txt\0"
+
+        assert parse_status_records(stdout) == [
+            " M docs/naïve file.md", "?? un tracked/", "R  new é.txt",
+        ]
+        assert parse_status_paths(stdout) == [
+            "docs/naïve file.md", "un tracked/", "new é.txt",
+        ]
