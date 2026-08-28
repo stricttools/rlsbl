@@ -16,11 +16,16 @@ parsed job. Comment-only lines are stripped before the negative matches, because
 the ``@v0`` comment names ``@latest`` on purpose.
 """
 
+import json
 import os
+from io import StringIO
+from unittest.mock import patch
 
 from ruamel.yaml import YAML
 
-from rlsbl.commands.init_cmd import process_template
+from rlsbl.commands.init_cmd import process_template, run_cmd
+from rlsbl.config import read_project_config
+from rlsbl.context import ProjectContext
 from rlsbl.targets.pgdesign import PgdesignTarget
 
 PHANTOM_COMMENT = (
@@ -109,3 +114,54 @@ class TestTemplateStillRenders:
         uses = [s["uses"] for s in doc["jobs"]["test"]["steps"] if "uses" in s]
         assert any(u.startswith("actions/checkout@") for u in uses)
         assert any(u.startswith("actions/setup-go@") for u in uses)
+
+
+# --------------------------------------------------------------------------- #
+# Scaffolded CI must run the check in the directory the target declares
+# --------------------------------------------------------------------------- #
+
+def _scaffold(root, *, target_path):
+    """Scaffold a pgdesign project whose schema sits at *target_path*."""
+    schema_dir = root if target_path == "." else root / target_path
+    schema_dir.mkdir(parents=True, exist_ok=True)
+    (schema_dir / "pgdesign.toml").write_text(
+        '[project]\nname = "acme"\nversion = "0.1.0"\n'
+    )
+    rlsbl_dir = root / ".rlsbl"
+    rlsbl_dir.mkdir(exist_ok=True)
+    (rlsbl_dir / "config.json").write_text(json.dumps({
+        "publish_mode": "none",
+        "targets": [{"name": "pgdesign", "path": target_path}],
+    }, indent=2) + "\n")
+
+    ctx = ProjectContext(
+        project_root=root, workspace_root=None, config=read_project_config("."),
+    )
+    with patch("sys.stdout", new_callable=StringIO):
+        run_cmd("pgdesign", [], {"no-tag": True, "skip-shared": True}, ctx=ctx)
+    return YAML(typ="safe").load(
+        (root / ".github" / "workflows" / "ci.yml").read_text()
+    )
+
+
+class TestScaffoldedWorkingDirectory:
+    """``pgdesign check`` resolves its project from the process cwd.
+
+    A schema in a subdirectory is declared as the target's ``path`` -- the only
+    supported subdirectory arrangement, since detection never walks down. The
+    release-time build already honours it (it runs the check with ``cwd``set to
+    the target directory), but the scaffolded CI used to run at the repo root,
+    so such a project validated locally and failed in CI on the first push.
+    """
+
+    def test_subdirectory_target_gets_the_working_directory(self, mock_git_repo):
+        doc = _scaffold(mock_git_repo, target_path="schema")
+        assert (
+            doc["jobs"]["test"]["defaults"]["run"]["working-directory"] == "schema"
+        ), "subdirectory pgdesign CI must run the check inside the schema dir"
+
+    def test_root_target_has_no_working_directory(self, mock_git_repo):
+        doc = _scaffold(mock_git_repo, target_path=".")
+        assert "defaults" not in doc["jobs"]["test"], (
+            "a root-path target must not carry a needless working-directory"
+        )

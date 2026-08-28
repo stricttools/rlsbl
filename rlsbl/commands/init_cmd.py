@@ -1745,11 +1745,20 @@ def run_cmd(registry, args, flags, ctx):
             # CI service containers (config services/test_env) are injected into
             # the single-target CI workflow (ci.yml -> maps to this registry)
             # as part of rendering "theirs", never as a post-merge patch.
+            #
+            # working_dir is the target's DECLARED path, exactly as the
+            # multi-target branch below passes it. Omitting it here made a
+            # lone subdirectory target the one arrangement whose CI ran at the
+            # repo root: a project whose sources live in a declared subdirectory
+            # validated locally (the release build runs with cwd set to the
+            # target directory) and failed on the first CI push. A root target
+            # resolves to "." and the transform then adds nothing.
             reg_plans = plan_mappings(
                 reg.template_dir(), reg_mappings, vars_dict,
                 required_vars={"name", "registryUrl"},
                 transform=make_ci_workflow_transform(
                     ctx.config or {}, single_target=registry,
+                    working_dir=target_path,
                 ),
             )
 

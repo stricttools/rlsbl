@@ -363,6 +363,13 @@ def make_ci_workflow_transform(config, *, single_target=None, working_dir=None):
     """
     services = config.get("services") or {}
     test_env = config.get("test_env") or {}
+    # Target paths arrive as detection produced them, which is os.path.join of
+    # the scan directory and the declared path -- "./schema" for a subdirectory
+    # and "./." for a target declared at the root. Normalizing first is what
+    # makes the root case answer "no working directory needed" instead of
+    # writing a literal "./." into every job.
+    if working_dir:
+        working_dir = os.path.normpath(working_dir)
     needs_working_dir = working_dir not in (None, "", ".")
     if not services and not test_env and not needs_working_dir:
         return None
