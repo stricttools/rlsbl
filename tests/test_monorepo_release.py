@@ -9,6 +9,7 @@ from unittest.mock import patch, call
 
 import pytest
 
+from githarness import canned_status_effects_run
 from rlsbl.commands.release import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
@@ -563,5 +564,10 @@ class TestSubtreePublish:
         # UnboundLocalError in monorepo-without-releasable path).  The subtree
         # publish code path is still exercised because it reads subtree_remote
         # from workspace.toml via resolve_project.
-        with patch("sys.stdout", new_callable=StringIO):
+        # The working tree is read through the shared helper on the effects
+        # chokepoint, which mock_run never sees: answer it as a clean tree so
+        # the fixture's own uncommitted files do not trip the release's
+        # concurrent-change guard.
+        with patch("sys.stdout", new_callable=StringIO), \
+             patch("rlsbl.effects.run", side_effect=canned_status_effects_run()):
             run_cmd(_rc(), {"quiet": False}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
