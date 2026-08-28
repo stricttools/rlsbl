@@ -522,6 +522,126 @@ class TestTheExpectedRefSet:
         assert alias.data.create_local_tag is True
 
 
+class TestTheApplyConsent:
+    """The plan's items ARE the consent, so an apply may perform nothing else.
+
+    ``world_digest`` covers the REMOTE, by design -- it is the force-push lease
+    material. A purely LOCAL change between plan and apply (a tag fetched, a
+    tag created) leaves the digest valid while enlarging what a freshly derived
+    preview would act on, so the plan's own item list is what the apply is held
+    to.
+    """
+
+    def _plan(self, tmp_path, preview):
+        from rlsbl.commands.release_reconcile import read_plan, render_plan
+
+        path = tmp_path / "reconcile-plan.toml"
+        path.write_text(render_plan(preview, "digest", generated_by="0.0.0"))
+        return read_plan(str(path)), str(path)
+
+    def _covers(self, tmp_path, planned, fresh):
+        from rlsbl.commands.release_reconcile import check_plan_covers
+
+        plan, path = self._plan(tmp_path, planned)
+        return check_plan_covers(plan, fresh, path)
+
+    def test_a_subject_the_plan_does_not_name_is_refused(self, tmp_path, ledger):
+        from rlsbl.commands.release_reconcile import ReconcileError
+
+        explanations = Explanations(
+            commit_map={OLD: NEW}, origins={OLD: "a recorded rewrite"},
+        )
+        planned = _preview(
+            tmp_path, ledger, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
+            explanations=explanations,
+        )
+        # Between plan and apply someone brings a second tag local. The remote
+        # never moved, so the digest still matches.
+        fresh = _preview(
+            tmp_path, ledger,
+            remote={**_refs(v1_0_0=OLD), **_refs(v2_0_0=OLD)},
+            local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
+            explanations=explanations,
+        )
+        with pytest.raises(ReconcileError) as exc:
+            self._covers(tmp_path, planned, fresh)
+        message = str(exc.value)
+        assert "refs/tags/v2.0.0" in message
+        assert "re-plan" in message or "--plan" in message
+
+    def test_a_planned_item_whose_verdict_changed_is_refused(
+        self, tmp_path, ledger,
+    ):
+        from rlsbl.commands.release_reconcile import ReconcileError
+
+        planned = _preview(
+            tmp_path, ledger, remote={}, local=_refs(v1_0_0=NEW),
+        )
+        assert planned.by_key("refs/tags/v1.0.0").state == STATE_MATERIALIZE
+        fresh = _preview(
+            tmp_path, ledger, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
+            explanations=Explanations(
+                commit_map={OLD: NEW}, origins={OLD: "a recorded rewrite"},
+            ),
+        )
+        with pytest.raises(ReconcileError) as exc:
+            self._covers(tmp_path, planned, fresh)
+        message = str(exc.value)
+        assert "materialize" in message
+        assert "re-point-with-lease" in message
+
+    def test_a_planned_item_whose_target_moved_locally_is_refused(
+        self, tmp_path, ledger,
+    ):
+        """Same verdict, same lease, different commit: the apply would push
+        something the plan never named."""
+        from rlsbl.commands.release_reconcile import ReconcileError
+
+        other = "7" * 40
+        planned = _preview(
+            tmp_path, ledger,
+            remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=OLD)},
+            local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
+            explanations=Explanations(commit_map={OLD: NEW}),
+        )
+        fresh = _preview(
+            tmp_path, ledger,
+            remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=OLD)},
+            local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=other)},
+            explanations=Explanations(commit_map={OLD: other}),
+        )
+        with pytest.raises(ReconcileError) as exc:
+            self._covers(tmp_path, planned, fresh)
+        assert "refs/tags/v2.0.0" in str(exc.value)
+
+    def test_a_planned_item_that_became_correct_is_a_recorded_no_op(
+        self, tmp_path, ledger,
+    ):
+        planned = _preview(
+            tmp_path, ledger,
+            remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=OLD)},
+            local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
+            explanations=Explanations(commit_map={OLD: NEW}),
+        )
+        assert planned.by_key("refs/tags/v2.0.0").state == STATE_RE_POINT
+        # v2.0.0 agrees now, so the fresh preview drops it entirely.
+        fresh = _preview(
+            tmp_path, ledger,
+            remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
+            local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
+        )
+        assert self._covers(tmp_path, planned, fresh) == ["refs/tags/v2.0.0"]
+
+    def test_an_unchanged_world_matches_itself(self, tmp_path, ledger):
+        preview = _preview(
+            tmp_path, ledger, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
+            explanations=Explanations(
+                commit_map={OLD: NEW}, origins={OLD: "a recorded rewrite"},
+            ),
+        )
+        assert self._covers(tmp_path, preview, preview) == []
+
+
 class TestThePlanFile:
     """The plan is the preview's artifact and the apply step's only input."""
 

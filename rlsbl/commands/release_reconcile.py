@@ -63,10 +63,20 @@ Consent is file-driven
 ----------------------
 
 ``--plan`` observes and writes ``.rlsbl/releases/reconcile-plan.toml``; that
-file IS the preview's output artifact. ``--apply`` reads it, re-observes, and
-refuses when the world moved under the plan. ``--dry-run`` renders and writes
-nothing at all -- under ``--plan`` the plan file is not written, and under
-``--apply`` the plan is checked and the writes are only described.
+file IS the preview's output artifact, and it is written even when the plan is
+empty, so an apply on it is a clean no-op rather than an instruction to run the
+plan that was just run. ``--apply`` reads it, re-observes, and performs exactly
+the repairable items the plan named: a subject the fresh observation grew, or a
+planned subject whose verdict, lease or target moved, is a hard refusal naming
+it (see :func:`check_plan_covers`). ``--dry-run`` renders and writes nothing at
+all -- under ``--plan`` the plan file is not written, and under ``--apply`` the
+plan is checked and the writes are only described.
+
+``reconcile`` declares itself ``consequential`` as ONE command, so ``--plan``
+prompts for consent too. That is deliberate: the two halves are one command,
+and the prompt is about running it at all. A per-half classification would make
+consent depend on a flag rather than on the command, which is exactly the shape
+the effects regime refuses.
 
 Every function that shells out takes its git/gh runners from the caller
 (``git=``, ``gh=``, ...). Both entry points -- the scrub flow and the
@@ -1102,7 +1112,10 @@ def render_plan(preview, digest, *, generated_by):
         if item.summary:
             entry.add("summary", item.summary)
         items.append(entry)
-    doc.add("items", items)
+    # An empty array-of-tables serializes to nothing at all, and `items` is a
+    # required member -- so a plan that found nothing writes an empty array
+    # rather than a document the validator rejects.
+    doc.add("items", items if preview.items else tomlkit.array())
     return tomlkit.dumps(doc)
 
 
@@ -1131,6 +1144,95 @@ def read_plan(path):
             + "; ".join(d.message for d in diags)
         )
     return root
+
+
+# The verdicts a plan item can carry that an apply would ACT on, in the
+# hyphenated spelling the plan file records.
+_REPAIRABLE_LABELS = frozenset({
+    STATE_MATERIALIZE.replace("_", "-"),
+    STATE_RE_POINT.replace("_", "-"),
+})
+
+
+def check_plan_covers(plan, preview, path):
+    """Refuse an apply whose fresh observation names work the plan does not.
+
+    The plan file IS the consent, so the apply performs exactly the repairable
+    items the operator read -- never a freshly derived set that happens to be
+    larger. :func:`check_plan_matches` cannot answer this on its own:
+    ``world_digest`` covers the REMOTE by design (it is the force-push lease
+    material), so a purely LOCAL change between plan and apply -- a tag
+    fetched, a tag created, a tag moved -- leaves the digest valid while the
+    fresh preview grows a subject, or re-points an existing one at a different
+    commit. Both are writes nobody previewed.
+
+    Three refusals, each naming what it saw:
+
+    * a fresh actionable subject the plan does not name at all;
+    * a planned subject whose verdict changed (both verdicts are named);
+    * a planned subject whose lease or target commit moved.
+
+    A planned repairable item the fresh observation no longer names became
+    correct on its own; those keys are RETURNED, so the caller can report them
+    as no-ops rather than treat their absence as a mismatch.
+    """
+    planned = {entry.key: entry for entry in plan.items}
+    filename = os.path.basename(path)
+    re_plan = (
+        f"  Re-run `rlsbl release reconcile --plan`, read the new plan, and "
+        f"apply that."
+    )
+
+    for item in preview.items:
+        action = item.data
+        if not isinstance(action, RefAction):
+            continue
+        entry = planned.get(item.key)
+        if entry is None:
+            raise ReconcileError(
+                f"the world grew a subject {filename} does not cover: "
+                f"{item.key}.\n"
+                f"  now: {item.state_label} -- {item.summary}\n"
+                f"  The plan's items are the consent, and its world_digest "
+                f"covers the remote only -- a tag brought local since the plan "
+                f"was written changes\n"
+                f"  nothing the digest can see while enlarging what an apply "
+                f"would touch.\n{re_plan}"
+            )
+        if entry.state != item.state_label:
+            raise ReconcileError(
+                f"the verdict for {item.key} changed since {filename} was "
+                f"written.\n"
+                f"  planned: {entry.state}\n"
+                f"  now:     {item.state_label} -- {item.summary}\n"
+                f"  Applying it would perform an action the plan does not "
+                f"describe.\n{re_plan}"
+            )
+        if (entry.observed or "") != (action.observed or ""):
+            raise ReconcileError(
+                f"the force-push lease for {item.key} changed since "
+                f"{filename} was written.\n"
+                f"  planned: {entry.observed or '<absent>'}\n"
+                f"  now:     {action.observed or '<absent>'}\n{re_plan}"
+            )
+        if (entry.target or "") != (action.target or ""):
+            raise ReconcileError(
+                f"the commit {item.key} would be pushed to changed since "
+                f"{filename} was written.\n"
+                f"  planned: {entry.target or '<absent>'}\n"
+                f"  now:     {action.target or '<absent>'}\n"
+                f"  The verdict is unchanged, so the digest still matches: "
+                f"this moved LOCALLY. Applying it would publish a commit the "
+                f"plan never named.\n{re_plan}"
+            )
+
+    fresh_keys = {
+        item.key for item in preview.items if isinstance(item.data, RefAction)
+    }
+    return [
+        entry.key for entry in plan.items
+        if entry.state in _REPAIRABLE_LABELS and entry.key not in fresh_keys
+    ]
 
 
 def check_plan_matches(plan, observation, path):
@@ -1264,7 +1366,18 @@ def _changelog_path(ctx):
 
 
 def run_cmd(flags, *, ctx):
-    """Reconcile this project's published refs and Releases with its records."""
+    """Reconcile this project's published refs and Releases with its records.
+
+    Both halves run through here. ``--plan`` writes the plan file (empty plan
+    included) and performs no per-item apply; ``--apply`` reads that plan back,
+    refuses when the remote or the plan's own subjects moved under it, and then
+    performs what it named.
+
+    The command is ``consequential`` as a whole, so ``--plan`` prompts as well.
+    That is deliberate rather than an oversight: consent is for running the
+    command, and making it depend on which half was elected would put a flag in
+    charge of whether a human is asked.
+    """
     from .. import __version__ as _rlsbl_version
     from .. import effects
 
@@ -1308,6 +1421,10 @@ def run_cmd(flags, *, ctx):
             state["plan"] = plan
             if refusals(preview):
                 raise ReconcileError(tripwire_error(preview))
+            # The plan's items are the consent: the fresh preview may not name
+            # a repairable subject the plan does not, and a planned subject may
+            # not have changed under it.
+            state["noops"] = check_plan_covers(plan, preview, path_of_plan)
         return preview
 
     def _apply(item):
@@ -1354,7 +1471,6 @@ def run_cmd(flags, *, ctx):
 
     if not preview.items:
         print("Nothing to reconcile: origin matches this repository's records.")
-        return
 
     if mode == "plan":
         blocked = refusals(preview)
@@ -1368,6 +1484,10 @@ def run_cmd(flags, *, ctx):
                 f"`rlsbl release reconcile --apply` to perform it."
             )
             return
+        # An EMPTY plan is still written. The two halves are one flow, and a
+        # plan half that writes nothing when it found nothing would leave the
+        # apply half telling the operator to run the plan first -- which they
+        # just did.
         effects.makedirs(os.path.dirname(path_of_plan), exist_ok=True)
         effects.atomic_write_text(
             path_of_plan,
@@ -1394,5 +1514,7 @@ def run_cmd(flags, *, ctx):
         i for i in preview.items if isinstance(i.data, RefAction)
     ]
     print(f"\nApplied {len(actionable)} change(s).")
+    for key in state.get("noops") or []:
+        print(f"  {key}: already correct by the time the plan was applied.")
     if os.path.exists(path_of_plan):
         effects.remove(path_of_plan)

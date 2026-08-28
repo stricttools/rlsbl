@@ -310,6 +310,52 @@ class TestReconcileAfterRawRewrite:
         assert "the world changed" in capsys.readouterr().err
 
 
+class TestTheApplyIsHeldToThePlan:
+    """The plan file is the consent, and consent covers a fixed set of subjects.
+
+    ``world_digest`` is remote-only by design -- it is the lease material for
+    the force-pushes. So a purely LOCAL change between plan and apply keeps the
+    digest valid while a freshly derived preview grows a subject nobody
+    previewed.
+    """
+
+    def test_a_tag_brought_local_after_the_plan_is_refused(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        repo = _setup_released_repo(e2e_env)
+        monkeypatch.chdir(repo)
+
+        # A second released tag that exists on origin but NOT locally, so the
+        # plan never judges it.
+        _git(repo, "tag", "-a", "v1.1.0", "-m", "release v1.1.0")
+        _git(repo, "push", "--no-verify", "origin", "v1.1.0")
+        unplanned_remote = _remote_ref(repo, "refs/tags/v1.1.0")
+        _git(repo, "tag", "-d", "v1.1.0")
+
+        _raw_safegit_scrub(repo)
+        _run_reconcile(repo, mode="plan")
+        plan_text = open(
+            plan_path(repo / ".rlsbl" / "releases"), encoding="utf-8",
+        ).read()
+        assert "v1.1.0" not in plan_text, (
+            "the tag is not local, so the plan does not judge it -- that is "
+            "the setup, not the bug"
+        )
+
+        # Now it IS local, at the commit the rewrite produced. The remote never
+        # moved, so the plan's digest still matches.
+        _git(repo, "tag", "v1.1.0", "HEAD")
+
+        with pytest.raises(SystemExit) as exc:
+            _run_reconcile(repo, mode="apply")
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "refs/tags/v1.1.0" in err
+        assert _remote_ref(repo, "refs/tags/v1.1.0") == unplanned_remote, (
+            "an apply must never force-push a subject the plan did not name"
+        )
+
+
 class TestThePublicationTripwire:
 
     def test_a_divergence_no_source_explains_is_refused(
@@ -400,6 +446,29 @@ class TestWithoutAJournal:
             _run_reconcile(repo, mode="plan")
         assert exc.value.code == 1
         assert "no record explains" in capsys.readouterr().err
+
+
+class TestTheEmptyPlan:
+    """Finding nothing is an answer, and the flow stays coherent around it."""
+
+    def test_it_is_written_and_applies_as_a_clean_no_op(
+        self, e2e_env, monkeypatch, capsys,
+    ):
+        repo = _setup_released_repo(e2e_env)
+        monkeypatch.chdir(repo)
+
+        _run_reconcile(repo, mode="plan")
+        path = plan_path(repo / ".rlsbl" / "releases")
+        assert os.path.exists(path), (
+            "a plan that found nothing is still the plan half's artifact; "
+            "without it the apply half tells the operator to run the plan "
+            "they just ran"
+        )
+        assert list(read_plan(path).items) == []
+
+        _run_reconcile(repo, mode="apply")
+        assert "Applied 0 change(s)" in capsys.readouterr().out
+        assert not os.path.exists(path), "a consumed plan is removed"
 
 
 class TestTheVerdictClassification:
