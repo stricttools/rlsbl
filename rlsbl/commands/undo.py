@@ -20,10 +20,11 @@ at resume time, several commits above the bump.
 So the release commits are found from the LEDGER, not by walking down from the
 tag: the archive for the version records the commit that was verified and
 tagged (the anchor), the predecessor's archive records where the previous
-release ended, and the release's own commits are the release-shaped commits
-between those two. Walking down from the tag and stopping at the first
-non-release-shaped subject collected ZERO commits on a resumed release, and
-undo reported success with the version files still bumped.
+release ended, and the release's own commits are the ones between those two
+whose subjects the release itself writes (the version bump and the
+finalization commits). Walking down from the tag and stopping at the first
+subject the release did not write collected ZERO commits on a resumed release,
+and undo reported success with the version files still bumped.
 
 What is reverted, and what is repaired
 --------------------------------------
@@ -440,8 +441,9 @@ def _collect_release_commits(uc, version, tag, expected_msg):
 
     The search range is ``<predecessor's anchor>..<this release's anchor>``,
     both read from the archives. Inside it the version-bump commit is
-    identified and everything release-shaped from the bump up to the anchor is
-    collected; foreign commits in between (a fix-forward) are left alone, and
+    identified and every commit whose subject the release itself writes, from
+    the bump up to the anchor, is collected; foreign commits in between (a
+    fix-forward) are left alone, and
     the predecessor's own finalization commits are below the bump and so out of
     the collected set.
 
@@ -494,7 +496,7 @@ def _collect_release_commits(uc, version, tag, expected_msg):
             "one shipped the release.",
         )
 
-    # Everything release-shaped from the bump commit up to the anchor. The list
+    # Every commit the release itself wrote, from the bump up to the anchor. The list
     # is newest-first, so the bump is the LAST element of the slice.
     span = commits[: bump_indexes[0] + 1]
     collected = []

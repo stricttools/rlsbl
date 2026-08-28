@@ -779,7 +779,7 @@ class TestRealReleaseShape:
         """A resumed release tags the CI-verified tip, not the bump commit.
 
         The commit walk used to start at the tag and stop at the first
-        non-release-shaped subject, so on this shape it collected ZERO commits
+        subject the release did not write, so on this history it collected ZERO commits
         and undo reported success with the version files still bumped.
         """
         repo = tmp_path / "repo"

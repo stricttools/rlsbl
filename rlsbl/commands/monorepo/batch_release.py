@@ -579,7 +579,7 @@ def _cmd_batch_release(flags, project_root):
     projects = load_workspace(workspace_root)
 
     # --- Repair pass / resolved-plan handling ---
-    # If a plan sidecar already exists, this is not a fresh batch: validate it
+    # If a plan file already exists, this is not a fresh batch: validate it
     # against the current batch file (never regenerate) and, if every item is
     # provably released, stop -- there is nothing left for this run to do.
     plan_path = get_batch_plan_path(workspace_root)
@@ -668,7 +668,7 @@ def _resolve_fresh_plan(workspace_root, batch_config, projects, plan_path, log):
 def _abort_legacy_plan_less_batch(batch_path, plan_path, detail):
     """Hard error for a plan-less batch file that was already (partly) released.
 
-    A batch ``unreleased.toml`` with no plan sidecar whose target tags already
+    A batch ``unreleased.toml`` with no companion plan file whose target tags already
     exist predates resolved-plan tracking: it was partially executed by an
     older rlsbl that never persisted base versions, so there is no safe way to
     decide which items still need releasing. Refuse to guess.
@@ -677,7 +677,7 @@ def _abort_legacy_plan_less_batch(batch_path, plan_path, detail):
         "Error: found a batch release file that predates resolved-plan "
         "tracking and appears to have been partially released.\n"
         f"  Batch file: {os.path.relpath(batch_path)}\n"
-        f"  Missing plan sidecar: {os.path.relpath(plan_path)}\n"
+        f"  Missing plan file: {os.path.relpath(plan_path)}\n"
         f"  Detail: {detail}\n"
         "Without a resolved plan, rlsbl cannot tell which items are already "
         "released. Resolve manually:\n"
@@ -958,7 +958,7 @@ def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root):
     into the archive without a single release happening.
 
     So the batch file is never touched here; it belongs to the operator. Only
-    the plan sidecar is archived, which is exactly what unblocks the next
+    the companion plan file is archived, which is exactly what unblocks the next
     run: with the stale plan gone, a re-run resolves a fresh plan against the
     surviving batch file.
 
@@ -1045,7 +1045,7 @@ def _announce_batch_completion(released, log):
             f"skipped "
             f"or unaccounted for.\nIf they are all already released, the batch "
             f"file and its plan are stale: archive them (or delete the plan "
-            f"sidecar and re-run) instead of re-running an empty batch.",
+            f"file and re-run) instead of re-running an empty batch.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1278,10 +1278,10 @@ def _push_finalized_batch_file(workspace_root, flags, log, *, pin_sha):
 
 
 def _finalize_batch_file(batch_path, log):
-    """Rename the batch release file (and its plan sidecar) and lock them.
+    """Rename the batch release file (and its companion plan file) and lock them.
 
     Idempotent: a no-op when the batch file has already been archived. The plan
-    sidecar, when present, is archived alongside under the same timestamped
+    file, when present, is archived alongside under the same timestamped
     stem so the two always travel together.
     """
     if not os.path.exists(batch_path):
@@ -1303,7 +1303,7 @@ def _finalize_batch_file(batch_path, log):
         os.path.normpath(batch_path),
     ]
 
-    # Archive the resolved-plan sidecar alongside, under the same stem.
+    # Archive the resolved-plan file alongside, under the same stem.
     plan_path = os.path.join(releases_dir, PLAN_FILENAME)
     finalize_files.extend(archive_plan_file(plan_path, versioned_stem))
 

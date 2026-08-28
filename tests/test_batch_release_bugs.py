@@ -214,7 +214,7 @@ class TestReleaseInitMonorepoWarning:
 
 
 # ---------------------------------------------------------------------------
-# Phase 1.2: resolved-plan sidecar + per-item idempotency + archive-as-repair
+# Phase 1.2: resolved-plan file + per-item idempotency + archive-as-repair
 #
 # These tests simulate batch releases against a real git repo. run_cmd is
 # mocked to reproduce the *observable* effects of a real release: it bumps the
@@ -376,13 +376,13 @@ class TestBatchPlanIdempotency:
         assert any(n.startswith("batch-") and n.endswith(".toml") for n in names)
         assert any(n.startswith("batch-") and n.endswith(".plan.json") for n in names)
 
-    def test_completed_plan_exits_nonzero_and_archives_only_the_sidecar(
+    def test_completed_plan_exits_nonzero_and_archives_only_the_plan_file(
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
     ):
         """(b) Everything already released per an existing plan.
 
         This used to archive BOTH files and exit 0 -- a silent success for a
-        run that released nothing. The plan sidecar is stale and gets
+        run that released nothing. The plan file is stale and gets
         archived (that is what unblocks the next run); the batch file is
         never touched, and the run exits nonzero naming the stale plan.
         """
@@ -434,7 +434,7 @@ class TestBatchPlanIdempotency:
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
     ):
         """The operator wrote a fresh batch file for the NEXT release while a
-        completed plan sidecar was still on disk.
+        completed plan file was still on disk.
 
         The plan is matched against the batch file by item set and bump
         intent only, so the fresh file validates against the stale plan --
@@ -562,7 +562,7 @@ class TestBatchPlanIdempotency:
     def test_happy_path_tail_archives_batch_and_plan(
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
     ):
-        """(c) A clean full run archives the batch file AND the plan sidecar
+        """(c) A clean full run archives the batch file AND the plan file
         at the loop tail."""
         ws = mock_git_repo
         _setup_batch_packages(ws, ["alpha", "beta"])
@@ -591,10 +591,10 @@ class TestBatchPlanIdempotency:
         self, mock_git_repo, capsys, bypass_upfront_validation, _no_commit_noise
     ):
         """(d) A batch file with an already-existing target tag and NO plan
-        sidecar predates plan tracking -> hard error naming both files."""
+        file predates plan tracking -> hard error naming both files."""
         ws = mock_git_repo
         _setup_batch_packages(ws, ["alpha"])
-        # The batch's target tag already exists but there is no plan sidecar.
+        # The batch's target tag already exists but there is no plan file.
         _git_tag(ws, "alpha@v0.1.1")
         assert not os.path.exists(get_batch_plan_path(str(ws)))
 

@@ -240,7 +240,7 @@ class TestGitignoreTemplateStateEntries:
         for entry in self.EXPECTED:
             assert entry in lines, f"gitignore.tpl is missing {entry}"
 
-    def test_template_does_not_ignore_the_committed_plan_sidecar(self):
+    def test_template_does_not_ignore_the_committed_plan_file(self):
         assert "unreleased.plan.json" not in self._template_text()
 
     def test_rescaffold_merges_the_entries_additively(self, tmp_path, monkeypatch):

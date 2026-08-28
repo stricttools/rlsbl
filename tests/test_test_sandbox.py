@@ -429,7 +429,7 @@ def _age(path):
 
 
 def _scratch(parent, name, *, pid=None, aged=True):
-    """Create a scratch dir with an optional owner-PID sidecar."""
+    """Create a scratch dir with an optional owner-PID file beside it."""
     directory = parent / name
     directory.mkdir(parents=True)
     (directory / "payload.txt").write_text("throwaway\n")
@@ -478,7 +478,7 @@ class TestOrphanedScratchSweep:
         dead = _scratch(tmpdir, "test-sandbox-work.DEADAA", pid=_reaped_pid())
         nopid = _scratch(tmpdir, "test-sandbox-work.NOPIDA")
         # A concurrent run that has just mktemp'd but not yet written its
-        # sidecar: no PID file, but inside the grace window.
+        # no PID file at all, but inside the grace window.
         fresh = _scratch(tmpdir, "test-sandbox-work.FRESHA", aged=False)
         unrelated = tmpdir / "flutter_tools.KEEPME"
         unrelated.mkdir()

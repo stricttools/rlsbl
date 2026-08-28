@@ -304,7 +304,7 @@ def _make_standalone(tmp_path, config, files):
 
 class TestMemberContextResolvedTargets:
     def test_www_like_assets_and_docs_deploy(self, tmp_path):
-        """WWW-shaped: a 'plain' assets target plus a target-less docs deploy.
+        """A 'plain' assets target plus a target-less docs deploy.
 
         The docs deploy (target: null) must appear only in deploy_pipelines,
         never as a ResolvedTarget. The assets target has no linked pipeline,
@@ -328,7 +328,7 @@ class TestMemberContextResolvedTargets:
         assert [p.name for p in ctx.deploy_pipelines] == ["docs-deploy"]
 
     def test_npm_subdir_linked_pipeline(self, tmp_path):
-        """wakethemup-shaped: an npm target in a subdir with a linked pipeline."""
+        """An npm target in a subdir with a linked pipeline."""
         config = {
             "publish_mode": "ci",
             "targets": [{"name": "npm", "path": "packages/app"}],

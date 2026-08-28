@@ -154,12 +154,12 @@ fi
 # tmpfs /tmp outright. So every run sweeps its OWN leftovers before allocating
 # new ones.
 #
-# Ownership is tracked with a sidecar `<scratch-dir>.pid` file -- a sidecar
-# rather than a file inside the dir, so the working copy of the repo and the
+# Ownership is tracked with a `<scratch-dir>.pid` file kept BESIDE the dir
+# rather than inside it, so the working copy of the repo and the
 # cloned uv cache stay byte-identical to their sources. A scratch dir is
 # orphaned when its owner process is gone (or was never recorded) AND it has not
 # been touched for the grace window; the grace window keeps the sweep off a
-# concurrent run that has mktemp'd its dir but not yet written the sidecar. A
+# concurrent run that has mktemp'd its dir but not yet written the PID file. A
 # dir whose owner PID is still alive is left alone until the hard-stale age,
 # past which the PID has certainly been recycled -- no sandbox run lasts a day.
 SANDBOX_SCRATCH_GRACE_MIN="${SANDBOX_SCRATCH_GRACE_MIN:-5}"

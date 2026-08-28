@@ -491,7 +491,7 @@ class TestReleasableReleaseChangelogHome:
         )
 
     def test_root_member_releasable_sane_layout(self, tmp_project):
-        """orxtra-shaped workspace: the sole member's path is '.'. The
+        """A workspace whose sole member has path '.'. The
         canonical file in the releasable dir and the combined root file
         coexist without duplication weirdness."""
         member = _setup_releasable_workspace(

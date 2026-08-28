@@ -344,7 +344,7 @@ def is_tool_owned_state_path(path) -> bool:
     clean-tree gate must not treat them as uncommitted changes -- otherwise
     rlsbl blocks its own ``release resume``.
 
-    The match is STRUCTURAL (path-shaped), never gitignore-derived: a stale
+    The match is STRUCTURAL (on the path itself), never gitignore-derived: a stale
     consumer ``.gitignore`` must not be able to defeat the exemption.
 
     ``path`` is a repo-root-relative path as ``git status --porcelain``

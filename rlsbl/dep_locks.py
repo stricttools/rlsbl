@@ -324,7 +324,7 @@ def _add_requirement(bucket, entry, sourced=frozenset()):
 
 
 def _locked_pypi_requirements(entries):
-    """``{name: {specifier, ...}}`` from a lock's ``requires-dist``-shaped list."""
+    """``{name: {specifier, ...}}`` from a lock's list of ``requires-dist`` entries."""
     result = {}
     for entry in entries or []:
         if not isinstance(entry, dict):

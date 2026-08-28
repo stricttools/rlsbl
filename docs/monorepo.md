@@ -316,7 +316,7 @@ Each releasable is released sequentially through the standard single-package rel
 3. Map each releasable to its highest-positioned member, preserving topological order
 4. Release each releasable in order
 
-The resolved base version, target version and tag of every item are written to a plan sidecar (`unreleased.plan.json`) before anything is released, and the plan is never regenerated mid-flight -- so a re-run skips exactly the items it can prove already shipped.
+The resolved base version, target version and tag of every item are written to a companion plan file (`unreleased.plan.json`) beside the batch file before anything is released, and the plan is never regenerated mid-flight -- so a re-run skips exactly the items it can prove already shipped.
 
 ### Partial failure
 

@@ -496,7 +496,7 @@ def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
     Returns the repo paths a commit must carry, empty when there is no journal
     or nothing moved.
 
-    This is the journal-shaped entry point, and the scrub's no-match path is
+    This is the entry point that reads the journal, and the scrub's no-match path is
     its caller. ``rlsbl release reconcile`` reaches the same repair through
     :func:`rlsbl.anchor_remap.repair_anchors` -- the shared core both go
     through -- but drives it from its own MERGED commit map (the journal plus

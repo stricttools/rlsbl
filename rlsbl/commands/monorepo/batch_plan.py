@@ -1,4 +1,4 @@
-"""Resolved-plan sidecar for monorepo batch releases that persists pre-batch base versions for idempotent, resumable release flows.
+"""Resolved-plan state file written beside a monorepo batch release file, persisting pre-batch base versions for idempotent, resumable release flows.
 
 A batch release file (``.rlsbl-monorepo/releases/unreleased.toml``) records
 only *bump intents* -- it does not persist the pre-batch base version of each
@@ -74,7 +74,7 @@ def get_batch_plan_path(workspace_root: str = ".") -> str:
 
 
 def plan_exists(workspace_root: str) -> bool:
-    """Return True if a resolved plan sidecar exists on disk."""
+    """Return True if a resolved plan file exists on disk."""
     return os.path.exists(get_batch_plan_path(workspace_root))
 
 
@@ -279,7 +279,7 @@ def plan_all_released(workspace_root, plan: BatchPlan) -> bool:
 
 
 def archive_plan_file(plan_path: str, versioned_stem: str) -> list[str]:
-    """Archive the plan sidecar next to the archived batch file.
+    """Archive the plan file next to the archived batch file.
 
     ``versioned_stem`` is the batch file's archived stem (e.g.
     ``batch-20260713-101500``); the plan is renamed to

@@ -285,7 +285,7 @@ def template_vars(config):
         "sandboxCaches": " ".join(caches),
         "sandboxPrewarm": prewarm_lines,
         "sandboxExtraEnv": extra_env_lines,
-        # The dev-overlay block is uv-shaped (it excludes packages from
+        # The dev-overlay block is uv-specific (it excludes packages from
         # `uv sync` and installs them editable), so it is rendered only for
         # repos that declared the uv cache. Everyone else gets the runner
         # unchanged, byte for byte.

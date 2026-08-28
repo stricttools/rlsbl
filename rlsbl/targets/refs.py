@@ -14,7 +14,7 @@ The three sources, and why each is where it is:
   and a standalone repository gets the target's ``tag_format``. The context
   states which of the three applies; the target renders it.
 * **Companion tags** are an ecosystem requirement. Go's module proxy resolves
-  ``{path}/v{version}``, so a releasable whose primary tag is *not* Go-shaped
+  ``{path}/v{version}``, so a releasable whose primary tag is *not* in that form
   needs one companion per publishing Go member. Both rules the collector
   carried -- skip when the primary tag is already Go-compatible, skip
   publish-suppressed members -- live in :meth:`BaseTarget._companion_refs`.

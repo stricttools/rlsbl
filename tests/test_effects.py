@@ -169,7 +169,7 @@ class TestAtomicWriteText:
         assert _mode(str(target)) == 0o666 & ~current_umask
 
     def test_file_mode_is_applied_verbatim(self, tmp_path):
-        """The mkstemp-shaped call sites pin their historical 0o600 this way."""
+        """The call sites that used mkstemp pin their historical 0o600 this way."""
         target = tmp_path / "state.json"
         effects.atomic_write_text(str(target), "{}", file_mode=0o600)
         assert _mode(str(target)) == 0o600

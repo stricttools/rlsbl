@@ -50,7 +50,7 @@ _GIT_OBJECT_HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
 # The archive filename: ``v{X.Y.Z}.toml``, optionally with a pre-release
 # suffix. Strict, and anchored on both ends, so nothing else that happens to
 # live in a releases directory (``unreleased.toml``, ``in-progress.json``, a
-# batch plan sidecar) can be mistaken for a released version.
+# batch plan file) can be mistaken for a released version.
 #
 # The grammar is rlsbl's OWN version vocabulary, not semver at large, and the
 # preid alternation is derived from :data:`VALID_PREIDS` rather than restated:

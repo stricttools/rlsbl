@@ -17,7 +17,7 @@ operator's escape was a manual `gh run rerun <id> --failed`.
 
 The properties under test:
 
-- infrastructure-shaped failures are classified as such, ahead of the
+- infrastructure failures are classified as such, ahead of the
   deterministic signatures they incidentally match;
 - the engine performs the rerun itself -- ONE bounded `gh run rerun <id>
   --failed`, then waits on it;

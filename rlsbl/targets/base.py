@@ -387,8 +387,8 @@ class BaseTarget:
         Two rules, both inherited from the collector this replaced:
 
         * A primary tag that is ALREADY Go-compatible (it contains ``/v``)
-          suppresses companions entirely, so a Go-shaped release does not
-          duplicate its own tag.
+          suppresses companions entirely, so a release already tagged that way
+          does not duplicate its own tag.
         * A publish-suppressed member (``publish_mode: "none"``) contributes
           nothing -- there is no proxy to satisfy for something never published.
 

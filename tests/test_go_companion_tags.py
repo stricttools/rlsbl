@@ -526,7 +526,8 @@ class TestGoCompanionTagsCheck:
 
         ``expected_refs`` is the single authority for a version's ref set, and
         it answers "no companions" when the primary tag already contains
-        ``/v`` -- a Go-shaped release does not duplicate its own tag. A check
+        ``/v`` -- a release already tagged that way does not duplicate its own
+        tag. A check
         that re-derives the member's ``companion_tags`` by hand does not know
         that rule and demands a tag the release never creates separately.
         """
