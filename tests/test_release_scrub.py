@@ -2177,7 +2177,9 @@ class TestNoMatchValidatesHashes:
     rewrite and therefore no force-push -- just validate, repair from the
     rewrite journal when possible, and commit the repairs."""
 
-    REPAIR_MSG = "scrub: repair changelog hashes from rewrite journal"
+    REPAIR_MSG = (
+        "scrub: repair changelog hashes and release anchors from rewrite journal"
+    )
 
     def _flags(self):
         return {

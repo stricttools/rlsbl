@@ -7,6 +7,7 @@ import re
 import sys
 
 from .. import effects
+from ..anchor_remap import ON_CONTENT_CHANGE_RECORD, repair_anchors
 from ..changelog.files import (
     can_remap_hash,
     changelog_remap_globs,
@@ -482,8 +483,49 @@ def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
     return True
 
 
+def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
+                              repo_root):
+    """Move stale ledger anchors through safegit's persisted rewrite journal.
+
+    The anchor half of detect-and-heal, and the counterpart to
+    :func:`_recover_from_rewrite_journal`, which does the changelog half. It
+    covers a rewrite that happened OUTSIDE this flow -- a raw ``safegit
+    scrub``, a ``git filter-repo`` run, a scrub interrupted before rlsbl's own
+    steps -- where the archives still name commits that no longer exist and
+    every guarded ledger read therefore refuses.
+
+    Returns the repo paths a commit must carry, empty when there is no journal
+    or nothing moved. Shared with ``rlsbl release reconcile``, which calls it
+    for exactly the same situation reached from the other direction.
+    """
+    # Asked before the journal is read: a repository with no release archive
+    # has no anchor to move, and reading the journal for it would be a git
+    # call made to answer a question that is already answered.
+    from ..anchor_remap import releases_dirs_for
+
+    if not releases_dirs_for(project_root, workspace_root, workspace_projects):
+        return []
+    journal = _load_rewrite_journal()
+    if journal is None or not journal.get("commit_map"):
+        return []
+    _remaps, touched = repair_anchors(
+        project_root=str(project_root),
+        commit_map=journal["commit_map"],
+        rewrite_id=journal["id"],
+        workspace_root=workspace_root,
+        workspace_projects=workspace_projects,
+        cwd=repo_root,
+    )
+    for r in _remaps:
+        print(
+            f"  re-anchored {r.version}: {r.old_sha[:12]} -> "
+            f"{r.new_sha[:12]}"
+        )
+    return touched
+
+
 def _no_match_validate_and_repair(project_root, workspace_root, workspace_projects):
-    """Changelog hash validation for a scrub that found NOTHING to rewrite.
+    """Changelog and ledger repair for a scrub that found NOTHING to rewrite.
 
     A no-match scrub is the one moment damage from a PRIOR crashed or
     direct scrub is still cheaply repairable: the safegit rewrite journal
@@ -493,16 +535,15 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
     unreachable and the operator is pointed at manual amends.
 
     No rewrite happened on this run, so there is nothing to force-push:
-    validate, repair from the journal when possible, COMMIT the repaired
-    files, and hard-error naming anything that remains dangling.
+    validate, repair the changelog hashes AND the ledger anchors from the
+    journal when possible, COMMIT the repaired files, and hard-error naming
+    anything that remains dangling.
     """
     all_changes_dirs = enumerate_changelog_dirs(
         str(project_root), workspace_root, workspace_projects=workspace_projects,
     )
     repo_root = str(workspace_root) if workspace_root else str(project_root)
     failures = validate_all_hashes_resolve(all_changes_dirs, repo_root=repo_root)
-    if not failures:
-        return
 
     # Repairs mutate changelog files, so take the same lock the main flow
     # holds while touching them.
@@ -512,11 +553,22 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
         # Stand-in for scrub_data: the recovery helper only records the
         # repaired paths under "remapped_files".
         tracking = {}
-        if _recover_from_rewrite_journal(all_changes_dirs, failures, tracking):
+        if failures and _recover_from_rewrite_journal(
+            all_changes_dirs, failures, tracking,
+        ):
             failures = validate_all_hashes_resolve(
                 all_changes_dirs, repo_root=repo_root,
             )
-        repaired = tracking.get("remapped_files", [])
+        repaired = list(tracking.get("remapped_files", []))
+        # The ledger's own hashes are checked whether or not the changelog had
+        # any: a rewrite that touched no changelog-referenced commit can still
+        # have moved a released one.
+        repaired.extend(heal_anchors_from_journal(
+            project_root, workspace_root, workspace_projects, repo_root,
+        ))
+
+        if not failures and not repaired:
+            return
 
         if failures:
             print(
@@ -547,18 +599,19 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
         try:
             run("safegit", [
                 "commit", "-m",
-                "scrub: repair changelog hashes from rewrite journal",
+                "scrub: repair changelog hashes and release anchors from "
+                "rewrite journal",
                 "--",
-            ] + sorted(repaired))
+            ] + sorted(set(repaired)))
         except Exception as e:
             print(
-                f"Error: failed to commit journal-repaired changelog "
-                f"files: {e}",
+                f"Error: failed to commit journal-repaired changelog and "
+                f"ledger files: {e}",
                 file=sys.stderr,
             )
             sys.exit(1)
         print(
-            f"Committed {len(repaired)} journal-repaired changelog file(s)."
+            f"Committed {len(set(repaired))} journal-repaired file(s)."
         )
     finally:
         release_lock()
@@ -979,6 +1032,52 @@ def run_cmd(flags, *, ctx):
 
             _save_step(scrub_result_path, scrub_data, "HASHES_VALIDATED")
 
+        # -- Move the release ledger's anchors through the same map --
+        # The JSONL hashes were remapped in history by safegit; the ARCHIVES
+        # were not, and they record each version's released commit. Left
+        # behind, every guarded ledger read hits the DISAGREEMENT error, which
+        # accuses the tag -- the one thing the scrub did repair. The remap is
+        # verified content-identical per released path before anything is
+        # written, so a rewrite that redacted a released file stops here
+        # instead of re-anchoring an archive onto content it never shipped.
+        if "ANCHORS_REMAPPED" not in completed:
+            # `record`, not `refuse`: this flow passed --remap-shas-in, so
+            # safegit rewrote the JSONL changelog files INSIDE every released
+            # tree. Every released tree therefore changes by construction, and
+            # refusing on a changed tree would refuse every scrub an
+            # rlsbl-managed repository ever runs. The changes are printed
+            # instead, per version and per released path.
+            _remaps, _anchor_files = repair_anchors(
+                project_root=str(project_root),
+                commit_map=rewrites,
+                rewrite_id=scrub_data.get("new_head", "") or "unknown",
+                workspace_root=ctx.workspace_root,
+                workspace_projects=workspace_projects,
+                cwd=lock_root,
+                on_content_change=ON_CONTENT_CHANGE_RECORD,
+            )
+            if _remaps:
+                print(
+                    f"Remapped {len(_remaps)} release anchor(s) through the "
+                    f"rewrite:"
+                )
+                for r in _remaps:
+                    print(
+                        f"  {r.version}: {r.old_sha[:12]} -> {r.new_sha[:12]}"
+                    )
+                    for tree_path, old_tree, new_tree in r.changed_paths:
+                        print(
+                            f"    content changed at {tree_path}: "
+                            f"{old_tree[:12]} -> {new_tree[:12]} (the rewrite "
+                            f"altered what this version's tree holds; the "
+                            f"archive now records the rewritten tree)"
+                        )
+            # Persisted so a resumed run still commits them.
+            scrub_data["anchor_files"] = sorted(
+                set(scrub_data.get("anchor_files", [])) | set(_anchor_files)
+            )
+            _save_step(scrub_result_path, scrub_data, "ANCHORS_REMAPPED")
+
         # -- Verify CHANGELOG.md (regenerate-and-assert-unchanged) --
         # In-history remap means HEAD's JSONL was already consistent when
         # safegit returned, so regeneration must reproduce what is on disk
@@ -1036,6 +1135,7 @@ def run_cmd(flags, *, ctx):
             # the in-history remap already made HEAD consistent, and the
             # CHANGELOG step above asserted regeneration is a no-op.
             modified_files = list(scrub_data.get("remapped_files", []))
+            modified_files.extend(scrub_data.get("anchor_files", []))
             modified_files.extend(scrub_data.get("deleted_validated", []))
 
             # Write the committed audit archive (whitelisted schema). It is
