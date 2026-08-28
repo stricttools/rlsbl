@@ -333,8 +333,9 @@ def _release_anchor(uc, version, tag):
     :func:`rlsbl.ledger.read_entry`, which refuses when the version's tag and
     the anchor disagree. Undo is the repair path for exactly that state and is
     about to delete the tag, so a disagreement is reported as a warning and the
-    ARCHIVE wins: it is written by the release flow, read-only from the instant
-    it exists and committed, while a tag is a ref anyone can move.
+    ARCHIVE wins: it is written by the release flow, committed, and rewritten by
+    rlsbl only through its own documented unlock paths, while a tag is a ref
+    anyone can move.
     """
     from ..release_file import archived_release_path, read_release_file
 

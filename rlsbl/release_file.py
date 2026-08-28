@@ -653,8 +653,11 @@ def write_archived_release_file(
 
     effects.makedirs(releases_dir, exist_ok=True)
     path = archived_release_path(releases_dir, version)
-    # file_mode, not a write-then-chmod: the archive is immutable from the
-    # instant it exists, exactly like the renamed-and-chmodded standalone one.
+    # file_mode, not a write-then-chmod: the archive is never briefly writable,
+    # so it carries the same mode as the renamed-and-chmodded standalone one
+    # from the instant it exists. That mode is local hygiene -- git records no
+    # read-only bit -- and the guarantee is that rlsbl rewrites an archive only
+    # through its own documented unlock paths.
     effects.atomic_write_text(path, tomlkit.dumps(doc), file_mode=0o444)
     return path
 

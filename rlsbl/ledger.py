@@ -16,8 +16,10 @@ HEAD", which is a different question from "the newest release contained in
 this checkout", and it answers it from a namespace anyone can write.  A tag
 that was deleted, moved, or never created makes a released version vanish from
 the answer; a tag created by hand makes an unreleased one appear.  The archive
-is written by the release flow, is read-only from the instant it exists, and
-is committed -- so it survives exactly what tags do not.
+is written by the release flow, is rewritten by rlsbl only through its own
+documented unlock paths, and is committed -- so it survives exactly what tags
+do not.  (Its local file mode is hygiene, not the guarantee: git records no
+read-only bit, so a fresh clone's archives are writable.)
 
 The two questions, and their two different answers
 --------------------------------------------------

@@ -102,8 +102,9 @@ def validate_no_authored_anchors(release_config):
     ``candidate_sha`` and ``tree_hashes`` record which commit and tree a version
     shipped from. The release flow writes them into the ARCHIVED
     ``v{X.Y.Z}.toml`` at the archive step, from the commit its own CI verified,
-    and the archive is read-only from that instant. There is no path by which a
-    pre-release file can know either value: the candidate does not exist yet.
+    and rlsbl rewrites that archive only through its own documented unlock
+    paths. There is no path by which a pre-release file can know either value:
+    the candidate does not exist yet.
 
     ``unanchorable`` is refused on the same ground from the other direction: it
     is the backfill pass's permanent record that an ALREADY SHIPPED version's
@@ -775,8 +776,8 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     either one is enough:
 
     * the LEDGER -- ``.rlsbl/releases/v<version>.toml``, written by the release
-      at its archive step and read-only from that instant. This is the
-      authority, and it is checked first.
+      at its archive step and rewritten by rlsbl only through its own
+      documented unlock paths. This is the authority, and it is checked first.
     * the finalized, immutable ``.rlsbl/changes/<version>.jsonl``, locked at
       release time. Still consulted, because a repository whose releases
       predate archiving has that record and no archive.

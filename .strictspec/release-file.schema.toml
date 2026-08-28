@@ -8,7 +8,10 @@
 # AUTHORITY. The archived release file is the authoritative record of WHICH
 # COMMIT AND TREE a version shipped from: the `candidate_sha` and `tree_hashes`
 # anchor fields are written by the release flow at the archive step, from the
-# commit its own CI verified, and the archive is read-only from that instant.
+# commit its own CI verified, and rlsbl rewrites that archive only through its
+# own documented unlock paths. (Its local file mode is hygiene, not the
+# guarantee: git records no read-only bit, so a fresh clone's archives are
+# writable.)
 # The `<!-- rlsbl-ci-sha: ... -->` marker in the GitHub Release body is a
 # PROJECTION of `candidate_sha` for CI's publish check to parse -- it restates
 # the anchor for a consumer that cannot read the repository, and it never
@@ -85,13 +88,13 @@ description = "Whether to generate a blog post for this release."
 [types.ReleaseConfig.fields.candidate_sha]
 type = "GitObjectHash"
 required = false
-description = "AUTHORITATIVE: the commit this version shipped from -- the release candidate whose CI concluded green, which is also the commit the version tag points at. Written by the release flow into the archived v{X.Y.Z}.toml before the archive is locked read-only; never authored by hand, and absent from the editable unreleased.toml (release validation refuses one that carries it). The rlsbl-ci-sha marker in the GitHub Release body is this field's projection for CI to parse, not a second source."
+description = "AUTHORITATIVE: the commit this version shipped from -- the release candidate whose CI concluded green, which is also the commit the version tag points at. Written by the release flow into the archived v{X.Y.Z}.toml at the archive step; never authored by hand, and absent from the editable unreleased.toml (release validation refuses one that carries it). The rlsbl-ci-sha marker in the GitHub Release body is this field's projection for CI to parse, not a second source."
 
 [types.ReleaseConfig.fields.tree_hashes]
 type = "map"
 required = false
 key_pattern = "^(\\.|[A-Za-z0-9._][A-Za-z0-9._/-]*)$"
-description = "AUTHORITATIVE: the released content, one git tree object per released path, keyed by the repo-relative path (\".\" for a whole standalone repository). A standalone release has the single \".\" entry carrying the root tree of candidate_sha; a workspace releasable has one entry per member directory, because no single git object covers a set of member subtrees -- a per-member table is therefore the honest representation rather than a synthesized hash. Written by the release flow alongside candidate_sha and read-only from the same instant."
+description = "AUTHORITATIVE: the released content, one git tree object per released path, keyed by the repo-relative path (\".\" for a whole standalone repository). A standalone release has the single \".\" entry carrying the root tree of candidate_sha; a workspace releasable has one entry per member directory, because no single git object covers a set of member subtrees -- a per-member table is therefore the honest representation rather than a synthesized hash. Written by the release flow alongside candidate_sha, at the same archive step and under the same rule: rlsbl rewrites the archive only through its own documented unlock paths."
 [types.ReleaseConfig.fields.tree_hashes.value]
 type = "GitObjectHash"
 
