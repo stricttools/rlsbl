@@ -931,52 +931,66 @@ class TestCmdMonoExtract:
 
 
 class TestCmdMonoAbsorb:
+    """The handler forwards to the conversion and turns failures into exit 1.
+
+    REWORKED: the conversion returns a Preview and prints its own plan and
+    summary, so the handler no longer formats a result dict -- these pin the
+    forwarding and the exit code instead of the sentences it used to write.
+    """
+
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.monorepo.absorb_cmd.find_workspace_root", return_value=None)
     def test_exits_when_no_workspace(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
+            rlsbl.cmd_mono_absorb(
+                cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name="",
+                registry_name="", releasable="", tag_format="",
+                delete_with_rm=False,
+            )
         assert exc.value.code == 1
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_absorb")
+    @patch("rlsbl.commands.monorepo.absorb_cmd.find_workspace_root", return_value="/repo")
+    @patch("rlsbl.commands.monorepo.absorb_cmd.cmd_absorb")
     def test_dry_run(self, mock_absorb, *_):
-        mock_absorb.return_value = {
-            "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
-            "tags_to_import": ["0.1.0", "0.2.0"],
-        }
-        rlsbl.cmd_mono_absorb(cli_ctx(dry_run=True), name="", registry_name="", releasable="core", source_repo="/src", dest_path="pkgs/pkg")
+        rlsbl.cmd_mono_absorb(
+            cli_ctx(dry_run=True), source_repo="/src", dest_path="pkgs/pkg",
+            name="", registry_name="", releasable="core", tag_format="",
+            delete_with_rm=False,
+        )
+        mock_absorb.assert_called_once()
+        assert mock_absorb.call_args[0] == ("/repo", "/src", "pkgs/pkg")
+        assert mock_absorb.call_args.kwargs["dry_run"] is True
+        assert mock_absorb.call_args.kwargs["releasable_name"] == "core"
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_absorb")
-    def test_real_run(self, mock_absorb, *_):
-        mock_absorb.return_value = {
-            "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
-            "entries_migrated": 3, "tags_imported": ["pkg@v0.1.0"],
-        }
-        rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
+    @patch("rlsbl.commands.monorepo.absorb_cmd.find_workspace_root", return_value="/repo")
+    @patch("rlsbl.commands.monorepo.absorb_cmd.cmd_absorb")
+    def test_real_run_forwards_every_choice(self, mock_absorb, *_):
+        rlsbl.cmd_mono_absorb(
+            cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name="thing",
+            registry_name="acme-thing", releasable="",
+            tag_format="pkgs/pkg/v{version}", delete_with_rm=True,
+        )
+        kwargs = mock_absorb.call_args.kwargs
+        assert kwargs["dry_run"] is False
+        assert kwargs["name"] == "thing"
+        assert kwargs["registry_name"] == "acme-thing"
+        # An unset --releasable arrives as absent, never as an empty name.
+        assert kwargs["releasable_name"] is None
+        assert kwargs["tag_format"] == "pkgs/pkg/v{version}"
+        assert kwargs["delete_with_rm"] is True
 
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_absorb")
-    def test_skipped_tags_logged(self, mock_absorb, mock_fwr, mock_rpr, capsys):
-        mock_absorb.return_value = {
-            "name": "pkg", "source_path": "/src", "dest_path": "pkgs/pkg",
-            "entries_migrated": 1, "tags_imported": ["pkg@v0.1.0"],
-            "skipped_tags": ["nightly", "legacy-build"],
-        }
-        rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
-        out = capsys.readouterr().out
-        assert "Skipped 2 non-version tag(s): nightly, legacy-build" in out
-
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
-    @patch("rlsbl.workspace.find_workspace_root", return_value="/repo")
-    @patch("rlsbl.commands.monorepo.cmd_absorb", side_effect=ValueError("bad"))
+    @patch("rlsbl.commands.monorepo.absorb_cmd.find_workspace_root", return_value="/repo")
+    @patch("rlsbl.commands.monorepo.absorb_cmd.cmd_absorb", side_effect=ValueError("bad"))
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_mono_absorb(cli_ctx(), name="", registry_name="", releasable="", source_repo="/src", dest_path="pkgs/pkg")
+            rlsbl.cmd_mono_absorb(
+                cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name="",
+                registry_name="", releasable="", tag_format="",
+                delete_with_rm=False,
+            )
         assert exc.value.code == 1
 
 

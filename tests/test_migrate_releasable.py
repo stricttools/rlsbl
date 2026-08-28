@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import workspace_toml
+from conftest import make_releasable_state, workspace_toml
 
 from rlsbl import app
 from rlsbl.changelog.schema import ChangelogEntry, serialize_entry, parse_jsonl
@@ -28,6 +28,7 @@ from rlsbl.workspace import (
     WORKSPACE_FILE,
     WorkspaceProject,
     get_releasable_changes_dir,
+    get_releasable_dir,
 )
 
 
@@ -653,36 +654,40 @@ class TestConsolidationPointTag:
     shutil.which("git-filter-repo") is None,
     reason="git-filter-repo not installed",
 )
+def _commit_everything(root, message):
+    """Commit whatever the fixture wrote, so the conversion sees a clean tree."""
+    subprocess.run(["git", "add", "-A"], cwd=str(root), check=True)
+    subprocess.run(["git", "commit", "-q", "-m", message], cwd=str(root), check=True)
+
+
 class TestAbsorbChangelogRouting:
-    """cmd_absorb routes changelogs to releasable dir when releasable_name is given."""
+    """An absorbed repository's changelog lands in a releasable's state dir.
 
-    def test_absorb_with_releasable_routes_to_releasable_dir(self, tmp_project):
-        """When releasable_name is provided, changelog goes to the releasable dir."""
-        _init_git(tmp_project)
+    FLIPPED. The old command had two routings: with ``--releasable`` the
+    changelog went to the releasable's directory, and without it to a
+    per-package one. The rebuilt conversion has one, because an absorbed
+    repository IS a releasable -- it owns a version, a changelog, archives and
+    a tag scheme -- so absorbing without ``--releasable`` creates the singleton
+    releasable for it rather than scattering its state into a member directory.
+    """
 
-        # Create the workspace with a releasable
-        _write_workspace(tmp_project, """\
-[[releasables]]
-name = "core"
+    def _source_repo(self, tmp_project, name="lib"):
+        """A clean standalone source with one unreleased changelog entry.
 
-[[projects]]
-path = "existing"
-name = "existing"
-releasable = "core"
-""")
-        _make_pypi_project(tmp_project, "existing", "0.1.0")
-        _make_commit(tmp_project, "existing/src.py", "existing pkg")
-
-        # Create source repo to absorb
-        source_dir = tmp_project / "source_repo"
+        OUTSIDE the workspace: a nested git repository inside it would make the
+        workspace's own tree dirty, which the conversion refuses (it merges).
+        """
+        source_dir = tmp_project.parent / f"{tmp_project.name}_source"
         source_dir.mkdir()
         _init_git(source_dir)
         (source_dir / "lib.py").write_text("# library\n")
-        subprocess.run(["git", "add", "lib.py"], cwd=str(source_dir), check=True)
+        (source_dir / "pyproject.toml").write_text(
+            f'[project]\nname = "{name}"\nversion = "0.1.0"\n'
+        )
+        subprocess.run(["git", "add", "."], cwd=str(source_dir), check=True)
         subprocess.run(["git", "commit", "-q", "-m", "add lib"],
                        cwd=str(source_dir), check=True)
 
-        # Add changelog entries to source repo
         source_changes = source_dir / ".rlsbl" / "changes"
         source_changes.mkdir(parents=True)
         sha = subprocess.run(
@@ -695,86 +700,98 @@ releasable = "core"
         subprocess.run(["git", "add", ".rlsbl/"], cwd=str(source_dir), check=True)
         subprocess.run(["git", "commit", "-q", "-m", "add changelog"],
                        cwd=str(source_dir), check=True)
+        return source_dir
 
-        # Absorb with releasable_name
-        from rlsbl.commands.monorepo.extract import cmd_absorb
-        result = cmd_absorb(
+    def test_absorb_with_releasable_routes_to_releasable_dir(self, tmp_project):
+        """When a releasable is named, its changes dir receives the entries."""
+        _init_git(tmp_project)
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "core"
+
+[[projects]]
+path = "existing"
+name = "existing"
+releasable = "core"
+""")
+        _make_pypi_project(tmp_project, "existing", "0.1.0")
+        _make_commit(tmp_project, "existing/src.py", "existing pkg")
+        # The releasable must have real state to absorb into: a version file,
+        # a changes directory and a releases directory.
+        make_releasable_state(tmp_project, "core", version="0.0.1")
+        _commit_everything(tmp_project, "workspace and core state")
+
+        source_dir = self._source_repo(tmp_project)
+
+        from rlsbl.commands.monorepo.absorb_cmd import cmd_absorb
+        cmd_absorb(
             str(tmp_project), str(source_dir), "newpkg",
             releasable_name="core",
         )
 
-        assert result["entries_migrated"] == 1
-
-        # Changelog should be in the RELEASABLE dir, not per-package dir
         releasable_changes = get_releasable_changes_dir(str(tmp_project), "core")
         unreleased_path = os.path.join(releasable_changes, "unreleased.jsonl")
         assert os.path.isfile(unreleased_path)
-
         entries = parse_jsonl(unreleased_path)
-        assert len(entries) == 1
-        assert entries[0].description == "Initial feature"
+        assert [e.description for e in entries] == ["Initial feature"]
 
-        # The per-package dir may have files from the git subtree merge
-        # (source's .rlsbl/changes/ is carried over by git subtree add).
-        # The key assertion is that _migrate_changelog_from_source wrote
-        # to the releasable dir, not that the subtree is clean.
+        # FLIPPED: the per-package copy the subtree merge brought in used to be
+        # left in place ("the key assertion is not that the subtree is clean").
+        # It is removed now -- a releasable's changelog has one home.
+        assert not os.path.isdir(
+            os.path.join(str(tmp_project), "newpkg", ".rlsbl", "changes")
+        )
 
-    def test_absorb_without_releasable_routes_to_package_dir(self, tmp_project):
-        """When releasable_name is None, changelog goes to the per-package dir."""
+    def test_absorb_without_releasable_creates_a_singleton_releasable(
+        self, tmp_project,
+    ):
+        """FLIPPED: no releasable named means one is CREATED, not bypassed.
+
+        The old command wrote the arriving changelog into
+        ``newpkg/.rlsbl/changes/`` -- a per-package changelog for a package
+        with no version, no archives and no tag scheme of its own.
+        """
         _init_git(tmp_project)
-
         _write_workspace(tmp_project, """\
+releasables = []
+
 [[projects]]
 path = "existing"
 name = "existing"
+releasable = false
 """)
         _make_pypi_project(tmp_project, "existing", "0.1.0")
         _make_commit(tmp_project, "existing/src.py", "existing pkg")
+        _commit_everything(tmp_project, "workspace")
 
-        # Create source repo
-        source_dir = tmp_project / "source_repo"
-        source_dir.mkdir()
-        _init_git(source_dir)
-        (source_dir / "lib.py").write_text("# library\n")
-        subprocess.run(["git", "add", "lib.py"], cwd=str(source_dir), check=True)
-        subprocess.run(["git", "commit", "-q", "-m", "add lib"],
-                       cwd=str(source_dir), check=True)
+        source_dir = self._source_repo(tmp_project)
 
-        # Add changelog entries to source repo
-        source_changes = source_dir / ".rlsbl" / "changes"
-        source_changes.mkdir(parents=True)
-        sha = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=str(source_dir), capture_output=True, text=True, check=True,
-        ).stdout.strip()
-        entry = ChangelogEntry(commits=[sha], user_facing=True,
-                               description="Feature X", type="feature")
-        (source_changes / "unreleased.jsonl").write_text(serialize_entry(entry) + "\n")
-        subprocess.run(["git", "add", ".rlsbl/"], cwd=str(source_dir), check=True)
-        subprocess.run(["git", "commit", "-q", "-m", "add changelog"],
-                       cwd=str(source_dir), check=True)
+        from rlsbl.commands.monorepo.absorb_cmd import cmd_absorb
+        cmd_absorb(str(tmp_project), str(source_dir), "newpkg")
 
-        # Absorb WITHOUT releasable_name
-        from rlsbl.commands.monorepo.extract import cmd_absorb
-        result = cmd_absorb(
-            str(tmp_project), str(source_dir), "newpkg",
-            releasable_name=None,
+        from rlsbl.workspace import load_releasables, load_workspace
+
+        projects = load_workspace(str(tmp_project))
+        member = next(p for p in projects if p.name == "newpkg")
+        assert member.releasable == "newpkg"
+        releasable = next(
+            r for r in load_releasables(str(tmp_project), projects)
+            if r.name == "newpkg"
         )
+        assert releasable.declares_tag_format
 
-        assert result["entries_migrated"] == 1
-
-        # Changelog should be in the per-package dir.
-        # Note: git subtree add brings source's .rlsbl/changes/ into the
-        # package dir, and _migrate_changelog_from_source appends to the
-        # same file, so entries appear twice (subtree + migration append).
-        pkg_changes = os.path.join(str(tmp_project), "newpkg", ".rlsbl", "changes",
-                                   "unreleased.jsonl")
-        assert os.path.isfile(pkg_changes)
-
-        entries = parse_jsonl(pkg_changes)
-        assert len(entries) >= 1
-        descriptions = {e.description for e in entries}
-        assert "Feature X" in descriptions
+        changes = get_releasable_changes_dir(str(tmp_project), "newpkg")
+        entries = parse_jsonl(os.path.join(changes, "unreleased.jsonl"))
+        assert "Initial feature" in {e.description for e in entries}
+        # The version the source declared is the releasable's version.
+        version_file = os.path.join(
+            get_releasable_dir(str(tmp_project), "newpkg"), "version",
+        )
+        assert open(version_file).read().strip() == "0.1.0"
+        # And no per-package changelog is invented for the member.
+        assert not os.path.isdir(
+            os.path.join(str(tmp_project), "newpkg", ".rlsbl", "changes")
+        )
 
 
 # ---------------------------------------------------------------------------

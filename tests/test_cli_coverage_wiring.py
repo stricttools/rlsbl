@@ -581,13 +581,15 @@ class TestMonorepoWorkspaceGatedWiring:
         assert result.exit_code == 0, result.stderr
         assert m.call_args.kwargs["delete_with_rm"] is True
 
+    _ABSORB_WS = {
+        "rlsbl.commands.monorepo.absorb_cmd.find_workspace_root": _FAKE_WS,
+    }
+
     def test_absorb(self):
         result, m = _dispatch(
             ["--dry-run", "monorepo", "absorb", "posA", "posB"],
-            "rlsbl.commands.monorepo.cmd_absorb",
-            ret={"name": "p", "source_path": "s", "dest_path": "posB",
-                 "tags_to_import": []},
-            extra={"rlsbl.workspace.find_workspace_root": _FAKE_WS},
+            "rlsbl.commands.monorepo.absorb_cmd.cmd_absorb",
+            extra=self._ABSORB_WS,
         )
         assert result.exit_code == 0, result.stderr
         # cmd_absorb(ws_root, source_repo, dest_path, name=..., dry_run=...)
@@ -596,6 +598,18 @@ class TestMonorepoWorkspaceGatedWiring:
         assert m.call_args[0][1] == "posA"  # source_repo (first token)
         assert m.call_args[0][2] == "posB"  # dest_path (second token)
         assert m.call_args.kwargs["dry_run"] is True
+        assert m.call_args.kwargs["delete_with_rm"] is False
+
+    def test_absorb_tag_format_and_deletion_choice(self):
+        result, m = _dispatch(
+            ["--dry-run", "monorepo", "absorb", "--tag-format", "{name}@v{version}",
+             "--delete-with-rm", "posA", "posB"],
+            "rlsbl.commands.monorepo.absorb_cmd.cmd_absorb",
+            extra=self._ABSORB_WS,
+        )
+        assert result.exit_code == 0, result.stderr
+        assert m.call_args.kwargs["tag_format"] == "{name}@v{version}"
+        assert m.call_args.kwargs["delete_with_rm"] is True
 
     def test_extract_releasable_is_gone(self):
         """The package-level and releasable-level commands collapsed into one.

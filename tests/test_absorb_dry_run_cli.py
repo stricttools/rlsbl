@@ -5,9 +5,9 @@ That bypasses the strictcli dispatch, so no effects handle is ever minted and
 the preview machinery is not in the loop -- which is exactly why the suite
 never saw the defect this module pins:
 
-``validate_absorb_preconditions`` runs BEFORE ``cmd_absorb``'s dry-run early
-return, and it read the source worktree with a ``git status --porcelain`` that
-carried no ``--no-optional-locks``.  The allowlisted status form (see
+The conversion's observation reads the source worktree before the dry-run
+branch point, and it read it with a ``git status --porcelain`` that carried no
+``--no-optional-locks``.  The allowlisted status form (see
 ``rlsbl/observe_allowlist.py``) is ``git --no-optional-locks status``, so under
 a real preview that argv was RECORDED instead of run, ``.stdout`` off the
 recorded carrier raised strictcli's truncation error, and
@@ -25,7 +25,7 @@ import subprocess
 import pytest
 
 import rlsbl
-from rlsbl.commands.monorepo import extract as extract_mod
+from rlsbl.commands.monorepo import absorb_cmd
 
 from conftest import workspace_toml
 
@@ -34,9 +34,9 @@ from conftest import workspace_toml
 def _filter_repo_present(monkeypatch):
     """Report ``git-filter-repo`` as installed, unconditionally.
 
-    ``validate_absorb_preconditions`` opens with a PRESENCE probe for
-    git-filter-repo; the dry-run path never invokes the tool itself, since it
-    returns before the history rewrite.  The probe is stubbed rather than
+    Observation opens with a PRESENCE probe for git-filter-repo; the dry-run
+    path never invokes the tool itself, since it renders the plan before the
+    history rewrite.  The probe is stubbed rather than
     skipped-around so these tests behave identically bare and inside the
     sandbox runner (which does not put ``~/.local/bin`` on PATH, so a
     ``shutil.which``-driven skipif would silently take the regression out of
@@ -49,7 +49,7 @@ def _filter_repo_present(monkeypatch):
     walk straight past the refusal that a real absent binary produces.
     """
     monkeypatch.setattr(
-        extract_mod, "require_filter_repo", lambda: "/stub/git-filter-repo"
+        absorb_cmd, "require_filter_repo", lambda: "/stub/git-filter-repo"
     )
 
 
@@ -86,13 +86,27 @@ def _make_source_repo(tmp_path):
     return src
 
 
+def _saferm_present(monkeypatch):
+    """Report saferm as installed: its absence is its own refusal, not this."""
+    import shutil
+
+    real = shutil.which
+    monkeypatch.setattr(
+        shutil, "which",
+        lambda n, *a, **k: "/stub/saferm" if n == "saferm" else real(n, *a, **k),
+    )
+
+
 def _make_monorepo(tmp_path):
     """A committed monorepo workspace with one unrelated member."""
     root = _init_repo(tmp_path / "mono")
     ws = root / ".rlsbl-monorepo"
     ws.mkdir()
     (ws / "workspace.toml").write_text(
-        workspace_toml('[[projects]]\npath = "existing"\nname = "existing"\n')
+        workspace_toml(
+            '[[projects]]\npath = "existing"\nname = "existing"\n'
+            'releasable = false\n'
+        )
     )
     _commit(root, "existing/keep.txt", "keep\n", "add existing")
     _git(root, "add", ".rlsbl-monorepo/workspace.toml")
@@ -113,6 +127,7 @@ class TestAbsorbDryRunThroughTheCli:
         root = _make_monorepo(tmp_path)
         source = _make_source_repo(tmp_path)
         head_before = _git(root, "rev-parse", "HEAD")
+        _saferm_present(monkeypatch)
 
         monkeypatch.chdir(root)
         result = rlsbl.app.test(
@@ -123,8 +138,10 @@ class TestAbsorbDryRunThroughTheCli:
             "the preview failed before it could report anything; "
             f"stderr was:\n{result.stderr}"
         )
-        assert "Would absorb 'widget'" in result.stdout, result.stdout
-        assert "0.1.0" in result.stdout, (
+        # REWORKED: the preview is the shared plan renderer's, not a
+        # hand-written "Would absorb ..." line.
+        assert "rewrite-history" in result.stdout, result.stdout
+        assert "v0.1.0 -> widget@v0.1.0" in result.stdout, (
             "the preview must name the version tags it would import; "
             f"stdout was:\n{result.stdout}"
         )
@@ -145,6 +162,7 @@ class TestAbsorbDryRunThroughTheCli:
         root = _make_monorepo(tmp_path)
         source = _make_source_repo(tmp_path)
         (source / "uncommitted.txt").write_text("dirty\n")
+        _saferm_present(monkeypatch)
 
         monkeypatch.chdir(root)
         result = rlsbl.app.test(
