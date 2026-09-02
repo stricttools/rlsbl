@@ -1,5 +1,6 @@
 """Workspace data layer for monorepo support handling discovery, loading, saving, and resolution of workspaces from workspace.toml config."""
 
+import dataclasses
 import os
 import tomllib
 
@@ -622,6 +623,34 @@ def _build_releasable_table(d):
     return table
 
 
+def _releasable_extra_keys(existing):
+    """Map each existing ``[[releasables]]`` table's name to its unknown keys.
+
+    "Unknown" is asked of the :class:`~rlsbl.workspace_types.Releasable` model
+    itself rather than restated as a list here, so a field added to the model
+    stops counting as unknown on the same edit that adds it.
+
+    ``existing`` is whatever the document holds under ``releasables`` -- an
+    array-of-tables, the explicit empty array, or nothing at all; only the
+    first carries tables to read.
+    """
+    from tomlkit.items import AoT
+
+    model_keys = {f.name for f in dataclasses.fields(Releasable)}
+    extras = {}
+    if not isinstance(existing, AoT):
+        return extras
+    for table in existing:
+        name = table.get("name")
+        if isinstance(name, str):
+            extras[name] = {
+                key: value
+                for key, value in table.items()
+                if key not in model_keys
+            }
+    return extras
+
+
 def _update_table_fields(table, desired):
     """Update a tomlkit table in place to match ``desired`` (a plain dict).
 
@@ -676,6 +705,41 @@ def _sync_aot_in_place(aot, desired_list, id_key, build_fn):
             aot.append(table)
 
 
+def _separate_releasables_from_projects(doc):
+    """Keep a blank line between the two sections when one follows the other.
+
+    An appended array-of-tables entry carries a blank line BEFORE itself
+    (``trivia.indent``), which separates it from its own siblings but not from
+    whatever section comes next: a newcomer appended as the last
+    ``[[releasables]]`` entry otherwise butts straight against the
+    ``[[projects]]`` header. tomlkit holds the blank line AFTER a table as a
+    trailing whitespace element inside that table, which is how a file that
+    already reads well is recognized and left byte-for-byte alone -- a no-op
+    save must not perturb a single byte.
+    """
+    from tomlkit.items import AoT, Whitespace
+
+    keys = list(doc.keys())
+    if "releasables" not in keys or "projects" not in keys:
+        return
+    if keys.index("releasables") > keys.index("projects"):
+        return
+    rels = doc.get("releasables")
+    projs = doc.get("projects")
+    if not isinstance(rels, AoT) or len(rels) == 0:
+        return
+    if not isinstance(projs, AoT) or len(projs) == 0:
+        return
+    last_table = rels[len(rels) - 1]
+    body = last_table.value.body
+    if not body:
+        return
+    trailing = body[-1][1]
+    if isinstance(trailing, Whitespace) and "\n" in trailing.value:
+        return
+    last_table.value.add(tomlkit.ws("\n"))
+
+
 def save_workspace(root, projects, releasables=None):
     """Write workspace.toml atomically, editing the existing document in place.
 
@@ -720,6 +784,14 @@ def save_workspace(root, projects, releasables=None):
         # so nothing here has to re-read the file to guess which it was.
         existing_rels = doc.get("releasables")
 
+        # A [[releasables]] table may carry keys this model does not know -- a
+        # line an operator wrote, or one a newer rlsbl writes. The desired dict
+        # is built from the model, and anything missing from it is pruned, so
+        # those keys are carried across explicitly. A [[projects]] table needs
+        # no such step: its desired dict IS the raw loaded dict, unknown keys
+        # included, which is what makes that section's rewrite lossless.
+        extras_by_name = _releasable_extra_keys(existing_rels)
+
         desired_rels = []
         for rel in releasables:
             d = {"name": rel.name}
@@ -727,6 +799,7 @@ def save_workspace(root, projects, releasables=None):
                 d["tag_format"] = rel.tag_format
             if rel.is_mirrored:
                 d["subtree_remote"] = rel.subtree_remote
+            d.update(extras_by_name.get(rel.name, {}))
             desired_rels.append(d)
 
         if not desired_rels:
@@ -780,6 +853,8 @@ def save_workspace(root, projects, releasables=None):
             for d in desired_projs:
                 aot.append(_build_project_table(d))
             doc.add("projects", aot)
+
+    _separate_releasables_from_projects(doc)
 
     effects.atomic_write_text(target, tomlkit.dumps(doc))
 
