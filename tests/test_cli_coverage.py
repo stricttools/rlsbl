@@ -874,9 +874,9 @@ class TestCmdMonoReleaseInit:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_batch_release_init")
     def test_delegates(self, mock_init, _):
-        rlsbl.cmd_mono_release_init(cli_ctx(), packages="core,web")
+        rlsbl.cmd_mono_release_init(cli_ctx(), releasables="core,web")
         mock_init.assert_called_once()
-        assert mock_init.call_args[1]["packages"] == "core,web"
+        assert mock_init.call_args[1]["releasables"] == "core,web"
 
 
 class TestCmdMonoExtract:

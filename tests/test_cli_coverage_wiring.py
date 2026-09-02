@@ -529,11 +529,11 @@ class TestMonorepoDirectWiring:
 
     def test_release_init(self):
         result, m = _dispatch(
-            ["monorepo", "release", "init", "--packages", "a,b"],
+            ["monorepo", "release", "init", "--releasables", "a,b"],
             "rlsbl.commands.monorepo._cmd_batch_release_init",
         )
         assert result.exit_code == 0, result.stderr
-        assert m.call_args.kwargs["packages"] == "a,b"
+        assert m.call_args.kwargs["releasables"] == "a,b"
 
     def test_release_init_default_all(self):
         result, m = _dispatch(
@@ -541,7 +541,16 @@ class TestMonorepoDirectWiring:
             "rlsbl.commands.monorepo._cmd_batch_release_init",
         )
         assert result.exit_code == 0, result.stderr
-        assert m.call_args.kwargs["packages"] is None
+        assert m.call_args.kwargs["releasables"] is None
+
+    def test_release_init_old_packages_spelling_is_gone(self):
+        """The flag selects releasables, and only the new spelling parses."""
+        result, _m = _dispatch(
+            ["monorepo", "release", "init", "--packages", "a,b"],
+            "rlsbl.commands.monorepo._cmd_batch_release_init",
+        )
+        assert result.exit_code != 0
+        assert "unknown flag '--packages'" in result.stderr
 
     def test_release_order(self):
         result, m = _dispatch(

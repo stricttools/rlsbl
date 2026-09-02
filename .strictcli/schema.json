@@ -2532,7 +2532,7 @@
               "dry_run_unsupported_reason": "the command scaffolds a batch release file whose point is that you edit it before releasing; printing it instead of writing it leaves nothing to edit",
               "flags": [
                 {
-                  "name": "packages",
+                  "name": "releasables",
                   "help": "Comma-separated releasable names to include (every releasable when omitted)",
                   "value_schema": {
                     "type": "string"

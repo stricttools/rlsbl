@@ -174,7 +174,7 @@ def _collect_releasable_targets(releasable_name, member_projects, workspace_root
     return collect_releasable_targets(releasable_name, member_projects, workspace_root)
 
 
-def _cmd_batch_release_init(project_root, packages=None):
+def _cmd_batch_release_init(project_root, releasables=None):
     """Create .rlsbl-monorepo/releases/unreleased.toml.
 
     Scaffolds one ``[releasables.<name>]`` section per releasable declared in
@@ -186,7 +186,7 @@ def _cmd_batch_release_init(project_root, packages=None):
 
     Args:
         project_root: Path to the project root directory.
-        packages: Optional comma-separated string of releasable names to
+        releasables: Optional comma-separated string of releasable names to
             include.
     """
     start = str(project_root)
@@ -209,7 +209,7 @@ def _cmd_batch_release_init(project_root, packages=None):
         sys.exit(1)
 
     _scaffold_releasable_sections(
-        workspace_root, projects, batch_path, packages,
+        workspace_root, projects, batch_path, releasables,
     )
 
 

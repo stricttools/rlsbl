@@ -319,10 +319,10 @@ class TestBatchReleaseInit:
         assert "no targets detected for releasable 'no-target'" in captured.err
 
 
-class TestPackagesFilter:
-    """Tests for --packages flag filtering."""
+class TestReleasablesFilter:
+    """Tests for --releasables flag filtering."""
 
-    def _setup_two_packages(self, mock_git_repo):
+    def _setup_two_releasables(self, mock_git_repo):
         """Helper: create workspace with pkg-a (npm) and pkg-b (pypi)."""
         make_workspace(mock_git_repo, [
             {"path": "pkg-a", "name": "pkg-a"},
@@ -344,11 +344,11 @@ class TestPackagesFilter:
         run_git(mock_git_repo, "add", ".")
         run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
 
-    def test_packages_filters_to_specified(self, mock_git_repo):
-        """Only the named package appears in the scaffolded file."""
-        self._setup_two_packages(mock_git_repo)
+    def test_releasables_filters_to_specified(self, mock_git_repo):
+        """Only the named releasable appears in the scaffolded file."""
+        self._setup_two_releasables(mock_git_repo)
 
-        _cmd_batch_release_init(project_root=mock_git_repo, packages="pkg-a")
+        _cmd_batch_release_init(project_root=mock_git_repo, releasables="pkg-a")
 
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
@@ -359,11 +359,11 @@ class TestPackagesFilter:
         raw = open(batch_path).read()
         assert "pkg-b" not in raw
 
-    def test_packages_multiple(self, mock_git_repo):
+    def test_releasables_multiple(self, mock_git_repo):
         """Multiple comma-separated names are all included."""
-        self._setup_two_packages(mock_git_repo)
+        self._setup_two_releasables(mock_git_repo)
 
-        _cmd_batch_release_init(project_root=mock_git_repo, packages="pkg-a,pkg-b")
+        _cmd_batch_release_init(project_root=mock_git_repo, releasables="pkg-a,pkg-b")
 
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         data = tomlkit.loads(open(batch_path).read())
@@ -371,21 +371,21 @@ class TestPackagesFilter:
         assert "pkg-a" in data["releasables"]
         assert "pkg-b" in data["releasables"]
 
-    def test_packages_unknown_name_errors(self, mock_git_repo):
+    def test_releasables_unknown_name_errors(self, mock_git_repo):
         """Providing a name that doesn't exist in workspace.toml exits with error."""
-        self._setup_two_packages(mock_git_repo)
+        self._setup_two_releasables(mock_git_repo)
 
         with pytest.raises(SystemExit) as exc_info:
-            _cmd_batch_release_init(project_root=mock_git_repo, packages="nonexistent")
+            _cmd_batch_release_init(project_root=mock_git_repo, releasables="nonexistent")
         assert exc_info.value.code == 1
 
-    def test_packages_partial_unknown_errors(self, mock_git_repo, capsys):
+    def test_releasables_partial_unknown_errors(self, mock_git_repo, capsys):
         """Even one unknown name in a mixed list causes an error."""
-        self._setup_two_packages(mock_git_repo)
+        self._setup_two_releasables(mock_git_repo)
 
         with pytest.raises(SystemExit) as exc_info:
             _cmd_batch_release_init(
-                project_root=mock_git_repo, packages="pkg-a,ghost"
+                project_root=mock_git_repo, releasables="pkg-a,ghost"
             )
         assert exc_info.value.code == 1
 

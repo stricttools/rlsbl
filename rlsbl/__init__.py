@@ -2066,13 +2066,13 @@ def cmd_mono_release_run(ctx, allow_dirty, watch, push_timeout, ci_timeout, chec
         "nothing to edit"
     ),
 )
-@strictcli.flag(name="packages", type=str, presence="optional", help="Comma-separated releasable names to include (every releasable when omitted)")
+@strictcli.flag(name="releasables", type=str, presence="optional", help="Comma-separated releasable names to include (every releasable when omitted)")
 @effects.handler
-def cmd_mono_release_init(ctx, packages):
+def cmd_mono_release_init(ctx, releasables):
     """Scaffold a batch release file for all workspace projects."""
     root = _require_project_root()
     from .commands.monorepo import _cmd_batch_release_init
-    _cmd_batch_release_init(project_root=root, packages=packages)
+    _cmd_batch_release_init(project_root=root, releasables=releasables)
 
 
 @mono_release.command(name="order", help="Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.", effect="read_only")
