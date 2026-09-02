@@ -312,7 +312,7 @@ rlsbl check --tag workspace
 #   dev-only-boundary ............. pass
 #   dead-workspace-packages ....... warn  library 'old-utils' not imported by any workspace package
 #
-#   Fix: run `rlsbl monorepo add --path packages/new-lib --target pypi`
+#   Fix: run `rlsbl monorepo add packages/new-lib --target pypi --releasable new-lib`
 ```
 
 ### Pre-push check output
