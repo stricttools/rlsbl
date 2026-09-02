@@ -11,6 +11,11 @@ from rlsbl.checks import (
     get_feature_matrix,
 )
 
+# The expected per-check target scopes are written down once, in the module
+# that pins them against the pre-migration hand-listed sets. This file used to
+# restate three of them, so a scope decision had to be applied in two places.
+from test_target_axis_check_scopes import expected_scope
+
 
 def _load_checks_toml_names() -> set[str]:
     """Load check names from checks.toml as the source of truth."""
@@ -84,21 +89,18 @@ class TestCheckTargetsConsistencyWithCode:
     """Verify CHECK_TARGETS matches the actual skip logic in check functions."""
 
     def test_dead_modules_targets(self):
-        """dead-modules check supports pypi, go, npm, dart, maven per its implementation."""
-        targets = CHECK_TARGETS["dead-modules"]
-        assert targets == frozenset({"pypi", "go", "npm", "dart", "maven"})
+        """dead-modules covers every target whose sources rlsbl can scan."""
+        assert CHECK_TARGETS["dead-modules"] == expected_scope("dead-modules")
 
     def test_library_lint_targets(self):
         """library-lint supports python/pypi, go, npm per _detect_languages."""
-        targets = CHECK_TARGETS["library-lint"]
-        assert targets == frozenset({"pypi", "go", "npm", "maven"})
+        assert CHECK_TARGETS["library-lint"] == expected_scope("library-lint")
 
     def test_dep_checks_use_import_scanners(self):
-        """Dep checks use Python, Dart, npm, Go, Java, and Kotlin import scanners."""
-        scanner_targets = frozenset({"pypi", "dart", "npm", "go", "maven"})
+        """The dep checks all share the import-scanner scope."""
         for check_name in ("deps-unused", "deps-undeclared",
                            "deps-runtime-test-only", "deps-dev-in-lib"):
-            assert CHECK_TARGETS[check_name] == scanner_targets, (
+            assert CHECK_TARGETS[check_name] == expected_scope(check_name), (
                 f"{check_name} should match import scanner targets"
             )
 

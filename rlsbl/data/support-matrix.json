@@ -421,6 +421,7 @@
       "kind": "targets",
       "targets": [
         "dart",
+        "flutter",
         "maven",
         "npm",
         "pypi"
@@ -458,6 +459,7 @@
       "kind": "targets",
       "targets": [
         "dart",
+        "flutter",
         "go",
         "maven",
         "npm",
@@ -468,6 +470,7 @@
       "kind": "targets",
       "targets": [
         "dart",
+        "flutter",
         "go",
         "maven",
         "npm",
@@ -498,6 +501,7 @@
       "kind": "targets",
       "targets": [
         "dart",
+        "flutter",
         "go",
         "maven",
         "npm",
@@ -508,6 +512,7 @@
       "kind": "targets",
       "targets": [
         "dart",
+        "flutter",
         "go",
         "maven",
         "npm",
@@ -522,6 +527,7 @@
       "kind": "targets",
       "targets": [
         "dart",
+        "flutter",
         "go",
         "maven",
         "npm",
@@ -532,6 +538,7 @@
       "kind": "targets",
       "targets": [
         "dart",
+        "flutter",
         "go",
         "maven",
         "npm",
@@ -1382,7 +1389,8 @@
         "hex",
         "swift",
         "swift-apple",
-        "maven"
+        "maven",
+        "flutter"
       ],
       "rows": [
         [
@@ -1394,7 +1402,8 @@
           "yes",
           "no",
           "no",
-          "yes"
+          "yes",
+          "no"
         ],
         [
           "circular-deps",
@@ -1405,11 +1414,13 @@
           "no",
           "no",
           "no",
+          "yes",
           "yes"
         ],
         [
           "cross-repo-path-sources",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1427,6 +1438,7 @@
           "no",
           "no",
           "no",
+          "yes",
           "yes"
         ],
         [
@@ -1438,6 +1450,7 @@
           "no",
           "no",
           "no",
+          "yes",
           "yes"
         ],
         [
@@ -1445,6 +1458,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1460,6 +1474,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1471,6 +1486,7 @@
           "no",
           "no",
           "no",
+          "yes",
           "yes"
         ],
         [
@@ -1482,6 +1498,7 @@
           "no",
           "no",
           "no",
+          "yes",
           "yes"
         ],
         [
@@ -1493,6 +1510,7 @@
           "no",
           "no",
           "no",
+          "yes",
           "yes"
         ],
         [
@@ -1504,11 +1522,13 @@
           "no",
           "no",
           "no",
+          "yes",
           "yes"
         ],
         [
           "dev-overlay-drift",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1526,11 +1546,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "format",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1548,12 +1570,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "go-module-identity",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1570,11 +1594,13 @@
           "no",
           "no",
           "no",
-          "yes"
+          "yes",
+          "no"
         ],
         [
           "lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1592,6 +1618,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1603,7 +1630,8 @@
           "no",
           "no",
           "no",
-          "yes"
+          "yes",
+          "no"
         ],
         [
           "mirror-required",
@@ -1614,6 +1642,7 @@
           "no",
           "yes",
           "yes",
+          "no",
           "no"
         ],
         [
@@ -1625,11 +1654,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "ruff-lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1647,6 +1678,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1658,11 +1690,13 @@
           "no",
           "no",
           "no",
-          "yes"
+          "yes",
+          "no"
         ],
         [
           "type-check",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1674,6 +1708,7 @@
         [
           "type-check-scope-guard",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -2179,10 +2214,10 @@
       "release_materialization_policy": "materialize",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
-      "supports_circular_dep_analysis": false,
+      "supports_circular_dep_analysis": true,
       "supports_dep_floors": false,
       "supports_dev_install": false,
-      "supports_import_analysis": false,
+      "supports_import_analysis": true,
       "supports_name_claim": false,
       "supports_publication_probe": false,
       "supports_read_metadata": true,

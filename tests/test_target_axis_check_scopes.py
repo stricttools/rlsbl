@@ -33,7 +33,7 @@ from rlsbl.targets import (
 from rlsbl.targets.base import BaseTarget
 
 # The scopes as they were hand-listed before the migration. Deriving them must
-# reproduce these exactly: this axis is a refactor, not a scope change.
+# reproduce these exactly: that axis was a refactor, not a scope change.
 SCOPES_BEFORE_MIGRATION = {
     "dep-floors": {"pypi", "npm", "go"},
     "deps-unused": {"pypi", "dart", "npm", "go", "maven"},
@@ -47,12 +47,38 @@ SCOPES_BEFORE_MIGRATION = {
     "test-suite": {"pypi", "go", "npm", "maven"},
 }
 
+# Scope WIDENINGS decided since the migration, kept apart from the sets above so
+# the migration's own claim -- deriving reproduces the hand-listed scopes
+# exactly -- stays checkable, and so every later change to a check's scope has
+# to be written down here as the deliberate decision it is.
+#
+# Flutter: a Flutter app IS Dart sources, so the Dart analysers FlutterTarget
+# inherits answer for it. They were pinned back to the base during the
+# migration to keep behavior identical; that pin was caution, not design, and
+# was removed.
+SCOPE_ADDITIONS_SINCE_MIGRATION = {
+    "deps-unused": {"flutter"},
+    "deps-undeclared": {"flutter"},
+    "deps-runtime-test-only": {"flutter"},
+    "deps-dev-in-lib": {"flutter"},
+    "dead-modules": {"flutter"},
+    "dead-modules-stale": {"flutter"},
+    "circular-deps": {"flutter"},
+}
+
+
+def expected_scope(check_name):
+    """The scope a check should have today: the pre-migration set plus widenings."""
+    return SCOPES_BEFORE_MIGRATION[check_name] | SCOPE_ADDITIONS_SINCE_MIGRATION.get(
+        check_name, set()
+    )
+
 
 class TestDerivedScopesReproduceTheHandListedOnes:
 
     @pytest.mark.parametrize("check_name", sorted(SCOPES_BEFORE_MIGRATION))
-    def test_scope_is_unchanged(self, check_name):
-        assert set(CHECK_TARGETS[check_name]) == SCOPES_BEFORE_MIGRATION[check_name]
+    def test_scope_is_the_hand_listed_one_plus_the_recorded_widenings(self, check_name):
+        assert set(CHECK_TARGETS[check_name]) == expected_scope(check_name)
 
     def test_each_scope_comes_from_a_protocol_property(self):
         assert CHECK_TARGETS["dep-floors"] == targets_with_dep_floors()
@@ -71,18 +97,20 @@ class TestDerivedScopesReproduceTheHandListedOnes:
         assert TARGETS["go"].supports_import_analysis
         assert "go" in CHECK_EXCLUDED_TARGETS["circular-deps"]
 
-    def test_flutter_is_deliberately_out_of_import_analysis(self):
-        """Flutter inherits the Dart analysers but is explicitly dropped back.
+    def test_flutter_answers_the_source_analysis_axes_like_dart(self):
+        """A Flutter app IS Dart sources, so it answers like Dart.
 
-        A Flutter app IS Dart sources, so the inherited implementations would
-        run -- and three of the checks that consume this property are
-        error-severity. Widening them to Flutter members is a scope decision,
-        not a consequence of deriving the set, so flutter stays out until that
-        is decided on its own.
+        FlutterTarget extends DartTarget and inherits its analysers. The
+        migration rebound both detectors back to the base so the derived scopes
+        would reproduce the hand-listed ones unchanged; that pin was caution,
+        not design, and is gone -- Flutter is in scope for import analysis and
+        cycle detection exactly as Dart is.
         """
         assert TARGETS["dart"].supports_import_analysis
-        assert not TARGETS["flutter"].supports_import_analysis
-        assert not TARGETS["flutter"].supports_circular_dep_analysis
+        assert TARGETS["flutter"].supports_import_analysis
+        assert TARGETS["flutter"].supports_circular_dep_analysis
+        assert "flutter" in targets_with_import_analysis()
+        assert "flutter" in targets_with_circular_dep_analysis()
 
 
 class TestPerTargetDetectorsAreProtocolMethods:
