@@ -14,12 +14,10 @@ rlsbl supports monorepo workflows via the `rlsbl monorepo` command family. A mon
 # --root-releasable <name> --tag-format <format>.
 rlsbl monorepo init --root-dev-node
 
-# Declare the releasables in .rlsbl-monorepo/workspace.toml first (see below):
-# every project registration names one, and `add` refuses a name that is not
-# declared.
-
 # Add projects to the workspace (the path is a positional argument, and
-# --releasable is required -- a name, or the literal `false` to opt out)
+# --releasable is required -- a name, or the literal `false` to opt out).
+# A name that [[releasables]] does not declare yet is CREATED as a singleton
+# releasable, with its tag_format written out explicitly (see below).
 rlsbl monorepo add packages/mylib --name mylib --library true --releasable mylib
 rlsbl monorepo add packages/cli --name cli --depends-on mylib --releasable cli
 rlsbl monorepo add packages/tests --name tests --dev-only true --releasable false
@@ -152,9 +150,11 @@ subtree_remote = "git@github.com:owner/uikit.git"
 
 `tag_format` is **explicit or absent**, never implicitly filled in. An entry that omits it tags with the workspace scheme, `{name}@v{version}`; an entry that declares it tags with what it declared. Absence is carried through loading and saving, so a rewrite of `workspace.toml` neither invents the key nor deletes a line an operator wrote — including one that spells out the default.
 
+An entry is written by hand, or by one of the two commands that create a releasable from a member: `rlsbl monorepo add --releasable <name>` naming a group the workspace does not declare yet, and `rlsbl monorepo absorb` for an arriving member. Both create a **singleton** releasable holding that one member, and both write its `tag_format` out explicitly rather than letting it be inherited by accident. The format is derived from the member's primary target's monorepo scheme — `{name}@v{version}` for every target but Go, and the Go module proxy's `<path>/v{version}` for Go — and a member whose targets span BOTH schemes has no single answer, so it is refused with `--tag-format` named as the remedy. `--tag-format` states the format directly; it is illegal when `--releasable` names a releasable that already exists (which owns its own format) and with `--releasable false` (which creates none). `rlsbl monorepo sync` scaffolds the created releasable's state directory.
+
 A releasable is also the unit a repository boundary moves: `rlsbl monorepo extract` moves one out into a repository of its own and `rlsbl monorepo absorb` moves an external repository in as one. Splitting a member out of a releasable it shares with others is a workspace edit first -- see [Repository conversions](conversions.md).
 
-The distinction is not cosmetic. **A releasable that owns the root member (`path = "."`) must declare `tag_format`, and the loader refuses one that does not.** A repository root's releases are commonly tagged `v1.2.3` because the repository used to be a standalone one, and inheriting `{name}@v{version}` there would silently orphan every existing tag. Only the operator knows which scheme the repository's history already uses, so `rlsbl monorepo init --root-releasable <name>` requires `--tag-format` alongside it.
+The distinction is not cosmetic. **A releasable that owns the root member (`path = "."`) must declare `tag_format`, and the loader refuses one that does not.** A repository root's releases are commonly tagged `v1.2.3` because the repository used to be a standalone one, and inheriting `{name}@v{version}` there would silently orphan every existing tag. Only the operator knows which scheme the repository's history already uses, so `rlsbl monorepo init --root-releasable <name>` requires `--tag-format` alongside it — and so does an `rlsbl monorepo add .` that creates the root member's releasable, which never derives a format the way an ordinary member's does.
 
 ### Layers section
 
@@ -550,15 +550,13 @@ rlsbl monorepo init --root-dev-node
 #   Initialized monorepo workspace in .rlsbl-monorepo/
 #   Root member 'root' is a dev node.
 
-# Declare [[releasables]] entries named "core" and "cli" in
-# .rlsbl-monorepo/workspace.toml before registering members against them.
-
-# Add a Python library
+# Add a Python library. "core" is not declared in [[releasables]] yet, so this
+# creates it as a singleton releasable with tag_format = "{name}@v{version}".
 mkdir -p packages/core
 # ... create packages/core/pyproject.toml ...
 rlsbl monorepo add packages/core --name core --library true --releasable core
 
-# Add an npm CLI that depends on the library
+# Add an npm CLI that depends on the library ("cli" is created the same way)
 mkdir -p packages/cli
 # ... create packages/cli/package.json ...
 rlsbl monorepo add packages/cli --name cli --depends-on core --releasable cli

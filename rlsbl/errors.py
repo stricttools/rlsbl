@@ -13,6 +13,15 @@ class WorkspaceError(RlsblError):
     """Invalid workspace.toml or layers configuration."""
 
 
+class MixedTagSchemeError(RlsblError):
+    """A member's targets span both monorepo tag schemes.
+
+    Raised when a releasable's tag format is being derived from a member whose
+    targets tag under both the ``{name}@v{version}`` and the ``{path}/v{version}``
+    scheme: there is no single format to derive, and the operator must state one.
+    """
+
+
 class ChangelogError(RlsblError):
     """Invalid JSONL changelog entry or schema."""
 

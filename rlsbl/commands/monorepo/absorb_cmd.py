@@ -431,43 +431,23 @@ def _source_targets(source_repo):
 
 
 def _derive_tag_format(source_repo, entries, name, dest_path):
-    """The tag format an auto-singleton releasable is created with.
+    """The tag format the auto-singleton releasable is created with.
 
-    Derived from the member's PRIMARY target's monorepo scheme and written out
-    literally: ``{name}@v{version}`` for every target but Go, and the Go module
-    proxy's ``<path>/v{version}`` for Go. A member whose targets span BOTH
-    schemes has no single answer, so it is a refusal naming ``--tag-format``
-    rather than a silent pick of whichever target was detected first.
+    Derivation is shared with ``monorepo add``, the other command that creates
+    a releasable from a member (:func:`rlsbl.tag_glob.derive_releasable_tag_format`);
+    only the subject of the mixed-scheme refusal differs, since here it is the
+    source repository's own declaration that spans both schemes.
     """
-    from ...targets import TARGETS
-    from ...tag_glob import _mixed_tag_schemes, _target_tag_scheme
+    from ...errors import MixedTagSchemeError
+    from ...tag_glob import derive_releasable_tag_format
 
-    mixed = _mixed_tag_schemes(entries, name, dest_path)
-    if mixed:
-        path_names = ", ".join(mixed.get("path", []))
-        at_names = ", ".join(mixed.get("at", []))
-        raise AbsorbError(
-            f"source repository '{source_repo}' declares targets with "
-            f"incompatible monorepo tag schemes: path-style ({path_names}) and "
-            f"@-style ({at_names}). A releasable has exactly one tag format, "
-            f"and picking whichever target was detected first would tag this "
-            f"unit under a scheme nobody chose. State it: re-run with "
-            f"--tag-format \"{{name}}@v{{version}}\" or --tag-format "
-            f"\"{dest_path}/v{{version}}\"."
+    try:
+        return derive_releasable_tag_format(
+            entries, name, dest_path,
+            subject=f"source repository '{source_repo}'",
         )
-    for entry in entries:
-        target = TARGETS.get(entry.name)
-        if target is None:
-            continue
-        # Asked of the target rather than pattern-matched on its name: which
-        # scheme a target tags under is the target's own fact. The @-scheme is
-        # the workspace format with the name left as a placeholder; the
-        # path-scheme has no name in it at all, so the target renders it with
-        # the version placeholder standing in for a version.
-        if _target_tag_scheme(target, name, dest_path) == "at":
-            return DEFAULT_TAG_FORMAT
-        return target.monorepo_tag_format(name, "{version}", path=dest_path)
-    return DEFAULT_TAG_FORMAT
+    except MixedTagSchemeError as exc:
+        raise AbsorbError(str(exc)) from exc
 
 
 def _version_key(version):

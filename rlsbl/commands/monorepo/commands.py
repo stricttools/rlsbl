@@ -85,6 +85,51 @@ def _cmd_init(flags, project_root):
     commit_files("monorepo: init workspace", [rel_ws_file], allow_failure=True)
 
 
+def _create_releasable(name, tag_format_flag, target_entries, path, *, adding_root):
+    """The Releasable an add naming an undeclared group creates.
+
+    Its ``tag_format`` is written out explicitly, either as the operator stated
+    it (``--tag-format``) or as the member's primary target implies -- the same
+    derivation ``monorepo absorb`` uses for its auto-singleton
+    (:func:`rlsbl.tag_glob.derive_releasable_tag_format`), so a member's targets
+    imply one format with one answer whichever command creates the releasable.
+
+    The ROOT member is the exception: a releasable that owns the repository root
+    is commonly tagged under the scheme the repository used while it was
+    standalone, and only the operator can read the existing tags. It is required
+    to state the format, exactly as ``monorepo init --root-releasable`` requires
+    it.
+    """
+    from ...errors import MixedTagSchemeError
+    from ...tag_glob import derive_releasable_tag_format
+    from ...workspace import Releasable
+
+    if tag_format_flag:
+        return Releasable(name=name, tag_format=tag_format_flag)
+
+    if adding_root:
+        print(
+            f"Error: --tag-format is required to create releasable '{name}' "
+            f"for the root member. A releasable that owns the repository root "
+            f"must never inherit a derived tag format: a repository that used "
+            f"to be standalone already has tags, and only you can read which "
+            f"scheme they use. Pass --tag-format \"v{{version}}\" for bare "
+            f"version tags, or --tag-format \"{{name}}@v{{version}}\" for the "
+            f"workspace scheme.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    try:
+        tag_format = derive_releasable_tag_format(
+            target_entries, name, path, subject=f"member dir '{path}'",
+        )
+    except MixedTagSchemeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    return Releasable(name=name, tag_format=tag_format)
+
+
 def _cmd_add(args, flags, project_root, dry_run=False):
     if not args:
         print("Error: Usage: rlsbl monorepo add <path> [--name <name>]", file=sys.stderr)
@@ -142,6 +187,7 @@ def _cmd_add(args, flags, project_root, dry_run=False):
     dev_only_raw = flags.get("dev_only")
     releasable_raw = flags.get("releasable")
     registry_name = flags.get("registry-name") or ""
+    tag_format_flag = flags.get("tag-format") or ""
 
     # Parse --library as boolean
     library = None
@@ -202,17 +248,44 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         )
         sys.exit(1)
 
-    # Validate releasable name exists in [[releasables]]
+    # A releasable this add NAMES but the workspace does not declare is created
+    # here, as the auto-singleton `monorepo absorb` creates for an arriving
+    # member: one [[releasables]] entry, with its tag_format written out
+    # explicitly rather than inherited by accident. A name the workspace already
+    # declares is joined, and that releasable already owns its format.
+    releasables = None
+    created_releasable = None
     if isinstance(releasable_value, str):
         releasables = load_releasables(root, projects)
         defined_names = {r.name for r in releasables}
-        if releasable_value not in defined_names:
-            print(
-                f"Error: releasable '{releasable_value}' is not defined in "
-                f"[[releasables]]. Available: {sorted(defined_names)}",
-                file=sys.stderr,
+        if releasable_value in defined_names:
+            if tag_format_flag:
+                declared = next(
+                    r for r in releasables if r.name == releasable_value
+                ).effective_tag_format
+                print(
+                    f"Error: --tag-format applies only to the releasable this "
+                    f"command creates. Releasable '{releasable_value}' already "
+                    f"exists and declares its own tag format ('{declared}'); "
+                    f"change it in workspace.toml if it is wrong.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            created_releasable = _create_releasable(
+                releasable_value, tag_format_flag, target_entries, path,
+                adding_root=adding_root,
             )
-            sys.exit(1)
+            releasables = list(releasables) + [created_releasable]
+    elif tag_format_flag:
+        print(
+            "Error: --tag-format is the format of the releasable this command "
+            "creates, and --releasable false creates none -- the member opts "
+            "out of versioning entirely. Drop --tag-format, or name the "
+            "releasable this member belongs to.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Validate --depends-on against existing project names
     depends_on = None
@@ -242,6 +315,11 @@ def _cmd_add(args, flags, project_root, dry_run=False):
     if dry_run:
         print(f"Would add project '{name}' at {path}")
         print(f"  workspace.toml entry: {project}")
+        if created_releasable is not None:
+            print(
+                f"  Would create releasable '{created_releasable.name}' "
+                f"(tag format: {created_releasable.tag_format})"
+            )
         project_rlsbl = os.path.join(path, ".rlsbl", "config.json")
         if not os.path.exists(project_rlsbl):
             print(f"  Would scaffold '{name}' (no .rlsbl/config.json present)")
@@ -251,8 +329,18 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         return
 
     projects.append(project)
-    save_workspace(root, projects)
+    # ``releasables`` is the full desired list only when this add created one;
+    # otherwise it stays None so the existing section is preserved untouched.
+    save_workspace(
+        root, projects, releasables=releasables if created_releasable else None,
+    )
     print(f"Added project '{name}' at {path}")
+    if created_releasable is not None:
+        print(
+            f"Created releasable '{created_releasable.name}' "
+            f"(tag format: {created_releasable.tag_format}). Its state "
+            f"directory is scaffolded by the `rlsbl monorepo sync` below."
+        )
 
     no_commit = not flags.get("auto-commit", True)
     ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)

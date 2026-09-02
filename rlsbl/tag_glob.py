@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+from .workspace_types import DEFAULT_TAG_FORMAT
+
 
 class TagMode(Enum):
     """Whether :func:`parse_version_tag` accepts prerelease tags.
@@ -130,6 +132,59 @@ def _mixed_tag_schemes(target_entries, name, path):
         scheme = _target_tag_scheme(TARGETS[te.name], name, path)
         schemes.setdefault(scheme, []).append(te.name)
     return schemes if len(schemes) > 1 else None
+
+
+def derive_releasable_tag_format(target_entries, name, path, *, subject):
+    """The tag format an auto-singleton releasable is created with.
+
+    Derived from the member's PRIMARY target's monorepo scheme and returned
+    literally: ``{name}@v{version}`` for every target but Go, and the Go module
+    proxy's ``<path>/v{version}`` for Go. A member whose targets span BOTH
+    schemes has no single answer, so it is a refusal naming ``--tag-format``
+    rather than a silent pick of whichever target was detected first.
+
+    Both commands that create a releasable from a member -- ``monorepo add``
+    and ``monorepo absorb`` -- derive through here, so the format a member's
+    targets imply is one fact with one answer.
+
+    Args:
+        target_entries: the member's detected (or declared) TargetEntry list.
+        name: the releasable's name, which fills ``{name}`` in the @-scheme.
+        path: the member's repo-relative path, which the Go path-scheme tags under.
+        subject: how the refusal names what declared the mixed targets
+            (e.g. ``"member dir 'packages/widget'"``).
+
+    Raises:
+        MixedTagSchemeError: the member's targets span both tag schemes.
+    """
+    from .errors import MixedTagSchemeError
+    from .targets import TARGETS
+
+    mixed = _mixed_tag_schemes(target_entries, name, path)
+    if mixed:
+        path_names = ", ".join(mixed.get("path", []))
+        at_names = ", ".join(mixed.get("at", []))
+        raise MixedTagSchemeError(
+            f"{subject} declares targets with incompatible monorepo tag "
+            f"schemes: path-style ({path_names}) and @-style ({at_names}). A "
+            f"releasable has exactly one tag format, and picking whichever "
+            f"target was detected first would tag this unit under a scheme "
+            f"nobody chose. State it: re-run with --tag-format "
+            f"\"{{name}}@v{{version}}\" or --tag-format \"{path}/v{{version}}\"."
+        )
+    for entry in target_entries:
+        target = TARGETS.get(entry.name)
+        if target is None:
+            continue
+        # Asked of the target rather than pattern-matched on its name: which
+        # scheme a target tags under is the target's own fact. The @-scheme is
+        # the workspace format with the name left as a placeholder; the
+        # path-scheme has no name in it at all, so the target renders it with
+        # the version placeholder standing in for a version.
+        if _target_tag_scheme(target, name, path) == "at":
+            return DEFAULT_TAG_FORMAT
+        return target.monorepo_tag_format(name, "{version}", path=path)
+    return DEFAULT_TAG_FORMAT
 
 
 def _mixed_scheme_error(project_path, mixed):
