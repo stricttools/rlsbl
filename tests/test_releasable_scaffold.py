@@ -382,16 +382,27 @@ class TestMonorepoAddReleasable:
                 "auto-commit": False,
             }, project_root=mock_git_repo)
 
-    def test_add_validates_releasable_exists(self, mock_git_repo):
-        """--releasable <name> errors if the name is not in [[releasables]]."""
+    def test_add_creates_undeclared_releasable(self, mock_git_repo):
+        """--releasable <name> creates the [[releasables]] entry when the
+        name is not declared yet, with an explicitly written tag_format
+        derived from the member's primary target scheme."""
         self._setup_explicit_workspace(mock_git_repo)
         self._make_project_dir(mock_git_repo, "app")
 
-        with pytest.raises(SystemExit):
+        with patch("rlsbl.effects.run"):
             _cmd_add(["app"], {
-                "releasable": "nonexistent",
+                "releasable": "newgroup",
                 "auto-commit": False,
             }, project_root=mock_git_repo)
+
+        from rlsbl.workspace import load_releasables
+
+        releasables = load_releasables(
+            str(mock_git_repo), declared_members(load_workspace(str(mock_git_repo)))
+        )
+        by_name = {r.name: r for r in releasables}
+        assert "newgroup" in by_name
+        assert by_name["newgroup"].tag_format == "{name}@v{version}"
 
     def test_add_without_releasable_flag_is_refused(self, mock_git_repo):
         """--releasable is required: every workspace declares its releasables.

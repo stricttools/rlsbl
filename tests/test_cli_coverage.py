@@ -740,7 +740,7 @@ class TestCmdMonoAdd:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_add")
     def test_delegates_with_all_flags(self, mock_add, _):
-        rlsbl.cmd_mono_add(cli_ctx(), name="mylib", target="npm", depends_on="core,utils", library="true", dev_only="true", releasable="core", registry_name="mylib-npm", auto_commit=False, path="packages/mylib")
+        rlsbl.cmd_mono_add(cli_ctx(), name="mylib", target="npm", depends_on="core,utils", library="true", dev_only="true", releasable="core", tag_format=None, registry_name="mylib-npm", auto_commit=False, path="packages/mylib")
         mock_add.assert_called_once()
         flags = mock_add.call_args[0][1]
         assert flags["name"] == "mylib"
