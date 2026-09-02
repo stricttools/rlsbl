@@ -246,31 +246,26 @@ class TestAddUnchangedPaths:
 
 
 class TestRootMemberReleasable:
-    """A releasable owning the repository root never derives its format.
+    """`add` never creates the root member's releasable.
 
-    The loader refuses a workspace with no root member, and `add` refuses a
-    path a member already claims, so the root member's releasable is created
-    through this helper only -- exercised here directly for that reason.
+    A workspace this command can load already declares a root member, so an add
+    naming the repository root is refused as a path the workspace claims --
+    before any releasable is created. Creating the root member's releasable is
+    `monorepo init --root-releasable`'s job, which requires the format stated.
     """
 
-    def test_root_member_requires_the_format_stated(self, capsys):
-        from rlsbl.targets import TargetEntry
-
+    def test_add_of_the_repository_root_is_refused(self, mock_git_repo, capsys):
+        _cmd_init({"root-dev-node": True}, project_root=".")
         with pytest.raises(SystemExit):
-            _create_releasable(
-                "core", "", [TargetEntry(name="npm", path=".")], ".",
-                adding_root=True,
-            )
-        err = capsys.readouterr().err
-        assert "--tag-format is required" in err
-        assert "v{version}" in err
+            _cmd_add(["."], {"releasable": "core", "target": "npm"}, project_root=".")
+        assert "already exists in workspace" in capsys.readouterr().err
+        assert _releasable(mock_git_repo, "core") is None
 
-    def test_root_member_takes_the_format_as_stated(self):
+    def test_the_helper_takes_the_format_as_stated(self):
         from rlsbl.targets import TargetEntry
 
         rel = _create_releasable(
             "core", "v{version}", [TargetEntry(name="npm", path=".")], ".",
-            adding_root=True,
         )
         assert rel.name == "core"
         assert rel.tag_format == "v{version}"

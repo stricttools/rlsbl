@@ -85,7 +85,7 @@ def _cmd_init(flags, project_root):
     commit_files("monorepo: init workspace", [rel_ws_file], allow_failure=True)
 
 
-def _create_releasable(name, tag_format_flag, target_entries, path, *, adding_root):
+def _create_releasable(name, tag_format_flag, target_entries, path):
     """The Releasable an add naming an undeclared group creates.
 
     Its ``tag_format`` is written out explicitly, either as the operator stated
@@ -94,11 +94,11 @@ def _create_releasable(name, tag_format_flag, target_entries, path, *, adding_ro
     (:func:`rlsbl.tag_glob.derive_releasable_tag_format`), so a member's targets
     imply one format with one answer whichever command creates the releasable.
 
-    The ROOT member is the exception: a releasable that owns the repository root
-    is commonly tagged under the scheme the repository used while it was
-    standalone, and only the operator can read the existing tags. It is required
-    to state the format, exactly as ``monorepo init --root-releasable`` requires
-    it.
+    The root member's releasable is never created here: a workspace this
+    command can load already declares a root member, so an add naming ``.`` is
+    refused as a path the workspace already claims. Creating it is
+    ``monorepo init --root-releasable``'s job, and that is where the format is
+    required to be stated.
     """
     from ...errors import MixedTagSchemeError
     from ...tag_glob import derive_releasable_tag_format
@@ -106,19 +106,6 @@ def _create_releasable(name, tag_format_flag, target_entries, path, *, adding_ro
 
     if tag_format_flag:
         return Releasable(name=name, tag_format=tag_format_flag)
-
-    if adding_root:
-        print(
-            f"Error: --tag-format is required to create releasable '{name}' "
-            f"for the root member. A releasable that owns the repository root "
-            f"must never inherit a derived tag format: a repository that used "
-            f"to be standalone already has tags, and only you can read which "
-            f"scheme they use. Pass --tag-format \"v{{version}}\" for bare "
-            f"version tags, or --tag-format \"{{name}}@v{{version}}\" for the "
-            f"workspace scheme.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
     try:
         tag_format = derive_releasable_tag_format(
@@ -274,7 +261,6 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         else:
             created_releasable = _create_releasable(
                 releasable_value, tag_format_flag, target_entries, path,
-                adding_root=adding_root,
             )
             releasables = list(releasables) + [created_releasable]
     elif tag_format_flag:
@@ -653,9 +639,16 @@ def _cmd_status(flags, project_root):
             _cl_changes_dir = get_releasable_changes_dir(root, _cl_rel_name)
         _changes_dir = _cl_changes_dir or get_changes_dir(os.path.join(root, path))
         fact, anchor = _latest_release_for_row(_changes_dir, tag_glob)
-        coverage_str = _coverage_column(
-            anchor, _changes_dir, OwnershipScope.for_member(projects, proj),
-        )
+        # The scope answers the same question the changes dir was chosen by: a
+        # releasable member's coverage is read against its RELEASABLE's state,
+        # whose own directory no member path claims. Scoping it as a bare member
+        # would drop every commit that touched only that state, and this row's
+        # "(N exempted)" would disagree with the releasable table's above.
+        if _cl_rel_name:
+            _scope = OwnershipScope.for_releasable(projects, [proj], _cl_rel_name)
+        else:
+            _scope = OwnershipScope.for_member(projects, proj)
+        coverage_str = _coverage_column(anchor, _changes_dir, _scope)
 
         # Dependency counts
         deps_count = graph.dep_count(name)
