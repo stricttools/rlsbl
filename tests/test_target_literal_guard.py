@@ -77,9 +77,6 @@ EXEMPT_PREFIXES = (
 # that is not listed. Entries here are NOT approved designs -- they are the
 # un-migrated remainder, recorded so it cannot grow.
 LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
-    "rlsbl/__init__.py": {
-        ("compare", ('flutter',)): 1,
-    },
     "rlsbl/checks/project.py": {
         # Spelling collision, not the target registry: both compare a
         # LAUNCHER entry's declared ``type`` (a config taxonomy of its own)
