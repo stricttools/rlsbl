@@ -245,18 +245,24 @@ def register_release_checks(app):
                 else "every ref"
             return reporter.passed(f"{subjects} exists for {scope}")
 
-        summary = (
-            f"{missing_local} ref(s) missing locally, "
-            f"{missing_remote} missing on origin, "
-            f"{wrong_commit} at the wrong commit, "
-            f"{missing_release} tag(s) without a GitHub Release"
-        )
+        # The Release half is reported only when it was ASKED. With no origin
+        # remote or no GitHub repository behind it there is no listing, and
+        # "0 tag(s) without a GitHub Release" would render a count of a
+        # question nobody put -- the same distinction the pass path draws
+        # between "every ref" and "every ref and GitHub Release".
+        parts = [
+            f"{missing_local} ref(s) missing locally",
+            f"{missing_remote} missing on origin",
+            f"{wrong_commit} at the wrong commit",
+        ]
+        if releases is not None:
+            parts.append(f"{missing_release} tag(s) without a GitHub Release")
         if underivable:
-            summary += (
-                f", {underivable} release archive(s) whose ref set could not "
+            parts.append(
+                f"{underivable} release archive(s) whose ref set could not "
                 f"be derived"
             )
-        return reporter.found(summary)
+        return reporter.found(", ".join(parts))
 
     @app.error_check("branch-sync")
     def check_branch_sync(ctx, reporter):

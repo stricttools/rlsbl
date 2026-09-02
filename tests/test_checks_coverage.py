@@ -10,8 +10,6 @@ Covers:
 import json
 import os
 import stat
-import subprocess
-import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -31,7 +29,6 @@ from conftest import (
 
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.changelog.schema import ChangelogEntry, serialize_entry
 
 
 # ------------------------------------------------------------------
@@ -441,6 +438,101 @@ class TestUnpublishedRefsCheck:
         )
         assert result.status == "pass", result
         assert "GitHub Release" not in result.message
+
+    def test_the_failure_summary_omits_the_release_half_when_it_was_skipped(
+        self, tmp_path, monkeypatch,
+    ):
+        """A half that was never asked must not be reported as answered.
+
+        With no GitHub repository behind origin there is no Release listing, so
+        the summary said "0 tag(s) without a GitHub Release" -- a count of a
+        question nobody put. The pass path already draws this distinction
+        ("every ref" vs "every ref and GitHub Release"); the failure summary
+        mirrors it.
+        """
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({}),
+            github_repo=None,
+        )
+        assert result.status == "fail"
+        assert "GitHub Release" not in result.message, result.message
+        assert "missing on origin" in result.message
+
+    def test_the_failure_summary_keeps_the_release_half_when_it_was_asked(
+        self, tmp_path, monkeypatch,
+    ):
+        """The clause stays when the listing really was read."""
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+            releases=[],
+        )
+        assert result.status == "fail"
+        assert "1 tag(s) without a GitHub Release" in result.message
+
+    def test_the_release_listing_is_read_once_per_run(
+        self, tmp_path, monkeypatch,
+    ):
+        """ONE listing answers every archived version, and must stay one.
+
+        `gh release list` is a network round trip; moving it inside the
+        per-version loop would multiply it by the number of released versions
+        and force a recency window, which is exactly what the retired
+        `github-release` check did. The call counter pins the single listing.
+        """
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch, version="0.3.0")
+        record_release(repo, "v0.1.0")
+        make_commit(repo, "more.txt", "more work")
+        record_release(repo, "v0.2.0")
+        make_commit(repo, "even-more.txt", "even more work")
+        record_release(repo, "v0.3.0")
+        tags = {
+            tag: git_out(repo, "rev-parse", f"{tag}^{{}}")
+            for tag in ("v0.1.0", "v0.2.0", "v0.3.0")
+        }
+
+        calls = []
+
+        def _list_releases(**kwargs):
+            calls.append(kwargs)
+            return frozenset(tags), True
+
+        patches = [
+            patch("rlsbl.utils.local_tag_commits",
+                  return_value=TagCommitMap(dict(tags))),
+            patch("rlsbl.utils.remote_is_configured", return_value=True),
+            patch("rlsbl.utils.remote_tag_commits",
+                  return_value=TagCommitMap(dict(tags))),
+            patch("rlsbl.utils.get_github_repo", return_value="owner/repo"),
+            patch("rlsbl.commands.release_reconcile.list_releases", _list_releases),
+        ]
+        for p in patches:
+            p.start()
+        try:
+            result = app._check_defs["unpublished-refs"].impl(make_ctx(repo))
+        finally:
+            for p in reversed(patches):
+                p.stop()
+
+        assert result.status == "pass", result
+        assert len(calls) == 1, calls
 
     def test_every_archived_version_is_covered_not_just_the_latest(
         self, tmp_path, monkeypatch,
