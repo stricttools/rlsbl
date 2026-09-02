@@ -10,6 +10,7 @@ from rlsbl.workspace_graph import (
     ManifestScanError,
     MavenScanner,
     SCANNERS,
+    UnrecognizedGradleDependencyError,
     WorkspaceGraph,
     WorkspaceScanner,
 )
@@ -389,7 +390,15 @@ class TestPomXmlDeps:
 
 
 class TestUnrecognizedGradlePatterns:
-    """Unrecognized Gradle dependency patterns produce warnings."""
+    """Unrecognized Gradle dependency patterns are raised, not swallowed.
+
+    A Gradle file that parses but declares a dependency in a form the scanner
+    cannot read is the unreadable manifest wearing different clothes: the edge
+    exists in the build and not in the graph, so anything derived from the
+    edges is narrower than the workspace. It travels the same road -- the
+    scanner raises, the graph stays tolerant (warns, keeps the edges it DID
+    recognize, records the failure), and a narrowing consumer refuses.
+    """
 
     def test_kts_variable_reference_warns(self, tmp_path, capsys):
         """libs.<alias> in KTS resolves via version catalog when available."""
@@ -422,8 +431,8 @@ class TestUnrecognizedGradlePatterns:
         captured = capsys.readouterr()
         assert "unrecognized" not in captured.err.lower()
 
-    def test_kts_variable_reference_warns_without_catalog(self, tmp_path, capsys):
-        """Variable reference in KTS without catalog still emits warning."""
+    def test_kts_variable_reference_raises_without_catalog(self, tmp_path):
+        """Variable reference in KTS without a catalog is raised to the caller."""
         proj_dir = tmp_path / "app"
         proj_dir.mkdir()
         (proj_dir / "build.gradle.kts").write_text(textwrap.dedent("""\
@@ -434,14 +443,18 @@ class TestUnrecognizedGradlePatterns:
         """))
 
         scanner = MavenScanner()
-        deps = scanner.scan(str(proj_dir), {"app", "core"})
-        assert len(deps) == 1  # Only the project dep
-        captured = capsys.readouterr()
-        assert "unrecognized" in captured.err.lower()
-        assert "libs.someLib" in captured.err
+        with pytest.raises(UnrecognizedGradleDependencyError) as exc:
+            scanner.scan(str(proj_dir), {"app", "core"})
+        assert exc.value.path.endswith("build.gradle.kts")
+        assert exc.value.lines == [(3, "implementation(libs.someLib)")]
+        # The recognized declarations are real edges and travel with the
+        # failure, so the tolerant graph keeps them.
+        assert [d.name for d in exc.value.deps] == ["core"]
+        assert "unrecognized" in str(exc.value).lower()
+        assert "libs.someLib" in str(exc.value)
 
-    def test_groovy_variable_reference_warns(self, tmp_path, capsys):
-        """Variable reference in Groovy dependency emits warning."""
+    def test_groovy_variable_reference_raises(self, tmp_path):
+        """Variable reference in a Groovy dependency is raised to the caller."""
         proj_dir = tmp_path / "app"
         proj_dir.mkdir()
         (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
@@ -452,11 +465,67 @@ class TestUnrecognizedGradlePatterns:
         """))
 
         scanner = MavenScanner()
-        deps = scanner.scan(str(proj_dir), {"app", "core"})
-        assert len(deps) == 1
+        with pytest.raises(UnrecognizedGradleDependencyError) as exc:
+            scanner.scan(str(proj_dir), {"app", "core"})
+        assert exc.value.path.endswith("build.gradle")
+        assert exc.value.lines == [(3, "implementation deps.someLib")]
+        assert [d.name for d in exc.value.deps] == ["core"]
+        assert "deps.someLib" in str(exc.value)
+
+    def test_it_is_a_manifest_scan_error(self, tmp_path):
+        """The new class rides the road the read failures already built."""
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation deps.someLib
+            }
+        """))
+
+        with pytest.raises(ManifestScanError):
+            MavenScanner().scan(str(proj_dir), {"app", "core"})
+
+    def test_the_graph_warns_keeps_the_recognized_edges_and_records_it(self, tmp_path, capsys):
+        """Tolerance, unchanged: the rendering consumers still get an answer."""
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation project(':core')
+                implementation deps.someLib
+            }
+        """))
+
+        graph = WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app"},
+            {"path": "core", "name": "core"},
+        ])
+        assert [d.name for d in graph.dependencies("app")] == ["core"]
         captured = capsys.readouterr()
+        assert "Warning" in captured.err
         assert "unrecognized" in captured.err.lower()
         assert "deps.someLib" in captured.err
+
+        assert [e.project for e in graph.scan_errors] == ["app"]
+        error = graph.scan_errors[0]
+        assert error.path.endswith("build.gradle")
+        assert "line 3" in error.message
+        assert "depends_on" in error.remedy
+
+    def test_a_recognized_gradle_file_records_nothing(self, tmp_path):
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation project(':core')
+            }
+        """))
+
+        graph = WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app"},
+            {"path": "core", "name": "core"},
+        ])
+        assert graph.scan_errors == []
 
     def test_groovy_catalog_reference_resolves(self, tmp_path, capsys):
         """libs.<alias> in Groovy resolves via version catalog."""

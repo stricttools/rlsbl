@@ -85,6 +85,27 @@ class TestReleaseRouterFilters:
         assert "packages/core/**" in patterns
         assert ".rlsbl-monorepo/releasables/alpha/CHANGELOG.md" in patterns
 
+    def test_an_unrecognized_gradle_dependency_refuses(self, tmp_project):
+        """The guard simulates the router, so it refuses what the router refuses.
+
+        A Gradle dependency line the scanner cannot read costs the dependent an
+        edge, and a window simulated against the narrowed filter would clear a
+        candidate whose CI job the real router leaves ``skipped``.
+        """
+        from rlsbl.errors import WorkspaceError
+
+        _setup_releasable_workspace(tmp_project)
+        (tmp_project / "packages" / "core" / "build.gradle").write_text(
+            "dependencies {\n"
+            "    implementation deps.other\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(WorkspaceError) as exc:
+            _release_router_filters(str(tmp_project), "core", "alpha")
+        assert "build.gradle" in str(exc.value)
+        assert "depends_on" in str(exc.value)
+
     def test_each_project_keeps_its_own_filter(self, tmp_project):
         """Filters are returned per project so one member's excludes cannot
         answer for another member's territory."""

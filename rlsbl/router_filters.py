@@ -196,12 +196,13 @@ class RouterFilters:
     under-trigger the dependent's CI.  The command reports the error instead.
 
     A manifest the graph could not READ is the same failure wearing different
-    clothes, and the graph is deliberately tolerant of it (see
-    :class:`~rlsbl.workspace_graph.WorkspaceGraph`) -- so this constructor asks
-    the graph whether any scan failed and refuses when one did.  The narrowing
-    is otherwise invisible from here and from the freshness check, which
-    re-derives from the same unreadable manifest and therefore agrees the
-    narrowed router is fresh.
+    clothes, and so is a Gradle file that parsed but declares a dependency in a
+    form no scanner recognizes.  The graph is deliberately tolerant of both
+    (see :class:`~rlsbl.workspace_graph.WorkspaceGraph`) -- so this constructor
+    asks the graph whether any scan failed and refuses when one did.  The
+    narrowing is otherwise invisible from here and from the freshness check,
+    which re-derives from the same unreadable manifest or declaration and
+    therefore agrees the narrowed router is fresh.
     """
 
     def __init__(self, root, projects, releasables=None):
@@ -218,15 +219,22 @@ class RouterFilters:
                 f"({error.message.split(': ', 1)[-1]})"
                 for error in self.graph.scan_errors
             )
+            # One remedy per failing class, in first-seen order: an operator
+            # facing an unreadable manifest and an unreadable declaration is
+            # told about both, and neither is told twice.
+            remedies = "\n".join(
+                dict.fromkeys(error.remedy for error in self.graph.scan_errors)
+            )
             raise WorkspaceError(
                 "cannot derive the CI router's paths filters: a manifest could "
-                "not be read, so the workspace dependency graph is missing "
+                "not be read, or declared a dependency in a form no scanner "
+                "recognizes, so the workspace dependency graph is missing "
                 "edges and every filter derived from it would be NARROWER "
                 "than the workspace it describes -- a member would stop "
                 "reacting to a dependency it really has, and its CI job would "
                 "conclude `skipped` on the commit a release tags.\n"
                 f"{listed}\n"
-                "Fix the manifest(s) and re-run."
+                f"{remedies}"
             )
         self._by_name = {member_name(p): p for p in self.projects}
         self._root_triggers = root_trigger_files(self.root)

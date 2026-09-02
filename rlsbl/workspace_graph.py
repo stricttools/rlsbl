@@ -55,15 +55,67 @@ class ManifestScanError(Exception):
     narrower than the truth reads that attribute and refuses.
     """
 
-    def __init__(self, path, cause, action="parse"):
+    #: What an operator does about it, rendered by the consumers that refuse.
+    remedy = "Fix the manifest(s) and re-run."
+
+    def __init__(self, path, cause, action="parse", *, deps=(), message=None):
         self.path = str(path)
         self.cause = cause
         self.action = action
-        super().__init__(f"failed to {action} {self.path}: {cause}")
+        #: Edges the failed scan DID establish, when it established any. A read
+        #: failure establishes none; a file that parsed but carries one
+        #: unreadable declaration carries the rest of its real edges here, so
+        #: the tolerant graph keeps them.
+        self.deps = list(deps)
+        super().__init__(message or f"failed to {action} {self.path}: {cause}")
+
+
+class UnrecognizedGradleDependencyError(ManifestScanError):
+    """A Gradle file that parsed, carrying a declaration nobody could read.
+
+    The same failure as :class:`ManifestScanError` wearing different clothes:
+    a dependency declared through a variable, a helper function, or a catalog
+    alias with no catalog behind it exists in the build and not in the graph,
+    so every filter derived from the edges is NARROWER than the workspace --
+    and the freshness check, re-deriving from the same line, agrees the
+    narrowed router is fresh.
+
+    It therefore travels the road the read failures already built: the scanner
+    raises, :class:`WorkspaceGraph` keeps the edges the file DID declare and
+    records the failure, the rendering consumers still get their answer with a
+    warning, and a consumer that must never narrow refuses.  The remedy it
+    names is the one no scanner has to recognize -- declaring the edge in the
+    member's ``depends_on``.
+    """
+
+    remedy = (
+        "A Gradle dependency the scanner cannot read can be declared in the "
+        "member's `depends_on` in workspace.toml instead -- an explicit edge "
+        "needs no scanner to recognize it."
+    )
+
+    def __init__(self, path, lines, *, deps=()):
+        #: ``(line number, source line)`` per unrecognized declaration.
+        self.lines = [(int(number), str(text)) for number, text in lines]
+        rendered = "; ".join(f"line {n}: {text}" for n, text in self.lines)
+        super().__init__(
+            path,
+            rendered,
+            action="recognize every dependency declaration in",
+            deps=deps,
+            message=(
+                f"unrecognized Gradle dependency declaration(s) in "
+                f"{str(path)}: {rendered}"
+            ),
+        )
 
 
 #: One manifest scan that failed, attributed to the member it belongs to.
-ScanError = namedtuple("ScanError", ["project", "path", "message"])
+#: ``remedy`` is the failing class's own, so a consumer that refuses can tell
+#: the operator what to do about THIS failure rather than about failures in
+#: general.
+ScanError = namedtuple("ScanError", ["project", "path", "message", "remedy"])
+ScanError.__new__.__defaults__ = (ManifestScanError.remedy,)
 
 
 def _parse_pypi_dep_name(dep_string):
@@ -346,6 +398,15 @@ class MavenScanner:
         return result
 
     @staticmethod
+    def _line_at(content: str, offset: int) -> tuple[int, str]:
+        """``(line number, source line)`` for the line *offset* falls on."""
+        line_start = content.rfind("\n", 0, offset) + 1
+        line_end = content.find("\n", offset)
+        if line_end == -1:
+            line_end = len(content)
+        return content.count("\n", 0, offset) + 1, content[line_start:line_end].strip()
+
+    @staticmethod
     def _resolve_catalog_alias(ref: str, catalog: dict[str, str]) -> str | None:
         """Resolve a libs.<alias> reference to 'group:artifact' using the catalog.
 
@@ -465,24 +526,15 @@ class MavenScanner:
                                 constraint=coords,
                                 scope=scope,
                             ))
-                    # Resolved (even if not a workspace dep) -- don't warn
+                    # Resolved (even if not a workspace dep) -- don't report it
                     continue
             # This is an unrecognized pattern
-            line_start = content.rfind("\n", 0, match.start()) + 1
-            line_end = content.find("\n", match.end())
-            if line_end == -1:
-                line_end = len(content)
-            line = content[line_start:line_end].strip()
+            number, line = self._line_at(content, match.start())
             if line:
-                unrecognized.append(line)
+                unrecognized.append((number, line))
 
         if unrecognized:
-            print(
-                f"Warning: unrecognized Gradle dependency patterns in {filepath}:",
-                file=sys.stderr,
-            )
-            for line in unrecognized:
-                print(f"  {line}", file=sys.stderr)
+            raise UnrecognizedGradleDependencyError(filepath, unrecognized, deps=deps)
 
         return deps
 
@@ -601,13 +653,9 @@ class MavenScanner:
                                 scope=scope,
                             ))
                     continue
-            line_start = content.rfind("\n", 0, match.start()) + 1
-            line_end = content.find("\n", match.end())
-            if line_end == -1:
-                line_end = len(content)
-            line = content[line_start:line_end].strip()
+            number, line = self._line_at(content, match.start())
             if line:
-                unrecognized.append(line)
+                unrecognized.append((number, line))
             matched_spans.add(span)
 
         # General pattern: config followed by something (space-separated)
@@ -644,19 +692,14 @@ class MavenScanner:
                                 constraint=coords,
                                 scope=scope,
                             ))
-                    # Resolved (even if not a workspace dep) -- don't warn
+                    # Resolved (even if not a workspace dep) -- don't report it
                     continue
-            line = match.group(0).strip()
+            number, line = self._line_at(content, match.start())
             if line:
-                unrecognized.append(line)
+                unrecognized.append((number, line))
 
         if unrecognized:
-            print(
-                f"Warning: unrecognized Gradle dependency patterns in {filepath}:",
-                file=sys.stderr,
-            )
-            for line in unrecognized:
-                print(f"  {line}", file=sys.stderr)
+            raise UnrecognizedGradleDependencyError(filepath, unrecognized, deps=deps)
 
         return deps
 
@@ -709,10 +752,12 @@ SCANNERS: list[WorkspaceScanner] = [PypiScanner(), NpmScanner(), DartScanner(), 
 class WorkspaceGraph:
     """Directed dependency graph of intra-workspace project dependencies.
 
-    Construction is tolerant of manifests it cannot read: the failure warns on
-    stderr, that manifest contributes no edges, and the rest of the workspace
-    is still answerable -- which is what ``monorepo impact``, ``monorepo
-    graph`` and ``monorepo status`` need on a half-broken tree.
+    Construction is tolerant of a manifest it cannot read and of a Gradle file
+    that parsed but declares a dependency in a form no scanner recognizes: the
+    failure warns on stderr, contributes no edge for what could not be read,
+    and the rest of the workspace is still answerable -- which is what
+    ``monorepo impact``, ``monorepo graph`` and ``monorepo status`` need on a
+    half-broken tree.
 
     Tolerance is only safe for a consumer that RENDERS the graph. A consumer
     that derives something narrowing from it cannot tell "this member has no
@@ -764,10 +809,10 @@ class WorkspaceGraph:
 
             found_deps = []
             for scanner in SCANNERS:
-                # One scanner's unreadable manifest costs that scanner's edges
-                # and nothing else: the remaining scanners still run, the
-                # warning still goes to stderr, and the failure is recorded so
-                # a narrowing consumer can refuse rather than derive from a
+                # One scanner's failed scan costs the edges that scan could not
+                # establish and nothing else: the remaining scanners still run,
+                # the warning still goes to stderr, and the failure is recorded
+                # so a narrowing consumer can refuse rather than derive from a
                 # graph that is missing edges nobody could see.
                 try:
                     if isinstance(scanner, PypiScanner):
@@ -777,9 +822,19 @@ class WorkspaceGraph:
                     else:
                         found_deps.extend(scanner.scan(project_dir, workspace_names))
                 except ManifestScanError as exc:
+                    # A file that parsed but carries one declaration nobody
+                    # could read still declared the rest of its edges, and
+                    # those are real: keep them, so tolerance costs only the
+                    # edges that were actually lost.
+                    found_deps.extend(exc.deps)
                     print(f"Warning: {exc}", file=sys.stderr)
                     self.scan_errors.append(
-                        ScanError(project=name, path=exc.path, message=str(exc))
+                        ScanError(
+                            project=name,
+                            path=exc.path,
+                            message=str(exc),
+                            remedy=exc.remedy,
+                        )
                     )
 
             # Explicit depends_on from workspace config

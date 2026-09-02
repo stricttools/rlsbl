@@ -314,6 +314,82 @@ class TestUnreadableManifestsRefuseToDeriveFilters:
         )
 
 
+class TestUnrecognizedGradleDependenciesRefuseToDeriveFilters:
+    """A dependency line the scanner cannot read is not an absent dependency.
+
+    A Gradle file that PARSES can still declare a dependency in a form the
+    scanner does not recognize -- a variable, a helper function, a catalog
+    alias with no catalog behind it. The scanner used to warn on stderr and
+    carry on, which narrows the dependent's filter exactly as an unreadable
+    manifest does, and just as invisibly: the freshness check re-derives from
+    the same line and agrees the narrowed router is fresh.
+
+    The derivation therefore refuses on it too, and names the remedy that needs
+    no scanner at all -- declaring the edge in ``depends_on``.
+    """
+
+    @staticmethod
+    def _members_with_an_unrecognized_dependency(tmp_path):
+        (tmp_path / "packages" / "core").mkdir(parents=True)
+        (tmp_path / "packages" / "cli").mkdir(parents=True)
+        (tmp_path / "packages" / "cli" / "build.gradle").write_text(
+            "dependencies {\n"
+            "    implementation deps.core\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        return [
+            _member("root", "."),
+            _member("core", "packages/core"),
+            _member("cli", "packages/cli"),
+        ]
+
+    def test_construction_refuses(self, tmp_path):
+        from rlsbl.errors import WorkspaceError
+
+        members = self._members_with_an_unrecognized_dependency(tmp_path)
+        with pytest.raises(WorkspaceError):
+            RouterFilters(tmp_path, members)
+
+    def test_the_refusal_names_the_project_the_file_and_the_line(self, tmp_path):
+        from rlsbl.errors import WorkspaceError
+
+        members = self._members_with_an_unrecognized_dependency(tmp_path)
+        with pytest.raises(WorkspaceError) as exc:
+            RouterFilters(tmp_path, members)
+        message = str(exc.value)
+        assert "cli" in message
+        assert "build.gradle" in message
+        assert "line 2" in message
+        assert "deps.core" in message
+
+    def test_the_refusal_names_depends_on_as_the_remedy(self, tmp_path):
+        from rlsbl.errors import WorkspaceError
+
+        members = self._members_with_an_unrecognized_dependency(tmp_path)
+        with pytest.raises(WorkspaceError) as exc:
+            RouterFilters(tmp_path, members)
+        assert "depends_on" in str(exc.value)
+
+    def test_a_recognized_gradle_workspace_still_derives(self, tmp_path):
+        (tmp_path / "packages" / "core").mkdir(parents=True)
+        (tmp_path / "packages" / "cli").mkdir(parents=True)
+        (tmp_path / "packages" / "cli" / "build.gradle").write_text(
+            "dependencies {\n"
+            "    implementation project(':core')\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        members = [
+            _member("root", "."),
+            _member("core", "packages/core"),
+            _member("cli", "packages/cli"),
+        ]
+        assert "packages/core/**" in RouterFilters(tmp_path, members).patterns_for(
+            members[2]
+        )
+
+
 class TestBuiltInTriggers:
 
     def test_root_manifests_and_lockfiles_trigger_every_member(self, tmp_path):
@@ -580,6 +656,28 @@ class TestRouterFiltersFreshCheck:
         outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
         assert outcome.status == "fail", outcome
         assert any("pyproject.toml" in p.text for p in outcome.problems), outcome
+
+    def test_an_unrecognized_gradle_dependency_fails_instead_of_passing(
+        self, router_workspace
+    ):
+        """The other way the same edge goes missing on both sides.
+
+        The committed router and the fresh derivation are both derived from
+        this file, so a dependency line neither of them can read makes them
+        agree on a filter narrower than the workspace. Agreeing is not passing.
+        """
+        core = router_workspace / "packages" / "core"
+        core.mkdir(parents=True, exist_ok=True)
+        (core / "build.gradle").write_text(
+            "dependencies {\n"
+            "    implementation deps.cli\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        outcome = _workspace_check("router-filters-fresh")(_wctx(router_workspace))
+        assert outcome.status == "fail", outcome
+        assert any("build.gradle" in p.text for p in outcome.problems), outcome
+        assert any("depends_on" in p.text for p in outcome.problems), outcome
 
     def test_it_derives_from_the_whole_workspace_not_the_context(self, router_workspace):
         """A context carrying one member (the releasable preflight) must not
