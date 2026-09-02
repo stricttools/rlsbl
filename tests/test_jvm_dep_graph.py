@@ -923,3 +923,225 @@ class TestNoManifest:
         proj_dir.mkdir()
         scanner = MavenScanner()
         assert scanner.scan(str(proj_dir), {"app"}) == []
+
+
+class TestGradleFormsThatDeclareNoWorkspaceEdge:
+    """Lines that plainly declare no intra-workspace edge are recognized.
+
+    The unrecognized-declaration refusal is a hard error, so every form it
+    fires on must really be a declaration the scanner failed to parse.  A
+    comment, a BOM import, the ``kotlin("stdlib")`` helper, a local-jar
+    ``fileTree``/``files`` and a version-catalog bundle reference are none of
+    them: each is recognized here and contributes no edge, exactly as it
+    contributes none in Gradle.
+
+    Every case carries a real ``project(...)`` edge beside the ignorable line,
+    so a fix that silenced the refusal by dropping the file's parsing
+    altogether would fail these too.
+    """
+
+    GROOVY_CASES = [
+        ("a line comment mentioning a config name", "// api docs: see https://example.com"),
+        ("a line comment about an omitted config", "// implementation is intentionally omitted here"),
+        ("a commented-out declaration", "// implementation(deps.other)"),
+        ("a trailing line comment", "implementation 'com.example:external:1.0' // api deps.other"),
+        ("a bom import", "implementation platform('com.example:bom:1.0')"),
+        ("a local jar tree", "implementation fileTree(dir: 'libs', include: ['*.jar'])"),
+        ("a local jar list", "implementation files('libs/legacy.jar')"),
+        ("a catalog bundle reference", "implementation libs.bundles.networking"),
+        ("a parenthesized catalog bundle reference", "implementation(libs.bundles.networking)"),
+    ]
+
+    KTS_CASES = [
+        ("a line comment mentioning a config name", "// api docs: see https://example.com"),
+        ("a line comment about an omitted config", "// implementation is intentionally omitted here"),
+        ("a commented-out declaration", "// implementation(deps.other)"),
+        ("a bom import", 'implementation(platform("com.example:bom:1.0"))'),
+        ("a kotlin helper", 'implementation(kotlin("stdlib"))'),
+        ("a local jar list", 'implementation(files("libs/legacy.jar"))'),
+        ("a catalog bundle reference", "implementation(libs.bundles.networking)"),
+    ]
+
+    @pytest.mark.parametrize(
+        "line", [case[1] for case in GROOVY_CASES], ids=[case[0] for case in GROOVY_CASES]
+    )
+    def test_groovy(self, tmp_path, line):
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(
+            "dependencies {\n"
+            "    implementation project(':core')\n"
+            f"    {line}\n"
+            "}\n"
+        )
+
+        deps = MavenScanner().scan(str(proj_dir), {"app", "core"})
+        assert [d.name for d in deps] == ["core"]
+
+    @pytest.mark.parametrize(
+        "line", [case[1] for case in KTS_CASES], ids=[case[0] for case in KTS_CASES]
+    )
+    def test_kts(self, tmp_path, line):
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle.kts").write_text(
+            "dependencies {\n"
+            '    implementation(project(":core"))\n'
+            f"    {line}\n"
+            "}\n"
+        )
+
+        deps = MavenScanner().scan(str(proj_dir), {"app", "core"})
+        assert [d.name for d in deps] == ["core"]
+
+    def test_a_block_comment_hides_nothing_and_declares_nothing(self, tmp_path):
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            /*
+             * implementation deps.someLib
+             * api deps.other
+             */
+            dependencies {
+                implementation project(':core')
+            }
+        """))
+
+        deps = MavenScanner().scan(str(proj_dir), {"app", "core"})
+        assert [d.name for d in deps] == ["core"]
+
+    def test_a_url_in_a_string_is_not_a_comment(self, tmp_path):
+        """The comment stripper is quote-aware: ``//`` inside a literal stays."""
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            repositories {
+                maven { url 'https://repo.example.com/m2' }
+            }
+            dependencies {
+                implementation project(':core')
+            }
+        """))
+
+        deps = MavenScanner().scan(str(proj_dir), {"app", "core"})
+        assert [d.name for d in deps] == ["core"]
+
+    def test_a_declaration_the_scanner_really_cannot_read_still_refuses(self, tmp_path):
+        """The refusal is narrowed, not removed."""
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation project(':core')
+                implementation deps.someLib
+            }
+        """))
+
+        with pytest.raises(UnrecognizedGradleDependencyError) as exc:
+            MavenScanner().scan(str(proj_dir), {"app", "core"})
+        assert exc.value.lines == [(3, "implementation deps.someLib")]
+
+    def test_the_reported_line_keeps_its_comment(self, tmp_path):
+        """Comments are ignored for matching, not erased from the report."""
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation deps.someLib // the variable is defined elsewhere
+            }
+        """))
+
+        with pytest.raises(UnrecognizedGradleDependencyError) as exc:
+            MavenScanner().scan(str(proj_dir), {"app", "core"})
+        assert exc.value.lines == [
+            (2, "implementation deps.someLib // the variable is defined elsewhere")
+        ]
+
+
+class TestDeclaredDependsOnAcknowledgesAnUnrecognizedLine:
+    """A member that states its own edges is not narrowed by an unread line.
+
+    The refusal's whole remedy is ``depends_on``, and a remedy that does not
+    clear the error it names leaves the operator with nothing to do but
+    rewrite the build file -- which the remedy says is unnecessary.  A member
+    whose ``workspace.toml`` entry DECLARES the key (any list, empty
+    included) has therefore stated its workspace edges by hand: the scanner
+    can no longer narrow them, so the failure stays a warning and is not
+    recorded for the consumers that refuse on it.
+
+    Only the unrecognized-declaration class is acknowledged this way.  A
+    manifest nobody could READ says nothing about whether the operator's
+    declaration is complete for the OTHER scanners that never got to run.
+    """
+
+    @staticmethod
+    def _gradle_project(tmp_path):
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "build.gradle").write_text(textwrap.dedent("""\
+            dependencies {
+                implementation deps.someLib
+            }
+        """))
+        (tmp_path / "core").mkdir()
+
+    def test_a_declared_depends_on_clears_the_scan_error(self, tmp_path):
+        self._gradle_project(tmp_path)
+        graph = WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app", "depends_on": ["core"]},
+            {"path": "core", "name": "core"},
+        ])
+        assert graph.scan_errors == []
+        assert [d.name for d in graph.dependencies("app")] == ["core"]
+
+    def test_an_explicitly_empty_declaration_clears_it_too(self, tmp_path):
+        """``depends_on = []`` is the operator saying "no workspace edges"."""
+        self._gradle_project(tmp_path)
+        graph = WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app", "depends_on": []},
+            {"path": "core", "name": "core"},
+        ])
+        assert graph.scan_errors == []
+        assert graph.dependencies("app") == []
+
+    def test_without_the_key_it_is_still_recorded(self, tmp_path):
+        self._gradle_project(tmp_path)
+        graph = WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app"},
+            {"path": "core", "name": "core"},
+        ])
+        assert [e.project for e in graph.scan_errors] == ["app"]
+
+    def test_the_warning_reaches_stderr_either_way(self, tmp_path, capsys):
+        """Only the refusal is lifted; the stderr warning is informational."""
+        self._gradle_project(tmp_path)
+        WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app", "depends_on": ["core"]},
+            {"path": "core", "name": "core"},
+        ])
+        captured = capsys.readouterr()
+        assert "Warning" in captured.err
+        assert "deps.someLib" in captured.err
+
+    def test_an_unreadable_manifest_is_not_acknowledged(self, tmp_path):
+        """The acknowledgment covers the unrecognized-pattern class only."""
+        proj_dir = tmp_path / "app"
+        proj_dir.mkdir()
+        (proj_dir / "pom.xml").write_text("this is not valid xml <<<")
+        (tmp_path / "core").mkdir()
+
+        graph = WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app", "depends_on": ["core"]},
+            {"path": "core", "name": "core"},
+        ])
+        assert [e.project for e in graph.scan_errors] == ["app"]
+
+    def test_the_remedy_says_the_declaration_clears_the_refusal(self, tmp_path):
+        self._gradle_project(tmp_path)
+        graph = WorkspaceGraph(str(tmp_path), [
+            {"path": "app", "name": "app"},
+            {"path": "core", "name": "core"},
+        ])
+        remedy = graph.scan_errors[0].remedy
+        assert "depends_on" in remedy
+        assert "depends_on = []" in remedy

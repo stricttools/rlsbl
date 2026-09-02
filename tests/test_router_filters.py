@@ -390,6 +390,81 @@ class TestUnrecognizedGradleDependenciesRefuseToDeriveFilters:
         )
 
 
+class TestDeclaredDependsOnLiftsTheGradleRefusal:
+    """The remedy the refusal names actually clears it.
+
+    The refusal tells the operator to declare the edge in ``depends_on``.  The
+    scanner raises from the file's text alone, so before this the declaration
+    changed nothing: sync, the freshness check and every release stayed dead
+    ended, with rewriting the build file -- the one thing the remedy says is
+    unnecessary -- the only way out.
+
+    A member whose ``workspace.toml`` entry declares the key has stated its
+    workspace edges by hand, so an unreadable line can no longer narrow them:
+    the derivation proceeds, and the warning still goes to stderr.
+    """
+
+    @staticmethod
+    def _members(tmp_path, **cli_extra):
+        (tmp_path / "packages" / "core").mkdir(parents=True)
+        (tmp_path / "packages" / "cli").mkdir(parents=True)
+        (tmp_path / "packages" / "cli" / "build.gradle").write_text(
+            "dependencies {\n"
+            "    implementation deps.core\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        return [
+            _member("root", "."),
+            _member("core", "packages/core"),
+            _member("cli", "packages/cli", **cli_extra),
+        ]
+
+    def test_a_declared_edge_derives_and_carries_the_territory(self, tmp_path):
+        members = self._members(tmp_path, depends_on=["core"])
+        patterns = RouterFilters(tmp_path, members).patterns_for(members[2])
+        assert "packages/cli/**" in patterns
+        assert "packages/core/**" in patterns
+
+    def test_an_explicitly_empty_declaration_derives_too(self, tmp_path):
+        """``depends_on = []`` states that the member has no workspace edges."""
+        members = self._members(tmp_path, depends_on=[])
+        patterns = RouterFilters(tmp_path, members).patterns_for(members[2])
+        assert "packages/cli/**" in patterns
+        assert "packages/core/**" not in patterns
+
+    def test_without_the_key_it_still_refuses(self, tmp_path):
+        from rlsbl.errors import WorkspaceError
+
+        members = self._members(tmp_path)
+        with pytest.raises(WorkspaceError):
+            RouterFilters(tmp_path, members)
+
+    def test_the_warning_still_reaches_stderr(self, tmp_path, capsys):
+        members = self._members(tmp_path, depends_on=["core"])
+        RouterFilters(tmp_path, members)
+        captured = capsys.readouterr()
+        assert "Warning" in captured.err
+        assert "deps.core" in captured.err
+
+    def test_an_unreadable_manifest_is_refused_despite_the_declaration(self, tmp_path):
+        """The acknowledgment covers the unrecognized-pattern class only."""
+        from rlsbl.errors import WorkspaceError
+
+        (tmp_path / "packages" / "core").mkdir(parents=True)
+        (tmp_path / "packages" / "cli").mkdir(parents=True)
+        (tmp_path / "packages" / "cli" / "pyproject.toml").write_text(
+            "this is not valid toml [[[", encoding="utf-8",
+        )
+        members = [
+            _member("root", "."),
+            _member("core", "packages/core"),
+            _member("cli", "packages/cli", depends_on=["core"]),
+        ]
+        with pytest.raises(WorkspaceError):
+            RouterFilters(tmp_path, members)
+
+
 class TestBuiltInTriggers:
 
     def test_root_manifests_and_lockfiles_trigger_every_member(self, tmp_path):

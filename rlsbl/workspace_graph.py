@@ -69,6 +69,19 @@ class ManifestScanError(Exception):
         self.deps = list(deps)
         super().__init__(message or f"failed to {action} {self.path}: {cause}")
 
+    def acknowledged_by(self, project) -> bool:
+        """Has *project* already stated by hand what this scan could not read?
+
+        Always False here.  A manifest nobody could READ withheld its whole
+        dependency section, and a ``depends_on`` declaration says nothing
+        about what the unread file would have added -- the operator wrote the
+        declaration for the edges they know about, not to certify a file they
+        cannot see either.  Only a failure whose *class* is confined to
+        declarations an explicit edge can replace overrides this; see
+        :meth:`UnrecognizedGradleDependencyError.acknowledged_by`.
+        """
+        return False
+
 
 class UnrecognizedGradleDependencyError(ManifestScanError):
     """A Gradle file that parsed, carrying a declaration nobody could read.
@@ -85,13 +98,17 @@ class UnrecognizedGradleDependencyError(ManifestScanError):
     records the failure, the rendering consumers still get their answer with a
     warning, and a consumer that must never narrow refuses.  The remedy it
     names is the one no scanner has to recognize -- declaring the edge in the
-    member's ``depends_on``.
+    member's ``depends_on`` -- and that remedy really clears the refusal, see
+    :meth:`acknowledged_by`.
     """
 
     remedy = (
-        "A Gradle dependency the scanner cannot read can be declared in the "
-        "member's `depends_on` in workspace.toml instead -- an explicit edge "
-        "needs no scanner to recognize it."
+        "Declare the member's workspace edges in its `depends_on` in "
+        "workspace.toml -- an explicit edge needs no scanner to recognize it, "
+        "and the declaration itself clears this refusal: the member's edges "
+        "are then stated rather than scanned, so a line no scanner can read "
+        "cannot narrow them. A member with no workspace edges at all declares "
+        "`depends_on = []`, which counts. The warning stays either way."
     )
 
     def __init__(self, path, lines, *, deps=()):
@@ -108,6 +125,22 @@ class UnrecognizedGradleDependencyError(ManifestScanError):
                 f"{str(path)}: {rendered}"
             ),
         )
+
+    def acknowledged_by(self, project) -> bool:
+        """Does *project*'s workspace entry DECLARE a ``depends_on`` key?
+
+        The declaration is the operator's own statement of that member's
+        workspace edges, and it is what the refusal asks for.  With it present
+        -- a list of names, or an explicit empty list -- the member's edges no
+        longer depend on this file being readable: the explicit ones are in
+        the graph whatever the line says, so an unreadable declaration can no
+        longer make the derived filter narrower than the workspace.
+
+        Presence is the whole test, not content: an empty list is a member
+        saying "no workspace edges", which is an answer.  Absence is not, so a
+        member without the key keeps the hard refusal.
+        """
+        return "depends_on" in project
 
 
 #: One manifest scan that failed, attributed to the member it belongs to.
@@ -320,6 +353,33 @@ class MavenScanner:
     # Maven scopes that map to dev
     _MAVEN_DEV_SCOPES = frozenset({"test", "provided"})
 
+    # Helper calls that take the place of a coordinate and declare no
+    # intra-workspace edge, whatever their argument is. Each is recognized and
+    # contributes nothing -- which is exactly what it contributes in Gradle,
+    # so a scanner that reported them as unreadable declarations would refuse
+    # on a build file that is perfectly readable:
+    #   platform()/enforcedPlatform() import a BOM's constraints, not an artifact
+    #   kotlin() expands to the Kotlin distribution's own artifacts
+    #   fileTree()/files() name jars on disk, which no workspace member is
+    _GRADLE_NO_EDGE_CALLS = (
+        "platform(",
+        "enforcedPlatform(",
+        "kotlin(",
+        "fileTree(",
+        "files(",
+    )
+
+    # Version-catalog namespaces that cannot name a single library artifact:
+    # a bundle is a list of them, a plugin is not a dependency, and a version
+    # is a string. Only ``libs.<alias>`` reaches the [libraries] table, and an
+    # alias that does not resolve there stays unrecognized -- it can name a
+    # workspace member, and dropping it silently is the whole failure class.
+    _GRADLE_NO_EDGE_CATALOG_PREFIXES = (
+        "libs.bundles.",
+        "libs.plugins.",
+        "libs.versions.",
+    )
+
     def __init__(self):
         # Cache: workspace_root -> {alias -> "group:artifact"}
         self._catalog_cache: dict[str, dict[str, str]] = {}
@@ -397,6 +457,81 @@ class MavenScanner:
                     result[alias] = f"{value['group']}:{value['name']}"
         return result
 
+    @classmethod
+    def _declares_no_workspace_edge(cls, arg: str) -> bool:
+        """Is *arg* a dependency argument that cannot name a workspace member?
+
+        The unrecognized-declaration failure is a hard error for the consumers
+        that refuse on it, so it must fire only on a line that plausibly
+        declares a dependency the scanner failed to parse.  These forms are
+        parsed fine; they simply declare no edge.
+        """
+        return arg.startswith(cls._GRADLE_NO_EDGE_CALLS) or arg.startswith(
+            cls._GRADLE_NO_EDGE_CATALOG_PREFIXES
+        )
+
+    @staticmethod
+    def _blank_comments(content: str) -> str:
+        """*content* with every comment blanked out, offsets left untouched.
+
+        Gradle's configuration names are ordinary English words, so a comment
+        mentioning one (``// implementation is intentionally omitted``, ``//
+        api docs: ...``) reads exactly like a declaration to the line-oriented
+        patterns below -- and reporting a comment as an unreadable dependency
+        blocks a workspace whose build files are fine.
+
+        Comments are replaced character-for-character with spaces rather than
+        removed, and newlines are kept, so every offset into the returned text
+        addresses the same place in the original: the scanners match against
+        this and render the reported line from the original, which keeps the
+        operator's own text (comment included) in the message.
+
+        Quote-aware, because ``//`` inside a string literal is not a comment
+        -- a repository URL is the common case.
+        """
+        out = list(content)
+        length = len(content)
+        i = 0
+        while i < length:
+            char = content[i]
+            for fence in ('"""', "'''"):
+                if content.startswith(fence, i):
+                    end = content.find(fence, i + 3)
+                    i = length if end == -1 else end + 3
+                    break
+            else:
+                if char in "'\"":
+                    i += 1
+                    while i < length:
+                        if content[i] == "\\":
+                            i += 2
+                            continue
+                        if content[i] == char:
+                            i += 1
+                            break
+                        if content[i] == "\n":
+                            # An unterminated literal is a broken build file;
+                            # ending it at the newline keeps the state machine
+                            # from swallowing the rest of the file.
+                            break
+                        i += 1
+                    continue
+                if content.startswith("//", i):
+                    while i < length and content[i] != "\n":
+                        out[i] = " "
+                        i += 1
+                    continue
+                if content.startswith("/*", i):
+                    end = content.find("*/", i + 2)
+                    end = length if end == -1 else end + 2
+                    while i < end:
+                        if content[i] != "\n":
+                            out[i] = " "
+                        i += 1
+                    continue
+                i += 1
+        return "".join(out)
+
     @staticmethod
     def _line_at(content: str, offset: int) -> tuple[int, str]:
         """``(line number, source line)`` for the line *offset* falls on."""
@@ -433,9 +568,15 @@ class MavenScanner:
         """Parse build.gradle.kts for dependency declarations."""
         try:
             with open(filepath, "r", encoding="utf-8") as f:
-                content = f.read()
+                source = f.read()
         except Exception as exc:
             raise ManifestScanError(filepath, exc, action="read") from exc
+
+        # Every pattern below matches the comment-blanked text, so a
+        # declaration someone commented out is never read as a live one.
+        # Offsets are preserved, so a report renders its line from ``source``
+        # and keeps the operator's own text. See :meth:`_blank_comments`.
+        content = self._blank_comments(source)
 
         deps = []
         unrecognized = []
@@ -510,6 +651,9 @@ class MavenScanner:
             # Skip project(...) calls (already handled by project_re)
             if arg.startswith("project("):
                 continue
+            # Recognized, and declares no intra-workspace edge
+            if self._declares_no_workspace_edge(arg):
+                continue
             # Try to resolve version catalog references (libs.<alias>)
             if catalog and arg.startswith("libs."):
                 coords = self._resolve_catalog_alias(arg, catalog)
@@ -529,7 +673,7 @@ class MavenScanner:
                     # Resolved (even if not a workspace dep) -- don't report it
                     continue
             # This is an unrecognized pattern
-            number, line = self._line_at(content, match.start())
+            number, line = self._line_at(source, match.start())
             if line:
                 unrecognized.append((number, line))
 
@@ -542,9 +686,16 @@ class MavenScanner:
         """Parse build.gradle (Groovy DSL) for dependency declarations."""
         try:
             with open(filepath, "r", encoding="utf-8") as f:
-                content = f.read()
+                source = f.read()
         except Exception as exc:
             raise ManifestScanError(filepath, exc, action="read") from exc
+
+        # Comment-blanked for matching, original for reporting. The general
+        # pattern further down scans whole lines, and every Gradle
+        # configuration name is an ordinary English word, so without this a
+        # comment like ``// implementation is intentionally omitted`` reads as
+        # a declaration nobody could parse. See :meth:`_blank_comments`.
+        content = self._blank_comments(source)
 
         deps = []
         unrecognized = []
@@ -637,6 +788,9 @@ class MavenScanner:
                 continue
             if arg.startswith("project(") or arg.startswith("project '") or arg.startswith('project "'):
                 continue
+            # Recognized, and declares no intra-workspace edge
+            if self._declares_no_workspace_edge(arg):
+                continue
             if catalog and arg.startswith("libs."):
                 coords = self._resolve_catalog_alias(arg, catalog)
                 if coords:
@@ -653,7 +807,7 @@ class MavenScanner:
                                 scope=scope,
                             ))
                     continue
-            number, line = self._line_at(content, match.start())
+            number, line = self._line_at(source, match.start())
             if line:
                 unrecognized.append((number, line))
             matched_spans.add(span)
@@ -676,6 +830,9 @@ class MavenScanner:
                 continue
             if arg.startswith("project(") or arg.startswith("project '") or arg.startswith('project "'):
                 continue
+            # Recognized, and declares no intra-workspace edge
+            if self._declares_no_workspace_edge(arg):
+                continue
             # Try to resolve version catalog references (libs.<alias>)
             if catalog and arg.startswith("libs."):
                 coords = self._resolve_catalog_alias(arg, catalog)
@@ -694,7 +851,7 @@ class MavenScanner:
                             ))
                     # Resolved (even if not a workspace dep) -- don't report it
                     continue
-            number, line = self._line_at(content, match.start())
+            number, line = self._line_at(source, match.start())
             if line:
                 unrecognized.append((number, line))
 
@@ -766,6 +923,13 @@ class WorkspaceGraph:
     therefore recorded on :attr:`scan_errors` (a list of :class:`ScanError`),
     and such a consumer refuses when the list is non-empty -- see
     :class:`rlsbl.router_filters.RouterFilters`.
+
+    One failure class is exempt from the recording, never from the warning: a
+    Gradle declaration no scanner recognizes, in a member whose workspace
+    entry declares its own ``depends_on``
+    (:meth:`ManifestScanError.acknowledged_by`).  That declaration is what the
+    failure's remedy asks for, so honouring it here is what makes the remedy
+    actually clear the refusal.
     """
 
     def __init__(self, root, projects):
@@ -828,6 +992,16 @@ class WorkspaceGraph:
                     # edges that were actually lost.
                     found_deps.extend(exc.deps)
                     print(f"Warning: {exc}", file=sys.stderr)
+                    # The warning is unconditional -- an operator reading a
+                    # build file the scanner cannot fully read wants to know
+                    # either way. What the acknowledgment changes is only
+                    # whether a NARROWING consumer refuses: a member that
+                    # declares its own `depends_on` has stated its edges by
+                    # hand, so this failure cannot make the derivation
+                    # narrower than the workspace, and recording it would
+                    # block the very remedy the failure names.
+                    if exc.acknowledged_by(proj):
+                        continue
                     self.scan_errors.append(
                         ScanError(
                             project=name,

@@ -203,6 +203,15 @@ class RouterFilters:
     narrowing is otherwise invisible from here and from the freshness check,
     which re-derives from the same unreadable manifest or declaration and
     therefore agrees the narrowed router is fresh.
+
+    The refusal's own remedy is its way out, and it really is one: a member
+    whose ``workspace.toml`` entry declares ``depends_on`` has stated its
+    workspace edges by hand, so an unrecognized Gradle line in it can no
+    longer narrow anything and the graph does not record it
+    (:meth:`~rlsbl.workspace_graph.ManifestScanError.acknowledged_by`) -- the
+    warning still reaches stderr.  Nothing else is acknowledged this way: an
+    unreadable manifest withheld a whole dependency section, which no
+    declaration answers for.
     """
 
     def __init__(self, root, projects, releasables=None):
