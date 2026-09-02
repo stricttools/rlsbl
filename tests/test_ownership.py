@@ -7,6 +7,7 @@ import pytest
 from rlsbl.ownership import (
     ROOT_MEMBER_NAME,
     ROOT_MEMBER_PATH,
+    OwnershipScope,
     find_root_member,
     is_root_member,
     is_tool_owned_path,
@@ -14,6 +15,7 @@ from rlsbl.ownership import (
     owner_name_of,
     owner_of,
     owner_names_of_files,
+    releasable_state_dir,
     tool_owned_rule,
     tool_owned_rules,
     unowned_paths,
@@ -239,6 +241,99 @@ class TestSingleOwnerInvariant:
             ".rlsbl-monorepo/snapshot.json",
         ]:
             assert owner_of(path, layout) is None
+
+    RELEASABLE_STATE_PATHS = [
+        ".rlsbl-monorepo/releasables/one/changes/unreleased.jsonl",
+        ".rlsbl-monorepo/releasables/one/releases/v0.1.0.toml",
+        ".rlsbl-monorepo/releasables/one/version",
+    ]
+
+    @pytest.mark.parametrize("layout", LAYOUTS)
+    def test_state_dirs_stay_memberless_and_are_claimed_by_one_scope(self, layout):
+        """The scope-level rule never turns into a member claim.
+
+        Over every layout: a releasable's state directory has no owning member
+        (it is tool-owned), exactly the releasable whose name it carries claims
+        it, and no other releasable does.
+        """
+        one = OwnershipScope.for_releasable(layout, layout, "one")
+        two = OwnershipScope.for_releasable(layout, layout, "two")
+        for path in self.RELEASABLE_STATE_PATHS:
+            assert owner_of(path, layout) is None
+            assert one.claims(path) is True
+            assert two.claims(path) is False
+
+
+class TestReleasableStateDirScope:
+    """A releasable owns its own state directory, at the SCOPE level.
+
+    Member attribution is unchanged -- a releasable is not a member, and the
+    state directory stays tool-owned and memberless.  What changes is the
+    question "does this releasable's changelog cover this file?", which the
+    releasable answers "yes" for its own release machinery: archiving its
+    release file and finalizing its changelog are commits about that
+    releasable, and used to fall outside every scope.
+    """
+
+    MEMBERS = [ROOT, member("pkg-a"), member("pkg-b")]
+
+    def rel_scope(self, name, *paths):
+        return OwnershipScope.for_releasable(
+            self.MEMBERS, [member(p) for p in paths], name,
+        )
+
+    def test_state_dir_is_derived_from_the_releasable_name(self):
+        assert releasable_state_dir("core") == ".rlsbl-monorepo/releasables/core"
+
+    @pytest.mark.parametrize("path", [
+        ".rlsbl-monorepo/releasables/core/changes/unreleased.jsonl",
+        ".rlsbl-monorepo/releasables/core/changes/0.2.0.jsonl",
+        ".rlsbl-monorepo/releasables/core/releases/v0.2.0.toml",
+        ".rlsbl-monorepo/releasables/core/version",
+        ".rlsbl-monorepo/releasables/core/lineage.jsonl",
+    ])
+    def test_releasable_scope_claims_its_own_state_dir(self, path):
+        scope = self.rel_scope("core", "pkg-a")
+        assert scope.claims(path) is True
+        assert scope.claims_any([path]) is True
+
+    @pytest.mark.parametrize("path", [
+        ".rlsbl-monorepo/releasables/other/releases/v0.2.0.toml",
+        ".rlsbl-monorepo/releasables/core-extras/version",
+        ".rlsbl-monorepo/workspace.toml",
+        ".rlsbl-monorepo/snapshot.json",
+    ])
+    def test_releasable_scope_claims_nothing_else_under_the_workspace_dir(self, path):
+        """Boundary-aware: a sibling releasable, and the workspace's own files."""
+        scope = self.rel_scope("core", "pkg-a")
+        assert scope.claims(path) is False
+
+    def test_member_files_are_unaffected(self):
+        scope = self.rel_scope("core", "pkg-a")
+        assert scope.claims("pkg-a/main.py") is True
+        assert scope.claims("pkg-b/main.py") is False
+        assert scope.claims("README.md") is False
+
+    def test_a_plain_member_scope_claims_no_state_dir(self):
+        """Only a releasable claims a releasable state directory."""
+        scope = OwnershipScope.for_members(self.MEMBERS, [member("pkg-a")])
+        assert scope.claims(".rlsbl-monorepo/releasables/core/version") is False
+
+    def test_member_attribution_is_untouched(self):
+        """No phantom member: the state directory has no owner, as before."""
+        path = ".rlsbl-monorepo/releasables/core/releases/v0.2.0.toml"
+        assert is_tool_owned_path(path) is True
+        assert owner_of(path, self.MEMBERS) is None
+        scope = self.rel_scope("core", "pkg-a")
+        assert scope.owner_name_of(path) is None
+
+    def test_two_releasables_claim_only_their_own(self):
+        core = self.rel_scope("core", "pkg-a")
+        extras = self.rel_scope("extras", "pkg-b")
+        core_file = ".rlsbl-monorepo/releasables/core/changes/unreleased.jsonl"
+        extras_file = ".rlsbl-monorepo/releasables/extras/changes/unreleased.jsonl"
+        assert core.claims(core_file) and not core.claims(extras_file)
+        assert extras.claims(extras_file) and not extras.claims(core_file)
 
 
 def _claims(m, path):

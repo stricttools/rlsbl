@@ -315,14 +315,16 @@ def run_cmd(registry, args, flags, ctx):
     else:
         tag_glob = None
 
-    # The ownership scope this status reports on: a releasable's members when
-    # in one, otherwise the single member the cwd resolves to. Attribution
-    # always sees the whole workspace member list.
+    # The ownership scope this status reports on: a releasable's members plus
+    # its own state directory when in one, otherwise the single member the cwd
+    # resolves to. Attribution always sees the whole workspace member list.
     status_scope = None
     if monorepo_project is not None and ws_projects is not None:
         from ..ownership import OwnershipScope
         if releasable_members:
-            status_scope = OwnershipScope.for_members(ws_projects, releasable_members)
+            status_scope = OwnershipScope.for_releasable(
+                ws_projects, releasable_members, releasable_info[0],
+            )
         else:
             status_scope = OwnershipScope.for_member(ws_projects, monorepo_project)
 

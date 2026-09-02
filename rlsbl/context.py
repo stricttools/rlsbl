@@ -177,8 +177,9 @@ def resolve_release_scope(root):
       resolving it per-package made every releasable member report "JSONL
       changelog not set up" and read an empty ledger.
     - ``scope`` is the ownership scope commits are attributed against: the
-      whole releasable when the project is in one, the single member
-      otherwise, and ``None`` outside a workspace.
+      whole releasable -- its members plus its own state directory -- when the
+      project is in one, the single member otherwise, and ``None`` outside a
+      workspace.
 
     Shared by every command that answers a question about this project's
     releases -- listing unreleased commits, labelling a watched commit with
@@ -227,8 +228,8 @@ def resolve_release_scope(root):
     if rel is not None:
         tag_glob = releasable_tag_glob(rel.effective_tag_format, rel.name)
         changes_dir = get_releasable_changes_dir(ws_root, rel.name)
-        scope = OwnershipScope.for_members(
-            ws_projects, members_of(rel.name, ws_projects),
+        scope = OwnershipScope.for_releasable(
+            ws_projects, members_of(rel.name, ws_projects), rel.name,
         )
     else:
         scope = OwnershipScope.for_member(ws_projects, project)

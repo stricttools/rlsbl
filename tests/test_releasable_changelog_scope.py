@@ -17,9 +17,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from conftest import archive_release, git_head, ledger_dir, make_commit, run_git
-from rlsbl.changelog.validate import check_coverage
+from rlsbl.changelog.schema import ChangelogEntry
+from rlsbl.changelog.validate import check_coverage, check_in_range, check_no_orphans
 from rlsbl.ownership import OwnershipScope
-from rlsbl.workspace import WorkspaceProject, get_releasable_changes_dir
+from rlsbl.workspace import (
+    RELEASABLES_DIR,
+    WORKSPACE_DIR,
+    WorkspaceProject,
+    get_releasable_changes_dir,
+)
 
 
 def _releases_dir(root, releasable_name):
@@ -47,7 +53,8 @@ def two_releasable_repo(tmp_path, monkeypatch):
     Returns (root, scope_a, scope_b) -- the ownership scopes for the two
     releasables. Each carries the WHOLE workspace member list (both
     releasables' members plus the root member) alongside the names in scope,
-    because a file's owner is decided against every member.
+    because a file's owner is decided against every member, plus the
+    releasable's own state directory, which the releasable claims itself.
     """
     monkeypatch.chdir(tmp_path)
 
@@ -85,8 +92,8 @@ def two_releasable_repo(tmp_path, monkeypatch):
 
     return (
         tmp_path,
-        OwnershipScope.for_members(all_members, projects_a),
-        OwnershipScope.for_members(all_members, projects_b),
+        OwnershipScope.for_releasable(all_members, projects_a, "rel-a"),
+        OwnershipScope.for_releasable(all_members, projects_b, "rel-b"),
     )
 
 
@@ -197,6 +204,81 @@ class TestReleasableChangelogScope:
             tag_glob="rel-b@v*", scope=scope_b,
         )
         assert passed_b, f"Expected pass for B, got: {details_b}"
+
+
+class TestReleasableOwnsItsStateDirectory:
+    """A releasable's own state directory is inside its changelog scope.
+
+    Archiving a release file and finalizing a changelog touch
+    ``.rlsbl-monorepo/releasables/<name>/`` and nothing else. No member's
+    declared path claims that directory, so such a commit used to fall
+    outside every releasable's scope -- and an entry naming it was reported
+    out of range and then orphaned.
+    """
+
+    def _state_commit(self, root, releasable_name):
+        """Commit a file under *releasable_name*'s state directory only.
+
+        The version file stands in for the whole directory: attribution is by
+        path, so the release archive and the finalized changelog that a real
+        release writes beside it answer identically -- and this one is not
+        parsed by the ledger the checks read.
+        """
+        rel_path = f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{releasable_name}/version"
+        (root / os.path.dirname(rel_path)).mkdir(parents=True, exist_ok=True)
+        return make_commit(root, rel_path, f"bump {releasable_name}")
+
+    def test_state_dir_commit_is_in_its_own_releasables_range(self, two_releasable_repo):
+        root, scope_a, scope_b = two_releasable_repo
+        sha = self._state_commit(root, "rel-b")
+
+        entries = [ChangelogEntry(commits=[sha], user_facing=False)]
+        passed, details = check_in_range(
+            entries, _releases_dir(root, "rel-b"),
+            tag_glob="rel-b@v*", scope=scope_b,
+        )
+        assert passed, f"Expected the state-dir commit in B's range, got: {details}"
+
+    def test_state_dir_commit_entry_is_not_orphaned(self, two_releasable_repo):
+        root, scope_a, scope_b = two_releasable_repo
+        sha = self._state_commit(root, "rel-b")
+
+        entries = [ChangelogEntry(commits=[sha], user_facing=False)]
+        passed, details = check_no_orphans(
+            entries, _releases_dir(root, "rel-b"),
+            tag_glob="rel-b@v*", scope=scope_b,
+        )
+        assert passed, f"Expected no orphan for the state-dir commit, got: {details}"
+
+    def test_another_releasables_state_dir_stays_out_of_scope(self, two_releasable_repo):
+        """Only the releasable whose directory it is claims the commit."""
+        root, scope_a, scope_b = two_releasable_repo
+        sha = self._state_commit(root, "rel-b")
+
+        entries = [ChangelogEntry(commits=[sha], user_facing=False)]
+        passed, details = check_in_range(
+            entries, _releases_dir(root, "rel-a"),
+            tag_glob="rel-a@v*", scope=scope_a,
+        )
+        assert not passed, "Expected B's state-dir commit outside A's range"
+        assert any("not in unreleased range" in d for d in details)
+
+    def test_state_dir_commit_needs_no_coverage(self, two_releasable_repo):
+        """In scope for attribution, still exempt from coverage.
+
+        The tool-owned exempt set already says a commit touching only release
+        machinery needs no changelog entry. Claiming the directory answers a
+        different question -- WHICH releasable it belongs to -- so coverage
+        stays silent while an entry naming it stays valid.
+        """
+        root, scope_a, scope_b = two_releasable_repo
+        self._state_commit(root, "rel-b")
+
+        passed, details = check_coverage(
+            [], _releases_dir(root, "rel-b"),
+            tag_glob="rel-b@v*", scope=scope_b,
+        )
+        assert passed, f"Expected pass (changelog-only commit), got: {details}"
 
 
 class TestReleaseFlowPassesMemberProjs:

@@ -74,7 +74,7 @@ def register_prepush_checks(app):
                 member_projs = members_of(rel.name, projects)
                 rel_commits = filter_commits_for_scope(
                     all_pushed,
-                    OwnershipScope.for_members(projects, member_projs),
+                    OwnershipScope.for_releasable(projects, member_projs, rel.name),
                     operation="pre-push changelog coverage",
                 )
                 if not rel_commits:

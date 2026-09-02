@@ -188,8 +188,9 @@ def filter_commits_for_scope(commits, scope, *, operation):
     *scope* is an :class:`~rlsbl.ownership.OwnershipScope`, which carries the
     whole member list alongside the subset asked about -- attribution needs
     both, because a file's owner is decided against every member, not just the
-    ones the caller cares about.  ``None`` means "no workspace" and returns
-    *commits* unchanged.
+    ones the caller cares about.  A releasable's scope additionally claims its
+    own state directory, which no member's declared path covers.  ``None``
+    means "no workspace" and returns *commits* unchanged.
     """
     if scope is None:
         return set(commits)

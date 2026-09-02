@@ -117,7 +117,8 @@ def _get_changelog_context(ctx):
     whole workspace member list plus the names of the members whose files this
     changelog covers -- or ``None`` for a standalone project with no workspace.
     Attribution needs the whole list even when only some members are in scope,
-    because a file's owner is decided against every member.
+    because a file's owner is decided against every member.  A releasable's
+    scope also claims its own state directory, which no member's path does.
 
     In explicit mode, ``changes_dir`` points to the releasable's changes
     directory (``.rlsbl-monorepo/releasables/{name}/changes/``) and
@@ -167,9 +168,10 @@ def _get_changelog_context(ctx):
             return None
         # tag_glob from releasable's tag_format: replace {version} with *
         tag_glob = rel.effective_tag_format.replace("{version}", "*").replace("{name}", rel.name)
-        # All member projects of this releasable for commit scoping
+        # All member projects of this releasable for commit scoping, plus the
+        # releasable's own state directory, which belongs to no member.
         member_projects = members_of(rel.name, ctx.projects)
-        scope = OwnershipScope.for_members(ctx.projects, member_projects)
+        scope = OwnershipScope.for_releasable(ctx.projects, member_projects, rel.name)
         entries = read_unreleased(changes_dir)
         return changes_dir, tag_glob, scope, entries
 
@@ -334,7 +336,7 @@ def _get_all_changelog_contexts(ctx):
             continue
         tag_glob = rel.effective_tag_format.replace("{version}", "*").replace("{name}", rel.name)
         member_projects = members_of(rel.name, ctx.projects)
-        scope = OwnershipScope.for_members(ctx.projects, member_projects)
+        scope = OwnershipScope.for_releasable(ctx.projects, member_projects, rel.name)
         entries = read_unreleased(changes_dir)
         contexts.append((changes_dir, tag_glob, scope, entries))
     return contexts

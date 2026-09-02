@@ -55,7 +55,13 @@ class _ResolvedContext:
         self.all_projects = list(all_projects)
 
     def scope(self):
-        """The ownership scope this changelog covers."""
+        """The ownership scope this changelog covers.
+
+        A releasable also claims its own state directory
+        (``.rlsbl-monorepo/releasables/<name>/``): a commit that archives its
+        release file or finalizes its changelog is about that releasable, and
+        belongs to no member at all.
+        """
         if not self.all_projects:
             raise OwnershipError(
                 "changelog scope was asked for without a workspace member "
@@ -65,6 +71,10 @@ class _ResolvedContext:
                 "give here, silently narrowed or otherwise."
             )
         in_scope = self.member_projects or ([self.project] if self.project else [])
+        if self.releasable is not None:
+            return OwnershipScope.for_releasable(
+                self.all_projects, in_scope, self.releasable.name,
+            )
         return OwnershipScope.for_members(self.all_projects, in_scope)
 
     @property

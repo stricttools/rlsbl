@@ -12,9 +12,17 @@ Two questions are answered here, and nowhere else:
    exactly one member: the most specific declared member path wins, and the
    root member (``path = "."``) owns everything no other member claims.
 
+3. **Is this path inside the scope I am asking about?**
+   :class:`OwnershipScope` answers, and it is the only question a *releasable*
+   participates in: a releasable is not a member, so it owns no file, but its
+   scope claims its own state directory
+   (``.rlsbl-monorepo/releasables/<name>/``) on top of its members' files.
+
 Kept free of imports from git, workspace, targets and checks so every layer can
-depend on it.  Commit-level attribution (which needs git) is in
-:mod:`rlsbl.git_util`, which imports this module.
+depend on it -- :mod:`rlsbl.workspace_types` is the one exception, for the
+directory names, and it imports nothing but :mod:`rlsbl.errors`.  Commit-level
+attribution (which needs git) is in :mod:`rlsbl.git_util`, which imports this
+module.
 """
 
 from __future__ import annotations
@@ -22,6 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .errors import RlsblError
+from .workspace_types import RELEASABLES_DIR, WORKSPACE_DIR
 
 
 class OwnershipError(RlsblError):
@@ -82,12 +91,24 @@ _TOOL_OWNED_FILES = (
 # scaffolded workflows are three-way merged with operator edits, so they stay
 # owned by whoever's territory they sit in and are not listed here.)
 _ROOT_ONLY_TREES = (
-    ".rlsbl-monorepo/",
+    WORKSPACE_DIR + "/",
 )
 
 _ROOT_ONLY_FILES = (
     ".github/workflows/ci-router.yml",
 )
+
+
+def releasable_state_dir(releasable_name) -> str:
+    """Repo-relative path of a releasable's own state directory.
+
+    ``.rlsbl-monorepo/releasables/<name>`` -- the changelog, the release
+    archives, the version, the lineage and the config of one releasable.  No
+    member's declared path claims it (it is tool-owned, and a releasable is not
+    a member), so it is the releasable itself that claims it, at the scope
+    level: see :meth:`OwnershipScope.for_releasable`.
+    """
+    return f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{releasable_name}"
 
 
 def normalize_path(path) -> str:
@@ -282,17 +303,36 @@ class OwnershipScope:
     cares about and nothing else is what let a file be claimed by two members
     at once, so the two halves travel together: ``members`` is every member in
     the workspace, ``owned`` names the subset in scope.
+
+    ``state_dirs`` is the third half, and the one thing here that is not a
+    member question.  A releasable's own state directory -- its changelog, its
+    release archives, its version -- belongs to no member: no declared path
+    claims it, and inventing a phantom member for it would break the invariant
+    that every file has exactly one member owner.  A RELEASABLE's scope claims
+    it directly instead, so archiving that releasable's release file and
+    finalizing its changelog are commits inside that releasable's scope rather
+    than outside every scope in the workspace.
     """
 
     members: tuple
     owned: frozenset
+    state_dirs: frozenset = frozenset()
 
     @classmethod
     def for_members(cls, all_members, scope_members) -> "OwnershipScope":
-        """Scope covering *scope_members* (e.g. a releasable's members)."""
+        """Scope covering *scope_members*, claiming no state directory."""
         return cls(
             members=tuple(all_members),
             owned=frozenset(member_name(m) for m in scope_members),
+        )
+
+    @classmethod
+    def for_releasable(cls, all_members, scope_members, releasable_name) -> "OwnershipScope":
+        """Scope covering a releasable: its members AND its state directory."""
+        return cls(
+            members=tuple(all_members),
+            owned=frozenset(member_name(m) for m in scope_members),
+            state_dirs=frozenset({releasable_state_dir(releasable_name)}),
         )
 
     @classmethod
@@ -309,9 +349,26 @@ class OwnershipScope:
         """Name of the member owning *filepath* (any member, in scope or not)."""
         return owner_name_of(filepath, self.members)
 
+    def claims_state_dir(self, filepath) -> bool:
+        """Does *filepath* sit inside a state directory this scope claims?"""
+        normalized = normalize_path(filepath)
+        if not normalized:
+            return False
+        for state_dir in self.state_dirs:
+            if normalized == state_dir or normalized.startswith(state_dir + "/"):
+                return True
+        return False
+
     def claims(self, filepath) -> bool:
-        """Is *filepath* owned by a member in scope?"""
-        return self.owner_name_of(filepath) in self.owned
+        """Is *filepath* in scope -- owned by a member, or in a state directory?
+
+        The two answers cannot collide: a state directory is tool-owned, so it
+        has no member owner to disagree with.  Being claimed here says which
+        releasable a path belongs to; it says nothing about whether a changelog
+        entry is REQUIRED for it, which the tool-owned exempt set still answers
+        with "no".
+        """
+        return self.claims_state_dir(filepath) or self.owner_name_of(filepath) in self.owned
 
     def claims_any(self, files) -> bool:
         """Is any path in *files* owned by a member in scope?"""

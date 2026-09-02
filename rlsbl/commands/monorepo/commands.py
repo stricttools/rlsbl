@@ -455,7 +455,7 @@ def _cmd_status_explicit(root, projects):
         fact, anchor = _latest_release_for_row(rel_changes, tag_glob)
         coverage = _coverage_column(
             anchor, rel_changes,
-            OwnershipScope.for_members(projects, members),
+            OwnershipScope.for_releasable(projects, members, rel.name),
         )
         member_names = ", ".join(m["name"] for m in members)
         members_col = f"{len(members)} ({member_names})" if members else "0"
