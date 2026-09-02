@@ -86,7 +86,10 @@ class TestUnpublishedRefsCheck:
     Those three each looked at the primary tag of the CURRENT version only.
     This one asks the ledger which versions were released and renders every ref
     each of them owns -- primary, companions, recorded aliases -- against the
-    local repository and against origin, reporting three distinct failures.
+    local repository and against origin, plus each version's GitHub Release
+    against the forge's own listing. Its failure classes: a ref missing
+    locally, a ref missing on origin, a ref at the wrong commit, and a
+    published tag carrying no GitHub Release.
     """
 
     def _project(self, tmp_path, monkeypatch, *, version="0.1.0"):
@@ -101,13 +104,30 @@ class TestUnpublishedRefsCheck:
         run_git(repo, "commit", "-q", "-m", "add pyproject")
         return repo
 
-    def _run(self, ctx, *, local, remote=None, has_remote=True):
-        """Run the check with both tag namespaces supplied as maps."""
-        from rlsbl.utils import TagCommitMap
+    def _run(self, ctx, *, local, remote=None, has_remote=True,
+             releases=None, releases_error=None, gh_known=True,
+             github_repo="owner/repo"):
+        """Run the check with both tag namespaces and the Release listing supplied.
+
+        ``releases`` defaults to "origin's tags all carry a Release", which is
+        the healthy world every pre-existing case here describes. Pass an
+        explicit sequence to make a Release absent, ``releases_error`` to make
+        the listing raise, or ``gh_known=False`` to make gh unavailable.
+        """
+        from rlsbl.commands.release_reconcile import ReconcileError
+
+        def _list_releases(**kwargs):
+            if releases_error is not None:
+                raise ReconcileError(releases_error)
+            if releases is None:
+                return frozenset(remote.commits if remote is not None else {}), gh_known
+            return frozenset(releases), gh_known
 
         patches = [
             patch("rlsbl.utils.local_tag_commits", return_value=local),
             patch("rlsbl.utils.remote_is_configured", return_value=has_remote),
+            patch("rlsbl.utils.get_github_repo", return_value=github_repo),
+            patch("rlsbl.commands.release_reconcile.list_releases", _list_releases),
         ]
         if remote is not None:
             patches.append(
@@ -268,6 +288,159 @@ class TestUnpublishedRefsCheck:
         )
         assert result.status == "pass", result
         assert "unanchorable" in result.message
+
+    def test_a_missing_github_release_fails(self, tmp_path, monkeypatch):
+        """A published tag with no Release document is its own failure.
+
+        The tag resolves for a consumer, but the forge shows no notes, and the
+        publish workflow finds no released-commit marker to judge. The retired
+        `github-release` check asked this of the current version only; here it
+        is asked of every archived one.
+        """
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+            releases=[],
+        )
+        assert result.status == "fail"
+        assert any("no GitHub Release" in p.text for p in result.problems), (
+            result.problems
+        )
+        assert any("rlsbl release reconcile" in p.text for p in result.problems)
+
+    def test_a_present_github_release_passes(self, tmp_path, monkeypatch):
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+            releases=["v0.1.0"],
+        )
+        assert result.status == "pass", result
+        assert "GitHub Release" in result.message
+
+    def test_a_release_is_not_demanded_for_a_tag_origin_lacks(
+        self, tmp_path, monkeypatch,
+    ):
+        """A Release hangs off a tag on the forge, so an unpushed tag owes none.
+
+        The finding for that version is that its ref never reached origin;
+        adding "and it has no Release" would be noise on the same cause.
+        """
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({}),
+            releases=[],
+        )
+        assert result.status == "fail"
+        assert any("not on origin" in p.text for p in result.problems)
+        assert not any("no GitHub Release" in p.text for p in result.problems), (
+            result.problems
+        )
+
+    def test_an_unanchorable_versions_absent_release_is_counted_not_errored(
+        self, tmp_path, monkeypatch,
+    ):
+        """No anchor means no released-commit marker to write, so no repair.
+
+        `rlsbl release reconcile` skips an unanchorable version entirely, so
+        demanding a Release for one would be a finding with no remedy.
+        """
+        from rlsbl.release_file import write_archived_release_file
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        write_archived_release_file(
+            str(repo / ".rlsbl" / "releases"), "0.1.0",
+            bump="patch", include=["pypi"], description="an old release",
+            candidate_sha=None, tree_hashes=None, unanchorable=True,
+        )
+        sha = "a" * 40
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+            releases=[],
+        )
+        assert result.status == "pass", result
+        assert "unanchorable" in result.message
+        assert "GitHub Release" in result.message
+
+    def test_an_unreadable_release_listing_is_an_error_not_a_pass(
+        self, tmp_path, monkeypatch,
+    ):
+        """Fail-closed: an unread listing is not an empty one."""
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+            releases_error="HTTP 502 from api.github.com",
+        )
+        assert result.status == "fail"
+        assert any("HTTP 502" in p.text for p in result.problems), result.problems
+
+    def test_an_unavailable_gh_is_an_error_not_a_pass(self, tmp_path, monkeypatch):
+        """gh missing or unauthenticated cannot answer, so it must not pass."""
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+            gh_known=False,
+        )
+        assert result.status == "fail"
+        assert any("gh" in p.text for p in result.problems), result.problems
+
+    def test_no_github_repository_checks_the_ref_half_only(
+        self, tmp_path, monkeypatch,
+    ):
+        """A repository the forge does not host has no Release to be missing."""
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch)
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+            releases=[],
+            github_repo=None,
+        )
+        assert result.status == "pass", result
+        assert "GitHub Release" not in result.message
 
     def test_every_archived_version_is_covered_not_just_the_latest(
         self, tmp_path, monkeypatch,

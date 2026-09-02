@@ -1,4 +1,4 @@
-"""Release checks (tag: release): the refs, the branch, the CI credentials, and the follow-ups a recorded conversion still owes the outside world.
+"""Release checks (tag: release): the refs and the Releases hanging off them, the branch, the CI credentials, and the follow-ups a recorded conversion still owes the outside world.
 
 Checks: unpublished-refs, branch-sync, ci-publish-secrets, old-repo-archived,
 go-deprecation-published.
@@ -41,14 +41,20 @@ def register_release_checks(app):
 
     @app.error_check("unpublished-refs")
     def check_unpublished_refs(ctx, reporter):
-        """Every released version's refs exist locally and on origin, at its anchor."""
+        """Every released version's refs exist at its anchor, and its tag carries a Release."""
+        from ..commands.release_reconcile import ReconcileError, list_releases
         from ..errors import RlsblError
         from ..release_file import (
             archived_release_path,
             list_archived_versions,
             read_release_file,
         )
-        from ..utils import local_tag_commits, remote_is_configured, remote_tag_commits
+        from ..utils import (
+            get_github_repo,
+            local_tag_commits,
+            remote_is_configured,
+            remote_tag_commits,
+        )
 
         resolved = _resolve_release_identity(ctx)
         if resolved is None:
@@ -84,10 +90,46 @@ def register_release_checks(app):
                 )
                 return reporter.found("origin's tag namespace could not be read")
 
+        # The GitHub Release half. A Release document hangs off a tag ON THE
+        # FORGE, so it is asked only where there is a forge to ask: a
+        # repository with no origin remote, or one whose origin resolves to no
+        # GitHub repository, has nothing to be missing FROM -- the same
+        # distinction the remote half draws. ONE listing answers every archived
+        # version, for the same reason both tag namespaces are read whole: a
+        # per-version `gh release view` would have forced a recency window and
+        # left older releases unchecked.
+        releases = None
+        if has_remote and get_github_repo(ctx.config):
+            try:
+                listed, releases_known = list_releases(ctx=ctx)
+            except ReconcileError as exc:
+                reporter.error(
+                    f"the repository's GitHub Releases could not be listed "
+                    f"({exc}), so no released version's Release could be "
+                    f"verified. An unanswered probe is not an answer. {_REMEDY}"
+                )
+                return reporter.found("the GitHub Releases could not be listed")
+            if not releases_known:
+                reporter.error(
+                    "the repository's GitHub Releases could not be listed "
+                    "because gh is unavailable or unauthenticated, so no "
+                    "released version's Release could be verified. An "
+                    "unanswered probe is not an answer -- install gh and "
+                    "authenticate it (`gh auth login`), then re-run."
+                )
+                return reporter.found("the GitHub Releases could not be listed")
+            releases = listed
+
         missing_local = 0
         missing_remote = 0
         wrong_commit = 0
+        missing_release = 0
         unrecoverable = 0
+        # Releases absent for versions the ledger records unanchorable. Counted
+        # for the same reason as their absent refs: reconcile skips such a
+        # version entirely, so there is no marker to write and no repair to
+        # name.
+        unrecoverable_release = 0
         # Versions whose ref set could not be derived at all -- an unreadable
         # archive, or a target that could not name the refs. Counted, because
         # the terminal decision below is the ONLY thing that decides pass or
@@ -158,7 +200,31 @@ def register_release_checks(app):
                         f"consumers resolve it. {_REMEDY}"
                     )
 
-        if not (missing_local or missing_remote or wrong_commit or underivable):
+            if releases is None:
+                continue
+            # The Release is judged on the PRIMARY tag -- the one the release
+            # flow attaches it to, and the one `rlsbl release reconcile`
+            # materializes it at. Only when that tag is on origin: a tag that
+            # never reached the forge has already been reported above, and a
+            # Release cannot exist without it.
+            primary = expected.primary
+            if remote is None or primary not in remote.commits:
+                continue
+            if primary in releases:
+                continue
+            if anchor is None:
+                unrecoverable_release += 1
+                continue
+            missing_release += 1
+            reporter.error(
+                f"{version}: the tag {primary} is on origin but carries no "
+                f"GitHub Release, so the forge shows consumers no notes for "
+                f"this version and the publish workflow finds no released-"
+                f"commit marker to judge. {_REMEDY}"
+            )
+
+        if not (missing_local or missing_remote or wrong_commit
+                or missing_release or underivable):
             scope = (
                 f"{len(versions)} released version(s)"
                 if has_remote else
@@ -169,12 +235,21 @@ def register_release_checks(app):
                     f"; {unrecoverable} ref(s) absent for versions recorded "
                     f"unanchorable, which have no commit to recreate them at"
                 )
-            return reporter.passed(f"every ref exists for {scope}")
+            if unrecoverable_release:
+                scope += (
+                    f"; {unrecoverable_release} GitHub Release(s) absent for "
+                    f"versions recorded unanchorable, which have no anchor to "
+                    f"mark them with"
+                )
+            subjects = "every ref and GitHub Release" if releases is not None \
+                else "every ref"
+            return reporter.passed(f"{subjects} exists for {scope}")
 
         summary = (
             f"{missing_local} ref(s) missing locally, "
             f"{missing_remote} missing on origin, "
-            f"{wrong_commit} at the wrong commit"
+            f"{wrong_commit} at the wrong commit, "
+            f"{missing_release} tag(s) without a GitHub Release"
         )
         if underivable:
             summary += (

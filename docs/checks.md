@@ -81,7 +81,7 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 
 | Check | Severity | Description |
 | --- | --- | --- |
-| `unpublished-refs` | error | Every ref each archived release owns -- its primary tag, its ecosystem's companion tags, and the aliases a rename or conversion recorded for it -- exists locally, exists on origin, and points at the commit the release anchored (requires network) |
+| `unpublished-refs` | error | Every ref each archived release owns -- its primary tag, its ecosystem's companion tags, and the aliases a rename or conversion recorded for it -- exists locally, exists on origin, and points at the commit the release anchored; and every version whose primary tag is on origin carries a GitHub Release (requires network) |
 | `branch-sync` | error | Local branch is not behind the remote tracking branch (requires network) |
 | `ci-publish-secrets` | error | Every Actions secret the configured CI publish pipelines authenticate with exists on the repository. Which secrets those are is each pipeline's own declaration (`ci_secret_names`): the npm pipeline declares `NPM_TOKEN`, the maven-central pipeline declares `SONATYPE_USERNAME`, `SONATYPE_PASSWORD`, `GPG_SIGNING_KEY` and `GPG_SIGNING_KEY_PASSWORD`, the hex pipeline declares `HEX_API_KEY`, a pypi pipeline declares none because it publishes through OIDC trusted publishing, and a `local: true` pipeline declares none. Without the secret the publish job fails with `ENEEDAUTH` after the release has already tagged, pushed and created the GitHub Release. Presence only -- the value is never read. The finding names the exact `gh secret set` command (requires network) |
 | `old-repo-archived` | error | Every repository this one absorbed (from the lineage record's conversion facts) is archived on GitHub, so it stops collecting issues, pull requests and clones for code that moved here. rlsbl never archives it -- the finding prints `gh repo archive`. Skips when the record holds no absorb (requires network) |
@@ -95,23 +95,26 @@ Every check in this tag reads something outside the working tree -- the remote's
 
 The ref set it renders against reality is `expected_refs`, the target protocol's single authority for what one version owns -- the same derivation the release's tag step acts on, so a ref the release creates can never be a ref the check does not look for.
 
-It reports three distinct failures, each naming `rlsbl release reconcile` as the remedy:
+Each failure it reports names `rlsbl release reconcile` as the remedy:
 
 | Failure | What it means |
 | --- | --- |
 | missing locally | The ledger records the version as released, but the ref is not in this repository |
 | missing on origin | The ref exists locally but was never pushed, so consumers cannot resolve it |
 | wrong commit | The ref exists but points somewhere other than the release's anchor, so it moved after the release wrote it |
+| no GitHub Release | The version's primary tag is on origin, but no Release document hangs off it, so the forge shows consumers no notes and the publish workflow finds no `rlsbl-ci-sha` marker to judge |
 
-It is fail-closed: a probe that cannot answer -- an unreadable local tag namespace, an `ls-remote` that fails -- is an error, never a pass. A repository with no `origin` remote at all is a different state: the remote half is skipped and the outcome says so.
+It is fail-closed: a probe that cannot answer -- an unreadable local tag namespace, an `ls-remote` that fails, a Release listing that errors or that `gh` cannot make because it is absent or unauthenticated -- is an error, never a pass. A repository with no `origin` remote at all is a different state: the remote half is skipped and the outcome says so. So is a repository whose origin resolves to no GitHub repository: the Release half is skipped, because there is no forge for a Release to be missing from.
 
-A version the ledger records as `unanchorable` has no recoverable commit, so a ref it is missing cannot be recreated and `rlsbl release reconcile` has nothing to point at. Those absences are counted and named in the outcome message instead of reported as fixable errors. Every other finding for such a version -- a ref that exists locally but not on origin -- is still reported.
+A version the ledger records as `unanchorable` has no recoverable commit, so a ref it is missing cannot be recreated and `rlsbl release reconcile` has nothing to point at -- and no anchor to take a `rlsbl-ci-sha` marker from either, so a Release it lacks cannot be materialized. Both absences are counted and named in the outcome message instead of reported as fixable errors. Every other finding for such a version -- a ref that exists locally but not on origin -- is still reported.
 
-**No version window.** Both halves cover every archived release, not a recent slice. The whole local tag namespace comes from one `for-each-ref` and the whole remote namespace from one `ls-remote`, so probing two hundred releases costs the same single network round trip as probing one. A per-version probe would have forced a bound and left older releases unchecked.
+A Release is judged on the version's primary tag, the one the release flow attaches it to, and only when that tag is on origin. A tag that never reached the forge is already reported as missing on origin, and a Release cannot exist without it.
+
+**No version window.** Every half covers every archived release, not a recent slice. The whole local tag namespace comes from one `for-each-ref`, the whole remote namespace from one `ls-remote`, and every Release from one `gh release list`, so probing two hundred releases costs the same as probing one. A per-version probe would have forced a bound and left older releases unchecked.
 
 It replaced three narrower checks (`local-tag`, `remote-tag`, `github-release`) that each looked at the primary tag of the *current* version only, and so saw neither companion tags, nor recorded aliases, nor any past release.
 
-**Where GitHub Release presence went.** The retired `github-release` check asked whether the current version's Release exists. That question is now answered by `rlsbl release reconcile --plan`, over every archived version rather than the current one, and anchored to the ledger: a version whose tag exists but whose Release does not gets a `materialize` verdict, and `--apply` creates the Release with the same body the release flow itself writes (the changelog section, the `rlsbl-ci-sha` marker taken from the ledger anchor, and the pre-release flag the version earns). It sits there rather than in a check because the answer is a repair plan, not a pass/fail: the same observation that finds the gap is what closes it. See [Reconciling published metadata](release-workflow.md#reconciling-published-metadata).
+**GitHub Release presence, and its repair.** The retired `github-release` check asked whether the *current* version's Release exists; this check asks it of every archived version, from the same listing, and reports an absence as an error. The repair is `rlsbl release reconcile`: `--plan` gives such a version a `materialize` verdict, and `--apply` creates the Release with the same body the release flow itself writes (the changelog section, the `rlsbl-ci-sha` marker taken from the ledger anchor, and the pre-release flag the version earns). The check finds the gap; the reconcile closes it. See [Reconciling published metadata](release-workflow.md#reconciling-published-metadata).
 
 ## Changelog checks
 
