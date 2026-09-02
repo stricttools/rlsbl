@@ -297,6 +297,17 @@ class TestReleasableStateDirScope:
         assert scope.claims(path) is True
         assert scope.claims_any([path]) is True
 
+    def test_the_bare_state_directory_itself_is_claimed(self):
+        """The directory path with nothing after it, not just paths inside it.
+
+        A rename, a mode change or a deletion can name the directory itself,
+        and a claim that only answered for paths BELOW it would put such a
+        path outside every scope in the workspace.
+        """
+        scope = self.rel_scope("core", "pkg-a")
+        assert scope.claims(".rlsbl-monorepo/releasables/core") is True
+        assert scope.claims(".rlsbl-monorepo/releasables/core/") is True
+
     @pytest.mark.parametrize("path", [
         ".rlsbl-monorepo/releasables/other/releases/v0.2.0.toml",
         ".rlsbl-monorepo/releasables/core-extras/version",
@@ -326,6 +337,23 @@ class TestReleasableStateDirScope:
         assert owner_of(path, self.MEMBERS) is None
         scope = self.rel_scope("core", "pkg-a")
         assert scope.owner_name_of(path) is None
+
+    def test_describe_names_the_state_dir_claim(self):
+        """A description that omits the claim contradicts what claims() answers.
+
+        The state directory belongs to no member, so naming the members alone
+        describes a scope narrower than the one being asked -- and a message
+        built from it would tell an operator that the releasable's own release
+        machinery is outside its changelog.
+        """
+        scope = self.rel_scope("core", "pkg-a")
+        described = scope.describe()
+        assert "pkg-a" in described
+        assert releasable_state_dir("core") in described
+
+    def test_describe_of_a_plain_member_scope_names_only_members(self):
+        scope = OwnershipScope.for_members(self.MEMBERS, [member("pkg-a")])
+        assert scope.describe() == "pkg-a"
 
     def test_two_releasables_claim_only_their_own(self):
         core = self.rel_scope("core", "pkg-a")

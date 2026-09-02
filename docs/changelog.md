@@ -107,7 +107,7 @@ rlsbl changelog add --commits f9g8h7i --no-user-facing
 
 The command:
 1. Resolves each hash via `git rev-parse` (errors on invalid hashes)
-2. In monorepo mode, validates that each commit touches files owned by the current sub-project (the most specific declared member path wins; the root member owns whatever no other member claims)
+2. In monorepo mode, validates that each commit touches files the current changelog's scope claims (the most specific declared member path wins; the root member owns whatever no other member claims; and a releasable's scope additionally claims its own state directory, `.rlsbl-monorepo/releasables/<name>/`, which belongs to no member — so a commit that only archives its release file or finalizes its changelog is in scope)
 3. Validates entry schema
 4. Appends to `unreleased.jsonl`
 5. Auto-commits the file (message: `changelog: <description>`) unless `--no-auto-commit` is passed

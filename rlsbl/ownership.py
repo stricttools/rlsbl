@@ -1,6 +1,6 @@
-"""File ownership: the tool-owned exempt set, and single-owner attribution.
+"""File ownership: the tool-owned exempt set, single-owner attribution, and the scope claims a releasable makes on its own state directory.
 
-Two questions are answered here, and nowhere else:
+The questions answered here, and nowhere else:
 
 1. **Is this path tool-owned?**  :func:`is_tool_owned_path` decides from static
    path rules alone -- no config reads, no git calls, no workspace lookups.  A
@@ -382,13 +382,20 @@ class OwnershipScope:
         return [m for m in self.members if member_name(m) in self.owned]
 
     def describe(self) -> str:
-        """A short human name for the scope, for error messages."""
+        """A short human name for the scope, for error messages.
+
+        A releasable's state-directory claim is named alongside its members:
+        the directory belongs to no member, so a description built from the
+        member names alone reads as if it were outside the scope -- and the
+        message that carries it would then contradict what
+        :meth:`claims` answers.
+        """
         names = sorted(self.owned)
-        if not names:
-            return "(no members)"
-        if len(names) == 1:
-            return names[0]
-        return ", ".join(names)
+        described = ", ".join(names) if names else "(no members)"
+        claims = sorted(self.state_dirs)
+        if claims:
+            described += " (and " + ", ".join(f"{c}/" for c in claims) + ")"
+        return described
 
 
 def unowned_paths(files, members) -> list:

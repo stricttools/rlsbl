@@ -19,10 +19,8 @@ import pytest
 from conftest import archive_release, git_head, ledger_dir, make_commit, run_git
 from rlsbl.changelog.schema import ChangelogEntry
 from rlsbl.changelog.validate import check_coverage, check_in_range, check_no_orphans
-from rlsbl.ownership import OwnershipScope
+from rlsbl.ownership import OwnershipScope, releasable_state_dir
 from rlsbl.workspace import (
-    RELEASABLES_DIR,
-    WORKSPACE_DIR,
     WorkspaceProject,
     get_releasable_changes_dir,
 )
@@ -224,7 +222,7 @@ class TestReleasableOwnsItsStateDirectory:
         release writes beside it answer identically -- and this one is not
         parsed by the ledger the checks read.
         """
-        rel_path = f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{releasable_name}/version"
+        rel_path = f"{releasable_state_dir(releasable_name)}/version"
         (root / os.path.dirname(rel_path)).mkdir(parents=True, exist_ok=True)
         return make_commit(root, rel_path, f"bump {releasable_name}")
 

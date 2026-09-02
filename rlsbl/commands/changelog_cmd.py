@@ -22,7 +22,7 @@ from ..changelog.schema import ChangelogEntry, generate_entry_id, parse_jsonl, s
 from ..changelog.validate import _get_batch_limits_config
 from ..config import read_project_config
 from ..git_util import filter_commits_for_scope
-from ..ownership import OwnershipError, OwnershipScope
+from ..ownership import OwnershipError, OwnershipScope, releasable_state_dir
 from ..utils import commit_files, run, working_tree_paths
 from ..workspace import (
     find_workspace_root,
@@ -131,12 +131,14 @@ def _resolve_workspace_project(project_root):
 
 
 def _check_project_scope(resolved_commits, ws_context):
-    """Verify all commits touch files this changelog's members own.
+    """Verify all commits touch something this changelog's scope claims.
 
-    Hard error if any commit owns none of the scope's files.  Ownership is
+    Hard error if any commit touches nothing in scope.  Member ownership is
     single-owner: a commit touching only another member's directory belongs in
     that member's changelog, and a commit touching only root files belongs in
-    the root member's.
+    the root member's.  A releasable's scope additionally claims its own state
+    directory, which belongs to no member, so a commit that only archives its
+    release file or finalizes its changelog is in scope for it.
 
     *ws_context* is what :func:`_resolve_workspace_project` returns: a
     :class:`_ResolvedContext` carrying the whole member list, or ``None`` in
@@ -148,12 +150,22 @@ def _check_project_scope(resolved_commits, ws_context):
     scope = ws_context.scope()
     if ws_context.releasable is not None:
         subject = f"releasable '{ws_context.releasable.name}'"
+        # Named only for a releasable subject: a scope with no releasable
+        # claims no state directory, and saying otherwise would describe a
+        # scope wider than the one that just refused the commit.
+        state_claim = (
+            f" A releasable's changelog covers its members' files AND its own "
+            f"state directory "
+            f"({releasable_state_dir(ws_context.releasable.name)}/), which "
+            f"belongs to no member."
+        )
     else:
         project = ws_context.project
         subject = (
             f"project '{project.get('name', 'unknown')}' "
             f"(path: {project.get('path', 'unknown')})"
         )
+        state_claim = ""
 
     in_scope = filter_commits_for_scope(
         set(resolved_commits), scope, operation="changelog add scope check",
@@ -161,12 +173,12 @@ def _check_project_scope(resolved_commits, ws_context):
     for sha in resolved_commits:
         if sha not in in_scope:
             print(
-                f"Error: commit {sha[:12]} does not touch files owned by "
-                f"{subject}. Every file belongs to exactly one workspace "
-                f"member: the most specific declared path in workspace.toml "
-                f"wins, and the root member owns whatever no other member "
-                f"claims. Add the entry from the owning member's directory "
-                f"instead.",
+                f"Error: commit {sha[:12]} touches nothing {subject} covers. "
+                f"Every file belongs to exactly one workspace member: the "
+                f"most specific declared path in workspace.toml wins, and the "
+                f"root member owns whatever no other member claims."
+                f"{state_claim} Add the entry from the owning member's "
+                f"directory instead.",
                 file=sys.stderr,
             )
             sys.exit(1)

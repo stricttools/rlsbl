@@ -86,6 +86,64 @@ class TestChangelogAddValidatesProjectScope:
         assert len(entries) == 1
         assert entries[0].description == "Alpha feature"
 
+    def test_state_dir_only_commit_succeeds(self, monorepo_with_projects,
+                                            monkeypatch):
+        """A commit touching only the releasable's own state directory.
+
+        Archiving a release file or finalizing a changelog touches
+        ``.rlsbl-monorepo/releasables/<name>/`` and nothing else. No member's
+        declared path claims that directory, so the scope check has to accept
+        it on the releasable's own claim -- otherwise the release flow's own
+        commits are unnameable in the changelog they belong to.
+        """
+        from rlsbl.ownership import releasable_state_dir
+
+        root = monorepo_with_projects
+        alpha_dir = root / "alpha"
+        monkeypatch.chdir(alpha_dir)
+
+        state_file = f"{releasable_state_dir('alpha')}/version"
+        (root / os.path.dirname(state_file)).mkdir(parents=True, exist_ok=True)
+        sha = make_commit(root, state_file, "0.1.1\n")
+
+        flags = {
+            "commits": sha[:12],
+            "description": "Alpha release machinery",
+            "user-facing": False,
+            "auto-commit": False,
+        }
+        cmd_add(flags, project_root=alpha_dir)
+
+        from rlsbl.changelog.files import read_unreleased
+        from rlsbl.workspace import get_releasable_changes_dir
+        entries = read_unreleased(get_releasable_changes_dir(str(root), "alpha"))
+        assert len(entries) == 1
+        assert entries[0].commits == [sha]
+
+    def test_another_releasables_state_dir_commit_is_rejected(
+        self, monorepo_with_projects, monkeypatch,
+    ):
+        """Only the releasable whose directory it is may name the commit."""
+        from rlsbl.ownership import releasable_state_dir
+
+        root = monorepo_with_projects
+        alpha_dir = root / "alpha"
+        monkeypatch.chdir(alpha_dir)
+
+        state_file = f"{releasable_state_dir('beta')}/version"
+        (root / os.path.dirname(state_file)).mkdir(parents=True, exist_ok=True)
+        sha = make_commit(root, state_file, "0.1.1\n")
+
+        flags = {
+            "commits": sha[:12],
+            "description": "Should fail",
+            "user-facing": False,
+            "auto-commit": False,
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_add(flags, project_root=alpha_dir)
+        assert exc_info.value.code == 1
+
 
 class TestChangelogAddRejectsOutOfScopeCommit:
     """Commits that don't touch project files cause a hard error."""
@@ -129,9 +187,39 @@ class TestChangelogAddRejectsOutOfScopeCommit:
             cmd_add(flags, project_root=alpha_dir)
 
         captured = capsys.readouterr()
-        assert "does not touch files owned by" in captured.err
+        assert "touches nothing" in captured.err
         assert "'alpha'" in captured.err
         assert "workspace.toml" in captured.err
+
+    def test_error_message_states_the_releasable_state_dir_claim(
+        self, monorepo_with_projects, monkeypatch, capsys
+    ):
+        """The refusal must describe the whole scope, not the member half.
+
+        A releasable's changelog covers its members' files AND its own state
+        directory, so a message that told only the member story would have an
+        operator conclude a state-directory commit belongs somewhere else.
+        """
+        from rlsbl.ownership import releasable_state_dir
+
+        root = monorepo_with_projects
+        alpha_dir = root / "alpha"
+        monkeypatch.chdir(alpha_dir)
+
+        sha = make_commit(root, "beta/src.py", "beta change")
+
+        flags = {
+            "commits": sha[:12],
+            "description": "Should fail",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        with pytest.raises(SystemExit):
+            cmd_add(flags, project_root=alpha_dir)
+
+        captured = capsys.readouterr()
+        assert releasable_state_dir("alpha") in captured.err
 
 
 class TestChangelogAddSkipsValidationStandalone:
