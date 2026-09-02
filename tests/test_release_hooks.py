@@ -110,6 +110,16 @@ class TestPreReleaseHookOutput:
             tmp_project, "pre-release.sh",
             f"#!/bin/bash\ntouch {sentinel}\n",
         )
+        # The CLI reaches the release flow only through the release file.
+        releases_dir = tmp_project / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True, exist_ok=True)
+        (releases_dir / "unreleased.toml").write_text(
+            'format_version = 1\n'
+            'bump = "patch"\n'
+            'description = "hook preview"\n'
+            'include = ["npm"]\n'
+            'exclude = []\n'
+        )
         # The CLI path runs more git reads than the direct-call tests do, so
         # answer by shape rather than by position: every count-like read is 0,
         # everything else is empty.
@@ -122,7 +132,6 @@ class TestPreReleaseHookOutput:
 
         result = app.test([
             "--dry-run", "release", "run",
-            "--bump", "patch", "--description", "hook preview",
             "--no-watch", "--allow-dirty",
         ])
 

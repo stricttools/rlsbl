@@ -225,37 +225,39 @@ class TestReleaseGroupWiring:
 
 class TestReleaseFlagSurface:
 
-    class _Target:
-        def __init__(self, name):
-            self.name = name
-
     @staticmethod
-    def _clean_project(tmp_path, monkeypatch):
-        """Chdir into a minimal rlsbl project with NO release file.
+    def _project_with_release_file(tmp_path, monkeypatch):
+        """Chdir into a minimal rlsbl project carrying its own release file.
 
-        The quick-bump path refuses when a release file exists; the real dev
-        repo carries an in-flight unreleased.toml during active development, so
-        these flag-surface tests must run against a clean project cwd. Coverage
-        still records into the App-construction repo regardless of chdir.
+        The release file is the only way to state a release's intent, so the
+        flag surface can only be reached through one. The real dev repo carries
+        an in-flight unreleased.toml of its own during active development, so
+        these tests run against a project cwd of their own. Coverage still
+        records into the App-construction repo regardless of chdir.
         """
-        (tmp_path / ".rlsbl").mkdir()
+        (tmp_path / ".rlsbl" / "releases").mkdir(parents=True)
         (tmp_path / ".rlsbl" / "config.json").write_text(
             '{"publish_mode": "ci", "targets": ["pypi"]}\n'
         )
+        (tmp_path / ".rlsbl" / "releases" / "unreleased.toml").write_text(
+            'format_version = 1\n'
+            'bump = "patch"\n'
+            'description = "d"\n'
+            'include = ["pypi"]\n'
+            'exclude = []\n'
+        )
         monkeypatch.chdir(tmp_path)
 
-    def test_release_run_quick_bump_flag_surface(self, tmp_path, monkeypatch):
-        # --bump quick mode bypasses the release file. Patch detect_targets so
-        # the flag surface is exercised deterministically regardless of what
-        # this repo detects.
-        self._clean_project(tmp_path, monkeypatch)
-        with patch("rlsbl.commands.release.run_cmd") as m, \
-             patch("rlsbl.targets.detect_targets", return_value=[self._Target("pypi")]):
+    def test_release_run_flag_surface(self, tmp_path, monkeypatch):
+        self._project_with_release_file(tmp_path, monkeypatch)
+        with patch("rlsbl.commands.release.run_cmd") as m:
             result = app.test(
-                ["release", "run", "--bump", "patch", "--description", "d",
-                 "--no-allow-dirty", "--watch"]
+                ["release", "run", "--no-allow-dirty", "--watch"]
             )
         assert result.exit_code == 0, result.stderr
+        release_config = m.call_args[0][0]
+        assert release_config.bump == "patch"
+        assert release_config.description == "d"
         flags = m.call_args[0][1]
         assert flags["allow-dirty"] is False
         assert flags["watch"] is True

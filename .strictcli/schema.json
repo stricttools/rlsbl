@@ -1130,30 +1130,6 @@
               "negatable": true
             },
             {
-              "name": "bump",
-              "help": "Bump type: patch, minor, major, infra, prerelease. Skips the release file.",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "optional"
-            },
-            {
-              "name": "description",
-              "help": "Short release description summarizing the changes (required with --bump)",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "optional"
-            },
-            {
-              "name": "preid",
-              "help": "Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "optional"
-            },
-            {
               "name": "releasable",
               "help": "Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it.",
               "value_schema": {
@@ -1892,7 +1868,7 @@
         },
         "add": {
           "name": "add",
-          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.",
+          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.",
           "effect": "mutating",
           "flags": [
             {
@@ -1937,7 +1913,15 @@
             },
             {
               "name": "releasable",
-              "help": "Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning)",
+              "help": "Releasable group this project belongs to (name of a [[releasables]] entry, which is created when it does not exist yet, or 'false' to opt out of versioning)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "tag-format",
+              "help": "The tag format of the releasable this command creates, e.g. \"{name}@v{version}\" or \"pkgs/thing/v{version}\". Derived from the member's primary target when omitted; required when its targets span both tag schemes, and when the member is the repository root. Illegal when --releasable names a releasable that already exists, which brings its own format, and with --releasable false, which creates none.",
               "value_schema": {
                 "type": "string"
               },

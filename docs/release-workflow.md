@@ -161,7 +161,7 @@ Only the distribution side changes, and it changes automatically from the versio
 
 ### Declaring it
 
-The release file's `preid` key is the normal path, and `rlsbl release init` scaffolds it as a commented line. The `--preid` flag on `rlsbl release run` is valid **only** alongside `--bump` (the flag pair that bypasses the release file entirely). In a monorepo, each `[releasables.<name>]` section carries its own `preid`, so one workspace release can ship some releasables stable and others as alphas.
+The release file's `preid` key is the only way to declare it, and `rlsbl release init` scaffolds it as a commented line. In a monorepo, each `[releasables.<name>]` section carries its own `preid`, so one workspace release can ship some releasables stable and others as alphas.
 
 ## Release pipeline order
 

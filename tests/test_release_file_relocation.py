@@ -295,9 +295,9 @@ class TestReleasableReleaseFileArchival:
         ).stdout.strip()
         assert status == "", f"working tree must be clean after release:\n{status}"
 
-    def test_quick_bump_release_leaves_member_untouched(self, tmp_project):
-        """Quick-bump (--bump) releasable releases never had a release file;
-        they must also leave the member's .rlsbl/ untouched."""
+    def test_release_from_a_config_leaves_member_untouched(self, tmp_project):
+        """A releasable release driven from an in-memory config writes no
+        release file; it must also leave the member's .rlsbl/ untouched."""
         core = _setup_releasable_workspace(tmp_project)
 
         p1, p2, p3, p4, p5, p6 = _release_patches()
@@ -504,7 +504,7 @@ class TestCliReadsReleasableReleaseFile:
         monkeypatch.chdir(core)
 
         with patch("rlsbl.commands.release.run_cmd") as mock_run:
-            rlsbl_mod.cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="", releasable=None)
+            rlsbl_mod.cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
         mock_run.assert_called_once()
         cfg = mock_run.call_args[0][0]
         assert cfg.bump == "patch"

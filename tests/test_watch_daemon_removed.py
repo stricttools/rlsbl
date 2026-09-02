@@ -37,10 +37,8 @@ class TestDaemonFlagsRejected:
     """Every removed flag must be an unknown-flag parse error."""
 
     @pytest.mark.parametrize("argv", [
-        ["release", "run", "--bump", "patch", "--description", "d",
-         "--no-allow-dirty", "--watch-async"],
-        ["release", "run", "--bump", "patch", "--description", "d",
-         "--no-allow-dirty", "--no-watch-async"],
+        ["release", "run", "--no-allow-dirty", "--watch-async"],
+        ["release", "run", "--no-allow-dirty", "--no-watch-async"],
         ["release", "resume", "--watch-async"],
         ["release", "retry", "--watch-async"],
         ["monorepo", "release", "run", "--no-allow-dirty", "--watch-async"],

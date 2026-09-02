@@ -148,7 +148,7 @@ class TestCmdReleaseRun:
         """The root names the workspace, so the invocation must name one of them."""
         mock_ctx.return_value = _ctx()
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(cli_ctx(), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="", releasable=None)
+            rlsbl.cmd_release_run(cli_ctx(), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
         assert exc.value.code == 1
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake/project"))
@@ -158,7 +158,7 @@ class TestCmdReleaseRun:
     @patch("os.path.exists", return_value=False)
     def test_exits_when_no_release_file(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(cli_ctx(), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="", releasable=None)
+            rlsbl.cmd_release_run(cli_ctx(), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
         assert exc.value.code == 1
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake/project"))
@@ -169,7 +169,7 @@ class TestCmdReleaseRun:
     @patch("rlsbl.release_file.read_release_file", side_effect=rlsbl.ReleaseFileError("bad"))
     def test_exits_on_release_file_error(self, *_):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_release_run(cli_ctx(), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="", releasable=None)
+            rlsbl.cmd_release_run(cli_ctx(), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
         assert exc.value.code == 1
 
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake/project"))
@@ -181,7 +181,7 @@ class TestCmdReleaseRun:
     @patch("rlsbl.commands.release.run_cmd")
     def test_delegates_to_release_run_cmd(self, mock_run, mock_read, *_):
         mock_read.return_value = MagicMock()
-        rlsbl.cmd_release_run(cli_ctx(dry_run=True), allow_dirty=True, watch=True, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, bump="", description="", preid="", releasable=None)
+        rlsbl.cmd_release_run(cli_ctx(dry_run=True), allow_dirty=True, watch=True, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
         mock_run.assert_called_once()
         call_args = mock_run.call_args
         flags = call_args[0][1]

@@ -440,18 +440,15 @@ release_group = app.group("release", help="Release orchestration commands coveri
 @strictcli.flag(name="hook-timeout", type=int, presence="optional", help="Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout.")
 @strictcli.flag(name="watch", type=bool, presence="required", help="After release, automatically watch CI runs to completion (--no-watch to skip)")
 @strictcli.flag(name="allow-dirty", type=bool, presence="required", help="Skip the clean working tree check and allow releasing with uncommitted changes")
-@strictcli.flag(name="bump", type=str, presence="optional", help="Bump type: patch, minor, major, infra, prerelease. Skips the release file.")
-@strictcli.flag(name="description", type=str, presence="optional", help="Short release description summarizing the changes (required with --bump)")
-@strictcli.flag(name="preid", type=str, presence="optional", help="Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump.")
 @strictcli.flag(name="releasable", type=str, presence="optional", help="Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it.")
 @effects.handler
-def cmd_release_run(ctx, allow_dirty, watch, bump, description, preid, releasable, push_timeout, ci_timeout, check_timeout, hook_timeout):
+def cmd_release_run(ctx, allow_dirty, watch, releasable, push_timeout, ci_timeout, check_timeout, hook_timeout):
     """Execute the release flow: validate, bump, test, commit, tag, push, and create GitHub Release."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
     root = _require_sub_project_root()
 
-    from .release_file import read_release_file, get_release_file_path, ReleaseConfig, VALID_BUMP_TYPES
+    from .release_file import read_release_file, get_release_file_path
     from .workspace import find_workspace_root, resolve_project
 
     # In monorepo mode, the release file lives in the package's directory
@@ -496,76 +493,9 @@ def cmd_release_run(ctx, allow_dirty, watch, bump, description, preid, releasabl
         from .commands.release.release_state import resolve_releasable_dir
         _releasable_dir = resolve_releasable_dir(project_dir, monorepo_root)
 
-    # --- Quick bump mode: --bump + --description bypass the release file ---
-    if preid and not bump:
-        print("Error: --preid requires --bump", file=sys.stderr)
-        sys.exit(1)
-    if bump and not description:
-        print("Error: --description is required when --bump is used", file=sys.stderr)
-        sys.exit(1)
-    if description and not bump:
-        print("Error: --bump is required when --description is used", file=sys.stderr)
-        sys.exit(1)
-    if bump and description:
-        if bump not in VALID_BUMP_TYPES:
-            print(
-                f"Error: invalid bump type {bump!r} (must be one of {VALID_BUMP_TYPES})",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        if preid:
-            from .release_file import VALID_PREIDS
-            if preid not in VALID_PREIDS:
-                print(
-                    f"Error: invalid preid {preid!r} (must be one of {VALID_PREIDS})",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-        release_path = get_release_file_path(project_dir, releasable_dir=_releasable_dir)
-        if os.path.exists(release_path):
-            print(
-                "Error: release file exists — use `rlsbl release run` without --bump, "
-                "or delete the file first.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        from .targets import detect_targets
-        from .errors import ConfigError
-        try:
-            targets = detect_targets(project_dir)
-        except ConfigError:
-            print(
-                "Error: cannot auto-detect targets — use `rlsbl release init` "
-                "for projects with custom target config",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        target_names = [t.name for t in targets]
-        if "flutter" in target_names:
-            print(
-                "Error: Flutter projects require a release file for the mode "
-                "setting — use `rlsbl release init`",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        release_config = ReleaseConfig(
-            bump=bump,
-            include=target_names,
-            exclude=[],
-            description=description,
-            preid=preid or "",
-        )
-        from .commands.release.shared import build_release_flags
-        flags = build_release_flags(dry_run, quiet, allow_dirty, watch=watch,
-                                    push_timeout=push_timeout,
-                                    ci_timeout=ci_timeout,
-                                    check_timeout=check_timeout,
-                                    hook_timeout=hook_timeout)
-        from .commands.release import run_cmd
-        run_cmd(release_config, flags, ctx=ctx)
-        return
-
-    # --- File-based flow ---
+    # The release file is the one place a release's intent is stated: bump
+    # type, description, context and target selection, committed and reviewable
+    # before anything runs. There is no flag form of any of it.
     release_path = get_release_file_path(project_dir, releasable_dir=_releasable_dir)
     if not os.path.exists(release_path):
         print(
@@ -1767,18 +1697,19 @@ def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
     _cmd_init(init_flags, project_root=root)
 
 
-@mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.", effect="mutating")
+@mono.command(name="add", help="Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.", effect="mutating")
 @strictcli.flag(name="name", type=str, presence="optional", help="Display name for the project in workspace.toml (defaults to directory name)")
 @strictcli.flag(name="target", type=str, presence="optional", help="Registry this project publishes to (e.g. npm, pypi, go)")
 @strictcli.flag(name="depends-on", type=str, presence="optional", help="Comma-separated names of workspace projects this project depends on")
 @strictcli.flag(name="library", type=str, presence="optional", help="Mark as a shared library consumed by other workspace projects (true/false)")
 @strictcli.flag(name="dev-only", type=str, presence="optional", help="Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false)")
-@strictcli.flag(name="releasable", type=str, presence="optional", help="Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning)")
+@strictcli.flag(name="releasable", type=str, presence="optional", help="Releasable group this project belongs to (name of a [[releasables]] entry, which is created when it does not exist yet, or 'false' to opt out of versioning)")
+@strictcli.flag(name="tag-format", type=str, presence="optional", help="The tag format of the releasable this command creates, e.g. \"{name}@v{version}\" or \"pkgs/thing/v{version}\". Derived from the member's primary target when omitted; required when its targets span both tag schemes, and when the member is the repository root. Illegal when --releasable names a releasable that already exists, which brings its own format, and with --releasable false, which creates none.")
 @strictcli.flag(name="registry-name", type=str, presence="optional", help="Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix)")
 @strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed)")
 @strictcli.arg(name="path", help="Relative path from the repo root to the project directory to register", presence="required")
 @effects.handler
-def cmd_mono_add(ctx, name, target, depends_on, library, dev_only, releasable, registry_name, auto_commit, path):
+def cmd_mono_add(ctx, name, target, depends_on, library, dev_only, releasable, tag_format, registry_name, auto_commit, path):
     """Register a project directory in the monorepo workspace.toml."""
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
@@ -1796,6 +1727,8 @@ def cmd_mono_add(ctx, name, target, depends_on, library, dev_only, releasable, r
         flags["dev_only"] = dev_only
     if releasable:
         flags["releasable"] = releasable
+    if tag_format:
+        flags["tag-format"] = tag_format
     if registry_name:
         flags["registry-name"] = registry_name
     if not auto_commit:

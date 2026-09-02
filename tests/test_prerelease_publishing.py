@@ -412,20 +412,11 @@ class TestPrePushPrerelease:
         assert detect_manual_push_branches(stdin_lines, ["main"]) == []
 
 
-class TestQuickBumpPreid:
-    """Quick bump shortcut (--bump + --preid) produces correct ReleaseConfig."""
-
-    def test_preid_without_bump_errors(self):
-        """--preid without --bump is an error."""
-        from rlsbl.release_file import VALID_PREIDS
-        # The actual error is printed and sys.exit(1) is called
-        # We test the validation logic directly
-        preid = "alpha"
-        bump = ""
-        assert preid and not bump  # This is the error condition
+class TestReleaseConfigPreid:
+    """A release file's preid key produces a correct ReleaseConfig."""
 
     def test_preid_with_bump_is_valid(self):
-        """--preid with --bump produces a ReleaseConfig with preid set."""
+        """A bump plus a preid produces a ReleaseConfig with preid set."""
         from rlsbl.release_file import ReleaseConfig, VALID_BUMP_TYPES, VALID_PREIDS
 
         bump = "minor"
