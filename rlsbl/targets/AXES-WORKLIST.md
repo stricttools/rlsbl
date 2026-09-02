@@ -121,13 +121,14 @@ place a check's scope is written down.
 
 `MATRIX_COLUMNS` was already derived from `TARGETS.keys()` and stays that way.
 
-**One scope question was deliberately left open.** `FlutterTarget` extends
-`DartTarget`, so it inherits the Dart import analysers and the derived sets
-would have pulled Flutter members into `deps-unused`, `deps-undeclared` and
-`deps-dev-in-lib` -- three error-severity checks that have never applied to
-them. Flutter explicitly drops both methods back to the base so the migration
-changes no scope; whether Flutter should be in that set is a decision on its
-own.
+**One scope question was deliberately left open at the time.** `FlutterTarget`
+extends `DartTarget`, so it inherits the Dart import analysers and the derived
+sets would have pulled Flutter members into `deps-unused`, `deps-undeclared`
+and `deps-dev-in-lib` -- three error-severity checks that had never applied to
+them. Flutter therefore dropped both methods back to the base, as a migration
+caution, so the migration changed no scope. That pin has since been removed: a
+Flutter app is Dart sources, so Flutter answers the import-analysis axes
+exactly as Dart does and its members are in scope for those checks.
 
 ### Companion tags — existing protocol method
 

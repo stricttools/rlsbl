@@ -145,7 +145,7 @@ Published libraries may still be consumed externally, so zero workspace importer
 
 ## Language support matrix
 
-The following matrix shows which dependency validation checks are supported for each of the 4 languages with import scanning (Python, Go, npm/JS/TS, and Dart). Not all checks apply to every language -- for example, Go's compiler natively rejects circular imports, so rlsbl skips that check for Go projects.
+The matrix below is the enumeration: every target a dependency validation check supports has a column, and every check with target-specific behavior has a row. Not all checks apply to every target -- for example, Go's compiler natively rejects circular imports, so rlsbl skips that check for Go projects. Flutter members are covered by the Dart scanners, which a Flutter app's sources are.
 
 :-: table-feature-matrix
 

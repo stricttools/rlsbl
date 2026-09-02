@@ -974,12 +974,26 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
 
     graph = WorkspaceGraph(workspace_root, projects)
     if graph.scan_errors:
-        named = "; ".join(f"{e.project}: {e.path}" for e in graph.scan_errors)
+        listed = "\n".join(
+            f"  - {e.project}: {_relative(workspace_root, e.path)} "
+            f"({e.message.split(': ', 1)[-1]})"
+            for e in graph.scan_errors
+        )
+        # One remedy per failing class, in first-seen order, read off the
+        # records rather than restated here: the classes an unreadable scan
+        # falls into, and what an operator does about each, belong to the
+        # graph that recorded them.
+        remedies = "\n".join(
+            dict.fromkeys(e.remedy for e in graph.scan_errors)
+        )
         raise ExtractError(
-            f"some member manifests could not be read, so the dependency edges "
-            f"into the extracted releasable cannot be established: {named}. Fix "
-            f"the manifests and re-run -- a conversion that cannot see an edge "
-            f"would leave it dangling."
+            "the workspace dependency graph is incomplete: a manifest could "
+            "not be read, or declared a dependency in a form no scanner "
+            "recognizes, so the edges into and out of the extracted "
+            "releasable cannot be established -- a conversion that cannot see "
+            "an edge would leave it dangling.\n"
+            f"{listed}\n"
+            f"{remedies}"
         )
     member_names = {m.name for m in members}
     _check_inbound(workspace_root, graph, projects, members, member_names)

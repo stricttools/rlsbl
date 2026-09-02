@@ -216,10 +216,31 @@ class TestGenerateFeatureMatrixData:
         assert "deps-unused" in check_names
 
     def test_only_active_columns(self):
-        """Columns with no 'yes' among interesting rows are excluded."""
+        """Columns with no 'yes' among interesting rows are excluded.
+
+        Pinned against a REGISTERED target that no target-specific check
+        supports -- ``docker``, whose every interesting cell is ``no``. The
+        earlier form of this test named ``cargo``, which is not a registered
+        target at all, so no rendering could ever have put it in the headers
+        and the assertion could not fail.
+        """
         headers, rows = generate_feature_matrix_data()
-        # cargo has no target-specific checks that support it
-        assert "cargo" not in headers
+        matrix = get_feature_matrix()
+        interesting = [
+            row for row in matrix.values()
+            if any(v in ("yes", "no", "n/a") for v in row.values())
+        ]
+
+        assert "docker" in MATRIX_COLUMNS
+        assert not any(row.get("docker") == "yes" for row in interesting)
+        assert "docker" not in headers
+
+        # Every registered column left out is left out for the same reason,
+        # and every column kept earned it with a "yes".
+        for col in MATRIX_COLUMNS:
+            supported = any(row.get(col) == "yes" for row in interesting)
+            assert (col in headers) is supported, col
+
         # pypi, go, npm, dart should all appear
         assert "pypi" in headers
         assert "go" in headers
