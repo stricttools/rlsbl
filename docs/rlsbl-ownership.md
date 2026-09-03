@@ -1,6 +1,6 @@
 ---
 title: rlsbl.ownership
-description: "The two questions answered here alone: whether a path is rlsbl's own tool-owned bookkeeping, and which workspace member owns it -- most specific path wins."
+description: "The questions answered here alone: whether a path is rlsbl's own tool-owned bookkeeping, which workspace member owns it (most specific path wins), and what a releasable's changelog scope claims beyond its members' files."
 generated: true
 nav_group: "API Reference"
 nav_order: 120

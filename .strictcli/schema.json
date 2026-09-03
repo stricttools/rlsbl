@@ -1921,7 +1921,7 @@
             },
             {
               "name": "tag-format",
-              "help": "The tag format of the releasable this command creates, e.g. \"{name}@v{version}\" or \"pkgs/thing/v{version}\". Derived from the member's primary target when omitted; required when its targets span both tag schemes, and when the member is the repository root. Illegal when --releasable names a releasable that already exists, which brings its own format, and with --releasable false, which creates none.",
+              "help": "The tag format of the releasable this command creates, e.g. \"{name}@v{version}\" or \"pkgs/thing/v{version}\". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal when --releasable names a releasable that already exists, which brings its own format, and with --releasable false, which creates none.",
               "value_schema": {
                 "type": "string"
               },
