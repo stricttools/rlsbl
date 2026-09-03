@@ -27,3 +27,7 @@ member's CI filter).
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "78a50e32d89d7706f856ee09704ebca1f064a3b8"
+
+[tree_hashes]
+"." = "2c91b222ca1cbef5fa10a06d7ea67555dcf61d85"
