@@ -2,11 +2,21 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "The post-campaign rulings batch: the release file becomes the only way to state release intent (--bump/--description/--preid deleted), monorepo release init --packages becomes --releasables, monorepo add creates the releasable it names, unpublished-refs checks GitHub Release presence, Flutter joins import analysis, releasable state-dir commits attribute to their releasable, and unreadable Gradle dependency lines fail closed in CI filter derivation with a workable depends_on remedy."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+After the conversion/ownership/ledger campaign shipped, its closing review
+put the remaining open design questions to the operator one by one; this
+release implements the accepted rulings as one batch. The two breaking
+changes both enforce the file-driven-over-flag-driven design rule; the
+rest close coverage the campaign left open (Release presence had no
+standing check, Flutter was pinned out of import analysis as migration
+caution, a releasable's own release machinery fell outside its changelog
+scope, and an unrecognized Gradle dependency line could silently narrow a
+member's CI filter).
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
