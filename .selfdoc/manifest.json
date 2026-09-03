@@ -2881,6 +2881,11 @@
         },
         {
           "level": 3,
+          "text": "`_releasable_extra_keys`",
+          "anchor": "_releasable_extra_keys"
+        },
+        {
+          "level": 3,
           "text": "`_update_table_fields`",
           "anchor": "_update_table_fields"
         },
@@ -2888,6 +2893,11 @@
           "level": 3,
           "text": "`_sync_aot_in_place`",
           "anchor": "_sync_aot_in_place"
+        },
+        {
+          "level": 3,
+          "text": "`_separate_releasables_from_projects`",
+          "anchor": "_separate_releasables_from_projects"
         },
         {
           "level": 3,
@@ -6433,6 +6443,11 @@
           "level": 2,
           "text": "`rlsbl.commands.monorepo.commands`",
           "anchor": "rlsblcommandsmonorepocommands"
+        },
+        {
+          "level": 3,
+          "text": "`_create_releasable`",
+          "anchor": "_create_releasable"
         },
         {
           "level": 3,
@@ -10554,6 +10569,11 @@
         },
         {
           "level": 3,
+          "text": "`MixedTagSchemeError`",
+          "anchor": "mixedtagschemeerror"
+        },
+        {
+          "level": 3,
           "text": "`ChangelogError`",
           "anchor": "changelogerror"
         },
@@ -12495,6 +12515,11 @@
         },
         {
           "level": 3,
+          "text": "`releasable_state_dir`",
+          "anchor": "releasable_state_dir"
+        },
+        {
+          "level": 3,
           "text": "`normalize_path`",
           "anchor": "normalize_path"
         },
@@ -12580,6 +12605,11 @@
         },
         {
           "level": 4,
+          "text": "`for_releasable`",
+          "anchor": "for_releasable"
+        },
+        {
+          "level": 4,
           "text": "`for_member`",
           "anchor": "for_member"
         },
@@ -12592,6 +12622,11 @@
           "level": 4,
           "text": "`owner_name_of`",
           "anchor": "owner_name_of-1"
+        },
+        {
+          "level": 4,
+          "text": "`claims_state_dir`",
+          "anchor": "claims_state_dir"
         },
         {
           "level": 4,
@@ -14367,6 +14402,11 @@
           "level": 3,
           "text": "`_mixed_tag_schemes`",
           "anchor": "_mixed_tag_schemes"
+        },
+        {
+          "level": 3,
+          "text": "`derive_releasable_tag_format`",
+          "anchor": "derive_releasable_tag_format"
         },
         {
           "level": 3,
@@ -17579,6 +17619,11 @@
         },
         {
           "level": 3,
+          "text": "`_releasable_extra_keys`",
+          "anchor": "_releasable_extra_keys"
+        },
+        {
+          "level": 3,
           "text": "`_update_table_fields`",
           "anchor": "_update_table_fields"
         },
@@ -17586,6 +17631,11 @@
           "level": 3,
           "text": "`_sync_aot_in_place`",
           "anchor": "_sync_aot_in_place"
+        },
+        {
+          "level": 3,
+          "text": "`_separate_releasables_from_projects`",
+          "anchor": "_separate_releasables_from_projects"
         },
         {
           "level": 3,
@@ -17650,6 +17700,21 @@
           "anchor": "manifestscanerror"
         },
         {
+          "level": 4,
+          "text": "`acknowledged_by`",
+          "anchor": "acknowledged_by"
+        },
+        {
+          "level": 3,
+          "text": "`UnrecognizedGradleDependencyError`",
+          "anchor": "unrecognizedgradledependencyerror"
+        },
+        {
+          "level": 4,
+          "text": "`acknowledged_by`",
+          "anchor": "acknowledged_by-1"
+        },
+        {
           "level": 3,
           "text": "`_parse_pypi_dep_name`",
           "anchor": "_parse_pypi_dep_name"
@@ -17703,6 +17768,21 @@
           "level": 4,
           "text": "`_parse_version_catalog`",
           "anchor": "_parse_version_catalog"
+        },
+        {
+          "level": 4,
+          "text": "`_declares_no_workspace_edge`",
+          "anchor": "_declares_no_workspace_edge"
+        },
+        {
+          "level": 4,
+          "text": "`_blank_comments`",
+          "anchor": "_blank_comments"
+        },
+        {
+          "level": 4,
+          "text": "`_line_at`",
+          "anchor": "_line_at"
         },
         {
           "level": 4,
@@ -19519,6 +19599,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-28T10:32:17.355032+00:00",
+  "last_gen": "2026-09-03T00:11:05.375319+00:00",
   "theme": "minimal"
 }

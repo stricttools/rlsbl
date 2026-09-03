@@ -31,7 +31,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 ## monorepo add
 
-Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.
+Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.
 
 **Effect:** mutating
 
@@ -44,7 +44,8 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 | `--depends-on` |  | str | optional |  | Comma-separated names of workspace projects this project depends on |
 | `--library` |  | str | optional |  | Mark as a shared library consumed by other workspace projects (true/false) |
 | `--dev-only` |  | str | optional |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
-| `--releasable` |  | str | optional |  | Releasable group this project belongs to (name of a [[releasables]] entry, or 'false' to opt out of versioning) |
+| `--releasable` |  | str | optional |  | Releasable group this project belongs to (name of a [[releasables]] entry, which is created when it does not exist yet, or 'false' to opt out of versioning) |
+| `--tag-format` |  | str | optional |  | The tag format of the releasable this command creates, e.g. "{name}@v{version}" or "pkgs/thing/v{version}". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal when --releasable names a releasable that already exists, which brings its own format, and with --releasable false, which creates none. |
 | `--registry-name` |  | str | optional |  | Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix) |
 | `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed) |
 

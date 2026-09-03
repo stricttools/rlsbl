@@ -27,9 +27,6 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 | `--hook-timeout` |  | int | optional |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
 | `--watch`, `--no-watch` |  | bool | required |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
 | `--allow-dirty`, `--no-allow-dirty` |  | bool | required |  | Skip the clean working tree check and allow releasing with uncommitted changes |
-| `--bump` |  | str | optional |  | Bump type: patch, minor, major, infra, prerelease. Skips the release file. |
-| `--description` |  | str | optional |  | Short release description summarizing the changes (required with --bump) |
-| `--preid` |  | str | optional |  | Pre-release identifier: alpha, beta, rc, stable. Only valid with --bump. |
 | `--releasable` |  | str | optional |  | Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it. |
 
 ## release resume
