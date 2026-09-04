@@ -457,6 +457,23 @@
               "null"
             ]
           },
+          "latest_release_state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "recorded",
+              "unrecoverable",
+              null
+            ]
+          },
+          "never_released_versions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "clean": {
             "type": [
               "boolean",
@@ -523,6 +540,8 @@
           "branch",
           "latest_release",
           "latest_release_in_checkout",
+          "latest_release_state",
+          "never_released_versions",
           "clean",
           "changelog",
           "jsonl_coverage",
