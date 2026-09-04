@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.118.1",
+  "version": "0.119.0",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -1495,8 +1495,8 @@
         },
         {
           "level": 3,
-          "text": "Release anchors",
-          "anchor": "release-anchors"
+          "text": "Release commits",
+          "anchor": "release-commits"
         },
         {
           "level": 3,
@@ -1545,8 +1545,8 @@
         },
         {
           "level": 2,
-          "text": "Lineage records",
-          "anchor": "lineage-records"
+          "text": "Transition records",
+          "anchor": "transition-records"
         },
         {
           "level": 3,
@@ -3277,8 +3277,8 @@
         },
         {
           "level": 3,
-          "text": "The release anchor",
-          "anchor": "the-release-anchor"
+          "text": "The release commit",
+          "anchor": "the-release-commit"
         },
         {
           "level": 4,
@@ -3387,8 +3387,8 @@
         },
         {
           "level": 3,
-          "text": "The ledger is healed before anything is judged",
-          "anchor": "the-ledger-is-healed-before-anything-is-judged"
+          "text": "The release record is healed before anything is judged",
+          "anchor": "the-release-record-is-healed-before-anything-is-judged"
         },
         {
           "level": 3,
@@ -3655,73 +3655,6 @@
           "level": 3,
           "text": "`get_all_versions`",
           "anchor": "get_all_versions"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-anchor_remap.md",
-      "title": "rlsbl.anchor_remap",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.anchor_remap",
-          "anchor": "rlsblanchor_remap"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.anchor_remap`",
-          "anchor": "rlsblanchor_remap"
-        },
-        {
-          "level": 3,
-          "text": "`AnchorRemap`",
-          "anchor": "anchorremap"
-        },
-        {
-          "level": 3,
-          "text": "`_map_sha`",
-          "anchor": "_map_sha"
-        },
-        {
-          "level": 3,
-          "text": "`_tree_at`",
-          "anchor": "_tree_at"
-        },
-        {
-          "level": 3,
-          "text": "`plan_anchor_remap`",
-          "anchor": "plan_anchor_remap"
-        },
-        {
-          "level": 3,
-          "text": "`remap_release_anchors`",
-          "anchor": "remap_release_anchors"
-        },
-        {
-          "level": 3,
-          "text": "`anchor_remap_event`",
-          "anchor": "anchor_remap_event"
-        },
-        {
-          "level": 3,
-          "text": "`record_anchor_remap`",
-          "anchor": "record_anchor_remap"
-        },
-        {
-          "level": 3,
-          "text": "`releases_dirs_for`",
-          "anchor": "releases_dirs_for"
-        },
-        {
-          "level": 3,
-          "text": "`lineage_path_for_releases_dir`",
-          "anchor": "lineage_path_for_releases_dir"
-        },
-        {
-          "level": 3,
-          "text": "`repair_anchors`",
-          "anchor": "repair_anchors"
         }
       ]
     },
@@ -4308,8 +4241,8 @@
         },
         {
           "level": 3,
-          "text": "`_resolve_ledger_dir`",
-          "anchor": "_resolve_ledger_dir"
+          "text": "`_resolve_release_record_dir`",
+          "anchor": "_resolve_release_record_dir"
         },
         {
           "level": 3,
@@ -4503,13 +4436,13 @@
         },
         {
           "level": 3,
-          "text": "`_lineage_paths`",
-          "anchor": "_lineage_paths"
+          "text": "`_transition_record_paths`",
+          "anchor": "_transition_record_paths"
         },
         {
           "level": 3,
-          "text": "`_read_lineage`",
-          "anchor": "_read_lineage"
+          "text": "`_read_transition_record`",
+          "anchor": "_read_transition_record"
         },
         {
           "level": 3,
@@ -6048,13 +5981,13 @@
         },
         {
           "level": 3,
-          "text": "`_remap_anchors`",
-          "anchor": "_remap_anchors"
+          "text": "`_remap_release_commits`",
+          "anchor": "_remap_release_commits"
         },
         {
           "level": 3,
-          "text": "`_dest_anchor_path`",
-          "anchor": "_dest_anchor_path"
+          "text": "`_dest_release_commit_path`",
+          "anchor": "_dest_release_commit_path"
         },
         {
           "level": 3,
@@ -6123,8 +6056,8 @@
         },
         {
           "level": 3,
-          "text": "`_apply_lineage`",
-          "anchor": "_apply_lineage"
+          "text": "`_apply_transition_record`",
+          "anchor": "_apply_transition_record"
         },
         {
           "level": 3,
@@ -6745,8 +6678,8 @@
         },
         {
           "level": 3,
-          "text": "`_source_lineage_path`",
-          "anchor": "_source_lineage_path"
+          "text": "`_source_transition_record_path`",
+          "anchor": "_source_transition_record_path"
         },
         {
           "level": 3,
@@ -6820,13 +6753,13 @@
         },
         {
           "level": 3,
-          "text": "`_remap_anchors`",
-          "anchor": "_remap_anchors"
+          "text": "`_remap_release_commits`",
+          "anchor": "_remap_release_commits"
         },
         {
           "level": 3,
-          "text": "`_dest_anchor_path`",
-          "anchor": "_dest_anchor_path"
+          "text": "`_dest_release_commit_path`",
+          "anchor": "_dest_release_commit_path"
         },
         {
           "level": 3,
@@ -6855,8 +6788,8 @@
         },
         {
           "level": 3,
-          "text": "`_apply_lineage`",
-          "anchor": "_apply_lineage"
+          "text": "`_apply_transition_record`",
+          "anchor": "_apply_transition_record"
         },
         {
           "level": 3,
@@ -7056,8 +6989,8 @@
         },
         {
           "level": 3,
-          "text": "`split_lineage_answer`",
-          "anchor": "split_lineage_answer"
+          "text": "`split_ancestry_answer`",
+          "anchor": "split_ancestry_answer"
         },
         {
           "level": 3,
@@ -7365,8 +7298,8 @@
         },
         {
           "level": 3,
-          "text": "`_record_alias_in_lineage`",
-          "anchor": "_record_alias_in_lineage"
+          "text": "`_record_alias_in_transition_record`",
+          "anchor": "_record_alias_in_transition_record"
         },
         {
           "level": 3,
@@ -7773,8 +7706,8 @@
         },
         {
           "level": 3,
-          "text": "`release_anchor_tree_hashes`",
-          "anchor": "release_anchor_tree_hashes"
+          "text": "`release_commit_tree_hashes`",
+          "anchor": "release_commit_tree_hashes"
         },
         {
           "level": 3,
@@ -8287,8 +8220,8 @@
         },
         {
           "level": 3,
-          "text": "`validate_no_authored_anchors`",
-          "anchor": "validate_no_authored_anchors"
+          "text": "`validate_no_authored_release_commit`",
+          "anchor": "validate_no_authored_release_commit"
         },
         {
           "level": 3,
@@ -8563,8 +8496,8 @@
         },
         {
           "level": 3,
-          "text": "`_ledger_dir_for_tag`",
-          "anchor": "_ledger_dir_for_tag"
+          "text": "`_release_record_dir_for_tag`",
+          "anchor": "_release_record_dir_for_tag"
         },
         {
           "level": 3,
@@ -8608,8 +8541,8 @@
         },
         {
           "level": 3,
-          "text": "`_lineage_facts`",
-          "anchor": "_lineage_facts"
+          "text": "`_transition_record_facts`",
+          "anchor": "_transition_record_facts"
         },
         {
           "level": 3,
@@ -8618,13 +8551,13 @@
         },
         {
           "level": 3,
-          "text": "`dangling_anchors`",
-          "anchor": "dangling_anchors"
+          "text": "`dangling_release_commits`",
+          "anchor": "dangling_release_commits"
         },
         {
           "level": 3,
-          "text": "`heal_dangling_anchors`",
-          "anchor": "heal_dangling_anchors"
+          "text": "`heal_dangling_release_commits`",
+          "anchor": "heal_dangling_release_commits"
         },
         {
           "level": 3,
@@ -8837,8 +8770,8 @@
         },
         {
           "level": 3,
-          "text": "`heal_anchors_from_journal`",
-          "anchor": "heal_anchors_from_journal"
+          "text": "`heal_release_commits_from_journal`",
+          "anchor": "heal_release_commits_from_journal"
         },
         {
           "level": 3,
@@ -9186,8 +9119,8 @@
         },
         {
           "level": 3,
-          "text": "`_ledger_dir`",
-          "anchor": "_ledger_dir"
+          "text": "`_release_record_dir`",
+          "anchor": "_release_record_dir"
         },
         {
           "level": 3,
@@ -9216,13 +9149,13 @@
         },
         {
           "level": 3,
-          "text": "`_release_anchor`",
-          "anchor": "_release_anchor"
+          "text": "`_release_commit`",
+          "anchor": "_release_commit"
         },
         {
           "level": 3,
-          "text": "`_predecessor_anchor`",
-          "anchor": "_predecessor_anchor"
+          "text": "`_predecessor_release_commit`",
+          "anchor": "_predecessor_release_commit"
         },
         {
           "level": 3,
@@ -9241,8 +9174,8 @@
         },
         {
           "level": 3,
-          "text": "`_refuse_foreign_work_above_anchor`",
-          "anchor": "_refuse_foreign_work_above_anchor"
+          "text": "`_refuse_foreign_work_above_release_commit`",
+          "anchor": "_refuse_foreign_work_above_release_commit"
         },
         {
           "level": 3,
@@ -10589,8 +10522,8 @@
         },
         {
           "level": 3,
-          "text": "`LedgerError`",
-          "anchor": "ledgererror"
+          "text": "`ReleaseRecordError`",
+          "anchor": "releaserecorderror"
         },
         {
           "level": 3,
@@ -11167,337 +11100,6 @@
           "level": 3,
           "text": "`validate_layer_assignments`",
           "anchor": "validate_layer_assignments"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-ledger.md",
-      "title": "rlsbl.ledger",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.ledger",
-          "anchor": "rlsblledger"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.ledger`",
-          "anchor": "rlsblledger"
-        },
-        {
-          "level": 3,
-          "text": "`LedgerEntry`",
-          "anchor": "ledgerentry"
-        },
-        {
-          "level": 4,
-          "text": "`anchored`",
-          "anchor": "anchored"
-        },
-        {
-          "level": 3,
-          "text": "`LatestReleaseFact`",
-          "anchor": "latestreleasefact"
-        },
-        {
-          "level": 4,
-          "text": "`label`",
-          "anchor": "label"
-        },
-        {
-          "level": 3,
-          "text": "`tag_for_version`",
-          "anchor": "tag_for_version"
-        },
-        {
-          "level": 3,
-          "text": "`_same_commit`",
-          "anchor": "_same_commit"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_ref`",
-          "anchor": "_resolve_ref"
-        },
-        {
-          "level": 3,
-          "text": "`_missing_anchor_error`",
-          "anchor": "_missing_anchor_error"
-        },
-        {
-          "level": 3,
-          "text": "`_scheme_tags`",
-          "anchor": "_scheme_tags"
-        },
-        {
-          "level": 3,
-          "text": "`_unbackfilled_ledger_error`",
-          "anchor": "_unbackfilled_ledger_error"
-        },
-        {
-          "level": 3,
-          "text": "`_require_backfilled_ledger`",
-          "anchor": "_require_backfilled_ledger"
-        },
-        {
-          "level": 3,
-          "text": "`version_is_archived`",
-          "anchor": "version_is_archived"
-        },
-        {
-          "level": 3,
-          "text": "`read_entry`",
-          "anchor": "read_entry"
-        },
-        {
-          "level": 3,
-          "text": "`range_anchor`",
-          "anchor": "range_anchor"
-        },
-        {
-          "level": 3,
-          "text": "`unreleased_range`",
-          "anchor": "unreleased_range"
-        },
-        {
-          "level": 3,
-          "text": "`release_at_commit`",
-          "anchor": "release_at_commit"
-        },
-        {
-          "level": 3,
-          "text": "`latest_release_fact`",
-          "anchor": "latest_release_fact"
-        },
-        {
-          "level": 3,
-          "text": "`require_checkout_contains_latest`",
-          "anchor": "require_checkout_contains_latest"
-        },
-        {
-          "level": 3,
-          "text": "`releases_dir_for_changes_dir`",
-          "anchor": "releases_dir_for_changes_dir"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-lineage.md",
-      "title": "rlsbl.lineage",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.lineage",
-          "anchor": "rlsbllineage"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.lineage`",
-          "anchor": "rlsbllineage"
-        },
-        {
-          "level": 3,
-          "text": "`LineageError`",
-          "anchor": "lineageerror"
-        },
-        {
-          "level": 3,
-          "text": "`get_lineage_path`",
-          "anchor": "get_lineage_path"
-        },
-        {
-          "level": 3,
-          "text": "`lineage_file_exists`",
-          "anchor": "lineage_file_exists"
-        },
-        {
-          "level": 3,
-          "text": "`new_event_id`",
-          "anchor": "new_event_id"
-        },
-        {
-          "level": 3,
-          "text": "`now_timestamp`",
-          "anchor": "now_timestamp"
-        },
-        {
-          "level": 3,
-          "text": "`LineageEndpoint`",
-          "anchor": "lineageendpoint"
-        },
-        {
-          "level": 3,
-          "text": "`TagMapping`",
-          "anchor": "tagmapping"
-        },
-        {
-          "level": 3,
-          "text": "`AnchorMapping`",
-          "anchor": "anchormapping"
-        },
-        {
-          "level": 3,
-          "text": "`BoundaryAlias`",
-          "anchor": "boundaryalias"
-        },
-        {
-          "level": 3,
-          "text": "`SplitMapping`",
-          "anchor": "splitmapping"
-        },
-        {
-          "level": 3,
-          "text": "`_LineageEventBase`",
-          "anchor": "_lineageeventbase"
-        },
-        {
-          "level": 3,
-          "text": "`ConversionEvent`",
-          "anchor": "conversionevent"
-        },
-        {
-          "level": 3,
-          "text": "`TagMapEvent`",
-          "anchor": "tagmapevent"
-        },
-        {
-          "level": 3,
-          "text": "`AnchorRemapEvent`",
-          "anchor": "anchorremapevent"
-        },
-        {
-          "level": 3,
-          "text": "`DepartedGlobsEvent`",
-          "anchor": "departedglobsevent"
-        },
-        {
-          "level": 3,
-          "text": "`BoundaryAliasEvent`",
-          "anchor": "boundaryaliasevent"
-        },
-        {
-          "level": 3,
-          "text": "`IdentityTransitionEvent`",
-          "anchor": "identitytransitionevent"
-        },
-        {
-          "level": 3,
-          "text": "`PromotionSplitMapEvent`",
-          "anchor": "promotionsplitmapevent"
-        },
-        {
-          "level": 3,
-          "text": "`_plain`",
-          "anchor": "_plain"
-        },
-        {
-          "level": 3,
-          "text": "`serialize_event`",
-          "anchor": "serialize_event"
-        },
-        {
-          "level": 3,
-          "text": "`_build_nested`",
-          "anchor": "_build_nested"
-        },
-        {
-          "level": 3,
-          "text": "`parse_event`",
-          "anchor": "parse_event"
-        },
-        {
-          "level": 3,
-          "text": "`_gate_line`",
-          "anchor": "_gate_line"
-        },
-        {
-          "level": 3,
-          "text": "`_validate_line`",
-          "anchor": "_validate_line"
-        },
-        {
-          "level": 3,
-          "text": "`append_events`",
-          "anchor": "append_events"
-        },
-        {
-          "level": 3,
-          "text": "`append_event`",
-          "anchor": "append_event"
-        },
-        {
-          "level": 3,
-          "text": "`_undecodable_bytes_error`",
-          "anchor": "_undecodable_bytes_error"
-        },
-        {
-          "level": 3,
-          "text": "`read_events`",
-          "anchor": "read_events"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-lineage_followup.md",
-      "title": "rlsbl.lineage_followup",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.lineage_followup",
-          "anchor": "rlsbllineage_followup"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.lineage_followup`",
-          "anchor": "rlsbllineage_followup"
-        },
-        {
-          "level": 3,
-          "text": "`FollowupVerdict`",
-          "anchor": "followupverdict"
-        },
-        {
-          "level": 4,
-          "text": "`ok`",
-          "anchor": "ok"
-        },
-        {
-          "level": 3,
-          "text": "`absorbed_sources`",
-          "anchor": "absorbed_sources"
-        },
-        {
-          "level": 3,
-          "text": "`github_slug`",
-          "anchor": "github_slug"
-        },
-        {
-          "level": 3,
-          "text": "`go_module_transitions`",
-          "anchor": "go_module_transitions"
-        },
-        {
-          "level": 3,
-          "text": "`probe_repo_archived`",
-          "anchor": "probe_repo_archived"
-        },
-        {
-          "level": 3,
-          "text": "`_gh_error`",
-          "anchor": "_gh_error"
-        },
-        {
-          "level": 3,
-          "text": "`evaluate_old_repo_archived`",
-          "anchor": "evaluate_old_repo_archived"
-        },
-        {
-          "level": 3,
-          "text": "`evaluate_go_deprecation_published`",
-          "anchor": "evaluate_go_deprecation_published"
         }
       ]
     },
@@ -13639,6 +13241,73 @@
       ]
     },
     {
+      "path": "rlsbl-release_commit_remap.md",
+      "title": "rlsbl.release_commit_remap",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.release_commit_remap",
+          "anchor": "rlsblrelease_commit_remap"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.release_commit_remap`",
+          "anchor": "rlsblrelease_commit_remap"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseCommitRemap`",
+          "anchor": "releasecommitremap"
+        },
+        {
+          "level": 3,
+          "text": "`_map_sha`",
+          "anchor": "_map_sha"
+        },
+        {
+          "level": 3,
+          "text": "`_tree_at`",
+          "anchor": "_tree_at"
+        },
+        {
+          "level": 3,
+          "text": "`plan_release_commit_remap`",
+          "anchor": "plan_release_commit_remap"
+        },
+        {
+          "level": 3,
+          "text": "`remap_release_commits`",
+          "anchor": "remap_release_commits"
+        },
+        {
+          "level": 3,
+          "text": "`release_commit_remap_event`",
+          "anchor": "release_commit_remap_event"
+        },
+        {
+          "level": 3,
+          "text": "`record_release_commit_remap`",
+          "anchor": "record_release_commit_remap"
+        },
+        {
+          "level": 3,
+          "text": "`releases_dirs_for`",
+          "anchor": "releases_dirs_for"
+        },
+        {
+          "level": 3,
+          "text": "`transition_record_path_for_releases_dir`",
+          "anchor": "transition_record_path_for_releases_dir"
+        },
+        {
+          "level": 3,
+          "text": "`repair_release_commits`",
+          "anchor": "repair_release_commits"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-release_file.md",
       "title": "rlsbl.release_file",
       "type": "doc",
@@ -13750,18 +13419,18 @@
         },
         {
           "level": 3,
-          "text": "`_check_anchor`",
-          "anchor": "_check_anchor"
+          "text": "`_check_release_commit`",
+          "anchor": "_check_release_commit"
         },
         {
           "level": 3,
-          "text": "`_anchor_tree_table`",
-          "anchor": "_anchor_tree_table"
+          "text": "`_release_commit_tree_table`",
+          "anchor": "_release_commit_tree_table"
         },
         {
           "level": 3,
-          "text": "`write_release_anchor`",
-          "anchor": "write_release_anchor"
+          "text": "`write_release_commit`",
+          "anchor": "write_release_commit"
         },
         {
           "level": 3,
@@ -13770,13 +13439,13 @@
         },
         {
           "level": 3,
-          "text": "`write_unanchorable_marker`",
-          "anchor": "write_unanchorable_marker"
+          "text": "`write_unrecoverable_marker`",
+          "anchor": "write_unrecoverable_marker"
         },
         {
           "level": 3,
-          "text": "`strip_release_anchor`",
-          "anchor": "strip_release_anchor"
+          "text": "`strip_release_commit`",
+          "anchor": "strip_release_commit"
         },
         {
           "level": 3,
@@ -13892,8 +13561,8 @@
         },
         {
           "level": 3,
-          "text": "`anchor_from_ledger`",
-          "anchor": "anchor_from_ledger"
+          "text": "`release_commit_from_record`",
+          "anchor": "release_commit_from_record"
         },
         {
           "level": 3,
@@ -13944,6 +13613,118 @@
           "level": 3,
           "text": "`ensure_marker`",
           "anchor": "ensure_marker"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-release_record.md",
+      "title": "rlsbl.release_record",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.release_record",
+          "anchor": "rlsblrelease_record"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.release_record`",
+          "anchor": "rlsblrelease_record"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseRecordEntry`",
+          "anchor": "releaserecordentry"
+        },
+        {
+          "level": 4,
+          "text": "`recorded`",
+          "anchor": "recorded"
+        },
+        {
+          "level": 3,
+          "text": "`LatestReleaseFact`",
+          "anchor": "latestreleasefact"
+        },
+        {
+          "level": 4,
+          "text": "`label`",
+          "anchor": "label"
+        },
+        {
+          "level": 3,
+          "text": "`tag_for_version`",
+          "anchor": "tag_for_version"
+        },
+        {
+          "level": 3,
+          "text": "`_same_commit`",
+          "anchor": "_same_commit"
+        },
+        {
+          "level": 3,
+          "text": "`_resolve_ref`",
+          "anchor": "_resolve_ref"
+        },
+        {
+          "level": 3,
+          "text": "`_missing_release_commit_error`",
+          "anchor": "_missing_release_commit_error"
+        },
+        {
+          "level": 3,
+          "text": "`_scheme_tags`",
+          "anchor": "_scheme_tags"
+        },
+        {
+          "level": 3,
+          "text": "`_unbackfilled_release_record_error`",
+          "anchor": "_unbackfilled_release_record_error"
+        },
+        {
+          "level": 3,
+          "text": "`_require_backfilled_release_record`",
+          "anchor": "_require_backfilled_release_record"
+        },
+        {
+          "level": 3,
+          "text": "`version_is_archived`",
+          "anchor": "version_is_archived"
+        },
+        {
+          "level": 3,
+          "text": "`read_entry`",
+          "anchor": "read_entry"
+        },
+        {
+          "level": 3,
+          "text": "`nearest_release_commit`",
+          "anchor": "nearest_release_commit"
+        },
+        {
+          "level": 3,
+          "text": "`unreleased_range`",
+          "anchor": "unreleased_range"
+        },
+        {
+          "level": 3,
+          "text": "`release_at_commit`",
+          "anchor": "release_at_commit"
+        },
+        {
+          "level": 3,
+          "text": "`latest_release_fact`",
+          "anchor": "latest_release_fact"
+        },
+        {
+          "level": 3,
+          "text": "`require_checkout_contains_latest`",
+          "anchor": "require_checkout_contains_latest"
+        },
+        {
+          "level": 3,
+          "text": "`releases_dir_for_changes_dir`",
+          "anchor": "releases_dir_for_changes_dir"
         }
       ]
     },
@@ -17154,6 +16935,225 @@
       ]
     },
     {
+      "path": "rlsbl-transition_record.md",
+      "title": "rlsbl.transition_record",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.transition_record",
+          "anchor": "rlsbltransition_record"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.transition_record`",
+          "anchor": "rlsbltransition_record"
+        },
+        {
+          "level": 3,
+          "text": "`TransitionRecordError`",
+          "anchor": "transitionrecorderror"
+        },
+        {
+          "level": 3,
+          "text": "`get_transition_record_path`",
+          "anchor": "get_transition_record_path"
+        },
+        {
+          "level": 3,
+          "text": "`transition_record_file_exists`",
+          "anchor": "transition_record_file_exists"
+        },
+        {
+          "level": 3,
+          "text": "`new_event_id`",
+          "anchor": "new_event_id"
+        },
+        {
+          "level": 3,
+          "text": "`now_timestamp`",
+          "anchor": "now_timestamp"
+        },
+        {
+          "level": 3,
+          "text": "`TransitionRecordEndpoint`",
+          "anchor": "transitionrecordendpoint"
+        },
+        {
+          "level": 3,
+          "text": "`TagMapping`",
+          "anchor": "tagmapping"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseCommitMapping`",
+          "anchor": "releasecommitmapping"
+        },
+        {
+          "level": 3,
+          "text": "`BoundaryAlias`",
+          "anchor": "boundaryalias"
+        },
+        {
+          "level": 3,
+          "text": "`SplitMapping`",
+          "anchor": "splitmapping"
+        },
+        {
+          "level": 3,
+          "text": "`_TransitionRecordEventBase`",
+          "anchor": "_transitionrecordeventbase"
+        },
+        {
+          "level": 3,
+          "text": "`ConversionEvent`",
+          "anchor": "conversionevent"
+        },
+        {
+          "level": 3,
+          "text": "`TagMapEvent`",
+          "anchor": "tagmapevent"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseCommitRemapEvent`",
+          "anchor": "releasecommitremapevent"
+        },
+        {
+          "level": 3,
+          "text": "`DepartedGlobsEvent`",
+          "anchor": "departedglobsevent"
+        },
+        {
+          "level": 3,
+          "text": "`BoundaryAliasEvent`",
+          "anchor": "boundaryaliasevent"
+        },
+        {
+          "level": 3,
+          "text": "`IdentityTransitionEvent`",
+          "anchor": "identitytransitionevent"
+        },
+        {
+          "level": 3,
+          "text": "`PromotionSplitMapEvent`",
+          "anchor": "promotionsplitmapevent"
+        },
+        {
+          "level": 3,
+          "text": "`_plain`",
+          "anchor": "_plain"
+        },
+        {
+          "level": 3,
+          "text": "`serialize_event`",
+          "anchor": "serialize_event"
+        },
+        {
+          "level": 3,
+          "text": "`_build_nested`",
+          "anchor": "_build_nested"
+        },
+        {
+          "level": 3,
+          "text": "`parse_event`",
+          "anchor": "parse_event"
+        },
+        {
+          "level": 3,
+          "text": "`_gate_line`",
+          "anchor": "_gate_line"
+        },
+        {
+          "level": 3,
+          "text": "`_validate_line`",
+          "anchor": "_validate_line"
+        },
+        {
+          "level": 3,
+          "text": "`append_events`",
+          "anchor": "append_events"
+        },
+        {
+          "level": 3,
+          "text": "`append_event`",
+          "anchor": "append_event"
+        },
+        {
+          "level": 3,
+          "text": "`_undecodable_bytes_error`",
+          "anchor": "_undecodable_bytes_error"
+        },
+        {
+          "level": 3,
+          "text": "`read_events`",
+          "anchor": "read_events"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-transition_record_followup.md",
+      "title": "rlsbl.transition_record_followup",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.transition_record_followup",
+          "anchor": "rlsbltransition_record_followup"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.transition_record_followup`",
+          "anchor": "rlsbltransition_record_followup"
+        },
+        {
+          "level": 3,
+          "text": "`FollowupVerdict`",
+          "anchor": "followupverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`absorbed_sources`",
+          "anchor": "absorbed_sources"
+        },
+        {
+          "level": 3,
+          "text": "`github_slug`",
+          "anchor": "github_slug"
+        },
+        {
+          "level": 3,
+          "text": "`go_module_transitions`",
+          "anchor": "go_module_transitions"
+        },
+        {
+          "level": 3,
+          "text": "`probe_repo_archived`",
+          "anchor": "probe_repo_archived"
+        },
+        {
+          "level": 3,
+          "text": "`_gh_error`",
+          "anchor": "_gh_error"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_old_repo_archived`",
+          "anchor": "evaluate_old_repo_archived"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_go_deprecation_published`",
+          "anchor": "evaluate_go_deprecation_published"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-utils.md",
       "title": "rlsbl.utils",
       "type": "doc",
@@ -19599,6 +19599,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-03T00:11:05.375319+00:00",
+  "last_gen": "2026-09-04T21:56:20.498573+00:00",
   "theme": "minimal"
 }
