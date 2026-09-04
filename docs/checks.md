@@ -1,5 +1,5 @@
 ---
-description: "Every rlsbl check by tag: project, release, changelog, workspace, quality, prepush and untagged, plus check metadata, severity and target applicability."
+description: "Every rlsbl check by tag: project, release, changelog, workspace, quality, prepush and untagged, plus check metadata, severity, target applicability, and how unpublished-refs treats a version recorded unrecoverable or never released."
 ---
 
 # Check system

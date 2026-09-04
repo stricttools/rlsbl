@@ -1,5 +1,5 @@
 ---
-description: "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and release commit verification, splitting a releasable, and transition record."
+description: "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and release commit verification, splitting a releasable, and the transition record with every event kind it holds."
 ---
 
 # Repository conversions

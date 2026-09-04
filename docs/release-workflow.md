@@ -1,5 +1,5 @@
 ---
-description: "The rlsbl release flow: the untagged candidate and its CI check, the release commit and what the release record is authoritative over, and the bump types."
+description: "The rlsbl release flow: the untagged candidate and its CI check, the release commit and what the release record is authoritative over, the three fates an archived version can record, and the bump types."
 ---
 
 # Release workflow
@@ -516,7 +516,7 @@ Successive rewrites chain: a commit rewritten twice is followed through both map
 | `refuse-foreign` | origin holds something no source explains — **the publication tripwire**. One of these aborts the entire reconcile: nothing is repaired anywhere. A reconcile that repaired around an unexplained divergence would be choosing which half of an inconsistent world to trust. The same verdict covers a local ref that disagrees with the release record, because pushing it would publish a commit the release record does not record as released. |
 | `refuse-identity-mismatch` | the target's `release_materialization_policy` refuses. Go declares it: a Go tag *is* the published artifact, so recreating one for a version released under a module path the repository has since changed would publish that version under the new identity for the first time, permanently. |
 
-Two fates are skipped entirely. An `unrecoverable` version has no commit, so there is nothing to compare against and nothing to create a ref at. A `never_released` version was never released, so it owns no ref origin could be wrong about and no GitHub Release that could be missing — and the refs it would have owned are claimed anyway, so a tag carrying its name never reaches the unarchived-tag pass where a divergence would fire the tripwire.
+Two fates are skipped entirely. An `unrecoverable` version has no commit, so there is nothing to compare against and nothing to create a ref at. A `never_released` version was never released, so it owns no ref origin could be wrong about and no GitHub Release that could be missing — and the refs it would have owned are claimed anyway, so a tag carrying its name never reaches the pass over tags the release record does not name, where a divergence would fire the tripwire.
 
 ### The release record is healed before anything is judged
 
