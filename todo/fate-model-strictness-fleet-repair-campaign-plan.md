@@ -4,10 +4,10 @@ Implementation plan for a single campaign across rlsbl and the fleet. Every
 design decision is made and approved by the user; no phase contains open
 design work. Grounded against the working tree at rlsbl 0.119.0 and the
 fleet repos by direct probes; hardened by a briefed four-area critique and
-a blind four-area critique, both folded in. The campaign's running record
-(measurements, tallies, per-phase outcomes) lives in ONE companion file:
-`todo/fate-model-campaign-record.md`, created in phase 0 and moved to done
-with this plan at close.
+a blind four-area critique, both folded in. The campaign keeps no
+companion record file: measurements and per-phase outcomes are reported in
+conversation and briefed to the agents that need them; the commits are the
+durable record.
 
 ## Terminology (defined here; the phases use these terms freely)
 
@@ -103,14 +103,14 @@ with this plan at close.
   - Only materialize / already-correct verdicts qualify. Deletions, moves
     of existing refs, force-pushes outside mirror flows, and any repair or
     refusal verdict never auto-apply.
-  - Ceilings: 130 GitHub Release creations and 80 tag creations fleet-wide
-    (approved at measurements of roughly 100 and 62; phase 0.6 re-derives
-    the measurements, and a material excess pauses for reconfirmation).
+  - No numeric ceilings (the user struck them): the write-kind and
+    verdict restrictions above are the whole limit. Phase 0.6 still
+    re-derives the fleet measurements so the projected writes are known
+    before any apply.
   - Apply mechanic: before each apply, the written reconcile plan file is
     inspected item by item; every item must match an approved write kind
     and verdict or that repo's whole plan pauses (reconcile has no
-    selective apply). The operator loop keeps the running tally against
-    the ceilings in the campaign record file.
+    selective apply).
   - The user's standing authorization recorded here covers passing
     `--approve-consequential` on the fleet phases' consequential commands
     (reconcile, the backfill) — the flag is never passed on the agent's own
@@ -123,8 +123,8 @@ with this plan at close.
     machinery, on the user's explicit standing order recorded here.
 - **Consent pauses**, all of them: an outward-writing plan whose items fall
   outside the pre-approved limits; a disposition of history no record and
-  no approved class ruling explains; a ceiling breach; a materially moved
-  measurement underlying a recorded approval. Nothing else pauses.
+  no approved class ruling explains; a materially moved measurement
+  underlying a recorded approval. Nothing else pauses.
 
 ## Standing conventions (binding on every phase)
 
@@ -151,8 +151,8 @@ with this plan at close.
   the text its own changes made stale, in every repo it touched.
 - Any archive or record field written by tooling after ship time carries an
   explicit reconstructed/derived note naming its source.
-- Rulings that rest on measurements are recorded with them in the campaign
-  record file; a materially moved measurement pauses for reconfirmation.
+- Rulings that rest on measurements are reported with them when made; a
+  materially moved measurement pauses for reconfirmation.
 - New commands update the schema dump, regenerated docs, and the
   wiring/effects/consequential pinning tests; a new target-protocol
   attribute updates the axis inventory and regenerates the support matrix.
@@ -187,9 +187,9 @@ Effort: medium.
 
 ### 0.1 Pin and toolchain
 
-- Replace the machine-wide editable install with released rlsbl 0.119.0;
-  commit the restore-command record (no foreign paths in it). Create the
-  campaign record file named in the preamble.
+- Replace the machine-wide editable install with released rlsbl 0.119.0.
+  The exact restore command, run at its phase 11 slot and nowhere earlier:
+  `uv tool install --force -e /home/m/Projects/rlsbl`.
 - Install the strictspec CLI at EXACTLY the version the Python runtime and
   the generated validators carry (0.2.3 at planning; validator pairing is
   exact-match, so neither an older nor a NEWER CLI is acceptable — a newer
@@ -198,7 +198,7 @@ Effort: medium.
   upgrade-everything-to-latest step deliberately rides a later natural
   release, not this campaign.
 - Verify: pinned rlsbl version reported; `strictspec` CLI version equals
-  the runtime's exactly; restore record and campaign record committed.
+  the runtime's exactly.
 
 ### 0.2 Fleet alias pre-edit
 
@@ -276,16 +276,16 @@ Effort: medium.
 
 ### 0.6 Fleet measurement re-derivation
 
-- Re-derive, per repo, into the campaign record file: the standalone
+- Re-derive, per repo, reported in conversation: the standalone
   rlsbl-managed repo set (planning-time measurement: 22); tags-without-
   archives (planning-time: roughly 100 across eight repos — safegit,
   claudewheel, howmuchleft, a private project, claudestream, predraw, saferm,
   wesktop); the inverse category, archives whose tags exist nowhere
   (planning-time instances: rlsbl, pgdesign); the projected outward writes.
-- Confirm the approved ceilings (130/80) still bound the projection, or
-  pause for reconfirmation.
-- Verify: the per-repo table exists in the campaign record file; ceilings
-  confirmed or escalated.
+- Confirm every projected write matches an approved write kind, or pause
+  for the unmatched remainder.
+- Verify: the per-repo table reported; the projection classified against
+  the approved write kinds.
 
 ## Phase 1 — The version-fate model
 
@@ -550,8 +550,8 @@ Effort: medium.
   to the user before phase 6 — the classification is by definition the
   human's call.
 - Verify: the pinned test's rationale text states the human-authority
-  criterion; the derived set is recorded in the campaign record file with
-  the user's rulings on any flips.
+  criterion; the derived set is presented to the user and their rulings on
+  any flips are applied before phase 6.
 
 ## Phase 5 — Hygiene
 
@@ -687,9 +687,8 @@ Effort: medium.
   pre-approved limits with the stated apply mechanic: the minted
   current-spelling tags at release commits, the missing GitHub Releases,
   the archived-but-unpushed tags. Pauses only per the consent-pauses list.
-- Verify: ref-presence checks green across the repos covered so far; the
-  running tally within ceilings in the campaign record file; a written
-  summary of every ref created.
+- Verify: ref-presence checks green across the repos covered so far; a
+  written summary of every ref created, reported in conversation.
 
 ## Phase 11 — Root-kind rollout and close
 
@@ -707,7 +706,7 @@ Effort: large.
   the two hand-steps the script does not perform (the dangling depends-on
   rewrite after the root member rename; the per-family tag reckoning).
 - Then, in order: reconcile runs for the repos newly migrated in this
-  phase (same limits, same tally); the editable install is restored; the
+  phase (same limits); the editable install is restored; the
   rlsbl reference sections of the user-level rules file at
   `~/Projects/CLAUDE.md` are refreshed against the shipped surface — the
   retired script's two mentions retargeted to `rlsbl release backfill`,
@@ -724,9 +723,9 @@ Effort: large.
   as todos in this repo's backlog
   (the batch release-file reader's unification onto the schema authority;
   the config-schema completion and wiring named by the policed-surfaces
-  list); completed todos move to done with the campaign record file; and
-  the final report reconciles every measured outcome against its recorded
-  approval, including the final write tally against the ceilings.
+  list); completed todos move to done; and the final report reconciles
+  every measured outcome against its recorded approval, including a
+  summary of every outward write performed.
 - Verify: the three migrated workspaces load and pass their workspace and
   changelog check tags; their reconcile plans applied within limits; the
   editable install restored last; the filings and moves committed.
