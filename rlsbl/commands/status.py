@@ -238,6 +238,15 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
         "branch": branch,
         "latest_release": latest.version,
         "latest_release_in_checkout": latest.in_checkout,
+        # The version-fate model, flattened. `latest_release_state` is the fate
+        # of the archive `latest_release` names -- "recorded" or
+        # "unrecoverable", null when the project has released nothing. The
+        # third fate cannot appear there, because a never-released version is
+        # not a release: it is reported by name in `never_released_versions`,
+        # which lists every archive above the latest release that no release
+        # ever used.
+        "latest_release_state": latest.state,
+        "never_released_versions": list(latest.never_released_above),
         "clean": clean,
         "changelog": changelog,
         "jsonl_coverage": jsonl_coverage,

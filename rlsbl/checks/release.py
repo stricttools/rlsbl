@@ -125,6 +125,12 @@ def register_release_checks(app):
         wrong_commit = 0
         missing_release = 0
         unrecoverable = 0
+        # Versions the release record says were NEVER RELEASED: the version
+        # number exists, no release does. They own no refs and no GitHub
+        # Release, so nothing about them can be missing -- counted so the
+        # outcome names what it passed over, and excluded from the released
+        # count, which would otherwise report a phantom as a release.
+        never_released = []
         # Releases absent for versions the release record records unrecoverable. Counted
         # for the same reason as their absent refs: reconcile skips such a
         # version entirely, so there is no marker to write and no repair to
@@ -147,6 +153,13 @@ def register_release_checks(app):
                     f"{version}: its release archive could not be read ({exc}), "
                     f"so the refs it should own are unknown."
                 )
+                continue
+            if archive.never_released:
+                # Not a release, so it owes the world nothing: no ref to be
+                # missing, no commit to be wrong, no Release to be absent. A
+                # tag that happens to carry its name is left to the second loop
+                # of `release reconcile`, which classifies unarchived tags.
+                never_released.append(version)
                 continue
             release_commit = None if archive.unrecoverable else archive.candidate_sha
 
@@ -225,11 +238,18 @@ def register_release_checks(app):
 
         if not (missing_local or missing_remote or wrong_commit
                 or missing_release or underivable):
+            released = len(versions) - len(never_released)
             scope = (
-                f"{len(versions)} released version(s)"
+                f"{released} released version(s)"
                 if has_remote else
-                f"{len(versions)} released version(s), locally (no origin remote)"
+                f"{released} released version(s), locally (no origin remote)"
             )
+            if never_released:
+                scope += (
+                    f"; {len(never_released)} archived version(s) recorded "
+                    f"never released, which own no refs: "
+                    f"{', '.join(never_released)}"
+                )
             if unrecoverable:
                 scope += (
                     f"; {unrecoverable} ref(s) absent for versions recorded "

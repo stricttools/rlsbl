@@ -379,6 +379,36 @@ class TestFullUnwind:
         assert not (repo / ".rlsbl/changes/1.0.1.jsonl").exists()
         assert not (repo / ".rlsbl/releases/v1.0.1.toml").exists()
 
+    def test_a_phantom_version_above_the_latest_release_is_not_undone(
+        self, tmp_path, monkeypatch,
+    ):
+        """The highest ARCHIVE is not always the latest RELEASE.
+
+        A version archived ``never_released = true`` is a version number no
+        release ever used -- a phantom tag's version, or one claimed and
+        abandoned. Undo used to take the highest archive outright, so on a
+        repository like this it selected the phantom, found no commit in its
+        archive, and died with "the release archive records no commit" --
+        leaving the real latest release un-undoable.
+        """
+        repo = tmp_path / "repo"
+        _make_released_repo(repo, n_commits=5)
+        archive_release(release_record_dir(repo), "1.0.2", None, never_released=True)
+        git(repo, "add", ".rlsbl/releases")
+        git(repo, "commit", "-q", "-m", "chore: record 1.0.2 as never released")
+        monkeypatch.chdir(repo)
+
+        gh = _run_undo(repo, {})
+
+        # The REAL latest release was undone, not the phantom.
+        assert json.loads((repo / "package.json").read_text())["version"] == "1.0.0"
+        assert "v1.0.1" not in git(repo, "tag", "-l").split()
+        assert [a for a in gh.calls if a[:2] == ["release", "delete"]] == [
+            delete_args("v1.0.1")
+        ], f"gh calls: {gh.calls}"
+        # The phantom's own archive is untouched: it records a fact, not a release.
+        assert (repo / ".rlsbl/releases/v1.0.2.toml").exists()
+
     def test_reverts_survive_post_release_hook_commit_after_tag(self, tmp_path, monkeypatch):
         """A post-release hook commit sitting AFTER the tag must not stop the
         walk from targeting the release commits (which are below the tag)."""

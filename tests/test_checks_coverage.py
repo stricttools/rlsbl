@@ -534,6 +534,67 @@ class TestUnpublishedRefsCheck:
         assert result.status == "pass", result
         assert len(calls) == 1, calls
 
+    def _archive_never_released(self, repo, version):
+        from rlsbl.release_file import write_archived_release_file
+
+        write_archived_release_file(
+            str(repo / ".rlsbl" / "releases"), version,
+            bump="patch", include=["pypi"], description=f"phantom {version}",
+            candidate_sha=None, tree_hashes=None, never_released=True,
+        )
+
+    def test_a_never_released_version_owes_no_refs(self, tmp_path, monkeypatch):
+        """A version number no release ever used has no refs to be missing.
+
+        Demanding them would make the check permanently red on a repository
+        that recorded a phantom version -- and the remedy it names,
+        ``rlsbl release reconcile``, skips such a version entirely, so there
+        would be nothing to run either.
+        """
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch, version="0.2.0")
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+        self._archive_never_released(repo, "0.2.0")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha}),
+            remote=TagCommitMap({"v0.1.0": sha}),
+        )
+        assert result.status == "pass", result
+        assert "never released" in result.message
+        assert "0.2.0" in result.message
+        # The phantom is not counted as a released version either.
+        assert "1 released version(s)" in result.message
+
+    def test_a_never_released_version_whose_tag_exists_is_still_no_finding(
+        self, tmp_path, monkeypatch,
+    ):
+        """The phantom tag case: the tag that created the phantom is still there.
+
+        It exists locally and on origin, carries no GitHub Release, and none of
+        that is a problem -- the version was never released, so no Release is
+        owed.
+        """
+        from rlsbl.utils import TagCommitMap
+
+        repo = self._project(tmp_path, monkeypatch, version="0.2.0")
+        record_release(repo, "v0.1.0")
+        sha = git_out(repo, "rev-parse", "v0.1.0^{}")
+        run_git(repo, "tag", "v0.2.0")
+        phantom = git_out(repo, "rev-parse", "v0.2.0^{}")
+        self._archive_never_released(repo, "0.2.0")
+
+        result = self._run(
+            make_ctx(repo),
+            local=TagCommitMap({"v0.1.0": sha, "v0.2.0": phantom}),
+            remote=TagCommitMap({"v0.1.0": sha, "v0.2.0": phantom}),
+            releases=["v0.1.0"],
+        )
+        assert result.status == "pass", result
+
     def test_every_archived_version_is_covered_not_just_the_latest(
         self, tmp_path, monkeypatch,
     ):

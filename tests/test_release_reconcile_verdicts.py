@@ -217,6 +217,75 @@ class TestTheFiveClasses:
         assert preview.by_key("refs/tags/v1.0.0").state == STATE_MATERIALIZE
 
 
+class TestNeverReleasedVersions:
+    """A version number no release ever used is outside the reconcile's account.
+
+    The reconcile answers "does origin agree with what this project RELEASED?".
+    A version archived ``never_released = true`` was never released, so it owns
+    no ref origin could be wrong about and no GitHub Release that could be
+    missing. It is skipped, counted and named -- and the refs it would have
+    owned are claimed, so a tag carrying its name never reaches the
+    unarchived-tag pass and can never fire the tripwire.
+    """
+
+    def _record(self, tmp_path):
+        releases = tmp_path / ".rlsbl" / "releases"
+        write_archived_release_file(
+            str(releases), "1.0.0", bump="minor", include=["plain"],
+            description="The first release.",
+            candidate_sha=NEW, tree_hashes={".": "f" * 40},
+        )
+        write_archived_release_file(
+            str(releases), "1.1.0", bump="minor", include=["plain"],
+            description="Claimed and abandoned.",
+            candidate_sha=None, tree_hashes=None, never_released=True,
+        )
+        return releases
+
+    def test_no_verdict_is_produced_for_it(self, tmp_path, capsys):
+        releases = self._record(tmp_path)
+        preview = build_preview(
+            observation=Observation(
+                remote_refs=_refs(v1_0_0=NEW), local_refs=_refs(v1_0_0=NEW),
+                releases=frozenset({"v1.0.0"}), releases_known=True,
+            ),
+            explanations=Explanations(),
+            target=BaseTarget(),
+            ref_ctx=ref_context(repo_root=str(tmp_path)),
+            releases_dir=str(releases),
+        )
+        assert preview.by_key("refs/tags/v1.1.0") is None
+        assert preview.by_key("release:v1.1.0") is None
+        out = capsys.readouterr().out
+        assert "never released" in out
+        assert "1.1.0" in out
+
+    def test_its_tag_existing_at_a_foreign_commit_does_not_trip_the_wire(
+        self, tmp_path,
+    ):
+        """The phantom-tag case, which is how such an archive comes to exist.
+
+        Origin and this checkout hold the tag at different commits, and no
+        record explains the difference -- but rlsbl never recorded where that
+        tag belongs, because the version was never released. Refusing here
+        would abort every reconcile on the repository forever.
+        """
+        releases = self._record(tmp_path)
+        preview = build_preview(
+            observation=Observation(
+                remote_refs={**_refs(v1_0_0=NEW), **_refs(v1_1_0=UNRELATED)},
+                local_refs={**_refs(v1_0_0=NEW), **_refs(v1_1_0=OLD)},
+                releases=frozenset({"v1.0.0"}), releases_known=True,
+            ),
+            explanations=Explanations(),
+            target=BaseTarget(),
+            ref_ctx=ref_context(repo_root=str(tmp_path)),
+            releases_dir=str(releases),
+        )
+        assert refusals(preview) == []
+        assert preview.by_key("refs/tags/v1.1.0") is None
+
+
 class TestTheTripwire:
 
     def test_one_refusal_is_reported_over_every_repairable_subject(

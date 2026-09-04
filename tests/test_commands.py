@@ -1220,6 +1220,7 @@ class TestStatusPayload:
         assert mock_out.getvalue() == ""
         expected_keys = {"name", "version", "target", "branch",
                          "latest_release", "latest_release_in_checkout",
+                         "latest_release_state", "never_released_versions",
                          "clean", "changelog", "jsonl_coverage",
                          "commits_ahead", "nearest_release_commit_tag",
                          "ci", "publish", "registry_version", "drift"}

@@ -252,23 +252,67 @@ def _find_latest_release(uc):
     which version is latest; the tag is then derived by translation
     (:func:`_build_tag_from_version`).
 
-    Only the archive's EXISTENCE is read here, not its release commit: everything
-    after this point -- the commit walk, the tag deletion, the revert --
-    operates on the tag namespace, so undo is an observe-and-repair layer over
-    tags in the same sense ``release reconcile`` is, and refusing to start
-    because a release commit and a tag disagree would refuse exactly the repair the
-    operator came for. The release commit IS read for the predecessor boundary, where
+    The archive's release commit is NOT read here: everything after this point
+    -- the commit walk, the tag deletion, the revert -- operates on the tag
+    namespace, so undo is an observe-and-repair layer over tags in the same
+    sense ``release reconcile`` is, and refusing to start because a release
+    commit and a tag disagree would refuse exactly the repair the operator came
+    for. The release commit IS read for the predecessor boundary, where
     it decides which commits belong to this release (see :func:`_build_plan`).
+
+    Its FATE is read, though, because the highest archive is not always the
+    latest release: an archive recorded ``never_released`` is a version number
+    no release ever used, so there is nothing there to undo. Taking the highest
+    archive outright made undo select such a phantom, find no commit in it, and
+    die -- leaving the real latest release un-undoable. The walk therefore
+    descends past every never-released archive to the highest one that names a
+    release. An archive that cannot be read at all does not silently shift the
+    selection onto an older release: it is a hard error naming the file.
 
     Returns ``(version, tag)``, or exits when nothing is recorded.
     """
-    from ..release_file import list_archived_versions
+    from ..release_file import (
+        archived_release_path,
+        list_archived_versions,
+        read_release_file,
+    )
 
-    versions = list_archived_versions(_release_record_dir(uc))
+    releases_dir = _release_record_dir(uc)
+    versions = list_archived_versions(releases_dir)
     if not versions:
         print("Error: no releases recorded. Nothing to undo.", file=sys.stderr)
         sys.exit(1)
-    return versions[0], _build_tag_from_version(uc, versions[0])
+
+    phantoms = []
+    for version in versions:
+        path = archived_release_path(releases_dir, version)
+        try:
+            cfg = read_release_file(path)
+        except Exception as exc:
+            _die(
+                f"Error: the release archive for {version} could not be read: {path}",
+                f"  {exc}",
+                "  Undo refused: nothing was destroyed. Which version is the "
+                "latest release cannot be",
+                "  decided while an archive above it is unreadable.",
+            )
+        if cfg.never_released:
+            phantoms.append(version)
+            continue
+        if phantoms:
+            print(
+                f"Skipping {', '.join(phantoms)}: recorded as never released, "
+                f"so there is no release there to undo. Undoing {version}.",
+                file=sys.stderr,
+            )
+        return version, _build_tag_from_version(uc, version)
+
+    _die(
+        f"Error: every archived version is recorded as never released "
+        f"({', '.join(phantoms)}).",
+        "  Those are version numbers no release ever used, so there is nothing "
+        "to undo.",
+    )
 
 
 def _version_and_msg(uc, tag):
@@ -351,7 +395,16 @@ def _release_commit(uc, version, tag):
             "  Undo refused: nothing was destroyed. That archive is what records "
             "which commit the release shipped from.",
         )
-    if cfg.unrecoverable or cfg.never_released or not cfg.candidate_sha:
+    if cfg.never_released:
+        _die(
+            f"Error: {version} is recorded as never released: {path}",
+            "  That version NUMBER exists in the record, but no release was "
+            "ever published under it,",
+            "  so there is nothing to undo. If a tag carrying its name exists, "
+            "delete it yourself --",
+            "  undo reverts releases, and this was not one.",
+        )
+    if cfg.unrecoverable or not cfg.candidate_sha:
         _die(
             f"Error: the release archive for {version} records no commit: {path}",
             "  Undo cannot find the release's own commits without it, and "

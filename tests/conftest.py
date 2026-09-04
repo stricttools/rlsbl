@@ -355,23 +355,31 @@ def release_record_dir(project_dir, *, releasable_dir=None):
     return os.path.join(str(project_dir), ".rlsbl", "releases")
 
 
-def archive_release(releases_dir, version, sha, *, tree=None, unrecoverable=False):
-    """Write a recorded release archive -- one release record entry -- for a test.
+def archive_release(releases_dir, version, sha, *, tree=None, unrecoverable=False,
+                    never_released=False):
+    """Write one release record entry -- an archive in one of the three fates.
 
     Tests that exercise the unreleased range need a RELEASE RECORD, not a tag: the
     range is bounded by the highest archived version whose ``candidate_sha``
     the checkout contains.  A repo fixture that only creates ``v0.0.0`` now
     also archives it here, released from the commit the tag names.
+
+    ``unrecoverable`` writes the archive of a version that SHIPPED from a commit
+    nothing can name; ``never_released`` writes the archive of a version NUMBER
+    no release ever used.  Both are commitless, so ``sha`` and ``tree`` are
+    ignored for them.
     """
     from rlsbl.release_file import write_archived_release_file
 
+    commitless = unrecoverable or never_released
     os.makedirs(str(releases_dir), exist_ok=True)
     return write_archived_release_file(
         str(releases_dir), version,
         bump="patch", include=[], description=f"release {version}",
-        candidate_sha=None if unrecoverable else sha,
-        tree_hashes=None if unrecoverable else {".": tree or ("b" * 40)},
+        candidate_sha=None if commitless else sha,
+        tree_hashes=None if commitless else {".": tree or ("b" * 40)},
         unrecoverable=unrecoverable,
+        never_released=never_released,
     )
 
 

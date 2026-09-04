@@ -1194,8 +1194,18 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
       classified, which is what makes the publication tripwire fire for a
       repository that has no archives at all.
 
-    An ``unanchorable`` version is skipped entirely: it has no commit, so there
-    is nothing to compare a ref against and nothing to create one at.
+    Two archive fates are skipped entirely, for different reasons:
+
+    * an ``unrecoverable`` version has no commit, so there is nothing to
+      compare a ref against and nothing to create one at;
+    * a ``never_released`` version was never released at all, so it owns no ref
+      origin could be wrong about and no GitHub Release that could be missing.
+      Its would-be refs are CLAIMED even though no verdict is produced for
+      them, so a tag carrying its name -- the phantom tag that is usually why
+      such an archive exists -- never reaches the unarchived-tag pass below and
+      can never fire the tripwire. rlsbl never recorded where that tag belongs,
+      so it has nothing to say about where origin holds it; refusing would
+      abort every reconcile on the repository forever.
 
     *release_commit_overrides* is :func:`heal_dangling_release_commits`' answer: the release commits
     the release record WOULD carry once healed, keyed by version. Outside a dry run the
@@ -1214,6 +1224,7 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
     items = []
     claimed = set()
     unrecoverable = []
+    never_released = []
 
     for version in list_archived_versions(releases_dir):
         path = archived_release_path(releases_dir, version)
@@ -1225,6 +1236,23 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
                 f"({exc}), so the refs it owns are unknown and the reconcile "
                 f"cannot say whether origin is right about them."
             ) from exc
+        if archive.never_released:
+            never_released.append(version)
+            # Claim the refs it WOULD have owned, without judging any of them:
+            # the version was never released, so there is nothing to compare
+            # origin against, and leaving the refname unclaimed would hand a
+            # phantom tag to the unarchived-tag pass, where a divergence is
+            # refuse-foreign and aborts everything.
+            try:
+                for tag in target.expected_refs(version, ref_ctx).tags:
+                    claimed.add(f"refs/tags/{tag}")
+            except RlsblError:
+                # The ref names could not be derived. Nothing is owed for this
+                # version either way, so this costs only the claim -- a tag of
+                # its name falls to the unarchived pass, which is where an
+                # unrecognized tag belongs.
+                pass
+            continue
         if archive.unrecoverable:
             unrecoverable.append(version)
             continue
@@ -1234,9 +1262,10 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
         )
         if not release_commit:
             raise ReconcileError(
-                f"the release archive for {version} carries neither a release commit "
-                f"nor the unrecoverable marker ({path}), so there is no commit "
-                f"its refs should point at. Backfill it before reconciling."
+                f"the release archive for {version} records no fate ({path}): "
+                f"no release commit, no unrecoverable marker and no "
+                f"never_released marker, so there is no commit its refs should "
+                f"point at. Backfill it before reconciling."
             )
 
         expected = target.expected_refs(version, ref_ctx)
@@ -1272,6 +1301,12 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
         items.append(verdict)
 
     preview = Preview(tuple(items))
+    if never_released:
+        print(
+            f"Skipping {len(never_released)} version(s) recorded never released "
+            f"(no release, so no ref or Release is owed): "
+            f"{', '.join(never_released)}"
+        )
     if unrecoverable:
         print(
             f"Skipping {len(unrecoverable)} version(s) recorded unrecoverable "

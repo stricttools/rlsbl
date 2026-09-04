@@ -708,6 +708,15 @@ _STATUS_PAYLOAD_SCHEMA = {
         "branch": {"type": ["string", "null"]},
         "latest_release": {"type": ["string", "null"]},
         "latest_release_in_checkout": {"type": ["boolean", "null"]},
+        # The version-fate model. `latest_release_state` is the fate of the
+        # archive `latest_release` names; the third fate cannot appear there,
+        # because a never-released version is not a release, so it is listed
+        # by name instead.
+        "latest_release_state": {
+            "type": ["string", "null"],
+            "enum": ["recorded", "unrecoverable", None],
+        },
+        "never_released_versions": {"type": "array", "items": {"type": "string"}},
         "clean": {"type": ["boolean", "null"]},
         "changelog": {"type": ["boolean", "null"]},
         "jsonl_coverage": {"type": "string"},
@@ -726,7 +735,8 @@ _STATUS_PAYLOAD_SCHEMA = {
     },
     "required": [
         "name", "version", "target", "branch", "latest_release",
-        "latest_release_in_checkout", "clean", "changelog",
+        "latest_release_in_checkout", "latest_release_state",
+        "never_released_versions", "clean", "changelog",
         "jsonl_coverage", "commits_ahead", "nearest_release_commit_tag", "ci",
         "publish", "registry_version", "drift",
     ],
