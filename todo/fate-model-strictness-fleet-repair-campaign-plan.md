@@ -708,9 +708,20 @@ Effort: large.
   rewrite after the root member rename; the per-family tag reckoning).
 - Then, in order: reconcile runs for the repos newly migrated in this
   phase (same limits, same tally); the editable install is restored; the
-  closing fleet pass runs (status plus cheap checks in every repo — by
-  hand this once; the fleet health runner is another project's filed
-  todo); the deferred items are filed as todos in this repo's backlog
+  rlsbl reference sections of the user-level rules file at
+  `~/Projects/CLAUDE.md` are refreshed against the shipped surface — the
+  retired script's two mentions retargeted to `rlsbl release backfill`,
+  the renamed literals updated (`unanchorable` → `unrecoverable`,
+  `anchor-remap` → `release-commit-remap`, `lineage.jsonl` →
+  `transitions.jsonl`), the new and deleted surfaces documented (both new
+  commands, `changelog remove`, the remote-release deletion, the
+  strictness refusals, the hygiene refusals), and the pgdesign phantom
+  paragraph in the Go-tools section rewritten to the post-retraction
+  reality — composed aside and applied as ONE atomic Write, the file's
+  only edit in the whole campaign; the closing fleet pass runs (status
+  plus cheap checks in every repo — by hand this once; the fleet health
+  runner is another project's filed todo); the deferred items are filed
+  as todos in this repo's backlog
   (the batch release-file reader's unification onto the schema authority;
   the config-schema completion and wiring named by the policed-surfaces
   list); completed todos move to done with the campaign record file; and
