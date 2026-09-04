@@ -326,7 +326,7 @@ class TestContractViolation:
         assert _remote_main(remote) == tip_before  # untouched
 
 
-class TestLineageUndetermined:
+class TestTransitionRecordUndetermined:
     """A walk git cannot finish refuses WITHOUT accusing anybody.
 
     The hazard the foreign-commit verdict used to swallow: when the mirror's
@@ -352,13 +352,13 @@ class TestLineageUndetermined:
         _git(elsewhere, "push", "-q", remote, "main:refs/heads/main")
         return _git(elsewhere, "rev-parse", "HEAD")
 
-    def test_plan_reports_lineage_undetermined(self, mono, tmp_path):
+    def test_plan_reports_ancestry_undetermined(self, mono, tmp_path):
         remote = _init_bare(tmp_path / "mirror.git")
         _make_monorepo(mono, subtree_remote=remote)
         unreachable = self._mirror_with_unreachable_history(remote, tmp_path)
 
         plan = observe(remote, str(mono), "mylib")
-        assert plan.state == "lineage_undetermined"
+        assert plan.state == "ancestry_undetermined"
         assert plan.undetermined_commits == [unreachable]
         assert plan.foreign_commits == [], (
             "nothing was shown to be foreign, so the field that says so must "
@@ -375,7 +375,7 @@ class TestLineageUndetermined:
             _cmd_mirror({"project": "mylib"}, project_root=mono)
         assert exc.value.code == 1
         err = capsys.readouterr().err
-        assert "lineage-undetermined" in err
+        assert "ancestry-undetermined" in err
         assert "could not determine" in err
         assert "never fetched" in err or "pruned" in err
         for accusation in (
@@ -398,7 +398,7 @@ class TestLineageUndetermined:
         _cmd_mirror({"project": "mylib", "dry-run": True}, project_root=mono)
 
         out = capsys.readouterr().out
-        assert "lineage-undetermined" in out
+        assert "ancestry-undetermined" in out
         assert "Remediation" in out
         assert _remote_main(remote) == tip_before
 

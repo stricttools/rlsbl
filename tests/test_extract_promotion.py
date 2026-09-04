@@ -7,7 +7,7 @@ standalone history of the same code with commit ids no consumer resolves, so
 ``rlsbl monorepo extract`` switches engines when a mirror binding exists: the
 destination starts from the mirror, the deletion is justified by tree-hash
 equality, and the monorepo-to-mirror correspondence is persisted into the
-extracted repository's own lineage record.
+extracted repository's own transition record.
 
 Nothing here needs git-filter-repo (a promotion filters nothing), and the
 mirror remote is always a local bare repository.
@@ -30,9 +30,9 @@ from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
 from rlsbl.commands.monorepo.extract import ExtractError
 from rlsbl.commands.monorepo.extract_cmd import cmd_extract
 from rlsbl.commands.monorepo.mirror_cmd import converge_branch
-from rlsbl.lineage import (
+from rlsbl.transition_record import (
     KIND_PROMOTION_SPLIT_MAP,
-    get_lineage_path,
+    get_transition_record_path,
     read_events,
 )
 from rlsbl.mirror_publication import split_commit_for
@@ -208,13 +208,13 @@ class TestApply:
         # Nothing was taken out of the source.
         assert (ns.root / "pkg").is_dir()
 
-    def test_the_split_map_is_persisted_into_the_lineage_record(self, tmp_path):
+    def test_the_split_map_is_persisted_into_the_transition_record_record(self, tmp_path):
         ns, mirror = make_promotable(tmp_path)
         target = tmp_path / "out"
         cmd_extract(str(ns.root), "pkg", str(target), delete_with_rm=True)
 
         events = read_events(
-            get_lineage_path(str(target)), kinds=[KIND_PROMOTION_SPLIT_MAP],
+            get_transition_record_path(str(target)), kinds=[KIND_PROMOTION_SPLIT_MAP],
         )
         assert len(events) == 1
         event = events[0]

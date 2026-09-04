@@ -1,7 +1,7 @@
 """``expected_refs`` is the single authority for a version's full ref set.
 
 Three sources compose into one answer -- the primary tag, the ecosystem's
-companion tags, and the aliases the lineage record attributes to the version --
+companion tags, and the aliases the transition record attributes to the version --
 and the release's tag step creates exactly that set. These tests pin both: the
 composition itself, and the equality between what the release pushes and what
 the authority names.
@@ -15,11 +15,11 @@ from pathlib import Path
 import pytest
 
 from githarness import git as _git
-from rlsbl.lineage import (
+from rlsbl.transition_record import (
     BoundaryAlias,
     BoundaryAliasEvent,
     append_events,
-    get_lineage_path,
+    get_transition_record_path,
 )
 from rlsbl.targets import TARGETS
 from rlsbl.targets.base import BaseTarget
@@ -104,7 +104,7 @@ class TestRecordedAliases:
         rel_dir = tmp_path / ".rlsbl-monorepo" / "releasables" / "core"
         rel_dir.mkdir(parents=True)
         _record_alias(
-            get_lineage_path(str(tmp_path), releasable_dir=str(rel_dir)),
+            get_transition_record_path(str(tmp_path), releasable_dir=str(rel_dir)),
             "core@v1.0.0", "old@v1.0.0",
         )
 
@@ -122,7 +122,7 @@ class TestRecordedAliases:
         rel_dir = tmp_path / ".rlsbl-monorepo" / "releasables" / "core"
         rel_dir.mkdir(parents=True)
         _record_alias(
-            get_lineage_path(str(tmp_path), releasable_dir=str(rel_dir)),
+            get_transition_record_path(str(tmp_path), releasable_dir=str(rel_dir)),
             "core@v1.0.0", "old@v1.0.0",
         )
 
@@ -138,7 +138,7 @@ class TestRecordedAliases:
         rel_dir = tmp_path / ".rlsbl-monorepo" / "releasables" / "core"
         rel_dir.mkdir(parents=True)
         _record_alias(
-            get_lineage_path(str(tmp_path), releasable_dir=str(rel_dir)),
+            get_transition_record_path(str(tmp_path), releasable_dir=str(rel_dir)),
             "core@v1.0.0-rc.1", "old@v1.0.0-rc.1",
         )
 
@@ -154,7 +154,7 @@ class TestRecordedAliases:
         rel_dir = tmp_path / ".rlsbl-monorepo" / "releasables" / "core"
         rel_dir.mkdir(parents=True)
         _record_alias(
-            get_lineage_path(str(tmp_path), releasable_dir=str(rel_dir)),
+            get_transition_record_path(str(tmp_path), releasable_dir=str(rel_dir)),
             "latest", "core@v1.0.0",
         )
 
@@ -167,17 +167,17 @@ class TestRecordedAliases:
 
     def test_a_standalone_project_reads_its_own_record(self, tmp_path):
         (tmp_path / ".rlsbl").mkdir()
-        _record_alias(get_lineage_path(str(tmp_path)), "v1.0.0", "old@v1.0.0")
+        _record_alias(get_transition_record_path(str(tmp_path)), "v1.0.0", "old@v1.0.0")
 
         refs = BaseTarget().expected_refs("1.0.0", ref_context(repo_root=str(tmp_path)))
         assert set(refs.aliases) == {"v1.0.0", "old@v1.0.0"}
 
     def test_a_malformed_record_is_a_hard_error(self, tmp_path):
-        from rlsbl.lineage import LineageError
+        from rlsbl.transition_record import TransitionRecordError
 
         (tmp_path / ".rlsbl").mkdir()
-        Path(get_lineage_path(str(tmp_path))).write_text("{not json\n", encoding="utf-8")
-        with pytest.raises(LineageError):
+        Path(get_transition_record_path(str(tmp_path))).write_text("{not json\n", encoding="utf-8")
+        with pytest.raises(TransitionRecordError):
             BaseTarget().expected_refs("1.0.0", ref_context(repo_root=str(tmp_path)))
 
 
@@ -186,14 +186,14 @@ class TestRefContextConstruction:
     def test_a_releasable_reads_only_its_own_record(self, tmp_path):
         rel_dir = tmp_path / ".rlsbl-monorepo" / "releasables" / "core"
         context = ref_context(repo_root=str(tmp_path), releasable_config_dir=str(rel_dir))
-        assert context.lineage_paths == (
-            os.path.join(str(rel_dir), "lineage.jsonl"),
+        assert context.transition_record_paths == (
+            os.path.join(str(rel_dir), "transitions.jsonl"),
         )
 
     def test_a_monorepo_package_reads_its_own_directory_record(self, tmp_path):
         context = ref_context(repo_root=str(tmp_path), project_path="packages/mylib")
-        assert context.lineage_paths == (
-            os.path.join(str(tmp_path), "packages", "mylib", ".rlsbl", "lineage.jsonl"),
+        assert context.transition_record_paths == (
+            os.path.join(str(tmp_path), "packages", "mylib", ".rlsbl", "transitions.jsonl"),
         )
 
     def test_member_paths_none_is_preserved_as_none(self, tmp_path):
@@ -258,7 +258,7 @@ class TestTheReleaseTagsExactlyTheExpectedSet:
         _git(root, "tag", "old@v1.0.0")
         commit = _git(root, "rev-list", "-n", "1", "old@v1.0.0")
         _record_alias(
-            get_lineage_path(str(root), releasable_dir=str(rel_dir)),
+            get_transition_record_path(str(root), releasable_dir=str(rel_dir)),
             "core@v1.0.0", "old@v1.0.0", commit=commit,
         )
 

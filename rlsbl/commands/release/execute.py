@@ -3221,7 +3221,7 @@ def _run_release_mutating(state: ReleaseState):
                 # SUBTREE_PUBLISHED -- the mirror's BRANCH, through the mirror
                 # reconciler itself. Not a hand-rolled push: the reconciler
                 # observes the remote, refuses a mirror carrying foreign work or
-                # one whose lineage it could not establish, force-pushes the new
+                # one whose ancestry it could not establish, force-pushes the new
                 # split WITH A LEASE, and re-applies the scaffold layer. The
                 # unforced `_rlsbl-subtree-tmp:refs/heads/main` push this
                 # replaced could only ever succeed on a mirror that had no

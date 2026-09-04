@@ -1,6 +1,6 @@
 """What a recorded conversion still owes the outside world.
 
-A lineage record states what repository surgery DID; two of those facts imply
+A transition record states what repository surgery DID; two of those facts imply
 an obligation that lives outside this repository, and nothing verifies them
 today:
 
@@ -25,18 +25,18 @@ retired repo -- both findings print the exact command instead.
 import subprocess
 
 from . import effects
-from .lineage import KIND_CONVERSION, KIND_IDENTITY_TRANSITION
+from .transition_record import KIND_CONVERSION, KIND_IDENTITY_TRANSITION
 
 #: The forge whose API these probes speak. A conversion source on any other
 #: host is reported as unprobeable rather than guessed at.
 GITHUB_HOST = "github.com"
 
-#: The lineage facet whose transitions imply a Go deprecation.
+#: The transition record facet whose transitions imply a Go deprecation.
 GO_MODULE_FACET = "go-module-path"
 
 
 class FollowupVerdict:
-    """Findings, notes, and a skip reason for one lineage-derived check."""
+    """Findings, notes, and a skip reason for one transition-record-derived check."""
 
     def __init__(self, *, problems=None, notes=None, skip_reason=None):
         self.problems = list(problems or [])
@@ -156,7 +156,7 @@ def evaluate_old_repo_archived(events, *, probe=probe_repo_archived):
     sources = absorbed_sources(events)
     if not sources:
         return FollowupVerdict(
-            skip_reason="the lineage record contains no absorb conversion",
+            skip_reason="the transition record contains no absorb conversion",
         )
 
     problems = []
@@ -211,7 +211,7 @@ def evaluate_go_deprecation_published(events, *, probe=None):
     if not transitions:
         return FollowupVerdict(
             skip_reason=(
-                "the lineage record contains no go-module-path identity "
+                "the transition record contains no go-module-path identity "
                 "transition"
             ),
         )

@@ -45,7 +45,7 @@ destination starts from the mirror instead: it is cloned, the monorepo-to-mirror
 correspondence is derived by splitting each commit the conversion has to
 translate, the deletion is justified by tree-hash equality against the mirror's
 pre-scaffold split commit, and the correspondence is persisted into the
-destination's lineage record as a ``promotion-split-map`` event. Everything
+destination's transition record as a ``promotion-split-map`` event. Everything
 below applies to both engines except where it names the filter.
 
 What an apply actually moves
@@ -65,7 +65,7 @@ What an apply actually moves
 * **The whole release state**: the releasable's state directory -- version,
   ``changes/`` (locked JSONL and generated markdown), ``releases/`` (the
   archives, anchors included), ``config.json``, ``lint/``, ``hooks/`` and its own
-  lineage record -- moves to wherever the destination keeps it: ``.rlsbl/`` for a
+  transition record -- moves to wherever the destination keeps it: ``.rlsbl/`` for a
   standalone successor, ``.rlsbl-monorepo/releasables/<name>/`` for a workspace.
 * **The anchors and the changelog hashes are remapped** through filter-repo's
   commit map (or, for a promotion, the subtree-split correspondence), and the
@@ -76,7 +76,7 @@ What an apply actually moves
   repository. Another live member's tags are pruned; a tag matching no current
   member is KEPT (it is most likely this releasable's own history under an older
   prefix, and release history is never destroyed on a guess).
-* **A lineage record** in the destination explains all of it, and the source
+* **A transition record** in the destination explains all of it, and the source
   records the departure of the releasable's tag globs.
 
 What it does NOT do: push anything (the tags it creates are local -- the
@@ -95,20 +95,20 @@ from dataclasses import dataclass, field
 from ...changelog.files import load_filter_repo_commit_map
 from ...config import read_json_config
 from ...errors import ConfigError, WorkspaceError
-from ...lineage import (
+from ...transition_record import (
     AnchorMapping,
     AnchorRemapEvent,
     BoundaryAlias,
     BoundaryAliasEvent,
     ConversionEvent,
     DepartedGlobsEvent,
-    LineageEndpoint,
+    TransitionRecordEndpoint,
     PromotionSplitMapEvent,
     SplitMapping,
     TagMapEvent,
     TagMapping,
     append_events,
-    get_lineage_path,
+    get_transition_record_path,
 )
 from ...lock import rlsbl_lock
 from ...ownership import find_root_member
@@ -160,7 +160,7 @@ ITEM_TREES = "trees"
 ITEM_STATE = "state"
 ITEM_TAGS = "tags"
 ITEM_DESTINATION = "destination"
-ITEM_LINEAGE = "lineage"
+ITEM_TRANSITION_RECORD = "transition-record"
 ITEM_SOURCE = "source"
 ITEM_NEXT_STEPS = "next-steps"
 
@@ -275,7 +275,7 @@ class Applied:
     state_commit: str = ""
     #: ``(monorepo sha, mirror sha)`` pairs, in the order they were derived.
     #: The promotion's whole translation, persisted into the destination's
-    #: lineage record so the extracted repository can explain its own hashes.
+    #: transition record so the extracted repository can explain its own hashes.
     split_mappings: list = field(default_factory=list)
     #: Monorepo commits whose mirror commit could not be derived, with why.
     unmapped_splits: list = field(default_factory=list)
@@ -437,7 +437,7 @@ def _root_state_dir(workspace_root, projects, releasables):
     live in the state directory of the releasable it belongs to. A root member
     outside every releasable (the common dev-node root) has no releasable
     directory, and its state home is the repository's own ``.rlsbl/``. Both
-    answers feed :func:`rlsbl.lineage.get_lineage_path` and the config writer,
+    answers feed :func:`rlsbl.transition_record.get_transition_record_path` and the config writer,
     which is why one function resolves them.
     """
     root_member = find_root_member(projects)
@@ -1358,17 +1358,17 @@ def observe(dep) -> Preview:
     if plan.alias:
         events.append("boundary-alias")
     items.append(VerdictItem(
-        key=ITEM_LINEAGE,
-        state="record_lineage",
+        key=ITEM_TRANSITION_RECORD,
+        state="record_transition_record",
         summary=(
-            f"a lineage record in the destination explains the conversion: "
+            f"a transition record in the destination explains the conversion: "
             f"{', '.join(events)}."
         ),
         facts=(
             f"destination record: "
-            f"{_relative(dep.target_path, get_lineage_path(dep.target_path, releasable_dir=dep.dest_state_dir if dep.is_multi else None))}",
+            f"{_relative(dep.target_path, get_transition_record_path(dep.target_path, releasable_dir=dep.dest_state_dir if dep.is_multi else None))}",
             f"source record: "
-            f"{_relative(dep.workspace_root, _source_lineage_path(dep))} "
+            f"{_relative(dep.workspace_root, _source_transition_record_path(dep))} "
             f"(departed-globs: {', '.join(dep.departed_globs)})",
         ),
     ))
@@ -1415,22 +1415,22 @@ def _departing_registry_names(dep):
     return sorted({m.registry_name or m.name for m in dep.members})
 
 
-def _source_lineage_path(dep):
+def _source_transition_record_path(dep):
     """Where the SOURCE records the departure: the WORKSPACE-scoped record.
 
-    ``<root>/.rlsbl-monorepo/lineage.jsonl``. A departure is a fact about this
+    ``<root>/.rlsbl-monorepo/transitions.jsonl``. A departure is a fact about this
     repository's tag namespace -- these globs stopped belonging here -- not
     about any releasable in it, and the departing releasable's own record leaves
     with the conversion. The other two candidates are both wrong:
 
-    * ``<root>/.rlsbl/lineage.jsonl`` (the standalone home) cannot exist in a
+    * ``<root>/.rlsbl/transitions.jsonl`` (the standalone home) cannot exist in a
       workspace at all: rlsbl's ``root-rlsbl-conflict`` check refuses a root
       ``.rlsbl/`` beside ``.rlsbl-monorepo/``, so writing there would make the
       source fail its own workspace checks;
     * a surviving releasable's record would file a repository-wide fact under
       whichever releasable happened to be picked.
     """
-    return get_lineage_path(dep.workspace_root, workspace=True)
+    return get_transition_record_path(dep.workspace_root, workspace=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1500,7 +1500,7 @@ def _apply_filter(dep, item, run):
 # mirror was built from, asked per commit, and it is what carries the release
 # state across: the changelog hashes and the release anchors are monorepo
 # commits, and every one of them is translated through it. The map is persisted
-# into the destination's lineage record, so the promoted repository can explain
+# into the destination's transition record, so the promoted repository can explain
 # its own hashes without the monorepo.
 
 
@@ -1630,7 +1630,7 @@ def _require_clean_mirror_contract(dep, member):
     mirror be converged?" are answered by one classification rather than by two
     that can drift apart.
 
-    ``contract_violated`` and ``lineage_undetermined`` refuse: the first because
+    ``contract_violated`` and ``ancestry_undetermined`` refuse: the first because
     a promotion would make hand-authored commits the permanent history of the
     extracted repository, the second because whether that is what would happen
     was never established. Neither refusal sends the operator at
@@ -1672,15 +1672,15 @@ def _require_clean_mirror_contract(dep, member):
             f"been written to the source and {dep.target_path} can be deleted."
         )
 
-    if plan.state == "lineage_undetermined":
+    if plan.state == "ancestry_undetermined":
         listed = "\n".join(
             f"  - commit {sha[:12]}: git could not tell whether it belongs to "
-            f"the split lineage."
+            f"the split ancestry."
             for sha in plan.undetermined_commits
         )
         raise ExtractError(
             f"the mirror at {dep.mirror_remote} could not be shown to share "
-            f"this member's split lineage, so a promotion cannot say whose "
+            f"this member's split ancestry, so a promotion cannot say whose "
             f"history it would adopt:\n{listed}\n"
             f"This is NOT a finding of hand-authored work -- the question was "
             f"never answered, usually because the monorepo lacks the objects "
@@ -1958,7 +1958,7 @@ def _remap_anchors(dep, run):
     An anchor whose commit the filter pruned is left exactly as it was and NAMED
     on stderr. Rewriting it to nothing would be worse (the fields are the record
     of what shipped), and aborting mid-conversion would leave a half-converted
-    pair of repositories -- the lineage record is what explains the stale value.
+    pair of repositories -- the transition record is what explains the stale value.
 
     A tree that DOES resolve is checked rather than merely rewritten. Tree
     hashes are content-addressed, so a faithful filter recomputes the recorded
@@ -2216,22 +2216,22 @@ def _assert_destination_loads(dep):
         ) from exc
 
 
-def _apply_lineage(dep, item, run):
-    """Write the destination's lineage record: conversion first, then the rest."""
-    path = get_lineage_path(
+def _apply_transition_record(dep, item, run):
+    """Write the destination's transition record: conversion first, then the rest."""
+    path = get_transition_record_path(
         dep.target_path,
         releasable_dir=dep.dest_state_dir if dep.is_multi else None,
     )
     conversion = ConversionEvent(
         direction="extract",
-        source=LineageEndpoint(
+        source=TransitionRecordEndpoint(
             repo=dep.source_repo_url,
             path=dep.member_paths[0] if not dep.is_multi else None,
             project=dep.member_names[0] if not dep.is_multi else None,
             releasable=dep.releasable.name,
             tag_format=dep.releasable.effective_tag_format,
         ),
-        destination=LineageEndpoint(
+        destination=TransitionRecordEndpoint(
             repo=".",
             releasable=dep.releasable.name,
             tag_format=dep.dest_tag_format,
@@ -2276,19 +2276,19 @@ def _apply_lineage(dep, item, run):
         append_events(path, followers)
 
     commit_files(
-        f"chore: record the {dep.releasable.name} extract lineage",
+        f"chore: record the {dep.releasable.name} extract transition record",
         [os.path.relpath(path, dep.target_path)],
         cwd=dep.target_path,
     )
-    print(f"  lineage: {len(followers) + 1} event(s) recorded.")
+    print(f"  transition record: {len(followers) + 1} event(s) recorded.")
 
 
 def _apply_source(dep, item, run):
     """Remove the departed members from the source and commit the whole edit."""
-    lineage_path = _source_lineage_path(dep)
-    append_events(lineage_path, [DepartedGlobsEvent(
+    transition_record_path = _source_transition_record_path(dep)
+    append_events(transition_record_path, [DepartedGlobsEvent(
         globs=list(dep.departed_globs),
-        destination=LineageEndpoint(
+        destination=TransitionRecordEndpoint(
             repo=dep.target_path,
             releasable=dep.releasable.name,
             tag_format=dep.dest_tag_format,
@@ -2411,7 +2411,7 @@ def _apply_next_steps(dep, item, run):
     if run.unremapped_anchors:
         # Said once more at the end, where it will still be on screen: these
         # archives record a commit that no longer exists in the new repository,
-        # and the lineage record is what explains why.
+        # and the transition record is what explains why.
         print(
             "\nRelease anchors left as recorded (their commits did not survive "
             "the filter):",
@@ -2464,7 +2464,7 @@ _APPLY_STEPS = {
     ITEM_STATE: _apply_state,
     ITEM_TAGS: _apply_tag_step,
     ITEM_DESTINATION: _apply_destination,
-    ITEM_LINEAGE: _apply_lineage,
+    ITEM_TRANSITION_RECORD: _apply_transition_record,
     ITEM_SOURCE: _apply_source,
     ITEM_NEXT_STEPS: _apply_next_steps,
 }

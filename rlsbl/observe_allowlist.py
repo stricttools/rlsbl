@@ -90,7 +90,7 @@ Consequences of the standard, entry by entry
 * ``git subtree split --prefix`` is pinned with ``--prefix`` as its own token,
   and the mirror reconciler issues exactly that spelling (``["subtree",
   "split", "--prefix", path]``, not ``--prefix=path``) so the pin can name it.
-  A branchless split prints a SHA and materializes the synthetic split lineage
+  A branchless split prints a SHA and materializes the synthetic split ancestry
   as loose objects: no ref, no index, no worktree -- the scratch-write clause.
   Its residual hazard is the same class as the fetch's: ``-b <branch>`` DOES
   create a ref, and prefix matching cannot refuse a flag APPENDED after the
@@ -230,7 +230,7 @@ OBSERVE_ALLOWLIST = (
     ObserveEntry(
         ("git", "subtree", "split", "--prefix"), "scratch-write",
         "the deterministic branchless split the mirror reconciler observes: it "
-        "prints the resulting SHA and materializes the synthetic split lineage "
+        "prints the resulting SHA and materializes the synthetic split ancestry "
         "as loose objects, creating no ref, taking no index lock and leaving "
         "the worktree alone. RESIDUAL, same class as the pinned fetch's: "
         "`-b <branch>` DOES create a ref and prefix matching cannot refuse a "

@@ -10,7 +10,7 @@ at commits that no longer exist.
 What changed is the shape of the answer. The reconcile is no longer a
 journal-driven tag pusher: it observes origin once, judges every subject against
 FOUR merged explanation sources (safegit's journal, the release record's
-anchors, the lineage records, and the committed scrub archives), and emits one
+anchors, the transition records, and the committed scrub archives), and emits one
 merged preview whose verdicts are ``materialize``, ``already-correct``,
 ``re-point-with-lease``, ``refuse-foreign`` or ``refuse-identity-mismatch``.
 Consent is file-driven: ``--plan`` writes the plan, ``--apply`` performs it.
@@ -237,7 +237,7 @@ def _observe(repo):
     target, ref_ctx, releases_dir = _resolve_identity(ctx)
     with patch(f"{MOD}.check_gh_installed", return_value=False):
         observation = observe_world(ctx=ctx)
-    explanations = collect_explanations([releases_dir], ref_ctx.lineage_paths)
+    explanations = collect_explanations([releases_dir], ref_ctx.transition_record_paths)
     return build_preview(
         observation=observation, explanations=explanations, target=target,
         ref_ctx=ref_ctx, releases_dir=releases_dir,
@@ -452,7 +452,7 @@ class TestTheReleaseRecordAfterAnOutOfBandRewrite:
         self, e2e_env, monkeypatch, capsys,
     ):
         """The heal is driven by a record, never by inference: with no journal,
-        no lineage event and no committed scrub archive, the release record names a
+        no transition record event and no committed scrub archive, the release record names a
         commit nobody can account for and the reconcile refuses."""
         repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
@@ -529,7 +529,7 @@ class TestThePublicationTripwire:
         _raw_safegit_scrub(repo)
 
         # Someone moves the tag by hand onto an unrelated commit after the
-        # rewrite: no journal entry, lineage record or scrub archive maps the
+        # rewrite: no journal entry, transition record or scrub archive maps the
         # remote value to this one.
         extra = _commit_file(repo, "note.txt", "hand-made\n", "manual commit")
         _git(repo, "tag", "-d", "v1.0.0")

@@ -41,7 +41,7 @@ ANCHOR_FIELDS = ("candidate_sha", "tree_hashes")
 UNANCHORABLE_FIELD = "unanchorable"
 
 # A git object name (commit or tree). The same shape the schema's
-# GitObjectHash refinement states -- and the same the lineage schema's GitSha
+# GitObjectHash refinement states -- and the same the transition record schema's GitSha
 # states -- restated here because the writer refuses a malformed anchor BEFORE
 # it reaches the file, rather than producing an archive the reader will later
 # reject.

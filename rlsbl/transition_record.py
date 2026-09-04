@@ -1,6 +1,6 @@
-"""Committed lineage records: an append-only log of repository-surgery facts.
+"""Committed transition records: an append-only log of repository-surgery facts.
 
-A LINEAGE RECORD is a JSONL file, one event per line, recording what a
+A TRANSITION RECORD is a JSONL file, one event per line, recording what a
 repository conversion actually did -- which tags were renamed, which commits a
 history rewrite moved, which tag globs departed with an extracted sub-project,
 which published identity changed and from which version. It is written by the
@@ -13,16 +13,16 @@ reader consults the record to EXPLAIN a divergence it already observed.
 Where the file lives
 --------------------
 
-One resolution function, :func:`get_lineage_path`, decides the path, and all
+One resolution function, :func:`get_transition_record_path`, decides the path, and all
 three locations hold the same format:
 
 - explicit-monorepo mode: inside the releasable's state directory,
-  ``.rlsbl-monorepo/releasables/<name>/lineage.jsonl`` -- pass
+  ``.rlsbl-monorepo/releasables/<name>/transitions.jsonl`` -- pass
   ``releasable_dir`` (build it with
   :func:`rlsbl.workspace_types.get_releasable_dir`);
 - standalone repos, including a standalone successor produced by an extract:
-  ``<project>/.rlsbl/lineage.jsonl``;
-- the workspace itself: ``<root>/.rlsbl-monorepo/lineage.jsonl`` -- pass
+  ``<project>/.rlsbl/transitions.jsonl``;
+- the workspace itself: ``<root>/.rlsbl-monorepo/transitions.jsonl`` -- pass
   ``workspace=True``.
 
 The first two mirror :func:`rlsbl.release_file.get_releases_dir` exactly -- the
@@ -74,8 +74,8 @@ Validation and where errors fire
 --------------------------------
 
 The strictspec-generated validator
-(``rlsbl/strictspec_gen/lineage_event_validator.py``, schema
-``.strictspec/lineage-event.schema.toml``) is the document authority for one
+(``rlsbl/strictspec_gen/transition_record_event_validator.py``, schema
+``.strictspec/transition-record-event.schema.toml``) is the document authority for one
 line: the ``format_version`` gate, the ``kind`` discriminator and its arm set,
 field types, enums, required fields, and unknown-key rejection. rlsbl keeps only
 what strictspec cannot see -- whether a recorded SHA still resolves, whether a
@@ -87,7 +87,7 @@ error. The format is new, so there is no pre-gate history to accommodate.
 
 ERROR SITING: the hard error fires in :func:`read_events`, the point where a
 record is read FOR USE. Detection code that merely asks whether a repository has
-a lineage record calls :func:`lineage_file_exists`, which touches only the
+a transition record calls :func:`transition_record_file_exists`, which touches only the
 filesystem and can never raise on content -- so a malformed record breaks the
 one command that consumes it, never every command that walks the tree.
 
@@ -116,9 +116,9 @@ from .errors import RlsblError
 from .workspace_types import WORKSPACE_DIR
 
 
-LINEAGE_FILENAME = "lineage.jsonl"
+TRANSITION_RECORD_FILENAME = "transitions.jsonl"
 
-# The current on-disk format for one lineage line. Every line rlsbl serializes
+# The current on-disk format for one transition record line. Every line rlsbl serializes
 # carries this as its per-line ``format_version`` gate. Bump only alongside a
 # strictspec schema format_version bump + migration.
 CURRENT_FORMAT_VERSION = 1
@@ -132,8 +132,8 @@ KIND_IDENTITY_TRANSITION = "identity-transition"
 KIND_PROMOTION_SPLIT_MAP = "promotion-split-map"
 
 
-class LineageError(RlsblError):
-    """Malformed lineage record, or an event that fails its schema."""
+class TransitionRecordError(RlsblError):
+    """Malformed transition record, or an event that fails its schema."""
 
 
 # ---------------------------------------------------------------------------
@@ -141,22 +141,22 @@ class LineageError(RlsblError):
 # ---------------------------------------------------------------------------
 
 
-def get_lineage_path(
+def get_transition_record_path(
     project_dir: str = ".",
     *,
     releasable_dir: str | None = None,
     workspace: bool = False,
 ) -> str:
-    """Return the path to a lineage record.
+    """Return the path to a transition record.
 
     ``releasable_dir`` is the releasable's state directory
     (``.rlsbl-monorepo/releasables/<name>/``); when given, the record sits
     directly in it, beside ``version`` and ``releases/``. ``workspace=True``
     selects the WORKSPACE-scoped record instead,
-    ``<project_dir>/.rlsbl-monorepo/lineage.jsonl``, for a fact about the
+    ``<project_dir>/.rlsbl-monorepo/transitions.jsonl``, for a fact about the
     repository rather than about one releasable (see the module docstring).
     With neither, it is the standalone home,
-    ``<project_dir>/.rlsbl/lineage.jsonl`` -- which is also where a standalone
+    ``<project_dir>/.rlsbl/transitions.jsonl`` -- which is also where a standalone
     successor produced by an extract finds its own record.
 
     The two selectors are mutually exclusive: a record is either a
@@ -168,18 +168,18 @@ def get_lineage_path(
     """
     if releasable_dir and workspace:
         raise ValueError(
-            "a lineage record is either a releasable's or the workspace's; "
+            "a transition record is either a releasable's or the workspace's; "
             "pass releasable_dir or workspace=True, never both"
         )
     if releasable_dir:
-        return os.path.join(releasable_dir, LINEAGE_FILENAME)
+        return os.path.join(releasable_dir, TRANSITION_RECORD_FILENAME)
     if workspace:
-        return os.path.join(project_dir, WORKSPACE_DIR, LINEAGE_FILENAME)
-    return os.path.join(project_dir, ".rlsbl", LINEAGE_FILENAME)
+        return os.path.join(project_dir, WORKSPACE_DIR, TRANSITION_RECORD_FILENAME)
+    return os.path.join(project_dir, ".rlsbl", TRANSITION_RECORD_FILENAME)
 
 
-def lineage_file_exists(path: str) -> bool:
-    """True when a lineage record file is present at ``path``.
+def transition_record_file_exists(path: str) -> bool:
+    """True when a transition record file is present at ``path``.
 
     DETECTION ONLY. It reads no content and validates nothing, so scanning code
     that runs on every command can ask this without a malformed record turning
@@ -195,13 +195,13 @@ def lineage_file_exists(path: str) -> bool:
 
 
 def new_event_id() -> str:
-    """Generate a unique lineage event id.
+    """Generate a unique transition record event id.
 
     Timestamp-prefixed UUID4 hex, so ids sort approximately by creation order
     without an external dependency: ``<16 hex ns><32 hex uuid4>``.
 
     This deliberately mirrors ``rlsbl.changelog.schema.generate_entry_id``
-    rather than importing it. A later phase has the changelog reading lineage
+    rather than importing it. A later phase has the changelog reading transition record
     anchor remaps, and importing the changelog package from here would close
     that loop into an import cycle. Two independent record systems each owning
     their own id generator is the cost of keeping them independent.
@@ -225,7 +225,7 @@ def now_timestamp() -> str:
 
 
 @dataclass(kw_only=True)
-class LineageEndpoint:
+class TransitionRecordEndpoint:
     """One side of a conversion: which repository, and which slice of it."""
 
     repo: str
@@ -276,8 +276,8 @@ class SplitMapping:
 
 
 @dataclass(kw_only=True)
-class _LineageEventBase:
-    """Fields every lineage event carries.
+class _TransitionRecordEventBase:
+    """Fields every transition record event carries.
 
     ``id`` and ``recorded_at`` are optional at construction and stamped by
     :func:`append_events`, so a writer states only the fact it is recording.
@@ -293,23 +293,23 @@ class _LineageEventBase:
 
 
 @dataclass(kw_only=True)
-class ConversionEvent(_LineageEventBase):
+class ConversionEvent(_TransitionRecordEventBase):
     """A sub-project extracted out of a workspace, or a repository absorbed in."""
 
     KIND: ClassVar[str] = KIND_CONVERSION
     NESTED: ClassVar[dict[str, tuple[type, bool]]] = {
-        "source": (LineageEndpoint, False),
-        "destination": (LineageEndpoint, False),
+        "source": (TransitionRecordEndpoint, False),
+        "destination": (TransitionRecordEndpoint, False),
     }
 
     direction: str  # "extract" | "absorb"
-    source: LineageEndpoint
-    destination: LineageEndpoint
+    source: TransitionRecordEndpoint
+    destination: TransitionRecordEndpoint
     commit: str
 
 
 @dataclass(kw_only=True)
-class TagMapEvent(_LineageEventBase):
+class TagMapEvent(_TransitionRecordEventBase):
     """The tag renames a conversion performed."""
 
     KIND: ClassVar[str] = KIND_TAG_MAP
@@ -319,7 +319,7 @@ class TagMapEvent(_LineageEventBase):
 
 
 @dataclass(kw_only=True)
-class AnchorRemapEvent(_LineageEventBase):
+class AnchorRemapEvent(_TransitionRecordEventBase):
     """The old-SHA -> new-SHA correspondence a history rewrite produced."""
 
     KIND: ClassVar[str] = KIND_ANCHOR_REMAP
@@ -330,20 +330,20 @@ class AnchorRemapEvent(_LineageEventBase):
 
 
 @dataclass(kw_only=True)
-class DepartedGlobsEvent(_LineageEventBase):
+class DepartedGlobsEvent(_TransitionRecordEventBase):
     """Tag globs that stopped belonging here because their sub-project left."""
 
     KIND: ClassVar[str] = KIND_DEPARTED_GLOBS
     NESTED: ClassVar[dict[str, tuple[type, bool]]] = {
-        "destination": (LineageEndpoint, False)
+        "destination": (TransitionRecordEndpoint, False)
     }
 
     globs: list[str]
-    destination: LineageEndpoint
+    destination: TransitionRecordEndpoint
 
 
 @dataclass(kw_only=True)
-class BoundaryAliasEvent(_LineageEventBase):
+class BoundaryAliasEvent(_TransitionRecordEventBase):
     """Alias tags created at a conversion point."""
 
     KIND: ClassVar[str] = KIND_BOUNDARY_ALIAS
@@ -353,7 +353,7 @@ class BoundaryAliasEvent(_LineageEventBase):
 
 
 @dataclass(kw_only=True)
-class IdentityTransitionEvent(_LineageEventBase):
+class IdentityTransitionEvent(_TransitionRecordEventBase):
     """A published identity changed, effective from a stated version."""
 
     KIND: ClassVar[str] = KIND_IDENTITY_TRANSITION
@@ -365,7 +365,7 @@ class IdentityTransitionEvent(_LineageEventBase):
 
 
 @dataclass(kw_only=True)
-class PromotionSplitMapEvent(_LineageEventBase):
+class PromotionSplitMapEvent(_TransitionRecordEventBase):
     """The subtree-split correspondence persisted when a mirror is promoted."""
 
     KIND: ClassVar[str] = KIND_PROMOTION_SPLIT_MAP
@@ -377,7 +377,7 @@ class PromotionSplitMapEvent(_LineageEventBase):
     promoted_version: str | None = None
 
 
-LineageEvent = (
+TransitionRecordEvent = (
     ConversionEvent
     | TagMapEvent
     | AnchorRemapEvent
@@ -440,14 +440,14 @@ def serialize_event(event) -> str:
 def _build_nested(cls, raw, field_name: str):
     """Construct one nested value dataclass from a raw JSON object."""
     if not isinstance(raw, dict):
-        raise LineageError(f"field {field_name} must be a JSON object")
+        raise TransitionRecordError(f"field {field_name} must be a JSON object")
     return cls(**raw)
 
 
 def parse_event(line: str):
     """Parse one JSON line into the event dataclass its ``kind`` selects.
 
-    Raises :class:`LineageError` on malformed JSON, a missing or unsupported
+    Raises :class:`TransitionRecordError` on malformed JSON, a missing or unsupported
     ``format_version``, an unknown ``kind``, a missing required field, an
     unknown key, or any other schema violation. There is no tolerant mode: a
     record that cannot be read is never half-read.
@@ -455,10 +455,10 @@ def parse_event(line: str):
     try:
         data = json.loads(line)
     except json.JSONDecodeError as exc:
-        raise LineageError(f"malformed JSON: {exc}") from exc
+        raise TransitionRecordError(f"malformed JSON: {exc}") from exc
 
     if not isinstance(data, dict):
-        raise LineageError("event must be a JSON object")
+        raise TransitionRecordError("event must be a JSON object")
 
     _gate_line(line)
     _validate_line(line)
@@ -489,27 +489,27 @@ def parse_event(line: str):
 def _gate_line(line: str) -> None:
     """Run the strictspec per-line ``format_version`` gate.
 
-    Unlike the changelog, absence is an error too: the lineage format was born
+    Unlike the changelog, absence is an error too: the transition record format was born
     with the gate, so there is no legacy line to accommodate and no config key
     that could turn enforcement off.
     """
     import strictspec
 
-    from .strictspec_gen import lineage_event_validator as validator
+    from .strictspec_gen import transition_record_event_validator as validator
 
     result = strictspec.version_gate(validator._program, line.encode("utf-8"), "jsonl")
     if result.ok:
         return
-    raise LineageError("; ".join(d.message for d in result.diagnostics))
+    raise TransitionRecordError("; ".join(d.message for d in result.diagnostics))
 
 
 def _validate_line(line: str) -> None:
     """Validate one line's full shape through the strictspec validator."""
-    from .strictspec_gen import lineage_event_validator as validator
+    from .strictspec_gen import transition_record_event_validator as validator
 
     _root, diags = validator.validate_bytes(line.encode("utf-8"), "jsonl")
     if diags:
-        raise LineageError("; ".join(d.message for d in diags))
+        raise TransitionRecordError("; ".join(d.message for d in diags))
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +518,7 @@ def _validate_line(line: str) -> None:
 
 
 def append_events(path: str, events) -> list:
-    """Append events to the lineage record at ``path``, in the order given.
+    """Append events to the transition record at ``path``, in the order given.
 
     Each event is stamped with an ``id`` and a ``recorded_at`` when it does not
     carry them, validated, and written as one line. The stamped copies are
@@ -582,7 +582,7 @@ def append_event(path: str, event):
 # ---------------------------------------------------------------------------
 
 
-def _undecodable_bytes_error(path: str, exc: UnicodeDecodeError) -> LineageError:
+def _undecodable_bytes_error(path: str, exc: UnicodeDecodeError) -> TransitionRecordError:
     """Turn a raw decode failure into a record error that names the file.
 
     The offsets on a :class:`UnicodeDecodeError` raised by a text-mode read
@@ -592,22 +592,22 @@ def _undecodable_bytes_error(path: str, exc: UnicodeDecodeError) -> LineageError
     still yields a named error -- the file, without a line number -- rather than
     letting a bare decode traceback out.
     """
-    detail = f"invalid UTF-8 in lineage record: {exc.reason}"
+    detail = f"invalid UTF-8 in transition record: {exc.reason}"
     try:
         with open(path, "rb") as f:
             data = f.read()
     except OSError:
-        return LineageError(f"{path}: {detail}")
+        return TransitionRecordError(f"{path}: {detail}")
     for line_num, raw in enumerate(data.splitlines(), start=1):
         try:
             raw.decode("utf-8")
         except UnicodeDecodeError:
-            return LineageError(f"{path}:{line_num}: {detail}")
-    return LineageError(f"{path}: {detail}")
+            return TransitionRecordError(f"{path}:{line_num}: {detail}")
+    return TransitionRecordError(f"{path}: {detail}")
 
 
 def read_events(path: str, *, kinds=None) -> list:
-    """Read the lineage record at ``path`` and return its events in order.
+    """Read the transition record at ``path`` and return its events in order.
 
     An absent file yields an empty list: no record means no surgery was ever
     recorded, which is the normal state.
@@ -615,7 +615,7 @@ def read_events(path: str, *, kinds=None) -> list:
     THIS IS THE READ-FOR-USE SITE, so this is where malformed content is a hard
     error. Any unreadable line -- bytes that are not UTF-8, bad JSON, unknown
     ``kind``, missing required field, wrong ``format_version`` -- raises
-    :class:`LineageError` naming the file and the line number. So does an ``id``
+    :class:`TransitionRecordError` naming the file and the line number. So does an ``id``
     that repeats one already used in the file: the schema calls the id unique
     within the file, and this is the only place that sees the whole file.
     ``kinds`` filters the RESULT, never the validation: a malformed or duplicate
@@ -635,14 +635,14 @@ def read_events(path: str, *, kinds=None) -> list:
                     continue
                 try:
                     event = parse_event(stripped)
-                except LineageError as exc:
-                    raise LineageError(f"{path}:{line_num}: {exc}") from exc
+                except TransitionRecordError as exc:
+                    raise TransitionRecordError(f"{path}:{line_num}: {exc}") from exc
                 first_line = ids_seen.get(event.id)
                 if first_line is not None:
-                    raise LineageError(
+                    raise TransitionRecordError(
                         f"{path}:{line_num}: duplicate event id {event.id!r} -- "
                         f"already used on line {first_line} of the same file; "
-                        "ids must be unique within a lineage record"
+                        "ids must be unique within a transition record"
                     )
                 ids_seen[event.id] = line_num
                 events.append(event)

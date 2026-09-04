@@ -11,7 +11,7 @@ one thing the scrub had repaired.
 Both directions are exercised against the REAL safegit binary:
 
 * ``rlsbl release scrub`` moves the anchors as part of its own flow, records an
-  ``anchor-remap`` lineage event, and commits both.
+  ``anchor-remap`` transition record event, and commits both.
 * A RAW ``safegit scrub`` -- no rlsbl orchestration -- leaves the release record broken,
   and rlsbl heals it from the persisted rewrite journal.
 
@@ -37,7 +37,7 @@ from rlsbl.changelog.generate import generate_changelog
 from rlsbl.commands.release_scrub import run_cmd as scrub_run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ReleaseRecordError
-from rlsbl.lineage import KIND_ANCHOR_REMAP, get_lineage_path, read_events
+from rlsbl.transition_record import KIND_ANCHOR_REMAP, get_transition_record_path, read_events
 from rlsbl.release_file import write_archived_release_file
 
 SCRUB_MOD = "rlsbl.commands.release_scrub"
@@ -154,14 +154,14 @@ class TestScrubMovesTheAnchors:
             "the anchor and the tag must name the same commit again"
         )
 
-    def test_the_remap_is_recorded_in_the_lineage(self, e2e_env, monkeypatch):
+    def test_the_remap_is_recorded_in_the_transition_record(self, e2e_env, monkeypatch):
         repo, released = _setup_released_repo(e2e_env)
         monkeypatch.chdir(repo)
 
         _run_scrub(repo)
 
         events = read_events(
-            get_lineage_path(str(repo)), kinds=[KIND_ANCHOR_REMAP],
+            get_transition_record_path(str(repo)), kinds=[KIND_ANCHOR_REMAP],
         )
         assert len(events) == 1, (
             "the anchor move is a repository-surgery fact, and a fresh clone "
@@ -178,11 +178,11 @@ class TestScrubMovesTheAnchors:
         _run_scrub(repo)
 
         assert _git(repo, "status", "--porcelain") == "", (
-            "the rewritten archive and the lineage record must ride the "
+            "the rewritten archive and the transition record must ride the "
             "scrub's own commit, not be left dirty for the operator"
         )
-        tracked = _git(repo, "ls-files", ".rlsbl/lineage.jsonl")
-        assert tracked, "the lineage record must be committed"
+        tracked = _git(repo, "ls-files", ".rlsbl/transitions.jsonl")
+        assert tracked, "the transition record must be committed"
 
 
 class TestTheRedWithoutTheRepair:

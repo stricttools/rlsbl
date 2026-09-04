@@ -37,10 +37,10 @@ from rlsbl.commands.release_reconcile import (
     refusals,
     tripwire_error,
 )
-from rlsbl.lineage import (
+from rlsbl.transition_record import (
     IdentityTransitionEvent,
     append_event,
-    get_lineage_path,
+    get_transition_record_path,
 )
 from rlsbl.release_file import write_archived_release_file
 from rlsbl.targets import TARGETS
@@ -145,7 +145,7 @@ class TestTheFiveClasses:
     def test_refuse_identity_mismatch(self, tmp_path, release_record):
         """A Go tag IS the published artifact, so it may not be recreated
         under an identity the version was never published under."""
-        append_event(get_lineage_path(str(tmp_path)), IdentityTransitionEvent(
+        append_event(get_transition_record_path(str(tmp_path)), IdentityTransitionEvent(
             facet="go-module-path",
             old="example.com/old", new="example.com/new",
             effective_version="2.0.0",
@@ -157,7 +157,7 @@ class TestTheFiveClasses:
             ),
             explanations=collect_explanations(
                 [str(release_record)],
-                ref_context(repo_root=str(tmp_path)).lineage_paths,
+                ref_context(repo_root=str(tmp_path)).transition_record_paths,
             ),
             target=TARGETS["go"],
             ref_ctx=ref_context(repo_root=str(tmp_path)),
@@ -175,7 +175,7 @@ class TestTheFiveClasses:
             description="After the move.",
             candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
-        append_event(get_lineage_path(str(tmp_path)), IdentityTransitionEvent(
+        append_event(get_transition_record_path(str(tmp_path)), IdentityTransitionEvent(
             facet="go-module-path",
             old="example.com/old", new="example.com/new",
             effective_version="2.0.0",
@@ -187,7 +187,7 @@ class TestTheFiveClasses:
             ),
             explanations=collect_explanations(
                 [str(releases)],
-                ref_context(repo_root=str(tmp_path)).lineage_paths,
+                ref_context(repo_root=str(tmp_path)).transition_record_paths,
             ),
             target=TARGETS["go"],
             ref_ctx=ref_context(repo_root=str(tmp_path)),
@@ -197,7 +197,7 @@ class TestTheFiveClasses:
 
     def test_a_non_go_target_materializes_across_a_transition(self, tmp_path, release_record):
         """The refusal is a per-target fact, not a universal rule."""
-        append_event(get_lineage_path(str(tmp_path)), IdentityTransitionEvent(
+        append_event(get_transition_record_path(str(tmp_path)), IdentityTransitionEvent(
             facet="package-name", old="old", new="new",
             effective_version="2.0.0",
         ))
@@ -208,7 +208,7 @@ class TestTheFiveClasses:
             ),
             explanations=collect_explanations(
                 [str(release_record)],
-                ref_context(repo_root=str(tmp_path)).lineage_paths,
+                ref_context(repo_root=str(tmp_path)).transition_record_paths,
             ),
             target=TARGETS["npm"],
             ref_ctx=ref_context(repo_root=str(tmp_path)),
@@ -419,20 +419,20 @@ class TestTheFreshCloneCase:
         )
         assert "scrub archive" in " ".join(item.facts)
 
-    def test_a_lineage_anchor_remap_explains_a_moved_ref(self, tmp_path):
-        from rlsbl.lineage import AnchorMapping, AnchorRemapEvent
+    def test_a_transition_record_anchor_remap_explains_a_moved_ref(self, tmp_path):
+        from rlsbl.transition_record import AnchorMapping, AnchorRemapEvent
 
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
             str(releases), "1.0.0", bump="minor", include=["plain"],
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
-        lineage = get_lineage_path(str(tmp_path))
-        append_event(lineage, AnchorRemapEvent(
+        transition_record = get_transition_record_path(str(tmp_path))
+        append_event(transition_record, AnchorRemapEvent(
             rewrite="scrub-1", mappings=[AnchorMapping(old_sha=OLD, new_sha=NEW)],
         ))
 
-        explanations = collect_explanations([str(releases)], (lineage,))
+        explanations = collect_explanations([str(releases)], (transition_record,))
         preview = build_preview(
             observation=Observation(
                 remote_refs=_refs(v1_0_0=OLD), local_refs=_refs(v1_0_0=NEW),
@@ -487,14 +487,14 @@ class TestTheExpectedRefSet:
     """Companions and recorded aliases are part of a version's ref set."""
 
     def test_a_recorded_alias_is_judged_too(self, tmp_path):
-        from rlsbl.lineage import BoundaryAlias, BoundaryAliasEvent
+        from rlsbl.transition_record import BoundaryAlias, BoundaryAliasEvent
 
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
             str(releases), "1.0.0", bump="minor", include=["plain"],
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
-        append_event(get_lineage_path(str(tmp_path)), BoundaryAliasEvent(
+        append_event(get_transition_record_path(str(tmp_path)), BoundaryAliasEvent(
             aliases=[BoundaryAlias(
                 alias_tag="lib@v1.0.0", aliased_tag="v1.0.0", commit=NEW,
             )],

@@ -1,6 +1,6 @@
 """Tests for ``old-repo-archived`` and ``go-deprecation-published``.
 
-Both read the committed lineage record and probe the outside world for a
+Both read the committed transition record and probe the outside world for a
 follow-up the recorded surgery still owes:
 
 * an absorb leaves its source repository standing, collecting issues and pull
@@ -20,14 +20,14 @@ import strictcli
 
 from rlsbl import app, effects
 from rlsbl import registry
-from rlsbl.lineage import (
+from rlsbl.transition_record import (
     ConversionEvent,
     IdentityTransitionEvent,
-    LineageEndpoint,
+    TransitionRecordEndpoint,
     append_events,
-    get_lineage_path,
+    get_transition_record_path,
 )
-from rlsbl.lineage_followup import (
+from rlsbl.transition_record_followup import (
     absorbed_sources,
     evaluate_go_deprecation_published,
     evaluate_old_repo_archived,
@@ -46,8 +46,8 @@ def _gh(returncode=0, stdout="", stderr=""):
 def _absorb(repo="https://github.com/owner/absorbed.git"):
     return ConversionEvent(
         direction="absorb",
-        source=LineageEndpoint(repo=repo, project="absorbed"),
-        destination=LineageEndpoint(
+        source=TransitionRecordEndpoint(repo=repo, project="absorbed"),
+        destination=TransitionRecordEndpoint(
             repo=".", path="packages/absorbed", project="absorbed",
         ),
         commit="a" * 40,
@@ -57,8 +57,8 @@ def _absorb(repo="https://github.com/owner/absorbed.git"):
 def _extract(repo="https://github.com/owner/extracted.git"):
     return ConversionEvent(
         direction="extract",
-        source=LineageEndpoint(repo=".", path="packages/x", project="x"),
-        destination=LineageEndpoint(repo=repo, project="x"),
+        source=TransitionRecordEndpoint(repo=".", path="packages/x", project="x"),
+        destination=TransitionRecordEndpoint(repo=repo, project="x"),
         commit="b" * 40,
     )
 
@@ -69,9 +69,9 @@ def _transition(old="github.com/owner/old", new="github.com/owner/new"):
     )
 
 
-def _write_lineage(root, events):
+def _write_transition_record(root, events):
     (root / ".rlsbl").mkdir(parents=True, exist_ok=True)
-    path = get_lineage_path(str(root))
+    path = get_transition_record_path(str(root))
     append_events(path, events)
     return path
 
@@ -211,25 +211,25 @@ class TestOldRepoArchived:
 
 
 class TestOldRepoArchivedCheck:
-    def test_no_lineage_record_skips(self, tmp_path):
+    def test_no_transition_record_record_skips(self, tmp_path):
         assert _run("old-repo-archived", tmp_path).status == "skip"
 
     def test_an_active_source_fails(self, tmp_path, monkeypatch):
-        _write_lineage(tmp_path, [_absorb()])
+        _write_transition_record(tmp_path, [_absorb()])
         monkeypatch.setattr(effects, "gh", lambda *a, **k: _gh(0, "false"))
         result = _run("old-repo-archived", tmp_path)
         assert result.status == "fail"
         assert "gh repo archive" in _text(result)
 
     def test_an_archived_source_passes(self, tmp_path, monkeypatch):
-        _write_lineage(tmp_path, [_absorb()])
+        _write_transition_record(tmp_path, [_absorb()])
         monkeypatch.setattr(effects, "gh", lambda *a, **k: _gh(0, "true"))
         assert _run("old-repo-archived", tmp_path).status == "pass"
 
     def test_a_malformed_record_is_reported_not_raised(self, tmp_path):
         (tmp_path / ".rlsbl").mkdir(parents=True)
-        get_lineage_path(str(tmp_path))
-        (tmp_path / ".rlsbl" / "lineage.jsonl").write_text("{not json\n")
+        get_transition_record_path(str(tmp_path))
+        (tmp_path / ".rlsbl" / "transitions.jsonl").write_text("{not json\n")
         result = _run("old-repo-archived", tmp_path)
         assert result.status == "fail"
         assert "could not be read" in _text(result)
@@ -362,11 +362,11 @@ class TestGoDeprecationPublished:
 
 
 class TestGoDeprecationPublishedCheck:
-    def test_no_lineage_record_skips(self, tmp_path):
+    def test_no_transition_record_record_skips(self, tmp_path):
         assert _run("go-deprecation-published", tmp_path).status == "skip"
 
     def test_an_undeprecated_path_fails(self, tmp_path, monkeypatch):
-        _write_lineage(tmp_path, [_transition()])
+        _write_transition_record(tmp_path, [_transition()])
         monkeypatch.setattr(
             registry, "query_go_module_deprecation",
             lambda old: {"status": "not_deprecated", "version": "v0.3.0"},
@@ -376,7 +376,7 @@ class TestGoDeprecationPublishedCheck:
         assert "Deprecated" in _text(result)
 
     def test_a_deprecated_path_passes(self, tmp_path, monkeypatch):
-        _write_lineage(tmp_path, [_transition()])
+        _write_transition_record(tmp_path, [_transition()])
         monkeypatch.setattr(
             registry, "query_go_module_deprecation",
             lambda old: {"status": "deprecated", "version": "v0.3.0",
@@ -385,8 +385,8 @@ class TestGoDeprecationPublishedCheck:
         assert _run("go-deprecation-published", tmp_path).status == "pass"
 
     def test_the_record_is_read_from_the_project_home(self, tmp_path):
-        """The standalone home, `<project>/.rlsbl/lineage.jsonl`."""
-        path = _write_lineage(tmp_path, [_transition()])
-        assert path == str(tmp_path / ".rlsbl" / "lineage.jsonl")
+        """The standalone home, `<project>/.rlsbl/transitions.jsonl`."""
+        path = _write_transition_record(tmp_path, [_transition()])
+        assert path == str(tmp_path / ".rlsbl" / "transitions.jsonl")
         with open(path, encoding="utf-8") as f:
             assert json.loads(f.readline())["facet"] == "go-module-path"

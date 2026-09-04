@@ -1,5 +1,5 @@
 ---
-description: "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and anchor verification, splitting a releasable, and lineage."
+description: "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and anchor verification, splitting a releasable, and transition record."
 ---
 
 # Repository conversions
@@ -40,7 +40,7 @@ A **mirrored** releasable is *promoted*. The mirror already holds this subtree's
 
 - the destination is a clone of the mirror, whose remote becomes the new repository's `origin`;
 - the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release anchor is remapped through it rather than through a filter-repo commit map;
-- the correspondence is persisted into the destination's lineage record as a `promotion-split-map` [event](#what-gets-recorded), so the promoted repository can explain its own hashes without the monorepo;
+- the correspondence is persisted into the destination's transition record as a `promotion-split-map` [event](#what-gets-recorded), so the promoted repository can explain its own hashes without the monorepo;
 - `git-filter-repo` is neither required nor invoked. A promotion filters nothing, so the missing-tool precondition does not apply to it.
 
 A releasable with more than one member may not declare a `subtree_remote` at all — there would be no single subtree to mirror — so a promotion is always a single-member extract to a flat standalone repository.
@@ -61,7 +61,7 @@ Extract's plan:
 | `state` | The state directory being transplanted, and the anchors that will be remapped |
 | `tags` | Translations, the boundary alias, and the foreign tags being pruned |
 | `destination` | The `workspace.toml` or `releasable.toml` the new repository gets |
-| `lineage` | The events recorded on both sides |
+| `transition-record` | The events recorded on both sides |
 | `source` | What the source loses, where the dependency floors are declared, and that the tags stay behind |
 | `next-steps` | The external administration rlsbl does not perform |
 
@@ -75,7 +75,7 @@ Absorb's plan:
 | `tags` | The version tags to import, the boundary alias, the tags that are not version tags, and anything already present from an earlier run |
 | `state` | The changelog and archives moving into the releasable, and the per-package residue being removed |
 | `workspace` | The `workspace.toml` entry, the scaffold, the sync and the snapshot |
-| `lineage` | The events recorded in the releasable |
+| `transition-record` | The events recorded in the releasable |
 | `next-steps` | The external administration rlsbl does not perform |
 
 ## What a conversion refuses
@@ -150,7 +150,7 @@ Go tags under the module proxy's path scheme (`pkgs/thing/v{version}`) rather th
 
 ### Departed tags stay in the source
 
-An extract does **not** delete the departed releasable's tags from the source repository. Deleting a published tag is a destructive act on a namespace consumers already resolve, and the conversion never performs one. Instead the source records a `departed-globs` [lineage event](#lineage-records) naming the tag globs that stopped belonging to it and where they went:
+An extract does **not** delete the departed releasable's tags from the source repository. Deleting a published tag is a destructive act on a namespace consumers already resolve, and the conversion never performs one. Instead the source records a `departed-globs` [transition record event](#transition-records) naming the tag globs that stopped belonging to it and where they went:
 
 ```json
 {"kind":"departed-globs","globs":["solo@v*"],
@@ -191,7 +191,7 @@ Two outcomes are recorded rather than fatal, because failing here would leave a 
 - an anchor whose commit the rewrite pruned is **left exactly as recorded** and named on stderr. Rewriting it to nothing would be worse: the fields are the record of what shipped.
 - an anchored path that does not resolve at the rewritten commit gets the same treatment.
 
-Both are reported again at the end of the run, and the lineage record is what explains the stale value afterwards.
+Both are reported again at the end of the run, and the transition record is what explains the stale value afterwards.
 
 ### Reading back through rlsbl's own loader
 
@@ -320,23 +320,23 @@ The plan says all of this out loud on a re-run -- `history-already-merged`, `alr
 
 ### Extract has no resume
 
-Extract has no state file and no resume, because everything before its last step is reversible by deletion. The apply order is: clone and filter (or, for a promotion, clone the mirror and derive its split correspondence), verify trees, transplant and remap state, apply the destination's tags, write its identity and commit it, record lineage, and only then edit the source.
+Extract has no state file and no resume, because everything before its last step is reversible by deletion. The apply order is: clone and filter (or, for a promotion, clone the mirror and derive its split correspondence), verify trees, transplant and remap state, apply the destination's tags, write its identity and commit it, record transition record, and only then edit the source.
 
-- **A failure anywhere up to and including the lineage step leaves the source untouched.** The target directory is a self-contained partial result; delete it, fix the cause, and re-run. This is exactly what the tree-verification and anchor-verification errors say.
+- **A failure anywhere up to and including the transition record step leaves the source untouched.** The target directory is a self-contained partial result; delete it, fix the cause, and re-run. This is exactly what the tree-verification and anchor-verification errors say.
 - **A failure inside the source-side edit** is the one case that needs a hand. That step appends the departure record, declares the floors, deletes the departed directories, rewrites `workspace.toml`, re-runs sync, regenerates the snapshot and commits all of it as one commit. A crash part-way leaves those edits uncommitted in the source's working tree, and the completed destination beside it. The deletions went through `saferm` unless `--delete-with-rm` was passed, so they are recoverable; the rest is ordinary uncommitted work. Finish or revert it by hand -- a re-run will refuse anyway, because the target path now exists and the source tree is dirty.
 - **A leftover dirty tree after the commit** is reported rather than swept up: each step commits the files it wrote, so anything left belongs to something else.
 
-## Lineage records
+## Transition records
 
-A lineage record is an append-only JSONL file, one event per line, recording what a conversion actually did. It **records history and never drives it** -- nothing in rlsbl branches on a lineage event. A reader consults the record to explain a divergence it has already observed, which is what makes it useful to later repair machinery, and what keeps it from becoming a hidden switch that changes behavior depending on a file's contents.
+A transition record is an append-only JSONL file, one event per line, recording what a conversion actually did. It **records history and never drives it** -- nothing in rlsbl branches on a transition record event. A reader consults the record to explain a divergence it has already observed, which is what makes it useful to later repair machinery, and what keeps it from becoming a hidden switch that changes behavior depending on a file's contents.
 
 ### Where a record lives
 
 | Home | Path | Used by |
 | ---- | ---- | ------- |
-| Releasable | `.rlsbl-monorepo/releasables/<name>/lineage.jsonl` | A releasable's own conversion facts, in a workspace |
-| Standalone | `<project>/.rlsbl/lineage.jsonl` | A standalone repository, including a standalone successor produced by an extract |
-| Workspace | `<root>/.rlsbl-monorepo/lineage.jsonl` | Facts about the repository rather than any releasable in it |
+| Releasable | `.rlsbl-monorepo/releasables/<name>/transitions.jsonl` | A releasable's own conversion facts, in a workspace |
+| Standalone | `<project>/.rlsbl/transitions.jsonl` | A standalone repository, including a standalone successor produced by an extract |
+| Workspace | `<root>/.rlsbl-monorepo/transitions.jsonl` | Facts about the repository rather than any releasable in it |
 
 The workspace-scoped home exists because a departure is a fact about the source repository's tag namespace, not about a releasable that is no longer there -- and there is nowhere else to put it. A workspace has no root `.rlsbl/` at all (the `root-rlsbl-conflict` check refuses one beside `.rlsbl-monorepo/`), and filing a repository-wide fact under some surviving releasable would be arbitrary.
 

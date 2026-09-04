@@ -297,58 +297,58 @@ def register_release_checks(app):
     register_networked_release_checks(app)
 
 
-def _lineage_paths(ctx):
-    """Every lineage record this project can reach, newest home first.
+def _transition_record_paths(ctx):
+    """Every transition record this project can reach, newest home first.
 
-    The three homes :func:`rlsbl.lineage.get_lineage_path` resolves: a
+    The three homes :func:`rlsbl.transition_record.get_transition_record_path` resolves: a
     standalone project's own record, the workspace-scoped record, and one per
     releasable. A monorepo carries facts in all three, and a conversion
     follow-up is owed whichever record recorded it.
     """
     from ..check_context import WorkspaceCheckContext
-    from ..lineage import get_lineage_path, lineage_file_exists
+    from ..transition_record import get_transition_record_path, transition_record_file_exists
 
-    paths = [get_lineage_path(str(ctx.project_root))]
+    paths = [get_transition_record_path(str(ctx.project_root))]
     if isinstance(ctx, WorkspaceCheckContext):
         root = str(ctx.workspace_root)
-        paths.append(get_lineage_path(root, workspace=True))
+        paths.append(get_transition_record_path(root, workspace=True))
         from ..workspace_types import get_releasable_dir
 
         for releasable in ctx.releasables or []:
-            paths.append(get_lineage_path(
+            paths.append(get_transition_record_path(
                 root, releasable_dir=get_releasable_dir(root, releasable.name),
             ))
     seen = []
     for path in paths:
-        if path not in seen and lineage_file_exists(path):
+        if path not in seen and transition_record_file_exists(path):
             seen.append(path)
     return seen
 
 
-def _read_lineage(ctx, reporter):
+def _read_transition_record(ctx, reporter):
     """``(events, error_outcome)`` -- the events, or a finalized failure.
 
     A malformed record is this check's finding, not a traceback: reading a
-    record FOR USE is where :func:`rlsbl.lineage.read_events` raises, and a
+    record FOR USE is where :func:`rlsbl.transition_record.read_events` raises, and a
     check that consumes one has to report it.
     """
-    from ..lineage import LineageError, read_events
+    from ..transition_record import TransitionRecordError, read_events
 
     events = []
-    for path in _lineage_paths(ctx):
+    for path in _transition_record_paths(ctx):
         try:
             events.extend(read_events(path))
-        except LineageError as exc:
+        except TransitionRecordError as exc:
             reporter.error(
                 f"{os.path.basename(path)} could not be read ({exc}), so the "
                 f"conversions it records cannot be verified."
             )
-            return None, reporter.found("the lineage record could not be read")
+            return None, reporter.found("the transition record could not be read")
     return events, None
 
 
 def _followup_outcome(verdict, reporter, *, passed):
-    """Report a :class:`rlsbl.lineage_followup.FollowupVerdict`."""
+    """Report a :class:`rlsbl.transition_record_followup.FollowupVerdict`."""
     if verdict.skip_reason is not None:
         return reporter.skipped(verdict.skip_reason)
     if verdict.ok:
@@ -403,13 +403,13 @@ def register_networked_release_checks(app):
         code that now lives here. rlsbl never archives it: the finding prints
         the `gh repo archive` command instead.
         """
-        from ..lineage_followup import evaluate_old_repo_archived
+        from ..transition_record_followup import evaluate_old_repo_archived
 
-        events, failure = _read_lineage(ctx, reporter)
+        events, failure = _read_transition_record(ctx, reporter)
         if failure is not None:
             return failure
         if not events:
-            return reporter.skipped("this repository has no lineage record")
+            return reporter.skipped("this repository has no transition record")
         return _followup_outcome(
             evaluate_old_repo_archived(events), reporter,
             passed="every absorbed source repository is archived",
@@ -424,13 +424,13 @@ def register_networked_release_checks(app):
         the old repository ships `// Deprecated:` in its `go.mod`. The finding
         prints the steps; rlsbl never commits into a retired repository.
         """
-        from ..lineage_followup import evaluate_go_deprecation_published
+        from ..transition_record_followup import evaluate_go_deprecation_published
 
-        events, failure = _read_lineage(ctx, reporter)
+        events, failure = _read_transition_record(ctx, reporter)
         if failure is not None:
             return failure
         if not events:
-            return reporter.skipped("this repository has no lineage record")
+            return reporter.skipped("this repository has no transition record")
         return _followup_outcome(
             evaluate_go_deprecation_published(events), reporter,
             passed="every superseded module path is deprecated",

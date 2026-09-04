@@ -405,19 +405,19 @@ class TestNeverReleasedNoSourceTag:
         assert rr._is_clean_tree(str(root))
 
 
-class TestAliasIsRecordedInLineage:
-    """The alias tag a rename creates is a lineage FACT, not only a git ref.
+class TestAliasIsRecordedInTransitionRecord:
+    """The alias tag a rename creates is a transition record FACT, not only a git ref.
 
-    ``expected_refs`` reads recorded aliases from the lineage record, so a
+    ``expected_refs`` reads recorded aliases from the transition record, so a
     rename that creates an alias tag without recording it would leave the ref
-    set with a second, undiscoverable source. One source: the lineage record.
+    set with a second, undiscoverable source. One source: the transition record.
     """
 
     def _aliases(self, root, name):
-        from rlsbl.lineage import KIND_BOUNDARY_ALIAS, get_lineage_path, read_events
+        from rlsbl.transition_record import KIND_BOUNDARY_ALIAS, get_transition_record_path, read_events
         from rlsbl.workspace import get_releasable_dir
 
-        path = get_lineage_path(
+        path = get_transition_record_path(
             str(root), releasable_dir=get_releasable_dir(str(root), name),
         )
         if not os.path.isfile(path):

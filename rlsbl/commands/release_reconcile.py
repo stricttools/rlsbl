@@ -26,7 +26,7 @@ one:
 * **The release record** -- the archived release files, whose ``candidate_sha``
   is what each version's refs should point at. This is the authority for the
   TARGET, not merely a witness to a move.
-* **The lineage records** -- ``anchor-remap`` events (the same commit map, but
+* **The transition records** -- ``anchor-remap`` events (the same commit map, but
   COMMITTED, so a fresh clone has it), ``boundary-alias`` events (a tag that
   legitimately duplicates another), and ``identity-transition`` events (a
   published identity that changed, and from which version).
@@ -591,9 +591,9 @@ def _scrub_archive_maps(releases_dirs):
     return merged, origins, label
 
 
-def _lineage_facts(lineage_paths):
+def _transition_record_facts(transition_record_paths):
     """Anchor remaps, boundary aliases and identity transitions, merged."""
-    from ..lineage import (
+    from ..transition_record import (
         KIND_ANCHOR_REMAP,
         KIND_BOUNDARY_ALIAS,
         KIND_IDENTITY_TRANSITION,
@@ -605,7 +605,7 @@ def _lineage_facts(lineage_paths):
     aliases = set()
     transitions = []
     seen_any = False
-    for path in lineage_paths:
+    for path in transition_record_paths:
         events = read_events(path, kinds=[
             KIND_ANCHOR_REMAP, KIND_BOUNDARY_ALIAS, KIND_IDENTITY_TRANSITION,
         ])
@@ -616,7 +616,7 @@ def _lineage_facts(lineage_paths):
                 for mapping in event.mappings:
                     commit_map[mapping.old_sha] = mapping.new_sha
                     origins[mapping.old_sha] = (
-                        f"lineage anchor-remap {event.rewrite}"
+                        f"transition record anchor-remap {event.rewrite}"
                     )
             elif event.KIND == KIND_BOUNDARY_ALIAS:
                 for alias in event.aliases:
@@ -625,11 +625,11 @@ def _lineage_facts(lineage_paths):
                 transitions.append(event)
     return (
         commit_map, origins, frozenset(aliases), tuple(transitions),
-        "lineage records" if seen_any else None,
+        "transition records" if seen_any else None,
     )
 
 
-def collect_explanations(releases_dirs, lineage_paths):
+def collect_explanations(releases_dirs, transition_record_paths):
     """Merge all four sources into one :class:`Explanations`.
 
     Precedence is deliberate and narrow: an entry contributed by more than one
@@ -648,12 +648,12 @@ def collect_explanations(releases_dirs, lineage_paths):
     if scrub_label:
         present.append(scrub_label)
 
-    (lineage_map, lineage_origins, aliases, transitions,
-     lineage_label) = _lineage_facts(lineage_paths)
-    commit_map.update(lineage_map)
-    origins.update(lineage_origins)
-    if lineage_label:
-        present.append(lineage_label)
+    (transition_record_map, transition_record_origins, aliases, transitions,
+     transition_record_label) = _transition_record_facts(transition_record_paths)
+    commit_map.update(transition_record_map)
+    origins.update(transition_record_origins)
+    if transition_record_label:
+        present.append(transition_record_label)
 
     journal_map, journal_label = _journal_map()
     commit_map.update(journal_map)
@@ -749,12 +749,12 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
     Three rules, none of them inferred:
 
     * a dangling anchor no record explains is a hard error naming the version
-      -- the heal is driven by the journal, a lineage anchor-remap event or a
+      -- the heal is driven by the journal, a transition record anchor-remap event or a
       committed scrub archive, never by resemblance;
     * the content check is ``refuse``: this command did not perform the
       rewrite, so it cannot state that a released tree changing is intended.
       ``rlsbl release scrub`` is the caller that can, and it declares so;
-    * the rewritten archives and the lineage events beside them are committed,
+    * the rewritten archives and the transition record events beside them are committed,
       because a rewritten read-only archive left in the working tree is
       breakage for every other command and every other session.
 
@@ -765,7 +765,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
     """
     from ..anchor_remap import (
         ON_CONTENT_CHANGE_REFUSE,
-        lineage_path_for_releases_dir,
+        transition_record_path_for_releases_dir,
         plan_anchor_remap,
         record_anchor_remap,
         remap_release_anchors,
@@ -804,7 +804,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
             f"from, and the release record is the authority for where every released "
             f"ref belongs -- so\n"
             f"  nothing can be judged against it while it names a pruned "
-            f"commit. safegit's rewrite journal, a lineage anchor-remap event "
+            f"commit. safegit's rewrite journal, a transition record anchor-remap event "
             f"or a committed\n"
             f"  scrub archive would explain the move; none of them does. "
             f"Restore the commits, or repair the archives, and re-run."
@@ -844,11 +844,11 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
             f"rewrite:\n{exc}"
         ) from exc
     touched = [remap.path for remap in remaps]
-    lineage_path = record_anchor_remap(
-        lineage_path_for_releases_dir(releases_dir), rewrite_id, remaps,
+    transition_record_path = record_anchor_remap(
+        transition_record_path_for_releases_dir(releases_dir), rewrite_id, remaps,
     )
-    if lineage_path:
-        touched.append(lineage_path)
+    if transition_record_path:
+        touched.append(transition_record_path)
     if touched:
         try:
             run("safegit", [
@@ -1147,7 +1147,7 @@ def _ref_verdict(*, refname, tag, version, anchor, observation, explanations,
             f"here:   {local_peeled or target_sha}",
         ),
         detail=(
-            "  No rewrite journal entry, lineage anchor-remap or committed "
+            "  No rewrite journal entry, transition record anchor-remap or committed "
             "scrub archive maps the origin value to this one.\n"
             "  Force-pushing over it could destroy work that is not part of "
             "any recorded rewrite."
@@ -1317,7 +1317,7 @@ def render_plan(preview, digest, *, generated_by):
     """Serialize *preview* as the plan document."""
     import tomlkit
 
-    from ..lineage import now_timestamp
+    from ..transition_record import now_timestamp
 
     doc = tomlkit.document()
     doc.add(tomlkit.comment(
@@ -1640,7 +1640,7 @@ def run_cmd(flags, *, ctx):
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    lineage_paths = ref_ctx.lineage_paths
+    transition_record_paths = ref_ctx.transition_record_paths
     path_of_plan = plan_path(releases_dir)
     changelog_path = _changelog_path(ctx)
     push_timeout = get_push_timeout(
@@ -1655,7 +1655,7 @@ def run_cmd(flags, *, ctx):
     # through the same records that explain the divergence first. Outside the
     # observation, because it writes.
     try:
-        explanations = collect_explanations([releases_dir], lineage_paths)
+        explanations = collect_explanations([releases_dir], transition_record_paths)
         anchor_overrides = heal_dangling_anchors(
             releases_dir=releases_dir, explanations=explanations,
             repo_root=repo_root, dry_run=dry_run,
@@ -1722,7 +1722,7 @@ def run_cmd(flags, *, ctx):
     else:
         print(
             "\nNo explanation source is present: no safegit rewrite journal, "
-            "no lineage anchor-remap record and no committed scrub archive. "
+            "no transition record anchor-remap record and no committed scrub archive. "
             "Only refs origin already agrees with, and refs it is missing "
             "entirely, can be reconciled."
         )

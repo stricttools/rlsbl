@@ -368,7 +368,7 @@ The mirror command follows an observe-then-converge reconciliation pattern. In d
 - `rlsbl monorepo mirror <project> --dry-run` — observe and print a plan; makes **zero writes** (beyond the loose objects a branchless subtree split leaves in the monorepo's own object store).
 - `rlsbl monorepo mirror <project>` — observe, then converge (apply).
 
-The desired state of the mirror's `main` is exactly one scaffold commit atop the **current split-lineage commit**, where that commit is the deterministic branchless `git subtree split` of the project's current history, and the scaffold commit touches only scaffold-owned paths.
+The desired state of the mirror's `main` is exactly one scaffold commit atop the **current split-ancestry commit**, where that commit is the deterministic branchless `git subtree split` of the project's current history, and the scaffold commit touches only scaffold-owned paths.
 
 Observation reports one of the following for the mirror's **branch**, and, beside it, one item per released version for the mirror's **tags** (see [Release tags on the mirror](#release-tags-on-the-mirror)):
 
@@ -379,14 +379,14 @@ Observation reports one of the following for the mirror's **branch**, and, besid
 | `behind` | A scaffold layer atop an **older** split; a new split is available (shows old → new). | Force-push the new split (with lease), then re-scaffold. |
 | `scaffold-missing` | The tip is a bare split commit with no scaffold layer (the pre-scaffold-layer shape). May also be behind. | Add the scaffold commit (and push a new split first if behind). |
 | `contract-violated` | A foreign, hand-authored commit exists on the mirror. | **Hard error, touches nothing.** Lists the offending commit(s) and paths, and tells you to either port the change into the monorepo or reset the mirror branch, then re-run. |
-| `lineage-undetermined` | Git could not determine whether the mirror's commits descend from the current split (typically objects that were pruned, or never fetched), and no split boundary could be confirmed. | **Hard error, touches nothing.** Names the unanswerable commit(s) and points at fetching/deepening the history, never at resetting the mirror. |
+| `ancestry-undetermined` | Git could not determine whether the mirror's commits descend from the current split (typically objects that were pruned, or never fetched), and no split boundary could be confirmed. | **Hard error, touches nothing.** Names the unanswerable commit(s) and points at fetching/deepening the history, never at resetting the mirror. |
 | `remote-missing-or-empty` | Virgin remote. | Push the split, then scaffold CI. |
 
 Apply is **idempotent**: re-running on a converged mirror is a clean no-op, and an interrupted apply (killed between the split push and the scaffold commit) heals on the next run — it re-observes as `scaffold-missing` and adds the scaffold layer.
 
 ### The tripwire
 
-Convergence never blindly overwrites the mirror. The remote tip must be **either** a bare split-lineage commit (the current split SHA or an older one — this covers legacy mirrors that never received a scaffold layer) **or** exactly one commit atop a split-lineage commit whose changed paths are all scaffold-owned (`.rlsbl/`, `.github/`, and a small set of root files like `CHANGELOG.md`). Anything else is a foreign commit: apply refuses and reports it. This makes contract violations *loud* instead of silently force-erased.
+Convergence never blindly overwrites the mirror. The remote tip must be **either** a bare split-ancestry commit (the current split SHA or an older one — this covers legacy mirrors that never received a scaffold layer) **or** exactly one commit atop a split-ancestry commit whose changed paths are all scaffold-owned (`.rlsbl/`, `.github/`, and a small set of root files like `CHANGELOG.md`). Anything else is a foreign commit: apply refuses and reports it. This makes contract violations *loud* instead of silently force-erased.
 
 > Note: `rlsbl monorepo sync` does **not** update mirror repositories. `sync` regenerates the monorepo's own `.github/workflows`. Mirrors are updated only by re-running `rlsbl monorepo mirror <project>` (for example after a release).
 
@@ -422,7 +422,7 @@ The mirror already holds this subtree's standalone history: every commit that to
 - the destination is a clone of the mirror, whose remote becomes its origin;
 - the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release anchor is remapped through it;
 - deleting the monorepo's copy is justified by **tree-hash equality**: `HEAD:<member>` in the monorepo must equal the root tree of the mirror's pre-scaffold split commit. A mirror that is behind stops the promotion and says to run `rlsbl monorepo mirror <project>` first;
-- the correspondence is persisted into the extracted repository's lineage record as a `promotion-split-map` event, so the promoted repository can explain its own hashes without the monorepo.
+- the correspondence is persisted into the extracted repository's transition record as a `promotion-split-map` event, so the promoted repository can explain its own hashes without the monorepo.
 
 After a promotion the mirror is no longer a derived artifact: nothing regenerates it, and a force-push to it is destructive. It also carries no publish workflow (a mirror's scaffold renders none), so a repository that publishes needs `rlsbl scaffold` run in it.
 

@@ -124,7 +124,7 @@ right = "exclude"
 normalization = "none"
 description = "No element appears in both include and exclude."
 
-# GitObjectHash -- a git object name, commit or tree. Same shape as the lineage
+# GitObjectHash -- a git object name, commit or tree. Same shape as the transition record
 # schema's GitSha, and for the same reason.
 [types.GitObjectHash]
 type = "string"

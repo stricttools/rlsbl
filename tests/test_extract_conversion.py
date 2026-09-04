@@ -4,7 +4,7 @@ The command observes the whole conversion, renders it as a plan under
 ``--dry-run``, and applies that plan item by item. These tests cover both
 halves: what the plan says and refuses, and what an apply actually moves --
 history, tree-object identity, the releasable's whole release state, the
-anchors, the tags, the lineage record, and what the source loses.
+anchors, the tags, the transition record, and what the source loses.
 
 The apply half needs git-filter-repo, which is not resolvable inside the
 sandbox runner, so those classes carry the established skip marker and are
@@ -25,7 +25,7 @@ from rlsbl.commands.monorepo.extract import ExtractError
 from rlsbl.commands.monorepo.extract_cmd import (
     ITEM_DEPENDENCIES,
     ITEM_DESTINATION,
-    ITEM_LINEAGE,
+    ITEM_TRANSITION_RECORD,
     ITEM_RELEASABLE,
     ITEM_SOURCE,
     ITEM_STATE,
@@ -34,13 +34,13 @@ from rlsbl.commands.monorepo.extract_cmd import (
     cmd_extract,
 )
 from rlsbl.dep_floors import CONFIG_KEY
-from rlsbl.lineage import (
+from rlsbl.transition_record import (
     KIND_ANCHOR_REMAP,
     KIND_BOUNDARY_ALIAS,
     KIND_CONVERSION,
     KIND_DEPARTED_GLOBS,
     KIND_TAG_MAP,
-    get_lineage_path,
+    get_transition_record_path,
     read_events,
 )
 from rlsbl.release_file import read_release_file, write_release_anchor
@@ -164,7 +164,7 @@ class TestPreview:
 
         assert list(preview.keys) == [
             ITEM_RELEASABLE, ITEM_DEPENDENCIES, ITEM_TREES, ITEM_STATE,
-            ITEM_TAGS, ITEM_DESTINATION, ITEM_LINEAGE, ITEM_SOURCE,
+            ITEM_TAGS, ITEM_DESTINATION, ITEM_TRANSITION_RECORD, ITEM_SOURCE,
             "next-steps",
         ]
         out = capsys.readouterr().out
@@ -866,13 +866,13 @@ class TestApplyMultiMember:
         assert version in out.out + out.err
         assert "dropped" in (out.out + out.err)
 
-    def test_lineage_record_explains_the_conversion(self, tmp_path):
+    def test_transition_record_record_explains_the_conversion(self, tmp_path):
         ns = make_source(tmp_path)
         target = tmp_path / "core_out"
 
         cmd_extract(str(ns.root), "core", str(target))
 
-        path = get_lineage_path(
+        path = get_transition_record_path(
             str(target), releasable_dir=get_releasable_dir(str(target), "core"),
         )
         events = read_events(path)
@@ -915,7 +915,7 @@ class TestApplyMultiMember:
 
         # The departure is a fact about the repository's tag namespace, so it
         # goes in the WORKSPACE-scoped record, not any releasable's.
-        events = read_events(get_lineage_path(str(ns.root), workspace=True))
+        events = read_events(get_transition_record_path(str(ns.root), workspace=True))
         departed = [e for e in events if e.KIND == KIND_DEPARTED_GLOBS]
         assert len(departed) == 1
         assert departed[0].globs == ["core@v*"]
@@ -1081,13 +1081,13 @@ class TestApplySingleMember:
         # Another live releasable's tags are pruned.
         assert "core@v0.1.0" not in tags
 
-    def test_lineage_records_the_rename_and_the_alias(self, tmp_path):
+    def test_transition_record_records_the_rename_and_the_alias(self, tmp_path):
         ns = make_source(tmp_path)
         target = tmp_path / "extras_out"
 
         cmd_extract(str(ns.root), "extras", str(target))
 
-        events = read_events(get_lineage_path(str(target)))
+        events = read_events(get_transition_record_path(str(target)))
         kinds = [e.KIND for e in events]
         assert kinds[0] == KIND_CONVERSION
         assert KIND_TAG_MAP in kinds

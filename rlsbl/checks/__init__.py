@@ -89,7 +89,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # and hex (HEX_API_KEY). A pypi pipeline publishes through OIDC trusted
     # publishing and declares none, so the check can find nothing there.
     "ci-publish-secrets": frozenset({"npm", "maven", "hex"}),
-    # Both lineage-derived follow-ups read a record no target decides the shape
+    # Both transition-record-derived follow-ups read a record no target decides the shape
     # of; go-deprecation-published then probes the Go module proxy, but which
     # transitions exist is the record's answer, not a target's.
     "old-repo-archived": None,

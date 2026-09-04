@@ -4,7 +4,7 @@ The command observes the whole conversion, renders it as a plan under
 ``--dry-run``, and applies that plan item by item. These tests cover both
 halves: what the plan says and refuses, and what an apply actually moves --
 history, tags, the release state with its anchors, the workspace entry, the
-lineage record -- plus the property the rebuild exists for: a crashed run can
+transition record -- plus the property the rebuild exists for: a crashed run can
 be re-run to completion without duplicating anything.
 
 The whole module needs git-filter-repo, which the conversion refuses without
@@ -34,12 +34,12 @@ from rlsbl.commands.monorepo.absorb_cmd import (
     AbsorbError,
     cmd_absorb,
 )
-from rlsbl.lineage import (
+from rlsbl.transition_record import (
     KIND_ANCHOR_REMAP,
     KIND_BOUNDARY_ALIAS,
     KIND_CONVERSION,
     KIND_TAG_MAP,
-    get_lineage_path,
+    get_transition_record_path,
     read_events,
 )
 from rlsbl.release_file import (
@@ -177,7 +177,7 @@ class TestPreview:
 
         assert list(preview.keys) == [
             ITEM_SOURCE, ITEM_RELEASABLE, ITEM_HISTORY, ITEM_TAGS, ITEM_STATE,
-            ITEM_WORKSPACE, "lineage", "next-steps",
+            ITEM_WORKSPACE, "transition-record", "next-steps",
         ]
         out = capsys.readouterr().out
         assert "rewrite-history" in out
@@ -677,13 +677,13 @@ class TestApply:
 
         assert not (ns.root / ".git" / "rlsbl" / "absorb-widget").exists()
 
-    def test_lineage_explains_the_conversion(self, tmp_path):
+    def test_transition_record_explains_the_conversion(self, tmp_path):
         ns = make_destination(tmp_path)
         source = make_source(tmp_path)
 
         absorb(ns, source)
 
-        path = get_lineage_path(
+        path = get_transition_record_path(
             str(ns.root),
             releasable_dir=get_releasable_dir(str(ns.root), "widget"),
         )

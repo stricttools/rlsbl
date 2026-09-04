@@ -362,12 +362,12 @@ class TestMirrorUsesTheSharedSkeleton:
 
     @pytest.mark.parametrize("state,expected", [
         (
-            dict(state="converged", split_sha="a" * 40, split_lineage_sha="a" * 40),
+            dict(state="converged", split_sha="a" * 40, split_ancestry_sha="a" * 40),
             "converged: mirror is up to date (split aaaaaaaaaaaa, "
             "scaffold layer present).\n",
         ),
         (
-            dict(state="behind", split_sha="b" * 40, split_lineage_sha="a" * 40),
+            dict(state="behind", split_sha="b" * 40, split_ancestry_sha="a" * 40),
             "behind: a new split is available.\n"
             "  old split: aaaaaaaaaaaa\n"
             "  new split: bbbbbbbbbbbb\n"
@@ -376,14 +376,14 @@ class TestMirrorUsesTheSharedSkeleton:
         ),
         (
             dict(state="scaffold_missing", split_sha="a" * 40,
-                 split_lineage_sha="a" * 40, behind=False),
+                 split_ancestry_sha="a" * 40, behind=False),
             "scaffold-missing: tip is the current bare split commit "
             "aaaaaaaaaaaa with no scaffold layer.\n"
             "  apply would add the scaffold commit and push.\n",
         ),
         (
             dict(state="scaffold_missing", split_sha="b" * 40,
-                 split_lineage_sha="a" * 40, behind=True),
+                 split_ancestry_sha="a" * 40, behind=True),
             "scaffold-missing (and behind): tip is a bare split commit "
             "aaaaaaaaaaaa, older than current split bbbbbbbbbbbb.\n"
             "  apply would force-push the new split (with lease) and scaffold.\n",

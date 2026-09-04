@@ -53,7 +53,7 @@ What an apply moves
   changelog hashes remapped through filter-repo's commit map and their release
   anchors remapped and VERIFIED -- a recorded tree hash is content-addressed,
   so a faithful rewrite reproduces it exactly.
-* **A lineage record** in the releasable's state directory explains all of it.
+* **A transition record** in the releasable's state directory explains all of it.
 
 Re-running a crashed absorb
 ---------------------------
@@ -89,17 +89,17 @@ from ...changelog.files import load_filter_repo_commit_map, remap_jsonl_hashes
 from ...changelog.schema import entry_content_key, parse_jsonl, serialize_entry
 from ...config import read_json_config
 from ...errors import ConfigError
-from ...lineage import (
+from ...transition_record import (
     AnchorMapping,
     AnchorRemapEvent,
     BoundaryAlias,
     BoundaryAliasEvent,
     ConversionEvent,
-    LineageEndpoint,
+    TransitionRecordEndpoint,
     TagMapEvent,
     TagMapping,
     append_events,
-    get_lineage_path,
+    get_transition_record_path,
 )
 from ...lock import rlsbl_lock
 from ...ownership import ROOT_MEMBER_NAME, normalize_path
@@ -154,7 +154,7 @@ ITEM_HISTORY = "history"
 ITEM_TAGS = "tags"
 ITEM_STATE = "state"
 ITEM_WORKSPACE = "workspace"
-ITEM_LINEAGE = "lineage"
+ITEM_TRANSITION_RECORD = "transition-record"
 ITEM_NEXT_STEPS = "next-steps"
 
 #: The trailer key naming what an absorb merge commit absorbed. Together with
@@ -1181,14 +1181,14 @@ def observe(arr) -> Preview:
     if plan.alias:
         events.append("boundary-alias")
     items.append(VerdictItem(
-        key=ITEM_LINEAGE,
-        state="record_lineage",
+        key=ITEM_TRANSITION_RECORD,
+        state="record_transition_record",
         summary=(
-            f"a lineage record in the releasable explains the conversion: "
+            f"a transition record in the releasable explains the conversion: "
             f"{', '.join(events)}."
         ),
         facts=(
-            f"record: {_relative(arr.workspace_root, get_lineage_path(arr.workspace_root, releasable_dir=arr.releasable_dir))}",
+            f"record: {_relative(arr.workspace_root, get_transition_record_path(arr.workspace_root, releasable_dir=arr.releasable_dir))}",
         ),
     ))
 
@@ -1838,19 +1838,19 @@ def _assert_workspace_loads(arr):
         )
 
 
-def _apply_lineage(arr, item, run):
-    """Write the releasable's lineage record: conversion first, then the rest."""
-    path = get_lineage_path(
+def _apply_transition_record(arr, item, run):
+    """Write the releasable's transition record: conversion first, then the rest."""
+    path = get_transition_record_path(
         arr.workspace_root, releasable_dir=arr.releasable_dir,
     )
     conversion = ConversionEvent(
         direction="absorb",
-        source=LineageEndpoint(
+        source=TransitionRecordEndpoint(
             repo=arr.source_repo_url,
             project=arr.name,
             tag_format=arr.source_tag_format,
         ),
-        destination=LineageEndpoint(
+        destination=TransitionRecordEndpoint(
             repo=".",
             path=arr.dest_path,
             project=arr.name,
@@ -1892,11 +1892,11 @@ def _apply_lineage(arr, item, run):
         append_events(path, followers)
 
     commit_files(
-        f"monorepo: record the {arr.name} absorb lineage",
+        f"monorepo: record the {arr.name} absorb transition record",
         [_relative(arr.workspace_root, path)],
         cwd=arr.workspace_root,
     )
-    print(f"  lineage: {len(followers) + 1} event(s) recorded.")
+    print(f"  transition record: {len(followers) + 1} event(s) recorded.")
 
 
 def _apply_next_steps(arr, item, run):
@@ -1941,7 +1941,7 @@ _APPLY_STEPS = {
     ITEM_TAGS: _apply_tags,
     ITEM_STATE: _apply_state,
     ITEM_WORKSPACE: _apply_workspace,
-    ITEM_LINEAGE: _apply_lineage,
+    ITEM_TRANSITION_RECORD: _apply_transition_record,
     ITEM_NEXT_STEPS: _apply_next_steps,
 }
 

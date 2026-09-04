@@ -16,17 +16,17 @@ Renaming a releasable is a coordinated, idempotent operation:
 Then, last, when the releasable's ``tag_format`` contains ``{name}`` (so the
 tag prefix actually changes), a boundary alias tag for the current version is
 created at the commit the old current-version tag points to, RECORDED as a
-``boundary-alias`` event in the releasable's lineage record, and pushed. The
+``boundary-alias`` event in the releasable's transition record, and pushed. The
 push is the single sanctioned remote action. Historical releases stay under the
 old prefix and are no longer managed by ``rlsbl release edit/deprecate/yank``.
 
-The lineage record is what makes the alias discoverable: ``expected_refs``
+The transition record is what makes the alias discoverable: ``expected_refs``
 (the single authority for a version's full ref set) reads recorded aliases from
 there, and it is the same event kind a conversion writes for the same fact.
 
 The flow is idempotent: a crash between the local commit and the tag push is
 healed by re-running the command, which detects the already-renamed state and
-finishes the tag step. The lineage append is idempotent by content, so a re-run
+finishes the tag step. The transition record append is idempotent by content, so a re-run
 never duplicates the record.
 """
 
@@ -233,8 +233,8 @@ def _push_timeout_for(root, name):
     return get_push_timeout(read_project_config(root, get_releasable_dir(root, name)))
 
 
-def _record_alias_in_lineage(root, releasable_name, alias_tag, aliased_tag, commit):
-    """Append the boundary alias to the releasable's lineage record and commit it.
+def _record_alias_in_transition_record(root, releasable_name, alias_tag, aliased_tag, commit):
+    """Append the boundary alias to the releasable's transition record and commit it.
 
     An alias tag created here and a boundary alias recorded by a conversion are
     the same kind of fact -- a pre-rename version made addressable under the
@@ -246,16 +246,16 @@ def _record_alias_in_lineage(root, releasable_name, alias_tag, aliased_tag, comm
     not appended again, so every crash window (and a plain re-run) heals without
     duplicating the record.
     """
-    from ...lineage import (
+    from ...transition_record import (
         KIND_BOUNDARY_ALIAS,
         BoundaryAlias,
         BoundaryAliasEvent,
         append_events,
-        get_lineage_path,
+        get_transition_record_path,
         read_events,
     )
 
-    path = get_lineage_path(
+    path = get_transition_record_path(
         root, releasable_dir=get_releasable_dir(root, releasable_name),
     )
     for event in read_events(path, kinds=[KIND_BOUNDARY_ALIAS]):
@@ -268,7 +268,7 @@ def _record_alias_in_lineage(root, releasable_name, alias_tag, aliased_tag, comm
     commit_files_if_changed(
         f"monorepo: record the {releasable_name} rename boundary alias",
         [os.path.relpath(path, root)],
-        skip_message="alias lineage already committed; nothing to commit.",
+        skip_message="alias transition record already committed; nothing to commit.",
         cwd=root,
     )
     return True
@@ -300,7 +300,7 @@ def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout,
     if releasable_name is not None:
         commit = _resolve_tag_commit(root, new_tag)
         if commit is not None:
-            _record_alias_in_lineage(
+            _record_alias_in_transition_record(
                 root, releasable_name, new_tag, old_tag, commit,
             )
 

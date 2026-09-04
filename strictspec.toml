@@ -37,11 +37,11 @@ path = ".strictspec/changelog-entry-commit-mode.schema.toml"
   package = "rlsbl.strictspec_gen"
 
 [[schemas]]
-path = ".strictspec/lineage-event.schema.toml"
+path = ".strictspec/transition-record-event.schema.toml"
 
   [[schemas.targets]]
   lang    = "python"
-  output  = "rlsbl/strictspec_gen/lineage_event_validator.py"
+  output  = "rlsbl/strictspec_gen/transition_record_event_validator.py"
   package = "rlsbl.strictspec_gen"
 
 [[schemas]]

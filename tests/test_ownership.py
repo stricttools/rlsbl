@@ -290,7 +290,7 @@ class TestReleasableStateDirScope:
         ".rlsbl-monorepo/releasables/core/changes/0.2.0.jsonl",
         ".rlsbl-monorepo/releasables/core/releases/v0.2.0.toml",
         ".rlsbl-monorepo/releasables/core/version",
-        ".rlsbl-monorepo/releasables/core/lineage.jsonl",
+        ".rlsbl-monorepo/releasables/core/transitions.jsonl",
     ])
     def test_releasable_scope_claims_its_own_state_dir(self, path):
         scope = self.rel_scope("core", "pkg-a")

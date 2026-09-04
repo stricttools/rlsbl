@@ -136,7 +136,7 @@ depends_on = []
 
 # old-repo-archived: an absorb leaves its source repository standing, where it
 # keeps collecting issues, pull requests and clones for code that moved here.
-# Skips when the lineage record holds no absorb. rlsbl never archives it: the
+# Skips when the transition record holds no absorb. rlsbl never archives it: the
 # finding prints the `gh repo archive` command.
 [checks.old-repo-archived]
 tags = ["release"]

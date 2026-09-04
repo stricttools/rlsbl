@@ -455,7 +455,7 @@ def append_lines(path, lines, *, encoding="utf-8"):
     """Append *lines* to *path* as ONE append, each on its own line.
 
     This is the append every record-file writer here uses -- the changelog
-    JSONL files and the lineage record alike -- and it carries the whole batch
+    JSONL files and the transition record alike -- and it carries the whole batch
     in a single :func:`append_text`.  Prior content is never read back and
     rewritten, so a concurrent writer cannot be clobbered and an already-written
     line is never modified.

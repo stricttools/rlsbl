@@ -1078,7 +1078,7 @@ class TestMirrorCmdConvergedShortCircuit:
             state="converged",
             split_sha="a" * 40,
             remote_tip="b" * 40,
-            split_lineage_sha="a" * 40,
+            split_ancestry_sha="a" * 40,
         )
         monkeypatch.setattr(mirror_mod, "observe", lambda remote, root, path: plan)
         converge_calls = {"n": 0}
@@ -1107,7 +1107,7 @@ class TestMirrorCmdContractViolationRefuses:
             state="contract_violated",
             split_sha="a" * 40,
             remote_tip="c" * 40,
-            split_lineage_sha="a" * 40,
+            split_ancestry_sha="a" * 40,
             foreign_commits=[("d" * 40, ["src/hand_authored.py"])],
         )
         monkeypatch.setattr(mirror_mod, "observe", lambda remote, root, path: plan)

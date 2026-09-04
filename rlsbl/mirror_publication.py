@@ -82,7 +82,7 @@ def split_commit_for(root, subtree_path, source_sha, *, timeout=SPLIT_TIMEOUT):
     """The mirror commit corresponding to monorepo commit *source_sha*.
 
     A branchless ``git subtree split`` AT that commit: it prints the synthetic
-    commit's SHA, creates no ref, and materializes the split lineage as loose
+    commit's SHA, creates no ref, and materializes the split ancestry as loose
     objects in the monorepo's object store. Deterministic, so two callers asking
     the same question get the same answer, and the answer for an ancestor is an
     ancestor of the answer for HEAD.

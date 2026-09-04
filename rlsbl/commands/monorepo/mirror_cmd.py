@@ -14,8 +14,8 @@ The command is an observe-then-converge reconciler:
 
 Desired state of the mirror's ``main``:
 
-* its tip is exactly one scaffold commit atop the CURRENT split-lineage commit,
-  where the split-lineage commit equals the deterministic branchless subtree
+* its tip is exactly one scaffold commit atop the CURRENT split-ancestry commit,
+  where the split-ancestry commit equals the deterministic branchless subtree
   split of the project's current history, and
 * the scaffold commit touches only scaffold-owned paths.
 
@@ -34,8 +34,8 @@ carries one is classified ``scaffold_stale`` rather than ``converged``, so the
 next apply rebuilds the layer without it.
 
 A tripwire enforces the contract with no heuristics: the remote tip must be
-EITHER a bare split-lineage commit (the current split SHA or an older one --
-covers pre-scaffold-layer mirrors) OR exactly one commit atop a split-lineage
+EITHER a bare split-ancestry commit (the current split SHA or an older one --
+covers pre-scaffold-layer mirrors) OR exactly one commit atop a split-ancestry
 commit whose changed paths are all scaffold-owned. Anything else is a foreign
 commit -- a contract violation -- and is a hard error that touches nothing.
 
@@ -43,10 +43,10 @@ The tripwire's walk asks an ancestry question per commit, and that question has
 three answers.  "No" and "cannot tell" both keep the walk moving, because a
 commit above the split boundary normally CANNOT be answered: its objects live
 on the mirror, not in the monorepo.  The difference shows up only when the walk
-reaches the end of the tip's history without ever finding a split-lineage
+reaches the end of the tip's history without ever finding a split-ancestry
 commit.  If every answer along the way was a definite "no", the mirror really
 does hold unrelated work: ``contract_violated``.  If any answer was "cannot
-tell", the honest verdict is ``lineage_undetermined`` -- also a refusal that
+tell", the honest verdict is ``ancestry_undetermined`` -- also a refusal that
 touches nothing, but one that names a git that could not answer (pruned or
 unfetched objects) instead of accusing an operator of authoring on the mirror.
 
@@ -170,10 +170,10 @@ class MirrorPlan:
                                     sweeps it.
       * ``"behind"``             -- a scaffold layer exists atop an OLDER split; a new
                                     split is available.
-      * ``"scaffold_missing"``   -- the tip is a bare split-lineage commit (no scaffold
+      * ``"scaffold_missing"``   -- the tip is a bare split-ancestry commit (no scaffold
                                     layer). May also be behind (older split).
       * ``"contract_violated"``  -- a foreign commit exists on the mirror.
-      * ``"lineage_undetermined"`` -- the walk never reached a split-lineage
+      * ``"ancestry_undetermined"`` -- the walk never reached a split-ancestry
                                     commit AND at least one ancestry question
                                     was unanswerable, so whether the mirror is
                                     foreign was never established.
@@ -183,11 +183,11 @@ class MirrorPlan:
     state: str
     split_sha: str
     remote_tip: str | None = None
-    split_lineage_sha: str | None = None
+    split_ancestry_sha: str | None = None
     behind: bool = False
     foreign_commits: list = field(default_factory=list)  # list of (sha, [paths])
-    # Commits whose split-lineage question git could not answer at all.  Only
-    # populated on the ``lineage_undetermined`` path: everywhere else an
+    # Commits whose split-ancestry question git could not answer at all.  Only
+    # populated on the ``ancestry_undetermined`` path: everywhere else an
     # unanswerable commit is an ordinary above-the-boundary commit.
     undetermined_commits: list = field(default_factory=list)
     remote_detail: str = ""
@@ -202,14 +202,14 @@ class MirrorPlan:
     def split_push_needed(self) -> bool:
         """Whether converging requires pushing a fresh bare split to ``main``.
 
-        ``scaffold_stale`` needs one even though the lineage is already the
+        ``scaffold_stale`` needs one even though the ancestry is already the
         current split: the layer to be swept IS the tip, so it is discarded by
         re-pushing the bare split and rebuilding the layer on top -- which is
         also what keeps the result exactly one commit above the boundary.
         """
         if self.state in ("virgin", "scaffold_stale"):
             return True
-        return self.split_lineage_sha != self.split_sha
+        return self.split_ancestry_sha != self.split_sha
 
 
 # ---------------------------------------------------------------------------
@@ -238,14 +238,14 @@ def _git_ok(args, cwd=None, timeout=180):
     return r.stdout.strip()
 
 
-def split_lineage_answer(commit, split_sha, cwd):
+def split_ancestry_answer(commit, split_sha, cwd):
     """Is ``commit`` the current split commit or one of its ancestors?
 
     Returns the :class:`Ancestry` verdict rather than a bool, because the
     reconciler needs all three answers, not two:
 
     * **TRUE** -- the split boundary; the walk stops here.
-    * **FALSE** -- git checked: this commit is not part of the split lineage.
+    * **FALSE** -- git checked: this commit is not part of the split ancestry.
     * **INDETERMINABLE** -- git could not check.  This is the ORDINARY answer
       for a commit above the boundary: the mirror's scaffold layer exists only
       on the remote, so the monorepo has no object to walk.  It is also what a
@@ -253,8 +253,8 @@ def split_lineage_answer(commit, split_sha, cwd):
       keeps it and the caller uses it only where the difference is real (see
       :func:`observe`).
 
-    The walk's fail-closed direction is "not lineage" for BOTH non-TRUE
-    answers: a commit whose lineage was never established is never treated as
+    The walk's fail-closed direction is "not ancestry" for BOTH non-TRUE
+    answers: a commit whose ancestry was never established is never treated as
     a boundary, so the reconciler refuses rather than force-pushing over
     something it cannot account for.
     """
@@ -311,7 +311,7 @@ def compute_split_sha(root, project_path):
 
     Runs ``git subtree split --prefix <path>`` WITHOUT ``-b``: it prints the
     resulting commit SHA to stdout, creates no refs, and materializes the whole
-    synthetic split lineage as loose objects in the monorepo (so later
+    synthetic split ancestry as loose objects in the monorepo (so later
     ancestry checks against older split commits resolve locally).
 
     ``--prefix`` and the path are SEPARATE tokens on purpose: that is the
@@ -483,15 +483,15 @@ def observe(remote, root, project_path):
         _clone_main(remote, clone_dir)
 
         # Walk the first-parent chain from the tip down to the SPLIT BOUNDARY:
-        # the nearest commit that is part of the split lineage (an ancestor of
+        # the nearest commit that is part of the split ancestry (an ancestor of
         # the current split, i.e. an old or current bare split commit). Every
         # commit strictly above the boundary is the mirror's "layer".
         chain = _first_parent_chain(clone_dir, tip)
         boundary = None
         above = []  # commits above the boundary, newest first
-        undetermined = []  # commits whose lineage question git could not answer
+        undetermined = []  # commits whose ancestry question git could not answer
         for commit in chain:
-            verdict = split_lineage_answer(commit, split_sha, cwd=root)
+            verdict = split_ancestry_answer(commit, split_sha, cwd=root)
             if verdict is Ancestry.TRUE:
                 boundary = commit
                 break
@@ -518,10 +518,10 @@ def observe(remote, root, project_path):
                 # be foreign, and a populated field named that is an
                 # accusation waiting for the next reader to render it.
                 return MirrorPlan(
-                    state="lineage_undetermined",
+                    state="ancestry_undetermined",
                     split_sha=split_sha,
                     remote_tip=tip,
-                    split_lineage_sha=None,
+                    split_ancestry_sha=None,
                     undetermined_commits=undetermined,
                     remote_refs_text=refs_text,
                 )
@@ -529,18 +529,18 @@ def observe(remote, root, project_path):
                 state="contract_violated",
                 split_sha=split_sha,
                 remote_tip=tip,
-                split_lineage_sha=None,
+                split_ancestry_sha=None,
                 foreign_commits=[(c, _commit_paths(clone_dir, c)) for c in above],
                 remote_refs_text=refs_text,
             )
 
-        # (a) No layer: tip is a bare split-lineage commit.
+        # (a) No layer: tip is a bare split-ancestry commit.
         if not above:
             return MirrorPlan(
                 state="scaffold_missing",
                 split_sha=split_sha,
                 remote_tip=tip,
-                split_lineage_sha=boundary,
+                split_ancestry_sha=boundary,
                 behind=boundary != split_sha,
                 remote_refs_text=refs_text,
             )
@@ -565,7 +565,7 @@ def observe(remote, root, project_path):
                             state="scaffold_stale",
                             split_sha=split_sha,
                             remote_tip=tip,
-                            split_lineage_sha=boundary,
+                            split_ancestry_sha=boundary,
                             publish_workflows=stale,
                             remote_refs_text=refs_text,
                         )
@@ -573,14 +573,14 @@ def observe(remote, root, project_path):
                         state="converged",
                         split_sha=split_sha,
                         remote_tip=tip,
-                        split_lineage_sha=boundary,
+                        split_ancestry_sha=boundary,
                         remote_refs_text=refs_text,
                     )
                 return MirrorPlan(
                     state="behind",
                     split_sha=split_sha,
                     remote_tip=tip,
-                    split_lineage_sha=boundary,
+                    split_ancestry_sha=boundary,
                     behind=True,
                     remote_refs_text=refs_text,
                 )
@@ -597,7 +597,7 @@ def observe(remote, root, project_path):
             state="contract_violated",
             split_sha=split_sha,
             remote_tip=tip,
-            split_lineage_sha=boundary,
+            split_ancestry_sha=boundary,
             foreign_commits=foreign,
             remote_refs_text=refs_text,
         )
@@ -784,7 +784,7 @@ def _remediation(plan, project_path):
     for sha, paths in plan.foreign_commits:
         if paths is None:
             lines.append(
-                f"  - commit {sha[:12]} is not a split-lineage commit and is not "
+                f"  - commit {sha[:12]} is not a split-ancestry commit and is not "
                 f"a single scaffold commit atop one."
             )
         else:
@@ -806,13 +806,13 @@ def _undetermined_detail(plan, project_path):
     """Remediation for a walk git could not finish.  Never an accusation."""
     lines = [
         f"  - commit {sha[:12]}: git could not tell whether it belongs to the "
-        f"split lineage."
+        f"split ancestry."
         for sha in plan.undetermined_commits
     ]
     body = "\n".join(lines)
     return (
         f"{body}\n"
-        f"The mirror's history never reached a split-lineage commit, and at "
+        f"The mirror's history never reached a split-ancestry commit, and at "
         f"least one ancestry question came back unanswerable rather than "
         f"answered 'no'. The usual cause is objects the monorepo does not "
         f"have: pruned by gc, or never fetched (a shallow clone).\n"
@@ -822,7 +822,7 @@ def _undetermined_detail(plan, project_path):
         f"`git fetch --unshallow` (or `git fetch --deepen=<n>`) if the clone "
         f"is shallow, `git fetch` the mirror remote to bring its commits "
         f"local, and re-run `git subtree split --prefix {project_path}` to "
-        f"re-materialize the split lineage gc may have pruned."
+        f"re-materialize the split ancestry gc may have pruned."
     )
 
 
@@ -862,7 +862,7 @@ def verdict_item(plan, remote, project_path, project_name):
         return VerdictItem(
             summary="a new split is available.",
             facts=(
-                f"old split: {plan.split_lineage_sha[:12]}",
+                f"old split: {plan.split_ancestry_sha[:12]}",
                 f"new split: {plan.split_sha[:12]}",
             ),
             actions=(
@@ -875,7 +875,7 @@ def verdict_item(plan, remote, project_path, project_name):
             return VerdictItem(
                 label="scaffold-missing (and behind)",
                 summary=(f"tip is a bare split commit "
-                         f"{plan.split_lineage_sha[:12]}, older than current "
+                         f"{plan.split_ancestry_sha[:12]}, older than current "
                          f"split {plan.split_sha[:12]}."),
                 actions=(
                     "apply would force-push the new split (with lease) and scaffold.",
@@ -894,14 +894,14 @@ def verdict_item(plan, remote, project_path, project_name):
             detail=_remediation(plan, project_path),
             **common,
         )
-    if plan.state == "lineage_undetermined":
+    if plan.state == "ancestry_undetermined":
         return VerdictItem(
-            summary="git could not determine the mirror's lineage.",
+            summary="git could not determine the mirror's ancestry.",
             facts=(
                 f"remote tip: {plan.remote_tip[:12]}",
                 f"current split: {plan.split_sha[:12]}",
                 "no commit in the tip's history could be confirmed as part of "
-                "the split lineage, and at least one check was unanswerable.",
+                "the split ancestry, and at least one check was unanswerable.",
             ),
             detail=_undetermined_detail(plan, project_path),
             **common,
@@ -1058,7 +1058,7 @@ def _converge(plan, remote, root, project_path, sub_config_path):
     """Bring the mirror to the desired state. Idempotent; interrupted runs heal."""
     split_sha = plan.split_sha
 
-    # 1. If the remote's split lineage is not the current split, force the new
+    # 1. If the remote's split ancestry is not the current split, force the new
     #    bare split onto main (with lease). This temporarily strips the scaffold
     #    layer; step 3 re-adds it -- an interrupted run re-observes as
     #    scaffold-missing and heals.
@@ -1126,15 +1126,15 @@ def converge_branch(remote, root, project_path, sub_config_path):
     and the two refusals below.
 
     Returns the observed :class:`MirrorPlan`. Raises :class:`MirrorError` when
-    the mirror carries foreign commits or its lineage could not be established:
+    the mirror carries foreign commits or its ancestry could not be established:
     both touch nothing, and neither is something a release may decide to
     overwrite.
     """
     plan = observe(remote, root, project_path)
-    if plan.state == "lineage_undetermined":
+    if plan.state == "ancestry_undetermined":
         raise MirrorError(
-            "lineage-undetermined -- git could not determine whether the "
-            "mirror shares this project's split lineage; nothing was "
+            "ancestry-undetermined -- git could not determine whether the "
+            "mirror shares this project's split ancestry; nothing was "
             f"touched.\n{_undetermined_detail(plan, project_path)}"
         )
     if plan.state == "contract_violated":
@@ -1338,9 +1338,9 @@ def _cmd_mirror(flags, project_root):
             )
             return
         plan = item.data
-        if plan.state == "lineage_undetermined":
-            print("Error: lineage-undetermined -- git could not determine "
-                  "whether the mirror shares this project's split lineage; "
+        if plan.state == "ancestry_undetermined":
+            print("Error: ancestry-undetermined -- git could not determine "
+                  "whether the mirror shares this project's split ancestry; "
                   "nothing was touched.", file=sys.stderr)
             print(_undetermined_detail(plan, project_path), file=sys.stderr)
             sys.exit(1)

@@ -296,7 +296,7 @@ def _append_entry_to_file(target: str, entry: ChangelogEntry) -> None:
     """Append one entry to any JSONL file, creating parents when missing.
 
     One append of one line, through :func:`rlsbl.effects.append_lines` -- the
-    shared append the lineage record uses too.  Prior content is never read back
+    shared append the transition record uses too.  Prior content is never read back
     and rewritten, so a `changelog add` racing another one cannot clobber the
     entry it just wrote, and a torn last line cannot swallow the new entry: the
     helper leads the append with a separating newline when the file does not end

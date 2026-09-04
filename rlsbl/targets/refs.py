@@ -18,7 +18,7 @@ The three sources, and why each is where it is:
   needs one companion per publishing Go member. Both rules the collector
   carried -- skip when the primary tag is already Go-compatible, skip
   publish-suppressed members -- live in :meth:`BaseTarget._companion_refs`.
-* **Recorded aliases** are a repository FACT, read from the lineage record
+* **Recorded aliases** are a repository FACT, read from the transition record
   rather than recomputed. A rename creates ``new@v1.2.3`` beside the existing
   ``old@v1.2.3``; a conversion does the same at its boundary. Both write a
   ``boundary-alias`` event, and both tags address the same version, so both
@@ -35,7 +35,7 @@ from dataclasses import dataclass
 class RefContext:
     """Everything ``expected_refs`` needs that is not the version itself.
 
-    Built by :func:`ref_context` rather than by hand, so the lineage records to
+    Built by :func:`ref_context` rather than by hand, so the transition records to
     consult are derived in one place instead of at every call site.
 
     Attributes:
@@ -56,7 +56,7 @@ class RefContext:
             which companion tags were never collected.
         releasable_config_dir: the releasable's state directory, for the
             member-config inheritance the publish-mode rule reads.
-        lineage_paths: the lineage records that may carry aliases for this
+        transition_record_paths: the transition records that may carry aliases for this
             project's versions, in read order.
     """
 
@@ -67,7 +67,7 @@ class RefContext:
     releasable_name: str | None = None
     member_package_paths: tuple[str, ...] | None = None
     releasable_config_dir: str | None = None
-    lineage_paths: tuple[str, ...] = ()
+    transition_record_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -108,7 +108,7 @@ def ref_context(
     member_package_paths=None,
     releasable_config_dir=None,
 ) -> RefContext:
-    """Build a :class:`RefContext`, deriving which lineage records to consult.
+    """Build a :class:`RefContext`, deriving which transition records to consult.
 
     Exactly ONE record is consulted, and which one follows the project's release
     identity: a releasable's own record when a releasable owns the versioning,
@@ -117,14 +117,14 @@ def ref_context(
     globs departed), and an alias recorded there for a different releasable
     could carry the same version number as this one.
     """
-    from ..lineage import get_lineage_path
+    from ..transition_record import get_transition_record_path
 
     root = str(repo_root)
     if releasable_config_dir:
-        paths = (get_lineage_path(root, releasable_dir=str(releasable_config_dir)),)
+        paths = (get_transition_record_path(root, releasable_dir=str(releasable_config_dir)),)
     else:
         project_dir = os.path.join(root, project_path) if project_path else root
-        paths = (get_lineage_path(project_dir),)
+        paths = (get_transition_record_path(project_dir),)
 
     return RefContext(
         repo_root=root,
@@ -139,12 +139,12 @@ def ref_context(
         releasable_config_dir=(
             str(releasable_config_dir) if releasable_config_dir else None
         ),
-        lineage_paths=paths,
+        transition_record_paths=paths,
     )
 
 
 def recorded_aliases(context: RefContext, version: str) -> tuple[str, ...]:
-    """Alias tags the lineage records attribute to *version*.
+    """Alias tags the transition records attribute to *version*.
 
     A ``boundary-alias`` event names two tags -- the alias created and the tag
     it duplicates -- and BOTH address the version they carry, so both join that
@@ -155,10 +155,10 @@ def recorded_aliases(context: RefContext, version: str) -> tuple[str, ...]:
     them carries no version rather than a guessed one.
 
     A missing record yields nothing; a MALFORMED one raises, because
-    :func:`~rlsbl.lineage.read_events` is the read-for-use site and a record
+    :func:`~rlsbl.transition_record.read_events` is the read-for-use site and a record
     that cannot be read in full cannot be trusted in part.
     """
-    from ..lineage import KIND_BOUNDARY_ALIAS, read_events
+    from ..transition_record import KIND_BOUNDARY_ALIAS, read_events
     from ..tag_glob import TagMode, parse_version_tag
 
     def carries(tag):
@@ -166,7 +166,7 @@ def recorded_aliases(context: RefContext, version: str) -> tuple[str, ...]:
         return parsed is not None and parsed.version == version
 
     found: list[str] = []
-    for path in context.lineage_paths:
+    for path in context.transition_record_paths:
         for event in read_events(path, kinds=[KIND_BOUNDARY_ALIAS]):
             for alias in event.aliases:
                 for tag in (alias.alias_tag, alias.aliased_tag):

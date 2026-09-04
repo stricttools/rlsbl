@@ -500,7 +500,7 @@ def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
     its caller. ``rlsbl release reconcile`` reaches the same repair through
     :func:`rlsbl.anchor_remap.repair_anchors` -- the shared core both go
     through -- but drives it from its own MERGED commit map (the journal plus
-    the lineage anchor-remap events plus the committed scrub archives), so it
+    the transition record anchor-remap events plus the committed scrub archives), so it
     can still heal in a fresh clone, where the journal under ``.git`` is not
     there to read.
     """

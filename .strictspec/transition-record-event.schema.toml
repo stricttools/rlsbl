@@ -1,8 +1,8 @@
-# strictspec schema for one rlsbl LINEAGE RECORD line.
-# Source of truth: rlsbl/lineage.py (the event dataclasses and read_events).
-# One document = one JSONL line = one lineage event.
+# strictspec schema for one rlsbl TRANSITION RECORD line.
+# Source of truth: rlsbl/transition_record.py (the event dataclasses and read_events).
+# One document = one JSONL line = one transition record event.
 #
-# WHAT A LINEAGE RECORD IS: a committed, append-only log of repository-surgery
+# WHAT A TRANSITION RECORD IS: a committed, append-only log of repository-surgery
 # FACTS -- what a conversion did, which tags were renamed, which commits a
 # history rewrite moved. It is written once by the operation that performed the
 # surgery and read afterwards by anything that needs to explain how the
@@ -15,14 +15,14 @@
 # a recorded tag still exists, and any cross-event correlation (`related_to`
 # pointing at an event id in the same or another file).
 
-name = "rlsbl-lineage-event"
+name = "rlsbl-transition-record-event"
 meta_version = 1
 format_version = 1
 document_syntax = "jsonl"
 role = "schema"
-root = "LineageEvent"
+root = "TransitionRecordEvent"
 targets = ["python"]
-description = "One JSONL lineage line: a single repository-surgery fact, discriminated by `kind`."
+description = "One JSONL transition record line: a single repository-surgery fact, discriminated by `kind`."
 
 # ---------------------------------------------------------------------------
 # Shared scalar refinements
@@ -31,40 +31,40 @@ description = "One JSONL lineage line: a single repository-surgery fact, discrim
 [types.GitSha]
 type = "string"
 regex = "^[0-9a-f]{7,40}$"
-description = "A git commit hash, abbreviated (>= 7) or full (40). Lineage writers always record the FULL 40-character form; the shorter bound exists so a hand-written record is readable rather than rejected. Resolution against the object database is rlsbl-native, not a shape check."
+description = "A git commit hash, abbreviated (>= 7) or full (40). Transition record writers always record the FULL 40-character form; the shorter bound exists so a hand-written record is readable rather than rejected. Resolution against the object database is rlsbl-native, not a shape check."
 
 # ---------------------------------------------------------------------------
 # Shared records
 # ---------------------------------------------------------------------------
 
-[types.LineageEndpoint]
+[types.TransitionRecordEndpoint]
 type = "record"
 description = "One side of a conversion: which repository, and which slice of it."
 
-[types.LineageEndpoint.fields.repo]
+[types.TransitionRecordEndpoint.fields.repo]
 type = "string"
 required = true
 non_empty = true
 description = "Repository identity. A remote URL for a repository other than the one holding this record, or \".\" for this repository itself."
 
-[types.LineageEndpoint.fields.path]
+[types.TransitionRecordEndpoint.fields.path]
 type = "string"
 required = false
 description = "Repo-relative subtree path of this endpoint. Absent means the repository root (a standalone repo). Present means a monorepo sub-project directory."
 
-[types.LineageEndpoint.fields.project]
+[types.TransitionRecordEndpoint.fields.project]
 type = "string"
 required = false
 non_empty = true
 description = "Workspace project name at this endpoint, when the endpoint is inside an rlsbl workspace."
 
-[types.LineageEndpoint.fields.releasable]
+[types.TransitionRecordEndpoint.fields.releasable]
 type = "string"
 required = false
 non_empty = true
 description = "Releasable group name at this endpoint, when the endpoint's versioning is owned by a releasable."
 
-[types.LineageEndpoint.fields.tag_format]
+[types.TransitionRecordEndpoint.fields.tag_format]
 type = "string"
 required = false
 non_empty = true
@@ -193,12 +193,12 @@ values = ["extract", "absorb"]
 description = "\"extract\" moved a sub-project out of a workspace into its own repository; \"absorb\" moved an external repository in as a sub-project."
 
 [types.ConversionEvent.fields.source]
-type = "LineageEndpoint"
+type = "TransitionRecordEndpoint"
 required = true
 description = "Where the code came from."
 
 [types.ConversionEvent.fields.destination]
-type = "LineageEndpoint"
+type = "TransitionRecordEndpoint"
 required = true
 description = "Where the code went."
 
@@ -249,7 +249,7 @@ type = "TagMapping"
 
 [types.AnchorRemapEvent]
 type = "record"
-description = "The commit correspondence a history rewrite produced. \"Anchor\" is any SHA another rlsbl record points at -- a changelog entry's commits, a tag's target, an earlier lineage event's commit -- which the rewrite invalidated."
+description = "The commit correspondence a history rewrite produced. \"Anchor\" is any SHA another rlsbl record points at -- a changelog entry's commits, a tag's target, an earlier transition record event's commit -- which the rewrite invalidated."
 
 [types.AnchorRemapEvent.fields.format_version]
 type = "integer"
@@ -335,7 +335,7 @@ type = "string"
 non_empty = true
 
 [types.DepartedGlobsEvent.fields.destination]
-type = "LineageEndpoint"
+type = "TransitionRecordEndpoint"
 required = true
 description = "The repository the globs went to, so a reader can follow them."
 
@@ -497,28 +497,28 @@ type = "SplitMapping"
 # The document root: one line is exactly one event, selected by `kind`.
 # ---------------------------------------------------------------------------
 
-[types.LineageEvent]
+[types.TransitionRecordEvent]
 type = "discriminated-union"
 discriminator = "kind"
-description = "One lineage line. The `kind` field selects the arm; an unrecognized kind is a hard error, never a skipped line."
+description = "One transition record line. The `kind` field selects the arm; an unrecognized kind is a hard error, never a skipped line."
 
-[types.LineageEvent.arms.conversion]
+[types.TransitionRecordEvent.arms.conversion]
 type = "ConversionEvent"
 
-[types.LineageEvent.arms.tag-map]
+[types.TransitionRecordEvent.arms.tag-map]
 type = "TagMapEvent"
 
-[types.LineageEvent.arms.anchor-remap]
+[types.TransitionRecordEvent.arms.anchor-remap]
 type = "AnchorRemapEvent"
 
-[types.LineageEvent.arms.departed-globs]
+[types.TransitionRecordEvent.arms.departed-globs]
 type = "DepartedGlobsEvent"
 
-[types.LineageEvent.arms.boundary-alias]
+[types.TransitionRecordEvent.arms.boundary-alias]
 type = "BoundaryAliasEvent"
 
-[types.LineageEvent.arms.identity-transition]
+[types.TransitionRecordEvent.arms.identity-transition]
 type = "IdentityTransitionEvent"
 
-[types.LineageEvent.arms.promotion-split-map]
+[types.TransitionRecordEvent.arms.promotion-split-map]
 type = "PromotionSplitMapEvent"

@@ -238,14 +238,14 @@ def remap_release_anchors(releases_dir: str, commit_map: dict, *, cwd=None,
 
 
 def anchor_remap_event(rewrite: str, remaps):
-    """The lineage event recording an anchor remap, or None when nothing moved.
+    """The transition record event recording an anchor remap, or None when nothing moved.
 
     The record is what lets a later reader EXPLAIN why a version's archive
     names a commit that no earlier record mentions -- including a reader in a
     fresh clone, where safegit's own journal (which lives under ``.git``) is
     not there to consult.
     """
-    from .lineage import AnchorMapping, AnchorRemapEvent
+    from .transition_record import AnchorMapping, AnchorRemapEvent
 
     mappings = [
         AnchorMapping(old_sha=r.old_sha, new_sha=r.new_sha) for r in remaps
@@ -255,18 +255,18 @@ def anchor_remap_event(rewrite: str, remaps):
     return AnchorRemapEvent(rewrite=rewrite, mappings=mappings)
 
 
-def record_anchor_remap(lineage_path: str, rewrite: str, remaps):
-    """Append the anchor-remap event for *remaps* to the lineage record.
+def record_anchor_remap(transition_record_path: str, rewrite: str, remaps):
+    """Append the anchor-remap event for *remaps* to the transition record.
 
     Returns the path when an event was written, None when nothing moved.
     """
     event = anchor_remap_event(rewrite, remaps)
     if event is None:
         return None
-    from .lineage import append_event
+    from .transition_record import append_event
 
-    append_event(lineage_path, event)
-    return lineage_path
+    append_event(transition_record_path, event)
+    return transition_record_path
 
 
 def releases_dirs_for(project_root: str, workspace_root=None,
@@ -298,18 +298,18 @@ def releases_dirs_for(project_root: str, workspace_root=None,
     return dirs
 
 
-def lineage_path_for_releases_dir(releases_dir: str) -> str:
-    """The lineage record that pairs with a release-archive directory.
+def transition_record_path_for_releases_dir(releases_dir: str) -> str:
+    """The transition record that pairs with a release-archive directory.
 
-    ``.rlsbl/releases/`` -> ``.rlsbl/lineage.jsonl``, and a releasable's
-    ``<releasable>/releases/`` -> ``<releasable>/lineage.jsonl``. Both are the
-    homes :func:`rlsbl.lineage.get_lineage_path` resolves, expressed as the
+    ``.rlsbl/releases/`` -> ``.rlsbl/transitions.jsonl``, and a releasable's
+    ``<releasable>/releases/`` -> ``<releasable>/transitions.jsonl``. Both are the
+    homes :func:`rlsbl.transition_record.get_transition_record_path` resolves, expressed as the
     derivation from the directory a caller already holds.
     """
-    from .lineage import LINEAGE_FILENAME
+    from .transition_record import TRANSITION_RECORD_FILENAME
 
     return os.path.join(
-        os.path.dirname(os.path.normpath(releases_dir)), LINEAGE_FILENAME,
+        os.path.dirname(os.path.normpath(releases_dir)), TRANSITION_RECORD_FILENAME,
     )
 
 
@@ -320,12 +320,12 @@ def repair_anchors(*, project_root, commit_map, rewrite_id,
 
     The whole-repository half of the repair: it finds every release-archive
     directory the same walk the JSONL remap uses finds, remaps each one's
-    anchors through *commit_map*, and appends an ``anchor-remap`` lineage event
+    anchors through *commit_map*, and appends an ``anchor-remap`` transition record event
     beside each release record that moved.
 
     Returns ``(remaps, touched)`` -- the :class:`AnchorRemap` records across
     every release record, and the repo paths a commit must carry (the rewritten
-    archives plus the lineage records that now name them).
+    archives plus the transition records that now name them).
 
     Verification runs across ALL release records before the first write, so a content
     mismatch in one project leaves every project's archives untouched.
@@ -353,9 +353,9 @@ def repair_anchors(*, project_root, commit_map, rewrite_id,
                 )
             touched.append(remap.path)
         remaps.extend(per_dir)
-        lineage_path = record_anchor_remap(
-            lineage_path_for_releases_dir(releases_dir), rewrite_id, per_dir,
+        transition_record_path = record_anchor_remap(
+            transition_record_path_for_releases_dir(releases_dir), rewrite_id, per_dir,
         )
-        if lineage_path:
-            touched.append(lineage_path)
+        if transition_record_path:
+            touched.append(transition_record_path)
     return remaps, touched

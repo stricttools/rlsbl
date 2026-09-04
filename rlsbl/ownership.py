@@ -103,7 +103,7 @@ def releasable_state_dir(releasable_name) -> str:
     """Repo-relative path of a releasable's own state directory.
 
     ``.rlsbl-monorepo/releasables/<name>`` -- the changelog, the release
-    archives, the version, the lineage and the config of one releasable.  No
+    archives, the version, the transition record and the config of one releasable.  No
     member's declared path claims it (it is tool-owned, and a releasable is not
     a member), so it is the releasable itself that claims it, at the scope
     level: see :meth:`OwnershipScope.for_releasable`.
