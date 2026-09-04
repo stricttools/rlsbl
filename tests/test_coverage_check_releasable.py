@@ -86,13 +86,13 @@ def _setup_releasable_monorepo(
     run_git(repo, "add", ".")
     run_git(repo, "commit", "-q", "-m", "scaffold monorepo")
 
-    # Tag each releasable AND record the release in its ledger -- the range
+    # Tag each releasable AND record the release in its release record -- the range
     # coverage measures from is the archived release, not the tag.
     for rel in releasables:
         tag = rel.effective_tag_format.format(name=rel.name, version=initial_version)
         record_release(
             repo, tag,
-            ledger=os.path.join(get_releasable_dir(str(repo), rel.name), "releases"),
+            release_record=os.path.join(get_releasable_dir(str(repo), rel.name), "releases"),
         )
 
     return releasables, projects
@@ -429,7 +429,7 @@ class TestImplicitModeNoCrash:
         make_workspace(repo, [{"path": "packages/alpha", "name": "alpha"}])
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")
-        record_release(repo, "alpha@v0.1.0", ledger=pkg / ".rlsbl" / "releases")
+        record_release(repo, "alpha@v0.1.0", release_record=pkg / ".rlsbl" / "releases")
 
         # Make a commit and cover it
         (pkg / "src.js").write_text("module.exports = 1;\n")
@@ -547,7 +547,7 @@ class TestWorkspaceRootWithDotProject:
         run_git(repo, "commit", "-q", "-m", "scaffold")
         record_release(
             repo, "v0.1.0",
-            ledger=os.path.join(get_releasable_dir(str(repo), "app"), "releases"),
+            release_record=os.path.join(get_releasable_dir(str(repo), "app"), "releases"),
         )
         return releasables, changes_dir
 

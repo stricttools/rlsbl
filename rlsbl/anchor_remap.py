@@ -1,12 +1,12 @@
-"""Moving the release ledger's anchors through a history rewrite's commit map.
+"""Moving the release record's anchors through a history rewrite's commit map.
 
 A release archive records the commit a version shipped from -- its
 ``candidate_sha`` -- and the git tree each released path carried. Both name
 objects in the commit graph, and a history rewrite replaces that graph. The
 JSONL changelog has been remapped through the rewrite's old-to-new commit map
-since scrubbing existed; the archives were not, so after a scrub the ledger's
+since scrubbing existed; the archives were not, so after a scrub the release record's
 anchor and the (correctly moved) tag disagreed, and
-:func:`rlsbl.ledger.read_entry` refused every read with the DISAGREEMENT error
+:func:`rlsbl.release_record.read_entry` refused every read with the DISAGREEMENT error
 -- an error that blames the tag for moving, which is precisely backwards.
 
 The repair is this module, and it is deliberately narrow:
@@ -36,7 +36,7 @@ the scrub's output rather than absorbed. Which behavior applies is the caller's
 declared choice, never something decided from what is observed.
 
 Every archive is validated before ANY of them is written, so a failure on one
-version leaves the whole ledger untouched rather than half-remapped.
+version leaves the whole release record untouched rather than half-remapped.
 """
 
 from __future__ import annotations
@@ -184,7 +184,7 @@ def plan_anchor_remap(releases_dir: str, commit_map: dict, *, cwd=None,
         old_sha = (archive.candidate_sha or "").strip()
         if not old_sha:
             # An archive carrying neither an anchor nor the unanchorable marker
-            # is the ledger's MISSING-ANCHOR case, which has its own recovery
+            # is the release record's MISSING-ANCHOR case, which has its own recovery
             # and its own error. A rewrite has nothing to move here.
             continue
         new_sha = _map_sha(old_sha, commit_map)
@@ -216,7 +216,7 @@ def remap_release_anchors(releases_dir: str, commit_map: dict, *, cwd=None,
     """Move every archived anchor in *releases_dir* through *commit_map*.
 
     Returns the :class:`AnchorRemap` records for the archives that moved, in
-    the ledger's own highest-first order. The whole set is planned and verified
+    the release record's own highest-first order. The whole set is planned and verified
     before the first write, so a mismatch on any version leaves every archive
     untouched.
 
@@ -280,11 +280,11 @@ def releases_dirs_for(project_root: str, workspace_root=None,
     A directory is included only when it actually HOLDS an archive. Its mere
     existence proves nothing: several unrelated paths (the release lock, a
     scaffold) create ``releases/`` before anything is released, and treating an
-    empty one as a ledger would make every caller pay for a rewrite-journal
+    empty one as a release record would make every caller pay for a rewrite-journal
     read on a repository with no release to repair.
     """
     from .changelog.files import enumerate_changelog_dirs
-    from .ledger import releases_dir_for_changes_dir
+    from .release_record import releases_dir_for_changes_dir
 
     dirs = []
     for changes_dir in enumerate_changelog_dirs(
@@ -316,18 +316,18 @@ def lineage_path_for_releases_dir(releases_dir: str) -> str:
 def repair_anchors(*, project_root, commit_map, rewrite_id,
                    workspace_root=None, workspace_projects=None, cwd=None,
                    on_content_change=ON_CONTENT_CHANGE_REFUSE):
-    """Move every ledger anchor in this repository and record that it happened.
+    """Move every release record anchor in this repository and record that it happened.
 
     The whole-repository half of the repair: it finds every release-archive
     directory the same walk the JSONL remap uses finds, remaps each one's
     anchors through *commit_map*, and appends an ``anchor-remap`` lineage event
-    beside each ledger that moved.
+    beside each release record that moved.
 
     Returns ``(remaps, touched)`` -- the :class:`AnchorRemap` records across
-    every ledger, and the repo paths a commit must carry (the rewritten
+    every release record, and the repo paths a commit must carry (the rewritten
     archives plus the lineage records that now name them).
 
-    Verification runs across ALL ledgers before the first write, so a content
+    Verification runs across ALL release records before the first write, so a content
     mismatch in one project leaves every project's archives untouched.
     """
     releases_dirs = releases_dirs_for(

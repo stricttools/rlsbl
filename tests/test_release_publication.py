@@ -13,7 +13,7 @@ the argv every consumer builds from it.
 import pytest
 
 from rlsbl.release_publication import (
-    anchor_from_ledger,
+    anchor_from_release_record,
     create_args,
     edit_notes_args,
     ensure_marker,
@@ -149,7 +149,7 @@ class TestTheGhSurface:
         assert not os.path.exists(seen["path"])
 
 
-class TestTheAnchorComesFromTheLedger:
+class TestTheAnchorComesFromTheReleaseRecord:
 
     def test_it_reads_the_archive(self, tmp_path):
         from rlsbl.release_file import write_archived_release_file
@@ -159,7 +159,7 @@ class TestTheAnchorComesFromTheLedger:
             releases, "1.0.0", bump="minor", include=["plain"],
             description="d", candidate_sha=SHA, tree_hashes={".": "c" * 40},
         )
-        assert anchor_from_ledger(releases, "1.0.0") == SHA
+        assert anchor_from_release_record(releases, "1.0.0") == SHA
 
     def test_an_unanchorable_version_has_no_anchor(self, tmp_path):
         from rlsbl.release_file import write_archived_release_file
@@ -170,21 +170,21 @@ class TestTheAnchorComesFromTheLedger:
             description="d", candidate_sha=None, tree_hashes=None,
             unanchorable=True,
         )
-        assert anchor_from_ledger(releases, "1.0.0") is None
+        assert anchor_from_release_record(releases, "1.0.0") is None
 
     def test_an_absent_archive_answers_none(self, tmp_path):
-        assert anchor_from_ledger(str(tmp_path), "9.9.9") is None
+        assert anchor_from_release_record(str(tmp_path), "9.9.9") is None
 
     def test_it_answers_where_the_guarded_read_refuses(self, tmp_path):
         """The read that repair paths need, on the repository they run in.
 
-        ``ledger.read_entry`` refuses when the tag and the anchor disagree --
+        ``release_record.read_entry`` refuses when the tag and the anchor disagree --
         which is exactly the state a repair is called to end, so the repair
         cannot be made to depend on that read.
         """
         from githarness import commit_file, git, init_repo
-        from rlsbl import ledger
-        from rlsbl.errors import LedgerError
+        from rlsbl import release_record
+        from rlsbl.errors import ReleaseRecordError
         from rlsbl.release_file import write_archived_release_file
 
         repo = tmp_path / "repo"
@@ -199,6 +199,6 @@ class TestTheAnchorComesFromTheLedger:
         second = commit_file(repo, "b.txt", "b\n", "two")
         git(repo, "tag", "v1.0.0", second)
 
-        with pytest.raises(LedgerError):
-            ledger.read_entry(releases, "1.0.0", tag_glob="v*", cwd=str(repo))
-        assert anchor_from_ledger(releases, "1.0.0") == sha
+        with pytest.raises(ReleaseRecordError):
+            release_record.read_entry(releases, "1.0.0", tag_glob="v*", cwd=str(repo))
+        assert anchor_from_release_record(releases, "1.0.0") == sha

@@ -1,9 +1,9 @@
 """The mirror reconciler's second dimension: the released versions' tags.
 
 A mirror can be perfectly converged on ``main`` and still carry none of the
-tags its releasable's ledger records. The preview names each missing version,
+tags its releasable's release record records. The preview names each missing version,
 and an apply materializes it -- the tag at the subtree split of that version's
-ledger anchor, and the mirror's own GitHub Release beside it.
+release record anchor, and the mirror's own GitHub Release beside it.
 
 Every remote here is a local bare repository reached over ``file://``.
 """
@@ -151,7 +151,7 @@ class TestObserveTags:
         """An anchor that predates the member's directory must not kill the run.
 
         A version absorbed from an era before this subtree existed has a real
-        ledger anchor, but no ``git subtree split`` of the member path can
+        release record anchor, but no ``git subtree split`` of the member path can
         answer for that commit. That is one version's problem: it becomes an
         ``unanchored`` item carrying the reason, and every other version -- and
         the branch itself -- is judged as usual.

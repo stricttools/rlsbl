@@ -170,12 +170,12 @@ def _setup_releasable_workspace(root, member_path="packages/core",
 
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "initial")
-    # Tag the baseline AND record it in the releasable's ledger -- the
+    # Tag the baseline AND record it in the releasable's release record -- the
     # unreleased range is measured from the archived release, not the tag.
     record_release(
         root,
         "v1.0.0" if tag_format else f"{releasable_name}@v1.0.0",
-        ledger=os.path.join(rel_dir, "releases"),
+        release_record=os.path.join(rel_dir, "releases"),
     )
 
     # Member-scoped feature commit

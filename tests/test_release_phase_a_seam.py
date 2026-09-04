@@ -195,19 +195,19 @@ _EXECUTOR_READ_WHITELIST = {"_capture"}
 # these is asking a question the builder was supposed to have answered.
 _READ_CALLS = {"run", "run_gh", "head_sha", "_git_read", "_git_answer"}
 
-# Reads of the release-state LEDGER. These are invisible to the world-read scan
+# Reads of the release-state record. These are invisible to the world-read scan
 # above (no subprocess, no git), so they are scanned separately -- an undeclared
 # read that nothing can see is worse than one that is merely tolerated.
 #
-# The ledger is the executor's OWN writing surface: it records how far this walk
+# The release record is the executor's OWN writing surface: it records how far this walk
 # has got, and reading it back is part of writing it. A builder-time snapshot
 # cannot substitute, because ``save_step`` mutates the file between the build
 # and every step that follows -- writing back a stale document would erase the
 # markers the walk itself had just recorded. Each site below is tolerated for
 # that reason and no other; anything new here has to earn its own line.
-_LEDGER_CALLS = {"load_release_state", "save_step", "_track_release_commit"}
+_RELEASE_RECORD_CALLS = {"load_release_state", "save_step", "_track_release_commit"}
 
-_TOLERATED_LEDGER_READS = {
+_TOLERATED_RELEASE_RECORD_READS = {
     # Records each marker as the walk reaches it. The walk is the only thing
     # that knows how far it got.
     "run": {"save_step"},
@@ -281,7 +281,7 @@ class TestExecutorReads:
             "build_phase_a_plan, or declare it as the step's capture."
         )
 
-    def test_every_ledger_read_is_named_and_justified(self):
+    def test_every_release_record_read_is_named_and_justified(self):
         """The release-state reads are enumerated, not silently exempt.
 
         They do not touch git or the filesystem-as-world, so the scan above
@@ -291,7 +291,7 @@ class TestExecutorReads:
         """
         offenders = []
         for name, fn in _executor_methods():
-            allowed = _TOLERATED_LEDGER_READS.get(name, frozenset())
+            allowed = _TOLERATED_RELEASE_RECORD_READS.get(name, frozenset())
             for node in ast.walk(fn):
                 if not isinstance(node, ast.Call):
                     continue
@@ -301,23 +301,23 @@ class TestExecutorReads:
                     else func.attr if isinstance(func, ast.Attribute)
                     else None
                 )
-                if called in _LEDGER_CALLS and called not in allowed:
+                if called in _RELEASE_RECORD_CALLS and called not in allowed:
                     offenders.append(f"{name}() calls {called}()")
         assert not offenders, (
-            "the Phase-A executor read the release-state ledger somewhere it "
-            f"is not accounted for: {offenders}. The ledger is the executor's "
+            "the Phase-A executor read the release-state record somewhere it "
+            f"is not accounted for: {offenders}. The release record is the executor's "
             "own writing surface, and reading it back is only legitimate where "
             "the value being written did not exist at build time. Add the site "
-            "to _TOLERATED_LEDGER_READS with the reason, or move the read into "
+            "to _TOLERATED_RELEASE_RECORD_READS with the reason, or move the read into "
             "build_phase_a_plan."
         )
 
-    def test_the_tolerated_ledger_reads_still_exist(self):
+    def test_the_tolerated_release_record_reads_still_exist(self):
         """The whitelist is a record of real sites, not accumulated cruft."""
         methods = dict(_executor_methods())
-        for name, calls in _TOLERATED_LEDGER_READS.items():
+        for name, calls in _TOLERATED_RELEASE_RECORD_READS.items():
             assert name in methods, (
-                f"_TOLERATED_LEDGER_READS names {name}(), which the executor no "
+                f"_TOLERATED_RELEASE_RECORD_READS names {name}(), which the executor no "
                 "longer has -- drop the entry rather than leaving a standing "
                 "exemption for a method that does not exist"
             )

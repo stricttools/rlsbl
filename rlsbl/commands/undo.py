@@ -17,7 +17,7 @@ rename, release-file archive, per-version .md) sit ABOVE it. A resumed release
 moves the tag further still: after a fix-forward the verified commit is the tip
 at resume time, several commits above the bump.
 
-So the release commits are found from the LEDGER, not by walking down from the
+So the release commits are found from the RELEASE RECORD, not by walking down from the
 tag: the archive for the version records the commit that was verified and
 tagged (the anchor), the predecessor's archive records where the previous
 release ended, and the release's own commits are the ones between those two
@@ -237,13 +237,13 @@ def _resolve_context(ctx):
     )
 
 
-def _ledger_dir(uc):
+def _release_record_dir(uc):
     """The release archives for the project or releasable being undone."""
     return os.path.join(_audit_dir(uc), "releases")
 
 
 def _find_latest_release(uc):
-    """The version ``undo`` reverts, and its tag -- selected from the LEDGER.
+    """The version ``undo`` reverts, and its tag -- selected from the RELEASE RECORD.
 
     ``undo`` used to ask ``git describe --tags --abbrev=0`` which release was
     the latest, so a release whose tag had already been half-deleted was
@@ -264,7 +264,7 @@ def _find_latest_release(uc):
     """
     from ..release_file import list_archived_versions
 
-    versions = list_archived_versions(_ledger_dir(uc))
+    versions = list_archived_versions(_release_record_dir(uc))
     if not versions:
         print("Error: no releases recorded. Nothing to undo.", file=sys.stderr)
         sys.exit(1)
@@ -329,10 +329,10 @@ def _die(*lines):
 
 
 def _release_anchor(uc, version, tag):
-    """The commit the LEDGER records *version* as having shipped from.
+    """The commit the RELEASE RECORD records *version* as having shipped from.
 
     Read from the archive DIRECTLY rather than through
-    :func:`rlsbl.ledger.read_entry`, which refuses when the version's tag and
+    :func:`rlsbl.release_record.read_entry`, which refuses when the version's tag and
     the anchor disagree. Undo is the repair path for exactly that state and is
     about to delete the tag, so a disagreement is reported as a warning and the
     ARCHIVE wins: it is written by the release flow, committed, and rewritten by
@@ -341,7 +341,7 @@ def _release_anchor(uc, version, tag):
     """
     from ..release_file import archived_release_path, read_release_file
 
-    path = archived_release_path(_ledger_dir(uc), version)
+    path = archived_release_path(_release_record_dir(uc), version)
     try:
         cfg = read_release_file(path)
     except Exception as exc:
@@ -394,17 +394,17 @@ def _predecessor_anchor(uc, version):
     The boundary survives that release's tag being deleted, because it is read
     from the archive rather than from ``git describe``.
     """
-    from ..ledger import read_entry
+    from ..release_record import read_entry
     from ..release_file import list_archived_versions
 
-    versions = list_archived_versions(_ledger_dir(uc))
+    versions = list_archived_versions(_release_record_dir(uc))
     try:
         below = versions[versions.index(version) + 1:]
     except ValueError:
         below = []
     for prev in below:
         try:
-            entry = read_entry(_ledger_dir(uc), prev, cwd=uc.project_path)
+            entry = read_entry(_release_record_dir(uc), prev, cwd=uc.project_path)
         except Exception as exc:
             # An unreadable predecessor archive (a tag that disagrees with its
             # anchor, say) only widens the search range, and the version-bump
@@ -437,7 +437,7 @@ def _log_commits(range_spec):
 
 
 def _collect_release_commits(uc, version, tag, expected_msg):
-    """The release's own commits, newest-first, located through the LEDGER.
+    """The release's own commits, newest-first, located through the RELEASE RECORD.
 
     The search range is ``<predecessor's anchor>..<this release's anchor>``,
     both read from the archives. Inside it the version-bump commit is
@@ -484,7 +484,7 @@ def _collect_release_commits(uc, version, tag, expected_msg):
             "command exists to avoid.",
             f"  Inspect the range (git log --oneline {range_spec}); if the "
             "release's commits were",
-            "  rewritten, repair the ledger and the tags first "
+            "  rewritten, repair the release record and the tags first "
             "(`rlsbl release reconcile`).",
         )
     if len(bump_indexes) > 1:

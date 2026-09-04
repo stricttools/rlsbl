@@ -179,8 +179,8 @@ def split_monorepo(tmp_path, monkeypatch):
     run_git(tmp_path, "commit", "-q", "-m", "add projects")
 
     # Tagged AND archived: a project carrying a version tag over an empty
-    # release ledger is one that shipped and was never backfilled, and the
-    # ledger refuses to answer any range question for it.
+    # release record is one that shipped and was never backfilled, and the
+    # release record refuses to answer any range question for it.
     for subdir in ("dev-rel", "dev-norel", "legacy", "regular"):
         run_git(tmp_path, "tag", f"{subdir}@v0.1.0")
         archive_release(

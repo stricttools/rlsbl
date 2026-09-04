@@ -212,8 +212,8 @@ def _resolve_tag_glob(ctx):
     return tag_glob or "v*"
 
 
-def _resolve_ledger_dir(ctx):
-    """Return the release-archive directory that is *ctx*'s project's ledger.
+def _resolve_release_record_dir(ctx):
+    """Return the release-archive directory that is *ctx*'s project's release record.
 
     Derived from the same context resolution :func:`_resolve_tag_glob` uses, so
     the range a check computes and the archives it computes it from always
@@ -222,7 +222,7 @@ def _resolve_ledger_dir(ctx):
     with no changes dir still has a releases dir, and an empty one honestly
     reports "nothing released here".
     """
-    from ..ledger import releases_dir_for_changes_dir
+    from ..release_record import releases_dir_for_changes_dir
 
     resolved = _get_changelog_context(ctx)
     if resolved is None:
@@ -235,9 +235,9 @@ def _resolve_release_identity(ctx):
     """Return ``(target, ref_context, releases_dir)`` for *ctx*'s project.
 
     The one resolution the ref checks work from: which target answers ref
-    questions, the context ``expected_refs`` reads, and the ledger whose
+    questions, the context ``expected_refs`` reads, and the release record whose
     archives say which versions exist.  All three describe the SAME project by
-    construction -- the releases dir comes from :func:`_resolve_ledger_dir`,
+    construction -- the releases dir comes from :func:`_resolve_release_record_dir`,
     and the context is built from the same branch that resolved it.
 
     Returns None when the project has no detectable target, so there is nothing
@@ -251,7 +251,7 @@ def _resolve_release_identity(ctx):
     if not entries:
         return None
     target = TARGETS[entries[0].name]
-    releases_dir = _resolve_ledger_dir(ctx)
+    releases_dir = _resolve_release_record_dir(ctx)
 
     if not isinstance(ctx, WorkspaceCheckContext):
         return target, ref_context(repo_root=str(ctx.project_root)), releases_dir

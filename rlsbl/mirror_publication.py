@@ -13,7 +13,7 @@ itself.
 The commit correspondence
 -------------------------
 
-A version's commit on the mirror is derived, never guessed. The release ledger
+A version's commit on the mirror is derived, never guessed. The release record
 anchors every released version to the monorepo commit it shipped from (the
 archive's ``candidate_sha``, the commit CI proved green), and the subtree split
 is a deterministic function from a monorepo commit to the mirror commit
@@ -303,7 +303,7 @@ def publish_version(
 ):
     """Publish one released version onto the mirror: the tag, then the Release.
 
-    *anchor_sha* is the release ledger's anchor -- the MONOREPO commit the
+    *anchor_sha* is the release record's anchor -- the MONOREPO commit the
     version shipped from. The mirror's commit for it is derived here, and it is
     that commit the tag names and the Release's marker carries.
 

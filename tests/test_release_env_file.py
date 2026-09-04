@@ -242,8 +242,8 @@ class TestBatchOrchestratorLoadsTheEnvFile:
         from rlsbl.workspace import save_workspace
 
         make_workspace(str(ws), [{"path": "alpha", "name": "alpha"}])
-        # The releasable has shipped 0.1.0 below (the tag), so its ledger
-        # carries the matching archive -- an empty ledger next to a real tag
+        # The releasable has shipped 0.1.0 below (the tag), so its release record
+        # carries the matching archive -- an empty release record next to a real tag
         # is refused.
         make_releasable_state(ws, "alpha", version="0.1.0")
         (ws / "alpha").mkdir()

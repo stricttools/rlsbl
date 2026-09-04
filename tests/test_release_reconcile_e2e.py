@@ -9,7 +9,7 @@ at commits that no longer exist.
 
 What changed is the shape of the answer. The reconcile is no longer a
 journal-driven tag pusher: it observes origin once, judges every subject against
-FOUR merged explanation sources (safegit's journal, the release ledger's
+FOUR merged explanation sources (safegit's journal, the release record's
 anchors, the lineage records, and the committed scrub archives), and emits one
 merged preview whose verdicts are ``materialize``, ``already-correct``,
 ``re-point-with-lease``, ``refuse-foreign`` or ``refuse-identity-mismatch``.
@@ -104,15 +104,15 @@ def _setup_released_repo(env):
     return repo
 
 
-def _setup_released_repo_with_ledger(env):
-    """The same repository, plus the release ledger a real project carries.
+def _setup_released_repo_with_release_record(env):
+    """The same repository, plus the release record a real project carries.
 
     ``_setup_released_repo`` has no archives at all. That is a repository
-    released before the ledger existed, and it stays that way on purpose: the
+    released before the release record existed, and it stays that way on purpose: the
     tripwire tests judge a repo whose tags are the only record. A project
     released by rlsbl today carries one archive per version, and the archive
     names the commit that version shipped from -- so an out-of-band rewrite
-    leaves the ledger naming commits the repository no longer has, which is a
+    leaves the release record naming commits the repository no longer has, which is a
     different situation and gets its own fixture.
 
     The secret leaves the tree BEFORE the release, which is the ordinary shape
@@ -366,26 +366,26 @@ class TestReconcileAfterRawRewrite:
         assert "the world changed" in capsys.readouterr().err
 
 
-class TestTheLedgerAfterAnOutOfBandRewrite:
+class TestTheReleaseRecordAfterAnOutOfBandRewrite:
     """The scenario the command documents, in a repository that has archives.
 
     An out-of-band rewrite moves the local tags and prunes the commits the
-    archives name. The ledger is the authority for where a released ref
+    archives name. The release record is the authority for where a released ref
     belongs, so every released ref then reads as disagreeing with it and the
     tripwire aborts the whole reconcile -- refusing exactly the repair it
-    exists to perform. The ledger is healed first, from the same records that
+    exists to perform. The release record is healed first, from the same records that
     explain the divergence, and only then are the verdicts computed.
     """
 
     def _archive_anchor(self, repo):
-        from rlsbl.release_publication import anchor_from_ledger
+        from rlsbl.release_publication import anchor_from_release_record
 
-        return anchor_from_ledger(str(repo / ".rlsbl" / "releases"), "1.0.0")
+        return anchor_from_release_record(str(repo / ".rlsbl" / "releases"), "1.0.0")
 
     def test_a_dangling_anchor_the_journal_explains_is_healed(
         self, e2e_env, monkeypatch, capsys,
     ):
-        repo = _setup_released_repo_with_ledger(e2e_env)
+        repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
         pre_rewrite_anchor = self._archive_anchor(repo)
 
@@ -401,11 +401,11 @@ class TestTheLedgerAfterAnOutOfBandRewrite:
         assert "re-point-with-lease" in out
         assert self._archive_anchor(repo) == _git(
             repo, "rev-parse", "refs/tags/v1.0.0^{}",
-        ), "the ledger must name the commit the rewrite produced"
+        ), "the release record must name the commit the rewrite produced"
         assert os.path.exists(plan_path(repo / ".rlsbl" / "releases"))
 
-    def test_the_healed_ledger_is_committed(self, e2e_env, monkeypatch):
-        repo = _setup_released_repo_with_ledger(e2e_env)
+    def test_the_healed_release_record_is_committed(self, e2e_env, monkeypatch):
+        repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
         _raw_safegit_scrub(repo)
 
@@ -418,7 +418,7 @@ class TestTheLedgerAfterAnOutOfBandRewrite:
         )
 
     def test_the_repaired_tag_is_then_pushed(self, e2e_env, monkeypatch):
-        repo = _setup_released_repo_with_ledger(e2e_env)
+        repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
         _raw_safegit_scrub(repo)
         new_local = _git(repo, "rev-parse", "refs/tags/v1.0.0")
@@ -430,10 +430,10 @@ class TestTheLedgerAfterAnOutOfBandRewrite:
     def test_a_dry_run_heals_nothing_and_still_judges_truthfully(
         self, e2e_env, monkeypatch, capsys,
     ):
-        """--dry-run writes nothing at all, including the ledger -- and the
+        """--dry-run writes nothing at all, including the release record -- and the
         preview is still the one a real run would compute, because the healed
         anchors are known without being written."""
-        repo = _setup_released_repo_with_ledger(e2e_env)
+        repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
         _raw_safegit_scrub(repo)
         stale = self._archive_anchor(repo)
@@ -452,9 +452,9 @@ class TestTheLedgerAfterAnOutOfBandRewrite:
         self, e2e_env, monkeypatch, capsys,
     ):
         """The heal is driven by a record, never by inference: with no journal,
-        no lineage event and no committed scrub archive, the ledger names a
+        no lineage event and no committed scrub archive, the release record names a
         commit nobody can account for and the reconcile refuses."""
-        repo = _setup_released_repo_with_ledger(e2e_env)
+        repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
         _raw_safegit_scrub(repo)
         os.remove(repo / ".git" / "safegit" / "rewrite-maps.jsonl")
@@ -638,7 +638,7 @@ class TestTheVerdictClassification:
     def test_tags_absent_from_the_remote_are_not_judged_as_refs_to_repair(
         self, e2e_env, monkeypatch,
     ):
-        """A local-only tag the ledger does not name is outside the account."""
+        """A local-only tag the release record does not name is outside the account."""
         repo = _setup_released_repo(e2e_env)
         _git(repo, "tag", "v9.9.9")  # never pushed
         monkeypatch.chdir(repo)

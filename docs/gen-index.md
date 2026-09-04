@@ -105,7 +105,7 @@ order: 90
 - [rlsbl.hook_hashes](../rlsbl-hook_hashes/)
 - [rlsbl.import_scanners](../rlsbl-import_scanners/)
 - [rlsbl.layers](../rlsbl-layers/)
-- [rlsbl.ledger](../rlsbl-ledger/)
+- [rlsbl.release_record](../rlsbl-release record/)
 - [rlsbl.lineage](../rlsbl-lineage/)
 - [rlsbl.lineage_followup](../rlsbl-lineage_followup/)
 - [rlsbl.lint](../rlsbl-lint/)

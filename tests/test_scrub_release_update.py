@@ -16,7 +16,7 @@ Three properties are pinned here:
   Release gets one, from the same document -- the materialize shape the
   reconcile command already performs.
 * **The document is the one the release flow writes.** Body, title, the
-  ``rlsbl-ci-sha`` marker taken from the ledger's anchor, and the pre-release
+  ``rlsbl-ci-sha`` marker taken from the release record's anchor, and the pre-release
   flag all come from :mod:`rlsbl.release_publication`, so a Release the scrub
   updates is one the publish workflow can still judge.
 """
@@ -69,7 +69,7 @@ class Recorder:
         return [c for c in self.calls if c[:2] == ["release", verb]]
 
 
-def _ledger(tmp_path, version, *, anchor=ANCHOR):
+def _release_record(tmp_path, version, *, anchor=ANCHOR):
     releases = tmp_path / ".rlsbl" / "releases"
     write_archived_release_file(
         str(releases), version, bump="patch", include=["plain"],
@@ -95,7 +95,7 @@ class TestNothingIsEverDeleted:
 
     def test_an_existing_release_is_edited_in_place(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0")
+        _release_record(tmp_path, "1.0.0")
         gh = Recorder(existing=("v1.0.0",))
 
         updated = _update(tmp_path, [{"refname": "refs/tags/v1.0.0"}], gh)
@@ -116,7 +116,7 @@ class TestNothingIsEverDeleted:
         every pre-release tag. Nothing is deleted now, and the pre-release
         version is updated like any other."""
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0-rc.1")
+        _release_record(tmp_path, "1.0.0-rc.1")
         gh = Recorder(existing=("v1.0.0-rc.1",))
 
         updated = _update(
@@ -153,8 +153,8 @@ class TestNothingIsEverDeleted:
         """Individual failures stay warnings, and the failure window is gone:
         nothing was deleted, so the tag still carries its old Release."""
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0")
-        _ledger(tmp_path, "1.1.0")
+        _release_record(tmp_path, "1.0.0")
+        _release_record(tmp_path, "1.1.0")
         gh = Recorder(existing=("v1.0.0", "v1.1.0"))
         real = gh.__call__
 
@@ -189,7 +189,7 @@ class TestTheUpdatedDocument:
         self, tmp_path, monkeypatch,
     ):
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0")
+        _release_record(tmp_path, "1.0.0")
         gh = Recorder(existing=("v1.0.0",))
         notes = "## 1.0.0\n\n### Fixes\n\n- **Fixed it.** Really.\n"
 
@@ -204,14 +204,14 @@ class TestTheUpdatedDocument:
         )
         assert f"<!-- rlsbl-ci-sha: {ANCHOR} -->" in gh.bodies["v1.0.0"]
 
-    def test_the_marker_comes_from_the_ledger_not_the_moved_tag(
+    def test_the_marker_comes_from_the_release_record_not_the_moved_tag(
         self, tmp_path, monkeypatch,
     ):
         """The anchor step runs before this one, so the archive already names
         the rewritten commit; the marker is that anchor, never the tag's own
         old value."""
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0", anchor="b" * 40)
+        _release_record(tmp_path, "1.0.0", anchor="b" * 40)
         gh = Recorder(existing=("v1.0.0",))
 
         _update(
@@ -225,7 +225,7 @@ class TestTheUpdatedDocument:
         self, tmp_path, monkeypatch,
     ):
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0-rc.1")
+        _release_record(tmp_path, "1.0.0-rc.1")
         gh = Recorder(existing=("v1.0.0-rc.1",))
 
         _update(tmp_path, [{"refname": "refs/tags/v1.0.0-rc.1"}], gh)
@@ -238,7 +238,7 @@ class TestTheUpdatedDocument:
         """The flag is stated either way: an edit that omitted it would leave a
         Release that was wrongly marked pre-release marked that way forever."""
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0")
+        _release_record(tmp_path, "1.0.0")
         gh = Recorder(existing=("v1.0.0",))
 
         _update(tmp_path, [{"refname": "refs/tags/v1.0.0"}], gh)
@@ -248,7 +248,7 @@ class TestTheUpdatedDocument:
 
     def test_the_title_is_written_on_the_edit(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0")
+        _release_record(tmp_path, "1.0.0")
         gh = Recorder(existing=("v1.0.0",))
 
         _update(tmp_path, [{"refname": "refs/tags/v1.0.0"}], gh)
@@ -259,7 +259,7 @@ class TestTheUpdatedDocument:
     def test_a_version_with_no_archive_is_written_markerless_and_says_so(
         self, tmp_path, monkeypatch, capsys,
     ):
-        """A version the ledger cannot anchor still gets its document --
+        """A version the release record cannot anchor still gets its document --
         without a marker, and with the omission stated rather than hidden."""
         monkeypatch.chdir(tmp_path)
         gh = Recorder(existing=("v0.1.0",))
@@ -275,7 +275,7 @@ class TestTheUpdatedDocument:
         """The materialize shape: a moved tag missing its Release is a gap the
         scrub closes, with the same document an edit would have written."""
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0")
+        _release_record(tmp_path, "1.0.0")
         gh = Recorder(existing=())
 
         updated = _update(tmp_path, [{"refname": "refs/tags/v1.0.0"}], gh)
@@ -290,7 +290,7 @@ class TestTheUpdatedDocument:
         self, tmp_path, monkeypatch, capsys,
     ):
         monkeypatch.chdir(tmp_path)
-        _ledger(tmp_path, "1.0.0")
+        _release_record(tmp_path, "1.0.0")
 
         def failing(args, **kwargs):
             if args[:2] == ["release", "view"]:

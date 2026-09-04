@@ -372,9 +372,9 @@ class TestUnpublishedRefsCheck:
     """The successor of local-tag/remote-tag/github-release.
 
     Those three asked whether the CURRENT version's primary tag existed. This
-    one asks the ledger which versions were released and renders every ref each
+    one asks the release record which versions were released and renders every ref each
     of them owns against the repository. The two skip conditions the old checks
-    had -- no version, nothing tagged yet -- are one condition here: the ledger
+    had -- no version, nothing tagged yet -- are one condition here: the release record
     records no release.
     """
 
@@ -384,7 +384,7 @@ class TestUnpublishedRefsCheck:
         result = app._check_defs["unpublished-refs"].impl(ctx)
         assert result.status == "skip"
 
-    def test_skips_when_the_ledger_records_nothing(self, mock_git_repo):
+    def test_skips_when_the_release_record_records_nothing(self, mock_git_repo):
         """A project with a target but no archived release -> skip."""
         pkg = {"name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))

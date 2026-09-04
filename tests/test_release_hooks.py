@@ -19,7 +19,7 @@ from githarness import fake_run_dispatch, status_answering_effects_run
 from githarness import write_covered_unreleased
 
 
-from conftest import archive_release, ledger_dir, tag_state_present
+from conftest import archive_release, release_record_dir, tag_state_present
 
 
 def _rc(bump="patch", include=None, exclude=None):
@@ -1038,9 +1038,9 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     _git(repo, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
     _git(repo, "tag", "v1.0.0")
-    # ...and its LEDGER entry: the unreleased range is bounded by the archived
+    # ...and its RELEASE RECORD entry: the unreleased range is bounded by the archived
     # release, so without this every commit in the repo reads as unreleased.
-    archive_release(ledger_dir(repo), "1.0.0", _git_head(repo))
+    archive_release(release_record_dir(repo), "1.0.0", _git_head(repo))
     _git(repo, "add", ".rlsbl/releases")
     _git(
         repo, "commit", "-q", "-m", "release archive for 1.0.0",
@@ -1226,7 +1226,7 @@ class TestHookGeneratedFiles:
         _git(tmp_project, "add", "package.json", "CHANGELOG.md", ".rlsbl/changes/unreleased.jsonl", ".rlsbl/config.json")
         _git(tmp_project, "commit", "-q", "-m", "initial")
         _git(tmp_project, "tag", "v1.0.0")
-        archive_release(ledger_dir(tmp_project), "1.0.0", _git_head(tmp_project))
+        archive_release(release_record_dir(tmp_project), "1.0.0", _git_head(tmp_project))
         _git(tmp_project, "add", ".rlsbl/releases")
         _git(
             tmp_project, "commit", "-q", "-m", "release archive for 1.0.0",

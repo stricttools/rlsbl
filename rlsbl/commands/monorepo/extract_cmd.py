@@ -114,7 +114,7 @@ from ...lock import rlsbl_lock
 from ...ownership import find_root_member
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
 from ...release_file import read_release_file, write_release_anchor
-from ...release_publication import anchor_from_ledger
+from ...release_publication import anchor_from_release_record
 from ...saferm import saferm_delete
 from ...snapshot import SNAPSHOT_FILE, generate_snapshot, write_snapshot
 from ...tag_glob import (
@@ -1507,7 +1507,7 @@ def _apply_filter(dep, item, run):
 def _promotion_source_shas(dep):
     """Every monorepo commit the promotion has to translate, HEAD first.
 
-    The ledger's anchors (which commit each released version shipped from), the
+    The release record's anchors (which commit each released version shipped from), the
     changelog's commit hashes, and the current HEAD -- the three things that
     name a monorepo commit and travel with the conversion.
     """
@@ -1748,11 +1748,11 @@ def _apply_promotion_trees(dep, item, run):
 
 
 def _apply_promotion_tags(dep, item, run):
-    """Materialize each released version's destination tag from the ledger.
+    """Materialize each released version's destination tag from the release record.
 
     The mirror carries tags for the versions released since it was bound, and
     nothing for the ones before. Both are handled by the same rule: the tag for
-    a version stands at the split of that version's ledger anchor. A tag already
+    a version stands at the split of that version's release record anchor. A tag already
     there at that commit is kept; one standing anywhere else is a hard error,
     because a released tag names what shipped and moving one is never this
     conversion's decision.
@@ -1769,7 +1769,7 @@ def _apply_promotion_tags(dep, item, run):
         parsed = parse_version_tag(old, mode=TagMode.PRERELEASE_INCLUSIVE)
         if parsed is None:
             continue
-        anchor = anchor_from_ledger(releases_dir, parsed.version)
+        anchor = anchor_from_release_record(releases_dir, parsed.version)
         commit = _map_sha(anchor, run.sha_map) if anchor else None
         if commit is None:
             print(

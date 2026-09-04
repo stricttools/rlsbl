@@ -51,12 +51,12 @@ touches nothing, but one that names a git that could not answer (pruned or
 unfetched objects) instead of accusing an operator of authoring on the mirror.
 
 The mirror's TAGS are a second dimension of the same reconciler. Every version
-the release ledger records shipped from a monorepo commit, and the mirror
+the release record records shipped from a monorepo commit, and the mirror
 carries that version under its own standalone tag name at the subtree split of
 that commit. A mirror can be converged on ``main`` and still be missing every
 one of those tags -- a mirror bound after the fact, a tag push that failed at
 release time, a mirror that was reset -- so the preview names each missing
-version and an apply materializes it from the ledger through
+version and an apply materializes it from the release record through
 :mod:`rlsbl.mirror_publication`.
 
 The observe/preview/apply machinery itself is not this module's: it comes from
@@ -610,12 +610,12 @@ def observe(remote, root, project_path):
 # ---------------------------------------------------------------------------
 #
 # The mirror's BRANCH is what everything above judges. Its TAGS are a second,
-# independent subject: every version the release ledger records shipped from a
+# independent subject: every version the release record records shipped from a
 # monorepo commit, and the mirror carries that version under its own standalone
 # tag name at the subtree split of that commit. A mirror can be perfectly
 # converged on main and still be missing every one of them -- a mirror bound
 # after the fact, a tag push that failed at release time, a mirror reset -- so
-# the preview names them and an apply materializes them from the ledger.
+# the preview names them and an apply materializes them from the release record.
 
 
 @dataclass
@@ -624,7 +624,7 @@ class MirrorTagPlan:
 
     ``state`` is one of:
       * ``"materialize"`` -- the mirror has no such tag; the split of the
-        version's ledger anchor is what an apply would push it at.
+        version's release record anchor is what an apply would push it at.
       * ``"present"``     -- the mirror already carries the tag.
       * ``"unanchored"``  -- no mirror commit for this version can be derived.
         Two ways that happens, and ``reason`` says which: the version's archive
@@ -648,7 +648,7 @@ class MirrorTagPlan:
 
 def observe_tags(remote, root, project_path, *, releases_dir, changes_dir,
                  tag_of, remote_refs_text=None):
-    """The mirror's tag state for every version the ledger records.
+    """The mirror's tag state for every version the release record records.
 
     *tag_of* maps a version to the tag the mirror carries it under (the
     target's standalone form -- see :func:`rlsbl.mirror_publication.mirror_tag`).
@@ -666,7 +666,7 @@ def observe_tags(remote, root, project_path, *, releases_dir, changes_dir,
         version_notes,
     )
     from ...release_file import list_archived_versions
-    from ...release_publication import anchor_from_ledger
+    from ...release_publication import anchor_from_release_record
 
     versions = list_archived_versions(releases_dir)
     if not versions:
@@ -687,7 +687,7 @@ def observe_tags(remote, root, project_path, *, releases_dir, changes_dir,
                 remote_commit=tags[tag],
             ))
             continue
-        anchor = anchor_from_ledger(releases_dir, version)
+        anchor = anchor_from_release_record(releases_dir, version)
         if not anchor:
             plans.append(MirrorTagPlan(
                 version=version, tag=tag, state="unanchored",
@@ -768,7 +768,7 @@ def tag_verdict_item(plan):
         detail=(
             "  Nothing is guessed and nothing is written for this version.\n"
             "  Restore the archive's candidate_sha (or accept that this "
-            "version predates the ledger) and re-run."
+            "version predates the release record) and re-run."
         ),
         **common,
     )
@@ -1178,7 +1178,7 @@ def _member_target(root, project, releasable):
 
 
 def _observe_tags(plan, root, project, releasable, remote):
-    """The tag plans for this mirror, or none when the ledger cannot be read."""
+    """The tag plans for this mirror, or none when the release record cannot be read."""
     from ...mirror_publication import mirror_tag
     from ...workspace_types import get_releasable_dir
 

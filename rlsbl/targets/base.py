@@ -7,7 +7,7 @@ from typing import ClassVar
 # workflows. Its presence is what ``provides_ci_templates`` answers from.
 CI_TEMPLATE_FILENAME = "ci.yml.tpl"
 
-# The closed vocabulary of ``release_materialization_policy``. A ref the ledger
+# The closed vocabulary of ``release_materialization_policy``. A ref the release record
 # records but the remote does not carry may either be recreated unconditionally,
 # or only when the version's published identity still matches the repository's
 # current one.
@@ -124,7 +124,7 @@ class BaseTarget:
     release_materialization_policy: ClassVar[str] = MATERIALIZE_ALWAYS
     """Whether a released version's MISSING refs may simply be recreated.
 
-    ``rlsbl release reconcile`` materializes a ref the ledger records as
+    ``rlsbl release reconcile`` materializes a ref the release record records as
     released but the remote does not carry. For most ecosystems that is a pure
     repair: the tag names a version, and pushing it publishes nothing that was
     not already released.

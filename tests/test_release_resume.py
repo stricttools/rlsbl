@@ -18,7 +18,7 @@ from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 from rlsbl.utils import run as real_run
 
-from conftest import archive_release, ledger_dir
+from conftest import archive_release, release_record_dir
 
 
 # ---------------------------------------------------------------------------
@@ -92,8 +92,8 @@ def _setup_releasable_npm_project(repo):
          ".rlsbl/config.json")
     _git(repo, "commit", "-q", "-m", "initial")
     _git(repo, "tag", "v1.0.0")
-    # ...and the LEDGER entry the unreleased range is measured from.
-    archive_release(ledger_dir(repo), "1.0.0", _git_head(repo))
+    # ...and the RELEASE RECORD entry the unreleased range is measured from.
+    archive_release(release_record_dir(repo), "1.0.0", _git_head(repo))
     _git(repo, "add", ".rlsbl/releases")
     _git(
         repo, "commit", "-q", "-m", "release archive for 1.0.0",

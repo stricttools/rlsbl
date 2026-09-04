@@ -171,11 +171,11 @@ def resolve_release_scope(root):
     - ``tag_glob`` scopes tag-namespace questions to this project's own
       releases.
     - ``changes_dir`` is the releasable-aware JSONL directory, and therefore
-      also names the ledger (``.../releases/``) that records what this project
+      also names the release record (``.../releases/``) that records what this project
       released. A releasable member's entries live under
       ``.rlsbl-monorepo/releasables/<name>/``, NOT under the member package --
       resolving it per-package made every releasable member report "JSONL
-      changelog not set up" and read an empty ledger.
+      changelog not set up" and read an empty release record.
     - ``scope`` is the ownership scope commits are attributed against: the
       whole releasable -- its members plus its own state directory -- when the
       project is in one, the single member otherwise, and ``None`` outside a

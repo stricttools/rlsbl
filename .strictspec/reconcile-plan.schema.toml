@@ -76,7 +76,7 @@ description = "The verdict class."
 type = "string"
 required = false
 non_empty = true
-description = "The released version this subject belongs to, when the ledger names one."
+description = "The released version this subject belongs to, when the release record names one."
 
 [types.PlanItem.fields.target]
 type = "string"

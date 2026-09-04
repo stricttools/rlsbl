@@ -27,7 +27,7 @@ from githarness import add_remote, git as _ghgit, init_repo, record_release
 from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION
 from rlsbl.context import ProjectContext
 from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
-from rlsbl.ledger import LatestReleaseFact
+from rlsbl.release_record import LatestReleaseFact
 
 
 def _undo_cleared_gate(*_a, **_k):
@@ -94,19 +94,19 @@ MOD_UNDO = "rlsbl.commands.undo"
 
 
 def _latest_release_stub(uc):
-    """Stand-in for undo's ledger read: "the latest release is 1.0.0"."""
+    """Stand-in for undo's release record read: "the latest release is 1.0.0"."""
     return ("1.0.0", "v1.0.0")
 
 
 # The commit these mocked undo runs pretend the release shipped from. undo
-# reads it out of the release ARCHIVE (the ledger), which these fixtures do not
+# reads it out of the release ARCHIVE (the release record), which these fixtures do not
 # have on disk, so the two archive reads are stubbed alongside
 # ``_find_latest_release``.
 _UNDO_ANCHOR_SHA = "a" * 40
 
 
 def _undo_anchor_stub(_uc, _version, _tag):
-    """Stand-in for the version's own ledger anchor."""
+    """Stand-in for the version's own release record anchor."""
     return _UNDO_ANCHOR_SHA
 
 
@@ -221,7 +221,7 @@ def _undo_run_stub(*, fail_on=None, release_sha=None, commits=None, record=None)
     the step it names.
 
     ``fail_on`` is a predicate over the argv list. ``commits`` is the release's
-    own commits as ``(sha, subject)`` pairs, answered to the ledger-range
+    own commits as ``(sha, subject)`` pairs, answered to the release record-range
     ``git log``; it defaults to the single version-bump commit, because a
     release with no locatable version bump is now refused outright. ``record``,
     when given, is a list every argv is appended to.

@@ -32,7 +32,7 @@ from rlsbl.workspace import (
     write_releasable_version,
 )
 
-from conftest import archive_release, ledger_dir, with_root_member
+from conftest import archive_release, release_record_dir, with_root_member
 
 
 _ENTRY = {
@@ -145,7 +145,7 @@ def _setup_released_releasable_workspace(root):
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "chore: finalize changelog for 1.0.1")
 
-    # The releasable's LEDGER: 1.0.0 at the initial commit, 1.0.1 at the
+    # The releasable's RELEASE RECORD: 1.0.0 at the initial commit, 1.0.1 at the
     # release commit. `undo` reads which version is latest from here.
     archive_release(
         os.path.join(rel_dir, "releases"), "1.0.0",
@@ -352,8 +352,8 @@ class TestUndoClearsStandaloneState:
         (repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
         _git(repo, "add", "-A")
         _git(repo, "commit", "-q", "-m", "v1.0.1")
-        archive_release(ledger_dir(repo), "1.0.0", _git(repo, "rev-parse", "HEAD~1"))
-        archive_release(ledger_dir(repo), "1.0.1", _git(repo, "rev-parse", "HEAD"))
+        archive_release(release_record_dir(repo), "1.0.0", _git(repo, "rev-parse", "HEAD~1"))
+        archive_release(release_record_dir(repo), "1.0.1", _git(repo, "rev-parse", "HEAD"))
         _git(repo, "add", "-A")
         _git(repo, "commit", "-q", "-m", "chore: finalize release file for 1.0.1")
         _git(repo, "tag", "v1.0.1")

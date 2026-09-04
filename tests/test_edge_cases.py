@@ -2,7 +2,7 @@
 
 Covers:
 - Detached HEAD behavior for get_current_branch()
-- Shallow clone behavior for the release ledger's range anchor
+- Shallow clone behavior for the release record's range anchor
 - Push timeout propagation for push_if_needed()
 - Signal handling (KeyboardInterrupt) during release, verifying lock cleanup
 """
@@ -13,9 +13,9 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 import rlsbl.lock
-from rlsbl.errors import GitError, LedgerError
+from rlsbl.errors import GitError, ReleaseRecordError
 from rlsbl.lock import release_lock
-from rlsbl.ledger import range_anchor
+from rlsbl.release_record import range_anchor
 from rlsbl.utils import get_current_branch, push_if_needed
 
 
@@ -72,11 +72,11 @@ class TestDetachedHead:
 
 
 class TestShallowClone:
-    """9.2: the release ledger's range anchor in a shallow clone.
+    """9.2: the release record's range anchor in a shallow clone.
 
     CI environments often use ``git clone --depth 1``, which strips history.
     The tag walk used to fail there and return None, which silently widened
-    the unreleased range to every commit; the ledger asks git whether the
+    the unreleased range to every commit; the release record asks git whether the
     released commit is an ancestor, gets an answer it cannot trust in a
     shallow repository, and hard-errors with the deepen remedy instead.
     """
@@ -121,20 +121,20 @@ class TestShallowClone:
             "clone should be shallow"
         )
 
-        from conftest import archive_release, ledger_dir
+        from conftest import archive_release, release_record_dir
 
         released = subprocess.run(
             ["git", "rev-list", "--max-parents=0", "HEAD"], cwd=str(source),
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        archive_release(ledger_dir(clone), "1.0.0", released)
+        archive_release(release_record_dir(clone), "1.0.0", released)
 
         import os
         old_cwd = os.getcwd()
         try:
             os.chdir(str(clone))
-            with pytest.raises(LedgerError, match="cannot determine"):
-                range_anchor(ledger_dir(clone))
+            with pytest.raises(ReleaseRecordError, match="cannot determine"):
+                range_anchor(release_record_dir(clone))
         finally:
             os.chdir(old_cwd)
 
@@ -151,15 +151,15 @@ class TestShallowClone:
         subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(repo), check=True)
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(repo), check=True)
 
-        from conftest import archive_release, git_head, ledger_dir
+        from conftest import archive_release, git_head, release_record_dir
 
-        archive_release(ledger_dir(repo), "1.0.0", git_head(repo))
+        archive_release(release_record_dir(repo), "1.0.0", git_head(repo))
 
         import os
         old_cwd = os.getcwd()
         try:
             os.chdir(str(repo))
-            result = range_anchor(ledger_dir(repo))
+            result = range_anchor(release_record_dir(repo))
         finally:
             os.chdir(old_cwd)
 
@@ -167,9 +167,9 @@ class TestShallowClone:
 
     def test_no_releases_not_shallow_returns_none(self, mock_git_repo):
         """Genuine first release: nothing archived, not shallow, returns None."""
-        from conftest import ledger_dir
+        from conftest import release_record_dir
 
-        assert range_anchor(ledger_dir(mock_git_repo)) is None
+        assert range_anchor(release_record_dir(mock_git_repo)) is None
 
 
 class TestPushTimeout:

@@ -23,7 +23,7 @@ one:
   old-to-new commit map of the last rewrite. It was the whole spine of this
   command and is now one source among four. It lives under ``.git``, so it does
   NOT survive a fresh clone.
-* **The release ledger** -- the archived release files, whose ``candidate_sha``
+* **The release record** -- the archived release files, whose ``candidate_sha``
   is what each version's refs should point at. This is the authority for the
   TARGET, not merely a witness to a move.
 * **The lineage records** -- ``anchor-remap`` events (the same commit map, but
@@ -221,7 +221,7 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
             return None
         # PRERELEASE_INCLUSIVE: the question here is which SCHEME the tag
         # follows, and a pre-release suffix does not change that. It also has
-        # to answer the same way _ledger_dir_for_tag does, or a rewritten
+        # to answer the same way _release_record_dir_for_tag does, or a rewritten
         # Release would take its notes from one project and its anchor from
         # another.
         parsed = parse_version_tag(tag_name, mode=TagMode.PRERELEASE_INCLUSIVE)
@@ -249,8 +249,8 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
     return None
 
 
-def _ledger_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index):
-    """The release-archive directory whose ledger anchors *tag_name*'s version.
+def _release_record_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index):
+    """The release-archive directory whose release record anchors *tag_name*'s version.
 
     The same resolution :func:`_notes_for_tag` performs for the CHANGELOG, so
     the notes and the anchor a written Release carries describe the same
@@ -305,10 +305,10 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
     without so much as a lookup: there is no version, therefore no document to
     write. Pre-release tags are first-class (``PRERELEASE_INCLUSIVE``).
 
-    The anchor comes from the ledger, which the scrub's ``ANCHORS_REMAPPED``
+    The anchor comes from the release record, which the scrub's ``ANCHORS_REMAPPED``
     step has already moved through the same rewrite by the time this runs, so
     the marker names the rewritten commit. A version whose archive holds no
-    anchor -- released before the ledger existed, or recorded unanchorable --
+    anchor -- released before the release record existed, or recorded unanchorable --
     gets its document WITHOUT a marker, and the omission is stated on stderr
     rather than hidden.
 
@@ -319,7 +319,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
     Returns the number of Releases written (edited or created).
     """
     from ..release_publication import (
-        anchor_from_ledger,
+        anchor_from_release_record,
         create_release,
         edit_all_args,
         is_prerelease,
@@ -373,14 +373,14 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
             tag_prefix_index=tag_prefix_index, extract_entry=extract_entry,
         ) or ""
 
-        ledger_dir = _ledger_dir_for_tag(
+        release_record_dir = _release_record_dir_for_tag(
             tag_name, ctx=ctx, project_root=project_root,
             tag_prefix_index=tag_prefix_index,
         )
         anchor = None
-        if ledger_dir and os.path.isdir(ledger_dir):
+        if release_record_dir and os.path.isdir(release_record_dir):
             try:
-                anchor = anchor_from_ledger(ledger_dir, version)
+                anchor = anchor_from_release_record(release_record_dir, version)
             except Exception as exc:
                 print(
                     f"Warning: the release archive for {version} could not be "
@@ -395,7 +395,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
         )
         if pub is None:
             print(
-                f"Warning: the release ledger holds no anchor for {version}, "
+                f"Warning: the release record holds no anchor for {version}, "
                 f"so its Release carries no rlsbl-ci-sha marker. "
                 f"The publish workflow reads that marker to learn which commit "
                 f"CI proved green; record the version's anchor and re-run "
@@ -485,7 +485,7 @@ _LIST_TIMEOUT = 60
 
 
 def plan_path(releases_dir):
-    """The reconcile plan file for a project whose ledger is *releases_dir*."""
+    """The reconcile plan file for a project whose release record is *releases_dir*."""
     return os.path.join(str(releases_dir), PLAN_FILENAME)
 
 
@@ -669,7 +669,7 @@ def collect_explanations(releases_dirs, lineage_paths):
 
 
 # ---------------------------------------------------------------------------
-# The ledger heal: detect-and-heal, before any verdict is computed
+# The release record heal: detect-and-heal, before any verdict is computed
 # ---------------------------------------------------------------------------
 
 
@@ -680,11 +680,11 @@ def dangling_anchors(releases_dir, *, git=None, cwd=None):
 
     This is the state an out-of-band rewrite leaves behind: the local tags
     followed the rewrite, the archives did not, and the commits they name were
-    pruned. The ledger is the authority for where a released ref belongs, so
+    pruned. The release record is the authority for where a released ref belongs, so
     until this is repaired every released ref reads as disagreeing with it.
 
     One ``git rev-list --no-walk --ignore-missing`` answers for the whole
-    ledger, so a repository with a hundred versions pays one git call rather
+    release record, so a repository with a hundred versions pays one git call rather
     than a hundred. An archive that cannot be read is skipped rather than
     guessed at: :func:`build_preview` reads the same file and raises its own
     error naming it.
@@ -731,12 +731,12 @@ def dangling_anchors(releases_dir, *, git=None, cwd=None):
 
 def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
                           dry_run=False, log=print):
-    """Move the ledger's stale anchors through the recorded rewrite.
+    """Move the release record's stale anchors through the recorded rewrite.
 
     The anchor half of detect-and-heal, and the counterpart to what the
     changelog side has done since scrubbing existed. It runs BEFORE the
     verdicts are computed, because the verdicts are computed AGAINST the
-    ledger: with the archives naming pruned commits, every released ref is
+    release record: with the archives naming pruned commits, every released ref is
     classified ``refuse-foreign`` and the tripwire aborts the reconcile --
     refusing precisely the repair the command exists to perform.
 
@@ -758,7 +758,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
       because a rewritten read-only archive left in the working tree is
       breakage for every other command and every other session.
 
-    The heal is scoped to the ledger being reconciled, not to every ledger in
+    The heal is scoped to the release record being reconciled, not to every release record in
     the repository: a reconcile answers for one project's published metadata,
     and healing a sibling's archives (or being blocked by a content mismatch in
     one) would be a wider write than the command was asked for.
@@ -783,7 +783,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
         )
     except RlsblError as exc:
         raise ReconcileError(
-            f"the release ledger cannot be moved through the recorded "
+            f"the release record cannot be moved through the recorded "
             f"rewrite:\n{exc}"
         ) from exc
 
@@ -798,10 +798,10 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
             for version, anchor in sorted(unexplained.items())
         )
         raise ReconcileError(
-            f"the release ledger names commits this repository no longer has, "
+            f"the release record names commits this repository no longer has, "
             f"and no record explains where they went:\n{listed}"
             f"  An archive's candidate_sha is the commit that version shipped "
-            f"from, and the ledger is the authority for where every released "
+            f"from, and the release record is the authority for where every released "
             f"ref belongs -- so\n"
             f"  nothing can be judged against it while it names a pruned "
             f"commit. safegit's rewrite journal, a lineage anchor-remap event "
@@ -811,7 +811,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
         )
 
     log(
-        f"The release ledger names {len(dangling)} commit(s) this repository "
+        f"The release record names {len(dangling)} commit(s) this repository "
         f"no longer has, and the recorded rewrite explains them:"
     )
     for remap in planned:
@@ -840,7 +840,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
         )
     except RlsblError as exc:
         raise ReconcileError(
-            f"the release ledger cannot be moved through the recorded "
+            f"the release record cannot be moved through the recorded "
             f"rewrite:\n{exc}"
         ) from exc
     touched = [remap.path for remap in remaps]
@@ -853,18 +853,18 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
         try:
             run("safegit", [
                 "commit", "-m",
-                "reconcile: re-anchor the release ledger through the recorded "
+                "reconcile: re-anchor the release record through the recorded "
                 "rewrite",
                 "--",
             ] + sorted(set(touched)))
         except Exception as exc:
             raise ReconcileError(
-                f"the release ledger was re-anchored, but the rewritten "
+                f"the release record was re-anchored, but the rewritten "
                 f"archives could not be committed ({exc}). They are read-only "
                 f"files every other command reads; commit or restore them "
                 f"before re-running."
             ) from exc
-        log(f"  Committed {len(set(touched))} re-anchored ledger file(s).")
+        log(f"  Committed {len(set(touched))} re-anchored release record file(s).")
     return healed
 
 
@@ -1044,21 +1044,21 @@ def _ref_verdict(*, refname, tag, version, anchor, observation, explanations,
 
     version_fact = f"version {version}" if version else "no archived version"
 
-    # The ledger is the authority for where a released ref belongs. A local ref
+    # The release record is the authority for where a released ref belongs. A local ref
     # that disagrees with it is not a repair the reconcile may publish.
     if archived and local_peeled and anchor and not _same_commit(
         local_peeled, anchor,
     ):
         return VerdictItem(
             key=refname, state=STATE_REFUSE_FOREIGN,
-            summary="the local ref does not match the release ledger",
+            summary="the local ref does not match the release record",
             facts=(
                 version_fact,
                 f"local:  {local_peeled}",
-                f"ledger: {anchor}",
+                f"release record: {anchor}",
             ),
             detail=(
-                "  Pushing this ref would publish a commit the ledger does "
+                "  Pushing this ref would publish a commit the release record does "
                 "not record as released.\n"
                 "  Re-point the tag at the anchor, or repair the archive, "
                 "before reconciling."
@@ -1184,12 +1184,12 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
 
     Subjects come from two places and are judged in one pass:
 
-    * **the release ledger** -- every archived version's full ref set (its
+    * **the release record** -- every archived version's full ref set (its
       primary tag, its ecosystem companions and its recorded aliases, all from
       ``expected_refs``, the single authority), plus that version's GitHub
       Release;
-    * **the local tag namespace** -- any tag the ledger does not name that
-      nonetheless diverges from origin. Those are outside the ledger's account
+    * **the local tag namespace** -- any tag the release record does not name that
+      nonetheless diverges from origin. Those are outside the release record's account
       of what was released, so they are never materialized; they are only
       classified, which is what makes the publication tripwire fire for a
       repository that has no archives at all.
@@ -1198,7 +1198,7 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
     is nothing to compare a ref against and nothing to create one at.
 
     *anchor_overrides* is :func:`heal_dangling_anchors`' answer: the anchors
-    the ledger WOULD carry once healed, keyed by version. Outside a dry run the
+    the release record WOULD carry once healed, keyed by version. Outside a dry run the
     archives already say the same thing (they were rewritten before this ran),
     so it changes nothing; under ``--dry-run``, where nothing may be written,
     it is what keeps the preview from judging every released ref against a
@@ -1499,14 +1499,14 @@ def check_plan_matches(plan, observation, path):
 
 
 def _release_publication_for(action, *, changelog_path, releases_dir):
-    """The Release document for one version, from the changelog and the ledger."""
-    from ..release_publication import anchor_from_ledger, publication
+    """The Release document for one version, from the changelog and the release record."""
+    from ..release_publication import anchor_from_release_record, publication
 
     notes = ""
     if changelog_path and os.path.exists(changelog_path):
         notes = extract_changelog_entry(changelog_path, action.version) or ""
     anchor = (
-        anchor_from_ledger(releases_dir, action.version) or action.target
+        anchor_from_release_record(releases_dir, action.version) or action.target
     )
     return publication(
         tag=action.tag, version=action.version, candidate_sha=anchor,
@@ -1538,7 +1538,7 @@ def apply_item(item, *, ctx, releases_dir, changelog_path, push_timeout,
             # The Release follows the tag NAME, so a moved tag drags its
             # Release onto the new commit -- but the body still names the old
             # one in its rlsbl-ci-sha marker, which is what the publish
-            # workflow reads. Re-pointed here, from the ledger's anchor.
+            # workflow reads. Re-pointed here, from the release record's anchor.
             pub = _release_publication_for(
                 action, changelog_path=changelog_path,
                 releases_dir=releases_dir,
@@ -1579,7 +1579,7 @@ def _resolve_identity(ctx):
     refusal, and the answer is not a guess: ref naming has a defined default
     (``v{version}``, :class:`~rlsbl.targets.base.BaseTarget`'s own
     ``tag_format``) that holds independently of any ecosystem, and the
-    ledger-driven half is empty there anyway. What remains is the local-tag
+    release record-driven half is empty there anyway. What remains is the local-tag
     half -- the divergences the publication tripwire judges -- and those need no
     target at all.
     """
@@ -1651,7 +1651,7 @@ def run_cmd(flags, *, ctx):
     repo_root = str(ctx.workspace_root or ctx.project_root)
 
     # Detect-and-heal, before anything is judged: the verdicts are computed
-    # AGAINST the ledger, so a ledger naming pruned commits has to be moved
+    # AGAINST the release record, so a release record naming pruned commits has to be moved
     # through the same records that explain the divergence first. Outside the
     # observation, because it writes.
     try:

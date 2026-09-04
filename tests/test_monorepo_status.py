@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 
 from conftest import make_ctx, with_root_member, make_workspace
-from rlsbl.ledger import range_anchor as _range_anchor
+from rlsbl.release_record import range_anchor as _range_anchor
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
@@ -88,7 +88,7 @@ class TestMonorepoStatus:
 
     def test_status_shows_released(self, mock_git_repo, capsys):
         """A project with an archived release shows that release."""
-        from conftest import archive_release, git_head, ledger_dir
+        from conftest import archive_release, git_head, release_record_dir
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "mylib", version="1.0.0")
@@ -99,7 +99,7 @@ class TestMonorepoStatus:
             check=True,
         )
         archive_release(
-            ledger_dir(mock_git_repo / "mylib"), "1.0.0", git_head(mock_git_repo),
+            release_record_dir(mock_git_repo / "mylib"), "1.0.0", git_head(mock_git_repo),
         )
         capsys.readouterr()
         _cmd_status({}, project_root=".")
@@ -122,9 +122,9 @@ class TestMonorepoStatus:
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
         # Release only alpha -- tag AND archive, since a tagged project with no
-        # archive is a repository that was never backfilled, and the ledger
+        # archive is a repository that was never backfilled, and the release record
         # refuses to answer for one.
-        from conftest import archive_release, git_head, ledger_dir
+        from conftest import archive_release, git_head, release_record_dir
 
         subprocess.run(
             ["git", "tag", "alpha@v1.0.0"],
@@ -132,7 +132,7 @@ class TestMonorepoStatus:
             check=True,
         )
         archive_release(
-            ledger_dir(mock_git_repo / "alpha"), "1.0.0", git_head(mock_git_repo),
+            release_record_dir(mock_git_repo / "alpha"), "1.0.0", git_head(mock_git_repo),
         )
         capsys.readouterr()
         _cmd_status({}, project_root=".")
@@ -220,7 +220,7 @@ def _releasable_workspace(repo, members=("pkg-a", "pkg-b"), name="alpha",
         ["git", "commit", "-q", "-m", "workspace setup"], cwd=str(repo), check=True,
     )
     subprocess.run(["git", "tag", f"{name}@v{version}"], cwd=str(repo), check=True)
-    # The LEDGER entry the status table reads: the archive, not the tag.
+    # The RELEASE RECORD entry the status table reads: the archive, not the tag.
     from conftest import archive_release, git_head
 
     archive_release(
@@ -309,7 +309,7 @@ class TestMonorepoStatusCoverage:
         assert "0/1 (1 exempted)" in row
 
     def test_member_row_scopes_like_the_releasable_row(self, mock_git_repo, capsys):
-        """Both tables read the releasable's ledger, so both count the same way.
+        """Both tables read the releasable's release record, so both count the same way.
 
         A commit touching only the releasable's own state directory belongs to
         no member's declared path, and is inside the releasable's scope alone.
@@ -385,10 +385,10 @@ class TestMonorepoStatusCoverage:
         subprocess.run(
             ["git", "tag", "tool@v3.0.0"], cwd=str(mock_git_repo), check=True,
         )
-        from conftest import archive_release, git_head, ledger_dir
+        from conftest import archive_release, git_head, release_record_dir
 
         archive_release(
-            ledger_dir(mock_git_repo / "tool"), "3.0.0", git_head(mock_git_repo),
+            release_record_dir(mock_git_repo / "tool"), "3.0.0", git_head(mock_git_repo),
         )
         sha = _commit_file(mock_git_repo, "tool/t.js", message="feat: tool")
         _write_entry(str(tool_changes), sha)
@@ -556,10 +556,10 @@ class TestStatusMonorepoAware:
 
 
 class TestStatusTagScoping:
-    """Status coverage reads the project's own ledger, scoped by tag_glob."""
+    """Status coverage reads the project's own release record, scoped by tag_glob."""
 
     def test_monorepo_passes_tag_glob(self, mock_git_repo, monkeypatch, capsys):
-        """In a monorepo project, the ledger read receives the computed tag_glob."""
+        """In a monorepo project, the release record read receives the computed tag_glob."""
         from unittest.mock import patch
 
         _cmd_init({"root-dev-node": True}, project_root=".")
@@ -592,7 +592,7 @@ class TestStatusTagScoping:
         assert captured_calls[0][1] == "mylib@v*"
 
     def test_standalone_no_tag_glob(self, mock_git_repo, monkeypatch, capsys):
-        """In a standalone project, the ledger read receives no tag_glob."""
+        """In a standalone project, the release record read receives no tag_glob."""
         from unittest.mock import patch
 
         # Create a standalone npm project (no monorepo init)
@@ -623,7 +623,7 @@ class TestStatusTagScoping:
         assert captured_calls[0][1] is None
 
     def test_collect_status_forwards_tag_glob(self, mock_git_repo, capsys):
-        """_collect_status passes tag_glob through to the ledger read."""
+        """_collect_status passes tag_glob through to the release record read."""
         from unittest.mock import patch
 
         with open(str(mock_git_repo / "package.json"), "w") as f:

@@ -1,10 +1,10 @@
-"""A history rewrite must move the release ledger's anchors, not just the changelog.
+"""A history rewrite must move the release record's anchors, not just the changelog.
 
 The release archive records the commit a version shipped from (its
 ``candidate_sha``) and the tree each released path carried. A history rewrite
 moves those commits. ``rlsbl release scrub`` has always remapped the JSONL
 changelog hashes through the rewrite's commit map -- and never the archives, so
-after a scrub every guarded ledger read hit the DISAGREEMENT error, which blames
+after a scrub every guarded release record read hit the DISAGREEMENT error, which blames
 the TAG for having moved when the tag is the only one of the two that was
 repaired.
 
@@ -18,9 +18,9 @@ import pytest
 
 from githarness import commit_file, git, init_repo
 
-from rlsbl import ledger
+from rlsbl import release_record
 from rlsbl.anchor_remap import remap_release_anchors
-from rlsbl.errors import LedgerError, RlsblError
+from rlsbl.errors import ReleaseRecordError, RlsblError
 from rlsbl.release_file import (
     archived_release_path,
     read_release_file,
@@ -67,18 +67,18 @@ def _rewrite(repo, *, content=None):
 
 
 class TestTheAuditsReproduction:
-    """After a scrub, every guarded ledger read must answer again."""
+    """After a scrub, every guarded release record read must answer again."""
 
-    def test_an_unremapped_anchor_breaks_every_ledger_read(self, tmp_path):
+    def test_an_unremapped_anchor_breaks_every_release_record_read(self, tmp_path):
         repo, _sha = _released_repo(tmp_path)
         _rewrite(repo)
 
         releases = str(repo / ".rlsbl" / "releases")
-        with pytest.raises(LedgerError) as exc:
-            ledger.read_entry(releases, "1.0.0", tag_glob="v*", cwd=str(repo))
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(releases, "1.0.0", tag_glob="v*", cwd=str(repo))
         assert "disagree" in str(exc.value)
 
-    def test_remapping_the_anchor_makes_the_ledger_readable_again(self, tmp_path):
+    def test_remapping_the_anchor_makes_the_release_record_readable_again(self, tmp_path):
         repo, _sha = _released_repo(tmp_path)
         old, new = _rewrite(repo)
 
@@ -88,7 +88,7 @@ class TestTheAuditsReproduction:
         assert [(r.version, r.old_sha, r.new_sha) for r in remapped] == [
             ("1.0.0", old, new)
         ]
-        entry = ledger.read_entry(
+        entry = release_record.read_entry(
             releases, "1.0.0", tag_glob="v*", cwd=str(repo),
         )
         assert entry.candidate_sha == new

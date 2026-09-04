@@ -8,7 +8,7 @@ changelog-user-facing, changelog-batch-commits, changelog-batch-entries.
 import os
 
 from ..changelog.files import read_changelog_format_version_enforced
-from ..ledger import releases_dir_for_changes_dir
+from ..release_record import releases_dir_for_changes_dir
 from ._common import _resolve_version_and_tag, _get_all_changelog_contexts
 
 

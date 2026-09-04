@@ -99,14 +99,14 @@ Each failure it reports names `rlsbl release reconcile` as the remedy:
 
 | Failure | What it means |
 | --- | --- |
-| missing locally | The ledger records the version as released, but the ref is not in this repository |
+| missing locally | The release record records the version as released, but the ref is not in this repository |
 | missing on origin | The ref exists locally but was never pushed, so consumers cannot resolve it |
 | wrong commit | The ref exists but points somewhere other than the release's anchor, so it moved after the release wrote it |
 | no GitHub Release | The version's primary tag is on origin, but no Release document hangs off it, so the forge shows consumers no notes and the publish workflow finds no `rlsbl-ci-sha` marker to judge |
 
 It is fail-closed: a probe that cannot answer -- an unreadable local tag namespace, an `ls-remote` that fails, a Release listing that errors or that `gh` cannot make because it is absent or unauthenticated -- is an error, never a pass. A repository with no `origin` remote at all is a different state: the remote half is skipped and the outcome says so. So is a repository whose origin resolves to no GitHub repository: the Release half is skipped, because there is no forge for a Release to be missing from.
 
-A version the ledger records as `unanchorable` has no recoverable commit, so a ref it is missing cannot be recreated and `rlsbl release reconcile` has nothing to point at -- and no anchor to take a `rlsbl-ci-sha` marker from either, so a Release it lacks cannot be materialized. Both absences are counted and named in the outcome message instead of reported as fixable errors. Every other finding for such a version -- a ref that exists locally but not on origin -- is still reported.
+A version the release record records as `unanchorable` has no recoverable commit, so a ref it is missing cannot be recreated and `rlsbl release reconcile` has nothing to point at -- and no anchor to take a `rlsbl-ci-sha` marker from either, so a Release it lacks cannot be materialized. Both absences are counted and named in the outcome message instead of reported as fixable errors. Every other finding for such a version -- a ref that exists locally but not on origin -- is still reported.
 
 A Release is judged on the version's primary tag, the one the release flow attaches it to, and only when that tag is on origin. A tag that never reached the forge is already reported as missing on origin, and a Release cannot exist without it.
 
@@ -114,7 +114,7 @@ A Release is judged on the version's primary tag, the one the release flow attac
 
 It replaced three narrower checks (`local-tag`, `remote-tag`, `github-release`) that each looked at the primary tag of the *current* version only, and so saw neither companion tags, nor recorded aliases, nor any past release.
 
-**GitHub Release presence, and its repair.** The retired `github-release` check asked whether the *current* version's Release exists; this check asks it of every archived version, from the same listing, and reports an absence as an error. The repair is `rlsbl release reconcile`: `--plan` gives such a version a `materialize` verdict, and `--apply` creates the Release with the same body the release flow itself writes (the changelog section, the `rlsbl-ci-sha` marker taken from the ledger anchor, and the pre-release flag the version earns). The check finds the gap; the reconcile closes it. See [Reconciling published metadata](release-workflow.md#reconciling-published-metadata).
+**GitHub Release presence, and its repair.** The retired `github-release` check asked whether the *current* version's Release exists; this check asks it of every archived version, from the same listing, and reports an absence as an error. The repair is `rlsbl release reconcile`: `--plan` gives such a version a `materialize` verdict, and `--apply` creates the Release with the same body the release flow itself writes (the changelog section, the `rlsbl-ci-sha` marker taken from the release record anchor, and the pre-release flag the version earns). The check finds the gap; the reconcile closes it. See [Reconciling published metadata](release-workflow.md#reconciling-published-metadata).
 
 ## Changelog checks
 

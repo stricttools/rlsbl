@@ -318,14 +318,14 @@ def _warn_stale_entries(src: str, tag_glob: str) -> None:
     """Warn on stderr for entries in unreleased.jsonl referencing out-of-range commits.
 
     In monorepo mode, an entry whose commits all sit before the release the
-    LEDGER anchors this checkout to is stale — typically left over from a
+    RELEASE RECORD anchors this checkout to is stale — typically left over from a
     sibling project's release. We emit a warning per stale entry but do not
-    strip them (warn-only). The ledger is the release archives beside *src*'s
+    strip them (warn-only). The release record is the release archives beside *src*'s
     own changes directory.
     """
     # Local imports to avoid circular dependency at module load time.
     from .resolve import resolve_hashes, _git_log_hashes
-    from ..ledger import releases_dir_for_changes_dir, unreleased_range
+    from ..release_record import releases_dir_for_changes_dir, unreleased_range
 
     releases_dir = releases_dir_for_changes_dir(os.path.dirname(src))
     range_spec = unreleased_range(releases_dir, tag_glob=tag_glob)

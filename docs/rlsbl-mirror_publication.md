@@ -1,6 +1,6 @@
 ---
 title: rlsbl.mirror_publication
-description: "Publishes one released version on a subtree mirror: its standalone tag at the subtree split of the ledger anchor, then its Release. A tag is never moved."
+description: "Publishes one released version on a subtree mirror: its standalone tag at the subtree split of the release record anchor, then its Release. A tag is never moved."
 generated: true
 nav_group: "API Reference"
 nav_order: 115

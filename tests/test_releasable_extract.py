@@ -607,7 +607,7 @@ def _archive_anchored(repo, version):
     # The version tag stands on the ANCHORED commit, not on the archive commit
     # that records it -- which is what a real release does (it tags the
     # CI-verified candidate, and the finalization commits land on top of it),
-    # and what the ledger checks the two against each other for.
+    # and what the release record checks the two against each other for.
     return sha
 
 
@@ -769,11 +769,11 @@ class TestAbsorbHistoryRewrite:
         assert "v0.1.0" not in tags  # one alias, at the current version only
 
     def test_compute_release_version_bumps_forward(self, tmp_path, monkeypatch):
-        """With the imported tags and the migrated ledger, the next release is
+        """With the imported tags and the migrated release record, the next release is
         a forward bump -- the destroyed-tag guard does not fire.
 
         REWORKED: the absorbed unit is a RELEASABLE, so the version and the
-        ledger are read from the releasable's state directory and the tag comes
+        release record are read from the releasable's state directory and the tag comes
         from its declared format. Under the old absorb this call read a
         per-package manifest and a per-package releases directory that held no
         archive at all.
@@ -827,9 +827,9 @@ class TestAbsorbHistoryRewrite:
         changes_dir = pathlib.Path(get_releasable_changes_dir(str(root), "widget"))
         entries = _parse_jsonl_hashes(str(changes_dir / "unreleased.jsonl"))
 
-        # FLIPPED: the range is bounded by the LEDGER, and absorb now MIGRATES
+        # FLIPPED: the range is bounded by the RELEASE RECORD, and absorb now MIGRATES
         # the source's release archives rather than importing only its tags --
-        # so the ledger is already there, remapped onto the rewritten commits,
+        # so the release record is already there, remapped onto the rewritten commits,
         # and this test no longer has to fabricate one.
         assert (changes_dir.parent / "releases" / "v0.2.0.toml").is_file()
 
@@ -1381,7 +1381,7 @@ class TestExtractRoundTrip:
         #    commit and the tree of every path that version shipped; absorb
         #    remapped both onto the rewritten monorepo history and re-keyed the
         #    paths to the member's, and the extract mapped them back to a
-        #    repository root. FLIPPED: this test used to fabricate a ledger
+        #    repository root. FLIPPED: this test used to fabricate a release record
         #    entry here, because absorb imported only tags.
         from rlsbl.release_file import read_release_file
 
@@ -1398,12 +1398,12 @@ class TestExtractRoundTrip:
             assert anchor.tree_hashes["."] == _run_git(
                 str(out), "rev-parse", f"{anchor.candidate_sha}^{{tree}}",
             )
-            # The tag and the ledger still agree about that version.
+            # The tag and the release record still agree about that version.
             assert _run_git(str(out), "rev-list", "-n", "1", f"v{version}") == (
                 anchor.candidate_sha
             )
 
-        # 6. Changelog coverage passes in the extracted repo, over the ledger
+        # 6. Changelog coverage passes in the extracted repo, over the release record
         #    the conversions carried rather than one the test wrote.
         from rlsbl.changelog.validate import check_coverage
 

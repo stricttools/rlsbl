@@ -742,7 +742,7 @@ class TestNonFatalFailures:
         )
         tags = {r: sha for r, sha in after.items() if r.startswith("refs/tags/")}
         assert list(tags) == ["refs/tags/v1.0.1"]
-        # The tag names the subtree split of the release's ledger anchor,
+        # The tag names the subtree split of the release's release record anchor,
         # which this fixture stages at HEAD.
         from rlsbl.mirror_publication import split_commit_for
 

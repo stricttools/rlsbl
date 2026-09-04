@@ -1,6 +1,6 @@
 ---
 title: rlsbl.anchor_remap
-description: "Moves the release ledger's anchors through a history rewrite's commit map, re-checking each recorded tree hash so a redacted release cannot be re-anchored."
+description: "Moves the release record's anchors through a history rewrite's commit map, re-checking each recorded tree hash so a redacted release cannot be re-anchored."
 generated: true
 nav_group: "API Reference"
 nav_order: 5

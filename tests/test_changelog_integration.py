@@ -238,19 +238,19 @@ class TestPrePushWithJsonl:
 
 
 def _tag_and_archive(repo, tag):
-    """Tag a baseline release and record it in the ledger.
+    """Tag a baseline release and record it in the release record.
 
     The unreleased range is measured from the archived release, so a fixture
     that only tags has released nothing and every commit reads as unreleased.
     """
-    from conftest import archive_release, ledger_dir
+    from conftest import archive_release, release_record_dir
 
     subprocess.run(["git", "tag", tag], cwd=str(repo), check=True)
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=str(repo),
         capture_output=True, text=True, check=True,
     ).stdout.strip()
-    archive_release(ledger_dir(repo), tag.lstrip("v"), head)
+    archive_release(release_record_dir(repo), tag.lstrip("v"), head)
 
 
 class TestUnreleasedWithJsonl:

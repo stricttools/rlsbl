@@ -109,8 +109,8 @@ def dev_node_monorepo(tmp_path, monkeypatch):
     run_git(tmp_path, "add", "regular-pkg")
     run_git(tmp_path, "commit", "-q", "-m", "add monorepo projects")
 
-    # Tag both projects, and record the regular one's release in its LEDGER:
-    # a project carrying a version tag with an empty release ledger is a
+    # Tag both projects, and record the regular one's release in its RELEASE RECORD:
+    # a project carrying a version tag with an empty release record is a
     # repository that shipped and was never backfilled, which is a hard error.
     run_git(tmp_path, "tag", "mypkg-internal@v0.1.0")
     run_git(tmp_path, "tag", "mypkg-regular@v0.1.0")

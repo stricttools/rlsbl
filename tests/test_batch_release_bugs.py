@@ -242,7 +242,7 @@ def _set_pyproject_version(proj_dir, version):
 
 
 def _git_tag(ws, tag):
-    """Tag a release AND record it in the ledger the range is measured from."""
+    """Tag a release AND record it in the release record the range is measured from."""
     from githarness import record_release
 
     record_release(ws, tag)

@@ -10,31 +10,31 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..ci_checks import verify_project_ci_ran
-from ..ledger import release_at_commit, tag_for_version
+from ..release_record import release_at_commit, tag_for_version
 from ..utils import require_tool, run, run_gh
 from .. import effects
 
 
 def _release_at(commit_sha):
-    """The release *commit_sha* is, from the ledger, or None.
+    """The release *commit_sha* is, from the release record, or None.
 
     ``rlsbl watch`` takes a bare commit and runs from wherever it is invoked,
-    so the ledger is resolved from the PROJECT the cwd is in -- the same
+    so the release record is resolved from the PROJECT the cwd is in -- the same
     resolution every other command's project root goes through -- and not by
     joining ``.rlsbl/releases`` onto the process cwd. That relative path
     answered "nothing was released here" for every invocation from a
     subdirectory, and for every releasable member, whose archives live under
     the releasable rather than under the package.
 
-    Outside an rlsbl project there is no ledger to read and no label to give:
-    None. A directory whose ledger holds no archive answers None too --
-    nothing was released here -- while a ledger that CANNOT answer (a tag
+    Outside an rlsbl project there is no release record to read and no label to give:
+    None. A directory whose release record holds no archive answers None too --
+    nothing was released here -- while a release record that CANNOT answer (a tag
     disagreeing with an anchor, an ancestry git cannot decide) raises, because
-    a label derived from a ledger rlsbl could not read would be a guess
+    a label derived from a release record rlsbl could not read would be a guess
     presented as a fact.
     """
     from ..context import resolve_release_scope
-    from ..ledger import releases_dir_for_changes_dir
+    from ..release_record import releases_dir_for_changes_dir
     from ..utils import find_sub_project_root
 
     root, _project, _ws_root = find_sub_project_root()
@@ -1097,7 +1097,7 @@ def run_cmd(registry, args, flags):
             print("Error: could not get repo info. Is gh installed and authenticated?", file=sys.stderr)
             sys.exit(1)
 
-        # Label the commit with the release it IS, read from the LEDGER --
+        # Label the commit with the release it IS, read from the RELEASE RECORD --
         # the archives record which commit each version shipped from, so a
         # deleted or moved tag cannot mislabel it. A commit that shipped no
         # version is labelled by its short hash, as before.

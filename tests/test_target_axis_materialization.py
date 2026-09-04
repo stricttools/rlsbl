@@ -1,6 +1,6 @@
 """``release_materialization_policy``: may a reconcile recreate a missing release ref?
 
-``rlsbl release reconcile`` materializes a ref the release ledger records but
+``rlsbl release reconcile`` materializes a ref the release record records but
 the remote does not carry. For most ecosystems that is a pure repair -- the tag
 names a version that was already released, and pushing it publishes nothing new.
 

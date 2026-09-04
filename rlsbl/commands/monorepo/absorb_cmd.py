@@ -624,7 +624,7 @@ def _check_version_overlap(workspace_root, releasable_name, source_repo,
                            state, version_tags):
     """Refuse a version the destination releasable has already released.
 
-    A tag-name collision is about SPELLING; this is about the release ledger,
+    A tag-name collision is about SPELLING; this is about the release record,
     which is where the fact really lives: a releasable's ``changes/<v>.jsonl``
     and ``releases/v<v>.toml`` say which versions it shipped, whatever its tags
     happen to be named. Two releases of one version is a state no later command

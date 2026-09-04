@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import archive_release, ledger_dir, make_ctx, tag_state_present
+from conftest import archive_release, release_record_dir, make_ctx, tag_state_present
 from githarness import (
     fake_run_dispatch,
     status_answering_effects_run,
@@ -1251,9 +1251,9 @@ class TestStatusChangelogExemption:
         subprocess.run(["git", "add", "package.json", "CHANGELOG.md"], check=True)
         subprocess.run(["git", "commit", "-q", "-m", "initial"], check=True)
         subprocess.run(["git", "tag", "v0.1.0"], check=True)
-        # ...and the ledger entry the coverage range is measured from.
+        # ...and the release record entry the coverage range is measured from.
         archive_release(
-            ledger_dir(tmp_path), "0.1.0",
+            release_record_dir(tmp_path), "0.1.0",
             subprocess.run(
                 ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
                 check=True,

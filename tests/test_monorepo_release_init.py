@@ -414,7 +414,7 @@ class TestCommentOutZeroCommits:
         # Tag the project so it has a "last release"
         record_release(
             mock_git_repo, "pkg-a@v1.0.0",
-            ledger=os.path.join(
+            release_record=os.path.join(
                 get_releasable_dir(str(mock_git_repo), "pkg-a"), "releases",
             ),
         )
@@ -457,7 +457,7 @@ class TestCommentOutZeroCommits:
         rel_dir = get_releasable_dir(str(mock_git_repo), "pkg-a")
         record_release(
             mock_git_repo, "pkg-a@v1.0.0",
-            ledger=os.path.join(rel_dir, "releases"),
+            release_record=os.path.join(rel_dir, "releases"),
         )
 
         note = os.path.join(rel_dir, "releases", "note.toml")
@@ -494,7 +494,7 @@ class TestCommentOutZeroCommits:
         # Tag the project
         record_release(
             mock_git_repo, "pkg-a@v1.0.0",
-            ledger=os.path.join(
+            release_record=os.path.join(
                 get_releasable_dir(str(mock_git_repo), "pkg-a"), "releases",
             ),
         )
@@ -561,13 +561,13 @@ class TestCommentOutZeroCommits:
         # Tag both
         record_release(
             mock_git_repo, "active@v1.0.0",
-            ledger=os.path.join(
+            release_record=os.path.join(
                 get_releasable_dir(str(mock_git_repo), "active"), "releases",
             ),
         )
         record_release(
             mock_git_repo, "stale@v0.5.0",
-            ledger=os.path.join(
+            release_record=os.path.join(
                 get_releasable_dir(str(mock_git_repo), "stale"), "releases",
             ),
         )

@@ -286,8 +286,8 @@ class TestBareVersionRootReleasable:
         pins the archived release for 1.2.3 doing the same job, so the range
         starts at the commit that release shipped from.
         """
-        from conftest import archive_release, ledger_dir
-        from rlsbl.ledger import unreleased_range
+        from conftest import archive_release, release_record_dir
+        from rlsbl.release_record import unreleased_range
 
         root = _bare_version_root_workspace(tmp_path)
         git(root, "init", "-q", "-b", "main")
@@ -297,7 +297,7 @@ class TestBareVersionRootReleasable:
         git(root, "commit", "-q", "-m", "initial")
         git(root, "tag", "v1.2.3")
         released = git(root, "rev-parse", "HEAD")
-        releases = ledger_dir(None, releasable_dir=(
+        releases = release_record_dir(None, releasable_dir=(
             root / ".rlsbl-monorepo" / "releasables" / "root"
         ))
         archive_release(releases, "1.2.3", released)

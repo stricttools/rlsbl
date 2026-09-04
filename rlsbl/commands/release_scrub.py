@@ -484,14 +484,14 @@ def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
 
 def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
                               repo_root):
-    """Move stale ledger anchors through safegit's persisted rewrite journal.
+    """Move stale release record anchors through safegit's persisted rewrite journal.
 
     The anchor half of detect-and-heal, and the counterpart to
     :func:`_recover_from_rewrite_journal`, which does the changelog half. It
     covers a rewrite that happened OUTSIDE this flow -- a raw ``safegit
     scrub``, a ``git filter-repo`` run, a scrub interrupted before rlsbl's own
     steps -- where the archives still name commits that no longer exist and
-    every guarded ledger read therefore refuses.
+    every guarded release record read therefore refuses.
 
     Returns the repo paths a commit must carry, empty when there is no journal
     or nothing moved.
@@ -531,7 +531,7 @@ def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
 
 
 def _no_match_validate_and_repair(project_root, workspace_root, workspace_projects):
-    """Changelog and ledger repair for a scrub that found NOTHING to rewrite.
+    """Changelog and release record repair for a scrub that found NOTHING to rewrite.
 
     A no-match scrub is the one moment damage from a PRIOR crashed or
     direct scrub is still cheaply repairable: the safegit rewrite journal
@@ -541,7 +541,7 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
     unreachable and the operator is pointed at manual amends.
 
     No rewrite happened on this run, so there is nothing to force-push:
-    validate, repair the changelog hashes AND the ledger anchors from the
+    validate, repair the changelog hashes AND the release record anchors from the
     journal when possible, COMMIT the repaired files, and hard-error naming
     anything that remains dangling.
     """
@@ -566,7 +566,7 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
                 all_changes_dirs, repo_root=repo_root,
             )
         repaired = list(tracking.get("remapped_files", []))
-        # The ledger's own hashes are checked whether or not the changelog had
+        # The release record's own hashes are checked whether or not the changelog had
         # any: a rewrite that touched no changelog-referenced commit can still
         # have moved a released one.
         repaired.extend(heal_anchors_from_journal(
@@ -612,7 +612,7 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
         except Exception as e:
             print(
                 f"Error: failed to commit journal-repaired changelog and "
-                f"ledger files: {e}",
+                f"release record files: {e}",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -1038,10 +1038,10 @@ def run_cmd(flags, *, ctx):
 
             _save_step(scrub_result_path, scrub_data, "HASHES_VALIDATED")
 
-        # -- Move the release ledger's anchors through the same map --
+        # -- Move the release record's anchors through the same map --
         # The JSONL hashes were remapped in history by safegit; the ARCHIVES
         # were not, and they record each version's released commit. Left
-        # behind, every guarded ledger read hits the DISAGREEMENT error, which
+        # behind, every guarded release record read hits the DISAGREEMENT error, which
         # accuses the tag -- the one thing the scrub did repair. The remap is
         # verified content-identical per released path before anything is
         # written, so a rewrite that redacted a released file stops here

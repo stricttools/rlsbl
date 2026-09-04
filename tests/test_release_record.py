@@ -1,6 +1,6 @@
-"""The release ledger: archived release files as the authority on what shipped.
+"""The release record: archived release files as the authority on what shipped.
 
-Covers :mod:`rlsbl.ledger` -- the archive enumeration, the two questions it
+Covers :mod:`rlsbl.release_record` -- the archive enumeration, the two questions it
 answers differently (what bounds the unreleased range vs what the latest
 release is), the four read errors, and the consumers that were migrated onto
 it.
@@ -16,7 +16,7 @@ tag scheme, or observing the tag namespace as a reconciler's input -- never
 when it is about which version is current.
 
 Unreleased range / coverage -- MIGRATED to the highest anchored version whose
-candidate_sha is an ancestor of the checkout (``ledger.range_anchor``):
+candidate_sha is an ancestor of the checkout (``release_record.range_anchor``):
 
 ===================================================  ==========================
 Site                                                 Was
@@ -60,8 +60,8 @@ release-page URL                                        --exact-match``
 ======================================================  =======================
 
 ``status``, ``unreleased`` and both monorepo status tables go through
-``ledger.latest_release_fact``, which annotates the version when the checkout
-does not contain it. ``watch`` asks ``ledger.release_at_commit`` -- which
+``release_record.latest_release_fact``, which annotates the version when the checkout
+does not contain it. ``watch`` asks ``release_record.release_at_commit`` -- which
 release a given commit IS -- and that costs one archive read, not a scan.
 
 ``undo`` reads which VERSION is latest (an archive-existence scan through
@@ -75,18 +75,18 @@ reconcile`` is, and refusing to start on a tag/anchor disagreement would refuse
 exactly the repair the operator came for -- the archive wins, and the tag is
 being deleted anyway.
 
-Release preparation -- MIGRATED to the ledger:
+Release preparation -- MIGRATED to the release record:
 
 * ``rlsbl/commands/release/validate.py`` ``compute_release_version`` decided
   "first release vs bump" from ``tag_exists_locally``; it now decides from
-  ``ledger.version_is_archived``, and consults the tag only as corroboration
+  ``release_record.version_is_archived``, and consults the tag only as corroboration
   through the new tri-state ``rlsbl.utils.local_tag_state`` -- whose UNKNOWN
   answer (a preview past its first recorded mutation) may no longer be read as
   "not released". ``_abort_on_destroyed_tag`` names the archive as its
   evidence, falling back to the finalized changelog for repositories whose
   releases predate archiving.
 * ``rlsbl/commands/release/validate.py`` gained
-  ``ledger.require_checkout_contains_latest``: preparing a release on a
+  ``release_record.require_checkout_contains_latest``: preparing a release on a
   checkout that does not contain the latest release's candidate is a hard
   error.
 
@@ -96,7 +96,7 @@ Legitimately still tag-based, with the reason:
   ``tag_exists_on_remote`` / ``remote_tag_commit`` -- tag EXISTENCE, asked to
   refuse a colliding tag before creating one, and to tell a destroyed tag from
   a missing release.  Not a question about which version is current.
-* ``rlsbl/ledger.py`` ``tag_for_version`` -- tag TRANSLATION, the inverse of
+* ``rlsbl/release_record.py`` ``tag_for_version`` -- tag TRANSLATION, the inverse of
   the glob construction.  Names the tag a version carries; never picks a
   version.
 * ``rlsbl/tag_glob.py`` -- glob construction and tag parsing for the three tag
@@ -115,7 +115,7 @@ Legitimately still tag-based, with the reason:
 every one of those sites went through -- had no callers left after the
 migration and was DELETED.  Its last would-be consumer, ``RLSBL_LAST_TAG``,
 needs a tag REF for a consumer subprocess, and now selects the version from
-the ledger and translates it with ``tag_for_version``.
+the release record and translates it with ``tag_for_version``.
 """
 
 import io
@@ -126,8 +126,8 @@ import sys
 
 import pytest
 
-from rlsbl import ledger
-from rlsbl.errors import LedgerError
+from rlsbl import release_record
+from rlsbl.errors import ReleaseRecordError
 from rlsbl.release_file import (
     archived_release_path,
     list_archived_versions,
@@ -181,7 +181,7 @@ class _Repo(type(pathlib.Path())):
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
-    """A repo whose ledger agrees with its tags: three releases, all tagged."""
+    """A repo whose release record agrees with its tags: three releases, all tagged."""
     r = _Repo(_init_repo(tmp_path / "agree"))
     monkeypatch.chdir(r)
     releases = r / ".rlsbl" / "releases"
@@ -233,7 +233,7 @@ class TestListArchivedVersions:
     def test_the_scan_opens_nothing(self, tmp_path, monkeypatch):
         # The scan is a listdir: enumerating history must not cost one parse
         # per released version. Guarded because the whole lazy design rests on
-        # it -- rlsbl's own ledger is 224 archives.
+        # it -- rlsbl's own release record is 224 archives.
         d = tmp_path / "releases"
         for v in ("0.1.0", "0.2.0"):
             _archive(d, v, "a" * 40)
@@ -255,7 +255,7 @@ class TestListArchivedVersions:
 class TestReadEntry:
 
     def test_agreeing_tag_and_anchor(self, repo):
-        entry = ledger.read_entry(_releases(repo), "0.2.0")
+        entry = release_record.read_entry(_releases(repo), "0.2.0")
         assert entry.candidate_sha == repo.shas["0.2.0"]
         assert entry.anchored is True
         assert entry.unanchorable is False
@@ -264,14 +264,14 @@ class TestReadEntry:
         # A version whose tag was deleted still reads fine: the archive is the
         # record, and the tag's absence is not evidence against it.
         _git(repo, "tag", "-d", "v0.2.0")
-        entry = ledger.read_entry(_releases(repo), "0.2.0")
+        entry = release_record.read_entry(_releases(repo), "0.2.0")
         assert entry.candidate_sha == repo.shas["0.2.0"]
 
     def test_tag_pointing_elsewhere_is_a_hard_error(self, repo):
         other = repo.shas["0.1.0"]
         _git(repo, "tag", "-f", "v0.2.0", other)
-        with pytest.raises(LedgerError) as exc:
-            ledger.read_entry(_releases(repo), "0.2.0")
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(_releases(repo), "0.2.0")
         text = str(exc.value)
         assert "0.2.0" in text
         assert other in text                      # the tag's commit
@@ -291,8 +291,8 @@ class TestReadEntry:
         """
         other = repo.shas["0.1.0"]
         _git(repo, "tag", "-f", "v0.2.0", other)
-        with pytest.raises(LedgerError) as exc:
-            ledger.read_entry(_releases(repo), "0.2.0")
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(_releases(repo), "0.2.0")
         text = str(exc.value)
         assert "read-only from" not in text
         assert f"git tag -f\n  v0.2.0 {repo.shas['0.2.0']}" in text
@@ -306,8 +306,8 @@ class TestReadEntry:
         releases = r / ".rlsbl-monorepo" / "releasables" / "lib" / "releases"
         _archive(releases, "0.4.0", second)
         _git(r, "tag", "lib@v0.4.0", first)
-        with pytest.raises(LedgerError, match="lib@v0.4.0"):
-            ledger.read_entry(str(releases), "0.4.0", tag_glob="lib@v*")
+        with pytest.raises(ReleaseRecordError, match="lib@v0.4.0"):
+            release_record.read_entry(str(releases), "0.4.0", tag_glob="lib@v*")
 
     def test_unanchorable_entry_reads_as_such(self, tmp_path, monkeypatch):
         r = _init_repo(tmp_path / "unanchorable")
@@ -315,7 +315,7 @@ class TestReadEntry:
         _commit(r, "one")
         releases = r / ".rlsbl" / "releases"
         _archive(releases, "0.3.1", None, unanchorable=True)
-        entry = ledger.read_entry(str(releases), "0.3.1")
+        entry = release_record.read_entry(str(releases), "0.3.1")
         assert entry.unanchorable is True
         assert entry.candidate_sha is None
         assert entry.anchored is False
@@ -332,8 +332,8 @@ class TestReadEntry:
                 and not line.startswith('"." =')
             )
             open(path, "w").write(stripped + "\n")
-        with pytest.raises(LedgerError) as exc:
-            ledger.read_entry(_releases(repo), "0.2.0")
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(_releases(repo), "0.2.0")
         text = str(exc.value)
         # The complete single-version recovery: the derived value, the unlock,
         # the edit, the relock, and the re-validation.
@@ -357,8 +357,8 @@ class TestReadEntry:
                     and not line.startswith('"." =')
                 ) + "\n"
             )
-        with pytest.raises(LedgerError) as exc:
-            ledger.read_entry(_releases(repo), "0.2.0")
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(_releases(repo), "0.2.0")
         assert "does not exist locally" in str(exc.value)
         assert "unanchorable" in str(exc.value)
 
@@ -370,7 +370,7 @@ class TestReadEntry:
 class TestRangeAnchor:
 
     def test_picks_the_highest_contained_release(self, repo):
-        entry = ledger.range_anchor(_releases(repo))
+        entry = release_record.range_anchor(_releases(repo))
         assert entry.version == "0.3.0"
 
     def test_a_release_not_in_this_history_does_not_bound_the_range(self, repo):
@@ -385,7 +385,7 @@ class TestRangeAnchor:
         with writable_release_file(_archive_path):
             body = open(_archive_path).read().replace("c" * 40, sha)
             open(_archive_path, "w").write(body)
-        entry = ledger.range_anchor(_releases(repo))
+        entry = release_record.range_anchor(_releases(repo))
         assert entry.version == "0.3.0"
 
     def test_an_unanchorable_version_is_skipped(self, repo):
@@ -394,17 +394,17 @@ class TestRangeAnchor:
         os.chmod(path, 0o644)
         os.remove(path)
         _archive(_releases(repo), "0.3.0", None, unanchorable=True)
-        entry = ledger.range_anchor(_releases(repo))
+        entry = release_record.range_anchor(_releases(repo))
         assert entry.version == "0.2.0"
 
     def test_no_archives_means_no_anchor(self, tmp_path, monkeypatch):
         r = _init_repo(tmp_path / "virgin")
         monkeypatch.chdir(r)
         _commit(r, "one")
-        assert ledger.range_anchor(str(r / ".rlsbl" / "releases")) is None
+        assert release_record.range_anchor(str(r / ".rlsbl" / "releases")) is None
 
     def test_unreleased_range_is_the_anchor_commit(self, repo):
-        assert ledger.unreleased_range(_releases(repo)) == (
+        assert release_record.unreleased_range(_releases(repo)) == (
             f"{repo.shas['0.3.0']}..HEAD"
         )
 
@@ -413,14 +413,14 @@ class TestRangeAnchor:
         r = _init_repo(tmp_path / "virgin2")
         monkeypatch.chdir(r)
         _commit(r, "one")
-        assert ledger.unreleased_range(str(r / ".rlsbl" / "releases")) == "HEAD"
+        assert release_record.unreleased_range(str(r / ".rlsbl" / "releases")) == "HEAD"
 
     def test_the_range_ignores_a_tag_that_disagrees_with_nothing(self, repo):
         # An extra tag on a later commit -- a hand-made one, no archive behind
         # it -- must not move the range. `git describe` would have picked it.
         _commit(repo, "after the release")
         _git(repo, "tag", "v9.9.9")
-        assert ledger.unreleased_range(_releases(repo)) == (
+        assert release_record.unreleased_range(_releases(repo)) == (
             f"{repo.shas['0.3.0']}..HEAD"
         )
 
@@ -433,8 +433,8 @@ class TestIndeterminable:
 
     def test_an_anchor_whose_object_is_missing_is_a_hard_error(self, repo):
         _archive(_releases(repo), "0.4.0", "c" * 40)
-        with pytest.raises(LedgerError) as exc:
-            ledger.range_anchor(_releases(repo))
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.range_anchor(_releases(repo))
         text = str(exc.value)
         assert "cannot determine" in text
         assert "git fetch --unshallow" in text
@@ -455,12 +455,12 @@ class TestIndeterminable:
         )
         monkeypatch.chdir(clone)
         _archive(clone / ".rlsbl" / "releases", "0.1.0", base)
-        with pytest.raises(LedgerError, match="cannot determine"):
-            ledger.range_anchor(str(clone / ".rlsbl" / "releases"))
+        with pytest.raises(ReleaseRecordError, match="cannot determine"):
+            release_record.range_anchor(str(clone / ".rlsbl" / "releases"))
 
 
 # --------------------------------------------------------------------------- #
-# An empty ledger in a repository whose tags say it has released
+# An empty release record in a repository whose tags say it has released
 # --------------------------------------------------------------------------- #
 
 @pytest.fixture
@@ -468,7 +468,7 @@ def unbackfilled(tmp_path, monkeypatch):
     """Released, never backfilled: two tagged releases and no archive at all.
 
     The finalized changelog files are what a real repository of this shape
-    carries -- the ledger guard never looks at them, but the backfill script
+    carries -- the release record guard never looks at them, but the backfill script
     does, and the same fixture has to serve both.
     """
     r = _Repo(_init_repo(tmp_path / "unbackfilled"))
@@ -494,7 +494,7 @@ def _assert_names_the_backfill(text):
     # The fact, the evidence, and the remedy -- in the shape the other three
     # read errors use: what is wrong, why answering anyway would be wrong, and
     # the exact command that fixes it.
-    assert "the release ledger is empty" in text
+    assert "the release record is empty" in text
     assert "version tags" in text
     assert "v0.2.0" in text and "v0.1.0" in text
     assert "scripts/backfill_release_anchors.py --dry-run" in text
@@ -502,34 +502,34 @@ def _assert_names_the_backfill(text):
     assert "genuinely never released" in text
 
 
-class TestEmptyLedgerInATaggedRepository:
+class TestEmptyReleaseRecordInATaggedRepository:
 
     def test_range_anchor_refuses(self, unbackfilled):
-        with pytest.raises(LedgerError) as exc:
-            ledger.range_anchor(_releases(unbackfilled))
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.range_anchor(_releases(unbackfilled))
         _assert_names_the_backfill(str(exc.value))
 
     def test_unreleased_range_refuses(self, unbackfilled):
         # The bug this replaces: "HEAD" -- the whole history reported as
         # unreleased, silently.
-        with pytest.raises(LedgerError):
-            ledger.unreleased_range(_releases(unbackfilled))
+        with pytest.raises(ReleaseRecordError):
+            release_record.unreleased_range(_releases(unbackfilled))
 
     def test_latest_release_fact_refuses(self, unbackfilled):
         # The bug this replaces: "(none)" for a project with two releases.
-        with pytest.raises(LedgerError) as exc:
-            ledger.latest_release_fact(_releases(unbackfilled))
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.latest_release_fact(_releases(unbackfilled))
         _assert_names_the_backfill(str(exc.value))
 
     def test_release_at_commit_refuses(self, unbackfilled):
-        with pytest.raises(LedgerError):
-            ledger.release_at_commit(
+        with pytest.raises(ReleaseRecordError):
+            release_record.release_at_commit(
                 _releases(unbackfilled), unbackfilled.shas["0.2.0"]
             )
 
     def test_preparing_a_release_refuses(self, unbackfilled):
-        with pytest.raises(LedgerError):
-            ledger.require_checkout_contains_latest(_releases(unbackfilled))
+        with pytest.raises(ReleaseRecordError):
+            release_record.require_checkout_contains_latest(_releases(unbackfilled))
 
     def test_a_missing_releases_directory_is_the_same_state(self, tmp_path,
                                                             monkeypatch):
@@ -539,15 +539,15 @@ class TestEmptyLedgerInATaggedRepository:
         monkeypatch.chdir(r)
         _commit(r, "v0.1.0")
         _git(r, "tag", "v0.1.0")
-        with pytest.raises(LedgerError):
-            ledger.range_anchor(str(r / ".rlsbl" / "releases"))
+        with pytest.raises(ReleaseRecordError):
+            release_record.range_anchor(str(r / ".rlsbl" / "releases"))
 
     def test_the_error_names_the_scheme_and_a_few_tags(self, unbackfilled):
         for extra in ("0.3.0", "0.4.0", "0.5.0"):
             _commit(unbackfilled, f"v{extra}")
             _git(unbackfilled, "tag", f"v{extra}")
-        with pytest.raises(LedgerError) as exc:
-            ledger.range_anchor(_releases(unbackfilled))
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.range_anchor(_releases(unbackfilled))
         text = str(exc.value)
         assert '"v*"' in text                    # the scheme it matched under
         assert "v0.5.0" in text                  # highest first
@@ -555,7 +555,7 @@ class TestEmptyLedgerInATaggedRepository:
         assert "v0.1.0" not in text.split("Matching tags:")[1].splitlines()[0]
 
 
-class TestEmptyLedgerLeftAlone:
+class TestEmptyReleaseRecordLeftAlone:
 
     def test_a_project_before_its_first_release_still_answers(self, tmp_path,
                                                               monkeypatch):
@@ -563,10 +563,10 @@ class TestEmptyLedgerLeftAlone:
         monkeypatch.chdir(r)
         _commit(r, "one")
         releases = str(r / ".rlsbl" / "releases")
-        assert ledger.range_anchor(releases) is None
-        assert ledger.unreleased_range(releases) == "HEAD"
-        assert ledger.latest_release_fact(releases).label() == "(none)"
-        ledger.require_checkout_contains_latest(releases)
+        assert release_record.range_anchor(releases) is None
+        assert release_record.unreleased_range(releases) == "HEAD"
+        assert release_record.latest_release_fact(releases).label() == "(none)"
+        release_record.require_checkout_contains_latest(releases)
 
     def test_tags_that_are_not_version_tags_do_not_trip_it(self, tmp_path,
                                                            monkeypatch):
@@ -577,9 +577,9 @@ class TestEmptyLedgerLeftAlone:
         _commit(r, "one")
         for tag in ("vNext", "v1.2", "verified"):
             _git(r, "tag", tag)
-        assert ledger.range_anchor(str(r / ".rlsbl" / "releases")) is None
+        assert release_record.range_anchor(str(r / ".rlsbl" / "releases")) is None
 
-    def test_another_scopes_tags_do_not_trip_a_releasables_ledger(self, tmp_path,
+    def test_another_scopes_tags_do_not_trip_a_releasables_release_record(self, tmp_path,
                                                                   monkeypatch):
         # A workspace where a SIBLING has released and this releasable has not.
         r = _init_repo(tmp_path / "ws")
@@ -589,7 +589,7 @@ class TestEmptyLedgerLeftAlone:
         releases = str(
             r / ".rlsbl-monorepo" / "releasables" / "lib" / "releases"
         )
-        assert ledger.range_anchor(releases, tag_glob="lib@v*") is None
+        assert release_record.range_anchor(releases, tag_glob="lib@v*") is None
 
     def test_it_does_trip_on_this_releasables_own_tags(self, tmp_path,
                                                        monkeypatch):
@@ -600,23 +600,23 @@ class TestEmptyLedgerLeftAlone:
         releases = str(
             r / ".rlsbl-monorepo" / "releasables" / "lib" / "releases"
         )
-        with pytest.raises(LedgerError) as exc:
-            ledger.range_anchor(releases, tag_glob="lib@v*")
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.range_anchor(releases, tag_glob="lib@v*")
         assert "lib@v0.4.0" in str(exc.value)
 
     def test_one_archive_is_enough_to_silence_it(self, unbackfilled):
-        # A half-backfilled ledger is the missing-anchor error's business, not
+        # A half-backfilled release record is the missing-anchor error's business, not
         # this one's: the guard is inert the instant an archive exists.
         _archive(_releases(unbackfilled), "0.2.0", unbackfilled.shas["0.2.0"])
-        assert ledger.range_anchor(_releases(unbackfilled)).version == "0.2.0"
+        assert release_record.range_anchor(_releases(unbackfilled)).version == "0.2.0"
 
     def test_an_unanswerable_tag_listing_does_not_accuse(self, unbackfilled,
                                                          monkeypatch):
         # No git, a timeout, a preview past its first recorded mutation: the
         # guard cannot read the namespace, so it says nothing rather than
         # naming evidence it never saw.
-        monkeypatch.setattr(ledger, "_scheme_tags", lambda *a, **k: [])
-        assert ledger.range_anchor(_releases(unbackfilled)) is None
+        monkeypatch.setattr(release_record, "_scheme_tags", lambda *a, **k: [])
+        assert release_record.range_anchor(_releases(unbackfilled)) is None
 
 
 class TestTheBackfillItselfIsNotBlocked:
@@ -628,10 +628,10 @@ class TestTheBackfillItselfIsNotBlocked:
     """
 
     def test_the_script_imports_no_guarded_read(self):
-        """The script never IMPORTS or CALLS the ledger module.
+        """The script never IMPORTS or CALLS the release record module.
 
         Asserted against the script's code, not its prose: a comment may
-        legitimately explain what the ledger would do with the files this pass
+        legitimately explain what the release record would do with the files this pass
         writes, and a bare word search made that a failure.
         """
         import ast
@@ -644,15 +644,15 @@ class TestTheBackfillItselfIsNotBlocked:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    assert "ledger" not in alias.name, alias.name
+                    assert "release record" not in alias.name, alias.name
             elif isinstance(node, ast.ImportFrom):
-                assert "ledger" not in (node.module or ""), node.module
+                assert "release record" not in (node.module or ""), node.module
                 for alias in node.names:
-                    assert "ledger" not in alias.name, alias.name
+                    assert "release record" not in alias.name, alias.name
             elif isinstance(node, ast.Attribute):
-                assert node.attr != "ledger"
+                assert node.attr != "release record"
             elif isinstance(node, ast.Name):
-                assert node.id != "ledger"
+                assert node.id != "release record"
 
     def test_the_script_runs_on_an_unbackfilled_repository(self, unbackfilled):
         import importlib.util
@@ -662,7 +662,7 @@ class TestTheBackfillItselfIsNotBlocked:
             / "scripts" / "backfill_release_anchors.py"
         )
         spec = importlib.util.spec_from_file_location(
-            "backfill_release_anchors_ledger_probe", path
+            "backfill_release_anchors_release_record_probe", path
         )
         module = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = module
@@ -675,7 +675,7 @@ class TestTheBackfillItselfIsNotBlocked:
         )
         assert code == 0, out.getvalue()
         # And the guard is satisfied by what the script wrote.
-        assert ledger.range_anchor(_releases(unbackfilled)).version == "0.2.0"
+        assert release_record.range_anchor(_releases(unbackfilled)).version == "0.2.0"
 
 
 # --------------------------------------------------------------------------- #
@@ -685,12 +685,12 @@ class TestTheBackfillItselfIsNotBlocked:
 class TestReleaseAtCommit:
 
     def test_a_release_candidate_names_its_version(self, repo):
-        entry = ledger.release_at_commit(_releases(repo), repo.shas["0.2.0"])
+        entry = release_record.release_at_commit(_releases(repo), repo.shas["0.2.0"])
         assert entry.version == "0.2.0"
 
     def test_a_commit_between_releases_names_nothing(self, repo):
         sha = _commit(repo, "after 0.3.0")
-        assert ledger.release_at_commit(_releases(repo), sha) is None
+        assert release_record.release_at_commit(_releases(repo), sha) is None
 
     def test_a_commit_inside_a_later_release_names_nothing(self, repo):
         # An ordinary commit that a LATER release contains: the answer is
@@ -698,12 +698,12 @@ class TestReleaseAtCommit:
         ordinary = _commit(repo, "work")
         later = _commit(repo, "v0.4.0")
         _archive(_releases(repo), "0.4.0", later)
-        assert ledger.release_at_commit(_releases(repo), ordinary) is None
-        assert ledger.release_at_commit(_releases(repo), later).version == "0.4.0"
+        assert release_record.release_at_commit(_releases(repo), ordinary) is None
+        assert release_record.release_at_commit(_releases(repo), later).version == "0.4.0"
 
     def test_survives_the_tag_being_deleted(self, repo):
         _git(repo, "tag", "-d", "v0.2.0")
-        entry = ledger.release_at_commit(_releases(repo), repo.shas["0.2.0"])
+        entry = release_record.release_at_commit(_releases(repo), repo.shas["0.2.0"])
         assert entry.version == "0.2.0"
 
     def test_costs_one_archive_read(self, repo, monkeypatch):
@@ -718,7 +718,7 @@ class TestReleaseAtCommit:
             return real_open(path, *args, **kwargs)
 
         monkeypatch.setattr("builtins.open", counting)
-        ledger.release_at_commit(_releases(repo), repo.shas["0.3.0"])
+        release_record.release_at_commit(_releases(repo), repo.shas["0.3.0"])
         assert len(opened) == 1, opened
 
 
@@ -729,7 +729,7 @@ class TestReleaseAtCommit:
 class TestLatestReleaseFact:
 
     def test_contained_release_is_reported_plainly(self, repo):
-        fact = ledger.latest_release_fact(_releases(repo))
+        fact = release_record.latest_release_fact(_releases(repo))
         assert fact.version == "0.3.0"
         assert fact.in_checkout is True
         assert fact.label() == "0.3.0"
@@ -739,7 +739,7 @@ class TestLatestReleaseFact:
         sha = _commit(repo, "released elsewhere")
         _git(repo, "checkout", "-q", "main")
         _archive(_releases(repo), "0.4.0", sha)
-        fact = ledger.latest_release_fact(_releases(repo))
+        fact = release_record.latest_release_fact(_releases(repo))
         assert fact.version == "0.4.0"          # the FACT, not the range anchor
         assert fact.in_checkout is False
         assert fact.label() == "0.4.0 (not in this checkout's history)"
@@ -748,13 +748,13 @@ class TestLatestReleaseFact:
         r = _init_repo(tmp_path / "virgin3")
         monkeypatch.chdir(r)
         _commit(r, "one")
-        fact = ledger.latest_release_fact(str(r / ".rlsbl" / "releases"))
+        fact = release_record.latest_release_fact(str(r / ".rlsbl" / "releases"))
         assert fact.version is None
         assert fact.label() == "(none)"
 
     def test_unanchorable_latest_is_labelled(self, repo):
         _archive(_releases(repo), "0.4.0", None, unanchorable=True)
-        fact = ledger.latest_release_fact(_releases(repo))
+        fact = release_record.latest_release_fact(_releases(repo))
         assert fact.version == "0.4.0"
         assert fact.in_checkout is None
         assert fact.label() == "0.4.0 (commit not recoverable)"
@@ -767,15 +767,15 @@ class TestLatestReleaseFact:
 class TestRequireCheckoutContainsLatest:
 
     def test_passes_when_the_checkout_has_the_latest_release(self, repo):
-        ledger.require_checkout_contains_latest(_releases(repo))
+        release_record.require_checkout_contains_latest(_releases(repo))
 
     def test_hard_errors_when_it_does_not(self, repo):
         _git(repo, "checkout", "-q", "--orphan", "sidelined")
         sha = _commit(repo, "released elsewhere")
         _git(repo, "checkout", "-q", "main")
         _archive(_releases(repo), "0.4.0", sha)
-        with pytest.raises(LedgerError) as exc:
-            ledger.require_checkout_contains_latest(_releases(repo))
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.require_checkout_contains_latest(_releases(repo))
         text = str(exc.value)
         assert "0.4.0" in text
         assert sha in text
@@ -785,11 +785,11 @@ class TestRequireCheckoutContainsLatest:
         r = _init_repo(tmp_path / "virgin4")
         monkeypatch.chdir(r)
         _commit(r, "one")
-        ledger.require_checkout_contains_latest(str(r / ".rlsbl" / "releases"))
+        release_record.require_checkout_contains_latest(str(r / ".rlsbl" / "releases"))
 
     def test_unanchorable_latest_is_not_an_error(self, repo):
         _archive(_releases(repo), "0.4.0", None, unanchorable=True)
-        ledger.require_checkout_contains_latest(_releases(repo))
+        release_record.require_checkout_contains_latest(_releases(repo))
 
 
 # --------------------------------------------------------------------------- #
@@ -799,17 +799,17 @@ class TestRequireCheckoutContainsLatest:
 class TestPathDerivations:
 
     def test_releases_dir_pairs_with_the_changes_dir(self):
-        assert ledger.releases_dir_for_changes_dir(
+        assert release_record.releases_dir_for_changes_dir(
             os.path.join("proj", ".rlsbl", "changes")
         ) == os.path.join("proj", ".rlsbl", "releases")
 
     def test_releasable_layout(self):
-        assert ledger.releases_dir_for_changes_dir(
+        assert release_record.releases_dir_for_changes_dir(
             os.path.join("ws", ".rlsbl-monorepo", "releasables", "www", "changes")
         ) == os.path.join("ws", ".rlsbl-monorepo", "releasables", "www", "releases")
 
     def test_trailing_separator_is_tolerated(self):
-        assert ledger.releases_dir_for_changes_dir(
+        assert release_record.releases_dir_for_changes_dir(
             os.path.join("proj", ".rlsbl", "changes") + os.sep
         ) == os.path.join("proj", ".rlsbl", "releases")
 
@@ -820,4 +820,4 @@ class TestPathDerivations:
         ("pkg/sub/v*", "pkg/sub/v1.2.3"),
     ])
     def test_tag_translation(self, glob, expected):
-        assert ledger.tag_for_version(glob, "1.2.3") == expected
+        assert release_record.tag_for_version(glob, "1.2.3") == expected

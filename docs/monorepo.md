@@ -399,7 +399,7 @@ That makes the tags a second dimension of the same reconciliation. A mirror can 
 | State | Meaning | What apply does |
 | --- | --- | --- |
 | `present` | The mirror already carries the tag. | Nothing. |
-| `materialize` | The mirror has no such tag. The subtree split of the version's ledger anchor is the commit it belongs at. | Push the tag at that commit, then create the mirror's GitHub Release with that version's notes. |
+| `materialize` | The mirror has no such tag. The subtree split of the version's release record anchor is the commit it belongs at. | Push the tag at that commit, then create the mirror's GitHub Release with that version's notes. |
 | `unanchored` | No mirror commit for this version can be derived: its release archive records no commit at all, or records one the subtree split cannot answer for — typically an anchor predating the member's own directory, from a release absorbed out of another repository. | **Nothing, and nothing is guessed.** The version is named with the reason it could not be derived; the branch and every other version reconcile as usual. |
 
 A tag standing at a **different** commit is never moved. That is a hard error naming both commits: a released tag names what shipped, and choosing which commit a version shipped from is never the reconciler's decision.
@@ -411,7 +411,7 @@ Two invariants follow:
 
 ### The release flow's own mirror steps
 
-Releasing a releasable that declares a `subtree_remote` does both halves without a separate command. After the primary release is published, `rlsbl release run` converges the mirror's branch through the same reconciler this chapter describes, then publishes that version's tag and GitHub Release on the mirror. The tag's commit is the subtree split of the release's **ledger anchor** — the CI-verified candidate — not the mirror's branch tip, so the mirror's tag names the same code the monorepo's does even though the finalization commits have moved `main` on since.
+Releasing a releasable that declares a `subtree_remote` does both halves without a separate command. After the primary release is published, `rlsbl release run` converges the mirror's branch through the same reconciler this chapter describes, then publishes that version's tag and GitHub Release on the mirror. The tag's commit is the subtree split of the release's **release record anchor** — the CI-verified candidate — not the mirror's branch tip, so the mirror's tag names the same code the monorepo's does even though the finalization commits have moved `main` on since.
 
 Both steps are **non-fatal**: the primary release has already shipped and nothing is rolled back. A failure is still recorded on the release state, so the run exits non-zero, stays resumable, and names its healer — `rlsbl monorepo mirror <project>` for the mirror, `rlsbl release reconcile` for this repository's own release refs.
 

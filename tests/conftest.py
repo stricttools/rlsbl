@@ -343,12 +343,12 @@ def tag_state_absent(tag, cwd=None):
     return LocalTagState.ABSENT
 
 
-def ledger_dir(project_dir, *, releasable_dir=None):
-    """The release-archive directory a test's ledger reads.
+def release_record_dir(project_dir, *, releasable_dir=None):
+    """The release-archive directory a test's release record reads.
 
     ``<project>/.rlsbl/releases/``, or ``<releasable>/releases/`` when a
     releasable state directory is given -- the two layouts
-    :func:`rlsbl.ledger.releases_dir_for_changes_dir` derives from.
+    :func:`rlsbl.release_record.releases_dir_for_changes_dir` derives from.
     """
     if releasable_dir is not None:
         return os.path.join(str(releasable_dir), "releases")
@@ -356,9 +356,9 @@ def ledger_dir(project_dir, *, releasable_dir=None):
 
 
 def archive_release(releases_dir, version, sha, *, tree=None, unanchorable=False):
-    """Write an anchored release archive -- one ledger entry -- for a test.
+    """Write an anchored release archive -- one release record entry -- for a test.
 
-    Tests that exercise the unreleased range need a LEDGER, not a tag: the
+    Tests that exercise the unreleased range need a RELEASE RECORD, not a tag: the
     range is bounded by the highest archived version whose ``candidate_sha``
     the checkout contains.  A repo fixture that only creates ``v0.0.0`` now
     also archives it here, anchored at the commit the tag names.
@@ -1144,16 +1144,16 @@ def monorepo_fixture(tmp_path, monkeypatch):
     run_git(tmp_path, "add", "go")
     run_git(tmp_path, "commit", "-q", "-m", "add monorepo projects")
 
-    # Tag both subprojects, and record each release in its LEDGER -- both the
+    # Tag both subprojects, and record each release in its RELEASE RECORD -- both the
     # per-project archive dir and the releasable's, since a changes dir's
-    # ledger is always its own sibling releases dir.
+    # release record is always its own sibling releases dir.
     run_git(tmp_path, "tag", "mypylib@v0.1.0")
     run_git(tmp_path, "tag", "mygolib@v0.1.0")
     _tagged_sha = git_head(tmp_path)
     for proj in projects:
-        archive_release(ledger_dir(tmp_path / proj["path"]), "0.1.0", _tagged_sha)
+        archive_release(release_record_dir(tmp_path / proj["path"]), "0.1.0", _tagged_sha)
         archive_release(
-            ledger_dir(None, releasable_dir=get_releasable_dir(str(tmp_path), proj["name"])),
+            release_record_dir(None, releasable_dir=get_releasable_dir(str(tmp_path), proj["name"])),
             "0.1.0", _tagged_sha,
         )
 

@@ -421,7 +421,7 @@ def _cmd_list(flags, project_root):
 
 
 def _latest_release_for_row(changes_dir, tag_glob):
-    """The release a status row reports, from that row's own LEDGER.
+    """The release a status row reports, from that row's own RELEASE RECORD.
 
     Returns ``(fact, anchor)``: the project's latest archived release as a
     displayable fact (annotated when this checkout does not contain it), and
@@ -432,7 +432,7 @@ def _latest_release_for_row(changes_dir, tag_glob):
     This used to be ``git tag -l <glob> --sort=-v:refname``, which reported
     whatever the tag namespace happened to hold.
     """
-    from ...ledger import (
+    from ...release_record import (
         latest_release_fact,
         range_anchor,
         releases_dir_for_changes_dir,
@@ -448,7 +448,7 @@ def _latest_release_for_row(changes_dir, tag_glob):
 def _coverage_column(anchor, changes_dir, scope):
     """Return the Coverage-column string for one status row.
 
-    Real JSONL coverage: the commits since *anchor* -- the ledger entry for
+    Real JSONL coverage: the commits since *anchor* -- the release record entry for
     the highest archived release this checkout contains -- scoped to the row's
     members via *scope* (an :class:`~rlsbl.ownership.OwnershipScope`, which
     carries the whole member list), minus the exempt ones, cross-referenced
@@ -624,7 +624,7 @@ def _cmd_status(flags, project_root):
                 version = "?"
 
         # The tag glob names this package's tag scheme; the release itself
-        # comes from its LEDGER. Releasable members read the releasable's
+        # comes from its RELEASE RECORD. Releasable members read the releasable's
         # changes dir -- and therefore its archives -- not the package's.
         if first_target_name and first_target_name in TARGETS:
             tag_glob = TARGETS[first_target_name].monorepo_tag_glob(name, path=path)

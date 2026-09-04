@@ -537,11 +537,11 @@ def test_commit_message_names_the_repo_relative_scope(tmp_path):
 
 
 class TestArchiveNameGrammar:
-    """The script and the ledger read the same directory, so they must agree
+    """The script and the release record read the same directory, so they must agree
     on which files in it ARE archives, and in what order they stand.
 
     They did not: the script matched an arbitrary semver prerelease suffix and
-    sorted prerelease identifiers as strings, while the ledger recognized only
+    sorted prerelease identifiers as strings, while the release record recognized only
     rlsbl's own preid vocabulary and ordered counters numerically. Both are
     now the one recognizer and the one ordering that live in
     ``rlsbl.release_file``.

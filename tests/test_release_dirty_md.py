@@ -122,7 +122,7 @@ def _setup_released_project_with_stale_md(repo):
          ".rlsbl/releases/v1.0.0.toml")
     _git(repo, "commit", "-q", "-m", "release state v1.0.0")
     _git(repo, "tag", "v1.0.0")
-    # The archive is the LEDGER entry; anchor it at the commit the tag names,
+    # The archive is the RELEASE RECORD entry; anchor it at the commit the tag names,
     # then lock it, exactly as the release flow leaves it.
     write_release_anchor(
         str(releases_dir / "v1.0.0.toml"),

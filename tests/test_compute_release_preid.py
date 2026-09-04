@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 from githarness import commit_file, git, init_repo
 
-from conftest import archive_release, git_head, ledger_dir
+from conftest import archive_release, git_head, release_record_dir
 from rlsbl.commands.release.validate import compute_release_version
 
 
@@ -20,7 +20,7 @@ class TestComputeReleaseVersionPreid:
     def test_minor_bump_with_alpha_preid(self, tmp_path):
         """minor bump + preid='alpha' on 0.42.0 -> 0.43.0-alpha.0."""
         # A real repository with 0.42.0 archived, so the bump path is taken
-        # because the LEDGER says the version shipped -- which is what decides
+        # because the RELEASE RECORD says the version shipped -- which is what decides
         # it now, rather than a mocked tag read.
         repo = tmp_path / "repo"
         init_repo(repo)
@@ -29,7 +29,7 @@ class TestComputeReleaseVersionPreid:
             json.dumps({"name": "pkg", "version": "0.42.0"}) + "\n", "initial",
         )
         git(repo, "tag", "v0.42.0")
-        archive_release(ledger_dir(repo), "0.42.0", git_head(repo))
+        archive_release(release_record_dir(repo), "0.42.0", git_head(repo))
 
         mock_target = MagicMock()
         mock_target.read_version.return_value = "0.42.0"

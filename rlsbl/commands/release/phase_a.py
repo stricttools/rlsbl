@@ -985,9 +985,9 @@ class _Executor:
     # 1. :meth:`_capture` -- a step's DECLARED result capture. A step's own
     #    result cannot exist before the step runs, so the builder names the
     #    observe rather than performing it.
-    # 2. The release-state LEDGER (``save_step`` in :meth:`run`,
+    # 2. The release-state record (``save_step`` in :meth:`run`,
     #    ``_track_release_commit`` in :meth:`_settle`, ``load_release_state``
-    #    in :meth:`_do_record_candidate`). The ledger is the executor's own
+    #    in :meth:`_do_record_candidate`). The release record is the executor's own
     #    writing surface -- it records how far this walk has got -- and reading
     #    it back is part of writing it. A builder-time snapshot could not
     #    substitute: ``save_step`` mutates the file between the build and every
@@ -995,7 +995,7 @@ class _Executor:
     #    clobber the very markers the walk had just written.
     #
     # ``tests/test_release_phase_a_seam.py`` scans this class for both, and
-    # tolerates the ledger only at the sites named above.
+    # tolerates the release record only at the sites named above.
 
     def _capture(self, step):
         """Run a step's DECLARED result-capture observe and return its output.
@@ -1345,7 +1345,7 @@ class _Executor:
         recorded as ``write: <state file> («step N output»)`` -- a write that
         names the value it is waiting on instead of inventing one.
 
-        The ``load_release_state`` below is a LEDGER read, not a question about
+        The ``load_release_state`` below is a RELEASE RECORD read, not a question about
         the world (see the note above :meth:`_capture`). It has to happen here
         rather than in the builder: ``run`` calls ``save_step`` for every marker
         as the walk goes, so the document on disk at this moment already carries

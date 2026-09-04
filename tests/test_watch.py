@@ -36,12 +36,12 @@ from rlsbl.commands.watch import (
 
 
 from conftest import cli_ctx
-from rlsbl.ledger import LedgerEntry
+from rlsbl.release_record import ReleaseRecordEntry
 
 
 def _released(version, sha="abc123full"):
-    """A ledger entry standing in for "this commit IS release <version>"."""
-    return LedgerEntry(
+    """A release record entry standing in for "this commit IS release <version>"."""
+    return ReleaseRecordEntry(
         version=version, path=f"/fake/.rlsbl/releases/v{version}.toml",
         candidate_sha=sha, unanchorable=False,
     )
@@ -1633,7 +1633,7 @@ class TestRetryReachesTheEffectsRegime:
 
 
 class TestReleaseLabelResolution:
-    """`_release_at` reads the ledger of the project the watch runs IN.
+    """`_release_at` reads the release record of the project the watch runs IN.
 
     It used to join ".rlsbl/releases" onto the process cwd, so every
     invocation from a subdirectory -- and every invocation inside a releasable

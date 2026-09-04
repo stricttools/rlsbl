@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from conftest import archive_release, git_head, ledger_dir, make_commit, run_git
+from conftest import archive_release, git_head, release_record_dir, make_commit, run_git
 from rlsbl.changelog.schema import ChangelogEntry
 from rlsbl.changelog.validate import check_coverage, check_in_range, check_no_orphans
 from rlsbl.ownership import OwnershipScope, releasable_state_dir
@@ -27,8 +27,8 @@ from rlsbl.workspace import (
 
 
 def _releases_dir(root, releasable_name):
-    """The ledger for a releasable: the sibling of its changes directory."""
-    return ledger_dir(
+    """The release record for a releasable: the sibling of its changes directory."""
+    return release_record_dir(
         None,
         releasable_dir=os.path.dirname(
             get_releasable_changes_dir(str(root), releasable_name)
@@ -71,7 +71,7 @@ def two_releasable_repo(tmp_path, monkeypatch):
     run_git(tmp_path, "commit", "-q", "-m", "initial")
 
     # Tag as v0.1.0 and archive it for each releasable: the unreleased range
-    # is bounded by the releasable's own LEDGER entry, not by the tag.
+    # is bounded by the releasable's own RELEASE RECORD entry, not by the tag.
     run_git(tmp_path, "tag", "rel-a@v0.1.0")
     run_git(tmp_path, "tag", "rel-b@v0.1.0")
     baseline = git_head(tmp_path)
@@ -220,7 +220,7 @@ class TestReleasableOwnsItsStateDirectory:
         The version file stands in for the whole directory: attribution is by
         path, so the release archive and the finalized changelog that a real
         release writes beside it answer identically -- and this one is not
-        parsed by the ledger the checks read.
+        parsed by the release record the checks read.
         """
         rel_path = f"{releasable_state_dir(releasable_name)}/version"
         (root / os.path.dirname(rel_path)).mkdir(parents=True, exist_ok=True)

@@ -141,11 +141,11 @@ def write_covered_unreleased(root, *, description="test", entry_type="feature",
     # coverage is narrowed: an entry naming a commit that never touched the
     # sub-project is out of range rather than helpful.
     # The range is the one PRODUCTION computes: bounded by the release the
-    # LEDGER anchors this checkout to, not by `git describe`. A fixture that
+    # RELEASE RECORD anchors this checkout to, not by `git describe`. A fixture that
     # tags v1.0.0 without archiving it has released nothing as far as rlsbl is
     # concerned, so every commit needs covering -- and covering the wider range
     # is always safe.
-    from rlsbl.ledger import releases_dir_for_changes_dir, unreleased_range
+    from rlsbl.release_record import releases_dir_for_changes_dir, unreleased_range
 
     _changes = Path(changes_dir) if changes_dir else root / ".rlsbl" / "changes"
     rev_range = unreleased_range(
@@ -179,15 +179,15 @@ def write_covered_unreleased(root, *, description="test", entry_type="feature",
     return sha
 
 
-def record_release(repo, tag, *, ledger=None, commit=True, sha=None):
-    """Tag a release AND record it in the LEDGER the range is measured from.
+def record_release(repo, tag, *, release_record=None, commit=True, sha=None):
+    """Tag a release AND record it in the RELEASE RECORD the range is measured from.
 
     Creating a git tag no longer makes a version released as far as rlsbl is
     concerned: the unreleased range is bounded by the highest ARCHIVED release
     the checkout contains, so a fixture that only tags has released nothing and
     every commit in it reads as unreleased.
 
-    The archive directory is resolved from the tag's scheme unless *ledger*
+    The archive directory is resolved from the tag's scheme unless *release record*
     says otherwise:
 
     * ``v1.2.3``            -> ``<repo>/.rlsbl/releases``
@@ -215,30 +215,30 @@ def record_release(repo, tag, *, ledger=None, commit=True, sha=None):
     git(repo, "tag", tag)
     head = sha or git(repo, "rev-parse", "HEAD")
 
-    if ledger is None:
+    if release_record is None:
         if parsed.scheme == "monorepo":
             name = tag.rsplit("@", 1)[0]
             rel = repo / ".rlsbl-monorepo" / "releasables" / name
             pkg = repo / name
             if rel.is_dir():
-                ledger = rel / "releases"
+                release_record = rel / "releases"
             elif pkg.is_dir():
-                ledger = pkg / ".rlsbl" / "releases"
+                release_record = pkg / ".rlsbl" / "releases"
             else:
-                ledger = repo / ".rlsbl" / "releases"
+                release_record = repo / ".rlsbl" / "releases"
         elif parsed.scheme == "path":
-            ledger = repo / tag.rsplit("/", 1)[0] / ".rlsbl" / "releases"
+            release_record = repo / tag.rsplit("/", 1)[0] / ".rlsbl" / "releases"
         else:
-            ledger = repo / ".rlsbl" / "releases"
+            release_record = repo / ".rlsbl" / "releases"
 
-    _os.makedirs(str(ledger), exist_ok=True)
+    _os.makedirs(str(release_record), exist_ok=True)
     write_archived_release_file(
-        str(ledger), version,
+        str(release_record), version,
         bump="patch", include=[], description=f"release {version}",
         candidate_sha=head, tree_hashes={".": git(repo, "rev-parse", f"{head}^{{tree}}")},
     )
     if commit:
-        rel_path = _os.path.relpath(str(ledger), str(repo))
+        rel_path = _os.path.relpath(str(release_record), str(repo))
         git(repo, "add", "--", rel_path)
         if git(repo, "status", "--porcelain", check=False):
             git(repo, "commit", "-q", "-m", f"chore: archive release {version}",

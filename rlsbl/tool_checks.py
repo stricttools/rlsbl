@@ -238,7 +238,7 @@ def compose_argv(check_name, paths, project_dir):
 
 
 #: Attribute the resolved release-context env is memoized on, so N checks in
-#: one run mean ONE ledger read, not N.
+#: one run mean ONE release record read, not N.
 _ENV_CACHE_ATTR = "_rlsbl_external_check_env"
 
 
@@ -249,15 +249,15 @@ def release_context_env(ctx):
 
     - ``RLSBL_PROJECT_ROOT`` -- the resolved project root. An entry with a
       ``cwd`` override otherwise has no way to find it.
-    - ``RLSBL_LAST_TAG`` -- the tag name of the release the LEDGER anchors this
+    - ``RLSBL_LAST_TAG`` -- the tag name of the release the RELEASE RECORD anchors this
       checkout to, translated into the project's own tag scheme (so it is
-      monorepo-correct). The EMPTY STRING when the ledger records no release
+      monorepo-correct). The EMPTY STRING when the release record records no release
       this checkout contains, so a check can tell "no baseline yet" from "not
       injected".
     - ``RLSBL_UNRELEASED_RANGE`` -- ``<candidate_sha>..HEAD``, or ``HEAD`` when
       there is no such release.
 
-    The version is SELECTED from the ledger and only then translated into a
+    The version is SELECTED from the release record and only then translated into a
     tag; the tag namespace no longer decides which release is the baseline.
     The range is expressed as the anchor commit rather than the tag, so a check
     receives a range that resolves even when the tag was deleted or moved.
@@ -268,20 +268,20 @@ def release_context_env(ctx):
     if cached is not None:
         return cached
 
-    from .ledger import range_anchor, tag_for_version
-    from .checks._common import _resolve_ledger_dir, _resolve_tag_glob
+    from .release_record import range_anchor, tag_for_version
+    from .checks._common import _resolve_release_record_dir, _resolve_tag_glob
 
     project_root = str(ctx.project_root)
     tag_glob = _resolve_tag_glob(ctx)
     # ``RLSBL_LAST_TAG=""`` is a SIGNAL, not a fallback: it states that this
     # project has no release in this history, and a check reading it takes the
     # first-release branch. Only the genuine no-release case may produce it --
-    # every other failure mode of the ledger read (a tag disagreeing with an
+    # every other failure mode of the release record read (a tag disagreeing with an
     # anchor, an ancestry git cannot decide, an archive with no anchor) is a
-    # LedgerError that propagates. A truncated history used to be flattened
+    # ReleaseRecordError that propagates. A truncated history used to be flattened
     # into the empty string here, which made a shallow clone look brand-new to
-    # every check; the ledger refuses to answer instead.
-    anchor = range_anchor(_resolve_ledger_dir(ctx), tag_glob=tag_glob,
+    # every check; the release record refuses to answer instead.
+    anchor = range_anchor(_resolve_release_record_dir(ctx), tag_glob=tag_glob,
                           cwd=project_root)
 
     env = dict(os.environ)

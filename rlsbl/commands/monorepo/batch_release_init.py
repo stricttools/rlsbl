@@ -40,7 +40,7 @@ def _handle_existing_batch(batch_path):
 def _get_unreleased_commit_count(proj, workspace_root, all_projects):
     """Return the number of unreleased commits inside a project's scope.
 
-    The baseline comes from the project's LEDGER -- the highest archived
+    The baseline comes from the project's RELEASE RECORD -- the highest archived
     release this checkout contains -- and commits since that release are
     counted when they touch a file *proj* owns, or (for a releasable member)
     that releasable's own state directory.  Ownership is resolved against
@@ -54,7 +54,7 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
     from ...changelog.files import get_changes_dir
     from ...changelog.validate import filter_exempt_commits
     from ...git_util import filter_commits_for_scope
-    from ...ledger import range_anchor, releases_dir_for_changes_dir
+    from ...release_record import range_anchor, releases_dir_for_changes_dir
     from ...ownership import OwnershipScope
     from ...workspace import get_releasable_changes_dir
 
@@ -70,7 +70,7 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
     else:
         tag_glob = f"{name}@v*"
 
-    # The project's own ledger: a releasable member's archives live under the
+    # The project's own release record: a releasable member's archives live under the
     # releasable, everyone else's under the package.
     releasable = proj.get("releasable")
     if isinstance(releasable, str) and releasable:
@@ -105,7 +105,7 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
     # Scope first, then exempt -- the order every other consumer of these two
     # filters uses. The scope is the RELEASABLE's when the member has one, so
     # its state directory (which no member path claims) is inside the scope
-    # that reads its ledger, rather than outside every scope.
+    # that reads its release record, rather than outside every scope.
     if isinstance(releasable, str) and releasable:
         scope = OwnershipScope.for_releasable(all_projects, [proj], releasable)
     else:

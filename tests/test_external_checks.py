@@ -936,18 +936,18 @@ class TestReleaseContextEnv:
     def test_released_repo_exports_tag_and_range(self, mock_git_repo):
         """A released standalone repo gets its tag NAME and a commit range.
 
-        The version is selected from the ledger and translated into a tag for
+        The version is selected from the release record and translated into a tag for
         ``RLSBL_LAST_TAG``; the range is expressed as the released COMMIT, so
         a check receives a range that resolves even where the tag does not.
         """
         from rlsbl.context import ProjectContext
         from pathlib import Path
 
-        from conftest import archive_release, git_head, ledger_dir
+        from conftest import archive_release, git_head, release_record_dir
 
         self._tag(mock_git_repo, "v1.2.3")
         released = git_head(mock_git_repo)
-        archive_release(ledger_dir(mock_git_repo), "1.2.3", released)
+        archive_release(release_record_dir(mock_git_repo), "1.2.3", released)
         ctx = ProjectContext(
             project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
         )
@@ -976,23 +976,23 @@ class TestReleaseContextEnv:
         assert f"root={mock_git_repo}" in result.message
 
     def test_resolved_once_per_run_not_once_per_check(self, mock_git_repo, monkeypatch):
-        """N external checks must not mean N ledger reads."""
+        """N external checks must not mean N release record reads."""
         from rlsbl.context import ProjectContext
         from pathlib import Path
 
-        from conftest import archive_release, git_head, ledger_dir
-        import rlsbl.ledger as ledger_mod
+        from conftest import archive_release, git_head, release_record_dir
+        import rlsbl.release_record as release_record_mod
 
         self._tag(mock_git_repo, "v2.0.0")
-        archive_release(ledger_dir(mock_git_repo), "2.0.0", git_head(mock_git_repo))
+        archive_release(release_record_dir(mock_git_repo), "2.0.0", git_head(mock_git_repo))
         calls = []
-        real = ledger_mod.range_anchor
+        real = release_record_mod.range_anchor
 
         def counting(releases_dir, **kwargs):
             calls.append(releases_dir)
             return real(releases_dir, **kwargs)
 
-        monkeypatch.setattr(ledger_mod, "range_anchor", counting)
+        monkeypatch.setattr(release_record_mod, "range_anchor", counting)
         ctx = ProjectContext(
             project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
         )
@@ -1004,7 +1004,7 @@ class TestReleaseContextEnv:
 
 
 class TestReleaseContextEnvFailureIsHard:
-    """A ledger read that cannot answer must not become "no release".
+    """A release record read that cannot answer must not become "no release".
 
     ``RLSBL_LAST_TAG=""`` is a SIGNAL everything rests on: it means "this
     project has never been released", and a check reading it takes the
@@ -1024,23 +1024,23 @@ class TestReleaseContextEnvFailureIsHard:
 
     def test_an_undecidable_ancestry_is_a_hard_error(self, mock_git_repo):
         """A truncated history cannot answer, so nothing is exported at all."""
-        from conftest import archive_release, ledger_dir
-        from rlsbl.errors import LedgerError
+        from conftest import archive_release, release_record_dir
+        from rlsbl.errors import ReleaseRecordError
 
         # An anchor whose object this repository does not have: git answers
         # "I cannot say", which is not "not released".
-        archive_release(ledger_dir(mock_git_repo), "1.0.0", "c" * 40)
-        with pytest.raises(LedgerError) as exc:
+        archive_release(release_record_dir(mock_git_repo), "1.0.0", "c" * 40)
+        with pytest.raises(ReleaseRecordError) as exc:
             tool_checks.release_context_env(self._ctx(mock_git_repo))
         assert "unshallow" in str(exc.value)
 
     def test_an_unexpected_failure_propagates(self, mock_git_repo, monkeypatch):
-        import rlsbl.ledger as ledger_mod
+        import rlsbl.release_record as release_record_mod
 
         def boom(*args, **kwargs):
             raise RuntimeError("git went sideways")
 
-        monkeypatch.setattr(ledger_mod, "range_anchor", boom)
+        monkeypatch.setattr(release_record_mod, "range_anchor", boom)
         with pytest.raises(RuntimeError, match="sideways"):
             tool_checks.release_context_env(self._ctx(mock_git_repo))
 
@@ -1052,7 +1052,7 @@ class TestReleaseContextEnvFailureIsHard:
 
 
 class TestReleaseContextEnvWorkspace:
-    """In a monorepo the ledger and the tag glob are the project's own."""
+    """In a monorepo the release record and the tag glob are the project's own."""
 
     def _workspace(self, repo):
         """An explicit-mode workspace with one releasable named `alpha`."""
@@ -1081,14 +1081,14 @@ class TestReleaseContextEnvWorkspace:
         from rlsbl.workspace import load_releasables, load_workspace
         from pathlib import Path
 
-        from conftest import archive_release, git_head, ledger_dir
+        from conftest import archive_release, git_head, release_record_dir
 
         pkg = self._workspace(mock_git_repo)
         subprocess.run(["git", "tag", "v9.9.9"], cwd=str(mock_git_repo), check=True)
         subprocess.run(["git", "tag", "alpha@v1.0.0"], cwd=str(mock_git_repo), check=True)
         released = git_head(mock_git_repo)
         archive_release(
-            ledger_dir(None, releasable_dir=(
+            release_record_dir(None, releasable_dir=(
                 mock_git_repo / ".rlsbl-monorepo" / "releasables" / "alpha"
             )),
             "1.0.0", released,

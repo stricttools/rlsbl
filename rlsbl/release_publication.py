@@ -12,11 +12,11 @@ Three decisions live here, and nowhere else:
 
 * **The notes** are the version's own CHANGELOG.md section, verbatim.
 * **The released-commit marker** is ``<!-- rlsbl-ci-sha: <40 hex> -->``, and
-  the sha it carries is THE RELEASE LEDGER'S ANCHOR for that version -- the
+  the sha it carries is THE RELEASE RECORD'S ANCHOR for that version -- the
   ``candidate_sha`` the archive records. The marker is a projection of the
   anchor onto the forge, not an independent fact: the publish workflow reads it
   to learn which commit CI proved green, and the archive is what rlsbl itself
-  reads for the same question. :func:`anchor_from_ledger` is how a caller that
+  reads for the same question. :func:`anchor_from_release_record` is how a caller that
   does not already hold the anchor obtains it.
 * **The pre-release flag** follows the version: a version carrying a
   pre-release segment is a GitHub pre-release.
@@ -47,7 +47,7 @@ CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
 def ci_sha_marker(candidate_sha: str) -> str:
     """The marker line for a released commit.
 
-    *candidate_sha* is the release ledger's anchor for the version -- the
+    *candidate_sha* is the release record's anchor for the version -- the
     commit the archive records as the one CI verified.
     """
     return f"<!-- rlsbl-ci-sha: {candidate_sha.strip()} -->"
@@ -80,7 +80,7 @@ class ReleasePublication:
             :attr:`body` then falls back to naming the version.
         version: the version being published, which decides
             :attr:`prerelease`.
-        candidate_sha: the release ledger's anchor for *version*.
+        candidate_sha: the release record's anchor for *version*.
     """
 
     tag: str
@@ -142,11 +142,11 @@ def publication(*, tag, version, candidate_sha, notes="", title=None):
     )
 
 
-def anchor_from_ledger(releases_dir: str, version: str) -> str | None:
-    """The ledger anchor for *version*, or None when there is none.
+def anchor_from_release_record(releases_dir: str, version: str) -> str | None:
+    """The release record anchor for *version*, or None when there is none.
 
     Read from the archive directly rather than through
-    :func:`rlsbl.ledger.read_entry`: this is asked on repair paths, where the
+    :func:`rlsbl.release_record.read_entry`: this is asked on repair paths, where the
     tag and the anchor are expected to disagree and the guarded read's
     DISAGREEMENT error would refuse to answer exactly when the answer is needed
     to end the disagreement. An unanchorable archive answers None -- there is

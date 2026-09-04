@@ -7,7 +7,7 @@ the published manifest carries no ``>=`` floor (or a stale one), so a
 consumer installing the artifact resolves an OLDER framework and breaks.
 Three published releases shipped broken this way before this check existed.
 
-The convention (campaign decision ledger): when a release requires new
+The convention (campaign decision record): when a release requires new
 framework behavior, the manifest carries a ``>=`` floor at that version.
 Floors are not pins; upper bounds stay banned.
 

@@ -298,10 +298,10 @@ def archived_versions(scope: Scope) -> dict[str, str]:
         return result
     for name in os.listdir(scope.releases_dir):
         # rlsbl.release_file owns both the archive-name grammar and the order
-        # archives stand in; this pass reads the very directories the ledger
+        # archives stand in; this pass reads the very directories the release record
         # reads, so a second opinion here about which files are archives (or
         # which of two prereleases came first) would make the pass repair
-        # files the ledger ignores and derive a bump from the wrong
+        # files the release record ignores and derive a bump from the wrong
         # predecessor.
         version = archive_version(name)
         if version is not None:

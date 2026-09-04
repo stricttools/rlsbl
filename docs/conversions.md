@@ -142,7 +142,7 @@ A collision is a preview error, not a runtime surprise. Tag names are the same i
 
 - **Extract, ref-name collision.** The translated name already exists, is not this releasable's, and stands at a different commit. Hard error naming both. When the existing tag stands at the *same* commit it is an earlier inbound conversion's boundary alias -- the translation it names has already happened, so the existing tag is kept rather than recreated.
 - **Absorb, ref-name collision.** The name rlsbl would create already exists and is not this absorb's own earlier work. A destination tag belongs to the destination's release history and is never overwritten or deleted; resolve the conflict first.
-- **Absorb, version collision.** A tag already stands at a version the source also carries, under whatever spelling, or the destination releasable's own ledger (`changes/<version>.jsonl`, `releases/v<version>.toml`) already records that version. One version is one release, and two records cannot both be that version's -- `changelog generate` would have two sources for one section. Absorb into a releasable that does not carry the version, or reconcile the histories first.
+- **Absorb, version collision.** A tag already stands at a version the source also carries, under whatever spelling, or the destination releasable's own release record (`changes/<version>.jsonl`, `releases/v<version>.toml`) already records that version. One version is one release, and two records cannot both be that version's -- `changelog generate` would have two sources for one section. Absorb into a releasable that does not carry the version, or reconcile the histories first.
 
 ### Go's path scheme
 

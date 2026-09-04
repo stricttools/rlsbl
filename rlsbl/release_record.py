@@ -1,4 +1,4 @@
-"""The release ledger: the archived release files, read as the authoritative
+"""The release record: the archived release files, read as the authoritative
 record of what this project has released.
 
 Every completed release archives its release file to
@@ -24,7 +24,7 @@ read-only bit, so a fresh clone's archives are writable.)
 The two questions, and their two different answers
 --------------------------------------------------
 
-The ledger deliberately answers *two* questions differently, because they are
+The release record deliberately answers *two* questions differently, because they are
 different questions:
 
 * **What bounds the unreleased range?**  The highest archived version whose
@@ -41,27 +41,27 @@ costs one ``listdir`` and opens nothing; this module opens archives one at a
 time walking down from the top and stops at the first answer.  In the ordinary
 case -- a checkout that contains the latest release -- that is exactly one
 file.  (Measured on rlsbl's own 224 archives: reading all of them through
-``read_release_file`` takes ~340ms, so eagerly loading the ledger on every
+``read_release_file`` takes ~340ms, so eagerly loading the release record on every
 command was never an option.)
 
 The four read errors
 --------------------
 
-They fire where the ledger is READ FOR USE, never while scanning:
+They fire where the release record is READ FOR USE, never while scanning:
 
 * **Disagreement** -- the version's tag exists locally and points at a commit
-  other than the anchor.  Something moved one of them; the ledger will not
+  other than the anchor.  Something moved one of them; the release record will not
   guess which.
 * **Indeterminable** -- ancestry cannot be decided (a missing object, a
   truncated history).  Not the same as "no", and not treated as one.
 * **Missing anchor** -- an archive carrying neither the anchor nor the
   ``unanchorable`` marker, i.e. one written before anchoring existed and never
   backfilled.  The error prints the complete single-version recovery.
-* **Empty ledger, tagged repository** -- no archive at all, yet the tag
+* **Empty release record, tagged repository** -- no archive at all, yet the tag
   namespace carries tags that parse under this project's version-tag scheme.
   That is a project that HAS released and was never backfilled, and reading its
-  empty ledger would report the entire history as unreleased.  A project with
-  no version tags is a project before its first release, and its empty ledger
+  empty release record would report the entire history as unreleased.  A project with
+  no version tags is a project before its first release, and its empty release record
   is the correct answer -- so the two states are told apart by the tags, and
   only the first one raises.
 
@@ -84,7 +84,7 @@ import subprocess
 from dataclasses import dataclass
 
 from . import effects
-from .errors import LedgerError
+from .errors import ReleaseRecordError
 from .git_util import Ancestry, ancestry
 from .release_file import (
     archived_release_path,
@@ -99,7 +99,7 @@ _HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
 
 
 @dataclass(frozen=True)
-class LedgerEntry:
+class ReleaseRecordEntry:
     """One archived release, read for use.
 
     ``candidate_sha`` is None exactly when ``unanchorable`` is True: an archive
@@ -187,7 +187,7 @@ def _resolve_ref(ref: str, cwd: str | None, *, timeout: int = 10) -> str | None:
 
 
 def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
-                          cwd: str | None) -> LedgerError:
+                          cwd: str | None) -> ReleaseRecordError:
     """Build the MISSING-ANCHOR error, with the complete recovery for it.
 
     The recovery is single-version and mechanical: the value to write is the
@@ -212,8 +212,8 @@ def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
             f"  instead (unanchorable = true, and no candidate_sha/tree_hashes)."
         )
         sha_line = 'candidate_sha = "<the released commit>"'
-    return LedgerError(
-        f"the release ledger entry for {version} carries no anchor: {path}\n"
+    return ReleaseRecordError(
+        f"the release record entry for {version} carries no anchor: {path}\n"
         f"  An archive records either the anchor the release flow wrote\n"
         f"  (candidate_sha + [tree_hashes]) or the unanchorable marker. This one\n"
         f"  has neither, so it was written before anchoring existed and was never\n"
@@ -236,7 +236,7 @@ def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
     )
 
 
-# How many matching tags the empty-ledger error prints as evidence. A handful
+# How many matching tags the empty-release record error prints as evidence. A handful
 # names the namespace concretely; the full list is the operator's `git tag -l`
 # away, and a count would be a number this message has no reason to carry.
 _TAG_EVIDENCE = 3
@@ -279,9 +279,9 @@ def _scheme_tags(tag_glob: str | None, cwd: str | None, *,
     ]
 
 
-def _unbackfilled_ledger_error(releases_dir: str, tag_glob: str | None,
-                               tags: list[str]) -> LedgerError:
-    """Build the EMPTY-LEDGER error for a repository that has clearly released.
+def _unbackfilled_release_record_error(releases_dir: str, tag_glob: str | None,
+                               tags: list[str]) -> ReleaseRecordError:
+    """Build the EMPTY-RELEASE RECORD error for a repository that has clearly released.
 
     The remedy is the whole-repository backfill rather than the single-version
     recovery the missing-anchor error prints: there is no archive to edit here,
@@ -290,15 +290,15 @@ def _unbackfilled_ledger_error(releases_dir: str, tag_glob: str | None,
     glob = tag_glob or "v*"
     evidence = ", ".join(tags[:_TAG_EVIDENCE])
     more = " (and others)" if len(tags) > _TAG_EVIDENCE else ""
-    return LedgerError(
-        f"the release ledger is empty, but this repository has version tags: "
+    return ReleaseRecordError(
+        f"the release record is empty, but this repository has version tags: "
         f"{releases_dir}\n"
-        f"  No release archive exists there, so the ledger records nothing -- and\n"
+        f"  No release archive exists there, so the release record records nothing -- and\n"
         f'  yet the tag namespace carries tags parsing under this project\'s scheme\n'
         f'  ("{glob}"), which is what a project that HAS released and was never\n'
         f"  backfilled looks like.\n"
         f"  Matching tags: {evidence}{more}\n"
-        f"  Answering from an empty ledger here would report this repository's\n"
+        f"  Answering from an empty release record here would report this repository's\n"
         f"  ENTIRE history as unreleased and silently widen every range computed\n"
         f"  from it, so rlsbl refuses instead of answering.\n"
         f"  Backfill the archives -- preview first, then write:\n"
@@ -307,15 +307,15 @@ def _unbackfilled_ledger_error(releases_dir: str, tag_glob: str | None,
         f"  (the script ships in the rlsbl repository: run it from a checkout of\n"
         f"  rlsbl with --repo pointing at this repository's root.)\n"
         f"  A project that has genuinely never released carries no tag under its\n"
-        f"  scheme and is unaffected: there, an empty ledger IS the answer."
+        f"  scheme and is unaffected: there, an empty release record IS the answer."
     )
 
 
-def _require_backfilled_ledger(releases_dir: str, versions: list[str],
+def _require_backfilled_release_record(releases_dir: str, versions: list[str],
                                tag_glob: str | None, cwd: str | None) -> None:
-    """Refuse an empty ledger in a repository whose tags say it has released.
+    """Refuse an empty release record in a repository whose tags say it has released.
 
-    A no-op the instant the ledger holds anything: a repository mid-backfill,
+    A no-op the instant the release record holds anything: a repository mid-backfill,
     or one whose archives predate anchoring, is the missing-anchor error's
     business, not this one's.
     """
@@ -324,11 +324,11 @@ def _require_backfilled_ledger(releases_dir: str, versions: list[str],
     tags = _scheme_tags(tag_glob, cwd)
     if not tags:
         return
-    raise _unbackfilled_ledger_error(releases_dir, tag_glob, tags)
+    raise _unbackfilled_release_record_error(releases_dir, tag_glob, tags)
 
 
 def version_is_archived(releases_dir: str, version: str) -> bool:
-    """Does the ledger record *version* as released?
+    """Does the release record record *version* as released?
 
     A scan, not a read: the archive's mere existence is the record that the
     release completed, and answering it opens no file. The read errors belong
@@ -338,10 +338,10 @@ def version_is_archived(releases_dir: str, version: str) -> bool:
 
 
 def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
-               cwd: str | None = None) -> LedgerEntry:
+               cwd: str | None = None) -> ReleaseRecordEntry:
     """Read one archived release FOR USE, with its read errors live.
 
-    Raises :class:`~rlsbl.errors.LedgerError` when the archive carries no
+    Raises :class:`~rlsbl.errors.ReleaseRecordError` when the archive carries no
     anchor and no ``unanchorable`` marker, and when the version's tag exists
     locally but points somewhere other than the anchor.  Raises
     ``FileNotFoundError`` when there is no archive for *version* at all --
@@ -351,7 +351,7 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
     cfg = read_release_file(path)
 
     if cfg.unanchorable:
-        return LedgerEntry(version=version, path=path, candidate_sha=None,
+        return ReleaseRecordEntry(version=version, path=path, candidate_sha=None,
                            unanchorable=True)
 
     sha = cfg.candidate_sha
@@ -361,8 +361,8 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
     tag = tag_for_version(tag_glob, version)
     tag_commit = _resolve_ref(tag, cwd)
     if tag_commit is not None and not _same_commit(tag_commit, sha):
-        raise LedgerError(
-            f"the release ledger and the git tag disagree about {version}:\n"
+        raise ReleaseRecordError(
+            f"the release record and the git tag disagree about {version}:\n"
             f'  tag "{tag}" points at   {tag_commit}\n'
             f"  the archive's anchor is {sha}\n"
             f"  archive: {path}\n"
@@ -379,12 +379,12 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
             f"  not guess which of the two is right."
         )
 
-    return LedgerEntry(version=version, path=path, candidate_sha=sha,
+    return ReleaseRecordEntry(version=version, path=path, candidate_sha=sha,
                        unanchorable=False)
 
 
-def _indeterminable_error(entry: LedgerEntry, head: str) -> LedgerError:
-    return LedgerError(
+def _indeterminable_error(entry: ReleaseRecordEntry, head: str) -> ReleaseRecordError:
+    return ReleaseRecordError(
         f"cannot determine whether the released commit for {entry.version} is in\n"
         f"  this checkout's history: git could not answer whether "
         f"{entry.candidate_sha}\n"
@@ -400,7 +400,7 @@ def _indeterminable_error(entry: LedgerEntry, head: str) -> LedgerError:
 
 
 def range_anchor(releases_dir: str, *, tag_glob: str | None = None,
-                 cwd: str | None = None, head: str = "HEAD") -> LedgerEntry | None:
+                 cwd: str | None = None, head: str = "HEAD") -> ReleaseRecordEntry | None:
     """The highest archived release whose commit this checkout CONTAINS.
 
     This is what bounds every unreleased-range and coverage computation.  The
@@ -409,17 +409,17 @@ def range_anchor(releases_dir: str, *, tag_glob: str | None = None,
     archive.  An ``unanchorable`` version is skipped -- it has no commit to
     anchor on, so its neighbours bound the range instead.
 
-    Returns None when the ledger records nothing this checkout contains: a
+    Returns None when the release record records nothing this checkout contains: a
     project before its first release, or a checkout that predates every
     release it knows about.  "Before its first release" is required to look
-    like it -- an empty ledger in a repository carrying version tags raises
+    like it -- an empty release record in a repository carrying version tags raises
     instead of widening the range to the whole history.
 
-    Raises :class:`~rlsbl.errors.LedgerError` for any of the read errors,
+    Raises :class:`~rlsbl.errors.ReleaseRecordError` for any of the read errors,
     including an ancestry git cannot decide.
     """
     versions = list_archived_versions(releases_dir)
-    _require_backfilled_ledger(releases_dir, versions, tag_glob, cwd)
+    _require_backfilled_release_record(releases_dir, versions, tag_glob, cwd)
     for version in versions:
         entry = read_entry(releases_dir, version, tag_glob=tag_glob, cwd=cwd)
         if entry.unanchorable:
@@ -436,9 +436,9 @@ def unreleased_range(releases_dir: str, *, tag_glob: str | None = None,
                      cwd: str | None = None) -> str:
     """The git log range spec for this checkout's unreleased commits.
 
-    ``<candidate_sha>..HEAD`` when the ledger records a release this checkout
+    ``<candidate_sha>..HEAD`` when the release record records a release this checkout
     contains, and ``HEAD`` when it does not -- the same shape the tag-based
-    predecessor produced, computed from the ledger instead of from
+    predecessor produced, computed from the release record instead of from
     ``git describe``.
     """
     entry = range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
@@ -449,7 +449,7 @@ def unreleased_range(releases_dir: str, *, tag_glob: str | None = None,
 
 def release_at_commit(releases_dir: str, sha: str, *,
                       tag_glob: str | None = None,
-                      cwd: str | None = None) -> LedgerEntry | None:
+                      cwd: str | None = None) -> ReleaseRecordEntry | None:
     """The release *sha* IS, or None when it shipped no version.
 
     Asked by displays that want to label a commit with its release
@@ -478,11 +478,11 @@ def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
     it rather than quietly reporting an older release as the latest.
 
     The "no release yet" fact is reported only for a repository that looks like
-    one: an empty ledger under a tagged version namespace raises rather than
+    one: an empty release record under a tagged version namespace raises rather than
     reporting ``(none)`` for a project that has plainly released.
     """
     versions = list_archived_versions(releases_dir)
-    _require_backfilled_ledger(releases_dir, versions, tag_glob, cwd)
+    _require_backfilled_release_record(releases_dir, versions, tag_glob, cwd)
     if not versions:
         return LatestReleaseFact(version=None, in_checkout=None)
 
@@ -510,14 +510,14 @@ def require_checkout_contains_latest(releases_dir: str, *,
     release is not in: the new release would silently revert it, and its
     changelog range would cover commits that already shipped.
 
-    A no-op when the ledger records nothing, and when the latest release is
+    A no-op when the release record records nothing, and when the latest release is
     ``unanchorable`` -- there is no commit to require.
     """
     fact = latest_release_fact(releases_dir, tag_glob=tag_glob, cwd=cwd, head=head)
     if fact.version is None or fact.in_checkout is not False:
         return
     entry = read_entry(releases_dir, fact.version, tag_glob=tag_glob, cwd=cwd)
-    raise LedgerError(
+    raise ReleaseRecordError(
         f"this checkout does not contain the latest release, {fact.version}.\n"
         f"  Its released commit {entry.candidate_sha} is not an ancestor of "
         f"{head}.\n"
@@ -536,6 +536,6 @@ def releases_dir_for_changes_dir(changes_dir: str) -> str:
     ``.rlsbl/changes/`` -> ``.rlsbl/releases/``, and a releasable's
     ``<releasable>/changes/`` -> ``<releasable>/releases/``.  Both layouts put
     the two directories side by side, and every caller that already resolved a
-    changes dir gets its ledger from here rather than re-deriving the path.
+    changes dir gets its release record from here rather than re-deriving the path.
     """
     return os.path.join(os.path.dirname(os.path.normpath(changes_dir)), "releases")

@@ -34,8 +34,8 @@ class ReleaseFileError(RlsblError):
     """Invalid unreleased.toml, retry.toml, or batch release file."""
 
 
-class LedgerError(RlsblError):
-    """The release ledger could not be read for use.
+class ReleaseRecordError(RlsblError):
+    """The release record could not be read for use.
 
     Raised for the three ways an archived release file fails the reader that
     needs its anchor: the version's tag disagrees with the anchor, the anchor's

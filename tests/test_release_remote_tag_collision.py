@@ -45,8 +45,8 @@ def _setup_repo_at_v100(tmp_path, monkeypatch):
         json.dumps({"name": "pkg", "version": "1.0.0"}, indent=2) + "\n",
         "initial",
     )
-    # Tagged AND archived: the ledger, not the tag, is the record that 1.0.0
-    # shipped, and a version tag over an empty ledger is its own hard error.
+    # Tagged AND archived: the release record, not the tag, is the record that 1.0.0
+    # shipped, and a version tag over an empty release record is its own hard error.
     record_release(repo, "v1.0.0")  # current release exists -> bump (-> v1.0.1)
     add_remote(repo, tmp_path / "remote")  # pushes main + v1.0.0
     monkeypatch.chdir(repo)  # remote_tag_commit(tag) uses process cwd

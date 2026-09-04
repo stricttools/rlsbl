@@ -1,10 +1,10 @@
-"""End-to-end: a scrub must leave the release ledger readable.
+"""End-to-end: a scrub must leave the release record readable.
 
 The audit that produced this test is short to state. ``rlsbl release scrub``
 remapped the JSONL changelog hashes through the rewrite's commit map and moved
 the tags -- but never the release ARCHIVES, which record each version's
 ``candidate_sha``. Afterwards the tag pointed at the rewritten commit and the
-archive still named the old one, so every guarded ledger read raised the
+archive still named the old one, so every guarded release record read raised the
 DISAGREEMENT error, whose text accuses the TAG of having moved. The tag was the
 one thing the scrub had repaired.
 
@@ -12,7 +12,7 @@ Both directions are exercised against the REAL safegit binary:
 
 * ``rlsbl release scrub`` moves the anchors as part of its own flow, records an
   ``anchor-remap`` lineage event, and commits both.
-* A RAW ``safegit scrub`` -- no rlsbl orchestration -- leaves the ledger broken,
+* A RAW ``safegit scrub`` -- no rlsbl orchestration -- leaves the release record broken,
   and rlsbl heals it from the persisted rewrite journal.
 
 Only the gh/network boundary is mocked, exactly as the other scrub e2e tests do.
@@ -32,11 +32,11 @@ from githarness import (
     init_repo,
 )
 
-from rlsbl import ledger
+from rlsbl import release_record
 from rlsbl.changelog.generate import generate_changelog
 from rlsbl.commands.release_scrub import run_cmd as scrub_run_cmd
 from rlsbl.context import ProjectContext
-from rlsbl.errors import LedgerError
+from rlsbl.errors import ReleaseRecordError
 from rlsbl.lineage import KIND_ANCHOR_REMAP, get_lineage_path, read_events
 from rlsbl.release_file import write_archived_release_file
 
@@ -106,8 +106,8 @@ def _releases_dir(repo):
     return str(repo / ".rlsbl" / "releases")
 
 
-def _read_ledger(repo):
-    return ledger.read_entry(
+def _read_release_record(repo):
+    return release_record.read_entry(
         _releases_dir(repo), "1.0.0", tag_glob="v*", cwd=str(repo),
     )
 
@@ -139,13 +139,13 @@ def _raw_safegit_scrub(repo):
 
 class TestScrubMovesTheAnchors:
 
-    def test_the_ledger_reads_again_after_a_scrub(self, e2e_env, monkeypatch):
+    def test_the_release_record_reads_again_after_a_scrub(self, e2e_env, monkeypatch):
         repo, released = _setup_released_repo(e2e_env)
         monkeypatch.chdir(repo)
 
         _run_scrub(repo)
 
-        entry = _read_ledger(repo)
+        entry = _read_release_record(repo)
         assert entry.candidate_sha != released, (
             "the rewrite moved the released commit, so the anchor must move too"
         )
@@ -169,7 +169,7 @@ class TestScrubMovesTheAnchors:
         )
         mappings = events[0].mappings
         assert [m.old_sha for m in mappings] == [released]
-        assert mappings[0].new_sha == _read_ledger(repo).candidate_sha
+        assert mappings[0].new_sha == _read_release_record(repo).candidate_sha
 
     def test_the_repair_is_committed(self, e2e_env, monkeypatch):
         repo, _released = _setup_released_repo(e2e_env)
@@ -187,15 +187,15 @@ class TestScrubMovesTheAnchors:
 
 class TestTheRedWithoutTheRepair:
 
-    def test_a_raw_rewrite_breaks_every_ledger_read(self, e2e_env, monkeypatch):
+    def test_a_raw_rewrite_breaks_every_release_record_read(self, e2e_env, monkeypatch):
         """The audit's reproduction, with no rlsbl orchestration at all."""
         repo, _released = _setup_released_repo(e2e_env)
         monkeypatch.chdir(repo)
 
         _raw_safegit_scrub(repo)
 
-        with pytest.raises(LedgerError) as exc:
-            _read_ledger(repo)
+        with pytest.raises(ReleaseRecordError) as exc:
+            _read_release_record(repo)
         assert "disagree" in str(exc.value)
 
     def test_the_journal_heals_it(self, e2e_env, monkeypatch):
@@ -208,7 +208,7 @@ class TestTheRedWithoutTheRepair:
         touched = heal_anchors_from_journal(str(repo), None, None, str(repo))
 
         assert touched, "the journal must be able to explain the moved anchor"
-        entry = _read_ledger(repo)
+        entry = _read_release_record(repo)
         assert entry.candidate_sha != released
         assert entry.candidate_sha == _git(
             repo, "rev-parse", "refs/tags/v1.0.0^{}",

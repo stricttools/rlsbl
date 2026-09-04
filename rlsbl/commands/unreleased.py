@@ -1,4 +1,4 @@
-"""Unreleased command that lists the commits since the release the ledger anchors this checkout to, and checks whether each one is covered by a corresponding changelog entry."""
+"""Unreleased command that lists the commits since the release the release record anchors this checkout to, and checks whether each one is covered by a corresponding changelog entry."""
 
 import os
 import subprocess
@@ -8,7 +8,7 @@ from ..changelog import read_unreleased, resolve_hashes
 from ..changelog.validate import filter_exempt_commits
 from ..context import resolve_release_scope
 from ..git_util import filter_commits_for_scope
-from ..ledger import (
+from ..release_record import (
     latest_release_fact,
     range_anchor,
     releases_dir_for_changes_dir,
@@ -19,7 +19,7 @@ from .. import effects
 def _get_commits_since(anchor_sha):
     """Get commits since *anchor_sha* (or all commits when it is None).
 
-    *anchor_sha* is the released commit the ledger anchors this checkout to,
+    *anchor_sha* is the released commit the release record anchors this checkout to,
     not a tag: a range expressed as a commit resolves even where the version's
     tag was deleted or moved.
 
@@ -70,13 +70,13 @@ def run_cmd(registry, args, flags, project_root):
 
     monorepo_project, tag_glob, changes_dir, scope = resolve_release_scope(root_str)
 
-    ledger_dir = releases_dir_for_changes_dir(changes_dir)
-    anchor = range_anchor(ledger_dir, tag_glob=tag_glob, cwd=root_str)
+    release_record_dir = releases_dir_for_changes_dir(changes_dir)
+    anchor = range_anchor(release_record_dir, tag_glob=tag_glob, cwd=root_str)
     # Two different questions, deliberately answered from two different
     # places: the RANGE is bounded by the highest release this checkout
     # contains, while the release the header names is the project's latest,
     # annotated when this checkout does not contain it.
-    latest = latest_release_fact(ledger_dir, tag_glob=tag_glob, cwd=root_str)
+    latest = latest_release_fact(release_record_dir, tag_glob=tag_glob, cwd=root_str)
     commits = _get_commits_since(anchor.candidate_sha if anchor else None)
 
     # Scope to the project's (or the whole releasable's) files FIRST, then

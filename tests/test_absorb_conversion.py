@@ -339,7 +339,7 @@ class TestRefusals:
             absorb(ns, source, dry_run=True)
 
     def test_a_version_the_releasable_has_already_released(self, tmp_path):
-        """The refusal reads the LEDGER, not the tag names.
+        """The refusal reads the RELEASE RECORD, not the tag names.
 
         ``core`` has released 0.1.0 -- it has the locked changelog and the
         archived release file to prove it -- and the source carries 0.1.0 too.

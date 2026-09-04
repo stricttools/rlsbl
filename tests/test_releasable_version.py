@@ -293,7 +293,7 @@ class TestComputeReleaseVersionReleasable:
 
         from rlsbl.commands.release.validate import compute_release_version
 
-        # The releasable's own LEDGER says 1.0.0 shipped, which is what puts
+        # The releasable's own RELEASE RECORD says 1.0.0 shipped, which is what puts
         # this on the bump path.
         from conftest import archive_release, git_head
         from rlsbl.workspace import get_releasable_dir

@@ -8,7 +8,7 @@ end-to-end run that happens to exercise it.
 
 The classes:
 
-* ``materialize`` -- the ledger records it; origin does not have it.
+* ``materialize`` -- the release record records it; origin does not have it.
 * ``already-correct`` -- both sides agree.
 * ``re-point-with-lease`` -- origin holds a different commit and a source
   explains the difference.
@@ -53,7 +53,7 @@ UNRELATED = "3" * 40
 
 
 @pytest.fixture
-def ledger(tmp_path):
+def release_record(tmp_path):
     """A releases directory holding one anchored version, 1.0.0 at NEW."""
     releases = tmp_path / ".rlsbl" / "releases"
     write_archived_release_file(
@@ -74,7 +74,7 @@ def _refs(**pairs):
     return refs
 
 
-def _preview(tmp_path, ledger, *, remote, local, releases=("v1.0.0",),
+def _preview(tmp_path, release_record, *, remote, local, releases=("v1.0.0",),
              releases_known=True, explanations=None, target=None):
     return build_preview(
         observation=Observation(
@@ -84,23 +84,23 @@ def _preview(tmp_path, ledger, *, remote, local, releases=("v1.0.0",),
         explanations=explanations or Explanations(),
         target=target or BaseTarget(),
         ref_ctx=ref_context(repo_root=str(tmp_path)),
-        releases_dir=str(ledger),
+        releases_dir=str(release_record),
     )
 
 
 class TestTheFiveClasses:
 
-    def test_already_correct(self, tmp_path, ledger):
+    def test_already_correct(self, tmp_path, release_record):
         preview = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote=_refs(v1_0_0=NEW), local=_refs(v1_0_0=NEW),
         )
         assert preview.by_key("refs/tags/v1.0.0").state == STATE_ALREADY_CORRECT
         assert preview.by_key("release:v1.0.0").state == STATE_ALREADY_CORRECT
 
-    def test_materialize_a_ref_origin_is_missing(self, tmp_path, ledger):
+    def test_materialize_a_ref_origin_is_missing(self, tmp_path, release_record):
         preview = _preview(
-            tmp_path, ledger, remote={}, local=_refs(v1_0_0=NEW),
+            tmp_path, release_record, remote={}, local=_refs(v1_0_0=NEW),
         )
         item = preview.by_key("refs/tags/v1.0.0")
         assert item.state == STATE_MATERIALIZE
@@ -110,9 +110,9 @@ class TestTheFiveClasses:
             "expectation"
         )
 
-    def test_materialize_a_release_that_does_not_exist(self, tmp_path, ledger):
+    def test_materialize_a_release_that_does_not_exist(self, tmp_path, release_record):
         preview = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote=_refs(v1_0_0=NEW), local=_refs(v1_0_0=NEW), releases=(),
         )
         item = preview.by_key("release:v1.0.0")
@@ -120,9 +120,9 @@ class TestTheFiveClasses:
         assert item.data.kind == "release"
         assert item.data.target == NEW
 
-    def test_re_point_with_lease_when_a_source_explains_it(self, tmp_path, ledger):
+    def test_re_point_with_lease_when_a_source_explains_it(self, tmp_path, release_record):
         preview = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
             explanations=Explanations(
                 commit_map={OLD: NEW}, origins={OLD: "a recorded rewrite"},
@@ -133,16 +133,16 @@ class TestTheFiveClasses:
         assert item.data.observed == OLD, "the lease is the observed remote value"
         assert item.data.target == NEW
 
-    def test_refuse_foreign_when_nothing_explains_it(self, tmp_path, ledger):
+    def test_refuse_foreign_when_nothing_explains_it(self, tmp_path, release_record):
         preview = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote=_refs(v1_0_0=UNRELATED), local=_refs(v1_0_0=NEW),
         )
         item = preview.by_key("refs/tags/v1.0.0")
         assert item.state == STATE_REFUSE_FOREIGN
         assert item.data is None, "a refusal carries no action"
 
-    def test_refuse_identity_mismatch(self, tmp_path, ledger):
+    def test_refuse_identity_mismatch(self, tmp_path, release_record):
         """A Go tag IS the published artifact, so it may not be recreated
         under an identity the version was never published under."""
         append_event(get_lineage_path(str(tmp_path)), IdentityTransitionEvent(
@@ -156,12 +156,12 @@ class TestTheFiveClasses:
                 releases=frozenset(), releases_known=False,
             ),
             explanations=collect_explanations(
-                [str(ledger)],
+                [str(release_record)],
                 ref_context(repo_root=str(tmp_path)).lineage_paths,
             ),
             target=TARGETS["go"],
             ref_ctx=ref_context(repo_root=str(tmp_path)),
-            releases_dir=str(ledger),
+            releases_dir=str(release_record),
         )
         item = preview.by_key("refs/tags/v1.0.0")
         assert item.state == STATE_REFUSE_IDENTITY
@@ -195,7 +195,7 @@ class TestTheFiveClasses:
         )
         assert preview.by_key("refs/tags/v3.0.0").state == STATE_MATERIALIZE
 
-    def test_a_non_go_target_materializes_across_a_transition(self, tmp_path, ledger):
+    def test_a_non_go_target_materializes_across_a_transition(self, tmp_path, release_record):
         """The refusal is a per-target fact, not a universal rule."""
         append_event(get_lineage_path(str(tmp_path)), IdentityTransitionEvent(
             facet="package-name", old="old", new="new",
@@ -207,12 +207,12 @@ class TestTheFiveClasses:
                 releases=frozenset(), releases_known=False,
             ),
             explanations=collect_explanations(
-                [str(ledger)],
+                [str(release_record)],
                 ref_context(repo_root=str(tmp_path)).lineage_paths,
             ),
             target=TARGETS["npm"],
             ref_ctx=ref_context(repo_root=str(tmp_path)),
-            releases_dir=str(ledger),
+            releases_dir=str(release_record),
         )
         assert preview.by_key("refs/tags/v1.0.0").state == STATE_MATERIALIZE
 
@@ -248,38 +248,38 @@ class TestTheTripwire:
         assert "refs/tags/v1.0.0" in message
         assert "NOTHING has been changed" in message
 
-    def test_a_local_ref_disagreeing_with_the_ledger_is_refused(
-        self, tmp_path, ledger,
+    def test_a_local_ref_disagreeing_with_the_release_record_is_refused(
+        self, tmp_path, release_record,
     ):
-        """The ledger is the authority for where a released ref belongs."""
+        """The release record is the authority for where a released ref belongs."""
         preview = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=UNRELATED),
         )
         item = preview.by_key("refs/tags/v1.0.0")
         assert item.state == STATE_REFUSE_FOREIGN
-        assert "ledger" in item.summary
+        assert "release record" in item.summary
 
 
 class TestTheReleaseHalf:
 
-    def test_an_unread_listing_judges_no_releases_at_all(self, tmp_path, ledger):
+    def test_an_unread_listing_judges_no_releases_at_all(self, tmp_path, release_record):
         """An unanswered gh listing is never read as 'no Releases exist'."""
         preview = _preview(
-            tmp_path, ledger, remote=_refs(v1_0_0=NEW), local=_refs(v1_0_0=NEW),
+            tmp_path, release_record, remote=_refs(v1_0_0=NEW), local=_refs(v1_0_0=NEW),
             releases=(), releases_known=False,
         )
         assert preview.by_key("release:v1.0.0") is None
 
-    def test_a_materialized_release_carries_the_marker_from_the_ledger(
-        self, tmp_path, ledger, monkeypatch,
+    def test_a_materialized_release_carries_the_marker_from_the_release_record(
+        self, tmp_path, release_record, monkeypatch,
     ):
         monkeypatch.chdir(tmp_path)
         (tmp_path / "CHANGELOG.md").write_text(
             "# Changelog\n\n## 1.0.0\n\n### Features\n\n- **Ship it.** Yes.\n"
         )
         preview = _preview(
-            tmp_path, ledger, remote=_refs(v1_0_0=NEW), local=_refs(v1_0_0=NEW),
+            tmp_path, release_record, remote=_refs(v1_0_0=NEW), local=_refs(v1_0_0=NEW),
             releases=(),
         )
         item = preview.by_key("release:v1.0.0")
@@ -297,12 +297,12 @@ class TestTheReleaseHalf:
             config = {}
 
         apply_item(
-            item, ctx=Ctx(), releases_dir=str(ledger),
+            item, ctx=Ctx(), releases_dir=str(release_record),
             changelog_path=str(tmp_path / "CHANGELOG.md"),
             push_timeout=30, gh=gh, log=lambda *_: None,
         )
         assert f"<!-- rlsbl-ci-sha: {NEW} -->" in seen["body"], (
-            "a Release the reconcile creates must carry the ledger anchor's "
+            "a Release the reconcile creates must carry the release record anchor's "
             "marker, or the publish workflow has nothing to judge"
         )
         assert "Ship it" in seen["body"]
@@ -516,7 +516,7 @@ class TestTheExpectedRefSet:
         )
         assert alias.state == STATE_MATERIALIZE, (
             "the alias addresses a released version, so it is created at that "
-            "version's ledger anchor like any other ref it owns"
+            "version's release record anchor like any other ref it owns"
         )
         assert alias.data.target == NEW
         assert alias.data.create_local_tag is True
@@ -545,20 +545,20 @@ class TestTheApplyConsent:
         plan, path = self._plan(tmp_path, planned)
         return check_plan_covers(plan, fresh, path)
 
-    def test_a_subject_the_plan_does_not_name_is_refused(self, tmp_path, ledger):
+    def test_a_subject_the_plan_does_not_name_is_refused(self, tmp_path, release_record):
         from rlsbl.commands.release_reconcile import ReconcileError
 
         explanations = Explanations(
             commit_map={OLD: NEW}, origins={OLD: "a recorded rewrite"},
         )
         planned = _preview(
-            tmp_path, ledger, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
+            tmp_path, release_record, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
             explanations=explanations,
         )
         # Between plan and apply someone brings a second tag local. The remote
         # never moved, so the digest still matches.
         fresh = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote={**_refs(v1_0_0=OLD), **_refs(v2_0_0=OLD)},
             local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
             explanations=explanations,
@@ -570,16 +570,16 @@ class TestTheApplyConsent:
         assert "re-plan" in message or "--plan" in message
 
     def test_a_planned_item_whose_verdict_changed_is_refused(
-        self, tmp_path, ledger,
+        self, tmp_path, release_record,
     ):
         from rlsbl.commands.release_reconcile import ReconcileError
 
         planned = _preview(
-            tmp_path, ledger, remote={}, local=_refs(v1_0_0=NEW),
+            tmp_path, release_record, remote={}, local=_refs(v1_0_0=NEW),
         )
         assert planned.by_key("refs/tags/v1.0.0").state == STATE_MATERIALIZE
         fresh = _preview(
-            tmp_path, ledger, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
+            tmp_path, release_record, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
             explanations=Explanations(
                 commit_map={OLD: NEW}, origins={OLD: "a recorded rewrite"},
             ),
@@ -591,7 +591,7 @@ class TestTheApplyConsent:
         assert "re-point-with-lease" in message
 
     def test_a_planned_item_whose_target_moved_locally_is_refused(
-        self, tmp_path, ledger,
+        self, tmp_path, release_record,
     ):
         """Same verdict, same lease, different commit: the apply would push
         something the plan never named."""
@@ -599,13 +599,13 @@ class TestTheApplyConsent:
 
         other = "7" * 40
         planned = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=OLD)},
             local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
             explanations=Explanations(commit_map={OLD: NEW}),
         )
         fresh = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=OLD)},
             local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=other)},
             explanations=Explanations(commit_map={OLD: other}),
@@ -615,10 +615,10 @@ class TestTheApplyConsent:
         assert "refs/tags/v2.0.0" in str(exc.value)
 
     def test_a_planned_item_that_became_correct_is_a_recorded_no_op(
-        self, tmp_path, ledger,
+        self, tmp_path, release_record,
     ):
         planned = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=OLD)},
             local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
             explanations=Explanations(commit_map={OLD: NEW}),
@@ -626,15 +626,15 @@ class TestTheApplyConsent:
         assert planned.by_key("refs/tags/v2.0.0").state == STATE_RE_POINT
         # v2.0.0 agrees now, so the fresh preview drops it entirely.
         fresh = _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
             local={**_refs(v1_0_0=NEW), **_refs(v2_0_0=NEW)},
         )
         assert self._covers(tmp_path, planned, fresh) == ["refs/tags/v2.0.0"]
 
-    def test_an_unchanged_world_matches_itself(self, tmp_path, ledger):
+    def test_an_unchanged_world_matches_itself(self, tmp_path, release_record):
         preview = _preview(
-            tmp_path, ledger, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
+            tmp_path, release_record, remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
             explanations=Explanations(
                 commit_map={OLD: NEW}, origins={OLD: "a recorded rewrite"},
             ),
@@ -645,9 +645,9 @@ class TestTheApplyConsent:
 class TestThePlanFile:
     """The plan is the preview's artifact and the apply step's only input."""
 
-    def _plan_preview(self, tmp_path, ledger):
+    def _plan_preview(self, tmp_path, release_record):
         return _preview(
-            tmp_path, ledger,
+            tmp_path, release_record,
             remote=_refs(v1_0_0=OLD), local=_refs(v1_0_0=NEW),
             releases=(),
             explanations=Explanations(
@@ -656,11 +656,11 @@ class TestThePlanFile:
         )
 
     def test_it_round_trips_through_the_strictspec_validator(
-        self, tmp_path, ledger,
+        self, tmp_path, release_record,
     ):
         from rlsbl.commands.release_reconcile import read_plan, render_plan
 
-        preview = self._plan_preview(tmp_path, ledger)
+        preview = self._plan_preview(tmp_path, release_record)
         text = render_plan(preview, "deadbeef", generated_by="0.0.0")
         path = tmp_path / "reconcile-plan.toml"
         path.write_text(text)

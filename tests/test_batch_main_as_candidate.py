@@ -100,7 +100,7 @@ def _setup_batch_workspace(root):
     git(root, "commit", "-q", "-m", "initial")
     git(root, "tag", "alpha@v1.0.0")
     git(root, "tag", "beta@v1.0.0")
-    # ...and each releasable's LEDGER entry: the unreleased range is measured
+    # ...and each releasable's RELEASE RECORD entry: the unreleased range is measured
     # from the archived release, not from the tag.
     _tagged = git(root, "rev-parse", "HEAD")
     for name in ("alpha", "beta"):
@@ -196,7 +196,7 @@ def _setup_releasable_batch_workspace(root):
     git(root, "commit", "-q", "-m", "initial")
     git(root, "tag", "alpha@v1.0.0")
     git(root, "tag", "beta@v1.0.0")
-    # ...and each releasable's LEDGER entry: the unreleased range is measured
+    # ...and each releasable's RELEASE RECORD entry: the unreleased range is measured
     # from the archived release, not from the tag.
     _tagged = git(root, "rev-parse", "HEAD")
     for name in ("alpha", "beta"):

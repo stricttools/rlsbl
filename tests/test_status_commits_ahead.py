@@ -12,7 +12,7 @@ import subprocess
 
 import pytest
 
-from conftest import archive_release, ledger_dir, make_ctx
+from conftest import archive_release, release_record_dir, make_ctx
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add
 
 
@@ -41,7 +41,7 @@ def _commit_file(repo, name, content="x\n", message="change"):
 
 
 def _tag(repo, tag_name, *, project="."):
-    """Tag a release AND record it in the project's LEDGER.
+    """Tag a release AND record it in the project's RELEASE RECORD.
 
     Tagging alone no longer makes a version released as far as rlsbl is
     concerned: the unreleased range is bounded by the archived release, so a
@@ -54,7 +54,7 @@ def _tag(repo, tag_name, *, project="."):
         capture_output=True, text=True, check=True,
     ).stdout.strip()
     proj_dir = repo if project == "." else os.path.join(str(repo), project)
-    archive_release(ledger_dir(proj_dir), version, head)
+    archive_release(release_record_dir(proj_dir), version, head)
 
 
 class TestStatusCommitsAheadStandalone:

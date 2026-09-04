@@ -78,7 +78,7 @@ def _workspace_with_releasable(repo, members=("pkg-a", "pkg-b"), name="alpha",
         ["git", "commit", "-q", "-m", "workspace setup"], cwd=str(repo), check=True,
     )
     subprocess.run(["git", "tag", f"{name}@v{version}"], cwd=str(repo), check=True)
-    # The releasable's LEDGER entry: coverage is measured from the archived
+    # The releasable's RELEASE RECORD entry: coverage is measured from the archived
     # release, not from the tag.
     archive_release(
         os.path.join(os.path.dirname(changes_dir), "releases"), version,

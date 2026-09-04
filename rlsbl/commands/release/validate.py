@@ -585,7 +585,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     ``primary_path``, which coincides with the project root for standalone
     repos.
 
-    Whether this is a first release is decided by the LEDGER, not by the tag
+    Whether this is a first release is decided by the RELEASE RECORD, not by the tag
     namespace. A tag read is still consulted, but only as corroboration, and
     its third answer is respected: under ``--dry-run`` past the first recorded
     mutation the tag read is UNANSWERABLE, and reading that as "no tag" is what
@@ -596,7 +596,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     Raises ReleaseValidationError on invalid bump type or duplicate tag.
     """
     from . import bump_version, tag_exists_locally
-    from ...ledger import (
+    from ...release_record import (
         require_checkout_contains_latest,
         version_is_archived,
     )
@@ -648,7 +648,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     tag_state = local_tag_state(current_tag, _guard_project_dir)
 
     if released_before and tag_state is LocalTagState.ABSENT:
-        # The ledger says this version shipped and the tag is genuinely gone
+        # The release record says this version shipped and the tag is genuinely gone
         # (not merely unanswerable): a destroyed tag. Abort PRE-MUTATION
         # rather than run the whole pipeline and crash at finalization.
         _abort_on_destroyed_tag(
@@ -748,14 +748,14 @@ def resolve_changes_dir(project_dir, releasable_name=None, workspace_root=None):
 
 def _resolve_releases_dir(project_dir, *, releasable_name=None,
                           workspace_root=None):
-    """The release archives -- the LEDGER -- for this project or releasable.
+    """The release archives -- the RELEASE RECORD -- for this project or releasable.
 
     A releasable keeps its archives beside its changelog under
     ``.rlsbl-monorepo/releasables/<name>/releases/``; everyone else under
     ``<project>/.rlsbl/releases/``. Derived from the changes-dir resolution so
     the two never disagree about which project's state is being read.
     """
-    from ...ledger import releases_dir_for_changes_dir
+    from ...release_record import releases_dir_for_changes_dir
 
     if releasable_name and workspace_root:
         from ...workspace import get_releasable_changes_dir
@@ -775,7 +775,7 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     indistinguishable from the tag alone. Two records can tell them apart, and
     either one is enough:
 
-    * the LEDGER -- ``.rlsbl/releases/v<version>.toml``, written by the release
+    * the RELEASE RECORD -- ``.rlsbl/releases/v<version>.toml``, written by the release
       at its archive step and rewritten by rlsbl only through its own
       documented unlock paths. This is the authority, and it is checked first.
     * the finalized, immutable ``.rlsbl/changes/<version>.jsonl``, locked at
@@ -793,7 +793,7 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     project with neither record is a genuine first release and the guard is a
     no-op.
     """
-    from ...ledger import archived_release_path, version_is_archived
+    from ...release_record import archived_release_path, version_is_archived
 
     releases_dir = _resolve_releases_dir(
         project_dir, releasable_name=releasable_name,

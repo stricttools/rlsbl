@@ -29,7 +29,7 @@ from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
 from rlsbl.release_file import write_release_anchor
 from rlsbl.release_publication import delete_args
 
-from conftest import archive_release, ledger_dir
+from conftest import archive_release, release_record_dir
 
 _ENTRY = {
     "commits": [],
@@ -128,10 +128,10 @@ def _make_released_repo(repo, *, n_commits=5, with_remote=True):
     git(repo, "commit", "-q", "-m", "initial")
     git(repo, "tag", "v1.0.0")
     shas = {"initial": git(repo, "rev-parse", "HEAD")}
-    # 1.0.0's LEDGER entry -- what `undo` reads to find the release BEFORE the
+    # 1.0.0's RELEASE RECORD entry -- what `undo` reads to find the release BEFORE the
     # one it is reverting.
     archive_release(
-        ledger_dir(repo), "1.0.0", shas["initial"],
+        release_record_dir(repo), "1.0.0", shas["initial"],
         tree=git(repo, "rev-parse", "HEAD^{tree}"),
     )
 
@@ -196,9 +196,9 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
     what ``rlsbl unreleased`` shows on rlsbl's own repository:
 
       1. ``initial``                                (version 1.0.0)
-      2. ``chore: archive release 1.0.0``           (the predecessor's ledger)
+      2. ``chore: archive release 1.0.0``           (the predecessor's release record)
       3. ``v1.0.1``                                 the version-bump commit --
-         the CANDIDATE: it carries the tag AND the ledger anchor
+         the CANDIDATE: it carries the tag AND the release record anchor
       3b. with *resumed*: a fix-forward commit and a changelog commit land on
           top of the candidate after a red CI verdict, and the tag/anchor move
           to that tip -- the tag is then NOT on the version-bump commit
@@ -231,7 +231,7 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
     shas = {"initial": git(repo, "rev-parse", "HEAD")}
 
     archive_release(
-        ledger_dir(repo), "1.0.0", shas["initial"],
+        release_record_dir(repo), "1.0.0", shas["initial"],
         tree=git(repo, "rev-parse", "HEAD^{tree}"),
     )
     git(repo, "add", ".rlsbl/releases")
@@ -605,7 +605,7 @@ class TestEdgeCases:
         This fixture used to be refused: the walk started at the tag, stopped
         at the foreign commit before reaching the version bump, and a
         completeness guard turned that into a hard error. The release commits
-        are now found through the ledger instead of by a contiguous walk, and
+        are now found through the release record instead of by a contiguous walk, and
         an interleaved foreign commit is the NORMAL shape of a resumed release
         (a fix-forward between the bump and the CI-verified commit) -- so the
         release commits are reverted around it and the foreign work survives.
@@ -629,7 +629,7 @@ class TestEdgeCases:
         git(repo, "commit", "-q", "-m", "initial")
         git(repo, "tag", "v1.0.0")
         archive_release(
-            ledger_dir(repo), "1.0.0", git(repo, "rev-parse", "HEAD"),
+            release_record_dir(repo), "1.0.0", git(repo, "rev-parse", "HEAD"),
             tree=git(repo, "rev-parse", "HEAD^{tree}"),
         )
         git(repo, "add", "-A")
@@ -653,7 +653,7 @@ class TestEdgeCases:
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "-m", "chore: finalize changelog for 1.0.1")
         archive_release(
-            ledger_dir(repo), "1.0.1", git(repo, "rev-parse", "HEAD"),
+            release_record_dir(repo), "1.0.1", git(repo, "rev-parse", "HEAD"),
             tree=git(repo, "rev-parse", "HEAD^{tree}"),
         )
         git(repo, "add", "-A")

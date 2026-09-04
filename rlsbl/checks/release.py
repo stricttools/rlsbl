@@ -63,7 +63,7 @@ def register_release_checks(app):
 
         versions = list_archived_versions(releases_dir)
         if not versions:
-            return reporter.skipped("the release ledger records no release")
+            return reporter.skipped("the release record records no release")
 
         root = str(ctx.project_root)
         local = local_tag_commits(cwd=root, timeout=_LOCAL_TIMEOUT)
@@ -125,7 +125,7 @@ def register_release_checks(app):
         wrong_commit = 0
         missing_release = 0
         unrecoverable = 0
-        # Releases absent for versions the ledger records unanchorable. Counted
+        # Releases absent for versions the release record records unanchorable. Counted
         # for the same reason as their absent refs: reconcile skips such a
         # version entirely, so there is no marker to write and no repair to
         # name.
@@ -442,7 +442,7 @@ def _same_commit(a, b):
 
     An anchor may be recorded abbreviated (the schema accepts 7 to 40 hex
     characters) while a resolved ref is always full, so the comparison is by
-    common prefix -- the same rule the ledger applies.
+    common prefix -- the same rule the release record applies.
     """
     n = min(len(a), len(b))
     return n > 0 and a[:n] == b[:n]

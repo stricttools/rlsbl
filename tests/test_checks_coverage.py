@@ -52,8 +52,8 @@ def _setup_changelog_repo(repo, tag="v0.1.0", targets=None):
     run_git(repo, "add", "README.md")
     run_git(repo, "commit", "-q", "-m", "initial")
     if tag:
-        # Tagged AND archived: the ledger is what records a release, and a
-        # version tag over an empty ledger is a repository that shipped and was
+        # Tagged AND archived: the release record is what records a release, and a
+        # version tag over an empty release record is a repository that shipped and was
         # never backfilled -- a hard error, not a baseline.
         record_release(repo, tag)
 
@@ -81,7 +81,7 @@ class TestUnpublishedRefsCheck:
     """The successor of local-tag, remote-tag and github-release.
 
     Those three each looked at the primary tag of the CURRENT version only.
-    This one asks the ledger which versions were released and renders every ref
+    This one asks the release record which versions were released and renders every ref
     each of them owns -- primary, companions, recorded aliases -- against the
     local repository and against origin, plus each version's GitHub Release
     against the forge's own listing. Its failure classes: a ref missing

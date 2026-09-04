@@ -79,7 +79,7 @@ def archived_release_path(releases_dir: str, version: str) -> str:
     """Return the archive path for *version* -- ``<releases_dir>/v{version}.toml``.
 
     The one place the archive filename is spelled; the writer, the reader and
-    the ledger all go through it.
+    the release record all go through it.
     """
     return os.path.join(releases_dir, f"v{version}.toml")
 
@@ -89,9 +89,9 @@ def archive_version(name: str) -> str | None:
 
     The one recognizer for "is this file in a releases directory an archive?".
     Exported because the backfill pass reads the same directories and must
-    agree with the ledger about which files in them are archives -- it used to
+    agree with the release record about which files in them are archives -- it used to
     carry a looser pattern of its own, so it discovered, sorted and repaired
-    "archives" the ledger then ignored entirely.
+    "archives" the release record then ignored entirely.
     """
     if _ARCHIVE_NAME_RE.match(name) is None:
         return None
@@ -138,7 +138,7 @@ def list_archived_versions(releases_dir: str) -> list[str]:
 
     A pure filename scan: no archive is opened, so enumerating a repository's
     whole release history costs one ``listdir``. This is deliberate -- the
-    ledger reads archives lazily, walking this list from the top and opening
+    release record reads archives lazily, walking this list from the top and opening
     only the ones it actually has to answer with.
 
     A missing or unreadable directory yields an empty list: "no releases are

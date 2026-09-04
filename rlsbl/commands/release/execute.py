@@ -3117,7 +3117,7 @@ def _run_release_mutating(state: ReleaseState):
     # which materializes and repairs Releases outside this flow. The anchor it
     # projects into the marker is `pushed_sha`, the verified candidate this
     # release wrote into the version's archive as `candidate_sha` a few steps
-    # above, so the marker and the ledger state the same commit by
+    # above, so the marker and the release record state the same commit by
     # construction.
     from ...release_publication import publication as _publication
 
@@ -3261,7 +3261,7 @@ def _run_release_mutating(state: ReleaseState):
 
                 # MIRROR_RELEASED -- the mirror's TAG and its GitHub Release,
                 # through the shared publication module. The commit is DERIVED,
-                # never the branch tip: it is the subtree split of the ledger
+                # never the branch tip: it is the subtree split of the release record
                 # anchor for this version -- the CI-verified candidate this
                 # release wrote into the archive -- so the mirror's tag names
                 # the same code the monorepo's tag does even when the

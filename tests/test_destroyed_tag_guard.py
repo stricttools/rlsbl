@@ -22,8 +22,8 @@ import pytest
 from githarness import init_repo, commit_file, git
 from unittest.mock import MagicMock, patch
 
-from conftest import archive_release, git_head, ledger_dir
-from rlsbl.errors import LedgerError
+from conftest import archive_release, git_head, release_record_dir
+from rlsbl.errors import ReleaseRecordError
 
 from rlsbl.commands.release.validate import (
     ReleaseValidationError,
@@ -195,7 +195,7 @@ class TestPreviewDoesNotDiagnoseADestroyedTag:
     the new tag; it is not a claim the preview can make about whether the
     CURRENT version was ever released.
 
-    The fix reads that from the ledger instead: the archive for the current
+    The fix reads that from the release record instead: the archive for the current
     version says it shipped, so the release computes a bump and the guard is
     never consulted.
     """
@@ -218,7 +218,7 @@ class TestPreviewDoesNotDiagnoseADestroyedTag:
             ".rlsbl/changes/unreleased.jsonl")
         git(repo, "commit", "-q", "-m", "released state")
         git(repo, "tag", f"v{version}")
-        archive_release(ledger_dir(repo), version, git_head(repo))
+        archive_release(release_record_dir(repo), version, git_head(repo))
         return repo
 
     def _unsettled_tag_read(self):
@@ -323,10 +323,10 @@ class TestReleasePrepRefusesADivergentCheckout:
         commit_file(repo, "other.txt", "elsewhere\n", "released elsewhere")
         elsewhere = git_head(repo)
         git(repo, "checkout", "-q", "main")
-        archive_release(ledger_dir(repo), "2.0.0", elsewhere)
+        archive_release(release_record_dir(repo), "2.0.0", elsewhere)
 
         target = _mock_target("1.0.0")
-        with pytest.raises(LedgerError) as exc:
+        with pytest.raises(ReleaseRecordError) as exc:
             compute_release_version(
                 target, str(repo), "patch", None, None, lambda _m: None,
                 project_dir=str(repo),
@@ -348,7 +348,7 @@ class TestReleasePrepRefusesADivergentCheckout:
         (repo / ".rlsbl" / "changes").mkdir(parents=True)
         (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
         git(repo, "tag", "v1.0.0")
-        archive_release(ledger_dir(repo), "1.0.0", git_head(repo))
+        archive_release(release_record_dir(repo), "1.0.0", git_head(repo))
         commit_file(repo, "work.txt", "work\n", "more work")
 
         target = _mock_target("1.0.0")
