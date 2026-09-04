@@ -256,7 +256,7 @@ def release_commit_remap_event(rewrite: str, remaps):
 
 
 def record_release_commit_remap(transition_record_path: str, rewrite: str, remaps):
-    """Append the anchor-remap event for *remaps* to the transition record.
+    """Append the release-commit-remap event for *remaps* to the transition record.
 
     Returns the path when an event was written, None when nothing moved.
     """
@@ -320,7 +320,7 @@ def repair_release_commits(*, project_root, commit_map, rewrite_id,
 
     The whole-repository half of the repair: it finds every release-archive
     directory the same walk the JSONL remap uses finds, remaps each one's
-    release commits through *commit_map*, and appends an ``anchor-remap`` transition record event
+    release commits through *commit_map*, and appends an ``release-commit-remap`` transition record event
     beside each release record that moved.
 
     Returns ``(remaps, touched)`` -- the :class:`ReleaseCommitRemap` records across

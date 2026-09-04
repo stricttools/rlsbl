@@ -1177,7 +1177,7 @@ def observe(arr) -> Preview:
     if plan.imports:
         events.append("tag-map")
     if state.archives:
-        events.append("anchor-remap")
+        events.append("release-commit-remap")
     if plan.alias:
         events.append("boundary-alias")
     items.append(VerdictItem(

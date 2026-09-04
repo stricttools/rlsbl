@@ -11,7 +11,7 @@ one thing the scrub had repaired.
 Both directions are exercised against the REAL safegit binary:
 
 * ``rlsbl release scrub`` moves the release commits as part of its own flow, records an
-  ``anchor-remap`` transition record event, and commits both.
+  ``release-commit-remap`` transition record event, and commits both.
 * A RAW ``safegit scrub`` -- no rlsbl orchestration -- leaves the release record broken,
   and rlsbl heals it from the persisted rewrite journal.
 

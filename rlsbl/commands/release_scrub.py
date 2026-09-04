@@ -500,7 +500,7 @@ def heal_release_commits_from_journal(project_root, workspace_root, workspace_pr
     its caller. ``rlsbl release reconcile`` reaches the same repair through
     :func:`rlsbl.release_commit_remap.repair_release_commits` -- the shared core both go
     through -- but drives it from its own MERGED commit map (the journal plus
-    the transition record anchor-remap events plus the committed scrub archives), so it
+    the transition record release-commit-remap events plus the committed scrub archives), so it
     can still heal in a fresh clone, where the journal under ``.git`` is not
     there to read.
     """

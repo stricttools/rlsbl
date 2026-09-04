@@ -3,12 +3,38 @@
 A TRANSITION RECORD is a JSONL file, one event per line, recording what a
 repository conversion actually did -- which tags were renamed, which commits a
 history rewrite moved, which tag globs departed with an extracted sub-project,
-which published identity changed and from which version. It is written by the
-operation that performs the surgery and read afterwards by anything that has to
-explain how the repository reached its current shape.
+which published identity changed and from which version, whose release history
+was deliberately closed, and which tags stand outside the version model on
+purpose. It is written by the operation that performs the surgery and read
+afterwards by anything that has to explain how the repository reached its
+current shape.
 
 It records history; it never drives it. Nothing here decides anything -- a
 reader consults the record to EXPLAIN a divergence it already observed.
+
+Rename versus identity
+----------------------
+
+The record draws one line that every reader of it must hold, because the two
+sides get opposite treatment from ``rlsbl release reconcile``:
+
+* A **rename** is a tag-SPELLING fact. A releasable renamed from ``widget`` to
+  ``gadget`` changes what its future tags are called and nothing a consumer
+  resolves by: the artifacts already published keep the names they were
+  published under. It is bookkeeping, recorded by :class:`TagMapEvent` and
+  :class:`BoundaryAliasEvent`, and reconcile's identity refusal does NOT match
+  on it.
+* An **identity change** is a change to the string CONSUMERS RESOLVE BY -- a Go
+  module path, a registry package name, a repository URL. Recreating an older
+  release's ref after one would publish a version that shipped under the OLD
+  identity under the NEW one, for the first time and permanently. That is what
+  :class:`IdentityTransitionEvent` records, and reconcile's
+  ``refuse-identity-mismatch`` matches on it with ZERO exceptions: no facet, no
+  version and no operator flag turns the refusal off.
+
+A rename must never be written as an identity transition to "be safe": doing so
+would make reconcile refuse to repair refs it is entitled to repair,
+permanently.
 
 Where the file lives
 --------------------
@@ -125,7 +151,9 @@ CURRENT_FORMAT_VERSION = 1
 
 KIND_CONVERSION = "conversion"
 KIND_TAG_MAP = "tag-map"
-KIND_RELEASE_COMMIT_REMAP = "anchor-remap"
+KIND_RELEASE_COMMIT_REMAP = "release-commit-remap"
+KIND_RELEASE_HISTORY_CLOSED = "release-history-closed"
+KIND_NON_VERSION_TAG = "non-version-tag"
 KIND_DEPARTED_GLOBS = "departed-globs"
 KIND_BOUNDARY_ALIAS = "boundary-alias"
 KIND_IDENTITY_TRANSITION = "identity-transition"
@@ -365,6 +393,26 @@ class IdentityTransitionEvent(_TransitionRecordEventBase):
 
 
 @dataclass(kw_only=True)
+class ReleaseHistoryClosedEvent(_TransitionRecordEventBase):
+    """A member's or releasable's release history is deliberately closed."""
+
+    KIND: ClassVar[str] = KIND_RELEASE_HISTORY_CLOSED
+
+    subject: str  # the releasable or member name whose history is closed
+    reason: str
+
+
+@dataclass(kw_only=True)
+class NonVersionTagEvent(_TransitionRecordEventBase):
+    """A tag deliberately outside the version model."""
+
+    KIND: ClassVar[str] = KIND_NON_VERSION_TAG
+
+    tag: str
+    reason: str
+
+
+@dataclass(kw_only=True)
 class PromotionSplitMapEvent(_TransitionRecordEventBase):
     """The subtree-split correspondence persisted when a mirror is promoted."""
 
@@ -385,6 +433,8 @@ TransitionRecordEvent = (
     | BoundaryAliasEvent
     | IdentityTransitionEvent
     | PromotionSplitMapEvent
+    | ReleaseHistoryClosedEvent
+    | NonVersionTagEvent
 )
 
 EVENT_CLASSES: dict[str, type] = {
@@ -397,6 +447,8 @@ EVENT_CLASSES: dict[str, type] = {
         BoundaryAliasEvent,
         IdentityTransitionEvent,
         PromotionSplitMapEvent,
+        ReleaseHistoryClosedEvent,
+        NonVersionTagEvent,
     )
 }
 

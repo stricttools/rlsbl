@@ -31,6 +31,8 @@ from rlsbl.transition_record import (
     ConversionEvent,
     DepartedGlobsEvent,
     IdentityTransitionEvent,
+    NonVersionTagEvent,
+    ReleaseHistoryClosedEvent,
     TransitionRecordEndpoint,
     TransitionRecordError,
     PromotionSplitMapEvent,
@@ -121,6 +123,20 @@ def make_identity_transition():
     )
 
 
+def make_release_history_closed():
+    return ReleaseHistoryClosedEvent(
+        subject="widget",
+        reason="the releasable was extracted; releases continue in its own repo",
+    )
+
+
+def make_non_version_tag():
+    return NonVersionTagEvent(
+        tag="nightly-2026-09-01",
+        reason="a nightly build marker, deliberately outside the version model",
+    )
+
+
 def make_promotion_split_map():
     return PromotionSplitMapEvent(
         subtree_path="packages/widget",
@@ -133,11 +149,13 @@ def make_promotion_split_map():
 ALL_MAKERS = {
     "conversion": make_conversion,
     "tag-map": make_tag_map,
-    "anchor-remap": make_release_commit_remap,
+    "release-commit-remap": make_release_commit_remap,
     "departed-globs": make_departed_globs,
     "boundary-alias": make_boundary_alias,
     "identity-transition": make_identity_transition,
     "promotion-split-map": make_promotion_split_map,
+    "release-history-closed": make_release_history_closed,
+    "non-version-tag": make_non_version_tag,
 }
 
 
@@ -330,7 +348,7 @@ class TestDurability:
         assert [e.KIND for e in read_events(path)] == [
             "conversion",
             "tag-map",
-            "anchor-remap",
+            "release-commit-remap",
         ]
         assert read_events(path) == written
 
@@ -463,6 +481,17 @@ class TestMalformedRecordsAreHardErrors:
         payload = valid_payload()
         payload["kind"] = "teleportation"
         self._expect(tmp_path, payload, needle="teleportation")
+
+    def test_the_retired_anchor_remap_kind_is_unknown(self, tmp_path):
+        """The rewrite kind is `release-commit-remap`. No dual recognition.
+
+        Nothing in the fleet holds a transitions.jsonl yet, so the old literal
+        has no reader to keep working -- it is simply not a kind of this
+        schema.
+        """
+        payload = valid_payload()
+        payload["kind"] = "anchor-remap"
+        self._expect(tmp_path, payload, needle="anchor-remap")
 
     def test_missing_kind(self, tmp_path):
         payload = valid_payload()
@@ -640,7 +669,7 @@ class TestCopySemantics:
     """The stamped return value is a TOP-LEVEL copy; nested values are shared.
 
     Pinned deliberately: the module documents exactly this, and deep-copying
-    anchor-remap mapping lists (which can hold thousands of entries) is not
+    release-commit-remap mapping lists (which can hold thousands of entries) is not
     worth the cost. The test exists so the docs cannot drift away from the code.
     """
 
@@ -682,6 +711,8 @@ class TestModuleSurface:
             transition_record.KIND_BOUNDARY_ALIAS,
             transition_record.KIND_IDENTITY_TRANSITION,
             transition_record.KIND_PROMOTION_SPLIT_MAP,
+            transition_record.KIND_RELEASE_HISTORY_CLOSED,
+            transition_record.KIND_NON_VERSION_TAG,
         }
 
     def test_generated_validator_is_paired_with_the_runtime(self):

@@ -26,7 +26,7 @@ one:
 * **The release record** -- the archived release files, whose ``candidate_sha``
   is what each version's refs should point at. This is the authority for the
   TARGET, not merely a witness to a move.
-* **The transition records** -- ``anchor-remap`` events (the same commit map, but
+* **The transition records** -- ``release-commit-remap`` events (the same commit map, but
   COMMITTED, so a fresh clone has it), ``boundary-alias`` events (a tag that
   legitimately duplicates another), and ``identity-transition`` events (a
   published identity that changed, and from which version).
@@ -616,7 +616,7 @@ def _transition_record_facts(transition_record_paths):
                 for mapping in event.mappings:
                     commit_map[mapping.old_sha] = mapping.new_sha
                     origins[mapping.old_sha] = (
-                        f"transition record anchor-remap {event.rewrite}"
+                        f"transition record release-commit-remap {event.rewrite}"
                     )
             elif event.KIND == KIND_BOUNDARY_ALIAS:
                 for alias in event.aliases:
@@ -749,7 +749,7 @@ def heal_dangling_release_commits(*, releases_dir, explanations, repo_root,
     Three rules, none of them inferred:
 
     * a dangling release commit no record explains is a hard error naming the version
-      -- the heal is driven by the journal, a transition record anchor-remap event or a
+      -- the heal is driven by the journal, a transition record release-commit-remap event or a
       committed scrub archive, never by resemblance;
     * the content check is ``refuse``: this command did not perform the
       rewrite, so it cannot state that a released tree changing is intended.
@@ -804,7 +804,7 @@ def heal_dangling_release_commits(*, releases_dir, explanations, repo_root,
             f"from, and the release record is the authority for where every released "
             f"ref belongs -- so\n"
             f"  nothing can be judged against it while it names a pruned "
-            f"commit. safegit's rewrite journal, a transition record anchor-remap event "
+            f"commit. safegit's rewrite journal, a transition record release-commit-remap event "
             f"or a committed\n"
             f"  scrub archive would explain the move; none of them does. "
             f"Restore the commits, or repair the archives, and re-run."
@@ -1147,7 +1147,7 @@ def _ref_verdict(*, refname, tag, version, release_commit, observation, explanat
             f"here:   {local_peeled or target_sha}",
         ),
         detail=(
-            "  No rewrite journal entry, transition record anchor-remap or committed "
+            "  No rewrite journal entry, transition record release-commit-remap or committed "
             "scrub archive maps the origin value to this one.\n"
             "  Force-pushing over it could destroy work that is not part of "
             "any recorded rewrite."
@@ -1757,7 +1757,7 @@ def run_cmd(flags, *, ctx):
     else:
         print(
             "\nNo explanation source is present: no safegit rewrite journal, "
-            "no transition record anchor-remap record and no committed scrub archive. "
+            "no transition record release-commit-remap record and no committed scrub archive. "
             "Only refs origin already agrees with, and refs it is missing "
             "entirely, can be reconciled."
         )

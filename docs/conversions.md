@@ -346,13 +346,13 @@ The workspace-scoped home exists because a departure is a fact about the source 
 | ----- | ------------- |
 | `conversion` | Always, first, naming the direction (`extract` or `absorb`), both endpoints with their tag formats, and the commit |
 | `tag-map` | Tags were renamed or imported: every old-to-new correspondence with the new commit |
-| `anchor-remap` | Release commits moved: the rewrite that moved them, and every old-SHA-to-new-SHA pair |
+| `release-commit-remap` | Release commits moved: the rewrite that moved them, and every old-SHA-to-new-SHA pair |
 | `boundary-alias` | An alias tag was created: the post-conversion name, the pre-conversion name it aliases, and the commit |
 | `departed-globs` | Written in the **source** of an extract: the tag globs that stopped belonging here, and where they went |
 | `identity-transition` | A published identity changed (a Go module path, a package name), effective from a stated version |
 | `promotion-split-map` | A mirror was promoted: the subtree-split correspondence it produced |
 
-The `tag-map`, `anchor-remap` and `boundary-alias` events a conversion writes carry `related_to`, pointing at the id of the `conversion` event that heads them, so the events of one conversion are recoverable as a group from a file that has accumulated several. A `departed-globs` event stands alone: it is written in the source, where the conversion event it would point at does not exist.
+The `tag-map`, `release-commit-remap` and `boundary-alias` events a conversion writes carry `related_to`, pointing at the id of the `conversion` event that heads them, so the events of one conversion are recoverable as a group from a file that has accumulated several. A `departed-globs` event stands alone: it is written in the source, where the conversion event it would point at does not exist.
 
 ### Format and reading
 

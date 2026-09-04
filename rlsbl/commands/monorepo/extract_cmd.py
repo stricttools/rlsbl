@@ -1352,7 +1352,7 @@ def observe(dep) -> Preview:
     if plan.translations:
         events.append("tag-map")
     if archives:
-        events.append("anchor-remap")
+        events.append("release-commit-remap")
     if dep.is_promotion:
         events.append("promotion-split-map")
     if plan.alias:

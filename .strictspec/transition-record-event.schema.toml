@@ -14,6 +14,28 @@
 # see native: whether a recorded SHA still resolves in this repository, whether
 # a recorded tag still exists, and any cross-event correlation (`related_to`
 # pointing at an event id in the same or another file).
+#
+# RENAME VERSUS IDENTITY -- the line every reader of this record must hold.
+#
+# A RENAME is a tag-SPELLING fact. A releasable renamed from `widget` to
+# `gadget` changes what its future tags are called and nothing a consumer
+# resolves by: the artifacts already published keep the names they were
+# published under, and the versions released under the old spelling are still
+# those versions. It is bookkeeping. `rlsbl release reconcile`'s refusal to
+# recreate an older ref does NOT match on it, and a `tag-map` or
+# `boundary-alias` event is the record that explains it.
+#
+# An IDENTITY change is a change to the string CONSUMERS RESOLVE BY -- a Go
+# module path, a registry package name, a repository URL. Recreating an older
+# release's ref after one of those would publish a version that shipped under
+# the OLD identity under the NEW one, for the first time and permanently. That
+# is what `identity-transition` records, and reconcile's
+# `refuse-identity-mismatch` matches on it with ZERO exceptions: there is no
+# facet, no version and no operator flag that turns the refusal off.
+#
+# The two are recorded by different kinds on purpose, and a rename must never
+# be written as an `identity-transition` to "be safe": doing so would make
+# reconcile refuse to repair refs it is entitled to repair, permanently.
 
 name = "rlsbl-transition-record-event"
 meta_version = 1
@@ -270,7 +292,7 @@ description = "When the event was appended (RFC 3339, with offset)."
 
 [types.ReleaseCommitRemapEvent.fields.kind]
 type = "literal"
-value = "anchor-remap"
+value = "release-commit-remap"
 required = true
 
 [types.ReleaseCommitRemapEvent.fields.related_to]
@@ -493,6 +515,94 @@ description = "The source-commit -> split-commit pairs. Non-empty: an empty spli
 [types.PromotionSplitMapEvent.fields.mappings.item]
 type = "SplitMapping"
 
+[types.ReleaseHistoryClosedEvent]
+type = "record"
+description = "A member's or releasable's release history is deliberately CLOSED: no further releases are expected under it. The state it leaves behind -- a version file, a changelog directory, release archives -- is therefore a deliberate record rather than residue to clean up, and the reason says who decided that and why."
+
+[types.ReleaseHistoryClosedEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.ReleaseHistoryClosedEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.ReleaseHistoryClosedEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.ReleaseHistoryClosedEvent.fields.kind]
+type = "literal"
+value = "release-history-closed"
+required = true
+
+[types.ReleaseHistoryClosedEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of the conversion event that closed the history, when one did."
+
+[types.ReleaseHistoryClosedEvent.fields.subject]
+type = "string"
+required = true
+non_empty = true
+description = "WHOSE release history is closed: the releasable name, or the member name when the member is the unit that stopped releasing. A name, never a path -- the same vocabulary workspace.toml uses."
+
+[types.ReleaseHistoryClosedEvent.fields.reason]
+type = "string"
+required = true
+non_empty = true
+description = "Why the history is closed, in the operator's own words (e.g. \"extracted into its own repository\", \"superseded by <name>\", \"retired\"). Free text: it explains the decision to a human and to a later check, and is never dispatched on."
+
+[types.NonVersionTagEvent]
+type = "record"
+description = "A tag that is deliberately OUTSIDE the version model: not a release, not an alias of one, and not something any repair path should try to explain as either. Recorded so a reader enumerating the tag namespace can account for it instead of reporting it as an unexplained ref."
+
+[types.NonVersionTagEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.NonVersionTagEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.NonVersionTagEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.NonVersionTagEvent.fields.kind]
+type = "literal"
+value = "non-version-tag"
+required = true
+
+[types.NonVersionTagEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of an event that explains where the tag came from, when one does."
+
+[types.NonVersionTagEvent.fields.tag]
+type = "string"
+required = true
+non_empty = true
+description = "The tag name, exactly as it exists in the namespace. One tag per event: each is a separate operator decision, and a list would let one reason stand for several that were never decided together."
+
+[types.NonVersionTagEvent.fields.reason]
+type = "string"
+required = true
+non_empty = true
+description = "Why this tag is outside the version model, in the operator's own words (e.g. \"a nightly build marker\", \"an upstream vendor tag imported with the history\"). Free text: it explains the decision to a human, it is never dispatched on."
+
 # ---------------------------------------------------------------------------
 # The document root: one line is exactly one event, selected by `kind`.
 # ---------------------------------------------------------------------------
@@ -508,7 +618,7 @@ type = "ConversionEvent"
 [types.TransitionRecordEvent.arms.tag-map]
 type = "TagMapEvent"
 
-[types.TransitionRecordEvent.arms.anchor-remap]
+[types.TransitionRecordEvent.arms.release-commit-remap]
 type = "ReleaseCommitRemapEvent"
 
 [types.TransitionRecordEvent.arms.departed-globs]
@@ -522,3 +632,9 @@ type = "IdentityTransitionEvent"
 
 [types.TransitionRecordEvent.arms.promotion-split-map]
 type = "PromotionSplitMapEvent"
+
+[types.TransitionRecordEvent.arms.release-history-closed]
+type = "ReleaseHistoryClosedEvent"
+
+[types.TransitionRecordEvent.arms.non-version-tag]
+type = "NonVersionTagEvent"
