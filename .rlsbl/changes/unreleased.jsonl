@@ -8,3 +8,4 @@
 {"format_version":1,"id":"18d2377c20f728c57a28ee30f468483fb67e305d886dd3e8","commits":["d3afcf049843a57da69254040d36aee72d26c9c9"],"user_facing":false}
 {"format_version":1,"id":"18d238695d9830f4da65d00dfd9241b4823500ca09b04a80","commits":["b696b5a77da16d6cb08b6a97eb4dcabb1f136442"],"user_facing":false}
 {"format_version":1,"id":"18d239dc44b63c48f54b975870fc4cc883ac33cb361162b2","commits":["f373fa4546aa55879e245f391a7291c4dcf0f608"],"user_facing":false}
+{"format_version":1,"id":"18d23b17776d205e28af327e872d4c9395c46d7585e642e4","commits":["f6b7ac4f10f6d60f92400e6b0bc8d3afaa989aee"],"user_facing":true,"description":"**Renamed: the release ledger is now the release record.** The `rlsbl.ledger` module is now `rlsbl.release_record`, and every error message, check result and doc page that said \"ledger\" now says \"the release record\" or \"the release archives\".","type":"breaking"}
