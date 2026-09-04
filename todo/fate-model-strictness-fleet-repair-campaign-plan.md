@@ -15,12 +15,24 @@ with this plan at close.
   `.rlsbl/releases/` (per releasable under
   `.rlsbl-monorepo/releasables/<name>/releases/` in monorepos). The
   authoritative record of versions. After this campaign an archive is in
-  exactly ONE of three states: anchored (`candidate_sha` + `tree_hashes`),
-  `unanchorable = true` (a real release whose shipping commit is
-  unrecoverable), or `never_released = true` (the version number exists but
-  was never a release). The schema's current exactly-one rule between the
-  anchor and the unanchorable marker is relaxed to this three-state rule in
-  the same edit that adds the new key.
+  exactly ONE of three states: **commit-recorded** (`candidate_sha` +
+  `tree_hashes`: the commit and trees the version shipped from),
+  **commit-unrecoverable** (a real release whose shipping commit cannot be
+  identified; the marker key is renamed by this campaign from its old
+  spelling `unanchorable` to `commit_unrecoverable`), or
+  `never_released = true` (the version number exists but was never a
+  release). The schema's current exactly-one rule between the recorded
+  commit and the unrecoverable marker is relaxed to this three-state rule
+  in the same edit that adds the new keys.
+- **The recorded-commit vocabulary rename**: the user has banned the old
+  jargon word for the recorded-commit concept fleet-wide. This campaign
+  renames it throughout rlsbl: prose, error texts, identifiers, and docs
+  say "the recorded commit" / "commit-recorded" / "commit-unrecoverable";
+  the schema key renames as above; the retiring script's filename is
+  quoted verbatim where it must be named. Scope note: the full-rename
+  reading of the ban follows the same precedent as the release-record
+  word's ban and rename; it is recorded in Decision origin as adopted from
+  the ban order and freely reversible to a prose-only rename.
 - **The shipped-as field**: a new optional archive field recording ANY
   historical tag spelling the version actually shipped under when it
   differs from the current scheme (a pre-rename spelling like
@@ -34,8 +46,8 @@ with this plan at close.
   deliberately DISTINCT and never merged: a **releasable rename** is a
   tag-spelling fact (bookkeeping; reconcile's identity refusal does not
   match it), while an **identity change** (Go module path, registry name —
-  what consumers resolve) keeps reconcile's refusal to recreate older refs,
-  with zero exceptions.
+  what consumers resolve) keeps reconcile's refusal to recreate older
+  refs, with zero exceptions.
 - **The fate taxonomy (closed)**: every version number or tag is exactly
   one of: released; never-released; deliberate non-release tag;
   release-history-closed; non-version tag. Placement rule: a fact about ONE
@@ -46,13 +58,13 @@ with this plan at close.
 - **The never-released declaration IS the archive**: to declare a version
   never-released, write (or amend) its archive with the marker BEFORE
   running the backfill; the backfill treats an existing never-released
-  archive as settled and never anchors such a version from a bump commit.
-  No flag and no input file exist for this on purpose (the
+  archive as settled and never records a commit for such a version from a
+  bump commit. No flag and no input file exist for this on purpose (the
   existing-artifact rule in the user's rules file).
 - **Adopt-as-released**: a version-shaped tag published on origin that no
-  store records was a release; it gets an archive anchored from its tag,
-  description recovered per the recovery chain, bump derived by version
-  arithmetic, every reconstructed field marked with its source.
+  store records was a release; it gets an archive with its commit recorded
+  from the tag, description recovered per the recovery chain, bump derived
+  by version arithmetic, every reconstructed field marked with its source.
 - **The identity ruling (minting)**: a renamed releasable's past versions
   get current-spelling tags minted at their recorded commits through the
   reconcile repair surface; the old-spelling tags remain in place,
@@ -128,7 +140,8 @@ with this plan at close.
   generated files via `rlsbl commit`. Changelog entries carry `--type
   breaking` where the item removes or renames surface (the vocabulary
   renames, the remote-release deletion, the strictness refusals, the alias
-  removal); those entries are what justify the minor bump.
+  removal, the marker-key rename); those entries are what justify the
+  minor bump.
 - Relevant suites green at phase boundaries; test batches over the bare-run
   limit go through the sandboxed runner; anything touching GitHub Release
   bodies in tests is fully mocked (the sandbox denies sockets).
@@ -140,6 +153,10 @@ with this plan at close.
   explicit reconstructed/derived note naming its source.
 - Rulings that rest on measurements are recorded with them in the campaign
   record file; a materially moved measurement pauses for reconfirmation.
+- Edits to the user-level rules file are BATCHED, never dribbled: each
+  edit invalidates every session's prompt cache, so accumulated fixes
+  apply together (phase 0.5 carries this campaign's batch, including the
+  superseded consequential-definition sentence already queued for it).
 - New commands update the schema dump, regenerated docs, and the
   wiring/effects/consequential pinning tests; a new target-protocol
   attribute updates the axis inventory and regenerates the support matrix.
@@ -154,7 +171,8 @@ trust-adopted elements (freely reversible, never to be cited as deliberate
 intent): the pre-approved limits [%%]; the reconstructed-description format
 (joined bullet text marked with its source); the shipped-as placement in
 the archives; the migration-script port target (the command's engine
-module); the member-key interim (constant plus binding test).
+module); the member-key interim (constant plus binding test); the
+full-rename scope reading of the recorded-commit vocabulary ban.
 
 ## Phase dependency notes
 
@@ -163,7 +181,7 @@ code phases because it touches the same files phases 1-4 edit most; 1.1
 precedes any archive carrying new keys (the validator rejects unknown
 keys); phase 6 (the release plus install update) precedes phases 7-11;
 phase 9's recordings precede phase 10's reconcile pass; phase 11's newly
-anchored repos get their own reconcile within phase 11.
+migrated repos get their own reconcile within phase 11.
 
 ---
 
@@ -229,33 +247,41 @@ Effort: medium.
 - The cross-phase red set, each verified red in ITS OWN consuming phase
   (not all in one phase): a cross-filed changelog entry (commit in another
   releasable's territory) misreported as out-of-range (consumed by 4.2); a
-  phantom version anchored from its version-bump commit (consumed by 2.1);
-  a pre-marker archive missing required fields the current backfill leaves
-  invalid (consumed by 2.1); unknown keys on each workspace configuration
-  surface (consumed by 3.2); an explicitly-empty flag value silently
-  dropped (consumed by 3.3).
+  phantom version whose commit gets recorded from its version-bump commit
+  (consumed by 2.1); a pre-marker archive missing required fields the
+  current backfill leaves invalid (consumed by 2.1); unknown keys on each
+  workspace configuration surface (consumed by 3.2); an explicitly-empty
+  flag value silently dropped (consumed by 3.3).
 - Verify: each fixture demonstrably red against current behavior.
 
 ### 0.5 The vocabulary renames (before the code phases)
 
-- Sweep the old release-record word out of rlsbl prose, error texts, and
-  identifiers in favor of "the release archives" / "the release record";
-  sweep "lineage" to "transition record": the module, its identifiers, the
-  store filename in code, the generated per-module doc pages the module
-  rename orphans, and the selfdoc manifest module lists. No committed
-  `lineage.jsonl` file exists anywhere in the fleet (verified — the store
-  has never been written), so no fleet data files need renaming.
+- Three renames swept together through rlsbl prose, error texts,
+  identifiers, and docs:
+  - the old release-record word → "the release archives" / "the release
+    record";
+  - "lineage" → "transition record": the module, its identifiers, the
+    store filename in code, the generated per-module doc pages the module
+    rename orphans, and the selfdoc manifest module lists (no committed
+    `lineage.jsonl` file exists anywhere in the fleet — verified — so no
+    fleet data files need renaming);
+  - the recorded-commit vocabulary: prose and identifiers move to
+    "recorded commit" / "commit-recorded" / "commit-unrecoverable"; the
+    schema-key half lives in 1.1; the retiring script filename
+    `backfill_release_anchors.py` is quoted verbatim where it must be
+    named until 2.1 retires it.
 - Rewrite the rlsbl reference sections of the user-level instruction file
-  at `~/Projects/CLAUDE.md`: the release-record vocabulary; the
-  effects-regime sentence that defines consequential by
-  interruption-worthiness (superseded by the user's human-authority
-  definition in the same file); the phrases the user has since banned
-  ("fail-closed" and its kin) reworded to plain statements.
+  at `~/Projects/CLAUDE.md` as ONE batched edit (per the batched-edits
+  convention): the three vocabulary renames; the effects-regime sentence
+  that defines consequential by interruption-worthiness (superseded by the
+  user's human-authority definition in the same file, already queued for
+  this batch); any remaining banned-phrase wording.
 - Root files generated by selfdoc are edited via their templates under
   docs/, never the generated read-only outputs.
 - Historical changelogs and archived release files stay untouched.
-- Verify: grep for both old words is clean outside immutable history;
-  selfdoc baselines re-accepted after review.
+- Verify: grep for all three old words is clean outside immutable history
+  and the not-yet-retired script; selfdoc baselines re-accepted after
+  review.
 
 ### 0.6 Fleet measurement re-derivation
 
@@ -276,17 +302,23 @@ Effort: large.
 
 ### 1.1 Schema and binding
 
-- One widening edit to the release-file schema: add `never_released` and
-  the shipped-as field, and relax the current anchor/unanchorable
-  exactly-one rule to the three-state rule (anchored, unanchorable, or
-  never-released — exactly one). No format-version bump is obligated
-  (verified against the schema authority's bump rule; relaxations widen).
-- Regenerate the validator with the exactly-matched toolchain; bind both
-  fields in the archive reader; the editable release file refuses both
-  exactly as it refuses the anchor fields (flow-owned).
+- One edit to the release-file schema covering: the `never_released` key;
+  the shipped-as field; the marker-key rename (`unanchorable` →
+  `commit_unrecoverable`, no dual recognition — pre-stable, no compat);
+  and the relaxation of the exactly-one rule to the three-state rule
+  (commit-recorded, commit-unrecoverable, or never-released — exactly
+  one). No format-version bump is obligated for the widening parts; the
+  key rename is breaking and changelogged as such.
+- Regenerate the validator with the exactly-matched toolchain; bind the
+  fields in the archive reader; the editable release file refuses the new
+  keys exactly as it refuses the recorded-commit fields (flow-owned).
+- Migrate the committed archives carrying the old marker key: rlsbl's own
+  one such archive now; strictcli's set needs no migration — phase 9
+  rewrites those archives wholesale when their commits are recorded (they
+  leave the marked state entirely).
 - Verify: archives in each of the three states validate; the editable-file
   refusal fires for each new key; generated files carry the exact
-  toolchain stamp.
+  toolchain stamp; the old key is refused as unknown.
 
 ### 1.2 Read-path semantics for never-released
 
@@ -353,11 +385,11 @@ Effort: extra large.
     no-substantive-content rule; the materialized-archive header comment
     updated to enumerate the sources.
   - The never-released declaration honored as defined in Terminology (an
-    existing never-released archive is settled; the bump-commit anchoring
-    note tells the operator to declare before running).
+    existing never-released archive is settled; the bump-commit note tells
+    the operator to declare before running).
   - Adopt-as-released for scheme-matching version tags no store records.
-  - Shipped-as consultation so renamed and member-path history anchors
-    instead of counting as unexplained.
+  - Shipped-as consultation so renamed and member-path history gets its
+    commits recorded instead of counting as unexplained.
   - Recorded non-version tags excluded from the unexplained listing.
   - An operator-authored overrides input (reviewed descriptions applied
     before derivation), replacing the separate description-authoring
@@ -371,21 +403,21 @@ Effort: extra large.
   in the publication module — and the two remaining ad-hoc body readers
   (in deprecate and yank) are folded onto it in this same item;
   tree-at-commit resolution consolidates onto ONE shared helper (the
-  copies in the release flow, anchor remap, extract, absorb, and the
-  script collapse onto it); "is this tag explained?" is answered by ONE
-  shared consultation function used by this command and reconcile
+  copies in the release flow, the commit-remap module, extract, absorb,
+  and the script collapse onto it); "is this tag explained?" is answered
+  by ONE shared consultation function used by this command and reconcile
   (archives for version-shaped tags, the transition record for the rest).
-- Both old scripts retire as removal stubs: the anchor backfill script and
-  the description-authoring script. The workspace migration script — which
-  today runs the backfill script in-process — is PORTED to the command's
-  engine module in this same item, keeping its own script form and exit
-  contract.
+- Both old scripts retire as removal stubs: `backfill_release_anchors.py`
+  and the description-authoring script. The workspace migration script —
+  which today runs the backfill script in-process — is PORTED to the
+  command's engine module in this same item, keeping its own script form
+  and exit contract.
 - The shipped remedy is retargeted at every live mention site: the three
   in the archive-reading module, the one in undo, the release-workflow
   doc, the user-level instruction file, the five test assertions naming
   the script, and both scripts' own test files (rewritten against the
   command); the hand-written multi-step recovery procedure in the
-  missing-anchor error is replaced by naming the command.
+  missing-record error is replaced by naming the command.
 - Verify: the 0.4 fixtures this phase consumes go green; idempotent second
   runs plan nothing; remedy-followability tests drive each printed remedy
   verbatim; grep confirms no live reference to either retired script; the
@@ -469,7 +501,14 @@ Effort: large.
   error on the guarded operations (release run/resume, the backfill's
   apply, reconcile's apply), with the remedy naming the drop. Registered
   as a check as well as enforced at the operations.
-- Verify: stash fixtures refuse each guarded operation; the check reds.
+- The dormant member-side reading paths are HARDENED (the user's ruling):
+  a non-releasable member's own per-package changes directory is refused
+  (not silently consumed) by the paths that would read it today — hash
+  enumeration, the monorepo status fallback, prepush coverage — closing
+  the class structurally, with 5.5's check as the detection layer.
+- Verify: stash fixtures refuse each guarded operation; the check reds; a
+  fixture giving a non-releasable member a changes directory is refused by
+  each reading path.
 
 ## Phase 4 — Truthful surfaces
 
@@ -576,7 +615,7 @@ Effort: medium.
   fixtures included), fix rounds as needed, then the single minor release;
   the pinned install updates to the new release.
 - Verify: registries serving the new version; suite and checks green; the
-  new version's archive anchored.
+  new version's archive carries its recorded commit.
 
 ## Phase 7 — Standalone-fleet sweep
 
@@ -589,7 +628,8 @@ in the limits section.
   recovered descriptions; early-tag adoptions (safegit and claudewheel
   recover real content from their own GitHub Release bodies; howmuchleft's
   bodies are boilerplate, so its recovery falls through to commit
-  subjects); tinymoon's tagless version anchored from its bump commit.
+  subjects); tinymoon's tagless version gets its commit recorded from its
+  bump commit.
 - a private project: FIRST the user-ordered exception — its milestone-tag
   family deleted locally and on origin (attended, plain git, per the
   standing order in the limits section) — then its backfill.
@@ -605,7 +645,7 @@ fleet state moves).
 
 In this order:
 
-1. The v1.0.0 archive rewritten from the unanchorable wedge to
+1. The v1.0.0 archive rewritten from the commit-unrecoverable wedge to
    never-released.
 2. The self-inclusive retract directive added to go.mod
    (`retract [v1.0.0, v1.0.1]` with a comment stating v1.0.0 was an
@@ -635,22 +675,23 @@ Effort: large.
 - stricttest and selfdoc: the cross-filed changelog entries removed via
   `changelog remove` (both are unreleased-file edits — no released-file
   unlock, no GitHub write); selfdoc's uncovered commit covered.
-- strictcli: the backfill re-anchors the wrongly-unrecoverable archives
-  from their real old-spelling tags, writing each version's shipped-as
-  field in the same unlock pass; ONE transition-record entry records the
-  rename event itself as a spelling fact (reason and scope stated once);
-  the unmatched early tags adopted as released; the conformance member's
-  release history recorded closed; the local-only tag left for phase 10.
+- strictcli: the backfill records the wrongly-unrecoverable archives'
+  commits from their real old-spelling tags, writing each version's
+  shipped-as field in the same unlock pass; ONE transition-record entry
+  records the rename event itself as a spelling fact (reason and scope
+  stated once); the unmatched early tags adopted as released; the
+  conformance member's release history recorded closed; the local-only
+  tag left for phase 10.
 - strictspec and stricttest: their old-spelling tag sets handled the same
   way (shipped-as fields plus one rename spelling-fact each).
 - Verify: changelog and workspace check tags green in all four; no archive
-  remains marked unrecoverable whose tag exists anywhere.
+  remains marked commit-unrecoverable whose tag exists anywhere.
 
 ## Phase 10 — The reconcile pass
 
 Effort: medium.
 
-- Reconcile plans across every repo anchored AT THIS POINT (the phase 11
+- Reconcile plans across every eligible repo AT THIS POINT (the phase 11
   repos are excluded here and covered in phase 11), auto-applied under the
   pre-approved limits with the stated apply mechanic: the minted
   current-spelling tags at recorded commits, the missing GitHub Releases,
@@ -671,11 +712,10 @@ Effort: large.
 - WWW: the dev-node root edit; its two member-path tags get shipped-as
   fields on the versions they shipped (the widened definition covers
   member-path spellings).
-- gamehome: deferred to its release hold. Its todo carries the two
-  hand-steps the script does not perform: rewriting the dangling
-  depends-on reference to the renamed root member, and the reckoning of
-  its two version-tag families.
-- Then, in order: reconcile runs for the repos newly anchored in this
+- gamehome: deferred to its release hold. Its todos carry the decision and
+  the two hand-steps the script does not perform (the dangling depends-on
+  rewrite after the root member rename; the per-family tag reckoning).
+- Then, in order: reconcile runs for the repos newly migrated in this
   phase (same limits, same tally); the editable install is restored; the
   closing fleet pass runs (status plus cheap checks in every repo — by
   hand this once; the fleet health runner is another project's filed
@@ -701,8 +741,8 @@ Effort: large.
 - The three implicit-mode workspace conversions (their own filed todos, on
   the pinned pre-campaign release, on their own schedule): rlsbl-sandbox,
   incantino, mobileinfra.
-- gamehome's migration (blocked on its release hold; its todo carries the
-  hand-steps).
+- gamehome's migration (blocked on its release hold; its todos carry the
+  decision and the hand-steps).
 - The fleet health runner (another project's filed todo).
 - The framework-level empty-flag stance (strictcli's todo, filed in 0.3);
   rlsbl's central predicate use in 3.3 is the consumer-side interim.
