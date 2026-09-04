@@ -1,8 +1,7 @@
 ---
 title: rlsbl.release_record
-description: "The release record: the archived release files, read as the authoritative record of what this project has released."
+description: "The archived release files, read as the authoritative record of what this project released -- committed, so they survive what a tag namespace does not."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 139
 ---

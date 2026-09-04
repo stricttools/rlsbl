@@ -1,8 +1,7 @@
 ---
 title: rlsbl.release_commit_remap
-description: "Moving the release record's release commits through a history rewrite's commit map."
+description: "Moves the release record's release commits through a history rewrite's commit map, re-checking each recorded tree hash so a redacted release cannot be re-recorded."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 136
 ---

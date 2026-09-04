@@ -906,8 +906,7 @@
   },
   "en/rlsbl-release_commit_remap.md": {
     "content": "1c8038d90e6fe9439cc58f59d30af482e5070112667c2dce83ff3edcc88c80d6",
-    "description": "bbf3eab1081bd9a583e195ae8966df7341f928306fbe3df4c4c76ea17f50dac3",
-    "seed_hash": "bbf3eab1081bd9a583e195ae8966df7341f928306fbe3df4c4c76ea17f50dac3",
+    "description": "028824790369642d5b91851eac0acc83727f124f8b763b3f3371aaddbf63320e",
     "source_docstring": "04af2deafbfb3d27ddae1c4cfaf15da59fcf7ba79d51a33c782c343721b4de47"
   },
   "en/rlsbl-release_file.md": {
@@ -922,8 +921,7 @@
   },
   "en/rlsbl-release_record.md": {
     "content": "63f8e7f20c36ec80b9f62dd908ff621466d396f9a4c0fb70efdddbe08854885f",
-    "description": "1530c1356e6aa2797bf64e8661331de4394b1161ca8b3d894161016ab9b9a791",
-    "seed_hash": "1530c1356e6aa2797bf64e8661331de4394b1161ca8b3d894161016ab9b9a791",
+    "description": "4d36c2ad87ef63c0263818182dd74a255e92807bd0f0118e848a49e1194f9a1a",
     "source_docstring": "d69aacb1729532ce6c49e4bc998f14b6fbc4b332d9d2aac6ed1fdbcd9ec36c90"
   },
   "en/rlsbl-resolved_target.md": {
@@ -1138,14 +1136,12 @@
   },
   "en/rlsbl-transition_record.md": {
     "content": "de4ae697b1b7863b537c8fbfb7c8114d2238156c92661b3622d128de523c1932",
-    "description": "499defb625ff9954c2ed8a2b807696d4b89a78d640bf8b1d45c7b12ea3ebed83",
-    "seed_hash": "499defb625ff9954c2ed8a2b807696d4b89a78d640bf8b1d45c7b12ea3ebed83",
+    "description": "0ab9737b742347413dbc269a628a18c188df2bbf2b9679ec8481a450ee69a6f2",
     "source_docstring": "25595f6eac66373bd2c72fa459565ab17e4ffa11edeca5e456e52a248be270f3"
   },
   "en/rlsbl-transition_record_followup.md": {
     "content": "e91933a1ddba43e85e1bae133c76907c11341a01a9d7fc4905b9a87ad75a97b7",
-    "description": "f000a3feb9219ed049c59338198567b7f4e3fb3b6e00fcf5afdd688ce1e5adef",
-    "seed_hash": "f000a3feb9219ed049c59338198567b7f4e3fb3b6e00fcf5afdd688ce1e5adef",
+    "description": "37455cb0ba27c2ac202dacdbbf89542ceba9b0ce971e02194db4a1fb352130d4",
     "source_docstring": "5d000a751daa82f299df8f50cd528f512af4dd018b519c22b7872d13d5f237c0"
   },
   "en/rlsbl-utils.md": {
