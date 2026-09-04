@@ -23,6 +23,24 @@
 # hand-authored release commit is refused natively at release validation, see
 # rlsbl/commands/release/validate.py), and archives written before release-commit recording
 # existed carry neither.
+#
+# THE VERSION-FATE MODEL. An ARCHIVE is in exactly one of three states, and
+# every reader dispatches on which:
+#
+#   recorded         candidate_sha + tree_hashes -- it shipped, from a known commit
+#   unrecoverable    unrecoverable = true        -- it shipped, from a commit nothing can name
+#   never_released   never_released = true       -- the version NUMBER exists, no release does
+#
+# The schema enforces the EXCLUSION half of that rule (no document carries two
+# states) and leaves the "exactly one" half to the archive readers, because the
+# same schema also validates the EDITABLE unreleased.toml, whose correct state
+# is none of the three. `rlsbl.release_record.read_entry` is where an archive in
+# none of them is a hard error.
+#
+# Exclusion is judged on PRESENCE, not on the value: rlsbl writes a marker only
+# when it is true (see write_archived_release_file), so `unrecoverable = false`
+# beside a candidate_sha is a hand-authored document rather than a state rlsbl
+# produced, and the same refusal covers it.
 
 name = "rlsbl-release-file"
 meta_version = 1
@@ -98,10 +116,21 @@ description = "AUTHORITATIVE: the released content, one git tree object per rele
 [types.ReleaseConfig.fields.tree_hashes.value]
 type = "GitObjectHash"
 
-[types.ReleaseConfig.fields.unanchorable]
+[types.ReleaseConfig.fields.unrecoverable]
 type = "boolean"
 required = false
-description = "A PERMANENT RECORD OF FAILED RECOVERY, written only by the backfill pass and only when set to true: this version shipped, but the commit it shipped from could not be recovered from any source -- no tag under any recognized scheme (v{X.Y.Z}, name@v{X.Y.Z}, path/v{X.Y.Z}) and no version-bump commit in history. It is the alternative to silently leaving an archive with no release commit, so an archive carries either the candidate_sha/tree_hashes release commit or this marker, never both and never neither. The release flow never writes it (a flow that is releasing knows its own candidate), and it is stripped along with the release commit when `release undo` restores an archive as the editable unreleased.toml."
+description = "A PERMANENT RECORD OF FAILED RECOVERY, written only by the backfill pass and only when set to true: this version SHIPPED, but the commit it shipped from could not be recovered from any source -- no tag under any recognized scheme (v{X.Y.Z}, name@v{X.Y.Z}, path/v{X.Y.Z}) and no version-bump commit in history. It is the alternative to silently leaving an archive with no release commit. The release flow never writes it (a flow that is releasing knows its own candidate), and it is stripped along with the release commit when `release undo` restores an archive as the editable unreleased.toml. Distinct from never_released: this version HAS consumers, its refs are real, and only rlsbl's knowledge of where it came from is lost."
+
+[types.ReleaseConfig.fields.never_released]
+type = "boolean"
+required = false
+description = "THE VERSION NUMBER EXISTS BUT NO RELEASE DOES, written only when set to true: a phantom tag's version, or a version claimed and abandoned. It is not a failed recovery -- there is nothing to recover, because nothing was ever published under this number. Every read that asks what this project RELEASED skips such a version: it is not the latest release, it does not bound the unreleased range, `release undo` does not select it, its refs are never demanded as missing, and `release reconcile` never plans a deletion of a tag that happens to carry its name. Its changelog section is still rendered -- a phantom version can have finalized changelog files, and hiding them would lose the record -- annotated as never released."
+
+[types.ReleaseConfig.fields.shipped_as]
+type = "string"
+required = false
+non_empty = true
+description = "The historical tag spelling this version ACTUALLY shipped under, when it differs from the tag scheme in effect today (e.g. \"strictcli@v0.12.0\" on a version now tagged \"v0.12.0\", or \"auth-gateway/v0.1.0\" on one absorbed under a workspace scheme). One string per archive: a version shipped once, under one name. Orthogonal to the three fate states -- legal on a recorded and on an unrecoverable archive, refused on a never-released one, which shipped under nothing."
 
 # NOTE: the preid couplings (preid == "stable" requires bump == "prerelease";
 # bump == "infra" forbids preid) are consumer-native, not schema constraints:
@@ -123,6 +152,37 @@ left = "include"
 right = "exclude"
 normalization = "none"
 description = "No element appears in both include and exclude."
+
+# The version-fate states exclude one another. Zero present is the editable
+# unreleased.toml and is legal here; an ARCHIVE with zero is refused by
+# rlsbl.release_record.read_entry, which is the only reader that knows it is
+# looking at an archive.
+[[types.ReleaseConfig.constraints]]
+form = "mutual-exclusion"
+fields = ["candidate_sha", "unrecoverable", "never_released"]
+description = "A version has one fate: recorded, unrecoverable, or never released."
+
+# tree_hashes is the other half of the release commit, so it is forbidden beside
+# either marker even in a document that omits candidate_sha.
+[[types.ReleaseConfig.constraints]]
+form = "forbidden-when"
+field = "tree_hashes"
+when = { field = "unrecoverable", predicate = "present" }
+description = "An unrecoverable version has no released trees to record."
+
+[[types.ReleaseConfig.constraints]]
+form = "forbidden-when"
+field = "tree_hashes"
+when = { field = "never_released", predicate = "present" }
+description = "A version that was never released released no trees."
+
+# A version that was never released shipped under no tag, so there is no
+# historical spelling for it to have shipped under.
+[[types.ReleaseConfig.constraints]]
+form = "forbidden-when"
+field = "shipped_as"
+when = { field = "never_released", predicate = "present" }
+description = "A never-released version shipped under nothing."
 
 # GitObjectHash -- a git object name, commit or tree. Same shape as the transition record
 # schema's GitSha, and for the same reason.

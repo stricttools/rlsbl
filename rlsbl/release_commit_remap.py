@@ -13,7 +13,7 @@ The repair is this module, and it is deliberately narrow:
 
 * a release commit whose commit the map names is rewritten to the new commit;
 * a release commit the map does not mention is left exactly as it is;
-* an ``unanchorable`` archive has no commit to move and is skipped.
+* an ``unrecoverable`` or ``never_released`` archive has no commit to move and is skipped.
 
 **The content check, and the one caller that cannot pass it.** Each recorded
 tree hash is recomputed at the new commit and compared. A rewrite that only

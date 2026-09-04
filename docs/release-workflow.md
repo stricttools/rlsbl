@@ -242,12 +242,12 @@ Two cases do not resolve to a tag, and neither is passed over silently:
 
 | Case | What the pass does |
 | --- | --- |
-| A released version with **no tag** | Looks for the version-bump commit (whose whole message is the tag string) and records the release commit from it, noting that it did. Only when that also fails does the archive get `unanchorable = true` — a permanent record that the commit is unrecoverable, not a temporary gap. |
+| A released version with **no tag** | Looks for the version-bump commit (whose whole message is the tag string) and records the release commit from it, noting that it did. Only when that also fails does the archive get `unrecoverable = true` — a permanent record that the commit is unrecoverable, not a temporary gap. |
 | A **tag matching no released version** that still parses under a recognized scheme | Reported as operator input, with the tag name and every spelling that was probed, and the pass exits non-zero. It never guesses which version such a tag belongs to. |
 
 Tags that parse under no recognized scheme are listed and left alone. The pass is idempotent: an archive that already carries the release commit (or the marker) and the gate is proposed for no change.
 
-`unanchorable` is written by the backfill and by nothing else — a flow that is releasing always knows its own candidate — and `rlsbl release undo` strips it alongside the release commit when it restores an archive as the editable release file.
+`unrecoverable` is written by the backfill and by nothing else — a flow that is releasing always knows its own candidate — and `rlsbl release undo` strips it alongside the release commit when it restores an archive as the editable release file.
 
 ### The CI gate
 
@@ -500,7 +500,7 @@ Successive rewrites chain: a commit rewritten twice is followed through both map
 | `refuse-foreign` | origin holds something no source explains — **the publication tripwire**. One of these aborts the entire reconcile: nothing is repaired anywhere. A reconcile that repaired around an unexplained divergence would be choosing which half of an inconsistent world to trust. The same verdict covers a local ref that disagrees with the release record, because pushing it would publish a commit the release record does not record as released. |
 | `refuse-identity-mismatch` | the target's `release_materialization_policy` refuses. Go declares it: a Go tag *is* the published artifact, so recreating one for a version released under a module path the repository has since changed would publish that version under the new identity for the first time, permanently. |
 
-An `unanchorable` version is skipped entirely — it has no commit, so there is nothing to compare against and nothing to create a ref at.
+An `unrecoverable` version is skipped entirely — it has no commit, so there is nothing to compare against and nothing to create a ref at.
 
 ### The release record is healed before anything is judged
 

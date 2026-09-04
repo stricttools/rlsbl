@@ -76,12 +76,11 @@ class TestSchemaToCodeEdge:
     """Every schema field is bound, and every bound field is in the schema."""
 
     def test_schema_fields_and_dataclass_fields_agree(self):
+        # Every field is spelled the same in code and on disk, marker included:
+        # ``UNRECOVERABLE_FIELD`` is the one place the key is stated, and the
+        # attribute now carries the same word.
         bound = {f.name for f in dataclasses.fields(ReleaseConfig)}
-        # One field is spelled differently in code and on disk: the marker is
-        # ``unrecoverable`` in Python and still ``unanchorable`` as the TOML
-        # key. ``UNRECOVERABLE_FIELD`` is the one place that pairing is stated,
-        # so the comparison reads it rather than restating the key here.
-        bound = (bound - {"unrecoverable"}) | {UNRECOVERABLE_FIELD}
+        assert UNRECOVERABLE_FIELD in bound
         assert bound == _schema_fields()
 
     def test_release_commit_fields_are_schema_fields(self):
@@ -204,7 +203,7 @@ class TestAuthoredReleaseCommitRefused:
             validate_no_authored_release_commit(cfg)
 
     def test_unrecoverable_marker_in_editable_file_refused(self):
-        # `unanchorable` is written by the backfill pass onto an ARCHIVE whose
+        # `unrecoverable` is written by the backfill pass onto an ARCHIVE whose
         # commit could not be recovered. On an editable release file it is a
         # hand-authored claim about a version that has not shipped -- refused
         # for the same reason the release commit fields are.
@@ -212,17 +211,17 @@ class TestAuthoredReleaseCommitRefused:
             bump="patch", include=[], exclude=[], description="x",
             unrecoverable=True,
         )
-        with pytest.raises(ReleaseValidationError, match="unanchorable"):
+        with pytest.raises(ReleaseValidationError, match=UNRECOVERABLE_FIELD):
             validate_no_authored_release_commit(cfg)
 
     def test_unrecoverable_false_is_still_an_authored_marker(self):
-        # Absence is None; an explicitly written `unanchorable = false` is a
+        # Absence is None; an explicitly written `unrecoverable = false` is a
         # present field and just as much the flow's to author.
         cfg = ReleaseConfig(
             bump="patch", include=[], exclude=[], description="x",
             unrecoverable=False,
         )
-        with pytest.raises(ReleaseValidationError, match="unanchorable"):
+        with pytest.raises(ReleaseValidationError, match=UNRECOVERABLE_FIELD):
             validate_no_authored_release_commit(cfg)
 
     def test_unrecoverable_named_alongside_the_release_commit_fields(self):
@@ -234,7 +233,7 @@ class TestAuthoredReleaseCommitRefused:
             validate_no_authored_release_commit(cfg)
         assert "candidate_sha" in str(exc.value)
         assert "tree_hashes" in str(exc.value)
-        assert "unanchorable" in str(exc.value)
+        assert UNRECOVERABLE_FIELD in str(exc.value)
 
 
 # --------------------------------------------------------------------------- #

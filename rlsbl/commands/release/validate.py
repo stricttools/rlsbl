@@ -97,7 +97,7 @@ def validate_release_targets(release_config, project_root, *,
 
 
 def validate_no_authored_release_commit(release_config):
-    """Refuse a release whose editable release file already carries a release commit.
+    """Refuse a release whose editable release file carries any flow-owned field.
 
     ``candidate_sha`` and ``tree_hashes`` record which commit and tree a version
     shipped from. The release flow writes them into the ARCHIVED
@@ -106,44 +106,47 @@ def validate_no_authored_release_commit(release_config):
     paths. There is no path by which a pre-release file can know either value:
     the candidate does not exist yet.
 
-    ``unanchorable`` is refused on the same ground from the other direction: it
-    is the backfill pass's permanent record that an ALREADY SHIPPED version's
-    commit could not be recovered. A file describing the NEXT release cannot
-    make that statement -- the candidate has not been created, let alone lost --
-    so a marker there is either hand-authored or an archive restored without
-    being un-finalized.
+    The version-fate fields are refused on the same ground from the other
+    direction -- each states something about a version whose fate is already
+    settled, which a file describing the NEXT release cannot know:
 
-    So a marker or release commit in ``unreleased.toml`` is either a hand-authored claim
-    about a commit that has not happened, or an archive that was copied back
-    without being un-finalized properly. Both would make the archive assert
-    something the release never verified, which is the one thing the release commit
-    exists to prevent -- hence a hard error rather than an overwrite.
-    (``release undo`` strips all three fields when it restores an archive, so
-    its output passes here.)
+    * ``unrecoverable`` is the backfill pass's permanent record that an ALREADY
+      SHIPPED version's commit could not be recovered. The candidate has not
+      been created here, let alone lost.
+    * ``never_released`` says a version NUMBER exists that no release ever used.
+      The file it appears on is the one preparing that very release.
+    * ``shipped_as`` names the tag spelling a version already shipped under.
+
+    So any of them in ``unreleased.toml`` is either a hand-authored claim about
+    something that has not happened, or an archive that was copied back without
+    being un-finalized properly. Both would make the archive assert something
+    the release never verified, which is the one thing the release commit exists
+    to prevent -- hence a hard error rather than an overwrite. (``release undo``
+    strips every flow-owned field when it restores an archive, so its output
+    passes here.)
 
     Raises ReleaseValidationError naming every flow-owned field present.
     """
-    from ...release_file import RELEASE_COMMIT_FIELDS, UNRECOVERABLE_FIELD
+    from ...release_file import (
+        FLOW_OWNED_FIELDS,
+        NEVER_RELEASED_FIELD,
+        UNRECOVERABLE_FIELD,
+    )
 
     present = [
-        name for name in RELEASE_COMMIT_FIELDS
+        name for name in FLOW_OWNED_FIELDS
         if getattr(release_config, name, None) is not None
     ]
-    # The marker's attribute and its serialized key are spelled differently
-    # (``unrecoverable`` in code, ``unanchorable`` on disk), so it is read by
-    # attribute and reported by the key the operator would have to remove.
-    if release_config.unrecoverable is not None:
-        present.append(UNRECOVERABLE_FIELD)
     if not present:
         return
     raise ReleaseValidationError(
-        f"the release file carries release-commit field(s) "
+        f"the release file carries flow-owned field(s) "
         f"{', '.join(present)}, which only the release flow may write. The "
         f"release commit records the commit CI verified and the tree each released "
-        f"path shipped -- neither exists before the release runs -- and "
-        f"{UNRECOVERABLE_FIELD} records that a SHIPPED version's commit could "
-        f"not be recovered. Both belong in the archived v{{version}}.toml, "
-        f"never in unreleased.toml. Remove "
+        f"path shipped -- neither exists before the release runs -- while "
+        f"{UNRECOVERABLE_FIELD} and {NEVER_RELEASED_FIELD} record the fate of a "
+        f"version that is already settled. All of them belong in the archived "
+        f"v{{version}}.toml, never in unreleased.toml. Remove "
         f"{'them' if len(present) > 1 else 'it'} from "
         f"the release file and re-run."
     )

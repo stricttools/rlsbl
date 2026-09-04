@@ -5,8 +5,32 @@ Every completed release archives its release file to
 ``<releases_dir>/v{X.Y.Z}.toml`` and writes the RELEASE COMMIT into it -- the
 ``candidate_sha`` CI verified and the ``tree_hashes`` each released path
 shipped -- or, for a version whose commit could not be recovered at all, the
-``unanchorable`` marker.  Those archives, not the git tags, are what rlsbl
+``unrecoverable`` marker.  Those archives, not the git tags, are what rlsbl
 now asks when it needs to know what was released.
+
+The three fates
+---------------
+
+Every archive is in exactly ONE of three states, and every read dispatches on
+which:
+
+* **recorded** -- ``candidate_sha`` plus ``tree_hashes``.  It shipped, and
+  rlsbl knows the commit and the trees it shipped from.
+* **unrecoverable** -- ``unrecoverable = true``.  It shipped, and the commit is
+  unrecoverable from any source.  The version still HAS consumers and real
+  refs; only rlsbl's knowledge of where it came from is gone.
+* **never released** -- ``never_released = true``.  The version NUMBER exists
+  in the record -- a phantom tag's version, a version claimed and abandoned --
+  but no release was ever published under it.
+
+The third is not a degraded second: a never-released version is not a release,
+so every read that asks what this project RELEASED skips it.  It is not the
+latest release, it does not bound the unreleased range, ``release undo`` does
+not select it, its refs are never demanded as missing, and ``release
+reconcile`` never plans a deletion of a tag carrying its name.  Its changelog
+section is still rendered, annotated as never released, because a phantom
+version can have finalized changelog files and hiding them would lose the
+record.
 
 Why not tags
 ------------
@@ -54,9 +78,10 @@ They fire where the release record is READ FOR USE, never while scanning:
   guess which.
 * **Indeterminable** -- ancestry cannot be decided (a missing object, a
   truncated history).  Not the same as "no", and not treated as one.
-* **Missing release commit** -- an archive carrying neither the release commit nor the
-  ``unanchorable`` marker, i.e. one written before release commits were recorded and never
-  backfilled.  The error prints the complete single-version recovery.
+* **No fate at all** -- an archive carrying none of the three: no release
+  commit, no ``unrecoverable`` marker, no ``never_released`` marker.  That is
+  one written before release commits were recorded and never backfilled.  The
+  error prints the complete single-version recovery.
 * **Empty release record, tagged repository** -- no archive at all, yet the tag
   namespace carries tags that parse under this project's version-tag scheme.
   That is a project that HAS released and was never backfilled, and reading its
@@ -100,50 +125,94 @@ _HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
 
 @dataclass(frozen=True)
 class ReleaseRecordEntry:
-    """One archived release, read for use.
+    """One archived release, read for use, in exactly one of three fates.
 
-    ``candidate_sha`` is None exactly when ``unanchorable`` is True: an archive
-    carries one or the other, never both and never neither (an archive with
-    neither raises rather than being constructed).
+    * **recorded** -- ``candidate_sha`` names the commit it shipped from;
+    * **unrecoverable** -- it shipped, from a commit nothing can name;
+    * **never_released** -- the version NUMBER exists, no release does.
+
+    Exactly one holds. An archive carrying none of them raises rather than
+    being constructed; one carrying two is refused by the schema.
     """
 
     version: str
     path: str
     candidate_sha: str | None
     unrecoverable: bool
+    never_released: bool = False
 
     @property
     def recorded(self) -> bool:
         return self.candidate_sha is not None
+
+    @property
+    def released(self) -> bool:
+        """Did a release ever happen under this version number?
+
+        True for recorded and unrecoverable entries, False for a never-released
+        one. This is the question every "what did this project release?" read
+        asks, and the one a phantom version must answer no to.
+        """
+        return not self.never_released
 
 
 @dataclass(frozen=True)
 class LatestReleaseFact:
     """The latest release this project has, and whether the checkout has it.
 
+    ``version`` names the highest archived version that was actually RELEASED:
+    an archive recorded ``never_released`` is a version number no release ever
+    used, so it cannot be the latest release. The ones skipped that way are
+    named in ``never_released_above``, highest first, so a display can say what
+    it passed over rather than silently reporting an older version.
+
     ``in_checkout`` is None when the question could not be asked at all: there
-    is no release yet, or the latest one is ``unanchorable`` and so has no
+    is no release yet, or the latest one is ``unrecoverable`` and so has no
     commit to look for.
     """
 
     version: str | None
     in_checkout: bool | None
     unrecoverable: bool = False
+    never_released_above: tuple[str, ...] = ()
+
+    @property
+    def state(self) -> str | None:
+        """The fate of the archive ``version`` names: the machine-readable form.
+
+        ``"recorded"``, ``"unrecoverable"``, or None when the project has no
+        release at all. A never-released archive never appears here -- it is
+        not a release, and it is reported through ``never_released_above``.
+        """
+        if self.version is None:
+            return None
+        return "unrecoverable" if self.unrecoverable else "recorded"
 
     def label(self) -> str:
         """The display string, annotated when the checkout predates the release.
 
         ``"0.117.2"`` when the checkout contains it, ``"0.117.2 (not in this
         checkout's history)"`` when it does not, ``"(none)"`` when the project
-        has released nothing.
+        has released nothing.  A version archived above it but never released
+        is named too, because otherwise the display silently reports an older
+        version than the highest archive and looks stale.
         """
         if self.version is None:
-            return "(none)"
-        if self.unrecoverable:
-            return f"{self.version} (commit not recoverable)"
-        if self.in_checkout is False:
-            return f"{self.version} (not in this checkout's history)"
-        return self.version
+            base = "(none)"
+            notes = []
+        elif self.unrecoverable:
+            base, notes = self.version, ["commit not recoverable"]
+        elif self.in_checkout is False:
+            base, notes = self.version, ["not in this checkout's history"]
+        else:
+            base, notes = self.version, []
+        if self.never_released_above:
+            notes.append(
+                f"{', '.join(self.never_released_above)} archived but never released"
+            )
+        if not notes:
+            return base
+        return f"{base} ({'; '.join(notes)})"
 
 
 def tag_for_version(tag_glob: str | None, version: str) -> str:
@@ -209,7 +278,7 @@ def _missing_release_commit_error(version: str, path: str, tag_glob: str | None,
             f'  Its tag "{tag}" does not exist locally, so there is no value to\n'
             f"  derive: fetch the tag (git fetch origin --tags) and re-run, or -- if\n"
             f"  the commit is genuinely gone -- record the version as unrecoverable\n"
-            f"  instead (unanchorable = true, and no candidate_sha/tree_hashes)."
+            f"  instead (unrecoverable = true, and no candidate_sha/tree_hashes)."
         )
         sha_line = 'candidate_sha = "<the released commit>"'
     return ReleaseRecordError(
@@ -342,14 +411,19 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
                cwd: str | None = None) -> ReleaseRecordEntry:
     """Read one archived release FOR USE, with its read errors live.
 
-    Raises :class:`~rlsbl.errors.ReleaseRecordError` when the archive carries no
-    release commit and no ``unanchorable`` marker, and when the version's tag exists
-    locally but points somewhere other than the release commit.  Raises
+    Raises :class:`~rlsbl.errors.ReleaseRecordError` when the archive is in NONE
+    of the three fates -- no release commit, no ``unrecoverable`` marker and no
+    ``never_released`` marker -- and when the version's tag exists locally but
+    points somewhere other than the release commit.  Raises
     ``FileNotFoundError`` when there is no archive for *version* at all --
     that is a caller error, since callers reach here from the enumeration.
     """
     path = archived_release_path(releases_dir, version)
     cfg = read_release_file(path)
+
+    if cfg.never_released:
+        return ReleaseRecordEntry(version=version, path=path, candidate_sha=None,
+                                  unrecoverable=False, never_released=True)
 
     if cfg.unrecoverable:
         return ReleaseRecordEntry(version=version, path=path, candidate_sha=None,
@@ -407,8 +481,10 @@ def nearest_release_commit(releases_dir: str, *, tag_glob: str | None = None,
     This is what bounds every unreleased-range and coverage computation.  The
     walk is highest-first and stops at the first version whose
     ``candidate_sha`` is an ancestor of *head*, so the ordinary case opens one
-    archive.  An ``unanchorable`` version is skipped -- it has no commit to
-    release commit on, so its neighbours bound the range instead.
+    archive.  A version in either commitless fate is skipped: an
+    ``unrecoverable`` one has no commit to bound with, and a ``never_released``
+    one was never a release at all, so neither can bound a range and their
+    neighbours do it instead.
 
     Returns None when the release record records nothing this checkout contains: a
     project before its first release, or a checkout that predates every
@@ -423,7 +499,7 @@ def nearest_release_commit(releases_dir: str, *, tag_glob: str | None = None,
     _require_backfilled_release_record(releases_dir, versions, tag_glob, cwd)
     for version in versions:
         entry = read_entry(releases_dir, version, tag_glob=tag_glob, cwd=cwd)
-        if entry.unrecoverable:
+        if entry.never_released or entry.unrecoverable:
             continue
         verdict = ancestry(entry.candidate_sha, head, cwd)
         if verdict is Ancestry.TRUE:
@@ -473,10 +549,14 @@ def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
                         head: str = "HEAD") -> LatestReleaseFact:
     """The project's latest release, and whether this checkout contains it.
 
-    The ABSOLUTE highest archived version -- not the highest one in this
-    history.  When the checkout does not contain its commit, the fact still
-    names that version and records the discrepancy, so a display can annotate
-    it rather than quietly reporting an older release as the latest.
+    The absolute highest archived version that was actually RELEASED -- not the
+    highest one in this history, and not a higher archive recorded
+    ``never_released``, which is a version number no release ever used.  Those
+    are skipped and named in the fact's ``never_released_above``, so a display
+    can say what it passed over.  When the checkout does not contain the
+    release's commit, the fact still names that version and records the
+    discrepancy, so a display can annotate it rather than quietly reporting an
+    older release as the latest.
 
     The "no release yet" fact is reported only for a repository that looks like
     one: an empty release record under a tagged version namespace raises rather than
@@ -484,20 +564,27 @@ def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
     """
     versions = list_archived_versions(releases_dir)
     _require_backfilled_release_record(releases_dir, versions, tag_glob, cwd)
-    if not versions:
-        return LatestReleaseFact(version=None, in_checkout=None)
 
-    version = versions[0]
-    entry = read_entry(releases_dir, version, tag_glob=tag_glob, cwd=cwd)
-    if entry.unrecoverable:
-        return LatestReleaseFact(version=version, in_checkout=None,
-                                 unrecoverable=True)
+    phantoms: list[str] = []
+    for version in versions:
+        entry = read_entry(releases_dir, version, tag_glob=tag_glob, cwd=cwd)
+        if entry.never_released:
+            phantoms.append(version)
+            continue
+        if entry.unrecoverable:
+            return LatestReleaseFact(version=version, in_checkout=None,
+                                     unrecoverable=True,
+                                     never_released_above=tuple(phantoms))
 
-    verdict = ancestry(entry.candidate_sha, head, cwd)
-    if verdict is Ancestry.INDETERMINABLE:
-        raise _indeterminable_error(entry, head)
-    return LatestReleaseFact(version=version,
-                             in_checkout=verdict is Ancestry.TRUE)
+        verdict = ancestry(entry.candidate_sha, head, cwd)
+        if verdict is Ancestry.INDETERMINABLE:
+            raise _indeterminable_error(entry, head)
+        return LatestReleaseFact(version=version,
+                                 in_checkout=verdict is Ancestry.TRUE,
+                                 never_released_above=tuple(phantoms))
+
+    return LatestReleaseFact(version=None, in_checkout=None,
+                             never_released_above=tuple(phantoms))
 
 
 def require_checkout_contains_latest(releases_dir: str, *,
@@ -511,8 +598,11 @@ def require_checkout_contains_latest(releases_dir: str, *,
     release is not in: the new release would silently revert it, and its
     changelog range would cover commits that already shipped.
 
-    A no-op when the release record records nothing, and when the latest release is
-    ``unanchorable`` -- there is no commit to require.
+    A no-op when the release record records nothing, and when the latest release
+    is ``unrecoverable`` -- there is no commit to require.  A version recorded
+    ``never_released`` is not the latest release at all, so it never reaches
+    here: requiring a checkout to contain a release that never happened would
+    refuse every release forever.
     """
     fact = latest_release_fact(releases_dir, tag_glob=tag_glob, cwd=cwd, head=head)
     if fact.version is None or fact.in_checkout is not False:

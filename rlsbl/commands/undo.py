@@ -351,7 +351,7 @@ def _release_commit(uc, version, tag):
             "  Undo refused: nothing was destroyed. That archive is what records "
             "which commit the release shipped from.",
         )
-    if getattr(cfg, "unanchorable", False) or not getattr(cfg, "candidate_sha", None):
+    if cfg.unrecoverable or cfg.never_released or not cfg.candidate_sha:
         _die(
             f"Error: the release archive for {version} records no commit: {path}",
             "  Undo cannot find the release's own commits without it, and "

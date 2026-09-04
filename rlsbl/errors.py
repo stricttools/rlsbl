@@ -40,7 +40,7 @@ class ReleaseRecordError(RlsblError):
     Raised for the three ways an archived release file fails the reader that
     needs its release commit: the version's tag disagrees with the release commit, the release commit's
     ancestry cannot be determined, or the archive carries neither a release commit nor
-    the ``unanchorable`` marker.
+    the ``unrecoverable`` marker.
     """
 
 

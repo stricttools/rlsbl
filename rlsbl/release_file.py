@@ -32,13 +32,45 @@ VALID_TARGET_MODES = ("ota", "build")
 # refusal, the strip and the writer all read it.
 RELEASE_COMMIT_FIELDS = ("candidate_sha", "tree_hashes")
 
-# The permanent record that recording a version's release commit FAILED. An archive carries
-# either the release commit or this marker, never both and never neither: a version
-# whose commit could not be recovered (no tag under any recognized scheme, no
-# version-bump commit in history) says so in its own file rather than being
-# silently skipped. Written by the backfill pass, never by the release flow --
-# the flow always knows its own candidate.
-UNRECOVERABLE_FIELD = "unanchorable"
+# THE VERSION-FATE MODEL. An archive is in exactly ONE of three states, and
+# every reader dispatches on which:
+#
+#   recorded         RELEASE_COMMIT_FIELDS present -- it shipped, from a known commit
+#   unrecoverable    UNRECOVERABLE_FIELD = true    -- it shipped, from a commit nothing can name
+#   never released   NEVER_RELEASED_FIELD = true   -- the version NUMBER exists, no release does
+#
+# The schema enforces the exclusion half (no document carries two states); the
+# "exactly one" half belongs to the archive readers, because the same schema
+# validates the editable unreleased.toml, whose correct state is none of them.
+
+# The permanent record that recovering a SHIPPED version's release commit FAILED:
+# no tag under any recognized scheme, no version-bump commit in history. Written
+# by the backfill pass, never by the release flow -- the flow always knows its
+# own candidate.
+UNRECOVERABLE_FIELD = "unrecoverable"
+
+# The record that a version NUMBER exists but no release does -- a phantom tag's
+# version, or a version claimed and abandoned. Not a failed recovery: there is
+# nothing to recover, because nothing was ever published under this number.
+NEVER_RELEASED_FIELD = "never_released"
+
+# The historical tag spelling a version ACTUALLY shipped under, when it differs
+# from the tag scheme in effect today. Orthogonal to the three fate states:
+# legal on a recorded and on an unrecoverable archive, refused on a
+# never-released one, which shipped under nothing.
+SHIPPED_AS_FIELD = "shipped_as"
+
+# Every field only the release flow (or the backfill pass acting for it) may
+# author. The editable unreleased.toml carrying any of them is refused at
+# release validation, and `release undo` strips them all when it restores an
+# archive as the editable file. Stated once here; the refusal and the strip
+# both read it.
+FLOW_OWNED_FIELDS = (
+    *RELEASE_COMMIT_FIELDS,
+    UNRECOVERABLE_FIELD,
+    NEVER_RELEASED_FIELD,
+    SHIPPED_AS_FIELD,
+)
 
 # A git object name (commit or tree). The same shape the schema's
 # GitObjectHash refinement states -- and the same the transition record schema's GitSha
@@ -176,6 +208,12 @@ class ReleaseConfig:
     # True on an archive whose commit could not be recovered at all. Absence is
     # None, not False: "never asked" and "asked and failed" are different facts.
     unrecoverable: bool | None = None
+    # True on an archive for a version NUMBER that no release ever used. Absence
+    # is None for the same reason.
+    never_released: bool | None = None
+    # The historical tag spelling this version shipped under, when it differs
+    # from the scheme in effect today. None means the current scheme applies.
+    shipped_as: str | None = None
 
 
 def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
@@ -514,6 +552,10 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
     else:
         tree_hashes = None
     unrecoverable = data[UNRECOVERABLE_FIELD] if UNRECOVERABLE_FIELD in data else None
+    never_released = (
+        data[NEVER_RELEASED_FIELD] if NEVER_RELEASED_FIELD in data else None
+    )
+    shipped_as = data[SHIPPED_AS_FIELD] if SHIPPED_AS_FIELD in data else None
 
     return ReleaseConfig(
         bump=bump,
@@ -527,6 +569,8 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
         candidate_sha=candidate_sha,
         tree_hashes=tree_hashes,
         unrecoverable=unrecoverable,
+        never_released=never_released,
+        shipped_as=shipped_as,
     )
 
 
@@ -581,6 +625,8 @@ def write_archived_release_file(
     candidate_sha: str | None,
     tree_hashes: dict | None,
     unrecoverable: bool = False,
+    never_released: bool = False,
+    shipped_as: str | None = None,
     header_comments=None,
 ) -> str:
     """Write ``v{version}.toml`` for a release that had no ``unreleased.toml``.
@@ -603,12 +649,26 @@ def write_archived_release_file(
     ``candidate_sha`` and ``tree_hashes`` are the release commit: an archive
     that does not say which commit and tree the version shipped from is not a
     record of the release, so they are written with the file and the archive
-    records its release commit from the instant it exists. The ONE way to write
-    an archive with no release commit is ``unrecoverable=True`` with both
-    release-commit arguments ``None`` -- the backfill
-    case where a version's commit could not be recovered from any source; the
-    file then carries the permanent ``unanchorable = true`` record instead. An
-    archive is never both recorded and unrecoverable, and never neither.
+    records its release commit from the instant it exists.
+
+    THE THREE FATES, and the only ways to write one:
+
+    * **recorded** -- ``candidate_sha`` and ``tree_hashes``, the ordinary case;
+    * **unrecoverable** -- ``unrecoverable=True`` with both release-commit
+      arguments ``None``: the backfill case where a SHIPPED version's commit
+      could not be recovered from any source;
+    * **never released** -- ``never_released=True`` with both release-commit
+      arguments ``None``: the version NUMBER exists (a phantom tag's version,
+      a version claimed and abandoned) but no release was ever published under
+      it.
+
+    The three are exclusive and one is mandatory: an archive is never two of
+    them and never none.
+
+    ``shipped_as`` names the historical tag spelling the version actually
+    shipped under, when it differs from the scheme in effect today. Legal on a
+    recorded and on an unrecoverable archive; refused on a never-released one,
+    which shipped under nothing.
 
     ``header_comments`` replaces the leading comment block (one list element per
     comment line) for a writer other than the release flow -- the backfill pass
@@ -616,14 +676,33 @@ def write_archived_release_file(
 
     Returns the path written.
     """
-    if unrecoverable:
+    if unrecoverable and never_released:
+        raise ReleaseFileError(
+            f"an archive has one fate: pass {UNRECOVERABLE_FIELD}=True for a "
+            f"version that shipped from a commit nothing can name, or "
+            f"{NEVER_RELEASED_FIELD}=True for a version number no release ever "
+            f"used -- never both"
+        )
+    if unrecoverable or never_released:
+        marker = UNRECOVERABLE_FIELD if unrecoverable else NEVER_RELEASED_FIELD
         if candidate_sha is not None or tree_hashes is not None:
             raise ReleaseFileError(
-                "an unrecoverable archive carries no release commit: pass "
-                "candidate_sha=None and tree_hashes=None with unrecoverable=True"
+                f"a {marker} archive carries no release commit: pass "
+                f"candidate_sha=None and tree_hashes=None with {marker}=True"
             )
     else:
         _check_release_commit(candidate_sha, tree_hashes)
+    if shipped_as is not None:
+        if not isinstance(shipped_as, str) or not shipped_as.strip():
+            raise ReleaseFileError(
+                f"{SHIPPED_AS_FIELD} must be a non-empty tag name, got "
+                f"{shipped_as!r}"
+            )
+        if never_released:
+            raise ReleaseFileError(
+                f"a {NEVER_RELEASED_FIELD} archive shipped under nothing, so it "
+                f"carries no {SHIPPED_AS_FIELD}"
+            )
     doc = tomlkit.document()
     if header_comments is None:
         header_comments = [
@@ -646,8 +725,12 @@ def write_archived_release_file(
         doc.add("preid", preid)
     if blog:
         doc.add("blog", True)
+    if shipped_as:
+        doc.add(SHIPPED_AS_FIELD, shipped_as)
     if unrecoverable:
         doc.add(UNRECOVERABLE_FIELD, True)
+    elif never_released:
+        doc.add(NEVER_RELEASED_FIELD, True)
     else:
         doc.add("candidate_sha", candidate_sha)
         doc.add("tree_hashes", _release_commit_tree_table(tree_hashes))
@@ -777,13 +860,14 @@ def strip_release_commit(path: str) -> bool:
     archive it restores as ``unreleased.toml`` must come back as an EDITABLE
     release file, and an editable file carrying a release commit is refused at the
     next release validation (the release commit is the flow's to author, never the
-    operator's). The ``unanchorable`` marker goes with them: it is a statement
-    about a version that already shipped, meaningless on a file describing the
-    next one.
+    operator's). Every other flow-owned field goes with them: the
+    ``unrecoverable`` and ``never_released`` markers and ``shipped_as`` are each
+    a statement about a version whose fate is already settled, meaningless on a
+    file describing the next one.
     """
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.loads(f.read())
-    present = [name for name in (*RELEASE_COMMIT_FIELDS, UNRECOVERABLE_FIELD) if name in doc]
+    present = [name for name in FLOW_OWNED_FIELDS if name in doc]
     if not present:
         return False
     for name in present:

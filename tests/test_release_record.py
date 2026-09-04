@@ -310,7 +310,7 @@ class TestReadEntry:
             release_record.read_entry(str(releases), "0.4.0", tag_glob="lib@v*")
 
     def test_unrecoverable_entry_reads_as_such(self, tmp_path, monkeypatch):
-        r = _init_repo(tmp_path / "unanchorable")
+        r = _init_repo(tmp_path / "unrecoverable")
         monkeypatch.chdir(r)
         _commit(r, "one")
         releases = r / ".rlsbl" / "releases"
@@ -360,7 +360,7 @@ class TestReadEntry:
         with pytest.raises(ReleaseRecordError) as exc:
             release_record.read_entry(_releases(repo), "0.2.0")
         assert "does not exist locally" in str(exc.value)
-        assert "unanchorable" in str(exc.value)
+        assert "unrecoverable" in str(exc.value)
 
 
 # --------------------------------------------------------------------------- #

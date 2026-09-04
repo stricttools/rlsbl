@@ -332,7 +332,7 @@ def read_archive_state(path: str) -> dict:
     return {
         "format_version": "format_version" in data,
         "recorded": any(f in data for f in RELEASE_COMMIT_FIELDS),
-        "unanchorable": bool(data.get(UNRECOVERABLE_FIELD)),
+        "unrecoverable": bool(data.get(UNRECOVERABLE_FIELD)),
     }
 
 
@@ -562,7 +562,7 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
             if version not in changelogs:
                 vp.notes.append("no changelog JSONL for this version")
 
-            already_recorded = bool(state and (state["recorded"] or state["unanchorable"]))
+            already_recorded = bool(state and (state["recorded"] or state["unrecoverable"]))
 
             if not tag:
                 bump_commits = find_bump_commits(repo, version)
@@ -614,7 +614,7 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
                     f"{vp.description_source}, include={vp.include})"
                 )
                 if vp.unrecoverable:
-                    vp.actions.append("write unanchorable = true")
+                    vp.actions.append(f"write {UNRECOVERABLE_FIELD} = true")
                 else:
                     vp.actions.append(
                         f"release commit candidate_sha={vp.candidate_sha[:12]} "
@@ -627,11 +627,11 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
                 if already_recorded:
                     vp.notes.append(
                         "already marked unrecoverable; left alone"
-                        if state["unanchorable"]
+                        if state["unrecoverable"]
                         else "already recorded; left alone"
                     )
                 elif vp.unrecoverable:
-                    vp.actions.append("write unanchorable = true")
+                    vp.actions.append(f"write {UNRECOVERABLE_FIELD} = true")
                 else:
                     vp.actions.append(
                         f"release commit candidate_sha={vp.candidate_sha[:12]} "

@@ -212,7 +212,7 @@ class TestMissingArchive:
         data = read_toml(repo / ".rlsbl" / "releases" / "v0.2.0.toml")
         assert data["candidate_sha"] == git(repo, "rev-parse", "v0.2.0^{commit}")
         assert data["tree_hashes"] == {".": git(repo, "rev-parse", "v0.2.0^{tree}")}
-        assert "unanchorable" not in data
+        assert "unrecoverable" not in data
 
     def test_header_says_it_was_materialized(self, repo):
         run_backfill(repo)
@@ -246,7 +246,7 @@ class TestTaglessVersion:
         assert code == 0
         data = read_toml(repo / ".rlsbl" / "releases" / "v0.1.0.toml")
         assert data["candidate_sha"] == sha
-        assert "unanchorable" not in data
+        assert "unrecoverable" not in data
         assert "recorded from the version-bump commit" in output
 
     def test_marks_unrecoverable_when_nothing_is_recoverable(self, tmp_path):
@@ -257,7 +257,7 @@ class TestTaglessVersion:
 
         assert code == 0
         data = read_toml(repo / ".rlsbl" / "releases" / "v0.1.0.toml")
-        assert data["unanchorable"] is True
+        assert data["unrecoverable"] is True
         assert "candidate_sha" not in data
         assert "tree_hashes" not in data
         assert "unrecoverable" in output
@@ -270,7 +270,7 @@ class TestTaglessVersion:
         run_backfill(repo)
 
         data = read_toml(path)
-        assert data["unanchorable"] is True
+        assert data["unrecoverable"] is True
         assert data["description"] == "The original description, preserved verbatim."
         assert data["format_version"] == 1
         assert is_locked(path)
@@ -461,7 +461,7 @@ class TestIdempotency:
 class TestTotalLine:
     """The closing TOTAL line counts ATTRIBUTES, not parts of a partition.
 
-    ``materialized``, ``format-version stamped`` and ``unanchorable`` are
+    ``materialized``, ``format-version stamped`` and ``unrecoverable`` are
     independent properties of the archives the pass will write: one archive can
     carry two of them (a materialized archive for a version with no recoverable
     commit is materialized AND unrecoverable), and an existing, already-stamped
