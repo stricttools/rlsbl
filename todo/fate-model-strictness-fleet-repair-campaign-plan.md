@@ -21,7 +21,7 @@ with this plan at close.
   identified; the marker key is renamed by this campaign from its old
   spelling `unanchorable` to `unrecoverable`), or
   `never_released = true` (the version number exists but was never a
-  release). The schema's current exactly-one rule between the recorded
+  release). The schema's current exactly-one rule between the release
   commit and the unrecoverable marker is relaxed to this three-state rule
   in the same edit that adds the new keys.
 - **The release-commit vocabulary rename**: the user has banned the old
@@ -262,7 +262,8 @@ Effort: medium.
     `lineage.jsonl` file exists anywhere in the fleet — verified — so no
     fleet data files need renaming);
   - the release-commit vocabulary: prose and identifiers move to
-    "release commit" / "recorded" / "unrecoverable"; the
+    "release commit" / "recorded" / "unrecoverable", and the range-bound
+    function and prose become "nearest release commit"; the
     schema-key half lives in 1.1; the retiring script filename
     `backfill_release_anchors.py` is quoted verbatim where it must be
     named until 2.1 retires it.
@@ -301,7 +302,7 @@ Effort: large.
   key rename is breaking and changelogged as such.
 - Regenerate the validator with the exactly-matched toolchain; bind the
   fields in the archive reader; the editable release file refuses the new
-  keys exactly as it refuses the recorded-commit fields (flow-owned).
+  keys exactly as it refuses the release-commit fields (flow-owned).
 - Migrate the committed archives carrying the old marker key: rlsbl's own
   one such archive now; strictcli's set needs no migration — phase 9
   rewrites those archives wholesale when their commits are recorded (they
@@ -389,14 +390,15 @@ Effort: extra large.
     script.
   - **Unexplained tags are a hard error**: preview lists the unexplained
     set first; apply refuses while any remain; the error names the cheap
-    resolutions (adopt / record / delete per the user's standing class
-    rulings). No partial completion. Per the managed-repo hygiene
+    resolutions: adopt as released (a version-shaped tag no store
+    records), record as a non-version tag in the transition record, or
+    delete on the user's explicit order. No partial completion. Per the managed-repo hygiene
     doctrine, a present git stash is likewise a hard error.
 - Named reuse, not re-creation: the GitHub Release body reader is the one
   in the publication module — and the two remaining ad-hoc body readers
   (in deprecate and yank) are folded onto it in this same item;
   tree-at-commit resolution consolidates onto ONE shared helper (the
-  copies in the release flow, the commit-remap module, extract, absorb,
+  copies in the release flow, the release-commit remap module, extract, absorb,
   and the script collapse onto it); "is this tag explained?" is answered
   by ONE shared consultation function used by this command and reconcile
   (archives for version-shaped tags, the transition record for the rest).
