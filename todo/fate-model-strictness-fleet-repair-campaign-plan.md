@@ -15,19 +15,19 @@ with this plan at close.
   `.rlsbl/releases/` (per releasable under
   `.rlsbl-monorepo/releasables/<name>/releases/` in monorepos). The
   authoritative record of versions. After this campaign an archive is in
-  exactly ONE of three states: **commit-recorded** (`candidate_sha` +
+  exactly ONE of three states: **recorded** (`candidate_sha` +
   `tree_hashes`: the commit and trees the version shipped from),
-  **commit-unrecoverable** (a real release whose shipping commit cannot be
+  **unrecoverable** (a real release whose shipping commit cannot be
   identified; the marker key is renamed by this campaign from its old
-  spelling `unanchorable` to `commit_unrecoverable`), or
+  spelling `unanchorable` to `unrecoverable`), or
   `never_released = true` (the version number exists but was never a
   release). The schema's current exactly-one rule between the recorded
   commit and the unrecoverable marker is relaxed to this three-state rule
   in the same edit that adds the new keys.
-- **The recorded-commit vocabulary rename**: the user has banned the old
-  jargon word for the recorded-commit concept fleet-wide. This campaign
+- **The release-commit vocabulary rename**: the user has banned the old
+  jargon word for the release-commit concept fleet-wide. This campaign
   renames it throughout rlsbl: prose, error texts, identifiers, and docs
-  say "the recorded commit" / "commit-recorded" / "commit-unrecoverable";
+  say "the release commit" / "recorded" / "unrecoverable";
   the schema key renames as above; the retiring script's filename is
   quoted verbatim where it must be named. Scope note: the full-rename
   reading of the ban follows the same precedent as the release-record
@@ -66,12 +66,12 @@ with this plan at close.
   from the tag, description recovered per the recovery chain, bump derived
   by version arithmetic, every reconstructed field marked with its source.
 - **The identity ruling (minting)**: a renamed releasable's past versions
-  get current-spelling tags minted at their recorded commits through the
+  get current-spelling tags minted at their release commits through the
   reconcile repair surface; the old-spelling tags remain in place,
   explained by their archives' shipped-as fields; once minted, a version's
   expected primary ref is the current spelling. The minting capability
   already exists in reconcile's materialize path (verified: it creates and
-  pushes a locally-absent tag at a recorded commit); what this campaign
+  pushes a locally-absent tag at a release commit); what this campaign
   builds is only the expected-spelling derivation.
 - **The one spelling authority**: `expected_refs` on the target protocol
   remains the single authority for which spellings address a version. Its
@@ -98,7 +98,7 @@ with this plan at close.
   be cited as deliberate intent):
   - Auto-apply is permitted only for: creating a GitHub Release on an
     archived version's existing tag; creating and pushing a tag at an
-    archive's recorded commit under the version's expected spelling;
+    archive's release commit under the version's expected spelling;
     pushing an archived tag origin lacks.
   - Only materialize / already-correct verdicts qualify. Deletions, moves
     of existing refs, force-pushes outside mirror flows, and any repair or
@@ -168,7 +168,7 @@ intent): the pre-approved limits [%%]; the reconstructed-description format
 (joined bullet text marked with its source); the shipped-as placement in
 the archives; the migration-script port target (the command's engine
 module); the member-key interim (constant plus binding test); the
-full-rename scope reading of the recorded-commit vocabulary ban.
+full-rename scope reading of the release-commit vocabulary ban.
 
 ## Phase dependency notes
 
@@ -261,8 +261,8 @@ Effort: medium.
     rename orphans, and the selfdoc manifest module lists (no committed
     `lineage.jsonl` file exists anywhere in the fleet — verified — so no
     fleet data files need renaming);
-  - the recorded-commit vocabulary: prose and identifiers move to
-    "recorded commit" / "commit-recorded" / "commit-unrecoverable"; the
+  - the release-commit vocabulary: prose and identifiers move to
+    "release commit" / "recorded" / "unrecoverable"; the
     schema-key half lives in 1.1; the retiring script filename
     `backfill_release_anchors.py` is quoted verbatim where it must be
     named until 2.1 retires it.
@@ -294,9 +294,9 @@ Effort: large.
 
 - One edit to the release-file schema covering: the `never_released` key;
   the shipped-as field; the marker-key rename (`unanchorable` →
-  `commit_unrecoverable`, no dual recognition — pre-stable, no compat);
+  `unrecoverable`, no dual recognition — pre-stable, no compat);
   and the relaxation of the exactly-one rule to the three-state rule
-  (commit-recorded, commit-unrecoverable, or never-released — exactly
+  (recorded, unrecoverable, or never-released — exactly
   one). No format-version bump is obligated for the widening parts; the
   key rename is breaking and changelogged as such.
 - Regenerate the validator with the exactly-matched toolchain; bind the
@@ -337,7 +337,10 @@ Effort: large.
 
 - The transition-record schema gains `release-history-closed` and
   `non-version-tag`, with the same schema-edit-plus-validator-regeneration
-  obligation as 1.1.
+  obligation as 1.1. The rewrite-event literal renames in the same pass
+  from its old banned-word spelling `anchor-remap` to
+  `release-commit-remap` (no committed transition file exists anywhere in
+  the fleet yet — verified — so the rename is code- and schema-only).
 - The rename-vs-identity line is stated in the record's definitions:
   releasable renames are spelling facts; identity changes keep reconcile's
   refusal to recreate older refs, with zero exceptions. Verify at
@@ -432,7 +435,7 @@ Effort: extra large.
   fields through the one spelling authority, with the
   disagreement-is-a-hard-error rule from Terminology.
 - Verify: a renamed-releasable fixture in which reconcile's plan mints the
-  current-spelling tag at the recorded commit while the old tag stands
+  current-spelling tag at the release commit while the old tag stands
   explained; a fixture where an alias event and a shipped-as field
   disagree hard-errors; the minted write matches the pre-approved write
   kinds.
@@ -605,7 +608,7 @@ Effort: medium.
   fixtures included), fix rounds as needed, then the single minor release;
   the pinned install updates to the new release.
 - Verify: registries serving the new version; suite and checks green; the
-  new version's archive carries its recorded commit.
+  new version's archive carries its release commit.
 
 ## Phase 7 — Standalone-fleet sweep
 
@@ -635,7 +638,7 @@ fleet state moves).
 
 In this order:
 
-1. The v1.0.0 archive rewritten from the commit-unrecoverable wedge to
+1. The v1.0.0 archive rewritten from the unrecoverable wedge to
    never-released.
 2. The self-inclusive retract directive added to go.mod
    (`retract [v1.0.0, v1.0.1]` with a comment stating v1.0.0 was an
@@ -671,7 +674,7 @@ Effort: large.
 - strictspec and stricttest: their old-spelling tag sets handled the same
   way (shipped-as fields plus one rename spelling-fact each).
 - Verify: changelog and workspace check tags green in all four; no archive
-  remains marked commit-unrecoverable whose tag exists anywhere.
+  remains marked unrecoverable whose tag exists anywhere.
 
 ## Phase 10 — The reconcile pass
 
@@ -680,7 +683,7 @@ Effort: medium.
 - Reconcile plans across every eligible repo AT THIS POINT (the phase 11
   repos are excluded here and covered in phase 11), auto-applied under the
   pre-approved limits with the stated apply mechanic: the minted
-  current-spelling tags at recorded commits, the missing GitHub Releases,
+  current-spelling tags at release commits, the missing GitHub Releases,
   the archived-but-unpushed tags. Pauses only per the consent-pauses list.
 - Verify: ref-presence checks green across the repos covered so far; the
   running tally within ceilings in the campaign record file; a written
