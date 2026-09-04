@@ -282,11 +282,15 @@ def _missing_release_commit_error(version: str, path: str, tag_glob: str | None,
         )
         sha_line = 'candidate_sha = "<the released commit>"'
     return ReleaseRecordError(
-        f"the release record entry for {version} carries no release commit: {path}\n"
-        f"  An archive records either the release commit the release flow wrote\n"
-        f"  (candidate_sha + [tree_hashes]) or the unrecoverable marker. This one\n"
-        f"  has neither, so it was written before release commits were recorded and was never\n"
-        f"  backfilled -- and rlsbl cannot tell which commit {version} shipped from.\n"
+        f"the release record entry for {version} records no fate: {path}\n"
+        f"  An archive records exactly one of three: the release commit the\n"
+        f"  release flow wrote (candidate_sha + [tree_hashes]), the\n"
+        f"  unrecoverable marker (it shipped, from a commit nothing can name),\n"
+        f"  or the never_released marker (the version number exists, no release\n"
+        f"  does). This one records none of them, so it was written before\n"
+        f"  release commits were recorded and was never backfilled -- and rlsbl\n"
+        f"  cannot tell which commit {version} shipped from, or whether it\n"
+        f"  shipped at all.\n"
         f"{derived}\n"
         f"  Recover this one version:\n"
         f"    1. Unlock the archive -- it is chmod 444. In Python:\n"

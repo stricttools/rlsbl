@@ -108,6 +108,8 @@ It is fail-closed: a probe that cannot answer -- an unreadable local tag namespa
 
 A version the release record records as `unrecoverable` has no recoverable commit, so a ref it is missing cannot be recreated and `rlsbl release reconcile` has nothing to point at -- and no release commit to take a `rlsbl-ci-sha` marker from either, so a Release it lacks cannot be materialized. Both absences are counted and named in the outcome message instead of reported as fixable errors. Every other finding for such a version -- a ref that exists locally but not on origin -- is still reported.
 
+A version the release record records as `never_released` is a version NUMBER no release ever used, so it owns no ref and no Release at all. It is skipped, named in the outcome message, and excluded from the released-version count -- reporting a phantom as a release would be the check agreeing with the mistake it exists to surface.
+
 A Release is judged on the version's primary tag, the one the release flow attaches it to, and only when that tag is on origin. A tag that never reached the forge is already reported as missing on origin, and a Release cannot exist without it.
 
 **No version window.** Every half covers every archived release, not a recent slice. The whole local tag namespace comes from one `for-each-ref`, the whole remote namespace from one `ls-remote`, and every Release from one `gh release list`, so probing two hundred releases costs the same as probing one. A per-version probe would have forced a bound and left older releases unchecked.

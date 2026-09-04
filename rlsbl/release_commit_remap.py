@@ -179,13 +179,15 @@ def plan_release_commit_remap(releases_dir: str, commit_map: dict, *, cwd=None,
     for version in list_archived_versions(releases_dir):
         path = archived_release_path(releases_dir, version)
         archive = read_release_file(path)
-        if archive.unrecoverable:
+        if archive.unrecoverable or archive.never_released:
+            # Both commitless fates: an unrecoverable version's commit cannot be
+            # named at all, and a never-released one never had a commit to move.
             continue
         old_sha = (archive.candidate_sha or "").strip()
         if not old_sha:
-            # An archive carrying neither a release commit nor the unrecoverable marker
-            # is the release record's MISSING-RELEASE-COMMIT case, which has its own recovery
-            # and its own error. A rewrite has nothing to move here.
+            # An archive in NONE of the three fates is the release record's
+            # no-fate case, which has its own recovery and its own error. A
+            # rewrite has nothing to move here.
             continue
         new_sha = _map_sha(old_sha, commit_map)
         if not new_sha or new_sha == old_sha:

@@ -249,6 +249,22 @@ Tags that parse under no recognized scheme are listed and left alone. The pass i
 
 `unrecoverable` is written by the backfill and by nothing else — a flow that is releasing always knows its own candidate — and `rlsbl release undo` strips it alongside the release commit when it restores an archive as the editable release file.
 
+### The three version fates
+
+Every archived release file records exactly one of three fates, and every read of the release record dispatches on which:
+
+| Fate | How it is written | What it means |
+| --- | --- | --- |
+| recorded | `candidate_sha` + `tree_hashes` | The version shipped, and rlsbl knows the commit and the trees it shipped from. |
+| unrecoverable | `unrecoverable = true` | The version shipped, and the commit it shipped from cannot be recovered from any source. It still has consumers and real refs; only rlsbl's knowledge of where it came from is gone. |
+| never released | `never_released = true` | The version NUMBER exists in the record — a phantom tag's version, a version claimed and abandoned — but no release was ever published under it. |
+
+The third is not a degraded second. Every read that asks what this project RELEASED skips a never-released version: it is not the latest release, it does not bound the unreleased range, `rlsbl release undo` does not select it, the `unpublished-refs` check demands neither refs nor a GitHub Release for it, and `rlsbl release reconcile` never plans a deletion of a tag carrying its name. Its CHANGELOG.md section is still rendered — such a version can carry finalized changelog files, and hiding them would lose the record — annotated as never released.
+
+An archive recording none of the three is a hard error at every read-for-use site: it was written before release commits were recorded and never backfilled, and rlsbl cannot tell which commit the version shipped from, or whether it shipped at all.
+
+`shipped_as` is orthogonal to the three. It names the historical tag spelling a version actually shipped under when that differs from the scheme in effect today (`strictcli@v0.12.0` on a version now tagged `v0.12.0`, say). Legal on a recorded and on an unrecoverable archive; refused on a never-released one, which shipped under nothing.
+
 ### The CI gate
 
 The gate blocks the irreversible half of the release until the repository's own CI has spoken about the candidate commit, and it distinguishes four outcomes rather than collapsing them into pass/fail. The distinction matters because the right operator response differs sharply between a definite failure, an unfinished wait, and a repository that simply has no CI to wait for:
@@ -500,7 +516,7 @@ Successive rewrites chain: a commit rewritten twice is followed through both map
 | `refuse-foreign` | origin holds something no source explains — **the publication tripwire**. One of these aborts the entire reconcile: nothing is repaired anywhere. A reconcile that repaired around an unexplained divergence would be choosing which half of an inconsistent world to trust. The same verdict covers a local ref that disagrees with the release record, because pushing it would publish a commit the release record does not record as released. |
 | `refuse-identity-mismatch` | the target's `release_materialization_policy` refuses. Go declares it: a Go tag *is* the published artifact, so recreating one for a version released under a module path the repository has since changed would publish that version under the new identity for the first time, permanently. |
 
-An `unrecoverable` version is skipped entirely — it has no commit, so there is nothing to compare against and nothing to create a ref at.
+Two fates are skipped entirely. An `unrecoverable` version has no commit, so there is nothing to compare against and nothing to create a ref at. A `never_released` version was never released, so it owns no ref origin could be wrong about and no GitHub Release that could be missing — and the refs it would have owned are claimed anyway, so a tag carrying its name never reaches the unarchived-tag pass where a divergence would fire the tripwire.
 
 ### The release record is healed before anything is judged
 

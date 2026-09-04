@@ -351,6 +351,8 @@ The workspace-scoped home exists because a departure is a fact about the source 
 | `departed-globs` | Written in the **source** of an extract: the tag globs that stopped belonging here, and where they went |
 | `identity-transition` | A published identity changed (a Go module path, a package name), effective from a stated version |
 | `promotion-split-map` | A mirror was promoted: the subtree-split correspondence it produced |
+| `release-history-closed` | A member's or releasable's release history is deliberately closed: the subject and an operator reason. Not written by a conversion — an operator records it |
+| `non-version-tag` | One tag stands deliberately outside the version model: its name and an operator reason. Not written by a conversion — an operator records it |
 
 The `tag-map`, `release-commit-remap` and `boundary-alias` events a conversion writes carry `related_to`, pointing at the id of the `conversion` event that heads them, so the events of one conversion are recoverable as a group from a file that has accumulated several. A `departed-globs` event stands alone: it is written in the source, where the conversion event it would point at does not exist.
 
