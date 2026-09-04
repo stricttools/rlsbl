@@ -1465,17 +1465,16 @@ def make_releasable_state(
     # mode (644), which is what production leaves behind: the .md is a
     # regenerated derivative, not a locked record like the .jsonl.
     from rlsbl.changelog.generate import (
-        _read_release_metadata_full,
         generate_version_file,
+        read_archive_metadata,
     )
 
     for ver in versioned_entries:
-        ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
-            root, ver, releases_dir=releases_dir,
-        )
+        meta = read_archive_metadata(root, ver, releases_dir=releases_dir)
         generate_version_file(
             changes_dir, ver,
-            description=ver_desc, context=ver_ctx, bump_type=ver_bump or None,
+            description=meta.description, context=meta.context,
+            bump_type=meta.bump or None, never_released=meta.never_released,
         )
 
     with open(os.path.join(rel_dir, "config.json"), "w", encoding="utf-8") as f:

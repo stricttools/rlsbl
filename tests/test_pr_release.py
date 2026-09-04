@@ -123,6 +123,7 @@ def _setup_pr_mode_project(repo):
     releases_dir = repo / ".rlsbl" / "releases"
     releases_dir.mkdir(parents=True, exist_ok=True)
     (releases_dir / "unreleased.toml").write_text(
+        'format_version = 1\n'
         'bump = "patch"\ninclude = ["npm"]\nexclude = []\ndescription = "test release"\n'
     )
     _git(repo, "add", ".rlsbl/releases/unreleased.toml")
@@ -277,6 +278,7 @@ class TestImperativeModeUnchanged:
         releases_dir = mock_git_repo / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text(
+            'format_version = 1\n'
             'bump = "patch"\ninclude = ["npm"]\nexclude = []\ndescription = "test"\n'
         )
         _git(mock_git_repo, "add", ".rlsbl/releases/unreleased.toml")

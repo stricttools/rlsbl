@@ -10,7 +10,7 @@ import tomlkit
 
 from conftest import run_git as _run_git, make_commit as _make_commit
 from rlsbl.changelog.generate import (
-    _read_release_metadata_full,
+    read_archive_metadata,
     generate_changelog,
     generate_version_section,
 )
@@ -239,7 +239,10 @@ class TestInfraChangelogAssembly:
         releases = tmp_path / ".rlsbl" / "releases"
         releases.mkdir(parents=True, exist_ok=True)
         doc = tomlkit.document()
+        doc.add("format_version", 1)
         doc.add("bump", "infra")
+        doc.add("include", [])
+        doc.add("exclude", [])
         doc.add("description", "Scaffold refresh.")
         (releases / "v0.1.1.toml").write_text(tomlkit.dumps(doc))
 
@@ -259,7 +262,10 @@ class TestLegacyHotfixArchiveHardError:
         releases = tmp_path / ".rlsbl" / "releases"
         releases.mkdir(parents=True, exist_ok=True)
         doc = tomlkit.document()
+        doc.add("format_version", 1)
         doc.add("bump", bump)
+        doc.add("include", [])
+        doc.add("exclude", [])
         doc.add("description", "Some release")
         (releases / f"v{version}.toml").write_text(tomlkit.dumps(doc))
         return str(releases)
@@ -267,7 +273,7 @@ class TestLegacyHotfixArchiveHardError:
     def test_legacy_hotfix_value_raises(self, tmp_path):
         releases = self._write_archive(tmp_path, "1.2.3", "hotfix")
         with pytest.raises(ReleaseFileError) as exc:
-            _read_release_metadata_full(
+            read_archive_metadata(
                 str(tmp_path), "1.2.3", releases_dir=releases,
             )
         msg = str(exc.value)
@@ -277,11 +283,11 @@ class TestLegacyHotfixArchiveHardError:
 
     def test_infra_value_is_accepted(self, tmp_path):
         releases = self._write_archive(tmp_path, "1.2.3", "infra")
-        desc, ctx, bump = _read_release_metadata_full(
+        meta = read_archive_metadata(
             str(tmp_path), "1.2.3", releases_dir=releases,
         )
-        assert bump == "infra"
-        assert desc == "Some release"
+        assert meta.bump == "infra"
+        assert meta.description == "Some release"
 
 
 class TestValidBumpTypesConsolidated:

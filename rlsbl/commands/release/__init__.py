@@ -15,7 +15,7 @@ from ...changelog import (
     get_changes_dir,
     validate_unreleased,
 )
-from ...changelog.generate import _read_release_metadata, _read_release_metadata_full
+from ...changelog.generate import read_archive_metadata
 from ...errors import ConfigError, PostReleaseError, RlsblError  # noqa: F401  (ConfigError re-exported for execute.py)
 from ...git_util import validate_subtree_remote_ssh_host
 from ...config import read_deploy_config, read_json_config, should_tag, update_last_build_release

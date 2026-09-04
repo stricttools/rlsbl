@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import dataclass
 
 import tomlkit
 
 from ..errors import ReleaseFileError
-from ..release_file import VALID_BUMP_TYPES
+from ..release_file import VALID_BUMP_TYPES, read_release_file
 from .files import get_changes_dir, list_versioned_files, read_unreleased
 from .schema import ChangelogEntry, parse_jsonl
 from .. import effects
@@ -51,62 +52,109 @@ _TYPE_ORDER: list[tuple[str, str]] = [
 ]
 
 
-def _read_release_metadata(project_path: str, version: str, *,
-                           releases_dir: str | None = None) -> tuple[str, str]:
-    """Read description and context from an archived release toml file.
+@dataclass(frozen=True)
+class ArchiveMetadata:
+    """What a regenerated changelog section reads out of a release archive.
 
-    Looks for v{version}.toml in ``releases_dir`` (default:
-    ``<project_path>/.rlsbl/releases/``; releasable releases archive under
-    the releasable's own releases dir) and extracts the description and
-    context fields. Returns ("", "") if the file doesn't exist or can't
-    be parsed.
+    The absent-archive case is this dataclass with every field at its default:
+    a version whose archive was never written renders its entries with no
+    description, which is the state a pre-archive release legitimately leaves.
+    An archive that EXISTS but cannot be read is not this -- it raises.
     """
-    desc, ctx, _bump = _read_release_metadata_full(
-        project_path, version, releases_dir=releases_dir,
-    )
-    return (desc, ctx)
+
+    description: str = ""
+    context: str = ""
+    bump: str = ""
+    never_released: bool = False
+    shipped_as: str | None = None
 
 
-def _read_release_metadata_full(project_path: str, version: str, *,
-                                releases_dir: str | None = None) -> tuple[str, str, str]:
-    """Read description, context, and bump type from an archived release toml file.
+_ABSENT_ARCHIVE = ArchiveMetadata()
 
-    Looks for v{version}.toml in ``releases_dir`` (default:
-    ``<project_path>/.rlsbl/releases/``; releasable releases archive under
-    the releasable's own releases dir) and extracts the description,
-    context, and bump fields. Returns ("", "", "") if the file doesn't exist
-    or can't be parsed.
+
+def _legacy_bump_error(toml_path: str) -> ReleaseFileError | None:
+    """The legacy-bump diagnostic for an archive the schema just refused.
+
+    ``bump = "hotfix"`` was renamed to ``"infra"``, and the schema's enum now
+    refuses the old value -- correctly, but with a diagnostic that names the
+    enum rather than the migration. This re-reads the refused document (only on
+    the error path, which already ends the read) and, when the cause really is
+    a legacy bump, raises the message that names what to do about it.
     """
-    if releases_dir is None:
-        releases_dir = os.path.join(project_path, ".rlsbl", "releases")
-    toml_path = os.path.join(releases_dir, f"v{version}.toml")
     try:
         with open(toml_path, "r", encoding="utf-8") as f:
             data = tomlkit.load(f)
     except (OSError, tomlkit.exceptions.ParseError):
-        return ("", "", "")
-
-    description = data.get("description", "")
-    context = data.get("context", "")
+        return None
     bump = data.get("bump", "")
-    if not isinstance(description, str):
-        description = ""
-    if not isinstance(context, str):
-        context = ""
     if not isinstance(bump, str):
-        bump = ""
+        return None
     bump = bump.strip()
-    # Legacy hard error: a non-empty bump value that is not one of the current
-    # valid types (notably the legacy "hotfix", renamed to "infra") must not be
-    # silently mis-rendered. Fail loudly so the archived file is migrated.
-    if bump and bump not in VALID_BUMP_TYPES:
+    if not bump or bump in VALID_BUMP_TYPES:
+        return None
+    return ReleaseFileError(
+        f'archived release file {toml_path} carries an unknown '
+        f'bump={bump!r}. If this is the legacy "hotfix" value, migrate it '
+        f'to "infra" (run the fleet archive migration or edit the file); '
+        f'valid bump types are {", ".join(VALID_BUMP_TYPES)}.'
+    )
+
+
+def read_archive_metadata(project_path: str, version: str, *,
+                          releases_dir: str | None = None) -> ArchiveMetadata:
+    """Read one version's archived release file, through the VALIDATING reader.
+
+    Looks for ``v{version}.toml`` in ``releases_dir`` (default:
+    ``<project_path>/.rlsbl/releases/``; releasable releases archive under the
+    releasable's own releases dir).
+
+    An ABSENT archive yields :data:`_ABSENT_ARCHIVE` -- empty metadata. That is
+    a real state: a version released before rlsbl archived a release file per
+    version has no archive, and its section renders without a description.
+
+    An archive that EXISTS and cannot be read is a HARD ERROR naming the file.
+    This path used to parse the document raw and turn any failure -- bad TOML,
+    a missing ``format_version`` gate, a field of the wrong type -- into an
+    empty description, which ``changelog generate`` then committed over the
+    version's real description in both CHANGELOG.md and the read-only
+    per-version ``.md``. Silently losing a shipped release's prose is the one
+    thing that read must not do.
+    """
+    if releases_dir is None:
+        releases_dir = os.path.join(project_path, ".rlsbl", "releases")
+    toml_path = os.path.join(releases_dir, f"v{version}.toml")
+    if not os.path.isfile(toml_path):
+        return _ABSENT_ARCHIVE
+
+    try:
+        cfg = read_release_file(toml_path)
+    except ReleaseFileError as exc:
+        legacy = _legacy_bump_error(toml_path)
+        if legacy is not None:
+            raise legacy from exc
+        raise
+    except OSError as exc:
         raise ReleaseFileError(
-            f'archived release file {toml_path} carries an unknown '
-            f'bump={bump!r}. If this is the legacy "hotfix" value, migrate it '
-            f'to "infra" (run the fleet archive migration or edit the file); '
-            f'valid bump types are {", ".join(VALID_BUMP_TYPES)}.'
-        )
-    return (description.strip(), context.strip(), bump)
+            f"archived release file {toml_path} could not be read: {exc}"
+        ) from exc
+
+    return ArchiveMetadata(
+        description=cfg.description.strip(),
+        context=cfg.context.strip(),
+        bump=cfg.bump.strip(),
+        never_released=bool(cfg.never_released),
+        shipped_as=cfg.shipped_as,
+    )
+
+
+# The annotation a never-released version's section carries. Such a version has
+# real finalized changelog files -- entries were written and locked before the
+# release was abandoned -- so the section is RENDERED rather than hidden, and the
+# annotation is what keeps a reader from taking it for a release that happened.
+NEVER_RELEASED_NOTE = (
+    "**Never released.** This version number exists in the release record, but "
+    "no release was ever published under it."
+)
 
 
 def generate_version_section(
@@ -116,6 +164,7 @@ def generate_version_section(
     description: str = "",
     context: str = "",
     bump_type: str | None = None,
+    never_released: bool = False,
 ) -> str:
     """Generate markdown for one version section.
 
@@ -130,6 +179,11 @@ def generate_version_section(
     version heading and before the first type group. When ``context`` is
     provided, it is rendered as a collapsible ``<details>`` block after the
     description.
+
+    ``never_released`` renders :data:`NEVER_RELEASED_NOTE` between the heading
+    and the description. The section is still produced in full: a version the
+    release record records as never released can carry finalized changelog
+    files, and dropping the section would lose them.
     """
     # Determine release type marker from entries
     release_types = {e.release_type for e in entries if e.release_type}
@@ -142,6 +196,8 @@ def generate_version_section(
 
     if not user_facing:
         section = f"## {version}{release_marker}\n\n"
+        if never_released:
+            section += f"{NEVER_RELEASED_NOTE}\n\n"
         if description:
             section += f"{description}\n\n"
         if context:
@@ -166,6 +222,10 @@ def generate_version_section(
         buckets.setdefault(key, []).append(desc)
 
     parts: list[str] = [f"## {version}{release_marker}"]
+
+    if never_released:
+        parts.append("")
+        parts.append(NEVER_RELEASED_NOTE)
 
     if description:
         parts.append("")
@@ -226,6 +286,7 @@ def generate_version_file(
     description: str = "",
     context: str = "",
     bump_type: str | None = None,
+    never_released: bool = False,
 ) -> str:
     """Read the JSONL file for a version, generate markdown, optionally write .md alongside it.
 
@@ -233,11 +294,15 @@ def generate_version_file(
     markdown without touching the filesystem (used to preview content before pre-checks).
 
     When ``description`` and ``context`` are provided, they are passed through to
-    ``generate_version_section()`` so release metadata appears in the output.
+    ``generate_version_section()`` so release metadata appears in the output, and
+    so is ``never_released``.
     """
     jsonl_path = os.path.join(changes_dir, f"{version}.jsonl")
     entries = parse_jsonl(jsonl_path)
-    md = generate_version_section(version, entries, description=description, context=context, bump_type=bump_type)
+    md = generate_version_section(
+        version, entries, description=description, context=context,
+        bump_type=bump_type, never_released=never_released,
+    )
 
     if write_to_disk:
         md_path = os.path.join(changes_dir, f"{version}.md")
@@ -282,6 +347,7 @@ def _generate_consolidated_section(
     description: str = "",
     context: str = "",
     bump_type: str | None = None,
+    never_released: bool = False,
 ) -> str:
     """Generate a consolidated section for a stable version with pre-release predecessors.
 
@@ -298,7 +364,7 @@ def _generate_consolidated_section(
     stable_section = generate_version_section(
         stable_version, deduped,
         description=description, context=context,
-        bump_type=bump_type,
+        bump_type=bump_type, never_released=never_released,
     )
     parts.append(stable_section.rstrip("\n"))
 
@@ -451,13 +517,14 @@ def generate_changelog(
 
     # Always generate individual per-version .md files.
     for version, _jsonl_path in versioned:
-        ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+        meta = read_archive_metadata(
             project_path, version, releases_dir=releases_dir_override,
         )
         generate_version_file(
             changes_dir, version, write_to_disk=write_to_disk,
-            description=ver_desc, context=ver_ctx,
-            bump_type=ver_bump or None,
+            description=meta.description, context=meta.context,
+            bump_type=meta.bump or None,
+            never_released=meta.never_released,
         )
 
     # Group versions by their base version for consolidation.
@@ -493,7 +560,7 @@ def generate_changelog(
             # (group is newest-first from list_versioned_files, reverse it).
             prerelease_asc = list(reversed(prerelease_versions))
 
-            ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+            meta = read_archive_metadata(
                 project_path, base, releases_dir=releases_dir_override,
             )
             section = _generate_consolidated_section(
@@ -501,24 +568,26 @@ def generate_changelog(
                 all_entries,
                 prerelease_asc,
                 prerelease_entries_map,
-                description=ver_desc,
-                context=ver_ctx,
-                bump_type=ver_bump or None,
+                description=meta.description,
+                context=meta.context,
+                bump_type=meta.bump or None,
+                never_released=meta.never_released,
             )
             sections.append(section)
         else:
             # No consolidation needed: either all pre-releases or a lone stable.
             # Emit each version individually.
             for ver in group:
-                ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+                meta = read_archive_metadata(
                     project_path, ver, releases_dir=releases_dir_override,
                 )
                 md = generate_version_section(
                     ver,
                     parse_jsonl(os.path.join(changes_dir, f"{ver}.jsonl")),
-                    description=ver_desc,
-                    context=ver_ctx,
-                    bump_type=ver_bump or None,
+                    description=meta.description,
+                    context=meta.context,
+                    bump_type=meta.bump or None,
+                    never_released=meta.never_released,
                 )
                 sections.append(md)
 

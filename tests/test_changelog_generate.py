@@ -10,12 +10,13 @@ from rlsbl.changelog.generate import (
     _base_version,
     _deduplicate_entries,
     _is_prerelease,
-    _read_release_metadata,
     generate_changelog,
     generate_version_file,
     generate_version_section,
+    read_archive_metadata,
 )
 from rlsbl.changelog.schema import ChangelogEntry
+from rlsbl.errors import ReleaseFileError
 
 
 def _jsonl_line(**kwargs) -> str:
@@ -726,6 +727,52 @@ class TestGenerateChangelog:
         v1_pos = content.index("## 1.0.0")
         assert v2_pos < desc_pos < v1_pos
 
+    def test_a_never_released_version_is_rendered_and_annotated(
+        self, tmp_path, monkeypatch,
+    ):
+        """Its section is kept, not hidden -- and marked as never released.
+
+        A version recorded ``never_released`` can carry finalized changelog
+        files: the entries were written and locked before the release was
+        abandoned. Dropping the section would lose them, so it is rendered with
+        its own archived description and an annotation that stops a reader
+        taking it for a release that happened.
+        """
+        from rlsbl.changelog.generate import NEVER_RELEASED_NOTE
+
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.0.0": [
+                    _jsonl_line(commits=["a"], user_facing=True,
+                                description="Initial", type="feature"),
+                ],
+                "1.1.0": [
+                    _jsonl_line(commits=["b"], user_facing=True,
+                                description="Work that never shipped",
+                                type="feature"),
+                ],
+            },
+        )
+        _archive(tmp_path, "1.0.0", _VALID + 'description = "First release"\n')
+        _archive(tmp_path, "1.1.0",
+                 _VALID + 'description = "Claimed, then abandoned."\n'
+                 "never_released = true\n")
+
+        content = generate_changelog(str(tmp_path))
+
+        section = content[content.index("## 1.1.0"):content.index("## 1.0.0")]
+        assert NEVER_RELEASED_NOTE in section
+        assert "Claimed, then abandoned." in section
+        assert "Work that never shipped" in section
+        # The real release keeps its plain section.
+        assert NEVER_RELEASED_NOTE not in content[content.index("## 1.0.0"):]
+
+        # And so does the per-version .md the same pass regenerates.
+        md = (tmp_path / ".rlsbl" / "changes" / "1.1.0.md").read_text()
+        assert NEVER_RELEASED_NOTE in md
+
     def test_versioned_sections_include_archived_description_and_context(
         self, tmp_path, monkeypatch,
     ):
@@ -748,10 +795,12 @@ class TestGenerateChangelog:
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "v1.0.0.toml").write_text(
+            'format_version = 1\n'
             'bump = "major"\ndescription = "First stable release"\ncontext = ""\n'
             'include = ["pypi"]\nexclude = []\n'
         )
         (releases_dir / "v2.0.0.toml").write_text(
+            'format_version = 1\n'
             'bump = "major"\ndescription = "Major rewrite"\n'
             'context = "Migrated from REST to GraphQL"\n'
             'include = ["pypi"]\nexclude = []\n'
@@ -815,6 +864,7 @@ class TestGenerateChangelog:
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "v3.0.0.toml").write_text(
+            'format_version = 1\n'
             'bump = "major"\ndescription = "Complete redesign"\n'
             'context = "Old API was unmaintainable"\n'
             'include = ["pypi"]\nexclude = []\n'
@@ -829,57 +879,92 @@ class TestGenerateChangelog:
         assert "Old API was unmaintainable" in md_content
 
 
-class TestReadReleaseMetadata:
-    """Tests for _read_release_metadata."""
+_VALID = (
+    "format_version = 1\n"
+    'bump = "minor"\n'
+    'include = ["pypi"]\n'
+    "exclude = []\n"
+)
+
+
+def _archive(tmp_path, version, body):
+    releases_dir = tmp_path / ".rlsbl" / "releases"
+    releases_dir.mkdir(parents=True, exist_ok=True)
+    path = releases_dir / f"v{version}.toml"
+    path.write_text(body)
+    return path
+
+
+class TestReadArchiveMetadata:
+    """The archive read behind every regenerated changelog section.
+
+    It goes through the validating reader, so an archive that fails its schema
+    is a hard error naming the file rather than an empty description silently
+    committed over the version's real one.
+    """
 
     def test_reads_description_and_context(self, tmp_path):
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True, exist_ok=True)
-        (releases_dir / "v1.0.0.toml").write_text(
-            'bump = "minor"\ndescription = "A release"\ncontext = "Some context"\n'
-            'include = ["pypi"]\nexclude = []\n'
-        )
-        desc, ctx = _read_release_metadata(str(tmp_path), "1.0.0")
-        assert desc == "A release"
-        assert ctx == "Some context"
+        _archive(tmp_path, "1.0.0",
+                 _VALID + 'description = "A release"\ncontext = "Some context"\n')
+        md = read_archive_metadata(str(tmp_path), "1.0.0")
+        assert md.description == "A release"
+        assert md.context == "Some context"
+        assert md.bump == "minor"
 
-    def test_returns_empty_when_no_file(self, tmp_path):
-        desc, ctx = _read_release_metadata(str(tmp_path), "1.0.0")
-        assert desc == ""
-        assert ctx == ""
+    def test_absent_archive_is_empty_metadata_not_an_error(self, tmp_path):
+        md = read_archive_metadata(str(tmp_path), "1.0.0")
+        assert md.description == ""
+        assert md.context == ""
+        assert md.bump == ""
+        assert md.never_released is False
 
-    def test_returns_empty_context_when_context_empty(self, tmp_path):
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True, exist_ok=True)
-        (releases_dir / "v2.0.0.toml").write_text(
-            'bump = "minor"\ndescription = "Release"\ncontext = ""\n'
-            'include = ["pypi"]\nexclude = []\n'
-        )
-        desc, ctx = _read_release_metadata(str(tmp_path), "2.0.0")
-        assert desc == "Release"
-        assert ctx == ""
-
-    def test_returns_empty_when_no_description_field(self, tmp_path):
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True, exist_ok=True)
-        # Old-style toml without description/context
-        (releases_dir / "v0.1.0.toml").write_text(
-            'bump = "patch"\ninclude = ["pypi"]\nexclude = []\n'
-        )
-        desc, ctx = _read_release_metadata(str(tmp_path), "0.1.0")
-        assert desc == ""
-        assert ctx == ""
+    def test_absent_context_reads_as_empty(self, tmp_path):
+        _archive(tmp_path, "2.0.0", _VALID + 'description = "Release"\n')
+        md = read_archive_metadata(str(tmp_path), "2.0.0")
+        assert md.description == "Release"
+        assert md.context == ""
 
     def test_strips_whitespace(self, tmp_path):
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        releases_dir.mkdir(parents=True, exist_ok=True)
-        (releases_dir / "v1.0.0.toml").write_text(
-            'bump = "minor"\ndescription = "  padded  "\ncontext = "  also padded  "\n'
-            'include = ["pypi"]\nexclude = []\n'
+        _archive(
+            tmp_path, "1.0.0",
+            _VALID + 'description = "  padded  "\ncontext = "  also padded  "\n',
         )
-        desc, ctx = _read_release_metadata(str(tmp_path), "1.0.0")
-        assert desc == "padded"
-        assert ctx == "also padded"
+        md = read_archive_metadata(str(tmp_path), "1.0.0")
+        assert md.description == "padded"
+        assert md.context == "also padded"
+
+    def test_reads_the_never_released_fate(self, tmp_path):
+        _archive(tmp_path, "3.0.0",
+                 _VALID + 'description = "Claimed, never shipped"\n'
+                 "never_released = true\n")
+        md = read_archive_metadata(str(tmp_path), "3.0.0")
+        assert md.never_released is True
+        assert md.description == "Claimed, never shipped"
+
+    def test_unparseable_archive_is_a_hard_error_naming_the_file(self, tmp_path):
+        _archive(tmp_path, "1.0.0", "this is not = valid = toml\n")
+        with pytest.raises(ReleaseFileError) as exc:
+            read_archive_metadata(str(tmp_path), "1.0.0")
+        assert "v1.0.0.toml" in str(exc.value)
+
+    def test_schema_invalid_archive_is_a_hard_error_naming_the_file(self, tmp_path):
+        # No format_version gate, no description: a document the schema
+        # refuses. It used to read as an empty description, which regeneration
+        # then committed over the version's real one.
+        _archive(tmp_path, "0.1.0", 'bump = "patch"\ninclude = []\nexclude = []\n')
+        with pytest.raises(ReleaseFileError) as exc:
+            read_archive_metadata(str(tmp_path), "0.1.0")
+        assert "v0.1.0.toml" in str(exc.value)
+
+    def test_the_legacy_hotfix_bump_still_names_its_migration(self, tmp_path):
+        _archive(tmp_path, "1.0.0",
+                 'format_version = 1\nbump = "hotfix"\ninclude = []\n'
+                 'exclude = []\ndescription = "d"\n')
+        with pytest.raises(ReleaseFileError) as exc:
+            read_archive_metadata(str(tmp_path), "1.0.0")
+        text = str(exc.value)
+        assert "hotfix" in text
+        assert "infra" in text
 
 
 class TestGenerateVersionFileWithMetadata:

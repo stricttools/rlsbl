@@ -266,7 +266,9 @@ class TestWatchInvokedAfterRelease:
         releases_dir = tmp_project / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text(
+            'format_version = 1\n'
             'bump = "patch"\ninclude = ["npm"]\nexclude = []\n'
+            'description = "test release"\n'
         )
 
         fake_sha = "abc123def456"
@@ -350,7 +352,9 @@ class TestWatchInvokedAfterRelease:
         releases_dir = tmp_project / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
         (releases_dir / "unreleased.toml").write_text(
+            'format_version = 1\n'
             'bump = "patch"\ninclude = ["npm"]\nexclude = []\n'
+            'description = "test release"\n'
         )
 
         fake_sha = "abc123def456"

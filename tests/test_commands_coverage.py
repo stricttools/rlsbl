@@ -1065,6 +1065,7 @@ class TestReleaseEnvFile:
 
     def test_env_file_loads_and_aliases_cf(self, monkeypatch, tmp_path, mock_git_repo):
         from rlsbl.commands.release import _run_cmd_inner
+        from rlsbl.release_file import FLOW_OWNED_FIELDS
 
         # mock_git_repo initializes a git repo at the process cwd so the release
         # flow's ``git status --porcelain`` (run in the process cwd) succeeds
@@ -1082,12 +1083,12 @@ class TestReleaseEnvFile:
         release_config.description = "test"
         release_config.context = ""
         release_config.blog = False
-        # A pre-release file carries no release commit and no unrecoverable marker --
-        # the release flow writes those into the archive. A MagicMock answers
-        # every attribute, so all three are pinned to their absent value.
-        release_config.candidate_sha = None
-        release_config.tree_hashes = None
-        release_config.unrecoverable = None
+        # A pre-release file carries no flow-owned field: the release flow
+        # writes the release commit and the version's fate into the archive. A
+        # MagicMock answers every attribute, so each one is pinned to its
+        # absent value, read from the tuple the refusal itself reads.
+        for _flow_owned in FLOW_OWNED_FIELDS:
+            setattr(release_config, _flow_owned, None)
 
         # Patch load_env_file to actually set the env var
         monkeypatch.setenv("CF_ACCOUNT_ID", "test123")

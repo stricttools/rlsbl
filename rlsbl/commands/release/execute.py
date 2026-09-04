@@ -1994,7 +1994,7 @@ def _run_release_mutating(state: ReleaseState):
         working_tree_paths,
         ReleaseValidationError,
         HookError,
-        _read_release_metadata_full,
+        read_archive_metadata,
     )
 
     # Registry-target instance for the primary target (needs TARGETS, imported
@@ -2794,18 +2794,19 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Finalized release file for {new_version}")
 
             # Now that v{version}.toml is archived, regenerate the per-version
-            # .md so its content is derived from _read_release_metadata() rather
+            # .md so its content is derived from read_archive_metadata() rather
             # than the direct params passed earlier. This keeps the .md
             # consistent with what future generate_changelog() calls produce.
             changes_dir_regen = state.changes_dir or (get_changes_dir(project_dir) if changes_dir_exists(project_dir) else None)
             if changes_dir_regen and os.path.isdir(changes_dir_regen):
-                ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+                meta = read_archive_metadata(
                     project_dir, new_version, releases_dir=releases_dir,
                 )
                 generate_version_file(
                     changes_dir_regen, new_version,
-                    description=ver_desc, context=ver_ctx,
-                    bump_type=ver_bump or None,
+                    description=meta.description, context=meta.context,
+                    bump_type=meta.bump or None,
+                    never_released=meta.never_released,
                 )
                 md_regen_path = os.path.join(changes_dir_regen, f"{new_version}.md")
                 md_regen_rel = _rel_to_git_root(md_regen_path, _git_root)

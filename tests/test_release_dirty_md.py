@@ -156,6 +156,7 @@ def _setup_released_project_with_stale_md(repo):
 
     # Release file for the upcoming 1.0.1 release
     (releases_dir / "unreleased.toml").write_text(
+        'format_version = 1\n'
         'bump = "patch"\n'
         'include = ["npm"]\n'
         'exclude = []\n'

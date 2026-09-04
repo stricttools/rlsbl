@@ -598,8 +598,8 @@ def cmd_generate(flags, project_root):
         # name for the WHOLE function and break the auto-commit path below.
         from ..changelog.generate import (
             _HEADER_COMMENT,
-            _read_release_metadata_full,
             generate_version_section,
+            read_archive_metadata,
         )
 
         sections = []
@@ -612,12 +612,13 @@ def cmd_generate(flags, project_root):
             from ..changelog.schema import parse_jsonl
 
             entries = parse_jsonl(jsonl_path)
-            ver_desc, ver_ctx, ver_bump = _read_release_metadata_full(
+            meta = read_archive_metadata(
                 project_root, version, releases_dir=releases_dir_override,
             )
             sections.append(generate_version_section(
-                version, entries, description=ver_desc, context=ver_ctx,
-                bump_type=ver_bump or None,
+                version, entries, description=meta.description,
+                context=meta.context, bump_type=meta.bump or None,
+                never_released=meta.never_released,
             ))
 
         body = "\n".join(sections)

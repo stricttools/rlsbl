@@ -142,6 +142,7 @@ def _setup_releasable_pypi_project(repo):
     releases_dir = repo / ".rlsbl" / "releases"
     releases_dir.mkdir(parents=True, exist_ok=True)
     (releases_dir / "unreleased.toml").write_text(
+        'format_version = 1\n'
         'bump = "minor"\npreid = "alpha"\n'
         'description = "First alpha"\n'
         'include = ["pypi"]\nexclude = []\n'

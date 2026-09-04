@@ -438,6 +438,8 @@ class TestMakeReleasableState:
                     'bump = "minor"\n'
                     'description = "The custom description"\n'
                     'context = "Why it happened"\n'
+                    "include = []\n"
+                    "exclude = []\n"
                 ),
             },
         )
@@ -471,7 +473,15 @@ class TestMakeReleasableState:
             tmp_path,
             "core",
             versioned_entries={"0.1.0": []},
-            archived_releases={"0.1.0": 'bump = "minor"\ndescription = "custom"\n'},
+            archived_releases={
+                "0.1.0": (
+                    "format_version = 1\n"
+                    'bump = "minor"\n'
+                    'description = "custom"\n'
+                    "include = []\n"
+                    "exclude = []\n"
+                ),
+            },
         )
         body = (rel_dir / "releases" / "v0.1.0.toml").read_text()
         assert 'description = "custom"' in body

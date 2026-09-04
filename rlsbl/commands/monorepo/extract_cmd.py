@@ -1912,8 +1912,8 @@ def _regenerate_pruned_markdown(dep, run, changes_dir, dropped):
     own heading and description over "No user-facing changes."
     """
     from ...changelog.generate import (
-        _read_release_metadata_full,
         generate_version_file,
+        read_archive_metadata,
     )
 
     releases_dir = os.path.join(dep.dest_state_dir, "releases")
@@ -1921,12 +1921,13 @@ def _regenerate_pruned_markdown(dep, run, changes_dir, dropped):
         version = name[: -len(".jsonl")]
         if version == "unreleased":
             continue  # no archive and no .md: nothing to re-render
-        description, context, bump = _read_release_metadata_full(
+        meta = read_archive_metadata(
             dep.target_path, version, releases_dir=releases_dir,
         )
         generate_version_file(
             changes_dir, version,
-            description=description, context=context, bump_type=bump or None,
+            description=meta.description, context=meta.context,
+            bump_type=meta.bump or None, never_released=meta.never_released,
         )
         run.pruned_versions.append((version, dropped[name]))
         print(
