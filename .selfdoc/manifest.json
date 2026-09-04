@@ -3292,6 +3292,11 @@
         },
         {
           "level": 3,
+          "text": "The three version fates",
+          "anchor": "the-three-version-fates"
+        },
+        {
+          "level": 3,
           "text": "The CI gate",
           "anchor": "the-ci-gate"
         },
@@ -3894,13 +3899,18 @@
         },
         {
           "level": 3,
-          "text": "`_read_release_metadata`",
-          "anchor": "_read_release_metadata"
+          "text": "`ArchiveMetadata`",
+          "anchor": "archivemetadata"
         },
         {
           "level": 3,
-          "text": "`_read_release_metadata_full`",
-          "anchor": "_read_release_metadata_full"
+          "text": "`_legacy_bump_error`",
+          "anchor": "_legacy_bump_error"
+        },
+        {
+          "level": 3,
+          "text": "`read_archive_metadata`",
+          "anchor": "read_archive_metadata"
         },
         {
           "level": 3,
@@ -13642,9 +13652,19 @@
           "anchor": "recorded"
         },
         {
+          "level": 4,
+          "text": "`released`",
+          "anchor": "released"
+        },
+        {
           "level": 3,
           "text": "`LatestReleaseFact`",
           "anchor": "latestreleasefact"
+        },
+        {
+          "level": 4,
+          "text": "`state`",
+          "anchor": "state"
         },
         {
           "level": 4,
@@ -17036,6 +17056,16 @@
         },
         {
           "level": 3,
+          "text": "`ReleaseHistoryClosedEvent`",
+          "anchor": "releasehistoryclosedevent"
+        },
+        {
+          "level": 3,
+          "text": "`NonVersionTagEvent`",
+          "anchor": "nonversiontagevent"
+        },
+        {
+          "level": 3,
           "text": "`PromotionSplitMapEvent`",
           "anchor": "promotionsplitmapevent"
         },
@@ -19599,6 +19629,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-04T21:56:20.498573+00:00",
+  "last_gen": "2026-09-04T23:51:01.048851+00:00",
   "theme": "minimal"
 }
