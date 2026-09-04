@@ -1,6 +1,6 @@
 ---
 title: rlsbl.transition_record
-description: "An append-only committed log of repository-surgery facts: renamed tags, moved commits, departed globs, changed identities. It never drives behavior."
+description: "An append-only committed log of repository-surgery facts, one kind per fact, written by the operation that performed the surgery. It never drives behavior."
 generated: true
 nav_group: "API Reference"
 nav_order: 178
