@@ -58,7 +58,7 @@
     "schema_hash": "63051ca6feb717547434aa33f97fbb1b4565809886e4c59edc33d192396e7c03"
   },
   "en/cli-index.md": {
-    "content": "f16921e0a872f38fe771d41b6b1d443a1b7c4697c3681a4ef3a794fa4b457913",
+    "content": "6543ad38147badf48f7d0d4d397f727b9fb418ddd3561d923ab114991d92587f",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -907,7 +907,8 @@
   "en/rlsbl-release_commit_remap.md": {
     "content": "1c8038d90e6fe9439cc58f59d30af482e5070112667c2dce83ff3edcc88c80d6",
     "description": "bbf3eab1081bd9a583e195ae8966df7341f928306fbe3df4c4c76ea17f50dac3",
-    "seed_hash": "bbf3eab1081bd9a583e195ae8966df7341f928306fbe3df4c4c76ea17f50dac3"
+    "seed_hash": "bbf3eab1081bd9a583e195ae8966df7341f928306fbe3df4c4c76ea17f50dac3",
+    "source_docstring": "04af2deafbfb3d27ddae1c4cfaf15da59fcf7ba79d51a33c782c343721b4de47"
   },
   "en/rlsbl-release_file.md": {
     "content": "5ba5e64163cfc8a8b5de492079f7a947ff32786674e92edef9a06b945d1c306f",
@@ -922,7 +923,8 @@
   "en/rlsbl-release_record.md": {
     "content": "63f8e7f20c36ec80b9f62dd908ff621466d396f9a4c0fb70efdddbe08854885f",
     "description": "1530c1356e6aa2797bf64e8661331de4394b1161ca8b3d894161016ab9b9a791",
-    "seed_hash": "1530c1356e6aa2797bf64e8661331de4394b1161ca8b3d894161016ab9b9a791"
+    "seed_hash": "1530c1356e6aa2797bf64e8661331de4394b1161ca8b3d894161016ab9b9a791",
+    "source_docstring": "d69aacb1729532ce6c49e4bc998f14b6fbc4b332d9d2aac6ed1fdbcd9ec36c90"
   },
   "en/rlsbl-resolved_target.md": {
     "content": "f6c4e13b1bc9c1eabbae169563236e24054a94bdb2375955c9a6cd6d5265e48b",
@@ -1137,12 +1139,14 @@
   "en/rlsbl-transition_record.md": {
     "content": "de4ae697b1b7863b537c8fbfb7c8114d2238156c92661b3622d128de523c1932",
     "description": "499defb625ff9954c2ed8a2b807696d4b89a78d640bf8b1d45c7b12ea3ebed83",
-    "seed_hash": "499defb625ff9954c2ed8a2b807696d4b89a78d640bf8b1d45c7b12ea3ebed83"
+    "seed_hash": "499defb625ff9954c2ed8a2b807696d4b89a78d640bf8b1d45c7b12ea3ebed83",
+    "source_docstring": "25595f6eac66373bd2c72fa459565ab17e4ffa11edeca5e456e52a248be270f3"
   },
   "en/rlsbl-transition_record_followup.md": {
     "content": "e91933a1ddba43e85e1bae133c76907c11341a01a9d7fc4905b9a87ad75a97b7",
     "description": "f000a3feb9219ed049c59338198567b7f4e3fb3b6e00fcf5afdd688ce1e5adef",
-    "seed_hash": "f000a3feb9219ed049c59338198567b7f4e3fb3b6e00fcf5afdd688ce1e5adef"
+    "seed_hash": "f000a3feb9219ed049c59338198567b7f4e3fb3b6e00fcf5afdd688ce1e5adef",
+    "source_docstring": "5d000a751daa82f299df8f50cd528f512af4dd018b519c22b7872d13d5f237c0"
   },
   "en/rlsbl-utils.md": {
     "content": "a47f1dcb0813a3326100a0a6f967b9614915f27b69c160f02ae8a8c3604f5dfe",
