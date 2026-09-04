@@ -16,7 +16,7 @@ from rlsbl.release_file import ReleaseConfig
 # A schema document in strictcli's own canonical v2 encoding, which is the only
 # shape this file's subject ever meets: two-space indent, one member per line,
 # `": "` between key and value, empty containers inline, one trailing newline.
-# The version patch is textual and anchored to that shape on purpose -- a
+# The version patch is textual and pinned to that shape on purpose -- a
 # decode/re-encode round trip silently rewrites the whole document (see
 # tests/test_schema_version_patch.py).
 _CANONICAL_SCHEMA = """\

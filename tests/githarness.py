@@ -141,7 +141,7 @@ def write_covered_unreleased(root, *, description="test", entry_type="feature",
     # coverage is narrowed: an entry naming a commit that never touched the
     # sub-project is out of range rather than helpful.
     # The range is the one PRODUCTION computes: bounded by the release the
-    # RELEASE RECORD anchors this checkout to, not by `git describe`. A fixture that
+    # RELEASE RECORD bounds this checkout to, not by `git describe`. A fixture that
     # tags v1.0.0 without archiving it has released nothing as far as rlsbl is
     # concerned, so every commit needs covering -- and covering the wider range
     # is always safe.

@@ -7,21 +7,21 @@
 #
 # AUTHORITY. The archived release file is the authoritative record of WHICH
 # COMMIT AND TREE a version shipped from: the `candidate_sha` and `tree_hashes`
-# anchor fields are written by the release flow at the archive step, from the
+# release commit fields are written by the release flow at the archive step, from the
 # commit its own CI verified, and rlsbl rewrites that archive only through its
 # own documented unlock paths. (Its local file mode is hygiene, not the
 # guarantee: git records no read-only bit, so a fresh clone's archives are
 # writable.)
 # The `<!-- rlsbl-ci-sha: ... -->` marker in the GitHub Release body is a
 # PROJECTION of `candidate_sha` for CI's publish check to parse -- it restates
-# the anchor for a consumer that cannot read the repository, and it never
+# the release commit for a consumer that cannot read the repository, and it never
 # outranks it. When the two disagree, the archive is right and the Release body
 # is stale.
 #
-# The anchor fields are optional in the SHAPE because they only exist once the
+# The release commit fields are optional in the SHAPE because they only exist once the
 # flow has authored them: the editable pre-release file never carries them (a
-# hand-authored anchor is refused natively at release validation, see
-# rlsbl/commands/release/validate.py), and archives written before anchoring
+# hand-authored release commit is refused natively at release validation, see
+# rlsbl/commands/release/validate.py), and archives written before release-commit recording
 # existed carry neither.
 
 name = "rlsbl-release-file"
@@ -101,7 +101,7 @@ type = "GitObjectHash"
 [types.ReleaseConfig.fields.unanchorable]
 type = "boolean"
 required = false
-description = "A PERMANENT RECORD OF FAILED RECOVERY, written only by the backfill pass and only when set to true: this version shipped, but the commit it shipped from could not be recovered from any source -- no tag under any recognized scheme (v{X.Y.Z}, name@v{X.Y.Z}, path/v{X.Y.Z}) and no version-bump commit in history. It is the alternative to silently leaving an archive unanchored, so an archive carries either the candidate_sha/tree_hashes anchor or this marker, never both and never neither. The release flow never writes it (a flow that is releasing knows its own candidate), and it is stripped along with the anchor when `release undo` restores an archive as the editable unreleased.toml."
+description = "A PERMANENT RECORD OF FAILED RECOVERY, written only by the backfill pass and only when set to true: this version shipped, but the commit it shipped from could not be recovered from any source -- no tag under any recognized scheme (v{X.Y.Z}, name@v{X.Y.Z}, path/v{X.Y.Z}) and no version-bump commit in history. It is the alternative to silently leaving an archive with no release commit, so an archive carries either the candidate_sha/tree_hashes release commit or this marker, never both and never neither. The release flow never writes it (a flow that is releasing knows its own candidate), and it is stripped along with the release commit when `release undo` restores an archive as the editable unreleased.toml."
 
 # NOTE: the preid couplings (preid == "stable" requires bump == "prerelease";
 # bump == "infra" forbids preid) are consumer-native, not schema constraints:

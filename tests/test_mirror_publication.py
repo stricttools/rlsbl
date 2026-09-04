@@ -181,7 +181,7 @@ class TestPublishVersion:
 
         split, tag_outcome, release_outcome = mp.publish_version(
             remote=remote, root=str(root), subtree_path="packages/lib",
-            version="1.0.0", tag="v1.0.0", anchor_sha=second,
+            version="1.0.0", tag="v1.0.0", release_commit_sha=second,
             notes="### Features\n- a thing", gh=gh, directory=str(tmp_path),
         )
 
@@ -196,7 +196,7 @@ class TestPublishVersion:
         assert len(creates) == 1
         assert "--repo" in creates[0]
 
-    def test_the_marker_names_the_mirror_commit_not_the_monorepo_anchor(
+    def test_the_marker_names_the_mirror_commit_not_the_monorepo_release_commit(
         self, tmp_path,
     ):
         root = tmp_path / "mono"
@@ -206,7 +206,7 @@ class TestPublishVersion:
 
         split, _t, _r = mp.publish_version(
             remote=remote, root=str(root), subtree_path="packages/lib",
-            version="1.0.0", tag="v1.0.0", anchor_sha=second,
+            version="1.0.0", tag="v1.0.0", release_commit_sha=second,
             notes="notes", gh=gh, directory=str(tmp_path),
         )
         body = gh.bodies["v1.0.0"]
@@ -221,7 +221,7 @@ class TestPublishVersion:
 
         common = dict(
             remote=remote, root=str(root), subtree_path="packages/lib",
-            version="1.0.0", tag="v1.0.0", anchor_sha=second, notes="notes",
+            version="1.0.0", tag="v1.0.0", release_commit_sha=second, notes="notes",
             gh=gh, directory=str(tmp_path),
         )
         mp.publish_version(**common)
@@ -238,7 +238,7 @@ class TestPublishVersion:
 
         split, _t, release_outcome = mp.publish_version(
             remote=remote, root=str(root), subtree_path="packages/lib",
-            version="1.0.0", tag="v1.0.0", anchor_sha=second,
+            version="1.0.0", tag="v1.0.0", release_commit_sha=second,
             notes="notes", gh=gh, directory=str(tmp_path),
         )
         assert release_outcome == "reconciled"

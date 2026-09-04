@@ -223,11 +223,11 @@ def check_in_range(entries: list[ChangelogEntry], releases_dir: str,
                    tag_glob: str | None = None, scope=None) -> tuple[bool, list[str]]:
     """Check that every resolved hash is in the unreleased range.
 
-    Unreleased range: the commits since the release the RELEASE RECORD anchors this
+    Unreleased range: the commits since the release the RELEASE RECORD release commits this
     checkout to -- the highest archived version whose ``candidate_sha`` this
     history contains -- or all commits when the release record records none.
     ``releases_dir`` is that release record; ``tag_glob`` names the tag scheme, used
-    to detect a tag that disagrees with an anchor.
+    to detect a tag that disagrees with a release commit.
 
     When *scope* is set (monorepo mode), only commits touching files owned
     by the scope's members are considered in-range.  *scope* is an

@@ -38,8 +38,8 @@ class ReleaseRecordError(RlsblError):
     """The release record could not be read for use.
 
     Raised for the three ways an archived release file fails the reader that
-    needs its anchor: the version's tag disagrees with the anchor, the anchor's
-    ancestry cannot be determined, or the archive carries neither an anchor nor
+    needs its release commit: the version's tag disagrees with the release commit, the release commit's
+    ancestry cannot be determined, or the archive carries neither a release commit nor
     the ``unanchorable`` marker.
     """
 

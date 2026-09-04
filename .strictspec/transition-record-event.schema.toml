@@ -96,16 +96,16 @@ type = "GitSha"
 required = true
 description = "The commit the new tag points at, in THIS repository's object graph."
 
-[types.AnchorMapping]
+[types.ReleaseCommitMapping]
 type = "record"
 description = "One old-SHA -> new-SHA correspondence produced by a history rewrite."
 
-[types.AnchorMapping.fields.old_sha]
+[types.ReleaseCommitMapping.fields.old_sha]
 type = "GitSha"
 required = true
 description = "The commit hash before the rewrite. Typically unresolvable in this repository afterwards -- that is the point of recording it."
 
-[types.AnchorMapping.fields.new_sha]
+[types.ReleaseCommitMapping.fields.new_sha]
 type = "GitSha"
 required = true
 description = "The commit hash after the rewrite."
@@ -247,51 +247,51 @@ description = "The tag renames. A tag-map event with no mappings is not a fact w
 [types.TagMapEvent.fields.mappings.item]
 type = "TagMapping"
 
-[types.AnchorRemapEvent]
+[types.ReleaseCommitRemapEvent]
 type = "record"
-description = "The commit correspondence a history rewrite produced. \"Anchor\" is any SHA another rlsbl record points at -- a changelog entry's commits, a tag's target, an earlier transition record event's commit -- which the rewrite invalidated."
+description = "The commit correspondence a history rewrite produced. \"Release commit\" is any SHA another rlsbl record points at -- a changelog entry's commits, a tag's target, an earlier transition record event's commit -- which the rewrite invalidated."
 
-[types.AnchorRemapEvent.fields.format_version]
+[types.ReleaseCommitRemapEvent.fields.format_version]
 type = "integer"
 required = true
 description = "Per-line format_version gate. Every line rlsbl writes carries 1."
 
-[types.AnchorRemapEvent.fields.id]
+[types.ReleaseCommitRemapEvent.fields.id]
 type = "string"
 required = true
 non_empty = true
 description = "Stable identifier for this event, unique within the file."
 
-[types.AnchorRemapEvent.fields.recorded_at]
+[types.ReleaseCommitRemapEvent.fields.recorded_at]
 type = "datetime"
 required = true
 datetime_kind = "offset"
 description = "When the event was appended (RFC 3339, with offset)."
 
-[types.AnchorRemapEvent.fields.kind]
+[types.ReleaseCommitRemapEvent.fields.kind]
 type = "literal"
 value = "anchor-remap"
 required = true
 
-[types.AnchorRemapEvent.fields.related_to]
+[types.ReleaseCommitRemapEvent.fields.related_to]
 type = "string"
 required = false
 non_empty = true
 description = "The id of the conversion event whose rewrite produced this mapping."
 
-[types.AnchorRemapEvent.fields.rewrite]
+[types.ReleaseCommitRemapEvent.fields.rewrite]
 type = "string"
 required = true
 non_empty = true
 description = "What performed the rewrite, in the writer's own words (e.g. \"git-filter-repo --to-subdirectory-filter\"). Free text: it explains the mapping to a human, it is never dispatched on."
 
-[types.AnchorRemapEvent.fields.mappings]
+[types.ReleaseCommitRemapEvent.fields.mappings]
 type = "array"
 required = true
 min_len = 1
 description = "The old-SHA -> new-SHA pairs. Non-empty: a rewrite that moved nothing is not recorded."
-[types.AnchorRemapEvent.fields.mappings.item]
-type = "AnchorMapping"
+[types.ReleaseCommitRemapEvent.fields.mappings.item]
+type = "ReleaseCommitMapping"
 
 [types.DepartedGlobsEvent]
 type = "record"
@@ -509,7 +509,7 @@ type = "ConversionEvent"
 type = "TagMapEvent"
 
 [types.TransitionRecordEvent.arms.anchor-remap]
-type = "AnchorRemapEvent"
+type = "ReleaseCommitRemapEvent"
 
 [types.TransitionRecordEvent.arms.departed-globs]
 type = "DepartedGlobsEvent"

@@ -29,11 +29,11 @@ class NpmPipeline(TokenPipeline):
         # Launcher artifact: wrapper-package that downloads a binary
         # from a GitHub Release at npm install time (postinstall script).
         # In addition to the publish workflow, emit the shim source files
-        # (postinstall downloader + bin exec stub) anchored under the
+        # (postinstall downloader + bin exec stub) rooted under the
         # launcher target's subdirectory.
         if self.config.get("artifact") == "launcher":
             subdir = self._linked_target_subdir(ctx)
-            def _anchor(rel):
+            def _release_commit(rel):
                 return rel if subdir == "." else f"{subdir}/{rel}"
             mappings = [
                 {"template": "publish-launcher.yml.tpl",
@@ -48,14 +48,14 @@ class NpmPipeline(TokenPipeline):
             if download == "first-run":
                 mappings.append(
                     {"template": "shim-firstrun.cjs.tpl",
-                     "target": _anchor("bin/launcher.cjs")}
+                     "target": _release_commit("bin/launcher.cjs")}
                 )
             else:
                 mappings.extend([
                     {"template": "shim-postinstall.cjs.tpl",
-                     "target": _anchor("scripts/postinstall.cjs")},
+                     "target": _release_commit("scripts/postinstall.cjs")},
                     {"template": "shim-bin.cjs.tpl",
-                     "target": _anchor("bin/launcher.cjs")},
+                     "target": _release_commit("bin/launcher.cjs")},
                 ])
             return mappings
         # Detect package manager to select the right publish template

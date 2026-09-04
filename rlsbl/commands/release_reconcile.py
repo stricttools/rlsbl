@@ -222,7 +222,7 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
         # PRERELEASE_INCLUSIVE: the question here is which SCHEME the tag
         # follows, and a pre-release suffix does not change that. It also has
         # to answer the same way _release_record_dir_for_tag does, or a rewritten
-        # Release would take its notes from one project and its anchor from
+        # Release would take its notes from one project and its release commit from
         # another.
         parsed = parse_version_tag(tag_name, mode=TagMode.PRERELEASE_INCLUSIVE)
         if parsed and parsed.scheme == "standalone":
@@ -250,12 +250,12 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
 
 
 def _release_record_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index):
-    """The release-archive directory whose release record anchors *tag_name*'s version.
+    """The release-archive directory whose release record owns *tag_name*'s version.
 
     The same resolution :func:`_notes_for_tag` performs for the CHANGELOG, so
-    the notes and the anchor a written Release carries describe the same
+    the notes and the release commit a written Release carries describe the same
     project. Returns None when no project owns the tag -- the marker then has
-    no anchor to project, which the caller reports rather than guesses at.
+    no release commit to project, which the caller reports rather than guesses at.
     """
     if not ctx.workspace_root:
         return os.path.join(str(project_root), ".rlsbl", "releases")
@@ -305,10 +305,10 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
     without so much as a lookup: there is no version, therefore no document to
     write. Pre-release tags are first-class (``PRERELEASE_INCLUSIVE``).
 
-    The anchor comes from the release record, which the scrub's ``ANCHORS_REMAPPED``
+    The release commit comes from the release record, which the scrub's ``RELEASE_COMMITS_REMAPPED``
     step has already moved through the same rewrite by the time this runs, so
     the marker names the rewritten commit. A version whose archive holds no
-    anchor -- released before the release record existed, or recorded unanchorable --
+    release commit -- released before the release record existed, or recorded unrecoverable --
     gets its document WITHOUT a marker, and the omission is stated on stderr
     rather than hidden.
 
@@ -319,7 +319,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
     Returns the number of Releases written (edited or created).
     """
     from ..release_publication import (
-        anchor_from_release_record,
+        release_commit_from_record,
         create_release,
         edit_all_args,
         is_prerelease,
@@ -377,10 +377,10 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
             tag_name, ctx=ctx, project_root=project_root,
             tag_prefix_index=tag_prefix_index,
         )
-        anchor = None
+        release_commit = None
         if release_record_dir and os.path.isdir(release_record_dir):
             try:
-                anchor = anchor_from_release_record(release_record_dir, version)
+                release_commit = release_commit_from_record(release_record_dir, version)
             except Exception as exc:
                 print(
                     f"Warning: the release archive for {version} could not be "
@@ -389,16 +389,16 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
                     file=sys.stderr,
                 )
         pub = (
-            publication(tag=tag_name, version=version, candidate_sha=anchor,
+            publication(tag=tag_name, version=version, candidate_sha=release_commit,
                         notes=notes)
-            if anchor else None
+            if release_commit else None
         )
         if pub is None:
             print(
-                f"Warning: the release record holds no anchor for {version}, "
+                f"Warning: the release record holds no release commit for {version}, "
                 f"so its Release carries no rlsbl-ci-sha marker. "
                 f"The publish workflow reads that marker to learn which commit "
-                f"CI proved green; record the version's anchor and re-run "
+                f"CI proved green; record the version's release commit and re-run "
                 f"`rlsbl release reconcile --plan` to put it back.",
                 file=sys.stderr,
             )
@@ -412,7 +412,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
                     create_release(pub, gh=gh, config=ctx.config,
                                    directory=str(project_root))
             else:
-                # Markerless: the same document minus the anchor it does not
+                # Markerless: the same document minus the release commit it does not
                 # have, through the same two argv builders.
                 body = (notes or f"Release {version}").rstrip("\n") + "\n"
                 with notes_file(body, directory=str(project_root)) as path:
@@ -592,9 +592,9 @@ def _scrub_archive_maps(releases_dirs):
 
 
 def _transition_record_facts(transition_record_paths):
-    """Anchor remaps, boundary aliases and identity transitions, merged."""
+    """Release commit remaps, boundary aliases and identity transitions, merged."""
     from ..transition_record import (
-        KIND_ANCHOR_REMAP,
+        KIND_RELEASE_COMMIT_REMAP,
         KIND_BOUNDARY_ALIAS,
         KIND_IDENTITY_TRANSITION,
         read_events,
@@ -607,12 +607,12 @@ def _transition_record_facts(transition_record_paths):
     seen_any = False
     for path in transition_record_paths:
         events = read_events(path, kinds=[
-            KIND_ANCHOR_REMAP, KIND_BOUNDARY_ALIAS, KIND_IDENTITY_TRANSITION,
+            KIND_RELEASE_COMMIT_REMAP, KIND_BOUNDARY_ALIAS, KIND_IDENTITY_TRANSITION,
         ])
         if events:
             seen_any = True
         for event in events:
-            if event.KIND == KIND_ANCHOR_REMAP:
+            if event.KIND == KIND_RELEASE_COMMIT_REMAP:
                 for mapping in event.mappings:
                     commit_map[mapping.old_sha] = mapping.new_sha
                     origins[mapping.old_sha] = (
@@ -673,10 +673,10 @@ def collect_explanations(releases_dirs, transition_record_paths):
 # ---------------------------------------------------------------------------
 
 
-def dangling_anchors(releases_dir, *, git=None, cwd=None):
-    """Archived versions whose anchor names a commit this repository lacks.
+def dangling_release_commits(releases_dir, *, git=None, cwd=None):
+    """Archived versions whose release commit names a commit this repository lacks.
 
-    Returns ``{version: anchor}``, empty when every anchor resolves.
+    Returns ``{version: release commit}``, empty when every release commit resolves.
 
     This is the state an out-of-band rewrite leaves behind: the local tags
     followed the rewrite, the archives did not, and the commits they name were
@@ -697,7 +697,7 @@ def dangling_anchors(releases_dir, *, git=None, cwd=None):
     )
 
     git = git or run
-    anchors = {}
+    release_commits = {}
     for version in list_archived_versions(releases_dir):
         try:
             archive = read_release_file(
@@ -705,17 +705,17 @@ def dangling_anchors(releases_dir, *, git=None, cwd=None):
             )
         except (RlsblError, OSError):
             continue
-        if archive.unanchorable:
+        if archive.unrecoverable:
             continue
-        anchor = (archive.candidate_sha or "").strip()
-        if anchor:
-            anchors[version] = anchor
-    if not anchors:
+        release_commit = (archive.candidate_sha or "").strip()
+        if release_commit:
+            release_commits[version] = release_commit
+    if not release_commits:
         return {}
 
     out = git(
         "git",
-        ["rev-list", "--no-walk", "--ignore-missing", *sorted(set(anchors.values()))],
+        ["rev-list", "--no-walk", "--ignore-missing", *sorted(set(release_commits.values()))],
         cwd=cwd,
     )
     if not isinstance(out, str):
@@ -724,31 +724,31 @@ def dangling_anchors(releases_dir, *, git=None, cwd=None):
         return {}
     present = [line.strip() for line in out.splitlines() if line.strip()]
     return {
-        version: anchor for version, anchor in anchors.items()
-        if not any(_same_commit(anchor, found) for found in present)
+        version: release_commit for version, release_commit in release_commits.items()
+        if not any(_same_commit(release_commit, found) for found in present)
     }
 
 
-def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
+def heal_dangling_release_commits(*, releases_dir, explanations, repo_root,
                           dry_run=False, log=print):
-    """Move the release record's stale anchors through the recorded rewrite.
+    """Move the release record's stale release commits through the recorded rewrite.
 
-    The anchor half of detect-and-heal, and the counterpart to what the
+    The release commit half of detect-and-heal, and the counterpart to what the
     changelog side has done since scrubbing existed. It runs BEFORE the
     verdicts are computed, because the verdicts are computed AGAINST the
     release record: with the archives naming pruned commits, every released ref is
     classified ``refuse-foreign`` and the tripwire aborts the reconcile --
     refusing precisely the repair the command exists to perform.
 
-    Returns ``{version: healed anchor}``, which the caller passes to
-    :func:`build_preview` as ``anchor_overrides``. Outside a dry run the
+    Returns ``{version: healed release commit}``, which the caller passes to
+    :func:`build_preview` as ``release_commit_overrides``. Outside a dry run the
     archives on disk are rewritten (and committed) as well, so the two agree;
     under ``--dry-run`` nothing is written and the mapping is what keeps the
     preview truthful about a world that WOULD be healed first.
 
     Three rules, none of them inferred:
 
-    * a dangling anchor no record explains is a hard error naming the version
+    * a dangling release commit no record explains is a hard error naming the version
       -- the heal is driven by the journal, a transition record anchor-remap event or a
       committed scrub archive, never by resemblance;
     * the content check is ``refuse``: this command did not perform the
@@ -763,21 +763,21 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
     and healing a sibling's archives (or being blocked by a content mismatch in
     one) would be a wider write than the command was asked for.
     """
-    from ..anchor_remap import (
+    from ..release_commit_remap import (
         ON_CONTENT_CHANGE_REFUSE,
         transition_record_path_for_releases_dir,
-        plan_anchor_remap,
-        record_anchor_remap,
-        remap_release_anchors,
+        plan_release_commit_remap,
+        record_release_commit_remap,
+        remap_release_commits,
     )
     from ..errors import RlsblError
 
-    dangling = dangling_anchors(releases_dir, cwd=repo_root)
+    dangling = dangling_release_commits(releases_dir, cwd=repo_root)
     if not dangling:
         return {}
 
     try:
-        planned = plan_anchor_remap(
+        planned = plan_release_commit_remap(
             releases_dir, explanations.commit_map, cwd=repo_root,
             on_content_change=ON_CONTENT_CHANGE_REFUSE,
         )
@@ -789,13 +789,13 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
 
     healed = {remap.version: remap.new_sha for remap in planned}
     unexplained = {
-        version: anchor for version, anchor in dangling.items()
+        version: release_commit for version, release_commit in dangling.items()
         if version not in healed
     }
     if unexplained:
         listed = "".join(
-            f"  {version}: anchored at {anchor}\n"
-            for version, anchor in sorted(unexplained.items())
+            f"  {version}: released from {release_commit}\n"
+            for version, release_commit in sorted(unexplained.items())
         )
         raise ReconcileError(
             f"the release record names commits this repository no longer has, "
@@ -834,7 +834,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
         for remap in planned
     })) or "an out-of-band rewrite"
     try:
-        remaps = remap_release_anchors(
+        remaps = remap_release_commits(
             releases_dir, explanations.commit_map, cwd=repo_root,
             on_content_change=ON_CONTENT_CHANGE_REFUSE,
         )
@@ -844,7 +844,7 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
             f"rewrite:\n{exc}"
         ) from exc
     touched = [remap.path for remap in remaps]
-    transition_record_path = record_anchor_remap(
+    transition_record_path = record_release_commit_remap(
         transition_record_path_for_releases_dir(releases_dir), rewrite_id, remaps,
     )
     if transition_record_path:
@@ -853,18 +853,18 @@ def heal_dangling_anchors(*, releases_dir, explanations, repo_root,
         try:
             run("safegit", [
                 "commit", "-m",
-                "reconcile: re-anchor the release record through the recorded "
-                "rewrite",
+                "reconcile: move the release record's release commits through the "
+                "recorded rewrite",
                 "--",
             ] + sorted(set(touched)))
         except Exception as exc:
             raise ReconcileError(
-                f"the release record was re-anchored, but the rewritten "
+                f"the release record's release commits were moved, but the rewritten "
                 f"archives could not be committed ({exc}). They are read-only "
                 f"files every other command reads; commit or restore them "
                 f"before re-running."
             ) from exc
-        log(f"  Committed {len(set(touched))} re-anchored release record file(s).")
+        log(f"  Committed {len(set(touched))} rewritten release record file(s).")
     return healed
 
 
@@ -1034,7 +1034,7 @@ def _identity_refusal(version, target, transitions):
     return None
 
 
-def _ref_verdict(*, refname, tag, version, anchor, observation, explanations,
+def _ref_verdict(*, refname, tag, version, release_commit, observation, explanations,
                  target, archived):
     """Classify one git ref. Returns a :class:`VerdictItem`."""
     remote = observation.remote_refs.get(refname)
@@ -1046,8 +1046,8 @@ def _ref_verdict(*, refname, tag, version, anchor, observation, explanations,
 
     # The release record is the authority for where a released ref belongs. A local ref
     # that disagrees with it is not a repair the reconcile may publish.
-    if archived and local_peeled and anchor and not _same_commit(
-        local_peeled, anchor,
+    if archived and local_peeled and release_commit and not _same_commit(
+        local_peeled, release_commit,
     ):
         return VerdictItem(
             key=refname, state=STATE_REFUSE_FOREIGN,
@@ -1055,17 +1055,17 @@ def _ref_verdict(*, refname, tag, version, anchor, observation, explanations,
             facts=(
                 version_fact,
                 f"local:  {local_peeled}",
-                f"release record: {anchor}",
+                f"release record: {release_commit}",
             ),
             detail=(
                 "  Pushing this ref would publish a commit the release record does "
                 "not record as released.\n"
-                "  Re-point the tag at the anchor, or repair the archive, "
+                "  Re-point the tag at the release commit, or repair the archive, "
                 "before reconciling."
             ),
         )
 
-    target_sha = local or (anchor if archived else "")
+    target_sha = local or (release_commit if archived else "")
 
     if remote is None:
         if not target_sha:
@@ -1075,7 +1075,7 @@ def _ref_verdict(*, refname, tag, version, anchor, observation, explanations,
                 facts=(version_fact, "absent locally and on origin"),
                 detail=(
                     "  There is no commit to create this ref at. Fetch the "
-                    "ref, or record the version as unanchorable."
+                    "ref, or record the version as unrecoverable."
                 ),
             )
         refusal = _identity_refusal(version, target, explanations.identity_transitions)
@@ -1155,7 +1155,7 @@ def _ref_verdict(*, refname, tag, version, anchor, observation, explanations,
     )
 
 
-def _release_verdict(*, tag, version, anchor, observation):
+def _release_verdict(*, tag, version, release_commit, observation):
     """Classify one version's GitHub Release. Presence only, from the listing."""
     key = f"release:{tag}"
     if tag in observation.releases:
@@ -1167,19 +1167,19 @@ def _release_verdict(*, tag, version, anchor, observation):
     return VerdictItem(
         key=key, state=STATE_MATERIALIZE,
         summary="released, but no GitHub Release exists for its tag",
-        facts=(f"version {version}", f"anchored at {anchor}"),
+        facts=(f"version {version}", f"released from {release_commit}"),
         actions=(
             f"create the GitHub Release {tag} with the version's changelog "
             f"section and its rlsbl-ci-sha marker",
         ),
         data=RefAction(
-            kind="release", tag=tag, version=version, target=anchor,
+            kind="release", tag=tag, version=version, target=release_commit,
         ),
     )
 
 
 def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
-                  anchor_overrides=None):
+                  release_commit_overrides=None):
     """One merged preview over every subject this repository owns.
 
     Subjects come from two places and are judged in one pass:
@@ -1197,7 +1197,7 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
     An ``unanchorable`` version is skipped entirely: it has no commit, so there
     is nothing to compare a ref against and nothing to create one at.
 
-    *anchor_overrides* is :func:`heal_dangling_anchors`' answer: the anchors
+    *release_commit_overrides* is :func:`heal_dangling_release_commits`' answer: the release commits
     the release record WOULD carry once healed, keyed by version. Outside a dry run the
     archives already say the same thing (they were rewritten before this ran),
     so it changes nothing; under ``--dry-run``, where nothing may be written,
@@ -1213,7 +1213,7 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
 
     items = []
     claimed = set()
-    unanchorable = []
+    unrecoverable = []
 
     for version in list_archived_versions(releases_dir):
         path = archived_release_path(releases_dir, version)
@@ -1225,17 +1225,17 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
                 f"({exc}), so the refs it owns are unknown and the reconcile "
                 f"cannot say whether origin is right about them."
             ) from exc
-        if archive.unanchorable:
-            unanchorable.append(version)
+        if archive.unrecoverable:
+            unrecoverable.append(version)
             continue
-        anchor = (
-            (anchor_overrides or {}).get(version)
+        release_commit = (
+            (release_commit_overrides or {}).get(version)
             or (archive.candidate_sha or "").strip()
         )
-        if not anchor:
+        if not release_commit:
             raise ReconcileError(
-                f"the release archive for {version} carries neither an anchor "
-                f"nor the unanchorable marker ({path}), so there is no commit "
+                f"the release archive for {version} carries neither a release commit "
+                f"nor the unrecoverable marker ({path}), so there is no commit "
                 f"its refs should point at. Backfill it before reconciling."
             )
 
@@ -1244,13 +1244,13 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
             refname = f"refs/tags/{tag}"
             claimed.add(refname)
             items.append(_ref_verdict(
-                refname=refname, tag=tag, version=version, anchor=anchor,
+                refname=refname, tag=tag, version=version, release_commit=release_commit,
                 observation=observation, explanations=explanations,
                 target=target, archived=True,
             ))
         if observation.releases_known:
             items.append(_release_verdict(
-                tag=expected.primary, version=version, anchor=anchor,
+                tag=expected.primary, version=version, release_commit=release_commit,
                 observation=observation,
             ))
 
@@ -1264,7 +1264,7 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
         verdict = _ref_verdict(
             refname=refname, tag=tag,
             version=parsed.version if parsed else "",
-            anchor="", observation=observation, explanations=explanations,
+            release_commit="", observation=observation, explanations=explanations,
             target=target, archived=False,
         )
         if verdict.state == STATE_ALREADY_CORRECT:
@@ -1272,10 +1272,10 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
         items.append(verdict)
 
     preview = Preview(tuple(items))
-    if unanchorable:
+    if unrecoverable:
         print(
-            f"Skipping {len(unanchorable)} version(s) recorded unanchorable "
-            f"(no commit to reconcile against): {', '.join(unanchorable)}"
+            f"Skipping {len(unrecoverable)} version(s) recorded unrecoverable "
+            f"(no commit to reconcile against): {', '.join(unrecoverable)}"
         )
     return preview
 
@@ -1500,16 +1500,16 @@ def check_plan_matches(plan, observation, path):
 
 def _release_publication_for(action, *, changelog_path, releases_dir):
     """The Release document for one version, from the changelog and the release record."""
-    from ..release_publication import anchor_from_release_record, publication
+    from ..release_publication import release_commit_from_record, publication
 
     notes = ""
     if changelog_path and os.path.exists(changelog_path):
         notes = extract_changelog_entry(changelog_path, action.version) or ""
-    anchor = (
-        anchor_from_release_record(releases_dir, action.version) or action.target
+    release_commit = (
+        release_commit_from_record(releases_dir, action.version) or action.target
     )
     return publication(
-        tag=action.tag, version=action.version, candidate_sha=anchor,
+        tag=action.tag, version=action.version, candidate_sha=release_commit,
         notes=notes,
     )
 
@@ -1538,7 +1538,7 @@ def apply_item(item, *, ctx, releases_dir, changelog_path, push_timeout,
             # The Release follows the tag NAME, so a moved tag drags its
             # Release onto the new commit -- but the body still names the old
             # one in its rlsbl-ci-sha marker, which is what the publish
-            # workflow reads. Re-pointed here, from the release record's anchor.
+            # workflow reads. Re-pointed here, from the release record's release commit.
             pub = _release_publication_for(
                 action, changelog_path=changelog_path,
                 releases_dir=releases_dir,
@@ -1656,7 +1656,7 @@ def run_cmd(flags, *, ctx):
     # observation, because it writes.
     try:
         explanations = collect_explanations([releases_dir], transition_record_paths)
-        anchor_overrides = heal_dangling_anchors(
+        release_commit_overrides = heal_dangling_release_commits(
             releases_dir=releases_dir, explanations=explanations,
             repo_root=repo_root, dry_run=dry_run,
         )
@@ -1671,7 +1671,7 @@ def run_cmd(flags, *, ctx):
         preview = build_preview(
             observation=observation, explanations=explanations,
             target=target, ref_ctx=ref_ctx, releases_dir=releases_dir,
-            anchor_overrides=anchor_overrides,
+            release_commit_overrides=release_commit_overrides,
         )
         if mode == "apply":
             plan = read_plan(path_of_plan)

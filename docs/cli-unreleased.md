@@ -1,6 +1,6 @@
 ---
 title: rlsbl unreleased
-description: "List the commits between the release this checkout is anchored to and HEAD, with each one's JSONL changelog coverage, as plain text or as JSON."
+description: "List the commits between this checkout's nearest release commit and HEAD, with each one's JSONL changelog coverage, as plain text or as JSON."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 17
@@ -9,6 +9,6 @@ nav_order: 17
 
 # rlsbl unreleased
 
-List the commits between the release this checkout is anchored to and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
+List the commits between this checkout's nearest release commit and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
 
 **Effect:** read_only

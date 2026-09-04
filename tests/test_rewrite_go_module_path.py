@@ -5,7 +5,7 @@ what make it safe to run, and each is pinned below:
 
 * the sweep is **boundary-aware** -- a neighbouring module whose path merely
   begins with the same letters is never rewritten;
-* the sweep is **line-anchored** -- only lines the tree-sitter parser reported
+* the sweep is **line-scoped** -- only lines the tree-sitter parser reported
   an import spec on are touched, so a comment or a string literal that happens
   to contain the old path survives;
 * **preview and apply agree on counts** -- an apply that finds a different
@@ -160,7 +160,7 @@ class TestObserveAndApply:
         assert f'import "{NEW}/internal/deep"' in svc
 
     def test_a_string_literal_outside_an_import_is_not_touched(self, repo, tmp_path):
-        """Line-anchoring, demonstrated: only import specs are rewritten."""
+        """Line-scoping, demonstrated: only import specs are rewritten."""
         _write(repo, "doc.go", (
             "package main\n"
             "\n"

@@ -742,16 +742,16 @@ class TestNonFatalFailures:
         )
         tags = {r: sha for r, sha in after.items() if r.startswith("refs/tags/")}
         assert list(tags) == ["refs/tags/v1.0.1"]
-        # The tag names the subtree split of the release's release record anchor,
+        # The tag names the subtree split of the release's recorded release commit,
         # which this fixture stages at HEAD.
         from rlsbl.mirror_publication import split_commit_for
 
-        anchor = subprocess.run(
+        release_commit = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=str(mock_git_repo),
             capture_output=True, text=True, check=True,
         ).stdout.strip()
         assert tags["refs/tags/v1.0.1"] == split_commit_for(
-            str(mock_git_repo), "packages/mylib", anchor,
+            str(mock_git_repo), "packages/mylib", release_commit,
         )
 
         creates = [c for c in gh_calls if c[:2] == ["release", "create"]]

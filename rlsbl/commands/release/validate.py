@@ -96,8 +96,8 @@ def validate_release_targets(release_config, project_root, *,
     return registry
 
 
-def validate_no_authored_anchors(release_config):
-    """Refuse a release whose editable release file already carries an anchor.
+def validate_no_authored_release_commit(release_config):
+    """Refuse a release whose editable release file already carries a release commit.
 
     ``candidate_sha`` and ``tree_hashes`` record which commit and tree a version
     shipped from. The release flow writes them into the ARCHIVED
@@ -113,30 +113,35 @@ def validate_no_authored_anchors(release_config):
     so a marker there is either hand-authored or an archive restored without
     being un-finalized.
 
-    So a marker or anchor in ``unreleased.toml`` is either a hand-authored claim
+    So a marker or release commit in ``unreleased.toml`` is either a hand-authored claim
     about a commit that has not happened, or an archive that was copied back
     without being un-finalized properly. Both would make the archive assert
-    something the release never verified, which is the one thing the anchor
+    something the release never verified, which is the one thing the release commit
     exists to prevent -- hence a hard error rather than an overwrite.
     (``release undo`` strips all three fields when it restores an archive, so
     its output passes here.)
 
     Raises ReleaseValidationError naming every flow-owned field present.
     """
-    from ...release_file import ANCHOR_FIELDS, UNANCHORABLE_FIELD
+    from ...release_file import RELEASE_COMMIT_FIELDS, UNRECOVERABLE_FIELD
 
     present = [
-        name for name in (*ANCHOR_FIELDS, UNANCHORABLE_FIELD)
+        name for name in RELEASE_COMMIT_FIELDS
         if getattr(release_config, name, None) is not None
     ]
+    # The marker's attribute and its serialized key are spelled differently
+    # (``unrecoverable`` in code, ``unanchorable`` on disk), so it is read by
+    # attribute and reported by the key the operator would have to remove.
+    if release_config.unrecoverable is not None:
+        present.append(UNRECOVERABLE_FIELD)
     if not present:
         return
     raise ReleaseValidationError(
-        f"the release file carries release-anchor field(s) "
+        f"the release file carries release-commit field(s) "
         f"{', '.join(present)}, which only the release flow may write. The "
-        f"anchor records the commit CI verified and the tree each released "
+        f"release commit records the commit CI verified and the tree each released "
         f"path shipped -- neither exists before the release runs -- and "
-        f"{UNANCHORABLE_FIELD} records that a SHIPPED version's commit could "
+        f"{UNRECOVERABLE_FIELD} records that a SHIPPED version's commit could "
         f"not be recovered. Both belong in the archived v{{version}}.toml, "
         f"never in unreleased.toml. Remove "
         f"{'them' if len(present) > 1 else 'it'} from "
@@ -660,7 +665,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     if first_release:
         # No archive and no tag. One more record can still contradict "never
         # released": a finalized, immutable <version>.jsonl, which a repository
-        # whose archives predate anchoring still has.
+        # whose archives predate release-commit recording still has.
         if tag_state is LocalTagState.ABSENT:
             _abort_on_destroyed_tag(
                 _guard_project_dir, current_version, current_tag,
@@ -1494,9 +1499,9 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
 
 # The top-level ``version`` member of a canonically-encoded schema document:
 # two spaces of indent (depth 1), the key, ``": "``, a JSON string literal, and
-# an optional comma. Anchored at exactly two spaces so a ``version`` key nested
+# an optional comma. Pinned at exactly two spaces so a ``version`` key nested
 # deeper -- a flag NAMED version, a nested object with its own -- can never
-# match, and anchored at the line start so it cannot match inside a string.
+# match, and pinned at the line start so it cannot match inside a string.
 _SCHEMA_VERSION_LINE = re.compile(
     r'^  "version": "(?:[^"\\]|\\.)*"(,?)$', re.MULTILINE,
 )

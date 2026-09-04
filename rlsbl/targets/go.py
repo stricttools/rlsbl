@@ -81,7 +81,7 @@ class GoTarget(BaseTarget):
         mirror is the package's public home. The rewrite itself is the one
         ``rlsbl rewrite go-module-path`` performs: the ``module`` directive,
         every cross-module reference to it, and every import site, all
-        token-anchored so a neighbouring module whose path merely starts with
+        token-bounded so a neighbouring module whose path merely starts with
         the same letters is left alone.
 
         Two refusals, both hard, because either would leave a go.mod that does

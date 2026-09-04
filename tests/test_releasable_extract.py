@@ -583,8 +583,8 @@ def _make_multi_commit(repo, files, message):
     return out.stdout.strip()
 
 
-def _archive_anchored(repo, version):
-    """Archive ``version`` at HEAD, anchored to the commit and tree it ships.
+def _archive_recorded(repo, version):
+    """Archive ``version`` at HEAD, recorded to the commit and tree it ships.
 
     A real released repository has one of these per version, and the absorb
     carries them across -- remapping the commit through the rewrite and
@@ -604,7 +604,7 @@ def _archive_anchored(repo, version):
                    check=True, capture_output=True, text=True)
     subprocess.run(["git", "commit", "-q", "-m", f"chore: archive {version}"],
                    cwd=str(repo), check=True, capture_output=True, text=True)
-    # The version tag stands on the ANCHORED commit, not on the archive commit
+    # The version tag stands on the RECORDED commit, not on the archive commit
     # that records it -- which is what a real release does (it tags the
     # CI-verified candidate, and the finalization commits land on top of it),
     # and what the release record checks the two against each other for.
@@ -613,7 +613,7 @@ def _archive_anchored(repo, version):
 
 def _setup_released_source_repo(tmp_path):
     """Build a released npm source repo: 2 version tags, finalized JSONL,
-    anchored release archives, plus one unreleased entry.
+    recorded release archives, plus one unreleased entry.
     Returns (repo_path, {"c1": ..., ...}).
     """
     repo = tmp_path / "widget_src"
@@ -641,7 +641,7 @@ def _setup_released_source_repo(tmp_path):
     ])
     _make_commit(repo, ".rlsbl/changes/0.1.0.jsonl",
                  (changes / "0.1.0.jsonl").read_text(), "changelog 0.1.0")
-    _git_tag(repo, "v0.1.0", ref=_archive_anchored(repo, "0.1.0"))
+    _git_tag(repo, "v0.1.0", ref=_archive_recorded(repo, "0.1.0"))
 
     # v0.2.0 feature commit
     c3 = _make_multi_commit(
@@ -658,7 +658,7 @@ def _setup_released_source_repo(tmp_path):
     ])
     _make_commit(repo, ".rlsbl/changes/0.2.0.jsonl",
                  (changes / "0.2.0.jsonl").read_text(), "changelog 0.2.0")
-    _git_tag(repo, "v0.2.0", ref=_archive_anchored(repo, "0.2.0"))
+    _git_tag(repo, "v0.2.0", ref=_archive_recorded(repo, "0.2.0"))
 
     # Unreleased work
     c5 = _make_commit(repo, "src/wip.js", "export const w = 3;\n", "feat: wip")
@@ -1349,7 +1349,7 @@ class TestExtractRoundTrip:
         preview = cmd_extract(str(root), "widget", str(out))
         assert preview.by_key("releasable").state == "extract_to_standalone"
 
-        # 1. Standalone anchor tags restored at the right commits.
+        # 1. Standalone release commit tags restored at the right commits.
         tags = _run_git(str(out), "tag", "-l").split()
         assert "v0.1.0" in tags
         assert "v0.2.0" in tags
@@ -1363,7 +1363,7 @@ class TestExtractRoundTrip:
             _run_git(str(out), "rev-list", "-n", "1", "v0.2.0")
         )
 
-        # 3. The v0.2.0 anchor is the newest reachable tag.
+        # 3. The v0.2.0 release commit is the newest reachable tag.
         desc = _run_git(str(out), "describe", "--tags", "--match", "v*")
         assert desc.startswith("v0.2.0")
 
@@ -1377,7 +1377,7 @@ class TestExtractRoundTrip:
         for h in all_hashes:
             _run_git(str(out), "cat-file", "-e", h + "^{commit}")
 
-        # 5. The RELEASE ANCHORS survive both directions. Each archive names a
+        # 5. The RELEASE COMMITS survive both directions. Each archive names a
         #    commit and the tree of every path that version shipped; absorb
         #    remapped both onto the rewritten monorepo history and re-keyed the
         #    paths to the member's, and the extract mapped them back to a
@@ -1389,18 +1389,18 @@ class TestExtractRoundTrip:
         for version in ("0.1.0", "0.2.0"):
             archive = releases_dir / f"v{version}.toml"
             assert archive.is_file()
-            anchor = read_release_file(str(archive))
-            _run_git(str(out), "cat-file", "-e", anchor.candidate_sha + "^{commit}")
+            release_commit = read_release_file(str(archive))
+            _run_git(str(out), "cat-file", "-e", release_commit.candidate_sha + "^{commit}")
             # Back at the repository root, and the recorded tree is the one the
             # commit really has there -- content-identical through two
             # rewrites, since neither changed a byte of the released content.
-            assert list(anchor.tree_hashes) == ["."]
-            assert anchor.tree_hashes["."] == _run_git(
-                str(out), "rev-parse", f"{anchor.candidate_sha}^{{tree}}",
+            assert list(release_commit.tree_hashes) == ["."]
+            assert release_commit.tree_hashes["."] == _run_git(
+                str(out), "rev-parse", f"{release_commit.candidate_sha}^{{tree}}",
             )
             # The tag and the release record still agree about that version.
             assert _run_git(str(out), "rev-list", "-n", "1", f"v{version}") == (
-                anchor.candidate_sha
+                release_commit.candidate_sha
             )
 
         # 6. Changelog coverage passes in the extracted repo, over the release record

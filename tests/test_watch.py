@@ -43,7 +43,7 @@ def _released(version, sha="abc123full"):
     """A release record entry standing in for "this commit IS release <version>"."""
     return ReleaseRecordEntry(
         version=version, path=f"/fake/.rlsbl/releases/v{version}.toml",
-        candidate_sha=sha, unanchorable=False,
+        candidate_sha=sha, unrecoverable=False,
     )
 
 class TestIsPublishWorkflow:

@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 
 from conftest import make_ctx, with_root_member, make_workspace
-from rlsbl.release_record import range_anchor as _range_anchor
+from rlsbl.release_record import nearest_release_commit as _range_release_commit
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
@@ -577,13 +577,13 @@ class TestStatusTagScoping:
 
         captured_calls = []
 
-        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+        def spy_range_release_commit(releases_dir, *, tag_glob=None, cwd=None):
             captured_calls.append((releases_dir, tag_glob))
-            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
+            return _range_release_commit(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status.range_anchor",
-            side_effect=spy_range_anchor,
+            "rlsbl.commands.status.nearest_release_commit",
+            side_effect=spy_range_release_commit,
         ):
             from rlsbl.commands.status import run_cmd
             run_cmd("npm", [], {}, ctx=make_ctx("."))
@@ -608,13 +608,13 @@ class TestStatusTagScoping:
 
         captured_calls = []
 
-        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+        def spy_range_release_commit(releases_dir, *, tag_glob=None, cwd=None):
             captured_calls.append((releases_dir, tag_glob))
-            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
+            return _range_release_commit(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status.range_anchor",
-            side_effect=spy_range_anchor,
+            "rlsbl.commands.status.nearest_release_commit",
+            side_effect=spy_range_release_commit,
         ):
             from rlsbl.commands.status import run_cmd
             run_cmd("npm", [], {}, ctx=make_ctx("."))
@@ -636,13 +636,13 @@ class TestStatusTagScoping:
 
         captured_calls = []
 
-        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+        def spy_range_release_commit(releases_dir, *, tag_glob=None, cwd=None):
             captured_calls.append((releases_dir, tag_glob))
-            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
+            return _range_release_commit(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status.range_anchor",
-            side_effect=spy_range_anchor,
+            "rlsbl.commands.status.nearest_release_commit",
+            side_effect=spy_range_release_commit,
         ):
             from rlsbl.commands.status import _collect_status
             _collect_status("npm", ".", tag_glob="my-project@v*", ctx=make_ctx("."))
@@ -674,13 +674,13 @@ class TestStatusTagScoping:
 
         captured_calls = []
 
-        def spy_range_anchor(releases_dir, *, tag_glob=None, cwd=None):
+        def spy_range_release_commit(releases_dir, *, tag_glob=None, cwd=None):
             captured_calls.append((releases_dir, tag_glob))
-            return _range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
+            return _range_release_commit(releases_dir, tag_glob=tag_glob, cwd=cwd)
 
         with patch(
-            "rlsbl.commands.status.range_anchor",
-            side_effect=spy_range_anchor,
+            "rlsbl.commands.status.nearest_release_commit",
+            side_effect=spy_range_release_commit,
         ):
             from rlsbl.commands.status import run_cmd
             run_cmd("npm", [], {}, ctx=make_ctx("."))

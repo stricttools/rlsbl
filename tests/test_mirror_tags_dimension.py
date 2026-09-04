@@ -3,7 +3,7 @@
 A mirror can be perfectly converged on ``main`` and still carry none of the
 tags its releasable's release record records. The preview names each missing version,
 and an apply materializes it -- the tag at the subtree split of that version's
-release record anchor, and the mirror's own GitHub Release beside it.
+recorded release commit, and the mirror's own GitHub Release beside it.
 
 Every remote here is a local bare repository reached over ``file://``.
 """
@@ -63,18 +63,18 @@ def _monorepo(root, remote, *, name="mylib", path="mylib"):
     )
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "release 1.0.0")
-    anchor = _git(root, "rev-parse", "HEAD")
+    release_commit = _git(root, "rev-parse", "HEAD")
 
     state = get_releasable_dir(str(root), name)
     (root / "x").write_text("")  # keep the tree non-empty for later commits
-    archive_release(f"{state}/releases", "1.0.0", anchor)
+    archive_release(f"{state}/releases", "1.0.0", release_commit)
     changes = f"{state}/changes"
     import os
 
     os.makedirs(changes, exist_ok=True)
     with open(f"{changes}/1.0.0.md", "w", encoding="utf-8") as f:
         f.write("### Features\n- the first release\n")
-    return anchor
+    return release_commit
 
 
 class _FakeGh:
@@ -113,47 +113,47 @@ class TestObserveTags:
     def test_a_released_version_the_mirror_lacks_is_materializable(self, tmp_path):
         remote = _bare(tmp_path / "mirror.git")
         root = tmp_path / "mono"
-        anchor = _monorepo(root, remote)
+        release_commit = _monorepo(root, remote)
 
         [plan] = _tag_plans(root, remote)
         assert plan.version == "1.0.0"
         assert plan.tag == "v1.0.0"
         assert plan.state == "materialize"
-        assert plan.anchor_sha == anchor
-        assert plan.split_sha == split_commit_for(str(root), "mylib", anchor)
+        assert plan.release_commit_sha == release_commit
+        assert plan.split_sha == split_commit_for(str(root), "mylib", release_commit)
         assert "the first release" in plan.notes
 
     def test_a_tag_the_mirror_carries_is_present(self, tmp_path):
         remote = _bare(tmp_path / "mirror.git")
         root = tmp_path / "mono"
-        anchor = _monorepo(root, remote)
-        split = split_commit_for(str(root), "mylib", anchor)
+        release_commit = _monorepo(root, remote)
+        split = split_commit_for(str(root), "mylib", release_commit)
         _git(root, "push", "-q", remote, f"{split}:refs/tags/v1.0.0")
 
         [plan] = _tag_plans(root, remote)
         assert plan.state == "present"
         assert plan.remote_commit == split
 
-    def test_an_unanchored_version_is_reported_never_guessed(self, tmp_path):
+    def test_an_underivable_version_is_reported_never_guessed(self, tmp_path):
         remote = _bare(tmp_path / "mirror.git")
         root = tmp_path / "mono"
         _monorepo(root, remote)
         state = get_releasable_dir(str(root), "mylib")
-        archive_release(f"{state}/releases", "0.9.0", "", unanchorable=True)
+        archive_release(f"{state}/releases", "0.9.0", "", unrecoverable=True)
 
         plans = {p.version: p for p in _tag_plans(root, remote)}
-        assert plans["0.9.0"].state == "unanchored"
+        assert plans["0.9.0"].state == "underivable"
         assert plans["0.9.0"].split_sha is None
 
-    def test_an_anchor_with_no_mirror_commit_is_unanchored_not_fatal(
+    def test_a_release_commit_with_no_mirror_commit_is_underivable_not_fatal(
         self, tmp_path,
     ):
-        """An anchor that predates the member's directory must not kill the run.
+        """A release commit that predates the member's directory must not kill the run.
 
         A version absorbed from an era before this subtree existed has a real
-        release record anchor, but no ``git subtree split`` of the member path can
+        recorded release commit, but no ``git subtree split`` of the member path can
         answer for that commit. That is one version's problem: it becomes an
-        ``unanchored`` item carrying the reason, and every other version -- and
+        ``underivable`` item carrying the reason, and every other version -- and
         the branch itself -- is judged as usual.
         """
         remote = _bare(tmp_path / "mirror.git")
@@ -172,9 +172,9 @@ class TestObserveTags:
         archive_release(f"{state}/releases", "0.9.0", absorbed)
 
         plans = {p.version: p for p in _tag_plans(root, remote)}
-        assert plans["0.9.0"].state == "unanchored"
+        assert plans["0.9.0"].state == "underivable"
         assert plans["0.9.0"].split_sha is None
-        assert plans["0.9.0"].anchor_sha == absorbed
+        assert plans["0.9.0"].release_commit_sha == absorbed
         assert plans["0.9.0"].reason, "the reason the split failed is reported"
         # The version that CAN be derived is unaffected.
         assert plans["1.0.0"].state == "materialize"
@@ -211,7 +211,7 @@ class TestThroughTheCommand:
     ):
         remote = _bare(tmp_path / "mirror.git")
         root = tmp_path / "mono"
-        anchor = _monorepo(root, remote)
+        release_commit = _monorepo(root, remote)
         gh = _FakeGh()
         monkeypatch.setattr(
             mirror_cmd, "validate_subtree_remote_ssh_host",
@@ -223,7 +223,7 @@ class TestThroughTheCommand:
 
         _cmd_mirror({"project": "mylib", "dry-run": False}, project_root=root)
 
-        split = split_commit_for(str(root), "mylib", anchor)
+        split = split_commit_for(str(root), "mylib", release_commit)
         tags = remote_tag_commits(remote_refs(remote, str(root)))
         assert tags == {"v1.0.0": split}
         assert f"<!-- rlsbl-ci-sha: {split} -->" in gh.bodies["v1.0.0"]
@@ -255,7 +255,7 @@ class TestThroughTheCommand:
     ):
         """A version the split cannot answer for costs that version only.
 
-        The anchor of an absorbed-era release predates the member's directory,
+        The release commit of an absorbed-era release predates the member's directory,
         so no subtree split of that path can name a mirror commit for it. That
         used to raise out of observation, and with it went the branch: nothing
         converged, and the command reported the split failure as if the whole
@@ -286,7 +286,7 @@ class TestThroughTheCommand:
 
         _cmd_mirror({"project": "mylib", "dry-run": True}, project_root=root)
         out = capsys.readouterr().out
-        assert "tag:v0.9.0" in out and "unanchored" in out
+        assert "tag:v0.9.0" in out and "underivable" in out
         assert "tag:v1.0.0" in out
 
         _cmd_mirror({"project": "mylib", "dry-run": False}, project_root=root)

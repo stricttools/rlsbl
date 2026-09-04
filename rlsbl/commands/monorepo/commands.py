@@ -423,7 +423,7 @@ def _cmd_list(flags, project_root):
 def _latest_release_for_row(changes_dir, tag_glob):
     """The release a status row reports, from that row's own RELEASE RECORD.
 
-    Returns ``(fact, anchor)``: the project's latest archived release as a
+    Returns ``(fact, release commit)``: the project's latest archived release as a
     displayable fact (annotated when this checkout does not contain it), and
     the highest archived release this checkout DOES contain, which is what
     bounds the coverage range. The two differ exactly when the checkout
@@ -434,21 +434,21 @@ def _latest_release_for_row(changes_dir, tag_glob):
     """
     from ...release_record import (
         latest_release_fact,
-        range_anchor,
+        nearest_release_commit,
         releases_dir_for_changes_dir,
     )
 
     releases_dir = releases_dir_for_changes_dir(changes_dir)
     return (
         latest_release_fact(releases_dir, tag_glob=tag_glob),
-        range_anchor(releases_dir, tag_glob=tag_glob),
+        nearest_release_commit(releases_dir, tag_glob=tag_glob),
     )
 
 
-def _coverage_column(anchor, changes_dir, scope):
+def _coverage_column(release_commit, changes_dir, scope):
     """Return the Coverage-column string for one status row.
 
-    Real JSONL coverage: the commits since *anchor* -- the release record entry for
+    Real JSONL coverage: the commits since *release commit* -- the release record entry for
     the highest archived release this checkout contains -- scoped to the row's
     members via *scope* (an :class:`~rlsbl.ownership.OwnershipScope`, which
     carries the whole member list), minus the exempt ones, cross-referenced
@@ -472,7 +472,7 @@ def _coverage_column(anchor, changes_dir, scope):
     from ...changelog.validate import filter_exempt_commits
     from ...git_util import filter_commits_for_scope
 
-    range_spec = f"{anchor.candidate_sha}..HEAD" if anchor else "HEAD"
+    range_spec = f"{release_commit.candidate_sha}..HEAD" if release_commit else "HEAD"
     commits = _git_log_hashes(range_spec)
     # Scope first, then exempt -- the order the authoritative coverage check
     # uses, so an unrelated package's changelog churn is never counted here.
@@ -526,9 +526,9 @@ def _cmd_status_explicit(root, projects):
             version = "?"
         tag_glob = resolve_monorepo_tag_glob(None, root, releasable=rel)
         rel_changes = get_releasable_changes_dir(root, rel.name)
-        fact, anchor = _latest_release_for_row(rel_changes, tag_glob)
+        fact, release_commit = _latest_release_for_row(rel_changes, tag_glob)
         coverage = _coverage_column(
-            anchor, rel_changes,
+            release_commit, rel_changes,
             OwnershipScope.for_releasable(projects, members, rel.name),
         )
         member_names = ", ".join(m["name"] for m in members)
@@ -550,9 +550,9 @@ def _cmd_status_explicit(root, projects):
                 version = "?"
         tag_glob = resolve_monorepo_tag_glob(proj, root, releasable=None)
         proj_changes = get_changes_dir(os.path.join(root, path))
-        fact, anchor = _latest_release_for_row(proj_changes, tag_glob)
+        fact, release_commit = _latest_release_for_row(proj_changes, tag_glob)
         coverage = _coverage_column(
-            anchor, proj_changes,
+            release_commit, proj_changes,
             OwnershipScope.for_member(projects, proj),
         )
         rows.append((name, "project", str(version), fact.label(), coverage, "-"))
@@ -638,7 +638,7 @@ def _cmd_status(flags, project_root):
             from ...workspace import get_releasable_changes_dir
             _cl_changes_dir = get_releasable_changes_dir(root, _cl_rel_name)
         _changes_dir = _cl_changes_dir or get_changes_dir(os.path.join(root, path))
-        fact, anchor = _latest_release_for_row(_changes_dir, tag_glob)
+        fact, release_commit = _latest_release_for_row(_changes_dir, tag_glob)
         # The scope answers the same question the changes dir was chosen by: a
         # releasable member's coverage is read against its RELEASABLE's state,
         # whose own directory no member path claims. Scoping it as a bare member
@@ -648,7 +648,7 @@ def _cmd_status(flags, project_root):
             _scope = OwnershipScope.for_releasable(projects, [proj], _cl_rel_name)
         else:
             _scope = OwnershipScope.for_member(projects, proj)
-        coverage_str = _coverage_column(anchor, _changes_dir, _scope)
+        coverage_str = _coverage_column(release_commit, _changes_dir, _scope)
 
         # Dependency counts
         deps_count = graph.dep_count(name)

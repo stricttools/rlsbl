@@ -7,7 +7,7 @@ args/flags that reached the dispatch target. This is the canonical pattern from
 tests/test_watch_stop.py::TestStopCliWiring.
 
 These tests double as the source of truth for strictcli's ``cli-test-coverage``
-check: recording is construction-anchored, so ``app.test`` records a coverage
+check: recording is construction-time, so ``app.test`` records a coverage
 hit into the repo where the App object was constructed (the repo root, under
 pytest) regardless of any chdir. A coverage hit is recorded on a SUCCESSFUL
 PARSE, before the handler body runs -- so patching the dispatch target both
@@ -351,7 +351,7 @@ class TestStandaloneWiring:
             ret={
                 "latest_release": None,
                 "latest_release_in_checkout": None,
-                "range_anchor_version": None,
+                "nearest_release_commit_version": None,
                 "commits": [],
             },
         )

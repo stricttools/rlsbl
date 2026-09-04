@@ -23,32 +23,32 @@ VALID_PREIDS = ("alpha", "beta", "rc", "stable")
 
 VALID_TARGET_MODES = ("ota", "build")
 
-# The anchor: the fields the release flow itself writes into the ARCHIVED
+# The release commit: the fields the release flow itself writes into the ARCHIVED
 # release file (v{X.Y.Z}.toml) at the archive step, recording which commit and
 # which tree the version shipped from. Authored by the flow and by nothing
 # else -- the editable unreleased.toml carrying one is refused at release
 # validation, and `release undo` strips them when it restores an archive as the
 # editable file. This tuple is the one place the field names are stated; the
 # refusal, the strip and the writer all read it.
-ANCHOR_FIELDS = ("candidate_sha", "tree_hashes")
+RELEASE_COMMIT_FIELDS = ("candidate_sha", "tree_hashes")
 
-# The permanent record that anchoring a version FAILED. An archive carries
-# either the anchor or this marker, never both and never neither: a version
+# The permanent record that recording a version's release commit FAILED. An archive carries
+# either the release commit or this marker, never both and never neither: a version
 # whose commit could not be recovered (no tag under any recognized scheme, no
 # version-bump commit in history) says so in its own file rather than being
 # silently skipped. Written by the backfill pass, never by the release flow --
 # the flow always knows its own candidate.
-UNANCHORABLE_FIELD = "unanchorable"
+UNRECOVERABLE_FIELD = "unanchorable"
 
 # A git object name (commit or tree). The same shape the schema's
 # GitObjectHash refinement states -- and the same the transition record schema's GitSha
-# states -- restated here because the writer refuses a malformed anchor BEFORE
+# states -- restated here because the writer refuses a malformed release commit BEFORE
 # it reaches the file, rather than producing an archive the reader will later
 # reject.
 _GIT_OBJECT_HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
 
 # The archive filename: ``v{X.Y.Z}.toml``, optionally with a pre-release
-# suffix. Strict, and anchored on both ends, so nothing else that happens to
+# suffix. Strict, and bounded on both ends, so nothing else that happens to
 # live in a releases directory (``unreleased.toml``, ``in-progress.json``, a
 # batch plan file) can be mistaken for a released version.
 #
@@ -167,15 +167,15 @@ class ReleaseConfig:
     context: str = ""  # optional context explaining why these changes were made
     preid: str = ""  # pre-release identifier: "alpha", "beta", "rc", or "stable"
     blog: bool = False
-    # --- the anchor (archived files only; None means the field is ABSENT) ---
+    # --- the release commit (archived files only; None means the field is ABSENT) ---
     # Absence is None rather than "" / {}: a release file that carries no
-    # anchor and one that carries an empty anchor are different documents, and
-    # only the second is a hand-authored anchor the flow must refuse.
+    # release commit and one that carries an empty release commit are different documents, and
+    # only the second is a hand-authored release commit the flow must refuse.
     candidate_sha: str | None = None  # the commit CI verified for this version
     tree_hashes: dict[str, str] | None = None  # released path -> git tree object
     # True on an archive whose commit could not be recovered at all. Absence is
     # None, not False: "never asked" and "asked and failed" are different facts.
-    unanchorable: bool | None = None
+    unrecoverable: bool | None = None
 
 
 def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
@@ -504,7 +504,7 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
 
     blog = data.get("blog", False)
 
-    # The anchor: bound only when the document actually carries it. `in` rather
+    # The release commit: bound only when the document actually carries it. `in` rather
     # than `.get(..., default)` so an absent field arrives as None and an empty
     # one (candidate_sha = "", [tree_hashes] with no entries) arrives as itself
     # -- the refusal at release validation must be able to tell them apart.
@@ -513,7 +513,7 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
         tree_hashes = {str(k): str(v) for k, v in data["tree_hashes"].items()}
     else:
         tree_hashes = None
-    unanchorable = data[UNANCHORABLE_FIELD] if UNANCHORABLE_FIELD in data else None
+    unrecoverable = data[UNRECOVERABLE_FIELD] if UNRECOVERABLE_FIELD in data else None
 
     return ReleaseConfig(
         bump=bump,
@@ -526,7 +526,7 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
         blog=blog,
         candidate_sha=candidate_sha,
         tree_hashes=tree_hashes,
-        unanchorable=unanchorable,
+        unrecoverable=unrecoverable,
     )
 
 
@@ -580,7 +580,7 @@ def write_archived_release_file(
     blog: bool = False,
     candidate_sha: str | None,
     tree_hashes: dict | None,
-    unanchorable: bool = False,
+    unrecoverable: bool = False,
     header_comments=None,
 ) -> str:
     """Write ``v{version}.toml`` for a release that had no ``unreleased.toml``.
@@ -600,14 +600,15 @@ def write_archived_release_file(
     accepts it, which matters because ``rlsbl release undo`` restores it as
     ``unreleased.toml``), and read-only like every other archived release file.
 
-    ``candidate_sha`` and ``tree_hashes`` are the anchor: an archive that does
-    not say which commit and tree the version shipped from is not a record of
-    the release, so they are written with the file and the archive is anchored
-    from the instant it exists. The ONE way to write an unanchored archive is
-    ``unanchorable=True`` with both anchor arguments ``None`` -- the backfill
+    ``candidate_sha`` and ``tree_hashes`` are the release commit: an archive
+    that does not say which commit and tree the version shipped from is not a
+    record of the release, so they are written with the file and the archive
+    records its release commit from the instant it exists. The ONE way to write
+    an archive with no release commit is ``unrecoverable=True`` with both
+    release-commit arguments ``None`` -- the backfill
     case where a version's commit could not be recovered from any source; the
     file then carries the permanent ``unanchorable = true`` record instead. An
-    archive is never both anchored and unanchorable, and never neither.
+    archive is never both recorded and unrecoverable, and never neither.
 
     ``header_comments`` replaces the leading comment block (one list element per
     comment line) for a writer other than the release flow -- the backfill pass
@@ -615,14 +616,14 @@ def write_archived_release_file(
 
     Returns the path written.
     """
-    if unanchorable:
+    if unrecoverable:
         if candidate_sha is not None or tree_hashes is not None:
             raise ReleaseFileError(
-                "an unanchorable archive carries no anchor: pass "
-                "candidate_sha=None and tree_hashes=None with unanchorable=True"
+                "an unrecoverable archive carries no release commit: pass "
+                "candidate_sha=None and tree_hashes=None with unrecoverable=True"
             )
     else:
-        _check_anchor(candidate_sha, tree_hashes)
+        _check_release_commit(candidate_sha, tree_hashes)
     doc = tomlkit.document()
     if header_comments is None:
         header_comments = [
@@ -645,11 +646,11 @@ def write_archived_release_file(
         doc.add("preid", preid)
     if blog:
         doc.add("blog", True)
-    if unanchorable:
-        doc.add(UNANCHORABLE_FIELD, True)
+    if unrecoverable:
+        doc.add(UNRECOVERABLE_FIELD, True)
     else:
         doc.add("candidate_sha", candidate_sha)
-        doc.add("tree_hashes", _anchor_tree_table(tree_hashes))
+        doc.add("tree_hashes", _release_commit_tree_table(tree_hashes))
 
     effects.makedirs(releases_dir, exist_ok=True)
     path = archived_release_path(releases_dir, version)
@@ -662,32 +663,32 @@ def write_archived_release_file(
     return path
 
 
-def _check_anchor(candidate_sha: str, tree_hashes: dict) -> None:
-    """Refuse a malformed anchor before it reaches a file.
+def _check_release_commit(candidate_sha: str, tree_hashes: dict) -> None:
+    """Refuse a malformed release commit before it reaches a file.
 
     The schema rejects one on the way back IN; this rejects it on the way OUT,
     so a release never produces a read-only archive its own reader refuses.
     """
     if not isinstance(candidate_sha, str) or not _GIT_OBJECT_HASH_RE.match(candidate_sha):
         raise ReleaseFileError(
-            f"release anchor candidate_sha must be a git commit hash "
+            f"release commit candidate_sha must be a git commit hash "
             f"(7 to 40 hex characters), got {candidate_sha!r}"
         )
     if not isinstance(tree_hashes, dict) or not tree_hashes:
         raise ReleaseFileError(
-            "release anchor tree_hashes must name at least one released path "
+            "release commit tree_hashes must name at least one released path "
             "(\".\" for a standalone repository, one entry per member "
             f"directory for a releasable), got {tree_hashes!r}"
         )
     for path, tree in tree_hashes.items():
         if not isinstance(tree, str) or not _GIT_OBJECT_HASH_RE.match(tree):
             raise ReleaseFileError(
-                f"release anchor tree_hashes[{path!r}] must be a git tree hash "
+                f"release commit tree_hashes[{path!r}] must be a git tree hash "
                 f"(7 to 40 hex characters), got {tree!r}"
             )
 
 
-def _anchor_tree_table(tree_hashes: dict):
+def _release_commit_tree_table(tree_hashes: dict):
     """Render the tree-hash map as a TOML table with quoted path keys."""
     table = tomlkit.table()
     for path in sorted(tree_hashes):
@@ -695,31 +696,31 @@ def _anchor_tree_table(tree_hashes: dict):
     return table
 
 
-def write_release_anchor(path: str, *, candidate_sha: str, tree_hashes: dict) -> None:
-    """Author the release anchor into an already-written release file.
+def write_release_commit(path: str, *, candidate_sha: str, tree_hashes: dict) -> None:
+    """Author the release commit into an already-written release file.
 
     Used on the finalization path, where the archive is the operator's own
-    ``unreleased.toml`` renamed to ``v{version}.toml``: the anchor is added
-    after the rename and BEFORE the file is chmodded read-only, so the archive
-    is never observable as a writable anchored file, and never as a locked
-    unanchored one.
+    ``unreleased.toml`` renamed to ``v{version}.toml``: the release commit is
+    added after the rename and BEFORE the file is chmodded read-only, so the
+    archive is never observable as a writable file that already records its
+    release commit, and never as a locked file that does not.
 
     The document is otherwise preserved as written -- tomlkit round-trips the
     operator's comments, ordering and formatting -- so the archive still reads
     as the file the operator authored, plus the two fields the flow owns.
     """
-    _check_anchor(candidate_sha, tree_hashes)
+    _check_release_commit(candidate_sha, tree_hashes)
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.loads(f.read())
-    for f_name in ANCHOR_FIELDS:
+    for f_name in RELEASE_COMMIT_FIELDS:
         if f_name in doc:
             del doc[f_name]
     # No explanatory comment block: tomlkit appends comments after the last
     # element, which in a file carrying a [targets.<name>] section reads as a
-    # comment ON that section. The anchor's meaning is stated where it belongs
+    # comment ON that section. The release commit's meaning is stated where it belongs
     # -- the schema field descriptions and docs/release-workflow.md.
     doc.add("candidate_sha", candidate_sha)
-    doc.add("tree_hashes", _anchor_tree_table(tree_hashes))
+    doc.add("tree_hashes", _release_commit_tree_table(tree_hashes))
     effects.atomic_write_text(path, tomlkit.dumps(doc))
 
 
@@ -728,8 +729,9 @@ def writable_release_file(path: str):
     """Temporarily clear the read-only bit on an archived release file.
 
     Archives are chmodded 0o444 the instant they exist, so any later edit --
-    the backfill pass that anchors a version released before anchoring existed,
-    or stamps the strictspec gate onto one written before the gate existed --
+    the backfill pass that records the release commit of a version shipped
+    before release commits were recorded, or stamps the strictspec gate onto
+    one written before the gate existed --
     has to unlock, write, and relock. Restores the original permissions on the
     way out even when the body raises, and is a no-op on an already-writable
     file (the editable ``unreleased.toml`` takes the same path without being
@@ -747,41 +749,41 @@ def writable_release_file(path: str):
             effects.chmod(path, 0o444)
 
 
-def write_unanchorable_marker(path: str) -> None:
+def write_unrecoverable_marker(path: str) -> None:
     """Record on an already-written archive that its commit is unrecoverable.
 
-    The counterpart to :func:`write_release_anchor` for the backfill pass: a
+    The counterpart to :func:`write_release_commit` for the backfill pass: a
     released version with no tag under any recognized scheme and no version-bump
-    commit in history cannot be anchored, and the archive says so permanently
+    commit in history cannot be recorded, and the archive says so permanently
     rather than being passed over in silence. Refuses an archive that already
-    carries an anchor -- an anchored version is by definition not unanchorable.
+    carries a release commit -- a recorded version is by definition not unrecoverable.
     """
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.loads(f.read())
-    present = [name for name in ANCHOR_FIELDS if name in doc]
+    present = [name for name in RELEASE_COMMIT_FIELDS if name in doc]
     if present:
         raise ReleaseFileError(
-            f"refusing to mark {path} unanchorable: it already carries "
+            f"refusing to mark {path} unrecoverable: it already carries "
             f"{', '.join(present)}"
         )
-    doc[UNANCHORABLE_FIELD] = True
+    doc[UNRECOVERABLE_FIELD] = True
     effects.atomic_write_text(path, tomlkit.dumps(doc))
 
 
-def strip_release_anchor(path: str) -> bool:
-    """Remove the anchor fields from a release file. True if anything changed.
+def strip_release_commit(path: str) -> bool:
+    """Remove the release commit fields from a release file. True if anything changed.
 
-    The inverse of :func:`write_release_anchor`, for ``release undo``: the
+    The inverse of :func:`write_release_commit`, for ``release undo``: the
     archive it restores as ``unreleased.toml`` must come back as an EDITABLE
-    release file, and an editable file carrying an anchor is refused at the
-    next release validation (the anchor is the flow's to author, never the
+    release file, and an editable file carrying a release commit is refused at the
+    next release validation (the release commit is the flow's to author, never the
     operator's). The ``unanchorable`` marker goes with them: it is a statement
     about a version that already shipped, meaningless on a file describing the
     next one.
     """
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.loads(f.read())
-    present = [name for name in (*ANCHOR_FIELDS, UNANCHORABLE_FIELD) if name in doc]
+    present = [name for name in (*RELEASE_COMMIT_FIELDS, UNRECOVERABLE_FIELD) if name in doc]
     if not present:
         return False
     for name in present:
@@ -800,10 +802,10 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
     2. If unreleased.toml exists with content that differs from the versioned
        file, warns on stderr and skips -- nothing is deleted.
     3. Otherwise removes any stale unreleased.toml, makes the versioned file
-       writable, renames it back to unreleased.toml, and STRIPS the anchor the
+       writable, renames it back to unreleased.toml, and STRIPS the release commit the
        release wrote into it. The restored file is an editable pre-release file
-       again, and one carrying an anchor is refused at the next release
-       validation -- so leaving the anchor on would block the re-release of the
+       again, and one carrying a release commit is refused at the next release
+       validation -- so leaving the release commit on would block the re-release of the
        very version the undo just freed.
 
     Returns the list of changed file paths (for committing).
@@ -832,7 +834,7 @@ def unfinalize_release_file(releases_dir: str, version: str) -> list[str]:
 
     effects.chmod(versioned, 0o644)
     effects.rename(versioned, unreleased)
-    strip_release_anchor(unreleased)
+    strip_release_commit(unreleased)
     changed = [unreleased, versioned]
 
     # Also reverse blog body file archival if present

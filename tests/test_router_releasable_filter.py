@@ -101,7 +101,7 @@ class TestReleasableFinalizeArtifactInFilter:
         assert ARTIFACT not in filters
 
     def test_implicit_mode_gets_no_artifact(self):
-        """No releasables (implicit monorepo) -> no finalize artifact to anchor on."""
+        """No releasables (implicit monorepo) -> no finalize artifact to key on."""
         filters = _filters(generate_router([_project("core", "core")], releasables=None))
         assert "- 'core/**'" in filters
         assert ".rlsbl-monorepo/" not in filters

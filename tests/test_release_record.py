@@ -15,8 +15,8 @@ question is about TAGS -- translating a version into a tag name, enumerating a
 tag scheme, or observing the tag namespace as a reconciler's input -- never
 when it is about which version is current.
 
-Unreleased range / coverage -- MIGRATED to the highest anchored version whose
-candidate_sha is an ancestor of the checkout (``release_record.range_anchor``):
+Unreleased range / coverage -- MIGRATED to the highest recorded version whose
+candidate_sha is an ancestor of the checkout (``release_record.nearest_release_commit``):
 
 ===================================================  ==========================
 Site                                                 Was
@@ -55,7 +55,7 @@ release-page URL                                        --exact-match``
 ``rlsbl/commands/undo.py`` ``_find_latest_release``     ``git describe
 (which release is being undone)                         --tags --abbrev=0``
 ``rlsbl/commands/undo.py``                              ``git describe
-``_predecessor_anchor``                                 --tags --abbrev=0
+``_predecessor_release_commit``                                 --tags --abbrev=0
                                                         <tag>^``
 ======================================================  =======================
 
@@ -65,13 +65,13 @@ does not contain it. ``watch`` asks ``release_record.release_at_commit`` -- whic
 release a given commit IS -- and that costs one archive read, not a scan.
 
 ``undo`` reads which VERSION is latest (an archive-existence scan through
-``list_archived_versions``) and then reads TWO anchors: the version's own --
+``list_archived_versions``) and then reads TWO release commits: the version's own --
 the commit CI verified and the tag was created on, which is where its release
 commits are found -- and the predecessor's, which bounds that search from
 below. Tag deletion still operates on the tag namespace, and a tag pointing
-somewhere other than the anchor is reported as a WARNING rather than refused:
+somewhere other than the release commit is reported as a WARNING rather than refused:
 undo is an observe-and-repair layer over tags in the same sense ``release
-reconcile`` is, and refusing to start on a tag/anchor disagreement would refuse
+reconcile`` is, and refusing to start on a tag/release commit disagreement would refuse
 exactly the repair the operator came for -- the archive wins, and the tag is
 being deleted anyway.
 
@@ -100,7 +100,7 @@ Legitimately still tag-based, with the reason:
   the glob construction.  Names the tag a version carries; never picks a
   version.
 * ``rlsbl/tag_glob.py`` -- glob construction and tag parsing for the three tag
-  schemes.  Scheme machinery, no anchoring.
+  schemes.  Scheme machinery, no release commits.
 * ``rlsbl/commands/release_reconcile.py`` local ``git tag -l`` -- the OBSERVE
   layer of a reconciler.  Its input IS the tag namespace; converging it is the
   whole job.
@@ -162,14 +162,14 @@ def _commit(repo, message):
     return _git(repo, "rev-parse", "HEAD")
 
 
-def _archive(releases_dir, version, sha, *, unanchorable=False):
+def _archive(releases_dir, version, sha, *, unrecoverable=False):
     os.makedirs(releases_dir, exist_ok=True)
     return write_archived_release_file(
         str(releases_dir), version,
         bump="patch", include=["pypi"], description=f"release {version}",
-        candidate_sha=None if unanchorable else sha,
-        tree_hashes=None if unanchorable else {".": _TREE},
-        unanchorable=unanchorable,
+        candidate_sha=None if unrecoverable else sha,
+        tree_hashes=None if unrecoverable else {".": _TREE},
+        unrecoverable=unrecoverable,
     )
 
 
@@ -249,16 +249,16 @@ class TestListArchivedVersions:
 
 
 # --------------------------------------------------------------------------- #
-# Reading an entry for use: the agree / disagree / missing-anchor fixtures
+# Reading an entry for use: the agree / disagree / missing-release-commit fixtures
 # --------------------------------------------------------------------------- #
 
 class TestReadEntry:
 
-    def test_agreeing_tag_and_anchor(self, repo):
+    def test_agreeing_tag_and_release_commit(self, repo):
         entry = release_record.read_entry(_releases(repo), "0.2.0")
         assert entry.candidate_sha == repo.shas["0.2.0"]
-        assert entry.anchored is True
-        assert entry.unanchorable is False
+        assert entry.recorded is True
+        assert entry.unrecoverable is False
 
     def test_no_tag_at_all_is_not_a_disagreement(self, repo):
         # A version whose tag was deleted still reads fine: the archive is the
@@ -275,7 +275,7 @@ class TestReadEntry:
         text = str(exc.value)
         assert "0.2.0" in text
         assert other in text                      # the tag's commit
-        assert repo.shas["0.2.0"] in text         # the anchor's commit
+        assert repo.shas["0.2.0"] in text         # the release commit's commit
         assert "v0.2.0" in text                   # the tag name
 
     def test_the_disagreement_does_not_argue_from_the_file_mode(self, repo):
@@ -309,19 +309,19 @@ class TestReadEntry:
         with pytest.raises(ReleaseRecordError, match="lib@v0.4.0"):
             release_record.read_entry(str(releases), "0.4.0", tag_glob="lib@v*")
 
-    def test_unanchorable_entry_reads_as_such(self, tmp_path, monkeypatch):
+    def test_unrecoverable_entry_reads_as_such(self, tmp_path, monkeypatch):
         r = _init_repo(tmp_path / "unanchorable")
         monkeypatch.chdir(r)
         _commit(r, "one")
         releases = r / ".rlsbl" / "releases"
-        _archive(releases, "0.3.1", None, unanchorable=True)
+        _archive(releases, "0.3.1", None, unrecoverable=True)
         entry = release_record.read_entry(str(releases), "0.3.1")
-        assert entry.unanchorable is True
+        assert entry.unrecoverable is True
         assert entry.candidate_sha is None
-        assert entry.anchored is False
+        assert entry.recorded is False
 
-    def test_archive_with_neither_anchor_nor_marker_is_a_hard_error(self, repo):
-        # A pre-backfill archive: written before anchoring existed.
+    def test_archive_with_neither_release_commit_nor_marker_is_a_hard_error(self, repo):
+        # A pre-backfill archive: written before release commits were recorded.
         path = archived_release_path(_releases(repo), "0.2.0")
         with writable_release_file(path):
             text = open(path).read()
@@ -344,7 +344,7 @@ class TestReadEntry:
         assert "tree_hashes" in text
         assert "Re-run the check" in text
 
-    def test_missing_anchor_without_a_tag_says_there_is_nothing_to_derive(self, repo):
+    def test_missing_release_commit_without_a_tag_says_there_is_nothing_to_derive(self, repo):
         path = archived_release_path(_releases(repo), "0.2.0")
         _git(repo, "tag", "-d", "v0.2.0")
         with writable_release_file(path):
@@ -364,13 +364,13 @@ class TestReadEntry:
 
 
 # --------------------------------------------------------------------------- #
-# The range anchor: the highest release this checkout CONTAINS
+# The nearest release commit: the highest release this checkout CONTAINS
 # --------------------------------------------------------------------------- #
 
-class TestRangeAnchor:
+class TestRangeReleaseCommit:
 
     def test_picks_the_highest_contained_release(self, repo):
-        entry = release_record.range_anchor(_releases(repo))
+        entry = release_record.nearest_release_commit(_releases(repo))
         assert entry.version == "0.3.0"
 
     def test_a_release_not_in_this_history_does_not_bound_the_range(self, repo):
@@ -385,25 +385,25 @@ class TestRangeAnchor:
         with writable_release_file(_archive_path):
             body = open(_archive_path).read().replace("c" * 40, sha)
             open(_archive_path, "w").write(body)
-        entry = release_record.range_anchor(_releases(repo))
+        entry = release_record.nearest_release_commit(_releases(repo))
         assert entry.version == "0.3.0"
 
-    def test_an_unanchorable_version_is_skipped(self, repo):
+    def test_an_unrecoverable_version_is_skipped(self, repo):
         # 0.3.0's archive says its commit is unrecoverable, so 0.2.0 bounds it.
         path = archived_release_path(_releases(repo), "0.3.0")
         os.chmod(path, 0o644)
         os.remove(path)
-        _archive(_releases(repo), "0.3.0", None, unanchorable=True)
-        entry = release_record.range_anchor(_releases(repo))
+        _archive(_releases(repo), "0.3.0", None, unrecoverable=True)
+        entry = release_record.nearest_release_commit(_releases(repo))
         assert entry.version == "0.2.0"
 
-    def test_no_archives_means_no_anchor(self, tmp_path, monkeypatch):
+    def test_no_archives_means_no_release_commit(self, tmp_path, monkeypatch):
         r = _init_repo(tmp_path / "virgin")
         monkeypatch.chdir(r)
         _commit(r, "one")
-        assert release_record.range_anchor(str(r / ".rlsbl" / "releases")) is None
+        assert release_record.nearest_release_commit(str(r / ".rlsbl" / "releases")) is None
 
-    def test_unreleased_range_is_the_anchor_commit(self, repo):
+    def test_unreleased_range_is_the_release_commit_commit(self, repo):
         assert release_record.unreleased_range(_releases(repo)) == (
             f"{repo.shas['0.3.0']}..HEAD"
         )
@@ -431,10 +431,10 @@ class TestRangeAnchor:
 
 class TestIndeterminable:
 
-    def test_an_anchor_whose_object_is_missing_is_a_hard_error(self, repo):
+    def test_a_release_commit_whose_object_is_missing_is_a_hard_error(self, repo):
         _archive(_releases(repo), "0.4.0", "c" * 40)
         with pytest.raises(ReleaseRecordError) as exc:
-            release_record.range_anchor(_releases(repo))
+            release_record.nearest_release_commit(_releases(repo))
         text = str(exc.value)
         assert "cannot determine" in text
         assert "git fetch --unshallow" in text
@@ -442,7 +442,7 @@ class TestIndeterminable:
 
     def test_truncated_history_is_indeterminable_not_absent(self, tmp_path,
                                                             monkeypatch):
-        # A shallow clone can SEE the anchor commit but cannot walk to it, and
+        # A shallow clone can SEE the release commit commit but cannot walk to it, and
         # git answers exit 1 -- the same code it gives for a genuine "no".
         origin = _init_repo(tmp_path / "origin")
         base = _commit(origin, "base")
@@ -456,7 +456,7 @@ class TestIndeterminable:
         monkeypatch.chdir(clone)
         _archive(clone / ".rlsbl" / "releases", "0.1.0", base)
         with pytest.raises(ReleaseRecordError, match="cannot determine"):
-            release_record.range_anchor(str(clone / ".rlsbl" / "releases"))
+            release_record.nearest_release_commit(str(clone / ".rlsbl" / "releases"))
 
 
 # --------------------------------------------------------------------------- #
@@ -504,9 +504,9 @@ def _assert_names_the_backfill(text):
 
 class TestEmptyReleaseRecordInATaggedRepository:
 
-    def test_range_anchor_refuses(self, unbackfilled):
+    def test_range_release_commit_refuses(self, unbackfilled):
         with pytest.raises(ReleaseRecordError) as exc:
-            release_record.range_anchor(_releases(unbackfilled))
+            release_record.nearest_release_commit(_releases(unbackfilled))
         _assert_names_the_backfill(str(exc.value))
 
     def test_unreleased_range_refuses(self, unbackfilled):
@@ -540,14 +540,14 @@ class TestEmptyReleaseRecordInATaggedRepository:
         _commit(r, "v0.1.0")
         _git(r, "tag", "v0.1.0")
         with pytest.raises(ReleaseRecordError):
-            release_record.range_anchor(str(r / ".rlsbl" / "releases"))
+            release_record.nearest_release_commit(str(r / ".rlsbl" / "releases"))
 
     def test_the_error_names_the_scheme_and_a_few_tags(self, unbackfilled):
         for extra in ("0.3.0", "0.4.0", "0.5.0"):
             _commit(unbackfilled, f"v{extra}")
             _git(unbackfilled, "tag", f"v{extra}")
         with pytest.raises(ReleaseRecordError) as exc:
-            release_record.range_anchor(_releases(unbackfilled))
+            release_record.nearest_release_commit(_releases(unbackfilled))
         text = str(exc.value)
         assert '"v*"' in text                    # the scheme it matched under
         assert "v0.5.0" in text                  # highest first
@@ -563,7 +563,7 @@ class TestEmptyReleaseRecordLeftAlone:
         monkeypatch.chdir(r)
         _commit(r, "one")
         releases = str(r / ".rlsbl" / "releases")
-        assert release_record.range_anchor(releases) is None
+        assert release_record.nearest_release_commit(releases) is None
         assert release_record.unreleased_range(releases) == "HEAD"
         assert release_record.latest_release_fact(releases).label() == "(none)"
         release_record.require_checkout_contains_latest(releases)
@@ -577,7 +577,7 @@ class TestEmptyReleaseRecordLeftAlone:
         _commit(r, "one")
         for tag in ("vNext", "v1.2", "verified"):
             _git(r, "tag", tag)
-        assert release_record.range_anchor(str(r / ".rlsbl" / "releases")) is None
+        assert release_record.nearest_release_commit(str(r / ".rlsbl" / "releases")) is None
 
     def test_another_scopes_tags_do_not_trip_a_releasables_release_record(self, tmp_path,
                                                                   monkeypatch):
@@ -589,7 +589,7 @@ class TestEmptyReleaseRecordLeftAlone:
         releases = str(
             r / ".rlsbl-monorepo" / "releasables" / "lib" / "releases"
         )
-        assert release_record.range_anchor(releases, tag_glob="lib@v*") is None
+        assert release_record.nearest_release_commit(releases, tag_glob="lib@v*") is None
 
     def test_it_does_trip_on_this_releasables_own_tags(self, tmp_path,
                                                        monkeypatch):
@@ -601,14 +601,14 @@ class TestEmptyReleaseRecordLeftAlone:
             r / ".rlsbl-monorepo" / "releasables" / "lib" / "releases"
         )
         with pytest.raises(ReleaseRecordError) as exc:
-            release_record.range_anchor(releases, tag_glob="lib@v*")
+            release_record.nearest_release_commit(releases, tag_glob="lib@v*")
         assert "lib@v0.4.0" in str(exc.value)
 
     def test_one_archive_is_enough_to_silence_it(self, unbackfilled):
-        # A half-backfilled release record is the missing-anchor error's business, not
+        # A half-backfilled release record is the missing-release-commit error's business, not
         # this one's: the guard is inert the instant an archive exists.
         _archive(_releases(unbackfilled), "0.2.0", unbackfilled.shas["0.2.0"])
-        assert release_record.range_anchor(_releases(unbackfilled)).version == "0.2.0"
+        assert release_record.nearest_release_commit(_releases(unbackfilled)).version == "0.2.0"
 
     def test_an_unanswerable_tag_listing_does_not_accuse(self, unbackfilled,
                                                          monkeypatch):
@@ -616,7 +616,7 @@ class TestEmptyReleaseRecordLeftAlone:
         # guard cannot read the namespace, so it says nothing rather than
         # naming evidence it never saw.
         monkeypatch.setattr(release_record, "_scheme_tags", lambda *a, **k: [])
-        assert release_record.range_anchor(_releases(unbackfilled)) is None
+        assert release_record.nearest_release_commit(_releases(unbackfilled)) is None
 
 
 class TestTheBackfillItselfIsNotBlocked:
@@ -662,7 +662,7 @@ class TestTheBackfillItselfIsNotBlocked:
             / "scripts" / "backfill_release_anchors.py"
         )
         spec = importlib.util.spec_from_file_location(
-            "backfill_release_anchors_release_record_probe", path
+            "backfill_release_commits_release_record_probe", path
         )
         module = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = module
@@ -675,7 +675,7 @@ class TestTheBackfillItselfIsNotBlocked:
         )
         assert code == 0, out.getvalue()
         # And the guard is satisfied by what the script wrote.
-        assert release_record.range_anchor(_releases(unbackfilled)).version == "0.2.0"
+        assert release_record.nearest_release_commit(_releases(unbackfilled)).version == "0.2.0"
 
 
 # --------------------------------------------------------------------------- #
@@ -707,7 +707,7 @@ class TestReleaseAtCommit:
         assert entry.version == "0.2.0"
 
     def test_costs_one_archive_read(self, repo, monkeypatch):
-        # The whole point of asking range_anchor at the commit rather than
+        # The whole point of asking nearest_release_commit at the commit rather than
         # scanning: labelling a commit must not parse the entire history.
         opened = []
         real_open = open
@@ -740,7 +740,7 @@ class TestLatestReleaseFact:
         _git(repo, "checkout", "-q", "main")
         _archive(_releases(repo), "0.4.0", sha)
         fact = release_record.latest_release_fact(_releases(repo))
-        assert fact.version == "0.4.0"          # the FACT, not the range anchor
+        assert fact.version == "0.4.0"          # the FACT, not the nearest release commit
         assert fact.in_checkout is False
         assert fact.label() == "0.4.0 (not in this checkout's history)"
 
@@ -752,8 +752,8 @@ class TestLatestReleaseFact:
         assert fact.version is None
         assert fact.label() == "(none)"
 
-    def test_unanchorable_latest_is_labelled(self, repo):
-        _archive(_releases(repo), "0.4.0", None, unanchorable=True)
+    def test_unrecoverable_latest_is_labelled(self, repo):
+        _archive(_releases(repo), "0.4.0", None, unrecoverable=True)
         fact = release_record.latest_release_fact(_releases(repo))
         assert fact.version == "0.4.0"
         assert fact.in_checkout is None
@@ -787,8 +787,8 @@ class TestRequireCheckoutContainsLatest:
         _commit(r, "one")
         release_record.require_checkout_contains_latest(str(r / ".rlsbl" / "releases"))
 
-    def test_unanchorable_latest_is_not_an_error(self, repo):
-        _archive(_releases(repo), "0.4.0", None, unanchorable=True)
+    def test_unrecoverable_latest_is_not_an_error(self, repo):
+        _archive(_releases(repo), "0.4.0", None, unrecoverable=True)
         release_record.require_checkout_contains_latest(_releases(repo))
 
 

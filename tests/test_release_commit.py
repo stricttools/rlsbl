@@ -1,6 +1,6 @@
-"""The release anchor: the archived release file's record of what shipped.
+"""The release commit: the archived release file's record of what shipped.
 
-An archived ``v{X.Y.Z}.toml`` carries two anchor fields written by the release
+An archived ``v{X.Y.Z}.toml`` carries two release commit fields written by the release
 flow itself:
 
 * ``candidate_sha`` -- the commit CI verified, which is also the tag's commit;
@@ -9,7 +9,7 @@ flow itself:
 
 They are authoritative: the ``rlsbl-ci-sha`` marker in the GitHub Release body
 is their projection for CI to parse, never a second source. The editable
-``unreleased.toml`` never carries them -- a hand-authored anchor is refused at
+``unreleased.toml`` never carries them -- a hand-authored release commit is refused at
 release validation -- and ``release undo`` strips them when it restores the
 archive as the editable file.
 """
@@ -28,17 +28,18 @@ from githarness import record_release
 
 from rlsbl.commands.release.validate import (
     ReleaseValidationError,
-    validate_no_authored_anchors,
+    validate_no_authored_release_commit,
 )
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
-    ANCHOR_FIELDS,
+    RELEASE_COMMIT_FIELDS,
+    UNRECOVERABLE_FIELD,
     ReleaseConfig,
     read_release_file,
-    strip_release_anchor,
+    strip_release_commit,
     unfinalize_release_file,
-    write_release_anchor,
+    write_release_commit,
 )
 
 _SHA = "a" * 40
@@ -76,10 +77,15 @@ class TestSchemaToCodeEdge:
 
     def test_schema_fields_and_dataclass_fields_agree(self):
         bound = {f.name for f in dataclasses.fields(ReleaseConfig)}
+        # One field is spelled differently in code and on disk: the marker is
+        # ``unrecoverable`` in Python and still ``unanchorable`` as the TOML
+        # key. ``UNRECOVERABLE_FIELD`` is the one place that pairing is stated,
+        # so the comparison reads it rather than restating the key here.
+        bound = (bound - {"unrecoverable"}) | {UNRECOVERABLE_FIELD}
         assert bound == _schema_fields()
 
-    def test_anchor_fields_are_schema_fields(self):
-        assert set(ANCHOR_FIELDS) <= _schema_fields()
+    def test_release_commit_fields_are_schema_fields(self):
+        assert set(RELEASE_COMMIT_FIELDS) <= _schema_fields()
 
     def test_every_schema_field_binds_a_value(self, tmp_path):
         # One document carrying every declared field; each must arrive bound.
@@ -106,10 +112,10 @@ class TestSchemaToCodeEdge:
 
 
 # --------------------------------------------------------------------------- #
-# Reading anchors
+# Reading release commits
 # --------------------------------------------------------------------------- #
 
-class TestAnchorReading:
+class TestReleaseCommitReading:
 
     def test_absence_reads_as_absence(self, tmp_path):
         cfg = read_release_file(_write(tmp_path, _BASE))
@@ -154,10 +160,10 @@ class TestAnchorReading:
 
 
 # --------------------------------------------------------------------------- #
-# The hand-authored-anchor refusal
+# The hand-authored-release commit refusal
 # --------------------------------------------------------------------------- #
 
-class TestAuthoredAnchorRefused:
+class TestAuthoredReleaseCommitRefused:
 
     def test_candidate_sha_in_editable_file_refused(self):
         cfg = ReleaseConfig(
@@ -165,7 +171,7 @@ class TestAuthoredAnchorRefused:
             candidate_sha=_SHA,
         )
         with pytest.raises(ReleaseValidationError, match="candidate_sha"):
-            validate_no_authored_anchors(cfg)
+            validate_no_authored_release_commit(cfg)
 
     def test_tree_hashes_in_editable_file_refused(self):
         cfg = ReleaseConfig(
@@ -173,7 +179,7 @@ class TestAuthoredAnchorRefused:
             tree_hashes={".": _TREE},
         )
         with pytest.raises(ReleaseValidationError, match="tree_hashes"):
-            validate_no_authored_anchors(cfg)
+            validate_no_authored_release_commit(cfg)
 
     def test_both_named_in_one_error(self):
         cfg = ReleaseConfig(
@@ -181,51 +187,51 @@ class TestAuthoredAnchorRefused:
             candidate_sha=_SHA, tree_hashes={".": _TREE},
         )
         with pytest.raises(ReleaseValidationError) as exc:
-            validate_no_authored_anchors(cfg)
+            validate_no_authored_release_commit(cfg)
         assert "candidate_sha" in str(exc.value)
         assert "tree_hashes" in str(exc.value)
 
-    def test_anchorless_config_passes(self):
+    def test_release_commitless_config_passes(self):
         cfg = ReleaseConfig(bump="patch", include=[], exclude=[], description="x")
-        validate_no_authored_anchors(cfg)
+        validate_no_authored_release_commit(cfg)
 
-    def test_empty_tree_hashes_table_is_still_an_anchor(self):
+    def test_empty_tree_hashes_table_is_still_a_release_commit(self):
         # An empty [tree_hashes] table is a present field, not an absent one.
         cfg = ReleaseConfig(
             bump="patch", include=[], exclude=[], description="x", tree_hashes={},
         )
         with pytest.raises(ReleaseValidationError, match="tree_hashes"):
-            validate_no_authored_anchors(cfg)
+            validate_no_authored_release_commit(cfg)
 
-    def test_unanchorable_marker_in_editable_file_refused(self):
+    def test_unrecoverable_marker_in_editable_file_refused(self):
         # `unanchorable` is written by the backfill pass onto an ARCHIVE whose
         # commit could not be recovered. On an editable release file it is a
         # hand-authored claim about a version that has not shipped -- refused
-        # for the same reason the anchor fields are.
+        # for the same reason the release commit fields are.
         cfg = ReleaseConfig(
             bump="patch", include=[], exclude=[], description="x",
-            unanchorable=True,
+            unrecoverable=True,
         )
         with pytest.raises(ReleaseValidationError, match="unanchorable"):
-            validate_no_authored_anchors(cfg)
+            validate_no_authored_release_commit(cfg)
 
-    def test_unanchorable_false_is_still_an_authored_marker(self):
+    def test_unrecoverable_false_is_still_an_authored_marker(self):
         # Absence is None; an explicitly written `unanchorable = false` is a
         # present field and just as much the flow's to author.
         cfg = ReleaseConfig(
             bump="patch", include=[], exclude=[], description="x",
-            unanchorable=False,
+            unrecoverable=False,
         )
         with pytest.raises(ReleaseValidationError, match="unanchorable"):
-            validate_no_authored_anchors(cfg)
+            validate_no_authored_release_commit(cfg)
 
-    def test_unanchorable_named_alongside_the_anchor_fields(self):
+    def test_unrecoverable_named_alongside_the_release_commit_fields(self):
         cfg = ReleaseConfig(
             bump="patch", include=[], exclude=[], description="x",
-            candidate_sha=_SHA, tree_hashes={".": _TREE}, unanchorable=True,
+            candidate_sha=_SHA, tree_hashes={".": _TREE}, unrecoverable=True,
         )
         with pytest.raises(ReleaseValidationError) as exc:
-            validate_no_authored_anchors(cfg)
+            validate_no_authored_release_commit(cfg)
         assert "candidate_sha" in str(exc.value)
         assert "tree_hashes" in str(exc.value)
         assert "unanchorable" in str(exc.value)
@@ -237,9 +243,9 @@ class TestAuthoredAnchorRefused:
 
 class TestWriteAndStrip:
 
-    def test_write_release_anchor_appends_both_fields(self, tmp_path):
+    def test_write_release_commit_appends_both_fields(self, tmp_path):
         p = Path(_write(tmp_path, _BASE))
-        write_release_anchor(str(p), candidate_sha=_SHA, tree_hashes={".": _TREE})
+        write_release_commit(str(p), candidate_sha=_SHA, tree_hashes={".": _TREE})
         cfg = read_release_file(str(p))
         assert cfg.candidate_sha == _SHA
         assert cfg.tree_hashes == {".": _TREE}
@@ -247,36 +253,36 @@ class TestWriteAndStrip:
         assert cfg.bump == "patch"
         assert cfg.description == "x"
 
-    def test_write_release_anchor_refuses_a_non_hash_sha(self, tmp_path):
+    def test_write_release_commit_refuses_a_non_hash_sha(self, tmp_path):
         p = Path(_write(tmp_path, _BASE))
         with pytest.raises(ReleaseFileError):
-            write_release_anchor(str(p), candidate_sha="HEAD",
+            write_release_commit(str(p), candidate_sha="HEAD",
                                  tree_hashes={".": _TREE})
 
-    def test_write_release_anchor_refuses_an_empty_tree_map(self, tmp_path):
+    def test_write_release_commit_refuses_an_empty_tree_map(self, tmp_path):
         p = Path(_write(tmp_path, _BASE))
         with pytest.raises(ReleaseFileError):
-            write_release_anchor(str(p), candidate_sha=_SHA, tree_hashes={})
+            write_release_commit(str(p), candidate_sha=_SHA, tree_hashes={})
 
     def test_strip_removes_both_fields(self, tmp_path):
         p = Path(_write(tmp_path, _BASE))
-        write_release_anchor(str(p), candidate_sha=_SHA, tree_hashes={".": _TREE})
-        assert strip_release_anchor(str(p)) is True
+        write_release_commit(str(p), candidate_sha=_SHA, tree_hashes={".": _TREE})
+        assert strip_release_commit(str(p)) is True
         with open(p, "rb") as f:
             data = tomllib.load(f)
-        for field in ANCHOR_FIELDS:
+        for field in RELEASE_COMMIT_FIELDS:
             assert field not in data
         assert data["bump"] == "patch"
 
-    def test_strip_is_a_noop_without_anchors(self, tmp_path):
+    def test_strip_is_a_noop_without_release_commits(self, tmp_path):
         p = Path(_write(tmp_path, _BASE))
         before = p.read_text()
-        assert strip_release_anchor(str(p)) is False
+        assert strip_release_commit(str(p)) is False
         assert p.read_text() == before
 
 
 # --------------------------------------------------------------------------- #
-# The release flow authors the anchor
+# The release flow authors the release commit
 # --------------------------------------------------------------------------- #
 
 def _git(repo, *args):
@@ -389,15 +395,15 @@ def _release(release_config):
         )
 
 
-class TestFlowAuthorsTheAnchor:
-    """A completed release leaves an archive anchored to the verified commit."""
+class TestFlowAuthorsTheReleaseCommit:
+    """A completed release leaves an archive recorded to the verified commit."""
 
-    def _assert_anchored(self, repo, version="1.0.1"):
+    def _assert_recorded(self, repo, version="1.0.1"):
         archive = repo / ".rlsbl" / "releases" / f"v{version}.toml"
         assert archive.exists(), "the release file was not archived"
         cfg = read_release_file(str(archive))
 
-        # The anchor names the commit the tag was created on -- the commit CI
+        # The release commit names the commit the tag was created on -- the commit CI
         # verified -- and NOT the finalization commits stacked on top of it.
         tagged = _git(repo, "rev-parse", f"v{version}^{{}}")
         assert cfg.candidate_sha == tagged
@@ -409,18 +415,18 @@ class TestFlowAuthorsTheAnchor:
         }
         return cfg
 
-    def test_renamed_archive_carries_the_anchor(self, tmp_project):
+    def test_renamed_archive_carries_the_release_commit(self, tmp_project):
         _setup_npm_project(tmp_project, release_file=_RELEASE_FILE)
         _release(ReleaseConfig(
             bump="patch", include=["npm"], exclude=[],
             description="A patch release.",
         ))
-        cfg = self._assert_anchored(tmp_project)
-        # The operator's own fields survived the anchoring.
+        cfg = self._assert_recorded(tmp_project)
+        # The operator's own fields survived the release-commit write.
         assert cfg.description == "A patch release."
         assert cfg.bump == "patch"
 
-    def test_archive_is_read_only_after_anchoring(self, tmp_project):
+    def test_archive_is_read_only_after_release_commit_recording(self, tmp_project):
         _setup_npm_project(tmp_project, release_file=_RELEASE_FILE)
         _release(ReleaseConfig(
             bump="patch", include=["npm"], exclude=[],
@@ -429,7 +435,7 @@ class TestFlowAuthorsTheAnchor:
         archive = tmp_project / ".rlsbl" / "releases" / "v1.0.1.toml"
         assert (archive.stat().st_mode & 0o222) == 0, "the archive stayed writable"
 
-    def test_anchor_is_committed_not_left_dirty(self, tmp_project):
+    def test_release_commit_is_committed_not_left_dirty(self, tmp_project):
         _setup_npm_project(tmp_project, release_file=_RELEASE_FILE)
         _release(ReleaseConfig(
             bump="patch", include=["npm"], exclude=[],
@@ -441,20 +447,20 @@ class TestFlowAuthorsTheAnchor:
         ).stdout
         assert ".rlsbl/releases" not in porcelain, porcelain
 
-    def test_synthesized_archive_carries_the_anchor(self, tmp_project):
+    def test_synthesized_archive_carries_the_release_commit(self, tmp_project):
         # No unreleased.toml on disk: the flow synthesizes the archive from the
-        # release config (the batch-member path). It anchors it just the same.
+        # release config (the batch-member path). It release commits it just the same.
         _setup_npm_project(tmp_project)
         _release(ReleaseConfig(
             bump="patch", include=["npm"], exclude=[],
             description="A synthesized release.",
         ))
-        cfg = self._assert_anchored(tmp_project)
+        cfg = self._assert_recorded(tmp_project)
         assert cfg.description == "A synthesized release."
 
 
-class TestMultiMemberAnchorHelper:
-    """A multi-member releasable anchors one tree per member path.
+class TestMultiMemberReleaseCommitHelper:
+    """A multi-member releasable release commits one tree per member path.
 
     No single git object covers a SET of subtrees, so the archive carries a
     per-member table. Each value must be git's own answer for that path at the
@@ -476,10 +482,10 @@ class TestMultiMemberAnchorHelper:
         return _git(repo, "rev-parse", "HEAD")
 
     def _trees(self, repo, sha, paths):
-        from rlsbl.commands.release.execute import release_anchor_tree_hashes
+        from rlsbl.commands.release.execute import release_commit_tree_hashes
         from rlsbl.utils import run
 
-        return release_anchor_tree_hashes(
+        return release_commit_tree_hashes(
             sha, run=run, git_root=str(repo), member_package_paths=paths,
         )
 
@@ -510,9 +516,9 @@ class TestMultiMemberAnchorHelper:
             self._trees(repo, sha, ["packages/core", "packages/missing"])
 
 
-class TestFlowRefusesAnAuthoredAnchor:
+class TestFlowRefusesAnAuthoredReleaseCommit:
 
-    def test_anchored_editable_file_aborts_the_release(self, tmp_project, capsys):
+    def test_recorded_editable_file_aborts_the_release(self, tmp_project, capsys):
         _setup_npm_project(
             tmp_project,
             release_file=_RELEASE_FILE + f'candidate_sha = "{_SHA}"\n',
@@ -532,7 +538,7 @@ class TestFlowRefusesAnAuthoredAnchor:
 def _setup_two_member_releasable_workspace(root):
     """One releasable ('alpha') with TWO member packages, npm targets.
 
-    The shape a per-member anchor table exists for: the release ships
+    The shape a per-member release commit table exists for: the release ships
     ``packages/core`` and ``packages/cli`` together under one version.
     """
     from rlsbl.workspace import (
@@ -586,7 +592,7 @@ def _setup_two_member_releasable_workspace(root):
     record_release(root, "alpha@v1.0.0")
 
     # One feature commit touching BOTH members, so each member's subtree really
-    # moves and the two anchors cannot coincidentally match the old ones.
+    # moves and the two release commits cannot coincidentally match the old ones.
     for name in ("core", "cli"):
         (root / "packages" / name / "feature.txt").write_text(f"{name} feature\n")
     _git(root, "add", "-A")
@@ -603,11 +609,11 @@ def _setup_two_member_releasable_workspace(root):
     _git(root, "commit", "-q", "-m", "changelog: alpha feature")
 
 
-class TestBatchAnchorsAMultiMemberReleasable:
-    """The batch release path anchors a releasable's synthesized archive.
+class TestBatchReleaseCommitsAMultiMemberReleasable:
+    """The batch release path release commits a releasable's synthesized archive.
 
     A releasable batch has no per-member editable release file: the archive is
-    synthesized from the workspace-level batch TOML, and it must be anchored
+    synthesized from the workspace-level batch TOML, and it must be recorded
     from the instant it exists -- with one tree entry per member path, since
     the release ships all of them under one version.
     """
@@ -623,7 +629,7 @@ class TestBatchAnchorsAMultiMemberReleasable:
             f"v{version}.toml",
         )
 
-    def test_the_synthesized_archive_carries_one_anchor_per_member(
+    def test_the_synthesized_archive_carries_one_release_commit_per_member(
         self, tmp_project,
     ):
         from test_batch_main_as_candidate import _run_batch
@@ -637,7 +643,7 @@ class TestBatchAnchorsAMultiMemberReleasable:
 
         verified = _git(tmp_project, "rev-list", "-n", "1", "alpha@v1.0.1")
         assert cfg.candidate_sha == verified, (
-            "the anchor must name the commit the tag was created on"
+            "the release commit must name the commit the tag was created on"
         )
 
         # One entry per member path, each git's own answer -- not the root
@@ -651,11 +657,11 @@ class TestBatchAnchorsAMultiMemberReleasable:
         root_tree = _git(tmp_project, "rev-parse", f"{verified}^{{tree}}")
         assert root_tree not in cfg.tree_hashes.values()
 
-        # The operator's batch metadata survived the anchoring.
+        # The operator's batch metadata survived the release-commit write.
         assert cfg.description == "Alpha patch"
         assert cfg.bump == "patch"
 
-    def test_the_anchored_archive_is_locked_and_committed(self, tmp_project):
+    def test_the_recorded_archive_is_locked_and_committed(self, tmp_project):
         from test_batch_main_as_candidate import _run_batch
 
         _setup_two_member_releasable_workspace(tmp_project)
@@ -663,14 +669,14 @@ class TestBatchAnchorsAMultiMemberReleasable:
 
         archive = self._archive(tmp_project)
         assert (os.stat(archive).st_mode & 0o222) == 0, (
-            "the anchored archive must be read-only"
+            "the recorded archive must be read-only"
         )
         status = _git(tmp_project, "status", "--porcelain")
         assert "v1.0.1.toml" not in status, status
 
 
 class TestUndoAndReRelease:
-    """The whole cycle: release, undo, release again -- each anchored afresh."""
+    """The whole cycle: release, undo, release again -- each recorded afresh."""
 
     def _undo(self, repo):
         from rlsbl.commands.undo import run_cmd as undo_run_cmd
@@ -705,7 +711,7 @@ class TestUndoAndReRelease:
                 config={"publish_mode": "ci"},
             ))
 
-    def test_undo_strips_the_anchor_and_the_re_release_re_authors_it(
+    def test_undo_strips_the_release_commit_and_the_re_release_re_authors_it(
         self, tmp_project,
     ):
         _setup_npm_project(tmp_project, release_file=_RELEASE_FILE)
@@ -714,41 +720,41 @@ class TestUndoAndReRelease:
             description="A patch release.",
         ))
         archive = tmp_project / ".rlsbl" / "releases" / "v1.0.1.toml"
-        first_anchor = read_release_file(str(archive)).candidate_sha
-        assert first_anchor
+        first_release_commit = read_release_file(str(archive)).candidate_sha
+        assert first_release_commit
 
         self._undo(tmp_project)
 
-        # The archive is gone and the editable file is back -- anchor-free, so
-        # the next release is not refused by the authored-anchor check.
+        # The archive is gone and the editable file is back -- release commit-free, so
+        # the next release is not refused by the authored-release commit check.
         assert not archive.exists()
         restored = tmp_project / ".rlsbl" / "releases" / "unreleased.toml"
         with open(restored, "rb") as f:
             data = tomllib.load(f)
-        for field in ANCHOR_FIELDS:
+        for field in RELEASE_COMMIT_FIELDS:
             assert field not in data, f"{field} survived the undo"
-        validate_no_authored_anchors(read_release_file(str(restored)))
+        validate_no_authored_release_commit(read_release_file(str(restored)))
 
         # Cover the commits the undo itself made (the revert and the audit
         # record), exactly as an operator would before re-releasing.
         _cover_unreleased_commits(tmp_project)
 
-        # Releasing the freed version again re-authors the anchor, at the new
+        # Releasing the freed version again re-authors the release commit, at the new
         # candidate commit (the reverts moved history along).
         _release(read_release_file(str(restored)))
         cfg = read_release_file(str(archive))
         tagged = _git(tmp_project, "rev-parse", "v1.0.1^{}")
         assert cfg.candidate_sha == tagged
-        assert cfg.candidate_sha != first_anchor
+        assert cfg.candidate_sha != first_release_commit
         assert cfg.tree_hashes == {
             ".": _git(tmp_project, "rev-parse", f"{tagged}^{{tree}}")
         }
 
 
-class TestUnfinalizeStripsAnchors:
-    """`release undo` restores the archive as the editable file, anchor-free.
+class TestUnfinalizeStripsReleaseCommits:
+    """`release undo` restores the archive as the editable file, release commit-free.
 
-    Without the strip, the restored ``unreleased.toml`` carries the anchor of
+    Without the strip, the restored ``unreleased.toml`` carries the release commit of
     the release that was just undone, and the next release refuses it.
     """
 
@@ -757,32 +763,32 @@ class TestUnfinalizeStripsAnchors:
         releases.mkdir()
         archived = releases / f"v{version}.toml"
         archived.write_text(_BASE)
-        write_release_anchor(str(archived), candidate_sha=_SHA,
+        write_release_commit(str(archived), candidate_sha=_SHA,
                              tree_hashes={".": _TREE})
         os.chmod(archived, 0o444)
         return str(releases), archived
 
-    def test_restored_editable_file_carries_no_anchor(self, tmp_path):
+    def test_restored_editable_file_carries_no_release_commit(self, tmp_path):
         releases, _archived = self._archive(tmp_path)
         changed = unfinalize_release_file(releases, "1.0.1")
         assert changed
         restored = Path(releases) / "unreleased.toml"
         with open(restored, "rb") as f:
             data = tomllib.load(f)
-        for field in ANCHOR_FIELDS:
+        for field in RELEASE_COMMIT_FIELDS:
             assert field not in data, f"{field} survived the undo"
 
     def test_restored_file_passes_the_release_validation(self, tmp_path):
         releases, _archived = self._archive(tmp_path)
         unfinalize_release_file(releases, "1.0.1")
         cfg = read_release_file(os.path.join(releases, "unreleased.toml"))
-        validate_no_authored_anchors(cfg)
+        validate_no_authored_release_commit(cfg)
 
-    def test_restored_file_can_be_re_anchored(self, tmp_path):
+    def test_restored_file_can_be_re_recorded(self, tmp_path):
         releases, _archived = self._archive(tmp_path)
         unfinalize_release_file(releases, "1.0.1")
         restored = os.path.join(releases, "unreleased.toml")
-        write_release_anchor(restored, candidate_sha=_TREE,
+        write_release_commit(restored, candidate_sha=_TREE,
                              tree_hashes={".": _SHA})
         cfg = read_release_file(restored)
         assert cfg.candidate_sha == _TREE

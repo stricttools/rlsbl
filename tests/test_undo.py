@@ -26,7 +26,7 @@ from githarness import add_remote, git, init_repo, remote_ref, snapshot_remote_r
 from rlsbl.commands.undo import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.evidence_gate import Evidence, EvidenceKind, GateResult, Verdict
-from rlsbl.release_file import write_release_anchor
+from rlsbl.release_file import write_release_commit
 from rlsbl.release_publication import delete_args
 
 from conftest import archive_release, release_record_dir
@@ -164,9 +164,9 @@ def _make_released_repo(repo, *, n_commits=5, with_remote=True):
         shas["clean_stale"] = git(repo, "rev-parse", "HEAD")
 
     # 4. finalize-release-file (rename unreleased.toml -> v1.0.1.toml, then
-    #    write the anchor into it, exactly as the release flow does)
+    #    write the release commit into it, exactly as the release flow does)
     os.rename(repo / ".rlsbl/releases/unreleased.toml", repo / ".rlsbl/releases/v1.0.1.toml")
-    write_release_anchor(
+    write_release_commit(
         str(repo / ".rlsbl/releases/v1.0.1.toml"),
         candidate_sha=shas["version_bump"],
         tree_hashes={".": git(repo, "rev-parse", f'{shas["version_bump"]}^{{tree}}')},
@@ -198,9 +198,9 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
       1. ``initial``                                (version 1.0.0)
       2. ``chore: archive release 1.0.0``           (the predecessor's release record)
       3. ``v1.0.1``                                 the version-bump commit --
-         the CANDIDATE: it carries the tag AND the release record anchor
+         the CANDIDATE: it carries the tag AND the recorded release commit
       3b. with *resumed*: a fix-forward commit and a changelog commit land on
-          top of the candidate after a red CI verdict, and the tag/anchor move
+          top of the candidate after a red CI verdict, and the tag/release commit move
           to that tip -- the tag is then NOT on the version-bump commit
       4. ``chore: finalize changelog for 1.0.1``    ABOVE the tag
       5. ``chore: finalize release file for 1.0.1`` ABOVE the tag
@@ -209,7 +209,7 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
     puts every finalization commit below the tag -- a shape the release flow
     stopped producing when the CI gate moved in front of the tag.
 
-    Returns a dict of shas (``version_bump``, ``anchor``, ...).
+    Returns a dict of shas (``version_bump``, ``release commit``, ...).
     """
     init_repo(repo)
 
@@ -247,7 +247,7 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "v1.0.1")
     shas["version_bump"] = git(repo, "rev-parse", "HEAD")
-    shas["anchor"] = shas["version_bump"]
+    shas["release commit"] = shas["version_bump"]
 
     if resumed:
         # A red CI verdict, fixed forward at the SAME version: the fix and its
@@ -262,16 +262,16 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
             }) + "\n")
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "-m", "changelog: non-user-facing entry")
-        shas["anchor"] = git(repo, "rev-parse", "HEAD")
+        shas["release commit"] = git(repo, "rev-parse", "HEAD")
 
     if snapshot:
         # The monorepo snapshot is regenerated pre-push, so it rides INTO the
-        # candidate: the tag and the anchor land on it, not on the bump commit.
+        # candidate: the tag and the release commit land on it, not on the bump commit.
         _write(repo, ".rlsbl-monorepo/snapshot.json", '{"packages": {}}\n')
         git(repo, "add", "-A")
         git(repo, "commit", "-q", "-m", "snapshot")
         shas["snapshot"] = git(repo, "rev-parse", "HEAD")
-        shas["anchor"] = shas["snapshot"]
+        shas["release commit"] = shas["snapshot"]
 
     # Finalization -- ABOVE the tag.
     os.rename(repo / ".rlsbl/changes/unreleased.jsonl", repo / ".rlsbl/changes/1.0.1.jsonl")
@@ -282,10 +282,10 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
     shas["finalize_changelog"] = git(repo, "rev-parse", "HEAD")
 
     os.rename(repo / ".rlsbl/releases/unreleased.toml", repo / ".rlsbl/releases/v1.0.1.toml")
-    write_release_anchor(
+    write_release_commit(
         str(repo / ".rlsbl/releases/v1.0.1.toml"),
-        candidate_sha=shas["anchor"],
-        tree_hashes={".": git(repo, "rev-parse", f'{shas["anchor"]}^{{tree}}')},
+        candidate_sha=shas["release commit"],
+        tree_hashes={".": git(repo, "rev-parse", f'{shas["release commit"]}^{{tree}}')},
     )
     os.chmod(repo / ".rlsbl/releases/v1.0.1.toml", 0o444)
     git(repo, "add", "-A")
@@ -293,7 +293,7 @@ def _make_real_shape_repo(repo, *, with_remote=True, resumed=False, snapshot=Fal
     shas["finalize_release_file"] = git(repo, "rev-parse", "HEAD")
 
     # The tag goes on the CI-VERIFIED commit, not on HEAD.
-    git(repo, "tag", "v1.0.1", shas["anchor"])
+    git(repo, "tag", "v1.0.1", shas["release commit"])
     if with_remote:
         add_remote(repo, repo.parent / "remote.git")
     return shas

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate one workspace.toml to the ownership model, then anchor its releases.
+"""Migrate one workspace.toml to the ownership model, then release commit its releases.
 
 The ownership model changed three things about a workspace's declaration, and
 each is a mechanical edit an operator would otherwise make by hand in every
@@ -25,7 +25,7 @@ loader itself refuses the old model and so cannot be used to read one, then
 loads the result and prints any remaining loader error verbatim as the
 operator's residue list.
 
-Finally it runs the release-anchor backfill (``backfill_release_anchors.py``) in
+Finally it runs the release-commit backfill (``backfill_release_anchors.py``) in
 the same repository, which is idempotent and commits its own writes.
 
 Usage:
@@ -665,14 +665,14 @@ def run(
             # The backfill enumerates a workspace's release scopes through the
             # loader, so it has nothing to read until the workspace loads.
             print(
-                "\nThe release-anchor backfill is skipped: it reads the "
+                "\nThe release-commit backfill is skipped: it reads the "
                 "workspace through the loader, which this file does not pass "
                 "yet. Re-run this pass once the residue above is resolved -- "
                 "both halves are idempotent.",
                 file=out,
             )
             return status
-        print("\n--- release-anchor backfill ---\n", file=out)
+        print("\n--- release-commit backfill ---\n", file=out)
         status = (
             _load_backfill().run(
                 repo, dry_run=dry_run, use_gh=use_gh, auto_commit=auto_commit,
@@ -684,7 +684,7 @@ def run(
 
 
 def _load_backfill():
-    """The anchor backfill, imported from this checkout's scripts directory.
+    """The release commit backfill, imported from this checkout's scripts directory.
 
     In-process rather than as a subprocess: the pass already exposes exactly the
     entry this one needs (``run(repo, dry_run=..., out=...)``), it already
@@ -706,7 +706,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Migrate one workspace.toml to the ownership model and backfill its "
-            "release anchors."
+            "release commits."
         ),
     )
     parser.add_argument(
@@ -750,7 +750,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--no-gh",
         action="store_true",
-        help="passed to the anchor backfill: skip its GitHub Release lookups",
+        help="passed to the release commit backfill: skip its GitHub Release lookups",
     )
     args = parser.parse_args(argv)
 

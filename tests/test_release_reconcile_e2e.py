@@ -10,7 +10,7 @@ at commits that no longer exist.
 What changed is the shape of the answer. The reconcile is no longer a
 journal-driven tag pusher: it observes origin once, judges every subject against
 FOUR merged explanation sources (safegit's journal, the release record's
-anchors, the transition records, and the committed scrub archives), and emits one
+release commits, the transition records, and the committed scrub archives), and emits one
 merged preview whose verdicts are ``materialize``, ``already-correct``,
 ``re-point-with-lease``, ``refuse-foreign`` or ``refuse-identity-mismatch``.
 Consent is file-driven: ``--plan`` writes the plan, ``--apply`` performs it.
@@ -118,7 +118,7 @@ def _setup_released_repo_with_release_record(env):
     The secret leaves the tree BEFORE the release, which is the ordinary shape
     of a leak: it is removed when it is discovered, and scrubbed out of history
     later. The released tree is therefore byte-identical after the rewrite --
-    the archive records the tree each released path carried, and re-anchoring
+    the archive records the tree each released path carried, and re-recording
     onto content the version never shipped is refused.
     """
     from rlsbl.release_file import write_archived_release_file
@@ -377,20 +377,20 @@ class TestTheReleaseRecordAfterAnOutOfBandRewrite:
     explain the divergence, and only then are the verdicts computed.
     """
 
-    def _archive_anchor(self, repo):
-        from rlsbl.release_publication import anchor_from_release_record
+    def _archive_release_commit(self, repo):
+        from rlsbl.release_publication import release_commit_from_record
 
-        return anchor_from_release_record(str(repo / ".rlsbl" / "releases"), "1.0.0")
+        return release_commit_from_record(str(repo / ".rlsbl" / "releases"), "1.0.0")
 
-    def test_a_dangling_anchor_the_journal_explains_is_healed(
+    def test_a_dangling_release_commit_the_journal_explains_is_healed(
         self, e2e_env, monkeypatch, capsys,
     ):
         repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
-        pre_rewrite_anchor = self._archive_anchor(repo)
+        pre_rewrite_release_commit = self._archive_release_commit(repo)
 
         _raw_safegit_scrub(repo)
-        assert self._archive_anchor(repo) == pre_rewrite_anchor, (
+        assert self._archive_release_commit(repo) == pre_rewrite_release_commit, (
             "a raw rewrite does not touch the archives -- that is the state "
             "being repaired"
         )
@@ -399,7 +399,7 @@ class TestTheReleaseRecordAfterAnOutOfBandRewrite:
 
         out = capsys.readouterr().out
         assert "re-point-with-lease" in out
-        assert self._archive_anchor(repo) == _git(
+        assert self._archive_release_commit(repo) == _git(
             repo, "rev-parse", "refs/tags/v1.0.0^{}",
         ), "the release record must name the commit the rewrite produced"
         assert os.path.exists(plan_path(repo / ".rlsbl" / "releases"))
@@ -432,11 +432,11 @@ class TestTheReleaseRecordAfterAnOutOfBandRewrite:
     ):
         """--dry-run writes nothing at all, including the release record -- and the
         preview is still the one a real run would compute, because the healed
-        anchors are known without being written."""
+        release commits are known without being written."""
         repo = _setup_released_repo_with_release_record(e2e_env)
         monkeypatch.chdir(repo)
         _raw_safegit_scrub(repo)
-        stale = self._archive_anchor(repo)
+        stale = self._archive_release_commit(repo)
 
         _run_reconcile(repo, mode="plan", flags={"dry-run": True})
 
@@ -445,10 +445,10 @@ class TestTheReleaseRecordAfterAnOutOfBandRewrite:
             "a dry run that reported the un-healed verdicts would preview a "
             "refusal the real run does not produce"
         )
-        assert self._archive_anchor(repo) == stale
+        assert self._archive_release_commit(repo) == stale
         assert _git(repo, "status", "--porcelain") == ""
 
-    def test_a_dangling_anchor_nothing_explains_is_refused(
+    def test_a_dangling_release_commit_nothing_explains_is_refused(
         self, e2e_env, monkeypatch, capsys,
     ):
         """The heal is driven by a record, never by inference: with no journal,

@@ -24,8 +24,8 @@ from rlsbl import transition_record
 from rlsbl.transition_record import (
     CURRENT_FORMAT_VERSION,
     EVENT_KINDS,
-    AnchorMapping,
-    AnchorRemapEvent,
+    ReleaseCommitMapping,
+    ReleaseCommitRemapEvent,
     BoundaryAlias,
     BoundaryAliasEvent,
     ConversionEvent,
@@ -85,12 +85,12 @@ def make_tag_map():
     )
 
 
-def make_anchor_remap():
-    return AnchorRemapEvent(
+def make_release_commit_remap():
+    return ReleaseCommitRemapEvent(
         rewrite="git-filter-repo --to-subdirectory-filter packages/widget",
         mappings=[
-            AnchorMapping(old_sha=SHA_A, new_sha=SHA_B),
-            AnchorMapping(old_sha=SHA_C, new_sha=SHA_D),
+            ReleaseCommitMapping(old_sha=SHA_A, new_sha=SHA_B),
+            ReleaseCommitMapping(old_sha=SHA_C, new_sha=SHA_D),
         ],
     )
 
@@ -133,7 +133,7 @@ def make_promotion_split_map():
 ALL_MAKERS = {
     "conversion": make_conversion,
     "tag-map": make_tag_map,
-    "anchor-remap": make_anchor_remap,
+    "anchor-remap": make_release_commit_remap,
     "departed-globs": make_departed_globs,
     "boundary-alias": make_boundary_alias,
     "identity-transition": make_identity_transition,
@@ -324,7 +324,7 @@ class TestDurability:
 
     def test_batch_append_preserves_order(self, tmp_path):
         path = get_transition_record_path(str(tmp_path))
-        batch = [make_conversion(), make_tag_map(), make_anchor_remap()]
+        batch = [make_conversion(), make_tag_map(), make_release_commit_remap()]
         written = append_events(path, batch)
 
         assert [e.KIND for e in read_events(path)] == [
@@ -360,7 +360,7 @@ class TestDurability:
         bad = make_tag_map()
         bad.mappings = []  # min_len 1
         with pytest.raises(TransitionRecordError):
-            append_events(path, [make_anchor_remap(), bad])
+            append_events(path, [make_release_commit_remap(), bad])
 
         with open(path, encoding="utf-8") as f:
             assert f.read() == before
@@ -406,7 +406,7 @@ class TestDurability:
 
     def test_kinds_filter_selects_without_relaxing_validation(self, tmp_path):
         path = get_transition_record_path(str(tmp_path))
-        append_events(path, [make_conversion(), make_tag_map(), make_anchor_remap()])
+        append_events(path, [make_conversion(), make_tag_map(), make_release_commit_remap()])
 
         selected = read_events(path, kinds=["tag-map"])
         assert [e.KIND for e in selected] == ["tag-map"]
@@ -664,7 +664,7 @@ class TestCopySemantics:
 
     def test_nested_mapping_lists_are_shared_with_the_caller(self, tmp_path):
         path = get_transition_record_path(str(tmp_path))
-        event = make_anchor_remap()
+        event = make_release_commit_remap()
 
         written = append_event(path, event)
 
@@ -677,7 +677,7 @@ class TestModuleSurface:
         assert set(EVENT_KINDS) == {
             transition_record.KIND_CONVERSION,
             transition_record.KIND_TAG_MAP,
-            transition_record.KIND_ANCHOR_REMAP,
+            transition_record.KIND_RELEASE_COMMIT_REMAP,
             transition_record.KIND_DEPARTED_GLOBS,
             transition_record.KIND_BOUNDARY_ALIAS,
             transition_record.KIND_IDENTITY_TRANSITION,

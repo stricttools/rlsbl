@@ -54,7 +54,7 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
     from ...changelog.files import get_changes_dir
     from ...changelog.validate import filter_exempt_commits
     from ...git_util import filter_commits_for_scope
-    from ...release_record import range_anchor, releases_dir_for_changes_dir
+    from ...release_record import nearest_release_commit, releases_dir_for_changes_dir
     from ...ownership import OwnershipScope
     from ...workspace import get_releasable_changes_dir
 
@@ -77,14 +77,14 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
         changes_dir = get_releasable_changes_dir(workspace_root, releasable)
     else:
         changes_dir = get_changes_dir(project_dir)
-    anchor = range_anchor(
+    release_commit = nearest_release_commit(
         releases_dir_for_changes_dir(changes_dir),
         tag_glob=tag_glob, cwd=workspace_root,
     )
-    last_release = anchor.version if anchor else None
+    last_release = release_commit.version if release_commit else None
 
     # Get commits in range
-    range_spec = f"{anchor.candidate_sha}..HEAD" if anchor else "HEAD"
+    range_spec = f"{release_commit.candidate_sha}..HEAD" if release_commit else "HEAD"
     try:
         result = effects.run(
             ["git", "log", "--format=%H", range_spec],

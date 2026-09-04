@@ -57,8 +57,8 @@ def _version_group(mode: "TagMode") -> str:
     raise TypeError(f"mode must be a TagMode, got {mode!r}")
 
 
-# Anchored, whole-tag scheme patterns. Order matters only for disambiguation of
-# schemes; each is fully anchored so a tag matches exactly one version shape.
+# Fully bounded, whole-tag scheme patterns. Order matters only for disambiguation of
+# schemes; each is fully bounded so a tag matches exactly one version shape.
 # ``{ver}`` is substituted with the mode-appropriate capturing group.
 _SCHEME_PATTERNS = (
     ("standalone", r"^v{ver}$"),

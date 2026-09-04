@@ -1,25 +1,25 @@
-"""Moving the release record's anchors through a history rewrite's commit map.
+"""Moving the release record's release commits through a history rewrite's commit map.
 
 A release archive records the commit a version shipped from -- its
 ``candidate_sha`` -- and the git tree each released path carried. Both name
 objects in the commit graph, and a history rewrite replaces that graph. The
 JSONL changelog has been remapped through the rewrite's old-to-new commit map
 since scrubbing existed; the archives were not, so after a scrub the release record's
-anchor and the (correctly moved) tag disagreed, and
+release commit and the (correctly moved) tag disagreed, and
 :func:`rlsbl.release_record.read_entry` refused every read with the DISAGREEMENT error
 -- an error that blames the tag for moving, which is precisely backwards.
 
 The repair is this module, and it is deliberately narrow:
 
-* an anchor whose commit the map names is rewritten to the new commit;
-* an anchor the map does not mention is left exactly as it is;
+* a release commit whose commit the map names is rewritten to the new commit;
+* a release commit the map does not mention is left exactly as it is;
 * an ``unanchorable`` archive has no commit to move and is skipped.
 
 **The content check, and the one caller that cannot pass it.** Each recorded
 tree hash is recomputed at the new commit and compared. A rewrite that only
 re-parents commits leaves every tree byte-identical, and the version really did
 ship the same content from a differently-named commit. A rewrite that REDACTED
-something under a released path did not, and re-anchoring the archive to it
+something under a released path did not, and re-recording the archive at it
 would make the archive claim content the release never shipped -- so by default
 a mismatch is a hard error naming the version and both hashes, and nothing is
 written.
@@ -52,7 +52,7 @@ from .release_file import (
     list_archived_versions,
     read_release_file,
     writable_release_file,
-    write_release_anchor,
+    write_release_commit,
 )
 
 # One git object read. Generous enough for a cold repository, bounded because
@@ -69,8 +69,8 @@ ON_CONTENT_CHANGE = (ON_CONTENT_CHANGE_REFUSE, ON_CONTENT_CHANGE_RECORD)
 
 
 @dataclass(frozen=True)
-class AnchorRemap:
-    """One archive's anchor, moved.
+class ReleaseCommitRemap:
+    """One archive's release commit, moved.
 
     ``tree_hashes`` is what the rewritten archive will record, and
     ``changed_paths`` names the released paths whose tree is a different object
@@ -89,7 +89,7 @@ def _map_sha(sha, commit_map):
     """The rewritten commit for *sha*, or None when the map does not name it.
 
     Abbreviation-tolerant in the same way the changelog remap is: a stored
-    anchor may be shorter than 40 characters, and it maps when it prefixes
+    release commit may be shorter than 40 characters, and it maps when it prefixes
     exactly one key.
     """
     from .changelog.files import _map_hash
@@ -97,7 +97,7 @@ def _map_sha(sha, commit_map):
     new_sha, ambiguous = _map_hash(sha, commit_map)
     if ambiguous:
         raise RlsblError(
-            f"the release anchor {sha} matches more than one commit in the "
+            f"the release commit {sha} matches more than one commit in the "
             f"rewrite map, so which commit it moved to cannot be decided. "
             f"Record the full 40-character sha in the archive and re-run."
         )
@@ -108,7 +108,7 @@ def _tree_at(sha, path, *, cwd):
     """The git tree object for *path* at commit *sha*.
 
     ``"."`` (and the empty path) resolve to the commit's root tree, matching
-    exactly how the release flow writes the anchor's content half.
+    exactly how the release flow writes the release commit's content half.
     """
     rev = f"{sha}^{{tree}}" if path in (".", "") else f"{sha}:{path}"
     try:
@@ -119,29 +119,29 @@ def _tree_at(sha, path, *, cwd):
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
         raise RlsblError(
             f"could not read the git tree {rev!r} while remapping release "
-            f"anchors: {exc}"
+            f"release commits: {exc}"
         ) from exc
     if effects.unsettled(result) or getattr(result, "returncode", 1) != 0:
         detail = (getattr(result, "stderr", "") or "").strip()
         raise RlsblError(
             f"could not resolve the git tree {rev!r} while remapping release "
-            f"anchors{': ' + detail if detail else ''}. The rewritten commit "
-            f"must be readable before its anchor can be recorded."
+            f"release commits{': ' + detail if detail else ''}. The rewritten commit "
+            f"must be readable before its release commit can be recorded."
         )
     return (result.stdout or "").strip()
 
 
 def _content_mismatch(version, path, old_sha, new_sha, recorded, found, archive):
     return RlsblError(
-        f"the release anchor for {version} cannot be moved through the "
+        f"the release commit for {version} cannot be moved through the "
         f"rewrite: the content it recorded is not the content the rewritten "
         f"commit carries.\n"
-        f"  released path:    {path}\n"
-        f"  recorded tree:    {recorded}\n"
-        f"  tree at {new_sha[:12]}:  {found}\n"
-        f"  anchor moved:     {old_sha[:12]} -> {new_sha[:12]}\n"
-        f"  archive:          {archive}\n"
-        f"  The archive states what {version} SHIPPED. Re-anchoring it to a "
+        f"  released path:       {path}\n"
+        f"  recorded tree:       {recorded}\n"
+        f"  tree at {new_sha[:12]}:     {found}\n"
+        f"  release commit moved: {old_sha[:12]} -> {new_sha[:12]}\n"
+        f"  archive:             {archive}\n"
+        f"  The archive states what {version} SHIPPED. Re-recording it at a "
         f"commit whose tree differs would make it claim content that was never\n"
         f"  released -- which is exactly what a rewrite that redacted a "
         f"released file produces. Nothing has been written.\n"
@@ -149,16 +149,16 @@ def _content_mismatch(version, path, old_sha, new_sha, recorded, found, archive)
         f"unchanged on the registry; only the repository's history moved), "
         f"then\n"
         f"  edit the archive through `rlsbl.release_file.writable_release_file` "
-        f"or record the version as unanchorable."
+        f"or record the version as unrecoverable."
     )
 
 
-def plan_anchor_remap(releases_dir: str, commit_map: dict, *, cwd=None,
+def plan_release_commit_remap(releases_dir: str, commit_map: dict, *, cwd=None,
                       on_content_change=ON_CONTENT_CHANGE_REFUSE):
     """Which archives the rewrite moves, verified but not yet written.
 
-    Reads every archive, maps the anchors, recomputes and compares the tree
-    hashes, and returns one :class:`AnchorRemap` per version that moves.
+    Reads every archive, maps the release commits, recomputes and compares the tree
+    hashes, and returns one :class:`ReleaseCommitRemap` per version that moves.
 
     *on_content_change* declares what a released path whose tree differs at the
     rewritten commit means to this caller: ``"refuse"`` raises
@@ -179,12 +179,12 @@ def plan_anchor_remap(releases_dir: str, commit_map: dict, *, cwd=None,
     for version in list_archived_versions(releases_dir):
         path = archived_release_path(releases_dir, version)
         archive = read_release_file(path)
-        if archive.unanchorable:
+        if archive.unrecoverable:
             continue
         old_sha = (archive.candidate_sha or "").strip()
         if not old_sha:
-            # An archive carrying neither an anchor nor the unanchorable marker
-            # is the release record's MISSING-ANCHOR case, which has its own recovery
+            # An archive carrying neither a release commit nor the unrecoverable marker
+            # is the release record's MISSING-RELEASE-COMMIT case, which has its own recovery
             # and its own error. A rewrite has nothing to move here.
             continue
         new_sha = _map_sha(old_sha, commit_map)
@@ -204,32 +204,32 @@ def plan_anchor_remap(releases_dir: str, commit_map: dict, *, cwd=None,
                     )
                 changed.append((tree_path, recorded, found))
             new_trees[tree_path] = found
-        planned.append(AnchorRemap(
+        planned.append(ReleaseCommitRemap(
             version=version, path=path, old_sha=old_sha, new_sha=new_sha,
             tree_hashes=new_trees, changed_paths=tuple(changed),
         ))
     return planned
 
 
-def remap_release_anchors(releases_dir: str, commit_map: dict, *, cwd=None,
+def remap_release_commits(releases_dir: str, commit_map: dict, *, cwd=None,
                           on_content_change=ON_CONTENT_CHANGE_REFUSE):
-    """Move every archived anchor in *releases_dir* through *commit_map*.
+    """Move every archived release commit in *releases_dir* through *commit_map*.
 
-    Returns the :class:`AnchorRemap` records for the archives that moved, in
+    Returns the :class:`ReleaseCommitRemap` records for the archives that moved, in
     the release record's own highest-first order. The whole set is planned and verified
     before the first write, so a mismatch on any version leaves every archive
     untouched.
 
-    Each write unlocks the read-only archive, rewrites the anchor, and relocks
+    Each write unlocks the read-only archive, rewrites the release commit, and relocks
     it -- the documented edit path, so the archive is never observable as a
-    writable anchored file.
+    writable file that already records its release commit.
     """
-    planned = plan_anchor_remap(
+    planned = plan_release_commit_remap(
         releases_dir, commit_map, cwd=cwd, on_content_change=on_content_change,
     )
     for remap in planned:
         with writable_release_file(remap.path):
-            write_release_anchor(
+            write_release_commit(
                 remap.path,
                 candidate_sha=remap.new_sha,
                 tree_hashes=remap.tree_hashes,
@@ -237,30 +237,30 @@ def remap_release_anchors(releases_dir: str, commit_map: dict, *, cwd=None,
     return planned
 
 
-def anchor_remap_event(rewrite: str, remaps):
-    """The transition record event recording an anchor remap, or None when nothing moved.
+def release_commit_remap_event(rewrite: str, remaps):
+    """The transition record event recording a release commit remap, or None when nothing moved.
 
     The record is what lets a later reader EXPLAIN why a version's archive
     names a commit that no earlier record mentions -- including a reader in a
     fresh clone, where safegit's own journal (which lives under ``.git``) is
     not there to consult.
     """
-    from .transition_record import AnchorMapping, AnchorRemapEvent
+    from .transition_record import ReleaseCommitMapping, ReleaseCommitRemapEvent
 
     mappings = [
-        AnchorMapping(old_sha=r.old_sha, new_sha=r.new_sha) for r in remaps
+        ReleaseCommitMapping(old_sha=r.old_sha, new_sha=r.new_sha) for r in remaps
     ]
     if not mappings:
         return None
-    return AnchorRemapEvent(rewrite=rewrite, mappings=mappings)
+    return ReleaseCommitRemapEvent(rewrite=rewrite, mappings=mappings)
 
 
-def record_anchor_remap(transition_record_path: str, rewrite: str, remaps):
+def record_release_commit_remap(transition_record_path: str, rewrite: str, remaps):
     """Append the anchor-remap event for *remaps* to the transition record.
 
     Returns the path when an event was written, None when nothing moved.
     """
-    event = anchor_remap_event(rewrite, remaps)
+    event = release_commit_remap_event(rewrite, remaps)
     if event is None:
         return None
     from .transition_record import append_event
@@ -313,17 +313,17 @@ def transition_record_path_for_releases_dir(releases_dir: str) -> str:
     )
 
 
-def repair_anchors(*, project_root, commit_map, rewrite_id,
+def repair_release_commits(*, project_root, commit_map, rewrite_id,
                    workspace_root=None, workspace_projects=None, cwd=None,
                    on_content_change=ON_CONTENT_CHANGE_REFUSE):
-    """Move every release record anchor in this repository and record that it happened.
+    """Move every release record release commit in this repository and record that it happened.
 
     The whole-repository half of the repair: it finds every release-archive
     directory the same walk the JSONL remap uses finds, remaps each one's
-    anchors through *commit_map*, and appends an ``anchor-remap`` transition record event
+    release commits through *commit_map*, and appends an ``anchor-remap`` transition record event
     beside each release record that moved.
 
-    Returns ``(remaps, touched)`` -- the :class:`AnchorRemap` records across
+    Returns ``(remaps, touched)`` -- the :class:`ReleaseCommitRemap` records across
     every release record, and the repo paths a commit must carry (the rewritten
     archives plus the transition records that now name them).
 
@@ -334,7 +334,7 @@ def repair_anchors(*, project_root, commit_map, rewrite_id,
         project_root, workspace_root, workspace_projects,
     )
     planned = [
-        (d, plan_anchor_remap(d, commit_map, cwd=cwd,
+        (d, plan_release_commit_remap(d, commit_map, cwd=cwd,
                               on_content_change=on_content_change))
         for d in releases_dirs
     ]
@@ -346,14 +346,14 @@ def repair_anchors(*, project_root, commit_map, rewrite_id,
             continue
         for remap in per_dir:
             with writable_release_file(remap.path):
-                write_release_anchor(
+                write_release_commit(
                     remap.path,
                     candidate_sha=remap.new_sha,
                     tree_hashes=remap.tree_hashes,
                 )
             touched.append(remap.path)
         remaps.extend(per_dir)
-        transition_record_path = record_anchor_remap(
+        transition_record_path = record_release_commit_remap(
             transition_record_path_for_releases_dir(releases_dir), rewrite_id, per_dir,
         )
         if transition_record_path:

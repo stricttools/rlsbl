@@ -10,7 +10,7 @@ one thing the scrub had repaired.
 
 Both directions are exercised against the REAL safegit binary:
 
-* ``rlsbl release scrub`` moves the anchors as part of its own flow, records an
+* ``rlsbl release scrub`` moves the release commits as part of its own flow, records an
   ``anchor-remap`` transition record event, and commits both.
 * A RAW ``safegit scrub`` -- no rlsbl orchestration -- leaves the release record broken,
   and rlsbl heals it from the persisted rewrite journal.
@@ -37,12 +37,12 @@ from rlsbl.changelog.generate import generate_changelog
 from rlsbl.commands.release_scrub import run_cmd as scrub_run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ReleaseRecordError
-from rlsbl.transition_record import KIND_ANCHOR_REMAP, get_transition_record_path, read_events
+from rlsbl.transition_record import KIND_RELEASE_COMMIT_REMAP, get_transition_record_path, read_events
 from rlsbl.release_file import write_archived_release_file
 
 SCRUB_MOD = "rlsbl.commands.release_scrub"
 
-SECRET = "ANCHORSECRET123"
+SECRET = "SCRUBSECRET123"
 REPLACEMENT = "REDACTEDVALUES"
 
 
@@ -62,11 +62,11 @@ def _jsonl_line(commits, description="A change", type_="feature"):
 
 
 def _setup_released_repo(env):
-    """A released repo whose archive anchors the release, and a bare remote.
+    """A released repo whose archive release commits the release, and a bare remote.
 
     The secret lives in a commit MESSAGE, not in a released file: a scrub of a
     message rewrites the commit and leaves every tree byte-identical, which is
-    the case where re-anchoring is provably safe.
+    the case where re-recording is provably safe.
     """
     repo = env / "repo"
     init_repo(repo, email="e2e@test.local", name="E2E")
@@ -137,7 +137,7 @@ def _raw_safegit_scrub(repo):
     )
 
 
-class TestScrubMovesTheAnchors:
+class TestScrubMovesTheReleaseCommits:
 
     def test_the_release_record_reads_again_after_a_scrub(self, e2e_env, monkeypatch):
         repo, released = _setup_released_repo(e2e_env)
@@ -147,11 +147,11 @@ class TestScrubMovesTheAnchors:
 
         entry = _read_release_record(repo)
         assert entry.candidate_sha != released, (
-            "the rewrite moved the released commit, so the anchor must move too"
+            "the rewrite moved the released commit, so the release commit must move too"
         )
         tag_commit = _git(repo, "rev-parse", "refs/tags/v1.0.0^{}")
         assert entry.candidate_sha == tag_commit, (
-            "the anchor and the tag must name the same commit again"
+            "the release commit and the tag must name the same commit again"
         )
 
     def test_the_remap_is_recorded_in_the_transition_record(self, e2e_env, monkeypatch):
@@ -161,10 +161,10 @@ class TestScrubMovesTheAnchors:
         _run_scrub(repo)
 
         events = read_events(
-            get_transition_record_path(str(repo)), kinds=[KIND_ANCHOR_REMAP],
+            get_transition_record_path(str(repo)), kinds=[KIND_RELEASE_COMMIT_REMAP],
         )
         assert len(events) == 1, (
-            "the anchor move is a repository-surgery fact, and a fresh clone "
+            "the release commit move is a repository-surgery fact, and a fresh clone "
             "has no safegit journal to reconstruct it from"
         )
         mappings = events[0].mappings
@@ -203,11 +203,11 @@ class TestTheRedWithoutTheRepair:
         monkeypatch.chdir(repo)
         _raw_safegit_scrub(repo)
 
-        from rlsbl.commands.release_scrub import heal_anchors_from_journal
+        from rlsbl.commands.release_scrub import heal_release_commits_from_journal
 
-        touched = heal_anchors_from_journal(str(repo), None, None, str(repo))
+        touched = heal_release_commits_from_journal(str(repo), None, None, str(repo))
 
-        assert touched, "the journal must be able to explain the moved anchor"
+        assert touched, "the journal must be able to explain the moved release commit"
         entry = _read_release_record(repo)
         assert entry.candidate_sha != released
         assert entry.candidate_sha == _git(

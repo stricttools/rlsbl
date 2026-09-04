@@ -126,7 +126,7 @@ def tool_owned_rule(path) -> str | None:
 
     The returned string is the rule itself (``".rlsbl/changes/**"``,
     ``"CHANGELOG.md"``), suitable for putting in a message that has to explain
-    why a path needs no owner.  Root-anchored rules answer only for a path at
+    why a path needs no owner.  Root-relative rules answer only for a path at
     the repository root; the rest answer at any depth.
     """
     normalized = normalize_path(path)

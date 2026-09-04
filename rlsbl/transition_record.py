@@ -125,7 +125,7 @@ CURRENT_FORMAT_VERSION = 1
 
 KIND_CONVERSION = "conversion"
 KIND_TAG_MAP = "tag-map"
-KIND_ANCHOR_REMAP = "anchor-remap"
+KIND_RELEASE_COMMIT_REMAP = "anchor-remap"
 KIND_DEPARTED_GLOBS = "departed-globs"
 KIND_BOUNDARY_ALIAS = "boundary-alias"
 KIND_IDENTITY_TRANSITION = "identity-transition"
@@ -202,7 +202,7 @@ def new_event_id() -> str:
 
     This deliberately mirrors ``rlsbl.changelog.schema.generate_entry_id``
     rather than importing it. A later phase has the changelog reading transition record
-    anchor remaps, and importing the changelog package from here would close
+    release commit remaps, and importing the changelog package from here would close
     that loop into an import cycle. Two independent record systems each owning
     their own id generator is the cost of keeping them independent.
     """
@@ -246,7 +246,7 @@ class TagMapping:
 
 
 @dataclass(kw_only=True)
-class AnchorMapping:
+class ReleaseCommitMapping:
     """One old-SHA -> new-SHA correspondence produced by a history rewrite."""
 
     old_sha: str
@@ -319,14 +319,14 @@ class TagMapEvent(_TransitionRecordEventBase):
 
 
 @dataclass(kw_only=True)
-class AnchorRemapEvent(_TransitionRecordEventBase):
+class ReleaseCommitRemapEvent(_TransitionRecordEventBase):
     """The old-SHA -> new-SHA correspondence a history rewrite produced."""
 
-    KIND: ClassVar[str] = KIND_ANCHOR_REMAP
-    NESTED: ClassVar[dict[str, tuple[type, bool]]] = {"mappings": (AnchorMapping, True)}
+    KIND: ClassVar[str] = KIND_RELEASE_COMMIT_REMAP
+    NESTED: ClassVar[dict[str, tuple[type, bool]]] = {"mappings": (ReleaseCommitMapping, True)}
 
     rewrite: str
-    mappings: list[AnchorMapping]
+    mappings: list[ReleaseCommitMapping]
 
 
 @dataclass(kw_only=True)
@@ -380,7 +380,7 @@ class PromotionSplitMapEvent(_TransitionRecordEventBase):
 TransitionRecordEvent = (
     ConversionEvent
     | TagMapEvent
-    | AnchorRemapEvent
+    | ReleaseCommitRemapEvent
     | DepartedGlobsEvent
     | BoundaryAliasEvent
     | IdentityTransitionEvent
@@ -392,7 +392,7 @@ EVENT_CLASSES: dict[str, type] = {
     for cls in (
         ConversionEvent,
         TagMapEvent,
-        AnchorRemapEvent,
+        ReleaseCommitRemapEvent,
         DepartedGlobsEvent,
         BoundaryAliasEvent,
         IdentityTransitionEvent,
@@ -530,7 +530,7 @@ def append_events(path: str, events) -> list:
     objects -- but nested values are SHARED, not copied. ``source``,
     ``destination`` and the ``mappings`` lists (with the mapping objects inside
     them) are the very objects the caller passed. Deep-copying them is not worth
-    the cost on an anchor remap that can carry thousands of mappings, so the
+    the cost on a release commit remap that can carry thousands of mappings, so the
     contract is: do not mutate a nested value after appending it, because the
     written line no longer reflects it and the returned copy will follow the
     mutation.

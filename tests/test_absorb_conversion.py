@@ -3,7 +3,7 @@
 The command observes the whole conversion, renders it as a plan under
 ``--dry-run``, and applies that plan item by item. These tests cover both
 halves: what the plan says and refuses, and what an apply actually moves --
-history, tags, the release state with its anchors, the workspace entry, the
+history, tags, the release state with its release commits, the workspace entry, the
 transition record -- plus the property the rebuild exists for: a crashed run can
 be re-run to completion without duplicating anything.
 
@@ -35,7 +35,7 @@ from rlsbl.commands.monorepo.absorb_cmd import (
     cmd_absorb,
 )
 from rlsbl.transition_record import (
-    KIND_ANCHOR_REMAP,
+    KIND_RELEASE_COMMIT_REMAP,
     KIND_BOUNDARY_ALIAS,
     KIND_CONVERSION,
     KIND_TAG_MAP,
@@ -45,7 +45,7 @@ from rlsbl.transition_record import (
 from rlsbl.release_file import (
     read_release_file,
     write_archived_release_file,
-    write_release_anchor,
+    write_release_commit,
 )
 from rlsbl.workspace import (
     Releasable,
@@ -86,7 +86,7 @@ def make_source(tmp_path, *, name="widget", version="0.1.0", targets=("npm",)):
 
     It carries what a real one carries: a manifest at the released version, a
     ``.rlsbl/config.json`` naming its targets, a locked released changelog with
-    its generated markdown, an ANCHORED release archive for that version, one
+    its generated markdown, a RECORDED release archive for that version, one
     unreleased entry over a later commit, and the ``v<version>`` tag.
     """
     repo = tmp_path / f"{name}_src"
@@ -564,7 +564,7 @@ class TestApply:
         ))
         assert "From a commit nobody has" not in [e.description for e in entries]
 
-    def test_the_release_anchor_is_remapped_and_resolves(self, tmp_path):
+    def test_the_release_commit_is_remapped_and_resolves(self, tmp_path):
         ns = make_destination(tmp_path)
         source = make_source(tmp_path)
         before = read_release_file(
@@ -579,7 +579,7 @@ class TestApply:
         after = read_release_file(archive)
         assert after.candidate_sha != before.candidate_sha
         gitout(ns.root, "cat-file", "-e", after.candidate_sha + "^{commit}")
-        # The anchor is rekeyed to the member path, and the tree it records is
+        # The release commit is rekeyed to the member path, and the tree it records is
         # the one the rewritten commit really has there.
         assert list(after.tree_hashes) == ["packages/widget"]
         assert after.tree_hashes["packages/widget"] == gitout(
@@ -691,7 +691,7 @@ class TestApply:
         kinds = [e.KIND for e in events]
         assert kinds[0] == KIND_CONVERSION
         assert set(kinds) == {
-            KIND_CONVERSION, KIND_TAG_MAP, KIND_ANCHOR_REMAP, KIND_BOUNDARY_ALIAS,
+            KIND_CONVERSION, KIND_TAG_MAP, KIND_RELEASE_COMMIT_REMAP, KIND_BOUNDARY_ALIAS,
         }
         conversion = events[0]
         assert conversion.direction == "absorb"
@@ -1107,11 +1107,11 @@ class TestHealReDerivesNothing:
 
 
 # ---------------------------------------------------------------------------
-# Anchor verification
+# Release-commit verification
 # ---------------------------------------------------------------------------
 
 
-class TestAnchorVerification:
+class TestReleaseCommitVerification:
     def test_a_recorded_tree_the_rewrite_disagrees_with_is_a_hard_error(
         self, tmp_path,
     ):
@@ -1120,14 +1120,14 @@ class TestAnchorVerification:
         archive = source / ".rlsbl" / "releases" / "v0.1.0.toml"
         config = read_release_file(str(archive))
         os.chmod(str(archive), 0o644)
-        write_release_anchor(
+        write_release_commit(
             str(archive),
             candidate_sha=config.candidate_sha,
             tree_hashes={".": "0" * 40},
         )
         os.chmod(str(archive), 0o444)
         run_git(source, "add", ".rlsbl")
-        run_git(source, "commit", "-q", "-m", "chore: a lying anchor")
+        run_git(source, "commit", "-q", "-m", "chore: a lying release commit")
 
         with pytest.raises(AbsorbError) as exc:
             absorb(ns, source)

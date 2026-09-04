@@ -13,7 +13,7 @@ the argv every consumer builds from it.
 import pytest
 
 from rlsbl.release_publication import (
-    anchor_from_release_record,
+    release_commit_from_record,
     create_args,
     edit_notes_args,
     ensure_marker,
@@ -45,7 +45,7 @@ class TestTheBody:
         assert "Release 1.2.3" in body
         assert f"<!-- rlsbl-ci-sha: {SHA} -->" in body
 
-    def test_a_missing_anchor_is_refused(self):
+    def test_a_missing_release_commit_is_refused(self):
         with pytest.raises(ValueError) as exc:
             publication(tag="v1.0.0", version="1.0.0", candidate_sha="")
         assert "rlsbl-ci-sha" in str(exc.value)
@@ -149,7 +149,7 @@ class TestTheGhSurface:
         assert not os.path.exists(seen["path"])
 
 
-class TestTheAnchorComesFromTheReleaseRecord:
+class TestTheReleaseCommitComesFromTheReleaseRecord:
 
     def test_it_reads_the_archive(self, tmp_path):
         from rlsbl.release_file import write_archived_release_file
@@ -159,26 +159,26 @@ class TestTheAnchorComesFromTheReleaseRecord:
             releases, "1.0.0", bump="minor", include=["plain"],
             description="d", candidate_sha=SHA, tree_hashes={".": "c" * 40},
         )
-        assert anchor_from_release_record(releases, "1.0.0") == SHA
+        assert release_commit_from_record(releases, "1.0.0") == SHA
 
-    def test_an_unanchorable_version_has_no_anchor(self, tmp_path):
+    def test_an_unrecoverable_version_has_no_release_commit(self, tmp_path):
         from rlsbl.release_file import write_archived_release_file
 
         releases = str(tmp_path / "releases")
         write_archived_release_file(
             releases, "1.0.0", bump="minor", include=["plain"],
             description="d", candidate_sha=None, tree_hashes=None,
-            unanchorable=True,
+            unrecoverable=True,
         )
-        assert anchor_from_release_record(releases, "1.0.0") is None
+        assert release_commit_from_record(releases, "1.0.0") is None
 
     def test_an_absent_archive_answers_none(self, tmp_path):
-        assert anchor_from_release_record(str(tmp_path), "9.9.9") is None
+        assert release_commit_from_record(str(tmp_path), "9.9.9") is None
 
     def test_it_answers_where_the_guarded_read_refuses(self, tmp_path):
         """The read that repair paths need, on the repository they run in.
 
-        ``release_record.read_entry`` refuses when the tag and the anchor disagree --
+        ``release_record.read_entry`` refuses when the tag and the release commit disagree --
         which is exactly the state a repair is called to end, so the repair
         cannot be made to depend on that read.
         """
@@ -201,4 +201,4 @@ class TestTheAnchorComesFromTheReleaseRecord:
 
         with pytest.raises(ReleaseRecordError):
             release_record.read_entry(releases, "1.0.0", tag_glob="v*", cwd=str(repo))
-        assert anchor_from_release_record(releases, "1.0.0") == sha
+        assert release_commit_from_record(releases, "1.0.0") == sha

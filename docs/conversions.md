@@ -1,5 +1,5 @@
 ---
-description: "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and anchor verification, splitting a releasable, and transition record."
+description: "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and release commit verification, splitting a releasable, and transition record."
 ---
 
 # Repository conversions
@@ -39,7 +39,7 @@ An **unmirrored** releasable is *filtered*. A fresh clone of the source is rewri
 A **mirrored** releasable is *promoted*. The mirror already holds this subtree's standalone history — every commit that touched the member has a synthetic counterpart there, produced by the deterministic subtree split — and consumers already resolve those commit ids. Filtering the monorepo again would build a second standalone history of the same code under commit ids nobody resolves, so the destination starts from the mirror instead:
 
 - the destination is a clone of the mirror, whose remote becomes the new repository's `origin`;
-- the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release anchor is remapped through it rather than through a filter-repo commit map;
+- the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release commit is remapped through it rather than through a filter-repo commit map;
 - the correspondence is persisted into the destination's transition record as a `promotion-split-map` [event](#what-gets-recorded), so the promoted repository can explain its own hashes without the monorepo;
 - `git-filter-repo` is neither required nor invoked. A promotion filters nothing, so the missing-tool precondition does not apply to it.
 
@@ -58,7 +58,7 @@ Extract's plan:
 | `releasable` | Which members leave, the tag-format change, and the engine: the `git-filter-repo` invocation that produces the new history, or — for a mirrored releasable — that the mirror is cloned and promoted |
 | `dependencies` | Edges that leave the workspace with the members (edges *into* them are a refusal, not a plan item) |
 | `trees` | The per-member tree hash that must survive the filter unchanged; for a promotion, the one member tree that must already equal the mirror's |
-| `state` | The state directory being transplanted, and the anchors that will be remapped |
+| `state` | The state directory being transplanted, and the release commits that will be remapped |
 | `tags` | Translations, the boundary alias, and the foreign tags being pruned |
 | `destination` | The `workspace.toml` or `releasable.toml` the new repository gets |
 | `transition-record` | The events recorded on both sides |
@@ -178,9 +178,9 @@ the history that left, so nothing further was written; the source is untouched
 and /path/to/target can be deleted.
 ```
 
-Absorb has no equivalent per-member step, because its arriving content is a whole repository rather than a slice of one; it verifies through the anchors instead.
+Absorb has no equivalent per-member step, because its arriving content is a whole repository rather than a slice of one; it verifies through the release commits instead.
 
-### Release anchors
+### Release commits
 
 An archived release file (`releases/v<version>.toml`) records which commit a version shipped from and the git tree of every path it shipped. Both statements are made in the source's object graph, which the rewrite has just replaced, so both are rewritten: the commit through `git-filter-repo`'s commit map -- or, for a promotion, through the monorepo-to-mirror subtree-split correspondence -- and the trees recomputed at the new commit and the path the member now has.
 
@@ -188,8 +188,8 @@ The recomputed tree is **checked against the recorded one**, not merely written 
 
 Two outcomes are recorded rather than fatal, because failing here would leave a half-converted pair of repositories:
 
-- an anchor whose commit the rewrite pruned is **left exactly as recorded** and named on stderr. Rewriting it to nothing would be worse: the fields are the record of what shipped.
-- an anchored path that does not resolve at the rewritten commit gets the same treatment.
+- a release commit whose commit the rewrite pruned is **left exactly as recorded** and named on stderr. Rewriting it to nothing would be worse: the fields are the record of what shipped.
+- a recorded path that does not resolve at the rewritten commit gets the same treatment.
 
 Both are reported again at the end of the run, and the transition record is what explains the stale value afterwards.
 
@@ -322,7 +322,7 @@ The plan says all of this out loud on a re-run -- `history-already-merged`, `alr
 
 Extract has no state file and no resume, because everything before its last step is reversible by deletion. The apply order is: clone and filter (or, for a promotion, clone the mirror and derive its split correspondence), verify trees, transplant and remap state, apply the destination's tags, write its identity and commit it, record transition record, and only then edit the source.
 
-- **A failure anywhere up to and including the transition record step leaves the source untouched.** The target directory is a self-contained partial result; delete it, fix the cause, and re-run. This is exactly what the tree-verification and anchor-verification errors say.
+- **A failure anywhere up to and including the transition record step leaves the source untouched.** The target directory is a self-contained partial result; delete it, fix the cause, and re-run. This is exactly what the tree-verification and release commit-verification errors say.
 - **A failure inside the source-side edit** is the one case that needs a hand. That step appends the departure record, declares the floors, deletes the departed directories, rewrites `workspace.toml`, re-runs sync, regenerates the snapshot and commits all of it as one commit. A crash part-way leaves those edits uncommitted in the source's working tree, and the completed destination beside it. The deletions went through `saferm` unless `--delete-with-rm` was passed, so they are recoverable; the rest is ordinary uncommitted work. Finish or revert it by hand -- a re-run will refuse anyway, because the target path now exists and the source tree is dirty.
 - **A leftover dirty tree after the commit** is reported rather than swept up: each step commits the files it wrote, so anything left belongs to something else.
 
@@ -346,7 +346,7 @@ The workspace-scoped home exists because a departure is a fact about the source 
 | ----- | ------------- |
 | `conversion` | Always, first, naming the direction (`extract` or `absorb`), both endpoints with their tag formats, and the commit |
 | `tag-map` | Tags were renamed or imported: every old-to-new correspondence with the new commit |
-| `anchor-remap` | Release anchors moved: the rewrite that moved them, and every old-SHA-to-new-SHA pair |
+| `anchor-remap` | Release commits moved: the rewrite that moved them, and every old-SHA-to-new-SHA pair |
 | `boundary-alias` | An alias tag was created: the post-conversion name, the pre-conversion name it aliases, and the commit |
 | `departed-globs` | Written in the **source** of an extract: the tag globs that stopped belonging here, and where they went |
 | `identity-transition` | A published identity changed (a Go module path, a package name), effective from a stated version |

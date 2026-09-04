@@ -64,10 +64,10 @@ What an apply actually moves
   the monorepo's copy.
 * **The whole release state**: the releasable's state directory -- version,
   ``changes/`` (locked JSONL and generated markdown), ``releases/`` (the
-  archives, anchors included), ``config.json``, ``lint/``, ``hooks/`` and its own
+  archives, release commits included), ``config.json``, ``lint/``, ``hooks/`` and its own
   transition record -- moves to wherever the destination keeps it: ``.rlsbl/`` for a
   standalone successor, ``.rlsbl-monorepo/releasables/<name>/`` for a workspace.
-* **The anchors and the changelog hashes are remapped** through filter-repo's
+* **The release commits and the changelog hashes are remapped** through filter-repo's
   commit map (or, for a promotion, the subtree-split correspondence), and the
   tree hashes recomputed at the new commits and paths. What could not be mapped
   is NAMED in the output rather than silently left stale.
@@ -96,8 +96,8 @@ from ...changelog.files import load_filter_repo_commit_map
 from ...config import read_json_config
 from ...errors import ConfigError, WorkspaceError
 from ...transition_record import (
-    AnchorMapping,
-    AnchorRemapEvent,
+    ReleaseCommitMapping,
+    ReleaseCommitRemapEvent,
     BoundaryAlias,
     BoundaryAliasEvent,
     ConversionEvent,
@@ -113,8 +113,8 @@ from ...transition_record import (
 from ...lock import rlsbl_lock
 from ...ownership import find_root_member
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
-from ...release_file import read_release_file, write_release_anchor
-from ...release_publication import anchor_from_release_record
+from ...release_file import read_release_file, write_release_commit
+from ...release_publication import release_commit_from_record
 from ...saferm import saferm_delete
 from ...snapshot import SNAPSHOT_FILE, generate_snapshot, write_snapshot
 from ...tag_glob import (
@@ -267,8 +267,8 @@ class Applied:
     sha_map: dict = field(default_factory=dict)
     pruned_shas: list = field(default_factory=list)
     tag_mappings: list = field(default_factory=list)
-    anchor_mappings: list = field(default_factory=list)
-    unremapped_anchors: list = field(default_factory=list)
+    release_commit_mappings: list = field(default_factory=list)
+    unremapped_release_commits: list = field(default_factory=list)
     #: (version, entries dropped) for every RELEASED version the filter emptied
     #: or thinned, whose markdown was re-rendered from what survived.
     pruned_versions: list = field(default_factory=list)
@@ -1300,13 +1300,13 @@ def observe(dep) -> Preview:
         ),
         facts=tuple(
             [f"carries: {', '.join(entries) or '(nothing)'}"]
-            + ([f"anchors to remap: {', '.join(archives)}"] if archives else [])
+            + ([f"release commits to remap: {', '.join(archives)}"] if archives else [])
             + ([f"not carried (a standalone project's version is its "
                 f"manifest's): {', '.join(STANDALONE_SKIPPED_STATE)}"]
                if not dep.is_multi else [])
         ),
         actions=(
-            "apply would remap every changelog hash and every release anchor "
+            "apply would remap every changelog hash and every release commit "
             + ("through the monorepo-to-mirror split correspondence"
                if dep.is_promotion else "through filter-repo's commit map")
             + ", and name what it could not map.",
@@ -1462,9 +1462,9 @@ def _apply_filter(dep, item, run):
     # run, so a second, chained run leaves a map keyed by the FIRST run's
     # rewritten commits unless the installed filter-repo composes the two --
     # 2.47 does, 2.38 (the Ubuntu 24.04 package) does not. Everything below
-    # keys off that map by the SOURCE's shas: anchors, changelog hashes, tag
+    # keys off that map by the SOURCE's shas: release commits, changelog hashes, tag
     # translation. Under a non-composing filter-repo the chained form made all
-    # three miss silently -- anchors left as recorded, changelog entries
+    # three miss silently -- release commits left as recorded, changelog entries
     # dropped as pruned. Both options in one run is filter-repo's own
     # subdirectory-filter recipe and produces the identical rewritten history.
     args = []
@@ -1498,7 +1498,7 @@ def _apply_filter(dep, item, run):
 #
 # The correspondence between the two histories is the same subtree split the
 # mirror was built from, asked per commit, and it is what carries the release
-# state across: the changelog hashes and the release anchors are monorepo
+# state across: the changelog hashes and the release commits are monorepo
 # commits, and every one of them is translated through it. The map is persisted
 # into the destination's transition record, so the promoted repository can explain
 # its own hashes without the monorepo.
@@ -1507,7 +1507,7 @@ def _apply_filter(dep, item, run):
 def _promotion_source_shas(dep):
     """Every monorepo commit the promotion has to translate, HEAD first.
 
-    The release record's anchors (which commit each released version shipped from), the
+    The release record's release commits (which commit each released version shipped from), the
     changelog's commit hashes, and the current HEAD -- the three things that
     name a monorepo commit and travel with the conversion.
     """
@@ -1548,7 +1548,7 @@ def _build_split_map(dep):
     another entry. A commit the split cannot answer for -- one that predates the
     member's directory, or a hash the monorepo no longer has -- is NOT guessed:
     it is left out of the map and named, and the ordinary unmapped-hash paths
-    (dropped changelog entries, an anchor left as recorded) handle it exactly as
+    (dropped changelog entries, a release commit left as recorded) handle it exactly as
     they do for a filter that pruned a commit.
     """
     from ...mirror_publication import MirrorPublicationError, split_commit_for
@@ -1752,13 +1752,13 @@ def _apply_promotion_tags(dep, item, run):
 
     The mirror carries tags for the versions released since it was bound, and
     nothing for the ones before. Both are handled by the same rule: the tag for
-    a version stands at the split of that version's release record anchor. A tag already
+    a version stands at the split of that version's recorded release commit. A tag already
     there at that commit is kept; one standing anywhere else is a hard error,
     because a released tag names what shipped and moving one is never this
     conversion's decision.
     """
     # The SOURCE's archives, not the destination's: the state step ran before
-    # this one and has already rewritten the destination's anchors THROUGH the
+    # this one and has already rewritten the destination's release commits THROUGH the
     # split map, so reading those would be mapping an already-mapped commit.
     # The source's are untouched until the source step, which runs after this.
     releases_dir = os.path.join(dep.source_state_dir, "releases")
@@ -1769,13 +1769,13 @@ def _apply_promotion_tags(dep, item, run):
         parsed = parse_version_tag(old, mode=TagMode.PRERELEASE_INCLUSIVE)
         if parsed is None:
             continue
-        anchor = anchor_from_release_record(releases_dir, parsed.version)
-        commit = _map_sha(anchor, run.sha_map) if anchor else None
+        release_commit = release_commit_from_record(releases_dir, parsed.version)
+        commit = _map_sha(release_commit, run.sha_map) if release_commit else None
         if commit is None:
             print(
                 f"  tag: '{new}' not created -- version {parsed.version} has "
-                f"no mirror commit to stand at (no release anchor, or the "
-                f"anchor has no counterpart on the mirror).",
+                f"no mirror commit to stand at (no release commit, or the "
+                f"release commit has no counterpart on the mirror).",
                 file=sys.stderr,
             )
             continue
@@ -1823,7 +1823,7 @@ def _apply_trees(dep, item, run):
 
 
 def _apply_state(dep, item, run):
-    """Transplant the state directory, then remap its hashes and anchors."""
+    """Transplant the state directory, then remap its hashes and release commits."""
     if not os.path.isdir(dep.source_state_dir):
         raise ExtractError(
             f"releasable '{dep.releasable.name}' has no state directory at "
@@ -1842,7 +1842,7 @@ def _apply_state(dep, item, run):
             effects.copy_file(src, dst)
 
     _remap_changelog(dep, run)
-    _remap_anchors(dep, run)
+    _remap_release_commits(dep, run)
 
 
 def _merge_standalone_config(dep, releasable_config, dest_config):
@@ -1946,8 +1946,8 @@ def _map_sha(old, sha_map):
     return None
 
 
-def _remap_anchors(dep, run):
-    """Remap every archived release anchor onto the rewritten history.
+def _remap_release_commits(dep, run):
+    """Remap every archived release commit onto the rewritten history.
 
     An archive records which commit a version shipped from and the tree of every
     path it shipped. Both are stated in the SOURCE's object graph, which the
@@ -1955,7 +1955,7 @@ def _remap_anchors(dep, run):
     filter-repo's map, the trees recomputed at the new commit and the path the
     member now has.
 
-    An anchor whose commit the filter pruned is left exactly as it was and NAMED
+    A release commit whose commit the filter pruned is left exactly as it was and NAMED
     on stderr. Rewriting it to nothing would be worse (the fields are the record
     of what shipped), and aborting mid-conversion would leave a half-converted
     pair of repositories -- the transition record is what explains the stale value.
@@ -1978,9 +1978,9 @@ def _remap_anchors(dep, run):
             continue
         new_sha = _map_sha(config.candidate_sha, run.sha_map)
         if new_sha is None:
-            run.unremapped_anchors.append((name, config.candidate_sha))
+            run.unremapped_release_commits.append((name, config.candidate_sha))
             print(
-                f"  anchor: {name} still names {config.candidate_sha[:12]}, a "
+                f"  release commit: {name} still names {config.candidate_sha[:12]}, a "
                 f"commit the filter pruned; left as recorded.",
                 file=sys.stderr,
             )
@@ -1988,7 +1988,7 @@ def _remap_anchors(dep, run):
         trees = {}
         failed = None
         for old_path, recorded in config.tree_hashes.items():
-            new_path = _dest_anchor_path(dep, old_path)
+            new_path = _dest_release_commit_path(dep, old_path)
             try:
                 recomputed = _tree_hash(
                     dep.target_path, new_path, rev=new_sha,
@@ -1998,7 +1998,7 @@ def _remap_anchors(dep, run):
                 break
             if recomputed != recorded:
                 raise ExtractError(
-                    f"release anchor {name} does not survive the filter: it "
+                    f"release commit {name} does not survive the filter: it "
                     f"records tree {recorded} for '{old_path}', but "
                     f"'{new_path or '<repo root>'}' at the rewritten commit "
                     f"{new_sha} is {recomputed}. A tree hash is "
@@ -2010,29 +2010,29 @@ def _remap_anchors(dep, run):
                 )
             trees[new_path] = recomputed
         if failed is not None:
-            run.unremapped_anchors.append((name, config.candidate_sha))
+            run.unremapped_release_commits.append((name, config.candidate_sha))
             print(
-                f"  anchor: {name} names path '{failed}', which does not "
+                f"  release commit: {name} names path '{failed}', which does not "
                 f"resolve at the rewritten commit; left as recorded.",
                 file=sys.stderr,
             )
             continue
         effects.chmod(path, 0o644)
-        write_release_anchor(path, candidate_sha=new_sha, tree_hashes=trees)
+        write_release_commit(path, candidate_sha=new_sha, tree_hashes=trees)
         effects.chmod(path, 0o444)
-        run.anchor_mappings.append(
-            AnchorMapping(old_sha=config.candidate_sha, new_sha=new_sha)
+        run.release_commit_mappings.append(
+            ReleaseCommitMapping(old_sha=config.candidate_sha, new_sha=new_sha)
         )
         print(
-            f"  anchor: {name} {config.candidate_sha[:12]} -> {new_sha[:12]} "
+            f"  release commit: {name} {config.candidate_sha[:12]} -> {new_sha[:12]} "
             f"({', '.join(sorted(trees))})"
         )
 
 
-def _dest_anchor_path(dep, old_path):
-    """An anchored path's spelling in the destination.
+def _dest_release_commit_path(dep, old_path):
+    """A recorded path's spelling in the destination.
 
-    A workspace releasable's anchor is keyed by member path and those paths are
+    A workspace releasable's release commit is keyed by member path and those paths are
     unchanged; a standalone successor hoisted its one member to the root, so
     that member's key becomes ``"."`` -- the same spelling a standalone release
     writes.
@@ -2244,10 +2244,10 @@ def _apply_transition_record(dep, item, run):
     mappings = getattr(run, "tag_mappings", [])
     if mappings:
         followers.append(TagMapEvent(mappings=mappings, related_to=stamped.id))
-    if run.anchor_mappings:
-        followers.append(AnchorRemapEvent(
-            rewrite="git-filter-repo --path (release anchors)",
-            mappings=run.anchor_mappings,
+    if run.release_commit_mappings:
+        followers.append(ReleaseCommitRemapEvent(
+            rewrite="git-filter-repo --path (release commits)",
+            mappings=run.release_commit_mappings,
             related_to=stamped.id,
         ))
     if dep.is_promotion and run.split_mappings:
@@ -2408,16 +2408,16 @@ def _declare_dep_floors(dep):
 
 def _apply_next_steps(dep, item, run):
     """Print what the operator still has to do. rlsbl administers nothing."""
-    if run.unremapped_anchors:
+    if run.unremapped_release_commits:
         # Said once more at the end, where it will still be on screen: these
         # archives record a commit that no longer exists in the new repository,
         # and the transition record is what explains why.
         print(
-            "\nRelease anchors left as recorded (their commits did not survive "
+            "\nRelease release commits left as recorded (their commits did not survive "
             "the filter):",
             file=sys.stderr,
         )
-        for name, sha in run.unremapped_anchors:
+        for name, sha in run.unremapped_release_commits:
             print(f"  - {name}: {sha[:12]}", file=sys.stderr)
     print("\nNext steps (rlsbl never administers an external system):")
     steps = list(_next_steps(dep))

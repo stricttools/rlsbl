@@ -5,7 +5,7 @@ the same `_generate_merged_publish` generator the multi-target path uses,
 instead of the old per-pipeline raw `plan_mappings` render. Consequences:
 
 - a lone subdir target gets `defaults.run.working-directory` injected plus
-  packages-dir/version-file input rewriting (previously root-anchored);
+  packages-dir/version-file input rewriting (previously root-relative);
 - a root-path single-target project's publish.yml is the merged-generator
   output (job keyed by target name, one shared gate) -- the pinned canonical
   form replacing the old raw render.
@@ -142,7 +142,7 @@ class TestRootSingleTargetCanonical:
 
 class TestLoneSubdirStandalone:
     """A single target declared in a subdirectory gets a subdir-aware
-    publish.yml, not a root-anchored one."""
+    publish.yml, not a root-relative one."""
 
     @pytest.fixture
     def npm_subdir(self, mock_git_repo):

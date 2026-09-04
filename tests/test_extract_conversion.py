@@ -4,7 +4,7 @@ The command observes the whole conversion, renders it as a plan under
 ``--dry-run``, and applies that plan item by item. These tests cover both
 halves: what the plan says and refuses, and what an apply actually moves --
 history, tree-object identity, the releasable's whole release state, the
-anchors, the tags, the transition record, and what the source loses.
+release commits, the tags, the transition record, and what the source loses.
 
 The apply half needs git-filter-repo, which is not resolvable inside the
 sandbox runner, so those classes carry the established skip marker and are
@@ -35,7 +35,7 @@ from rlsbl.commands.monorepo.extract_cmd import (
 )
 from rlsbl.dep_floors import CONFIG_KEY
 from rlsbl.transition_record import (
-    KIND_ANCHOR_REMAP,
+    KIND_RELEASE_COMMIT_REMAP,
     KIND_BOUNDARY_ALIAS,
     KIND_CONVERSION,
     KIND_DEPARTED_GLOBS,
@@ -43,7 +43,7 @@ from rlsbl.transition_record import (
     get_transition_record_path,
     read_events,
 )
-from rlsbl.release_file import read_release_file, write_release_anchor
+from rlsbl.release_file import read_release_file, write_release_commit
 from rlsbl.workspace import (
     WORKSPACE_DIR,
     Releasable,
@@ -90,13 +90,13 @@ def _tags(repo):
     return gitout(repo, "tag", "-l").split()
 
 
-def _anchor_archive(root, releasable, version, sha, tree_hashes):
-    """Put a release anchor on an already-archived (locked) release file."""
+def _release_commit_archive(root, releasable, version, sha, tree_hashes):
+    """Put a release commit on an already-archived (locked) release file."""
     path = os.path.join(
         get_releasable_dir(str(root), releasable), "releases", f"v{version}.toml",
     )
     os.chmod(path, 0o644)
-    write_release_anchor(path, candidate_sha=sha, tree_hashes=tree_hashes)
+    write_release_commit(path, candidate_sha=sha, tree_hashes=tree_hashes)
     os.chmod(path, 0o444)
     return path
 
@@ -107,8 +107,8 @@ def make_source(tmp_path, *, projects=None, releasables=None, name="mono"):
     Both carry the real releasable layout -- version, changes/, releases/ with
     the archived v0.1.0 -- and are tagged at 0.1.0. One further commit touches
     both core members, is referenced by core's unreleased changelog entry, and
-    is the commit core's release anchor names, so an extract has real hashes and
-    real anchors to remap rather than an empty state directory.
+    is the commit core's release commit names, so an extract has real hashes and
+    real release commits to remap rather than an empty state directory.
     """
     root = tmp_path / name
     if releasables is None:
@@ -137,7 +137,7 @@ def make_source(tmp_path, *, projects=None, releasables=None, name="mono"):
             description="Core work", type="feature",
         )],
     )
-    _anchor_archive(
+    _release_commit_archive(
         root, "core", ns.initial_version, sha,
         {"pkgA": _tree(root, "pkgA"), "pkgB": _tree(root, "pkgB")},
     )
@@ -736,7 +736,7 @@ class TestApplyMultiMember:
             for sha in entry.commits:
                 gitout(target, "cat-file", "-e", sha + "^{commit}")
 
-    def test_release_anchor_is_remapped_and_resolves(self, tmp_path):
+    def test_release_commit_is_remapped_and_resolves(self, tmp_path):
         ns = make_source(tmp_path)
         target = tmp_path / "core_out"
 
@@ -761,7 +761,7 @@ class TestApplyMultiMember:
     def test_a_recorded_tree_the_filter_disagrees_with_is_a_hard_error(
         self, tmp_path,
     ):
-        """The anchors are the only record of what HISTORICAL releases shipped.
+        """The release commits are the only record of what HISTORICAL releases shipped.
 
         A tree hash is content-addressed, so a faithful filter recomputes each
         one identically. Overwriting the recorded value without comparing threw
@@ -777,7 +777,7 @@ class TestApplyMultiMember:
         tampered = dict(config.tree_hashes)
         tampered["pkgA"] = "0" * 40
         os.chmod(archive, 0o644)
-        write_release_anchor(
+        write_release_commit(
             archive, candidate_sha=config.candidate_sha, tree_hashes=tampered,
         )
         os.chmod(archive, 0o444)
@@ -883,8 +883,8 @@ class TestApplyMultiMember:
         assert conversion.destination.repo == "."
         assert conversion.destination.releasable == "core"
         assert conversion.commit
-        assert KIND_ANCHOR_REMAP in kinds
-        remap = next(e for e in events if e.KIND == KIND_ANCHOR_REMAP)
+        assert KIND_RELEASE_COMMIT_REMAP in kinds
+        remap = next(e for e in events if e.KIND == KIND_RELEASE_COMMIT_REMAP)
         assert remap.related_to == conversion.id
         assert remap.mappings[0].old_sha == ns.core_sha
         # A multi-member destination keeps its tag format, so nothing renamed.
@@ -1008,13 +1008,13 @@ class TestApplySingleMember:
     def test_the_hoist_rides_the_one_filter_run(self, tmp_path, monkeypatch):
         """The paths and the hoist go in as ONE git-filter-repo invocation.
 
-        Everything downstream -- the anchors, the changelog hashes, the tag
+        Everything downstream -- the release commits, the changelog hashes, the tag
         translation -- is keyed off ``.git/filter-repo/commit-map``, and that
         file must map the SOURCE's commits. filter-repo rewrites it on every
         run: a second, chained invocation leaves a map keyed by the FIRST run's
         rewritten commits unless the installed filter-repo composes the two.
         2.47 composes; 2.38 (the Ubuntu 24.04 package, and therefore CI) does
-        not, and there every original sha silently misses -- anchors are left
+        not, and there every original sha silently misses -- release commits are left
         as recorded, changelog entries are dropped as pruned. So the shape is
         asserted here rather than the composing behaviour of whichever
         filter-repo happens to be on PATH.
@@ -1101,16 +1101,16 @@ class TestApplySingleMember:
         assert alias.aliases[0].alias_tag == "v0.1.0"
         assert alias.aliases[0].aliased_tag == "extras@v0.1.0"
 
-    def test_anchor_paths_are_rekeyed_to_the_repository_root(self, tmp_path):
+    def test_release_commit_paths_are_rekeyed_to_the_repository_root(self, tmp_path):
         ns = make_source(tmp_path)
-        # Anchored at a commit that touches pkgC, so it survives the filter.
+        # Released from a commit that touches pkgC, so it survives the filter.
         sha = _commit(ns.root, {"pkgC/main.py": "print('C')\n"}, "feat: extras")
-        _anchor_archive(
+        _release_commit_archive(
             ns.root, "extras", ns.initial_version, sha,
             {"pkgC": _tree(ns.root, "pkgC")},
         )
         run_git(ns.root, "add", WORKSPACE_DIR)
-        run_git(ns.root, "commit", "-q", "-m", "extras anchor")
+        run_git(ns.root, "commit", "-q", "-m", "extras release commit")
 
         target = tmp_path / "extras_out"
         cmd_extract(str(ns.root), "extras", str(target))

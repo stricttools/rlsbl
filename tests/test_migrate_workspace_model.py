@@ -619,7 +619,7 @@ class TestDryRun:
 
 
 # ---------------------------------------------------------------------------
-# The commit, and the anchor backfill that follows the edits
+# The commit, and the release commit backfill that follows the edits
 # ---------------------------------------------------------------------------
 
 
@@ -668,8 +668,8 @@ class TestCommit:
         assert git(repo, "rev-parse", "HEAD") == head
 
 
-class TestAnchorBackfill:
-    """The migration edits the workspace, then the anchor pass runs on it."""
+class TestReleaseCommitBackfill:
+    """The migration edits the workspace, then the release commit pass runs on it."""
 
     @pytest.fixture
     def repo(self, tmp_path):
@@ -697,12 +697,12 @@ class TestAnchorBackfill:
             / "v0.1.0.toml"
         )
 
-    def test_the_release_is_anchored_after_the_edits(self, repo):
+    def test_the_release_is_recorded_after_the_edits(self, repo):
         from githarness import git
 
         code, output = migrate(repo, dev_node=True, backfill=True)
         assert code == 0
-        assert "release-anchor backfill" in output
+        assert "release-commit backfill" in output
         with open(self.archive(repo), "rb") as f:
             data = tomllib.load(f)
         assert data["candidate_sha"] == git(repo, "rev-parse", "core@v0.1.0^{commit}")

@@ -13,7 +13,7 @@ from rlsbl.commands.unreleased import (
     run_cmd,
 )
 from rlsbl.errors import ReleaseRecordError
-from rlsbl.release_record import range_anchor
+from rlsbl.release_record import nearest_release_commit
 
 from conftest import (
     archive_release,
@@ -38,10 +38,10 @@ class TestBaselineReleaseSelection:
         sha = git_head(mock_git_repo)
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
         archive_release(release_record_dir(mock_git_repo), "1.0.0", sha)
-        assert range_anchor(release_record_dir(mock_git_repo)).version == "1.0.0"
+        assert nearest_release_commit(release_record_dir(mock_git_repo)).version == "1.0.0"
 
     def test_returns_none_when_nothing_released(self, mock_git_repo):
-        assert range_anchor(release_record_dir(mock_git_repo)) is None
+        assert nearest_release_commit(release_record_dir(mock_git_repo)) is None
 
     def test_a_tag_with_no_archive_does_not_move_the_selection(self, mock_git_repo):
         # A hand-made tag above the newest release. `git describe` would have
@@ -49,7 +49,7 @@ class TestBaselineReleaseSelection:
         # nothing.
         archive_release(release_record_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
         subprocess.run(["git", "tag", "v9.9.9"], cwd=str(mock_git_repo), check=True)
-        assert range_anchor(release_record_dir(mock_git_repo)).version == "1.0.0"
+        assert nearest_release_commit(release_record_dir(mock_git_repo)).version == "1.0.0"
 
     def test_version_tags_with_no_archive_at_all_are_a_hard_error(self,
                                                                   mock_git_repo):
@@ -57,7 +57,7 @@ class TestBaselineReleaseSelection:
         # select nothing and report the entire history as unreleased.
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
         with pytest.raises(ReleaseRecordError, match="backfill_release_anchors"):
-            range_anchor(release_record_dir(mock_git_repo))
+            nearest_release_commit(release_record_dir(mock_git_repo))
 
     def test_returns_the_highest_archived_release(self, mock_git_repo):
         archive_release(release_record_dir(mock_git_repo), "1.0.0", git_head(mock_git_repo))
@@ -68,20 +68,20 @@ class TestBaselineReleaseSelection:
             cwd=str(mock_git_repo), check=True,
         )
         archive_release(release_record_dir(mock_git_repo), "1.1.0", git_head(mock_git_repo))
-        assert range_anchor(release_record_dir(mock_git_repo)).version == "1.1.0"
+        assert nearest_release_commit(release_record_dir(mock_git_repo)).version == "1.1.0"
 
     def test_the_selection_survives_the_tag_being_deleted(self, mock_git_repo):
         sha = git_head(mock_git_repo)
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
         archive_release(release_record_dir(mock_git_repo), "1.0.0", sha)
         subprocess.run(["git", "tag", "-d", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        assert range_anchor(release_record_dir(mock_git_repo)).version == "1.0.0"
+        assert nearest_release_commit(release_record_dir(mock_git_repo)).version == "1.0.0"
 
 
 class TestGetCommitsSince:
     """Tests for _get_commits_since."""
 
-    def test_returns_commits_since_the_anchor(self, mock_git_repo):
+    def test_returns_commits_since_the_release_commit(self, mock_git_repo):
         released = git_head(mock_git_repo)
         # Add a commit after the release. It goes through githarness so the
         # repo's own configured identity is what lands in the author field --
@@ -94,11 +94,11 @@ class TestGetCommitsSince:
         assert commits[0]["author"] == "Test"
         assert commits[0]["date"]  # non-empty ISO date
 
-    def test_returns_empty_when_no_commits_since_the_anchor(self, mock_git_repo):
+    def test_returns_empty_when_no_commits_since_the_release_commit(self, mock_git_repo):
         commits = _get_commits_since(git_head(mock_git_repo))
         assert commits == []
 
-    def test_returns_all_commits_when_there_is_no_anchor(self, mock_git_repo):
+    def test_returns_all_commits_when_there_is_no_release_commit(self, mock_git_repo):
         # With no release to measure from, the range is HEAD (one commit here)
         commits = _get_commits_since(None)
         assert len(commits) == 1
@@ -139,7 +139,7 @@ class TestRunCmd:
         data = run_cmd(None, [], {"json": True}, project_root=".")
         assert data["latest_release"] == "1.0.0"
         assert data["latest_release_in_checkout"] is True
-        assert data["range_anchor_version"] == "1.0.0"
+        assert data["nearest_release_commit_version"] == "1.0.0"
         assert data["commits"] == []
         assert data["coverage"] == {"covered": 0, "total": 0, "exempted": 0}
 
@@ -180,17 +180,17 @@ class TestPerProjectBaselineSelection:
         sha = git_head(mock_git_repo)
         archive_release(release_record_dir(mock_git_repo / "alpha"), "1.0.0", sha)
         archive_release(release_record_dir(mock_git_repo / "beta"), "2.0.0", sha)
-        assert range_anchor(
+        assert nearest_release_commit(
             release_record_dir(mock_git_repo / "alpha"), tag_glob="alpha@v*"
         ).version == "1.0.0"
-        assert range_anchor(
+        assert nearest_release_commit(
             release_record_dir(mock_git_repo / "beta"), tag_glob="beta@v*"
         ).version == "2.0.0"
 
     def test_a_project_with_no_archives_has_no_baseline(self, mock_git_repo):
         archive_release(release_record_dir(mock_git_repo / "alpha"), "1.0.0",
                         git_head(mock_git_repo))
-        assert range_anchor(
+        assert nearest_release_commit(
             release_record_dir(mock_git_repo / "nonexistent"), tag_glob="nonexistent@v*"
         ) is None
 
@@ -224,7 +224,7 @@ class TestUnreleasedMonorepo:
         data = run_cmd("npm", [], {"json": True}, project_root=str(mock_git_repo / "alpha"))
         # Scoped to alpha's own release archives
         assert data["latest_release"] == "1.0.0"
-        assert data["range_anchor_version"] == "1.0.0"
+        assert data["nearest_release_commit_version"] == "1.0.0"
 
     def test_monorepo_filters_commits_by_directory(self, mock_git_repo, monkeypatch, capsys):
         """Commits touching only another project's files are excluded."""

@@ -75,7 +75,7 @@ def _run_root_selfdoc(flags, workspace_root, log):
     log("Detected selfdoc.json at workspace root")
 
     # Snapshot dirty files before selfdoc runs. All git operations here are
-    # anchored to workspace_root -- never the process cwd. An unanchored
+    # rooted at workspace_root -- never the process cwd. An unrooted
     # ``git status``/commit here once walked up from a TMPDIR-inside-repo
     # fixture into the real repo and committed junk (the Jul junk-commit
     # incidents); the explicit cwd makes the target repo unambiguous.

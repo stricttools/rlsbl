@@ -2,7 +2,7 @@
 
 Covers:
 - Detached HEAD behavior for get_current_branch()
-- Shallow clone behavior for the release record's range anchor
+- Shallow clone behavior for the release record's nearest release commit
 - Push timeout propagation for push_if_needed()
 - Signal handling (KeyboardInterrupt) during release, verifying lock cleanup
 """
@@ -15,7 +15,7 @@ import pytest
 import rlsbl.lock
 from rlsbl.errors import GitError, ReleaseRecordError
 from rlsbl.lock import release_lock
-from rlsbl.release_record import range_anchor
+from rlsbl.release_record import nearest_release_commit
 from rlsbl.utils import get_current_branch, push_if_needed
 
 
@@ -72,7 +72,7 @@ class TestDetachedHead:
 
 
 class TestShallowClone:
-    """9.2: the release record's range anchor in a shallow clone.
+    """9.2: the release record's nearest release commit in a shallow clone.
 
     CI environments often use ``git clone --depth 1``, which strips history.
     The tag walk used to fail there and return None, which silently widened
@@ -82,7 +82,7 @@ class TestShallowClone:
     """
 
     def test_shallow_clone_raises(self, tmp_path):
-        """In a shallow clone, resolving the range anchor is a hard error."""
+        """In a shallow clone, resolving the nearest release commit is a hard error."""
         # Create a source repo with a tag
         source = tmp_path / "source"
         source.mkdir()
@@ -134,12 +134,12 @@ class TestShallowClone:
         try:
             os.chdir(str(clone))
             with pytest.raises(ReleaseRecordError, match="cannot determine"):
-                range_anchor(release_record_dir(clone))
+                nearest_release_commit(release_record_dir(clone))
         finally:
             os.chdir(old_cwd)
 
     def test_full_clone_release_found(self, tmp_path):
-        """In a full clone, the archived release anchors the range."""
+        """In a full clone, the archived release bounds the range."""
         repo = tmp_path / "repo"
         repo.mkdir()
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(repo), check=True)
@@ -159,7 +159,7 @@ class TestShallowClone:
         old_cwd = os.getcwd()
         try:
             os.chdir(str(repo))
-            result = range_anchor(release_record_dir(repo))
+            result = nearest_release_commit(release_record_dir(repo))
         finally:
             os.chdir(old_cwd)
 
@@ -169,7 +169,7 @@ class TestShallowClone:
         """Genuine first release: nothing archived, not shallow, returns None."""
         from conftest import release_record_dir
 
-        assert range_anchor(release_record_dir(mock_git_repo)) is None
+        assert nearest_release_commit(release_record_dir(mock_git_repo)) is None
 
 
 class TestPushTimeout:

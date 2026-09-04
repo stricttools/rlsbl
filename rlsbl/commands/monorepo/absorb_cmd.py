@@ -4,7 +4,7 @@
 and it is the mirror image of ``rlsbl monorepo extract``: the source's history
 is rewritten to live under ``dest_path``, merged in, its version tags imported
 under the destination's tag scheme, and its whole release state -- changelog,
-release archives with their anchors, config and version -- moved into a
+release archives with their release commits, config and version -- moved into a
 releasable's state directory.
 
 The unit is the RELEASABLE, in both directions
@@ -51,7 +51,7 @@ What an apply moves
 * **The release state**: the arriving ``.rlsbl/changes/`` and
   ``.rlsbl/releases/`` move into the releasable's state directory, their
   changelog hashes remapped through filter-repo's commit map and their release
-  anchors remapped and VERIFIED -- a recorded tree hash is content-addressed,
+  release commits remapped and VERIFIED -- a recorded tree hash is content-addressed,
   so a faithful rewrite reproduces it exactly.
 * **A transition record** in the releasable's state directory explains all of it.
 
@@ -90,8 +90,8 @@ from ...changelog.schema import entry_content_key, parse_jsonl, serialize_entry
 from ...config import read_json_config
 from ...errors import ConfigError
 from ...transition_record import (
-    AnchorMapping,
-    AnchorRemapEvent,
+    ReleaseCommitMapping,
+    ReleaseCommitRemapEvent,
     BoundaryAlias,
     BoundaryAliasEvent,
     ConversionEvent,
@@ -104,7 +104,7 @@ from ...transition_record import (
 from ...lock import rlsbl_lock
 from ...ownership import ROOT_MEMBER_NAME, normalize_path
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
-from ...release_file import read_release_file, write_release_anchor
+from ...release_file import read_release_file, write_release_commit
 from ...saferm import saferm_delete
 from ...snapshot import SNAPSHOT_FILE, generate_snapshot, write_snapshot
 from ...tag_glob import TagMode, parse_version_tag, releasable_tag_glob
@@ -274,8 +274,8 @@ class Applied:
     sha_map: dict = field(default_factory=dict)
     pruned_shas: list = field(default_factory=list)
     tag_mappings: list = field(default_factory=list)
-    anchor_mappings: list = field(default_factory=list)
-    unremapped_anchors: list = field(default_factory=list)
+    release_commit_mappings: list = field(default_factory=list)
+    unremapped_release_commits: list = field(default_factory=list)
     entries_migrated: int = 0
     entries_already_present: int = 0
     #: Repo-relative paths this run wrote or deleted, for the scoped commit.
@@ -630,7 +630,7 @@ def _check_version_overlap(workspace_root, releasable_name, source_repo,
     happen to be named. Two releases of one version is a state no later command
     can make sense of -- ``changelog generate`` would have two sources for one
     section and the unreleased range would be bounded by a version with two
-    anchors -- so it is refused before anything is written.
+    release commits -- so it is refused before anything is written.
     """
     incoming = set(state.versioned)
     incoming |= {name[1: -len(".toml")] for name in state.archives}
@@ -1143,7 +1143,7 @@ def observe(arr) -> Preview:
                if state.has_config and arr.creates_releasable else [])
         ),
         actions=(
-            "apply would remap every changelog hash and every release anchor "
+            "apply would remap every changelog hash and every release commit "
             "through filter-repo's commit map, verify each recorded tree "
             "against the rewritten history, and name what it could not map.",
             f"apply would then delete the per-package changes/, releases/, "
@@ -1350,7 +1350,7 @@ def _apply_state(arr, item, run):
     releases_dir = os.path.join(arr.member_rlsbl_dir, "releases")
 
     _remap_changelog(arr, run, changes_dir)
-    _remap_anchors(arr, run, releases_dir)
+    _remap_release_commits(arr, run, releases_dir)
     _migrate_changes(arr, run, changes_dir)
     _migrate_releases(arr, run, releases_dir)
     _migrate_identity(arr, run)
@@ -1390,8 +1390,8 @@ def _remap_changelog(arr, run, changes_dir):
         )
 
 
-def _remap_anchors(arr, run, releases_dir):
-    """Remap every arriving release anchor onto the rewritten history.
+def _remap_release_commits(arr, run, releases_dir):
+    """Remap every arriving release commit onto the rewritten history.
 
     An archive records the commit a version shipped from and the git tree of
     every path it shipped. The commit is mapped through filter-repo's map; the
@@ -1412,9 +1412,9 @@ def _remap_anchors(arr, run, releases_dir):
             continue
         new_sha = _map_sha(config.candidate_sha, run.sha_map)
         if new_sha is None or not _commit_exists(arr.workspace_root, new_sha):
-            run.unremapped_anchors.append((name, config.candidate_sha))
+            run.unremapped_release_commits.append((name, config.candidate_sha))
             print(
-                f"  anchor: {name} still names {config.candidate_sha[:12]}, a "
+                f"  release commit: {name} still names {config.candidate_sha[:12]}, a "
                 f"commit the rewrite did not carry over; left as recorded.",
                 file=sys.stderr,
             )
@@ -1422,7 +1422,7 @@ def _remap_anchors(arr, run, releases_dir):
         trees = {}
         failed = None
         for old_path, recorded in config.tree_hashes.items():
-            new_path = _dest_anchor_path(arr, old_path)
+            new_path = _dest_release_commit_path(arr, old_path)
             try:
                 recomputed = _tree_hash(
                     arr.workspace_root, new_path, rev=new_sha,
@@ -1432,7 +1432,7 @@ def _remap_anchors(arr, run, releases_dir):
                 break
             if recomputed != recorded:
                 raise AbsorbError(
-                    f"release anchor {name} does not survive the rewrite: it "
+                    f"release commit {name} does not survive the rewrite: it "
                     f"records tree {recorded} for '{old_path}', but "
                     f"'{new_path}' at the rewritten commit {new_sha} is "
                     f"{recomputed}. A tree hash is content-addressed, so a "
@@ -1441,28 +1441,28 @@ def _remap_anchors(arr, run, releases_dir):
                 )
             trees[new_path] = recomputed
         if failed is not None:
-            run.unremapped_anchors.append((name, config.candidate_sha))
+            run.unremapped_release_commits.append((name, config.candidate_sha))
             print(
-                f"  anchor: {name} names path '{failed}', which does not "
+                f"  release commit: {name} names path '{failed}', which does not "
                 f"resolve at the rewritten commit; left as recorded.",
                 file=sys.stderr,
             )
             continue
         effects.chmod(path, 0o644)
-        write_release_anchor(path, candidate_sha=new_sha, tree_hashes=trees)
-        run.anchor_mappings.append(
-            AnchorMapping(old_sha=config.candidate_sha, new_sha=new_sha)
+        write_release_commit(path, candidate_sha=new_sha, tree_hashes=trees)
+        run.release_commit_mappings.append(
+            ReleaseCommitMapping(old_sha=config.candidate_sha, new_sha=new_sha)
         )
         print(
-            f"  anchor: {name} {config.candidate_sha[:12]} -> {new_sha[:12]} "
+            f"  release commit: {name} {config.candidate_sha[:12]} -> {new_sha[:12]} "
             f"({', '.join(sorted(trees))})"
         )
 
 
-def _dest_anchor_path(arr, old_path):
-    """An anchored path's spelling in the destination.
+def _dest_release_commit_path(arr, old_path):
+    """A recorded path's spelling in the destination.
 
-    A standalone project anchors its release at ``"."``; that same content now
+    A standalone project records its release at ``"."``; that same content now
     sits under the member's path, so the key becomes the member path -- exactly
     the spelling a workspace release writes, and exactly what an extract turns
     back into ``"."``.
@@ -1868,10 +1868,10 @@ def _apply_transition_record(arr, item, run):
         followers.append(
             TagMapEvent(mappings=run.tag_mappings, related_to=stamped.id)
         )
-    if run.anchor_mappings:
-        followers.append(AnchorRemapEvent(
-            rewrite="git-filter-repo --to-subdirectory-filter (release anchors)",
-            mappings=run.anchor_mappings,
+    if run.release_commit_mappings:
+        followers.append(ReleaseCommitRemapEvent(
+            rewrite="git-filter-repo --to-subdirectory-filter (release commits)",
+            mappings=run.release_commit_mappings,
             related_to=stamped.id,
         ))
     if arr.tag_plan.alias and run.alias_commit:
@@ -1921,13 +1921,13 @@ def _apply_next_steps(arr, item, run):
         f"  Tags: "
         f"{', '.join(m.new_tag for m in run.tag_mappings) or 'none imported'}"
     )
-    if run.unremapped_anchors:
+    if run.unremapped_release_commits:
         print(
-            "\nRelease anchors left as recorded (their commits did not survive "
+            "\nRelease release commits left as recorded (their commits did not survive "
             "the rewrite):",
             file=sys.stderr,
         )
-        for name, sha in run.unremapped_anchors:
+        for name, sha in run.unremapped_release_commits:
             print(f"  - {name}: {sha[:12]}", file=sys.stderr)
     print("\nNext steps (rlsbl never administers an external system):")
     for step in _next_steps(arr):

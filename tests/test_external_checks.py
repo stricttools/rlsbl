@@ -986,13 +986,13 @@ class TestReleaseContextEnv:
         self._tag(mock_git_repo, "v2.0.0")
         archive_release(release_record_dir(mock_git_repo), "2.0.0", git_head(mock_git_repo))
         calls = []
-        real = release_record_mod.range_anchor
+        real = release_record_mod.nearest_release_commit
 
         def counting(releases_dir, **kwargs):
             calls.append(releases_dir)
             return real(releases_dir, **kwargs)
 
-        monkeypatch.setattr(release_record_mod, "range_anchor", counting)
+        monkeypatch.setattr(release_record_mod, "nearest_release_commit", counting)
         ctx = ProjectContext(
             project_root=Path(str(mock_git_repo)), workspace_root=None, config={},
         )
@@ -1027,7 +1027,7 @@ class TestReleaseContextEnvFailureIsHard:
         from conftest import archive_release, release_record_dir
         from rlsbl.errors import ReleaseRecordError
 
-        # An anchor whose object this repository does not have: git answers
+        # A release commit whose object this repository does not have: git answers
         # "I cannot say", which is not "not released".
         archive_release(release_record_dir(mock_git_repo), "1.0.0", "c" * 40)
         with pytest.raises(ReleaseRecordError) as exc:
@@ -1040,7 +1040,7 @@ class TestReleaseContextEnvFailureIsHard:
         def boom(*args, **kwargs):
             raise RuntimeError("git went sideways")
 
-        monkeypatch.setattr(release_record_mod, "range_anchor", boom)
+        monkeypatch.setattr(release_record_mod, "nearest_release_commit", boom)
         with pytest.raises(RuntimeError, match="sideways"):
             tool_checks.release_context_env(self._ctx(mock_git_repo))
 

@@ -16,7 +16,7 @@ Three properties are pinned here:
   Release gets one, from the same document -- the materialize shape the
   reconcile command already performs.
 * **The document is the one the release flow writes.** Body, title, the
-  ``rlsbl-ci-sha`` marker taken from the release record's anchor, and the pre-release
+  ``rlsbl-ci-sha`` marker taken from the release record's release commit, and the pre-release
   flag all come from :mod:`rlsbl.release_publication`, so a Release the scrub
   updates is one the publish workflow can still judge.
 """
@@ -27,7 +27,7 @@ from rlsbl.commands.release_reconcile import update_github_releases
 from rlsbl.release_file import write_archived_release_file
 from rlsbl.release_publication import publication
 
-ANCHOR = "a" * 40
+RELEASE_COMMIT = "a" * 40
 TREE = "f" * 40
 
 
@@ -69,11 +69,11 @@ class Recorder:
         return [c for c in self.calls if c[:2] == ["release", verb]]
 
 
-def _release_record(tmp_path, version, *, anchor=ANCHOR):
+def _release_record(tmp_path, version, *, release_commit=RELEASE_COMMIT):
     releases = tmp_path / ".rlsbl" / "releases"
     write_archived_release_file(
         str(releases), version, bump="patch", include=["plain"],
-        description="A release.", candidate_sha=anchor,
+        description="A release.", candidate_sha=release_commit,
         tree_hashes={".": TREE},
     )
     return releases
@@ -107,7 +107,7 @@ class TestNothingIsEverDeleted:
         assert gh.of("create") == []
         assert len(gh.of("edit")) == 1
         assert gh.of("edit")[0][2] == "v1.0.0"
-        assert f"<!-- rlsbl-ci-sha: {ANCHOR} -->" in gh.bodies["v1.0.0"]
+        assert f"<!-- rlsbl-ci-sha: {RELEASE_COMMIT} -->" in gh.bodies["v1.0.0"]
         assert updated == 1
 
     def test_a_prerelease_tags_release_is_updated(self, tmp_path, monkeypatch):
@@ -120,7 +120,7 @@ class TestNothingIsEverDeleted:
         gh = Recorder(existing=("v1.0.0-rc.1",))
 
         updated = _update(
-            tmp_path, [{"refname": "refs/tags/v1.0.0-rc.1", "new_sha": ANCHOR}],
+            tmp_path, [{"refname": "refs/tags/v1.0.0-rc.1", "new_sha": RELEASE_COMMIT}],
             gh,
         )
 
@@ -137,7 +137,7 @@ class TestNothingIsEverDeleted:
         gh = Recorder(existing=("nightly",))
 
         updated = _update(
-            tmp_path, [{"refname": "refs/tags/nightly", "new_sha": ANCHOR}], gh,
+            tmp_path, [{"refname": "refs/tags/nightly", "new_sha": RELEASE_COMMIT}], gh,
         )
 
         assert gh.calls == [], (
@@ -196,22 +196,22 @@ class TestTheUpdatedDocument:
         _update(tmp_path, [{"refname": "refs/tags/v1.0.0"}], gh, notes=notes)
 
         expected = publication(
-            tag="v1.0.0", version="1.0.0", candidate_sha=ANCHOR, notes=notes,
+            tag="v1.0.0", version="1.0.0", candidate_sha=RELEASE_COMMIT, notes=notes,
         ).body
         assert gh.bodies["v1.0.0"] == expected, (
             "the scrub must write the same document the release flow writes, "
             "not a notes-only body"
         )
-        assert f"<!-- rlsbl-ci-sha: {ANCHOR} -->" in gh.bodies["v1.0.0"]
+        assert f"<!-- rlsbl-ci-sha: {RELEASE_COMMIT} -->" in gh.bodies["v1.0.0"]
 
     def test_the_marker_comes_from_the_release_record_not_the_moved_tag(
         self, tmp_path, monkeypatch,
     ):
-        """The anchor step runs before this one, so the archive already names
-        the rewritten commit; the marker is that anchor, never the tag's own
+        """The release commit step runs before this one, so the archive already names
+        the rewritten commit; the marker is that release commit, never the tag's own
         old value."""
         monkeypatch.chdir(tmp_path)
-        _release_record(tmp_path, "1.0.0", anchor="b" * 40)
+        _release_record(tmp_path, "1.0.0", release_commit="b" * 40)
         gh = Recorder(existing=("v1.0.0",))
 
         _update(
@@ -259,7 +259,7 @@ class TestTheUpdatedDocument:
     def test_a_version_with_no_archive_is_written_markerless_and_says_so(
         self, tmp_path, monkeypatch, capsys,
     ):
-        """A version the release record cannot anchor still gets its document --
+        """A version the release record cannot release commit still gets its document --
         without a marker, and with the omission stated rather than hidden."""
         monkeypatch.chdir(tmp_path)
         gh = Recorder(existing=("v0.1.0",))
@@ -283,7 +283,7 @@ class TestTheUpdatedDocument:
         assert gh.of("delete") == []
         assert gh.of("edit") == []
         assert len(gh.of("create")) == 1
-        assert f"<!-- rlsbl-ci-sha: {ANCHOR} -->" in gh.bodies["v1.0.0"]
+        assert f"<!-- rlsbl-ci-sha: {RELEASE_COMMIT} -->" in gh.bodies["v1.0.0"]
         assert updated == 1
 
     def test_a_creation_failure_is_a_warning_naming_the_tag(

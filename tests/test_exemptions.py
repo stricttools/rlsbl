@@ -166,7 +166,7 @@ class TestCrossReleaseBoundary:
         _run_git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
         _run_git(repo, "commit", "-q", "-m", "add changelog entry for v0.1.0")
 
-        # Tag v0.1.0 and record it in the release record -- the range is anchored on
+        # Tag v0.1.0 and record it in the release record -- the range starts at
         # the archived release, not on the tag.
         _run_git(repo, "tag", "v0.1.0")
         _archive_release(_release_record_dir(repo), "0.1.0", _git_head(repo))

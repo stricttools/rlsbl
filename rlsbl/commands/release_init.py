@@ -136,7 +136,7 @@ def run_cmd(project_root):
     with f:
         tomlkit.dump(doc, f)
 
-    # Anchor the git-repo check and the commit to the project directory, not
+    # Root the git-repo check and the commit at the project directory, not
     # the process cwd -- the file lives under project_dir/releasable_dir, which
     # is what determines whether there is a repo to commit into.
     commit_scaffold_file(

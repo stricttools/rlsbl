@@ -141,7 +141,7 @@ class TestUndoUnwindsSnapshotCommit:
         reverted along with the version bump.
 
         The snapshot is regenerated BEFORE the candidate push, so it rides into
-        the candidate -- the tag and the release record anchor land on it, and the
+        the candidate -- the tag and the recorded release commit land on it, and the
         version bump sits below it. Red-green: without the 'snapshot' subject
         being recognized, the collected set stops at the version bump and
         snapshot.json survives the undo."""

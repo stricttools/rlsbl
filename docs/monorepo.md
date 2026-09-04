@@ -392,15 +392,15 @@ Convergence never blindly overwrites the mirror. The remote tip must be **either
 
 ### Release tags on the mirror
 
-The mirror carries every released version under its own **standalone** tag name (`v1.2.3`, not the workspace's `{name}@v1.2.3`, which is exactly what a consumer resolving the mirror by URL cannot read). The commit each tag stands at is derived, never guessed: it is the subtree split of the commit that version's release archive anchors -- the commit CI verified.
+The mirror carries every released version under its own **standalone** tag name (`v1.2.3`, not the workspace's `{name}@v1.2.3`, which is exactly what a consumer resolving the mirror by URL cannot read). The commit each tag stands at is derived, never guessed: it is the subtree split of the commit that version's release archive release commits -- the commit CI verified.
 
 That makes the tags a second dimension of the same reconciliation. A mirror can be perfectly converged on `main` and still carry none of its releasable's tags (a mirror bound after the fact, a tag push that failed at release time, a mirror that was reset), so observation reports one item per released version beside the branch's own verdict:
 
 | State | Meaning | What apply does |
 | --- | --- | --- |
 | `present` | The mirror already carries the tag. | Nothing. |
-| `materialize` | The mirror has no such tag. The subtree split of the version's release record anchor is the commit it belongs at. | Push the tag at that commit, then create the mirror's GitHub Release with that version's notes. |
-| `unanchored` | No mirror commit for this version can be derived: its release archive records no commit at all, or records one the subtree split cannot answer for — typically an anchor predating the member's own directory, from a release absorbed out of another repository. | **Nothing, and nothing is guessed.** The version is named with the reason it could not be derived; the branch and every other version reconcile as usual. |
+| `materialize` | The mirror has no such tag. The subtree split of the version's recorded release commit is the commit it belongs at. | Push the tag at that commit, then create the mirror's GitHub Release with that version's notes. |
+| `underivable` | No mirror commit for this version can be derived: its release archive records no commit at all, or records one the subtree split cannot answer for — typically a release commit predating the member's own directory, from a release absorbed out of another repository. | **Nothing, and nothing is guessed.** The version is named with the reason it could not be derived; the branch and every other version reconcile as usual. |
 
 A tag standing at a **different** commit is never moved. That is a hard error naming both commits: a released tag names what shipped, and choosing which commit a version shipped from is never the reconciler's decision.
 
@@ -411,7 +411,7 @@ Two invariants follow:
 
 ### The release flow's own mirror steps
 
-Releasing a releasable that declares a `subtree_remote` does both halves without a separate command. After the primary release is published, `rlsbl release run` converges the mirror's branch through the same reconciler this chapter describes, then publishes that version's tag and GitHub Release on the mirror. The tag's commit is the subtree split of the release's **release record anchor** — the CI-verified candidate — not the mirror's branch tip, so the mirror's tag names the same code the monorepo's does even though the finalization commits have moved `main` on since.
+Releasing a releasable that declares a `subtree_remote` does both halves without a separate command. After the primary release is published, `rlsbl release run` converges the mirror's branch through the same reconciler this chapter describes, then publishes that version's tag and GitHub Release on the mirror. The tag's commit is the subtree split of the release's **recorded release commit** — the CI-verified candidate — not the mirror's branch tip, so the mirror's tag names the same code the monorepo's does even though the finalization commits have moved `main` on since.
 
 Both steps are **non-fatal**: the primary release has already shipped and nothing is rolled back. A failure is still recorded on the release state, so the run exits non-zero, stays resumable, and names its healer — `rlsbl monorepo mirror <project>` for the mirror, `rlsbl release reconcile` for this repository's own release refs.
 
@@ -420,7 +420,7 @@ Both steps are **non-fatal**: the primary release has already shipped and nothin
 The mirror already holds this subtree's standalone history: every commit that touched the member has a synthetic counterpart there, produced by the deterministic subtree split, and consumers already resolve those commit ids. So [extracting](conversions.md) a mirrored releasable does not filter a second history out of the monorepo -- it **promotes** the mirror. Same command, different engine:
 
 - the destination is a clone of the mirror, whose remote becomes its origin;
-- the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release anchor is remapped through it;
+- the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release commit is remapped through it;
 - deleting the monorepo's copy is justified by **tree-hash equality**: `HEAD:<member>` in the monorepo must equal the root tree of the mirror's pre-scaffold split commit. A mirror that is behind stops the promotion and says to run `rlsbl monorepo mirror <project>` first;
 - the correspondence is persisted into the extracted repository's transition record as a `promotion-split-map` event, so the promoted repository can explain its own hashes without the monorepo.
 
@@ -456,7 +456,7 @@ The step declares `predicate-quantifier: some-with-excludes`. Under the action's
 
 A push whose diff matches none of a project's patterns leaves that project's CI job `skipped` on the pushed commit. `rlsbl check --name router-filters-fresh` re-derives the block and fails when the committed router no longer matches the workspace; regenerate with `rlsbl monorepo sync`.
 
-In explicit releasable mode, one more pattern is appended to **every** member of a releasable: the releasable's own `CHANGELOG.md` under `.rlsbl-monorepo/releasables/<name>/`. It is a single path shared by all members, so any commit that touches it matches all of their filters at once. This is a deliberate run-everything hook. A release commit may touch nothing under a member's own directory -- guaranteed on a first release, where the version write is a no-op -- and the publish gate refuses to treat that member's `skipped` check as passing, with no re-runnable recovery. Since the release commit always regenerates and commits the releasable `CHANGELOG.md`, anchoring every member's filter on it makes the release commit verifiable for all members.
+In explicit releasable mode, one more pattern is appended to **every** member of a releasable: the releasable's own `CHANGELOG.md` under `.rlsbl-monorepo/releasables/<name>/`. It is a single path shared by all members, so any commit that touches it matches all of their filters at once. This is a deliberate run-everything hook. A release commit may touch nothing under a member's own directory -- guaranteed on a first release, where the version write is a no-op -- and the publish gate refuses to treat that member's `skipped` check as passing, with no re-runnable recovery. Since the release commit always regenerates and commits the releasable `CHANGELOG.md`, release-commit recording every member's filter on it makes the release commit verifiable for all members.
 
 Be aware of the cost: **releasing a releasable runs the CI jobs of every one of its members**, including members whose own code did not change. That is the accepted trade, not a bug -- see [Publish gating](release-workflow.md#the-releasable-run-everything-hook) in the release workflow docs for the full rationale, including why the gate is never relaxed to accept `skipped`, and what a push that touches only non-member paths (a dev node's directory, for instance) looks like.
 

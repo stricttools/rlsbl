@@ -14,12 +14,12 @@ The commit correspondence
 -------------------------
 
 A version's commit on the mirror is derived, never guessed. The release record
-anchors every released version to the monorepo commit it shipped from (the
+ties every released version to the monorepo commit it shipped from (the
 archive's ``candidate_sha``, the commit CI proved green), and the subtree split
 is a deterministic function from a monorepo commit to the mirror commit
 carrying that commit's subtree state::
 
-    mirror commit for version V  ==  git subtree split --prefix <path> <anchor(V)>
+    mirror commit for version V  ==  git subtree split --prefix <path> <release_commit(V)>
 
 The split is incremental and content-derived, so the split of an ancestor is an
 ancestor of the split of HEAD: a tag materialized this way always names a commit
@@ -33,7 +33,7 @@ The document is :mod:`rlsbl.release_publication`'s -- the same authority the
 monorepo's own Release uses, so the two can never disagree about what a Release
 body looks like. One thing differs, and it is the point of the correspondence
 above: the ``rlsbl-ci-sha`` marker on a MIRROR Release names the SPLIT commit,
-because a marker naming the monorepo's anchor would name a commit that does not
+because a marker naming the monorepo's release commit would name a commit that does not
 exist in the repository the Release is attached to.
 
 Idempotence, and the one refusal
@@ -294,7 +294,7 @@ def publish_version(
     subtree_path,
     version,
     tag,
-    anchor_sha,
+    release_commit_sha,
     notes="",
     gh,
     existing_tags=None,
@@ -303,7 +303,7 @@ def publish_version(
 ):
     """Publish one released version onto the mirror: the tag, then the Release.
 
-    *anchor_sha* is the release record's anchor -- the MONOREPO commit the
+    *release_commit_sha* is the release record's release commit -- the MONOREPO commit the
     version shipped from. The mirror's commit for it is derived here, and it is
     that commit the tag names and the Release's marker carries.
 
@@ -314,10 +314,10 @@ def publish_version(
     """
     say = log or (lambda _message: None)
 
-    split_sha = split_commit_for(root, subtree_path, anchor_sha)
+    split_sha = split_commit_for(root, subtree_path, release_commit_sha)
     say(
         f"Mirror commit for {version}: {split_sha[:12]} "
-        f"(split of {anchor_sha[:12]})"
+        f"(split of {release_commit_sha[:12]})"
     )
 
     tag_outcome = ensure_tag(

@@ -550,7 +550,7 @@ class TestExemptionCoversReleasableStatePath:
         )
 
     def test_a_nested_spelling_is_not_exempt(self):
-        """``.rlsbl-monorepo/`` is anchored at the repository root, on purpose.
+        """``.rlsbl-monorepo/`` is rooted at the repository root, on purpose.
 
         Every path the exemption ever judges comes from ``git diff-tree``, which
         prints repository-root-relative paths, and rlsbl writes exactly one
@@ -558,7 +558,7 @@ class TestExemptionCoversReleasableStatePath:
         the directory name deeper in the tree is somebody's own file (a
         hand-written ``docs/.rlsbl-monorepo/...``, a fixture, a vendored copy)
         and needs an owner and changelog coverage like any other. This
-        assertion used to read the other way, from before the anchoring.
+        assertion used to read the other way, from before the release commit was written.
         """
         from rlsbl.changelog.exemptions import is_changelog_path
 

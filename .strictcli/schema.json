@@ -478,7 +478,7 @@
               "null"
             ]
           },
-          "range_anchor_tag": {
+          "nearest_release_commit_tag": {
             "type": [
               "string",
               "null"
@@ -527,7 +527,7 @@
           "changelog",
           "jsonl_coverage",
           "commits_ahead",
-          "range_anchor_tag",
+          "nearest_release_commit_tag",
           "ci",
           "publish",
           "registry_version",
@@ -921,7 +921,7 @@
     },
     "unreleased": {
       "name": "unreleased",
-      "help": "List the commits between the release this checkout is anchored to and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.",
+      "help": "List the commits between this checkout's nearest release commit and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.",
       "effect": "read_only",
       "payload_schema": {
         "type": "object",
@@ -938,7 +938,7 @@
               "null"
             ]
           },
-          "range_anchor_version": {
+          "nearest_release_commit_version": {
             "type": [
               "string",
               "null"
@@ -1012,7 +1012,7 @@
         "required": [
           "latest_release",
           "latest_release_in_checkout",
-          "range_anchor_version",
+          "nearest_release_commit_version",
           "commits"
         ],
         "additionalProperties": false
@@ -1430,7 +1430,7 @@
         },
         "reconcile": {
           "name": "reconcile",
-          "help": "Reconcile this project's published release metadata with what its own records say it released: push the refs origin is missing, re-point the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Merges four explanation sources -- safegit's rewrite journal, the release record's anchors, the transition records, and the committed scrub archives -- into one preview whose verdicts are materialize, already-correct, re-point-with-lease, refuse-foreign, or refuse-identity-mismatch. Fail-closed: one ref origin holds that no record explains aborts the whole reconcile, and nothing anywhere is repaired. Consent is file-driven: --plan writes the plan, --apply performs it.",
+          "help": "Reconcile this project's published release metadata with what its own records say it released: push the refs origin is missing, re-point the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Merges four explanation sources -- safegit's rewrite journal, the release record's release commits, the transition records, and the committed scrub archives -- into one preview whose verdicts are materialize, already-correct, re-point-with-lease, refuse-foreign, or refuse-identity-mismatch. Fail-closed: one ref origin holds that no record explains aborts the whole reconcile, and nothing anywhere is repaired. Consent is file-driven: --plan writes the plan, --apply performs it.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -2316,7 +2316,7 @@
         },
         "extract": {
           "name": "extract",
-          "help": "Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their anchors, config and hooks -- is transplanted, the anchors and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. A mirrored releasable is extracted by promotion instead of by filtering: the destination is cloned from the mirror and adopts the standalone history consumers already resolve, with the monorepo-to-mirror commit correspondence derived by subtree split and recorded in the destination's transition record. A promotion refuses a mirror whose contract is violated or whose split ancestry cannot be established, and one whose tree is behind the source. Refuses a releasable owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.",
+          "help": "Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their release commits, config and hooks -- is transplanted, the release commits and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. A mirrored releasable is extracted by promotion instead of by filtering: the destination is cloned from the mirror and adopts the standalone history consumers already resolve, with the monorepo-to-mirror commit correspondence derived by subtree split and recorded in the destination's transition record. A promotion refuses a mirror whose contract is violated or whose split ancestry cannot be established, and one whose tree is behind the source. Refuses a releasable owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -2351,7 +2351,7 @@
         },
         "absorb": {
           "name": "absorb",
-          "help": "Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their anchors, config and version -- moves into a releasable's state directory with every hash and anchor remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.",
+          "help": "Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their release commits, config and version -- moves into a releasable's state directory with every hash and release commit remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -2619,7 +2619,7 @@
       "commands": {
         "go-module-path": {
           "name": "go-module-path",
-          "help": "Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-anchored. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.",
+          "help": "Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-scoped. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.",
           "effect": "mutating",
           "flags": [
             {

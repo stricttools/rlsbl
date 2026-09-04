@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""Backfill release-archive anchors, format_version gates, and missing archives.
+"""Backfill release-archive release commits, format_version gates, and missing archives.
 
 Release archives (``.rlsbl/releases/v{X.Y.Z}.toml``, and the releasable-level
 equivalent) are the authoritative record of what a version shipped: the bump
 type, the description and context every later changelog regeneration reads back,
-and -- since anchoring exists -- the ``candidate_sha`` / ``tree_hashes`` anchor
+and -- since release commits are recorded -- the ``candidate_sha`` / ``tree_hashes`` release commit
 naming the commit and the released trees. Repositories that predate any of that
-carry archives with no anchor, archives with no ``format_version`` gate, and
+carry archives with no release commit, archives with no ``format_version`` gate, and
 released versions with no archive at all.
 
 This pass repairs one repository (``--repo``, default: the process cwd), and it
 sorts every released version and every git tag into four buckets, all of which
 appear in the plan and in the run output:
 
-  (a) anchorable from a tag -- the version's tag resolves under one of the
-      repository's recognized tag spellings, and its commit becomes the anchor.
+  (a) release_commitable from a tag -- the version's tag resolves under one of the
+      repository's recognized tag spellings, and its commit becomes the release commit.
   (b) TAGLESS -- no tag under any spelling. Recovery is attempted from history:
       a commit whose message is the version-bump message (``v1.2.3``) is the
-      commit the release built, and anchoring from it is recorded as such. Only
-      when that also fails does the archive get the permanent ``unanchorable =
+      commit the release built, and the release commit recorded from it is noted as such. Only
+      when that also fails does the archive get the permanent ``unrecoverable =
       true`` marker. A version is never silently skipped.
   (c) FOREIGN tags -- a tag that parses under a recognized scheme but matches no
       released version of any scope. The script does not guess what it is: it
@@ -26,8 +26,8 @@ appear in the plan and in the run output:
       operator resolves it.
   (d) unrecognizable tags -- listed, untouched, non-fatal.
 
-The pass is idempotent: an archive that already carries an anchor (or the
-unanchorable marker) and the format_version gate is proposed for no change, so a
+The pass is idempotent: an archive that already carries a release commit (or the
+unrecoverable marker) and the format_version gate is proposed for no change, so a
 second run plans nothing and commits nothing.
 
 Usage:
@@ -35,7 +35,7 @@ Usage:
     uv run python scripts/backfill_release_anchors.py [--repo PATH]
 
 The plan is printed either way; ``--dry-run`` stops before writing anything.
-Exit status: 0 when everything is anchored and no foreign tag is present, 1 when
+Exit status: 0 when everything is recorded and no foreign tag is present, 1 when
 foreign tags need operator input (the rest of the work is still done first).
 """
 
@@ -56,13 +56,13 @@ sys.path.insert(0, _SCRIPT_ROOT)
 
 from rlsbl.changelog.files import list_versioned_files  # noqa: E402
 from rlsbl.release_file import (  # noqa: E402
-    ANCHOR_FIELDS,
-    UNANCHORABLE_FIELD,
+    RELEASE_COMMIT_FIELDS,
+    UNRECOVERABLE_FIELD,
     archive_sort_key,
     archive_version,
     write_archived_release_file,
-    write_release_anchor,
-    write_unanchorable_marker,
+    write_release_commit,
+    write_unrecoverable_marker,
     writable_release_file,
 )
 from rlsbl.tag_glob import TagMode, parse_version_tag  # noqa: E402
@@ -179,7 +179,7 @@ def find_bump_commits(repo: str, version: str) -> list[str]:
 class Scope:
     """One independently-versioned release-state location in a repository.
 
-    ``released_paths`` are the repo-relative paths whose trees the anchor
+    ``released_paths`` are the repo-relative paths whose trees the release commit
     records: ``["."]`` for a standalone repository, one entry per member
     directory for a workspace releasable. ``tag_formats`` are the tag spellings
     this scope's versions may be tagged under, as format strings taking
@@ -331,8 +331,8 @@ def read_archive_state(path: str) -> dict:
             raise RuntimeError(f"{path}: unparseable TOML: {exc}") from exc
     return {
         "format_version": "format_version" in data,
-        "anchored": any(f in data for f in ANCHOR_FIELDS),
-        "unanchorable": bool(data.get(UNANCHORABLE_FIELD)),
+        "recorded": any(f in data for f in RELEASE_COMMIT_FIELDS),
+        "unanchorable": bool(data.get(UNRECOVERABLE_FIELD)),
     }
 
 
@@ -472,19 +472,19 @@ class VersionPlan:
 
     scope: Scope
     version: str
-    bucket: str  # "anchorable" | "tagless"
+    bucket: str  # "release_commitable" | "tagless"
     archive_path: str
     archive_exists: bool
     actions: list[str] = field(default_factory=list)
     tag: str | None = None
     probed_tags: list[str] = field(default_factory=list)
     candidate_sha: str | None = None
-    anchored_from: str = ""  # "tag" | "bump-commit" | ""
+    recorded_from: str = ""  # "tag" | "bump-commit" | ""
     tree_hashes: dict = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     stamp_format_version: bool = False
     materialize: bool = False
-    unanchorable: bool = False
+    unrecoverable: bool = False
     bump: str = ""
     description: str = ""
     description_source: str = ""
@@ -552,7 +552,7 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
             vp = VersionPlan(
                 scope=scope,
                 version=version,
-                bucket="anchorable" if tag else "tagless",
+                bucket="release_commitable" if tag else "tagless",
                 archive_path=archive_path,
                 archive_exists=exists,
                 tag=tag,
@@ -562,15 +562,15 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
             if version not in changelogs:
                 vp.notes.append("no changelog JSONL for this version")
 
-            already_anchored = bool(state and (state["anchored"] or state["unanchorable"]))
+            already_recorded = bool(state and (state["recorded"] or state["unanchorable"]))
 
             if not tag:
                 bump_commits = find_bump_commits(repo, version)
                 if bump_commits:
                     sha = bump_commits[0]
-                    vp.anchored_from = "bump-commit"
+                    vp.recorded_from = "bump-commit"
                     vp.notes.append(
-                        f"no tag (probed {', '.join(probed)}); anchored from the "
+                        f"no tag (probed {', '.join(probed)}); recorded from the "
                         f"version-bump commit {sha[:8]}"
                     )
                     if len(bump_commits) > 1:
@@ -579,21 +579,21 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
                             f"took the first ({', '.join(s[:8] for s in bump_commits)})"
                         )
                 else:
-                    vp.unanchorable = True
+                    vp.unrecoverable = True
                     vp.notes.append(
                         f"no tag (probed {', '.join(probed)}) and no version-bump "
                         f"commit in history: unrecoverable"
                     )
             else:
-                vp.anchored_from = "tag"
+                vp.recorded_from = "tag"
 
-            if sha and not vp.unanchorable:
+            if sha and not vp.unrecoverable:
                 vp.candidate_sha = sha
                 trees, notes = tree_hashes_at(repo, sha, scope.released_paths)
                 vp.tree_hashes = trees
                 vp.notes.extend(notes)
                 if not trees:
-                    vp.unanchorable = True
+                    vp.unrecoverable = True
                     vp.candidate_sha = None
                     vp.notes.append(
                         f"commit {sha[:8]} yielded no tree for any released path"
@@ -613,28 +613,28 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
                     f"{predecessor or '0.0.0'}, description from "
                     f"{vp.description_source}, include={vp.include})"
                 )
-                if vp.unanchorable:
+                if vp.unrecoverable:
                     vp.actions.append("write unanchorable = true")
                 else:
                     vp.actions.append(
-                        f"anchor candidate_sha={vp.candidate_sha[:12]} "
+                        f"release commit candidate_sha={vp.candidate_sha[:12]} "
                         f"tree_hashes={ {k: v[:12] for k, v in vp.tree_hashes.items()} }"
                     )
             else:
                 if not state["format_version"]:
                     vp.stamp_format_version = True
                     vp.actions.append("stamp format_version = 1")
-                if already_anchored:
+                if already_recorded:
                     vp.notes.append(
-                        "already marked unanchorable; left alone"
+                        "already marked unrecoverable; left alone"
                         if state["unanchorable"]
-                        else "already anchored; left alone"
+                        else "already recorded; left alone"
                     )
-                elif vp.unanchorable:
+                elif vp.unrecoverable:
                     vp.actions.append("write unanchorable = true")
                 else:
                     vp.actions.append(
-                        f"anchor candidate_sha={vp.candidate_sha[:12]} "
+                        f"release commit candidate_sha={vp.candidate_sha[:12]} "
                         f"tree_hashes={ {k: v[:12] for k, v in vp.tree_hashes.items()} }"
                     )
 
@@ -684,7 +684,7 @@ def render_plan(plan: Plan, out=None) -> None:
     print("", file=out)
 
     for bucket, title in (
-        ("anchorable", "(a) anchorable from a tag"),
+        ("release_commitable", "(a) release_commitable from a tag"),
         ("tagless", "(b) TAGLESS versions"),
     ):
         rows = [v for v in plan.versions if v.bucket == bucket]
@@ -716,7 +716,7 @@ def render_plan(plan: Plan, out=None) -> None:
         print(f"      probed: {'; '.join(ft.probed) or '(no scope)'}", file=out)
         print(
             "      the script does not guess: resolve it by hand (identify the "
-            "commit and content, then anchor the right version or remove nothing).",
+            "commit and content, then record the right version or remove nothing).",
             file=out,
         )
     print("", file=out)
@@ -735,14 +735,14 @@ def render_plan(plan: Plan, out=None) -> None:
         f"TOTAL: {len(changed)} archive(s) to write -- "
         f"materialized: {sum(1 for v in changed if v.materialize)}, "
         f"format-version stamped: {sum(1 for v in changed if v.stamp_format_version)}, "
-        f"unanchorable: {sum(1 for v in changed if v.unanchorable)}",
+        f"unrecoverable: {sum(1 for v in changed if v.unrecoverable)}",
         file=out,
     )
     print(
         "  (the three are independent attributes, not parts of a split: one "
         "archive can carry several of them -- a materialized archive for a "
         "version with no recoverable commit is both materialized and "
-        "unanchorable -- and an existing archive that only gains its anchor "
+        "unrecoverable -- and an existing archive that only gains its release commit "
         "carries none, so the counts need not add up to the total)",
         file=out,
     )
@@ -763,9 +763,9 @@ def apply_version(vp: VersionPlan) -> str:
             include=vp.include,
             exclude=[],
             description=vp.description,
-            candidate_sha=None if vp.unanchorable else vp.candidate_sha,
-            tree_hashes=None if vp.unanchorable else vp.tree_hashes,
-            unanchorable=vp.unanchorable,
+            candidate_sha=None if vp.unrecoverable else vp.candidate_sha,
+            tree_hashes=None if vp.unrecoverable else vp.tree_hashes,
+            unrecoverable=vp.unrecoverable,
             header_comments=MATERIALIZED_HEADER,
         )
         return vp.archive_path
@@ -776,10 +776,10 @@ def apply_version(vp: VersionPlan) -> str:
                 content = f.read()
             with open(vp.archive_path, "w", encoding="utf-8") as f:
                 f.write(FORMAT_VERSION_STAMP + content)
-        if vp.unanchorable:
-            write_unanchorable_marker(vp.archive_path)
+        if vp.unrecoverable:
+            write_unrecoverable_marker(vp.archive_path)
         elif vp.candidate_sha:
-            write_release_anchor(
+            write_release_commit(
                 vp.archive_path,
                 candidate_sha=vp.candidate_sha,
                 tree_hashes=vp.tree_hashes,
@@ -800,7 +800,7 @@ def commit_message(plan: Plan, written: list[str]) -> str:
     """One commit per run, naming the repo-relative scope it touched."""
     dirs = sorted({os.path.dirname(p) for p in written})
     return (
-        f"Backfill release anchors in {', '.join(dirs)} "
+        f"Backfill release commits in {', '.join(dirs)} "
         f"({len(written)} archive(s))"
     )
 
@@ -818,7 +818,7 @@ def run(repo: str, *, dry_run: bool, use_gh: bool, auto_commit: bool, out=None) 
     if dry_run:
         print("\n--dry-run: nothing written.", file=out)
     elif not plan.changed_versions:
-        print("\nNothing to do: every archive is anchored and gated.", file=out)
+        print("\nNothing to do: every archive is recorded and gated.", file=out)
     else:
         written = apply_plan(plan)
         print(f"\nWrote {len(written)} archive(s).", file=out)
@@ -844,7 +844,7 @@ def run(repo: str, *, dry_run: bool, use_gh: bool, auto_commit: bool, out=None) 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
-        description="Backfill release-archive anchors, format_version gates, and missing archives.",
+        description="Backfill release-archive release commits, format_version gates, and missing archives.",
     )
     parser.add_argument(
         "--repo", default=".", help="repository to operate on (default: cwd)"

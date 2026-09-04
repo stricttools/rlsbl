@@ -95,9 +95,9 @@ def _guard_repo_root_litter():
             "Test run littered the repository root with new entries:\n"
             f"{listing}\n\n"
             "Something wrote a path relative to the process cwd instead of an "
-            "anchored temp location -- classically a mocked path helper (e.g. a "
+            "rooted temp location -- classically a mocked path helper (e.g. a "
             "MagicMock returned by a patched tempfile.mkdtemp) interpolated into "
-            "a path string. Find the test, anchor the write to tmp_path, and "
+            "a path string. Find the test, root the write at tmp_path, and "
             "delete the litter with saferm.",
             pytrace=False,
         )
@@ -355,13 +355,13 @@ def release_record_dir(project_dir, *, releasable_dir=None):
     return os.path.join(str(project_dir), ".rlsbl", "releases")
 
 
-def archive_release(releases_dir, version, sha, *, tree=None, unanchorable=False):
-    """Write an anchored release archive -- one release record entry -- for a test.
+def archive_release(releases_dir, version, sha, *, tree=None, unrecoverable=False):
+    """Write a recorded release archive -- one release record entry -- for a test.
 
     Tests that exercise the unreleased range need a RELEASE RECORD, not a tag: the
     range is bounded by the highest archived version whose ``candidate_sha``
     the checkout contains.  A repo fixture that only creates ``v0.0.0`` now
-    also archives it here, anchored at the commit the tag names.
+    also archives it here, released from the commit the tag names.
     """
     from rlsbl.release_file import write_archived_release_file
 
@@ -369,9 +369,9 @@ def archive_release(releases_dir, version, sha, *, tree=None, unanchorable=False
     return write_archived_release_file(
         str(releases_dir), version,
         bump="patch", include=[], description=f"release {version}",
-        candidate_sha=None if unanchorable else sha,
-        tree_hashes=None if unanchorable else {".": tree or ("b" * 40)},
-        unanchorable=unanchorable,
+        candidate_sha=None if unrecoverable else sha,
+        tree_hashes=None if unrecoverable else {".": tree or ("b" * 40)},
+        unrecoverable=unrecoverable,
     )
 
 

@@ -12,12 +12,12 @@ Three decisions live here, and nowhere else:
 
 * **The notes** are the version's own CHANGELOG.md section, verbatim.
 * **The released-commit marker** is ``<!-- rlsbl-ci-sha: <40 hex> -->``, and
-  the sha it carries is THE RELEASE RECORD'S ANCHOR for that version -- the
+  the sha it carries is THE RELEASE RECORD'S RELEASE COMMIT for that version -- the
   ``candidate_sha`` the archive records. The marker is a projection of the
-  anchor onto the forge, not an independent fact: the publish workflow reads it
+  release commit onto the forge, not an independent fact: the publish workflow reads it
   to learn which commit CI proved green, and the archive is what rlsbl itself
-  reads for the same question. :func:`anchor_from_release_record` is how a caller that
-  does not already hold the anchor obtains it.
+  reads for the same question. :func:`release_commit_from_record` is how a caller that
+  does not already hold the release commit obtains it.
 * **The pre-release flag** follows the version: a version carrying a
   pre-release segment is a GitHub pre-release.
 
@@ -39,7 +39,7 @@ from . import effects
 
 
 # The publish workflow's only precise statement of which commit CI must be
-# green on. Anchored to its own line so a reconcile REPLACES it rather than
+# green on. Pinned to its own line so a reconcile REPLACES it rather than
 # appending a second one to a body that already carries a stale marker.
 CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
 
@@ -47,7 +47,7 @@ CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
 def ci_sha_marker(candidate_sha: str) -> str:
     """The marker line for a released commit.
 
-    *candidate_sha* is the release record's anchor for the version -- the
+    *candidate_sha* is the release record's release commit for the version -- the
     commit the archive records as the one CI verified.
     """
     return f"<!-- rlsbl-ci-sha: {candidate_sha.strip()} -->"
@@ -80,7 +80,7 @@ class ReleasePublication:
             :attr:`body` then falls back to naming the version.
         version: the version being published, which decides
             :attr:`prerelease`.
-        candidate_sha: the release record's anchor for *version*.
+        candidate_sha: the release record's release commit for *version*.
     """
 
     tag: str
@@ -125,16 +125,16 @@ class ReleasePublication:
 def publication(*, tag, version, candidate_sha, notes="", title=None):
     """Build the :class:`ReleasePublication` for one version.
 
-    Raises ``ValueError`` when the anchor is missing: a Release written without
+    Raises ``ValueError`` when the release commit is missing: a Release written without
     the marker is one the publish workflow cannot judge, and silently omitting
     it is the failure this module exists to make impossible.
     """
     sha = (candidate_sha or "").strip()
     if not sha:
         raise ValueError(
-            f"no release anchor for {version}: a GitHub Release carries the "
+            f"no release commit for {version}: a GitHub Release carries the "
             f"rlsbl-ci-sha marker naming the commit the release archive "
-            f"anchors, and there is nothing to name."
+            f"release commits, and there is nothing to name."
         )
     return ReleasePublication(
         tag=tag, version=version, candidate_sha=sha, notes=notes or "",
@@ -142,14 +142,14 @@ def publication(*, tag, version, candidate_sha, notes="", title=None):
     )
 
 
-def anchor_from_release_record(releases_dir: str, version: str) -> str | None:
-    """The release record anchor for *version*, or None when there is none.
+def release_commit_from_record(releases_dir: str, version: str) -> str | None:
+    """The recorded release commit for *version*, or None when there is none.
 
     Read from the archive directly rather than through
     :func:`rlsbl.release_record.read_entry`: this is asked on repair paths, where the
-    tag and the anchor are expected to disagree and the guarded read's
+    tag and the release commit are expected to disagree and the guarded read's
     DISAGREEMENT error would refuse to answer exactly when the answer is needed
-    to end the disagreement. An unanchorable archive answers None -- there is
+    to end the disagreement. An unrecoverable archive answers None -- there is
     no commit to name.
     """
     from .release_file import archived_release_path, read_release_file
@@ -158,7 +158,7 @@ def anchor_from_release_record(releases_dir: str, version: str) -> str | None:
     if not os.path.isfile(path):
         return None
     archive = read_release_file(path)
-    if archive.unanchorable:
+    if archive.unrecoverable:
         return None
     return archive.candidate_sha
 

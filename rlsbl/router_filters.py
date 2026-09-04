@@ -160,7 +160,7 @@ def _finalize_artifact(project, releasables):
     (:mod:`rlsbl.publish_gate`) -- a skipped check proves nothing about the
     commit.  The result is a deadlock with no re-runnable recovery: re-running
     CI on that commit skips the job again, for the same reason it skipped the
-    first time.  Anchoring every member's filter on the one file a release
+    first time.  Rooting every member's filter on the one file a release
     always writes makes the verified commit readable for all of them.
 
     The cost, accepted knowingly: **any release of a releasable runs the full

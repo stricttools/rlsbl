@@ -248,7 +248,7 @@ class TestBareVersionRootReleasable:
         assert "1.2.3" in rows[0], rows
         assert "(none)" not in rows[0], rows
 
-    def test_coverage_anchors_on_the_bare_version_tag(self, tmp_path, capsys):
+    def test_coverage_release_commits_on_the_bare_version_tag(self, tmp_path, capsys):
         """The unreleased range starts at ``v1.2.3``, not at the repo's first commit."""
         from rlsbl.check_context import WorkspaceCheckContext
         from rlsbl.checks._common import _get_all_changelog_contexts

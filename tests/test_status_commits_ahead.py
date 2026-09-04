@@ -191,7 +191,7 @@ class TestStatusCommitsAheadStandalone:
         data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
 
         assert data["commits_ahead"] == 2
-        assert data["range_anchor_tag"] == "v1.0.0"
+        assert data["nearest_release_commit_tag"] == "v1.0.0"
 
     def test_json_commits_ahead_none_without_a_release(self, mock_git_repo, capsys):
         """With nothing released, commits_ahead is None in --json."""
@@ -204,7 +204,7 @@ class TestStatusCommitsAheadStandalone:
         data = run_cmd("npm", [], {"json": True}, ctx=make_ctx("."))
 
         assert data["commits_ahead"] is None
-        assert data["range_anchor_tag"] is None
+        assert data["nearest_release_commit_tag"] is None
 
 
 class TestStatusCommitsAheadMonorepo:

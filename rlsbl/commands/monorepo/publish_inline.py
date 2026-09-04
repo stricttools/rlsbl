@@ -156,7 +156,7 @@ _SETUP_VERSION_FILE_KEYS = {
 
 
 def _compose_project_subpath(project_path: str, sub: str) -> str:
-    """Anchor a per-target *sub* path under *project_path*.
+    """Root a per-target *sub* path under *project_path*.
 
     Mirrors :func:`inject_job_metadata`'s working-directory composition, but
     string-based so packages-dir's trailing ``dist/`` slash is preserved
@@ -165,9 +165,9 @@ def _compose_project_subpath(project_path: str, sub: str) -> str:
     The merged-publish generator pre-injects each subdir target's own
     subpath into these inputs (e.g. ``py/dist/`` for a pypi target living in
     ``py/``). This composes that subpath under the project's path rather than
-    overwriting it with a root-anchored value. Behaviour is unchanged for
+    overwriting it with a root-relative value. Behaviour is unchanged for
     targets at the project root (``sub`` already correct relative to the
-    repo root) and for inputs already anchored under *project_path*
+    repo root) and for inputs already rooted under *project_path*
     (idempotent -- never double-prefixed).
     """
     if project_path in (".", "", "./"):
@@ -396,7 +396,7 @@ def _render_root_publisher_jobs(
     # Real per-target paths so a subdir target (e.g. {"name": "npm",
     # "path": "npm"}) gets defaults.run.working-directory injected plus
     # packages-dir/version-file input rewriting, exactly like the standalone
-    # scaffold. detect_targets returns paths anchored at project_dir; make
+    # scaffold. detect_targets returns paths rooted at project_dir; make
     # them relative to project_dir (the root publisher's dir == repo root) so
     # a root target resolves to "." (no rewriting) and a subdir target to its
     # offset within the repo.

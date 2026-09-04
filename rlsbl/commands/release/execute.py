@@ -1616,15 +1616,15 @@ def archive_blog_body(releases_dir, version):
     return None
 
 
-_ANCHOR_READ_TIMEOUT = 30
+_RELEASE_COMMIT_READ_TIMEOUT = 30
 
 
-def release_anchor_tree_hashes(verified_sha, *, run, git_root,
+def release_commit_tree_hashes(verified_sha, *, run, git_root,
                                member_package_paths=None,
                                monorepo_project_path=None):
     """The tree object of every path this release ships, keyed by that path.
 
-    The anchor's content half. Which paths a release ships depends on what is
+    The release commit's content half. Which paths a release ships depends on what is
     being released:
 
     * a **standalone repository** ships everything, so the single key is
@@ -1664,12 +1664,12 @@ def release_anchor_tree_hashes(verified_sha, *, run, git_root,
         try:
             trees[path] = run(
                 "git", ["rev-parse", rev],
-                timeout=_ANCHOR_READ_TIMEOUT, cwd=git_root,
+                timeout=_RELEASE_COMMIT_READ_TIMEOUT, cwd=git_root,
             ).strip()
         except subprocess.CalledProcessError as exc:
             raise RlsblError(
                 f"could not resolve the git tree for {rev!r}, so the release "
-                f"anchor for this version cannot be written: {exc}"
+                f"release commit for this version cannot be written: {exc}"
             )
     return trees
 
@@ -2742,14 +2742,14 @@ def _run_release_mutating(state: ReleaseState):
             release_finalize_files = [
                 _rel_to_git_root(versioned_release, _git_root),
             ]
-            # The anchor: the commit CI verified, and the tree of every path
+            # The release commit: the commit CI verified, and the tree of every path
             # this release ships as of that commit. Written INTO the archive,
             # which is the authoritative record of what the version shipped
             # from; the rlsbl-ci-sha marker put on the GitHub Release further
             # down is this record's projection for CI to parse, not a second
             # source. Resolved here, from the same verified_sha the tag is
             # about to be created on, so archive and tag cannot disagree.
-            _anchor_trees = release_anchor_tree_hashes(
+            _release_commit_trees = release_commit_tree_hashes(
                 verified_sha,
                 run=run,
                 git_root=_git_root,
@@ -2768,17 +2768,18 @@ def _run_release_mutating(state: ReleaseState):
                     preid=state.preid,
                     blog=state.blog,
                     candidate_sha=verified_sha,
-                    tree_hashes=_anchor_trees,
+                    tree_hashes=_release_commit_trees,
                 )
             else:
-                from ...release_file import write_release_anchor
+                from ...release_file import write_release_commit
                 effects.rename(release_file_path, versioned_release)
-                # Anchor BEFORE the lock: the archive is never observable as a
-                # writable anchored file, nor as a locked unanchored one.
-                write_release_anchor(
+                # Record the release commit BEFORE the lock: the archive is
+                # never observable as a writable file that already records it,
+                # nor as a locked one that does not.
+                write_release_commit(
                     versioned_release,
                     candidate_sha=verified_sha,
-                    tree_hashes=_anchor_trees,
+                    tree_hashes=_release_commit_trees,
                 )
                 effects.chmod(versioned_release, 0o444)
                 release_finalize_files.append(
@@ -3114,7 +3115,7 @@ def _run_release_mutating(state: ReleaseState):
     #
     # The document is built by rlsbl.release_publication, the one authority for
     # what a Release body carries -- shared with `rlsbl release reconcile`,
-    # which materializes and repairs Releases outside this flow. The anchor it
+    # which materializes and repairs Releases outside this flow. The release commit it
     # projects into the marker is `pushed_sha`, the verified candidate this
     # release wrote into the version's archive as `candidate_sha` a few steps
     # above, so the marker and the release record state the same commit by
@@ -3262,12 +3263,12 @@ def _run_release_mutating(state: ReleaseState):
                 # MIRROR_RELEASED -- the mirror's TAG and its GitHub Release,
                 # through the shared publication module. The commit is DERIVED,
                 # never the branch tip: it is the subtree split of the release record
-                # anchor for this version -- the CI-verified candidate this
+                # release commit for this version -- the CI-verified candidate this
                 # release wrote into the archive -- so the mirror's tag names
                 # the same code the monorepo's tag does even when the
                 # finalization commits have moved main on. The Release's
                 # rlsbl-ci-sha marker carries that split commit, because a
-                # marker naming the monorepo's anchor would name a commit the
+                # marker naming the monorepo's release commit would name a commit the
                 # mirror does not have.
                 #
                 # Non-fatal, like the branch: the primary release is already
@@ -3286,7 +3287,7 @@ def _run_release_mutating(state: ReleaseState):
                             subtree_path=monorepo_project_path,
                             version=new_version,
                             tag=plain_tag,
-                            anchor_sha=pushed_sha,
+                            release_commit_sha=pushed_sha,
                             notes=changelog_entry or "",
                             # Unscoped: --repo names the mirror explicitly, so
                             # this must NOT inherit the current project's

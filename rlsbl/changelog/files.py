@@ -318,7 +318,7 @@ def _warn_stale_entries(src: str, tag_glob: str) -> None:
     """Warn on stderr for entries in unreleased.jsonl referencing out-of-range commits.
 
     In monorepo mode, an entry whose commits all sit before the release the
-    RELEASE RECORD anchors this checkout to is stale — typically left over from a
+    RELEASE RECORD bounds this checkout to is stale — typically left over from a
     sibling project's release. We emit a warning per stale entry but do not
     strip them (warn-only). The release record is the release archives beside *src*'s
     own changes directory.

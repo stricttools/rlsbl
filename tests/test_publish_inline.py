@@ -397,7 +397,7 @@ class TestRewriteActionPaths:
         # A monorepo root publisher (project_path ".") whose pypi target lives
         # in the "py" subdir arrives with packages-dir already pre-injected as
         # "py/dist/" by the merged-publish generator. It must be preserved
-        # (root-relative), NOT overwritten to a root-anchored "./dist/".
+        # (root-relative), NOT overwritten to a root-relative "./dist/".
         jobs = {
             "publish": {
                 "steps": [

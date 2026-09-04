@@ -25,7 +25,7 @@ sys.modules["set_archived_descriptions"] = setdesc
 _spec.loader.exec_module(setdesc)
 
 
-ANCHORED_WITH_DESCRIPTION = """\
+RECORDED_WITH_DESCRIPTION = """\
 # strictspec document version gate (do not remove)
 format_version = 1
 bump = "minor"
@@ -38,7 +38,7 @@ candidate_sha = "1111111111111111111111111111111111111111"
 "." = "2222222222222222222222222222222222222222"
 """
 
-ANCHORED_WITHOUT_DESCRIPTION = """\
+RECORDED_WITHOUT_DESCRIPTION = """\
 # strictspec document version gate (do not remove)
 format_version = 1
 bump = "minor"
@@ -83,14 +83,14 @@ def run(repo, mapping, *, dry_run=False):
 
 
 def test_rewrites_an_existing_description(repo):
-    path = write_archive(repo, "0.1.0", ANCHORED_WITH_DESCRIPTION)
+    path = write_archive(repo, "0.1.0", RECORDED_WITH_DESCRIPTION)
     run(repo, {"0.1.0": "A new description."})
     assert read_toml(path)["description"] == "A new description."
 
 
 def test_inserts_a_missing_description_outside_the_trailing_table(repo):
     """The inserted key must be a document field, not a tree_hashes entry."""
-    path = write_archive(repo, "0.1.0", ANCHORED_WITHOUT_DESCRIPTION)
+    path = write_archive(repo, "0.1.0", RECORDED_WITHOUT_DESCRIPTION)
 
     run(repo, {"0.1.0": "An authored description."})
 
@@ -106,7 +106,7 @@ def test_inserts_a_missing_description_outside_the_trailing_table(repo):
 def test_the_result_is_a_valid_release_document(repo):
     from rlsbl.release_file import read_release_file
 
-    path = write_archive(repo, "0.1.0", ANCHORED_WITHOUT_DESCRIPTION)
+    path = write_archive(repo, "0.1.0", RECORDED_WITHOUT_DESCRIPTION)
     run(repo, {"0.1.0": "An authored description."})
     cfg = read_release_file(str(path))
     assert cfg.description == "An authored description."
@@ -114,14 +114,14 @@ def test_the_result_is_a_valid_release_document(repo):
 
 
 def test_archive_stays_locked(repo):
-    path = write_archive(repo, "0.1.0", ANCHORED_WITH_DESCRIPTION)
+    path = write_archive(repo, "0.1.0", RECORDED_WITH_DESCRIPTION)
     run(repo, {"0.1.0": "A new description."})
     mode = os.stat(path).st_mode
     assert not (mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
 
 
 def test_dry_run_writes_nothing(repo, capsys):
-    path = write_archive(repo, "0.1.0", ANCHORED_WITH_DESCRIPTION)
+    path = write_archive(repo, "0.1.0", RECORDED_WITH_DESCRIPTION)
     before = path.read_bytes()
     run(repo, {"0.1.0": "A new description."}, dry_run=True)
     assert path.read_bytes() == before
@@ -129,7 +129,7 @@ def test_dry_run_writes_nothing(repo, capsys):
 
 
 def test_a_second_run_reports_nothing_to_do(repo, capsys):
-    write_archive(repo, "0.1.0", ANCHORED_WITH_DESCRIPTION)
+    write_archive(repo, "0.1.0", RECORDED_WITH_DESCRIPTION)
     run(repo, {"0.1.0": "A new description."})
     capsys.readouterr()
     run(repo, {"0.1.0": "A new description."})
@@ -139,14 +139,14 @@ def test_a_second_run_reports_nothing_to_do(repo, capsys):
 
 
 def test_a_version_with_no_archive_is_a_hard_error(repo, capsys):
-    write_archive(repo, "0.1.0", ANCHORED_WITH_DESCRIPTION)
+    write_archive(repo, "0.1.0", RECORDED_WITH_DESCRIPTION)
     with pytest.raises(SystemExit) as exc:
         run(repo, {"0.2.0": "Nowhere to put this."})
     assert "no archive for version(s): 0.2.0" in str(exc.value)
 
 
 def test_an_empty_description_is_refused(repo):
-    write_archive(repo, "0.1.0", ANCHORED_WITH_DESCRIPTION)
+    write_archive(repo, "0.1.0", RECORDED_WITH_DESCRIPTION)
     with pytest.raises(SystemExit) as exc:
         run(repo, {"0.1.0": "   "})
     assert "non-empty description" in str(exc.value)

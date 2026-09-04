@@ -712,7 +712,7 @@ _STATUS_PAYLOAD_SCHEMA = {
         "changelog": {"type": ["boolean", "null"]},
         "jsonl_coverage": {"type": "string"},
         "commits_ahead": {"type": ["integer", "null"]},
-        "range_anchor_tag": {"type": ["string", "null"]},
+        "nearest_release_commit_tag": {"type": ["string", "null"]},
         "ci": {"type": "array", "items": {"type": "string"}},
         "publish": {"type": "boolean"},
         "registry_version": {"type": ["string", "null"]},
@@ -727,7 +727,7 @@ _STATUS_PAYLOAD_SCHEMA = {
     "required": [
         "name", "version", "target", "branch", "latest_release",
         "latest_release_in_checkout", "clean", "changelog",
-        "jsonl_coverage", "commits_ahead", "range_anchor_tag", "ci",
+        "jsonl_coverage", "commits_ahead", "nearest_release_commit_tag", "ci",
         "publish", "registry_version", "drift",
     ],
     "additionalProperties": False,
@@ -1208,7 +1208,7 @@ class ReconcileApplyMode:
     effect="mutating",
     # Force-pushes tags and creates GitHub Releases.
     consequential=True,
-    help="Reconcile this project's published release metadata with what its own records say it released: push the refs origin is missing, re-point the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Merges four explanation sources -- safegit's rewrite journal, the release record's anchors, the transition records, and the committed scrub archives -- into one preview whose verdicts are materialize, already-correct, re-point-with-lease, refuse-foreign, or refuse-identity-mismatch. Fail-closed: one ref origin holds that no record explains aborts the whole reconcile, and nothing anywhere is repaired. Consent is file-driven: --plan writes the plan, --apply performs it.",
+    help="Reconcile this project's published release metadata with what its own records say it released: push the refs origin is missing, re-point the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Merges four explanation sources -- safegit's rewrite journal, the release record's release commits, the transition records, and the committed scrub archives -- into one preview whose verdicts are materialize, already-correct, re-point-with-lease, refuse-foreign, or refuse-identity-mismatch. Fail-closed: one ref origin holds that no record explains aborts the whole reconcile, and nothing anywhere is repaired. Consent is file-driven: --plan writes the plan, --apply performs it.",
 )
 @strictcli.choice_flag(
     "mode", help="Which half of the reconcile to run: write the plan, or perform it. Exactly one must be elected.",
@@ -1315,7 +1315,7 @@ def cmd_prs(ctx):
 # its coverage counts; the empty report carries the same with an empty list;
 # a non-releasable project carries the commit COUNT instead of the list, plus
 # the two flags that say why it has no changelog. `latest_release` is the
-# project's highest archived version and `range_anchor_version` the highest one
+# project's highest archived version and `nearest_release_commit_version` the highest one
 # THIS checkout contains -- both null before the first release, and different
 # from each other exactly when the checkout predates a release.
 _UNRELEASED_PAYLOAD_SCHEMA = {
@@ -1323,7 +1323,7 @@ _UNRELEASED_PAYLOAD_SCHEMA = {
     "properties": {
         "latest_release": {"type": ["string", "null"]},
         "latest_release_in_checkout": {"type": ["boolean", "null"]},
-        "range_anchor_version": {"type": ["string", "null"]},
+        "nearest_release_commit_version": {"type": ["string", "null"]},
         "commits": {
             "type": ["array", "integer"],
             "items": {
@@ -1357,13 +1357,13 @@ _UNRELEASED_PAYLOAD_SCHEMA = {
     },
     "required": [
         "latest_release", "latest_release_in_checkout",
-        "range_anchor_version", "commits",
+        "nearest_release_commit_version", "commits",
     ],
     "additionalProperties": False,
 }
 
 
-@app.command(name="unreleased", help="List the commits between the release this checkout is anchored to and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.", effect="read_only", payload_schema=_UNRELEASED_PAYLOAD_SCHEMA)
+@app.command(name="unreleased", help="List the commits between this checkout's nearest release commit and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.", effect="read_only", payload_schema=_UNRELEASED_PAYLOAD_SCHEMA)
 @effects.handler
 def cmd_unreleased(ctx):
     """List unreleased commits and their changelog coverage status."""
@@ -2022,7 +2022,7 @@ def cmd_mono_release_order(ctx):
 # The old classification rested on the claim that the source is barely touched
 # -- true of the previous implementation, which only dropped a workspace.toml
 # entry, and false of this one, which completes the move.
-@mono.command(name="extract", help="Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their anchors, config and hooks -- is transplanted, the anchors and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. A mirrored releasable is extracted by promotion instead of by filtering: the destination is cloned from the mirror and adopts the standalone history consumers already resolve, with the monorepo-to-mirror commit correspondence derived by subtree split and recorded in the destination's transition record. A promotion refuses a mirror whose contract is violated or whose split ancestry cannot be established, and one whose tree is behind the source. Refuses a releasable owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
+@mono.command(name="extract", help="Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their release commits, config and hooks -- is transplanted, the release commits and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. A mirrored releasable is extracted by promotion instead of by filtering: the destination is cloned from the mirror and adopts the standalone history consumers already resolve, with the monorepo-to-mirror commit correspondence derived by subtree split and recorded in the destination's transition record. A promotion refuses a mirror whose contract is violated or whose split ancestry cannot be established, and one whose tree is behind the source. Refuses a releasable owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
 # Positional order is declaration order (top decorator first) since strictcli
 # 0.41 fixed the stacked-@arg binding; these stacks used to be written
 # bottom-up to compensate for the old reversal.
@@ -2048,7 +2048,7 @@ def cmd_mono_extract(ctx, releasable_name, target_path, delete_with_rm):
 # Consequential: it rewrites another repository's history, merges it into the
 # one you are standing in, creates tags and moves release state -- and the
 # merge is not something a `git reset` walks back once it is pushed.
-@mono.command(name="absorb", help="Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their anchors, config and version -- moves into a releasable's state directory with every hash and anchor remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
+@mono.command(name="absorb", help="Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their release commits, config and version -- moves into a releasable's state directory with every hash and release commit remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
 # Positional order is declaration order (top decorator first): `absorb
 # <source_repo> <dest_path>`, as the help text documents it.
 @strictcli.arg(name="source_repo", help="Filesystem path to the external git repository to absorb", presence="required")
@@ -2226,7 +2226,7 @@ def cmd_dev_status(ctx):
 rewrite = app.group("rewrite", help="Sweeping rewrites of the current working tree, each previewed before it is performed. Every command in this group observes the tree, reports a per-file plan with occurrence counts, and refuses to apply when a count moved between the preview and the write.")
 
 
-@rewrite.command(name="go-module-path", help="Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-anchored. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.", effect="mutating")
+@rewrite.command(name="go-module-path", help="Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-scoped. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.", effect="mutating")
 @strictcli.flag(name="from-module", type=str, presence="required", help="The Go module path being renamed away from. It need not be DECLARED here: a repository that only references the module is a consumer following an upstream move, and the plan reports that as a fact while rewriting the references. What is required is that something references it -- a path with zero occurrences anywhere in the repository is a hard error, because the overwhelmingly likely cause is a typo.")
 @strictcli.flag(name="to-module", type=str, presence="required", help="The Go module path to rename to")
 @effects.handler

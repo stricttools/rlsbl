@@ -584,7 +584,7 @@ class TestExemptionCoversReleasableReleaseFiles:
         "docs/.rlsbl-monorepo/releasables/alpha/releases/v1.0.1.toml",
     ])
     def test_a_nested_spelling_is_not_exempt(self, path):
-        """The workspace directory is anchored at the repository root.
+        """The workspace directory is rooted at the repository root.
 
         Exemption only ever judges ``git diff-tree`` output, which is
         repository-root-relative, and rlsbl writes one ``.rlsbl-monorepo/`` per

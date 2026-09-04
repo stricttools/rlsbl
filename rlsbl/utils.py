@@ -761,7 +761,7 @@ def push_if_needed(branch, *, config, cwd, sha=None):
         branch: branch name to push.
         config: project config dict forwarded to get_push_timeout.
         cwd: REQUIRED (keyword-only) repo directory the git commands run from.
-            There is deliberately no process-cwd default: an unanchored push
+            There is deliberately no process-cwd default: an unrooted push
             once executed a real ``git push`` from the test-runner's own repo.
             Callers must pass the project root explicitly.
         sha: optional explicit commit to publish as ``<sha>:refs/heads/<branch>``
@@ -938,8 +938,8 @@ def assert_git_toplevel(cwd: str | None, expected_root: str) -> None:
         raise GitError(
             f"refusing to commit: resolved git repo {resolved!r} is not the "
             f"expected project root {expected!r}. The commit cwd resolved into a "
-            f"different repository (a TMPDIR-inside-repo or mis-anchored path). "
-            f"Anchor the commit to the intended project root."
+            f"different repository (a TMPDIR-inside-repo or mis-rooted path). "
+            f"Root the commit at the intended project root."
         )
 
 
@@ -1080,7 +1080,7 @@ def commit_scaffold_file(
             git-repo membership is checked.
         expected_root: when set, the git repo discovered from ``cwd`` must be
             this project root or the commit is refused (hard error). Guards
-            against a mis-anchored ``cwd`` walking up into the wrong repo.
+            against a mis-rooted ``cwd`` walking up into the wrong repo.
     """
     if not is_git_repo(cwd):
         return

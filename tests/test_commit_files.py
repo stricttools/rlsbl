@@ -154,7 +154,7 @@ class TestGitToplevelGuard:
         assert_git_toplevel(str(tmp_path), str(tmp_path))
 
     def test_commit_scaffold_refuses_wrong_repo(self, tmp_path):
-        """commit_scaffold_file with a mis-anchored expected_root refuses,
+        """commit_scaffold_file with a mis-rooted expected_root refuses,
         rather than committing into the enclosing repo."""
         from rlsbl.utils import commit_scaffold_file
         from rlsbl.errors import GitError

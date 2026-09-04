@@ -54,7 +54,7 @@ UNRELATED = "3" * 40
 
 @pytest.fixture
 def release_record(tmp_path):
-    """A releases directory holding one anchored version, 1.0.0 at NEW."""
+    """A releases directory holding one recorded version, 1.0.0 at NEW."""
     releases = tmp_path / ".rlsbl" / "releases"
     write_archived_release_file(
         str(releases), "1.0.0", bump="minor", include=["plain"],
@@ -302,7 +302,7 @@ class TestTheReleaseHalf:
             push_timeout=30, gh=gh, log=lambda *_: None,
         )
         assert f"<!-- rlsbl-ci-sha: {NEW} -->" in seen["body"], (
-            "a Release the reconcile creates must carry the release record anchor's "
+            "a Release the reconcile creates must carry the recorded release commit's "
             "marker, or the publish workflow has nothing to judge"
         )
         assert "Ship it" in seen["body"]
@@ -419,8 +419,8 @@ class TestTheFreshCloneCase:
         )
         assert "scrub archive" in " ".join(item.facts)
 
-    def test_a_transition_record_anchor_remap_explains_a_moved_ref(self, tmp_path):
-        from rlsbl.transition_record import AnchorMapping, AnchorRemapEvent
+    def test_a_transition_record_release_commit_remap_explains_a_moved_ref(self, tmp_path):
+        from rlsbl.transition_record import ReleaseCommitMapping, ReleaseCommitRemapEvent
 
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
@@ -428,8 +428,8 @@ class TestTheFreshCloneCase:
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
         transition_record = get_transition_record_path(str(tmp_path))
-        append_event(transition_record, AnchorRemapEvent(
-            rewrite="scrub-1", mappings=[AnchorMapping(old_sha=OLD, new_sha=NEW)],
+        append_event(transition_record, ReleaseCommitRemapEvent(
+            rewrite="scrub-1", mappings=[ReleaseCommitMapping(old_sha=OLD, new_sha=NEW)],
         ))
 
         explanations = collect_explanations([str(releases)], (transition_record,))
@@ -516,7 +516,7 @@ class TestTheExpectedRefSet:
         )
         assert alias.state == STATE_MATERIALIZE, (
             "the alias addresses a released version, so it is created at that "
-            "version's release record anchor like any other ref it owns"
+            "version's recorded release commit like any other ref it owns"
         )
         assert alias.data.target == NEW
         assert alias.data.create_local_tag is True

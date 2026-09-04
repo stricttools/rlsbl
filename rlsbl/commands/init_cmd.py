@@ -1766,7 +1766,7 @@ def run_cmd(registry, args, flags, ctx):
         # multi-target path uses, with a one-element target list. This unifies
         # the two paths so a lone subdir target gets defaults.run.working-directory
         # injected and packages-dir/version-file inputs rewritten, instead of the
-        # root-anchored publish.yml the old per-pipeline raw render produced.
+        # root-relative publish.yml the old per-pipeline raw render produced.
         # For a root target (path ".") no subdir rewriting occurs.
         # (skip for publish_mode "none", workspace roots, and non-releasable
         # workspace projects -- see _skip_publish_scaffold)

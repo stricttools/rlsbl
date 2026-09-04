@@ -19,7 +19,7 @@ at resume time, several commits above the bump.
 
 So the release commits are found from the RELEASE RECORD, not by walking down from the
 tag: the archive for the version records the commit that was verified and
-tagged (the anchor), the predecessor's archive records where the previous
+tagged (the release commit), the predecessor's archive records where the previous
 release ended, and the release's own commits are the ones between those two
 whose subjects the release itself writes (the version bump and the
 finalization commits). Walking down from the tag and stopping at the first
@@ -29,9 +29,9 @@ and undo reported success with the version files still bumped.
 What is reverted, and what is repaired
 --------------------------------------
 
-Reverted: the release's own commits at or below the anchor (always the version
+Reverted: the release's own commits at or below the release commit (always the version
 bump; also the finalization commits on the older shape where they sat below the
-tag). Repaired rather than reverted: the finalization ABOVE the anchor -- the
+tag). Repaired rather than reverted: the finalization ABOVE the release commit -- the
 changelog is un-finalized and CHANGELOG.md regenerated, and the archived
 release file is restored to ``unreleased.toml``. Foreign work in between (a
 fix-forward that made CI green) is neither reverted nor repaired: it is
@@ -252,12 +252,12 @@ def _find_latest_release(uc):
     which version is latest; the tag is then derived by translation
     (:func:`_build_tag_from_version`).
 
-    Only the archive's EXISTENCE is read here, not its anchor: everything
+    Only the archive's EXISTENCE is read here, not its release commit: everything
     after this point -- the commit walk, the tag deletion, the revert --
     operates on the tag namespace, so undo is an observe-and-repair layer over
     tags in the same sense ``release reconcile`` is, and refusing to start
-    because an anchor and a tag disagree would refuse exactly the repair the
-    operator came for. The anchor IS read for the predecessor boundary, where
+    because a release commit and a tag disagree would refuse exactly the repair the
+    operator came for. The release commit IS read for the predecessor boundary, where
     it decides which commits belong to this release (see :func:`_build_plan`).
 
     Returns ``(version, tag)``, or exits when nothing is recorded.
@@ -328,12 +328,12 @@ def _die(*lines):
     sys.exit(1)
 
 
-def _release_anchor(uc, version, tag):
+def _release_commit(uc, version, tag):
     """The commit the RELEASE RECORD records *version* as having shipped from.
 
     Read from the archive DIRECTLY rather than through
     :func:`rlsbl.release_record.read_entry`, which refuses when the version's tag and
-    the anchor disagree. Undo is the repair path for exactly that state and is
+    the release commit disagree. Undo is the repair path for exactly that state and is
     about to delete the tag, so a disagreement is reported as a warning and the
     ARCHIVE wins: it is written by the release flow, committed, and rewritten by
     rlsbl only through its own documented unlock paths, while a tag is a ref
@@ -358,12 +358,12 @@ def _release_anchor(uc, version, tag):
             "deleting the tag while",
             "  leaving the version files bumped is the half-undone state this "
             "command exists to avoid.",
-            "  Backfill the anchor (scripts/backfill_release_anchors.py) and "
+            "  Backfill the release commit (scripts/backfill_release_anchors.py) and "
             "re-run.",
         )
-    anchor = cfg.candidate_sha
+    release_commit = cfg.candidate_sha
     try:
-        anchor = run("git", ["rev-parse", "--verify", f"{anchor}^{{commit}}"],
+        release_commit = run("git", ["rev-parse", "--verify", f"{release_commit}^{{commit}}"],
                      timeout=30).strip()
     except Exception:
         _die(
@@ -378,17 +378,17 @@ def _release_anchor(uc, version, tag):
         tag_sha = run("git", ["rev-list", "-n", "1", tag], timeout=30).strip()
     except Exception:
         pass
-    if tag_sha and tag_sha != anchor:
+    if tag_sha and tag_sha != release_commit:
         print(
             f"warning: the tag {tag} points at {tag_sha[:12]} but the release "
-            f"archive anchors {version} at {anchor[:12]}. The archive is what "
+            f"archive records {version} at {release_commit[:12]}. The archive is what "
             f"undo reverts from; the tag is deleted either way.",
             file=sys.stderr,
         )
-    return anchor
+    return release_commit
 
 
-def _predecessor_anchor(uc, version):
+def _predecessor_release_commit(uc, version):
     """The commit the release BELOW *version* shipped from, or None.
 
     The boundary survives that release's tag being deleted, because it is read
@@ -407,7 +407,7 @@ def _predecessor_anchor(uc, version):
             entry = read_entry(_release_record_dir(uc), prev, cwd=uc.project_path)
         except Exception as exc:
             # An unreadable predecessor archive (a tag that disagrees with its
-            # anchor, say) only widens the search range, and the version-bump
+            # release commit, say) only widens the search range, and the version-bump
             # subject is version-specific, so a wider range cannot match an
             # older release's bump. Said out loud rather than swallowed.
             print(
@@ -417,7 +417,7 @@ def _predecessor_anchor(uc, version):
                 file=sys.stderr,
             )
             continue
-        if entry.anchored:
+        if entry.recorded:
             return entry.candidate_sha
     return None
 
@@ -439,23 +439,23 @@ def _log_commits(range_spec):
 def _collect_release_commits(uc, version, tag, expected_msg):
     """The release's own commits, newest-first, located through the RELEASE RECORD.
 
-    The search range is ``<predecessor's anchor>..<this release's anchor>``,
+    The search range is ``<predecessor's release commit>..<this release's release commit>``,
     both read from the archives. Inside it the version-bump commit is
     identified and every commit whose subject the release itself writes, from
-    the bump up to the anchor, is collected; foreign commits in between (a
+    the bump up to the release commit, is collected; foreign commits in between (a
     fix-forward) are left alone, and
     the predecessor's own finalization commits are below the bump and so out of
     the collected set.
 
     Returns ``(revert_shas, captured_finalize_changelog,
-    captured_finalize_release_file, anchor)``. Refuses -- loudly, before
+    captured_finalize_release_file, release commit)``. Refuses -- loudly, before
     anything is destroyed -- when the version-bump commit cannot be found: a
     silent "no release commits found" is how undo used to delete a tag and a
     GitHub Release while leaving the version files bumped.
     """
-    anchor = _release_anchor(uc, version, tag)
-    predecessor = _predecessor_anchor(uc, version)
-    range_spec = f"{predecessor}..{anchor}" if predecessor else anchor
+    release_commit = _release_commit(uc, version, tag)
+    predecessor = _predecessor_release_commit(uc, version)
+    range_spec = f"{predecessor}..{release_commit}" if predecessor else release_commit
 
     commits = _log_commits(range_spec)
     if commits is None:
@@ -470,11 +470,11 @@ def _collect_release_commits(uc, version, tag, expected_msg):
         if _classify_release_commit(subject, expected_msg) == "version_bump"
     ]
     if not bump_indexes:
-        anchor_subject = commits[0][1] if commits else "(no commits in range)"
+        release_commit_subject = commits[0][1] if commits else "(no commits in range)"
         _die(
             f"Error: could not find the version-bump commit of {tag}.",
-            f"  The release archive anchors {version} at {anchor[:12]} "
-            f'("{anchor_subject}").',
+            f"  The release archive records {version} at {release_commit[:12]} "
+            f'("{release_commit_subject}").',
             f"  Searched {range_spec} for a commit whose subject is exactly "
             f'"{expected_msg}"',
             f"  and found none among its {len(commits)} commit(s).",
@@ -496,7 +496,7 @@ def _collect_release_commits(uc, version, tag, expected_msg):
             "one shipped the release.",
         )
 
-    # Every commit the release itself wrote, from the bump up to the anchor. The list
+    # Every commit the release itself wrote, from the bump up to the release commit. The list
     # is newest-first, so the bump is the LAST element of the slice.
     span = commits[: bump_indexes[0] + 1]
     collected = []
@@ -511,7 +511,7 @@ def _collect_release_commits(uc, version, tag, expected_msg):
             captured_cl = True
         elif shape == "finalize_release_file":
             captured_rf = True
-    return collected, captured_cl, captured_rf, anchor
+    return collected, captured_cl, captured_rf, release_commit
 
 
 def _commit_paths(sha):
@@ -524,10 +524,10 @@ def _commit_paths(sha):
     return [p.strip() for p in out.splitlines() if p.strip()]
 
 
-def _refuse_foreign_work_above_anchor(anchor, revert_shas, tag):
+def _refuse_foreign_work_above_release_commit(release_commit, revert_shas, tag):
     """Refuse when work above the released commit endangers the revert.
 
-    A commit between the anchor and HEAD is safe when either it is entirely
+    A commit between the release commit and HEAD is safe when either it is entirely
     rlsbl's own bookkeeping (the finalization commits, and anything else in the
     tool-owned set) or it touches none of the files the revert touches -- a
     post-release hook writing its own notes cannot conflict with reverting a
@@ -545,11 +545,11 @@ def _refuse_foreign_work_above_anchor(anchor, revert_shas, tag):
     if not reverted_paths:
         return
 
-    span = _log_commits(f"{anchor}..HEAD")
+    span = _log_commits(f"{release_commit}..HEAD")
     if span is None:
         _die(
             f"Error: could not read the commits above the released commit "
-            f"{anchor[:12]}.",
+            f"{release_commit[:12]}.",
             "  Undo refused: nothing was destroyed.",
         )
     for sha, subject in span:
@@ -671,12 +671,12 @@ def _build_plan(uc, flags, ctx):
     if is_latest:
         version, tag = _find_latest_release(uc)
         _tag_version, expected_msg = _version_and_msg(uc, tag)
-        revert_shas, cap_cl, cap_rf, anchor = _collect_release_commits(
+        revert_shas, cap_cl, cap_rf, release_commit = _collect_release_commits(
             uc, version, tag, expected_msg,
         )
         # The one guard left, and it fires before anything is destroyed: work
         # above the released commit that touches what the revert touches.
-        _refuse_foreign_work_above_anchor(anchor, revert_shas, tag)
+        _refuse_foreign_work_above_release_commit(release_commit, revert_shas, tag)
     else:
         version = version_flag.lstrip("v")
         tag = _build_tag_from_version(uc, version)

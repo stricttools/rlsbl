@@ -7,7 +7,7 @@ import re
 import sys
 
 from .. import effects
-from ..anchor_remap import ON_CONTENT_CHANGE_RECORD, repair_anchors
+from ..release_commit_remap import ON_CONTENT_CHANGE_RECORD, repair_release_commits
 from ..changelog.files import (
     can_remap_hash,
     changelog_remap_globs,
@@ -482,11 +482,11 @@ def _recover_from_rewrite_journal(all_changes_dirs, failures, scrub_data):
     return True
 
 
-def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
+def heal_release_commits_from_journal(project_root, workspace_root, workspace_projects,
                               repo_root):
-    """Move stale release record anchors through safegit's persisted rewrite journal.
+    """Move stale recorded release commits through safegit's persisted rewrite journal.
 
-    The anchor half of detect-and-heal, and the counterpart to
+    The release commit half of detect-and-heal, and the counterpart to
     :func:`_recover_from_rewrite_journal`, which does the changelog half. It
     covers a rewrite that happened OUTSIDE this flow -- a raw ``safegit
     scrub``, a ``git filter-repo`` run, a scrub interrupted before rlsbl's own
@@ -498,23 +498,23 @@ def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
 
     This is the entry point that reads the journal, and the scrub's no-match path is
     its caller. ``rlsbl release reconcile`` reaches the same repair through
-    :func:`rlsbl.anchor_remap.repair_anchors` -- the shared core both go
+    :func:`rlsbl.release_commit_remap.repair_release_commits` -- the shared core both go
     through -- but drives it from its own MERGED commit map (the journal plus
     the transition record anchor-remap events plus the committed scrub archives), so it
     can still heal in a fresh clone, where the journal under ``.git`` is not
     there to read.
     """
     # Asked before the journal is read: a repository with no release archive
-    # has no anchor to move, and reading the journal for it would be a git
+    # has no release commit to move, and reading the journal for it would be a git
     # call made to answer a question that is already answered.
-    from ..anchor_remap import releases_dirs_for
+    from ..release_commit_remap import releases_dirs_for
 
     if not releases_dirs_for(project_root, workspace_root, workspace_projects):
         return []
     journal = _load_rewrite_journal()
     if journal is None or not journal.get("commit_map"):
         return []
-    _remaps, touched = repair_anchors(
+    _remaps, touched = repair_release_commits(
         project_root=str(project_root),
         commit_map=journal["commit_map"],
         rewrite_id=journal["id"],
@@ -524,7 +524,7 @@ def heal_anchors_from_journal(project_root, workspace_root, workspace_projects,
     )
     for r in _remaps:
         print(
-            f"  re-anchored {r.version}: {r.old_sha[:12]} -> "
+            f"  re-recorded {r.version}: {r.old_sha[:12]} -> "
             f"{r.new_sha[:12]}"
         )
     return touched
@@ -541,7 +541,7 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
     unreachable and the operator is pointed at manual amends.
 
     No rewrite happened on this run, so there is nothing to force-push:
-    validate, repair the changelog hashes AND the release record anchors from the
+    validate, repair the changelog hashes AND the recorded release commits from the
     journal when possible, COMMIT the repaired files, and hard-error naming
     anything that remains dangling.
     """
@@ -569,7 +569,7 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
         # The release record's own hashes are checked whether or not the changelog had
         # any: a rewrite that touched no changelog-referenced commit can still
         # have moved a released one.
-        repaired.extend(heal_anchors_from_journal(
+        repaired.extend(heal_release_commits_from_journal(
             project_root, workspace_root, workspace_projects, repo_root,
         ))
 
@@ -605,7 +605,7 @@ def _no_match_validate_and_repair(project_root, workspace_root, workspace_projec
         try:
             run("safegit", [
                 "commit", "-m",
-                "scrub: repair changelog hashes and release anchors from "
+                "scrub: repair changelog hashes and release commits from "
                 "rewrite journal",
                 "--",
             ] + sorted(set(repaired)))
@@ -1038,22 +1038,22 @@ def run_cmd(flags, *, ctx):
 
             _save_step(scrub_result_path, scrub_data, "HASHES_VALIDATED")
 
-        # -- Move the release record's anchors through the same map --
+        # -- Move the release record's release commits through the same map --
         # The JSONL hashes were remapped in history by safegit; the ARCHIVES
         # were not, and they record each version's released commit. Left
         # behind, every guarded release record read hits the DISAGREEMENT error, which
         # accuses the tag -- the one thing the scrub did repair. The remap is
         # verified content-identical per released path before anything is
         # written, so a rewrite that redacted a released file stops here
-        # instead of re-anchoring an archive onto content it never shipped.
-        if "ANCHORS_REMAPPED" not in completed:
+        # instead of re-recording an archive onto content it never shipped.
+        if "RELEASE_COMMITS_REMAPPED" not in completed:
             # `record`, not `refuse`: this flow passed --remap-shas-in, so
             # safegit rewrote the JSONL changelog files INSIDE every released
             # tree. Every released tree therefore changes by construction, and
             # refusing on a changed tree would refuse every scrub an
             # rlsbl-managed repository ever runs. The changes are printed
             # instead, per version and per released path.
-            _remaps, _anchor_files = repair_anchors(
+            _remaps, _release_commit_files = repair_release_commits(
                 project_root=str(project_root),
                 commit_map=rewrites,
                 rewrite_id=scrub_data.get("new_head", "") or "unknown",
@@ -1064,7 +1064,7 @@ def run_cmd(flags, *, ctx):
             )
             if _remaps:
                 print(
-                    f"Remapped {len(_remaps)} release anchor(s) through the "
+                    f"Remapped {len(_remaps)} release commit(s) through the "
                     f"rewrite:"
                 )
                 for r in _remaps:
@@ -1079,10 +1079,10 @@ def run_cmd(flags, *, ctx):
                             f"archive now records the rewritten tree)"
                         )
             # Persisted so a resumed run still commits them.
-            scrub_data["anchor_files"] = sorted(
-                set(scrub_data.get("anchor_files", [])) | set(_anchor_files)
+            scrub_data["release_commit_files"] = sorted(
+                set(scrub_data.get("release_commit_files", [])) | set(_release_commit_files)
             )
-            _save_step(scrub_result_path, scrub_data, "ANCHORS_REMAPPED")
+            _save_step(scrub_result_path, scrub_data, "RELEASE_COMMITS_REMAPPED")
 
         # -- Verify CHANGELOG.md (regenerate-and-assert-unchanged) --
         # In-history remap means HEAD's JSONL was already consistent when
@@ -1141,7 +1141,7 @@ def run_cmd(flags, *, ctx):
             # the in-history remap already made HEAD consistent, and the
             # CHANGELOG step above asserted regeneration is a no-op.
             modified_files = list(scrub_data.get("remapped_files", []))
-            modified_files.extend(scrub_data.get("anchor_files", []))
+            modified_files.extend(scrub_data.get("release_commit_files", []))
             modified_files.extend(scrub_data.get("deleted_validated", []))
 
             # Write the committed audit archive (whitelisted schema). It is

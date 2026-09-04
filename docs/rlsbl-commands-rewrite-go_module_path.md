@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.rewrite.go_module_path
-description: "Renames a Go module path across a repository: every go.mod token and every import site, line-anchored, with containment asked of the module-prefix rule."
+description: "Renames a Go module path across a repository: every go.mod token and every import site, line-scoped, with containment asked of the module-prefix rule."
 generated: true
 nav_group: "API Reference"
 nav_order: 70

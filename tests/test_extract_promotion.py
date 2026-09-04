@@ -39,7 +39,7 @@ from rlsbl.mirror_publication import split_commit_for
 from rlsbl.release_file import (
     list_archived_versions,
     read_release_file,
-    write_release_anchor,
+    write_release_commit,
 )
 from rlsbl.workspace import (
     Releasable,
@@ -86,7 +86,7 @@ def make_promotable(tmp_path, *, converge=True):
     )
 
     # A second released-state commit inside the member, referenced by the
-    # unreleased changelog and anchored by the archive, so the promotion has
+    # unreleased changelog and recorded by the archive, so the promotion has
     # real hashes to translate rather than an empty state directory.
     (root / "pkg" / "feature.py").write_text("value = 1\n")
     run_git(root, "add", "pkg/feature.py")
@@ -116,12 +116,12 @@ def make_promotable(tmp_path, *, converge=True):
         )],
     )
     os.chmod(released, 0o444)
-    # Anchor the archived 0.1.0 at that commit, with the member's tree.
+    # Record the archived 0.1.0 at that commit, with the member's tree.
     archive = os.path.join(
         get_releasable_dir(str(root), "pkg"), "releases", "v0.1.0.toml",
     )
     os.chmod(archive, 0o644)
-    write_release_anchor(
+    write_release_commit(
         archive,
         candidate_sha=sha,
         tree_hashes={"pkg": gitout(root, "rev-parse", "HEAD:pkg")},
@@ -245,7 +245,7 @@ class TestApply:
                     )
         assert seen, "the fixture must carry changelog hashes to translate"
 
-    def test_every_release_anchor_resolves_in_the_promoted_repo(self, tmp_path):
+    def test_every_release_commit_resolves_in_the_promoted_repo(self, tmp_path):
         ns, _mirror = make_promotable(tmp_path)
         target = tmp_path / "out"
         cmd_extract(str(ns.root), "pkg", str(target), delete_with_rm=True)
@@ -257,15 +257,15 @@ class TestApply:
             archive = read_release_file(os.path.join(releases, f"v{version}.toml"))
             assert archive.candidate_sha
             assert _resolves(target, archive.candidate_sha), (
-                f"v{version}: anchor {archive.candidate_sha} does not resolve"
+                f"v{version}: release commit {archive.candidate_sha} does not resolve"
             )
 
-    def test_the_anchor_is_the_split_of_the_monorepo_anchor(self, tmp_path):
+    def test_the_release_commit_is_the_split_of_the_monorepo_release_commit(self, tmp_path):
         ns, _mirror = make_promotable(tmp_path)
-        source_anchor = read_release_file(os.path.join(
+        source_release_commit = read_release_file(os.path.join(
             get_releasable_dir(str(ns.root), "pkg"), "releases", "v0.1.0.toml",
         )).candidate_sha
-        expected = split_commit_for(str(ns.root), "pkg", source_anchor)
+        expected = split_commit_for(str(ns.root), "pkg", source_release_commit)
 
         target = tmp_path / "out"
         cmd_extract(str(ns.root), "pkg", str(target), delete_with_rm=True)
@@ -277,10 +277,10 @@ class TestApply:
 
     def test_the_released_tag_stands_at_that_commit(self, tmp_path):
         ns, _mirror = make_promotable(tmp_path)
-        source_anchor = read_release_file(os.path.join(
+        source_release_commit = read_release_file(os.path.join(
             get_releasable_dir(str(ns.root), "pkg"), "releases", "v0.1.0.toml",
         )).candidate_sha
-        expected = split_commit_for(str(ns.root), "pkg", source_anchor)
+        expected = split_commit_for(str(ns.root), "pkg", source_release_commit)
 
         target = tmp_path / "out"
         cmd_extract(str(ns.root), "pkg", str(target), delete_with_rm=True)

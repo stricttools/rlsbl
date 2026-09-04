@@ -65,7 +65,7 @@ The certificate itself is un-gated by design (it carries `certificate_format_ver
 
 The `test_sandbox` object opts a project into the **sandboxed test runner** rlsbl distributes: the outer layer of the [stricttest](https://github.com/smm-h/stricttest) test-isolation floor. Declaring the section makes `rlsbl scaffold` render the shared runner template to `runner_path` (executable), and turns on the `stricttest-floor` check. Projects without the section are untouched — the check skips.
 
-Inside the sandbox the real repo is bound read-only, the suite runs in a writable throwaway copy of the tree on a private tmpfs, `HOME` is throwaway, and there is no network at all — a stray push, an unanchored commit into the dev repo, or a live API call is physically impossible rather than merely discouraged. The runner exports `STRICTTEST_SANDBOX=1`, the variable the stricttest plugin reads to lift its bare-run refusal.
+Inside the sandbox the real repo is bound read-only, the suite runs in a writable throwaway copy of the tree on a private tmpfs, `HOME` is throwaway, and there is no network at all — a stray push, an unresolvable commit into the dev repo, or a live API call is physically impossible rather than merely discouraged. The runner exports `STRICTTEST_SANDBOX=1`, the variable the stricttest plugin reads to lift its bare-run refusal.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |

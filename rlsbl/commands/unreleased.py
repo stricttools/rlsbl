@@ -1,4 +1,4 @@
-"""Unreleased command that lists the commits since the release the release record anchors this checkout to, and checks whether each one is covered by a corresponding changelog entry."""
+"""Unreleased command that lists the commits since this checkout's nearest release commit, and checks whether each one is covered by a corresponding changelog entry."""
 
 import os
 import subprocess
@@ -10,16 +10,16 @@ from ..context import resolve_release_scope
 from ..git_util import filter_commits_for_scope
 from ..release_record import (
     latest_release_fact,
-    range_anchor,
+    nearest_release_commit,
     releases_dir_for_changes_dir,
 )
 from .. import effects
 
 
-def _get_commits_since(anchor_sha):
-    """Get commits since *anchor_sha* (or all commits when it is None).
+def _get_commits_since(release_commit_sha):
+    """Get commits since *release_commit_sha* (or all commits when it is None).
 
-    *anchor_sha* is the released commit the release record anchors this checkout to,
+    *release_commit_sha* is the released commit the release record bounds this checkout to,
     not a tag: a range expressed as a commit resolves even where the version's
     tag was deleted or moved.
 
@@ -28,8 +28,8 @@ def _get_commits_since(anchor_sha):
     """
     # Format: hash<NUL>subject<NUL>author<NUL>ISO-date
     fmt = "%H%x00%s%x00%an%x00%aI"
-    if anchor_sha:
-        range_spec = f"{anchor_sha}..HEAD"
+    if release_commit_sha:
+        range_spec = f"{release_commit_sha}..HEAD"
     else:
         range_spec = "HEAD"
 
@@ -71,13 +71,13 @@ def run_cmd(registry, args, flags, project_root):
     monorepo_project, tag_glob, changes_dir, scope = resolve_release_scope(root_str)
 
     release_record_dir = releases_dir_for_changes_dir(changes_dir)
-    anchor = range_anchor(release_record_dir, tag_glob=tag_glob, cwd=root_str)
+    release_commit = nearest_release_commit(release_record_dir, tag_glob=tag_glob, cwd=root_str)
     # Two different questions, deliberately answered from two different
     # places: the RANGE is bounded by the highest release this checkout
     # contains, while the release the header names is the project's latest,
     # annotated when this checkout does not contain it.
     latest = latest_release_fact(release_record_dir, tag_glob=tag_glob, cwd=root_str)
-    commits = _get_commits_since(anchor.candidate_sha if anchor else None)
+    commits = _get_commits_since(release_commit.candidate_sha if release_commit else None)
 
     # Scope to the project's (or the whole releasable's) files FIRST, then
     # apply the exemption filter -- the same order the authoritative coverage
@@ -96,7 +96,7 @@ def run_cmd(registry, args, flags, project_root):
         return {
             "latest_release": latest.version,
             "latest_release_in_checkout": latest.in_checkout,
-            "range_anchor_version": anchor.version if anchor else None,
+            "nearest_release_commit_version": release_commit.version if release_commit else None,
             "commits": [],
             "coverage": {"covered": 0, "total": 0, "exempted": 0},
         }
@@ -109,7 +109,7 @@ def run_cmd(registry, args, flags, project_root):
         return {
             "latest_release": latest.version,
             "latest_release_in_checkout": latest.in_checkout,
-            "range_anchor_version": anchor.version if anchor else None,
+            "nearest_release_commit_version": release_commit.version if release_commit else None,
             "commits": len(commits),
             "non_releasable": True, "dev_only": monorepo_project.dev_only,
         }
@@ -145,7 +145,7 @@ def run_cmd(registry, args, flags, project_root):
     exempted = len(commits) - total
 
     if not flags.get("json"):
-        since = anchor.version if anchor else "(no release in this history)"
+        since = release_commit.version if release_commit else "(no release in this history)"
         print(f"Unreleased commits since {since} ({len(commits)} commits):\n")
         if latest.version is not None and latest.in_checkout is False:
             print(f"latest release: {latest.label()}\n")
@@ -166,7 +166,7 @@ def run_cmd(registry, args, flags, project_root):
     return {
         "latest_release": latest.version,
         "latest_release_in_checkout": latest.in_checkout,
-        "range_anchor_version": anchor.version if anchor else None,
+        "nearest_release_commit_version": release_commit.version if release_commit else None,
         "commits": commits,
         "coverage": {
             "covered": covered_count, "total": total, "exempted": exempted,

@@ -76,7 +76,7 @@ from .validate import (
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
     validate_release_targets, validate_ota_mode, validate_config_integrity,
-    validate_no_authored_anchors,
+    validate_no_authored_release_commit,
     validate_pipeline_config, validate_gh_cli, validate_gh_push_access,
     validate_clean_tree,
     validate_branch_and_remote, resolve_monorepo_context,
@@ -589,11 +589,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # mirroring config-schema's root-only scope.)
     validate_test_config(config)
 
-    # The anchor is the release flow's to write, into the ARCHIVE, from the
+    # The release commit is the release flow's to write, into the ARCHIVE, from the
     # commit CI verified. One already present in the editable release file is
     # refused here -- before any mutation, alongside the other release-file
     # validations -- rather than silently overwritten at the archive step.
-    validate_no_authored_anchors(release_config)
+    validate_no_authored_release_commit(release_config)
 
     # Target validation is deferred until after releasable context is resolved
     # so that member_dirs can be passed for releasable target union.

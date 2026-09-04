@@ -1,6 +1,6 @@
 """Tests for the backfill_release_anchors script.
 
-The script repairs a repository's release archives: it anchors versions to the
+The script repairs a repository's release archives: it release commits versions to the
 commit they shipped from, stamps the strictspec gate onto archives written
 before the gate existed, materializes archives for versions that never got one,
 and records a permanent marker on a version whose commit cannot be recovered at
@@ -101,12 +101,12 @@ def is_locked(path):
 
 
 # ---------------------------------------------------------------------------
-# (a) anchorable from a tag
+# (a) release_commitable from a tag
 # ---------------------------------------------------------------------------
 
 
 class TestMarkerLessArchive:
-    """An archive predating both the gate and the anchor gets both."""
+    """An archive predating both the gate and the release commit gets both."""
 
     @pytest.fixture
     def repo(self, tmp_path):
@@ -123,7 +123,7 @@ class TestMarkerLessArchive:
         run_backfill(repo)
         assert read_toml(path)["format_version"] == 1
 
-    def test_anchor_is_the_tags_commit_and_tree(self, repo):
+    def test_release_commit_is_the_tags_commit_and_tree(self, repo):
         path = repo / ".rlsbl" / "releases" / "v0.1.0.toml"
         run_backfill(repo)
         data = read_toml(path)
@@ -162,7 +162,7 @@ class TestMarkerLessArchive:
 
 
 class TestMissingArchive:
-    """A released version with no archive gets one, locked and anchored."""
+    """A released version with no archive gets one, locked and recorded."""
 
     @pytest.fixture
     def repo(self, tmp_path):
@@ -207,7 +207,7 @@ class TestMissingArchive:
         # No predecessor: measured against 0.0.0, so 0.1.0 is a minor.
         assert read_toml(repo / ".rlsbl" / "releases" / "v0.1.0.toml")["bump"] == "minor"
 
-    def test_materialized_archive_is_anchored(self, repo):
+    def test_materialized_archive_is_recorded(self, repo):
         run_backfill(repo)
         data = read_toml(repo / ".rlsbl" / "releases" / "v0.2.0.toml")
         assert data["candidate_sha"] == git(repo, "rev-parse", "v0.2.0^{commit}")
@@ -236,7 +236,7 @@ def test_derive_bump_arithmetic():
 class TestTaglessVersion:
     """No tag: recovery from the version-bump commit, or a permanent marker."""
 
-    def test_anchors_from_the_version_bump_commit(self, tmp_path):
+    def test_release_commits_from_the_version_bump_commit(self, tmp_path):
         repo = make_standalone(tmp_path)
         sha = commit_file(repo, "a.txt", "a\n", "v0.1.0")
         write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.1.0")
@@ -247,9 +247,9 @@ class TestTaglessVersion:
         data = read_toml(repo / ".rlsbl" / "releases" / "v0.1.0.toml")
         assert data["candidate_sha"] == sha
         assert "unanchorable" not in data
-        assert "anchored from the version-bump commit" in output
+        assert "recorded from the version-bump commit" in output
 
-    def test_marks_unanchorable_when_nothing_is_recoverable(self, tmp_path):
+    def test_marks_unrecoverable_when_nothing_is_recoverable(self, tmp_path):
         repo = make_standalone(tmp_path)
         write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.1.0")
 
@@ -262,7 +262,7 @@ class TestTaglessVersion:
         assert "tree_hashes" not in data
         assert "unrecoverable" in output
 
-    def test_marks_an_existing_archive_unanchorable_in_place(self, tmp_path):
+    def test_marks_an_existing_archive_unrecoverable_in_place(self, tmp_path):
         repo = make_standalone(tmp_path)
         write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.1.0")
         path = write_archive(repo / ".rlsbl" / "releases", "0.1.0")
@@ -345,8 +345,8 @@ def test_unrecognizable_tags_are_listed_and_left_alone(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_releasable_tag_scheme_anchors_normally(tmp_path, monkeypatch):
-    """A ``{name}@v{version}`` tag anchors its releasable's version."""
+def test_releasable_tag_scheme_records_normally(tmp_path, monkeypatch):
+    """A ``{name}@v{version}`` tag release commits its releasable's version."""
     repo = tmp_path / "ws"
     repo.mkdir()
     init_repo(repo)
@@ -372,7 +372,7 @@ def test_releasable_tag_scheme_anchors_normally(tmp_path, monkeypatch):
     path = repo / ".rlsbl-monorepo" / "releasables" / "core" / "releases" / "v0.1.0.toml"
     data = read_toml(path)
     assert data["candidate_sha"] == git(repo, "rev-parse", "core@v0.1.0^{commit}")
-    # The releasable's anchor names its member directory, not the whole repo.
+    # The releasable's release commit names its member directory, not the whole repo.
     assert list(data["tree_hashes"]) == ["pkgs/core"]
     assert data["tree_hashes"]["pkgs/core"] == git(
         repo, "rev-parse", "core@v0.1.0:pkgs/core"
@@ -426,7 +426,7 @@ class TestIdempotency:
         write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.1.0")
         write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.2.0")
         write_archive(repo / ".rlsbl" / "releases", "0.1.0")
-        # A version with no tag at all, so the unanchorable path is exercised too.
+        # A version with no tag at all, so the unrecoverable path is exercised too.
         write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.3.0")
         return repo
 
@@ -464,8 +464,8 @@ class TestTotalLine:
     ``materialized``, ``format-version stamped`` and ``unanchorable`` are
     independent properties of the archives the pass will write: one archive can
     carry two of them (a materialized archive for a version with no recoverable
-    commit is materialized AND unanchorable), and an existing, already-stamped
-    archive that only gains its anchor carries none. Their sum is therefore
+    commit is materialized AND unrecoverable), and an existing, already-stamped
+    archive that only gains its release commit carries none. Their sum is therefore
     neither the total nor bounded by it, and a rendering that reads as a
     breakdown of the total is a lie about arithmetic the reader will do.
     """
@@ -478,7 +478,7 @@ class TestTotalLine:
         changes = repo / ".rlsbl" / "changes"
         releases = repo / ".rlsbl" / "releases"
         # 0.1.0: an archive that already carries the gate and only needs its
-        # anchor -- none of the three attributes.
+        # release commit -- none of the three attributes.
         commit_file(repo, "a.txt", "a\n", "v0.1.0")
         git(repo, "tag", "v0.1.0")
         write_changelog_jsonl(changes, "0.1.0")
@@ -502,14 +502,14 @@ class TestTotalLine:
         assert len(changed) == 3
         assert sum(1 for v in changed if v.materialize) == 1
         assert sum(1 for v in changed if v.stamp_format_version) == 1
-        assert sum(1 for v in changed if v.unanchorable) == 0
+        assert sum(1 for v in changed if v.unrecoverable) == 0
 
     def test_each_count_is_named_as_an_attribute(self, repo):
         _code, output = run_backfill(repo, dry_run=True)
         assert "TOTAL: 3 archive(s) to write" in output
         assert "materialized: 1" in output
         assert "format-version stamped: 1" in output
-        assert "unanchorable: 0" in output
+        assert "unrecoverable: 0" in output
 
     def test_the_reader_is_told_they_are_independent(self, repo):
         _code, output = run_backfill(repo, dry_run=True)
@@ -520,7 +520,7 @@ class TestTotalLine:
         assert "independent" in rest
 
     def test_the_old_partition_rendering_is_gone(self, repo):
-        """``(a materialized, b stamped, c unanchorable)`` in parentheses right
+        """``(a materialized, b stamped, c unrecoverable)`` in parentheses right
         after the count read as a breakdown of it."""
         _code, output = run_backfill(repo, dry_run=True)
         assert "(1 materialized," not in output

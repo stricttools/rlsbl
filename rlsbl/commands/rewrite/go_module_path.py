@@ -8,7 +8,7 @@ module and everything under it onto a new path:
   ``exclude`` / ``retract`` reference to the old path from a nested module;
 * every Go import site under the old path is rewritten, located by the
   tree-sitter import scanner (:func:`rlsbl.lint.go_ast.scan_imports`) and
-  rewritten **line-anchored** -- only on the exact line the parser reported an
+  rewritten **line-scoped** -- only on the exact line the parser reported an
   import spec, and only inside that spec's quoted literal.
 
 Containment is never a bare ``startswith``.  Both halves ask
@@ -207,7 +207,7 @@ def _literal_on_line(line, import_path):
 
 
 def rewrite_go_source_text(text, sites, old, new):
-    """Rewrite the import literals *sites* names, line-anchored.
+    """Rewrite the import literals *sites* names, line-scoped.
 
     Args:
         text: the file's full contents.

@@ -259,13 +259,13 @@ class TestUnpublishedRefsCheck:
         assert result.status == "pass"
         assert "no origin remote" in result.message
 
-    def test_an_unanchorable_versions_absent_ref_is_counted_not_errored(
+    def test_an_unrecoverable_versions_absent_ref_is_counted_not_errored(
         self, tmp_path, monkeypatch,
     ):
         """No commit to recreate it at means no repair to name.
 
         Surfaced in the pass message rather than passed over: a check that can
-        never go green is a check people stop reading, and an unanchorable
+        never go green is a check people stop reading, and an unrecoverable
         archive is a permanent recorded fact, not a fixable state.
         """
         from rlsbl.release_file import write_archived_release_file
@@ -275,7 +275,7 @@ class TestUnpublishedRefsCheck:
         write_archived_release_file(
             str(repo / ".rlsbl" / "releases"), "0.1.0",
             bump="patch", include=["pypi"], description="an old release",
-            candidate_sha=None, tree_hashes=None, unanchorable=True,
+            candidate_sha=None, tree_hashes=None, unrecoverable=True,
         )
 
         result = self._run(
@@ -284,7 +284,7 @@ class TestUnpublishedRefsCheck:
             remote=TagCommitMap({}),
         )
         assert result.status == "pass", result
-        assert "unanchorable" in result.message
+        assert "unrecoverable" in result.message
 
     def test_a_missing_github_release_fails(self, tmp_path, monkeypatch):
         """A published tag with no Release document is its own failure.
@@ -354,12 +354,12 @@ class TestUnpublishedRefsCheck:
             result.problems
         )
 
-    def test_an_unanchorable_versions_absent_release_is_counted_not_errored(
+    def test_an_unrecoverable_versions_absent_release_is_counted_not_errored(
         self, tmp_path, monkeypatch,
     ):
-        """No anchor means no released-commit marker to write, so no repair.
+        """No release commit means no released-commit marker to write, so no repair.
 
-        `rlsbl release reconcile` skips an unanchorable version entirely, so
+        `rlsbl release reconcile` skips an unrecoverable version entirely, so
         demanding a Release for one would be a finding with no remedy.
         """
         from rlsbl.release_file import write_archived_release_file
@@ -369,7 +369,7 @@ class TestUnpublishedRefsCheck:
         write_archived_release_file(
             str(repo / ".rlsbl" / "releases"), "0.1.0",
             bump="patch", include=["pypi"], description="an old release",
-            candidate_sha=None, tree_hashes=None, unanchorable=True,
+            candidate_sha=None, tree_hashes=None, unrecoverable=True,
         )
         sha = "a" * 40
 
@@ -380,7 +380,7 @@ class TestUnpublishedRefsCheck:
             releases=[],
         )
         assert result.status == "pass", result
-        assert "unanchorable" in result.message
+        assert "unrecoverable" in result.message
         assert "GitHub Release" in result.message
 
     def test_an_unreadable_release_listing_is_an_error_not_a_pass(

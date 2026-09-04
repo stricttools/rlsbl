@@ -2196,7 +2196,7 @@ class TestNoMatchValidatesHashes:
     rewrite journal when possible, and commit the repairs."""
 
     REPAIR_MSG = (
-        "scrub: repair changelog hashes and release anchors from rewrite journal"
+        "scrub: repair changelog hashes and release commits from rewrite journal"
     )
 
     def _flags(self):

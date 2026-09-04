@@ -130,7 +130,7 @@ def test_patch_errors_when_the_document_has_no_version_key(tmp_path):
 def test_patch_errors_on_a_non_canonically_encoded_schema(tmp_path):
     """A compact document is not something a strictcli dump wrote.
 
-    The patch is anchored to the canonical encoding, so it refuses rather than
+    The patch is pinned to the canonical encoding, so it refuses rather than
     silently leaving the version alone -- and the message names the second
     possibility, since "no version key" would be a misdiagnosis here.
     """

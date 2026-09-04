@@ -2,7 +2,7 @@
 record of what this project has released.
 
 Every completed release archives its release file to
-``<releases_dir>/v{X.Y.Z}.toml`` and writes the ANCHOR into it -- the
+``<releases_dir>/v{X.Y.Z}.toml`` and writes the RELEASE COMMIT into it -- the
 ``candidate_sha`` CI verified and the ``tree_hashes`` each released path
 shipped -- or, for a version whose commit could not be recovered at all, the
 ``unanchorable`` marker.  Those archives, not the git tags, are what rlsbl
@@ -28,7 +28,7 @@ The release record deliberately answers *two* questions differently, because the
 different questions:
 
 * **What bounds the unreleased range?**  The highest archived version whose
-  ``candidate_sha`` is an ANCESTOR of this checkout -- :func:`range_anchor`.
+  ``candidate_sha`` is an ANCESTOR of this checkout -- :func:`nearest_release_commit`.
   A release that exists but is not in this history cannot bound a range
   computed from this history.
 * **What is the latest release?**  The absolute highest archived version --
@@ -50,12 +50,12 @@ The four read errors
 They fire where the release record is READ FOR USE, never while scanning:
 
 * **Disagreement** -- the version's tag exists locally and points at a commit
-  other than the anchor.  Something moved one of them; the release record will not
+  other than the release commit.  Something moved one of them; the release record will not
   guess which.
 * **Indeterminable** -- ancestry cannot be decided (a missing object, a
   truncated history).  Not the same as "no", and not treated as one.
-* **Missing anchor** -- an archive carrying neither the anchor nor the
-  ``unanchorable`` marker, i.e. one written before anchoring existed and never
+* **Missing release commit** -- an archive carrying neither the release commit nor the
+  ``unanchorable`` marker, i.e. one written before release commits were recorded and never
   backfilled.  The error prints the complete single-version recovery.
 * **Empty release record, tagged repository** -- no archive at all, yet the tag
   namespace carries tags that parse under this project's version-tag scheme.
@@ -94,7 +94,7 @@ from .release_file import (
 from .tag_glob import TagMode, parse_version_tag
 
 
-# A git object name as the anchor records it: 7 to 40 hex characters.
+# A git object name as the release commit records it: 7 to 40 hex characters.
 _HASH_RE = re.compile(r"^[0-9a-f]{7,40}$")
 
 
@@ -110,10 +110,10 @@ class ReleaseRecordEntry:
     version: str
     path: str
     candidate_sha: str | None
-    unanchorable: bool
+    unrecoverable: bool
 
     @property
-    def anchored(self) -> bool:
+    def recorded(self) -> bool:
         return self.candidate_sha is not None
 
 
@@ -128,7 +128,7 @@ class LatestReleaseFact:
 
     version: str | None
     in_checkout: bool | None
-    unanchorable: bool = False
+    unrecoverable: bool = False
 
     def label(self) -> str:
         """The display string, annotated when the checkout predates the release.
@@ -139,7 +139,7 @@ class LatestReleaseFact:
         """
         if self.version is None:
             return "(none)"
-        if self.unanchorable:
+        if self.unrecoverable:
             return f"{self.version} (commit not recoverable)"
         if self.in_checkout is False:
             return f"{self.version} (not in this checkout's history)"
@@ -155,7 +155,7 @@ def tag_for_version(tag_glob: str | None, version: str) -> str:
     ``v1.2.3``, ``mylib@v*`` -> ``mylib@v1.2.3``, ``pkg/dir/v*`` ->
     ``pkg/dir/v1.2.3``.  None means the standalone scheme.
 
-    This is tag TRANSLATION, not version anchoring: it names the tag a version
+    This is tag TRANSLATION, not version selection: it names the tag a version
     would carry, and never decides which version is current.
     """
     glob = tag_glob or "v*"
@@ -186,9 +186,9 @@ def _resolve_ref(ref: str, cwd: str | None, *, timeout: int = 10) -> str | None:
     return sha or None
 
 
-def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
+def _missing_release_commit_error(version: str, path: str, tag_glob: str | None,
                           cwd: str | None) -> ReleaseRecordError:
-    """Build the MISSING-ANCHOR error, with the complete recovery for it.
+    """Build the MISSING-RELEASE-COMMIT error, with the complete recovery for it.
 
     The recovery is single-version and mechanical: the value to write is the
     commit the version's own tag already points at, and the archive is
@@ -208,15 +208,15 @@ def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
         derived = (
             f'  Its tag "{tag}" does not exist locally, so there is no value to\n'
             f"  derive: fetch the tag (git fetch origin --tags) and re-run, or -- if\n"
-            f"  the commit is genuinely gone -- record the version as unanchorable\n"
+            f"  the commit is genuinely gone -- record the version as unrecoverable\n"
             f"  instead (unanchorable = true, and no candidate_sha/tree_hashes)."
         )
         sha_line = 'candidate_sha = "<the released commit>"'
     return ReleaseRecordError(
-        f"the release record entry for {version} carries no anchor: {path}\n"
-        f"  An archive records either the anchor the release flow wrote\n"
-        f"  (candidate_sha + [tree_hashes]) or the unanchorable marker. This one\n"
-        f"  has neither, so it was written before anchoring existed and was never\n"
+        f"the release record entry for {version} carries no release commit: {path}\n"
+        f"  An archive records either the release commit the release flow wrote\n"
+        f"  (candidate_sha + [tree_hashes]) or the unrecoverable marker. This one\n"
+        f"  has neither, so it was written before release commits were recorded and was never\n"
         f"  backfilled -- and rlsbl cannot tell which commit {version} shipped from.\n"
         f"{derived}\n"
         f"  Recover this one version:\n"
@@ -224,7 +224,7 @@ def _missing_anchor_error(version: str, path: str, tag_glob: str | None,
         f"         from rlsbl.release_file import writable_release_file\n"
         f"         with writable_release_file({path!r}) as p: ...\n"
         f"       or from a shell: chmod 644 {path}\n"
-        f"    2. Append the anchor to it:\n"
+        f"    2. Append the release commit to it:\n"
         f"         {sha_line}\n"
         f"         [tree_hashes]\n"
         f'         "." = "<the tree that commit shipped>"\n'
@@ -284,7 +284,7 @@ def _unbackfilled_release_record_error(releases_dir: str, tag_glob: str | None,
     """Build the EMPTY-RELEASE RECORD error for a repository that has clearly released.
 
     The remedy is the whole-repository backfill rather than the single-version
-    recovery the missing-anchor error prints: there is no archive to edit here,
+    recovery the missing-release-commit error prints: there is no archive to edit here,
     and the versions to materialize are however many the repository shipped.
     """
     glob = tag_glob or "v*"
@@ -316,7 +316,8 @@ def _require_backfilled_release_record(releases_dir: str, versions: list[str],
     """Refuse an empty release record in a repository whose tags say it has released.
 
     A no-op the instant the release record holds anything: a repository mid-backfill,
-    or one whose archives predate anchoring, is the missing-anchor error's
+    or one whose archives predate release-commit recording, is the
+    missing-release-commit error's
     business, not this one's.
     """
     if versions:
@@ -342,21 +343,21 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
     """Read one archived release FOR USE, with its read errors live.
 
     Raises :class:`~rlsbl.errors.ReleaseRecordError` when the archive carries no
-    anchor and no ``unanchorable`` marker, and when the version's tag exists
-    locally but points somewhere other than the anchor.  Raises
+    release commit and no ``unanchorable`` marker, and when the version's tag exists
+    locally but points somewhere other than the release commit.  Raises
     ``FileNotFoundError`` when there is no archive for *version* at all --
     that is a caller error, since callers reach here from the enumeration.
     """
     path = archived_release_path(releases_dir, version)
     cfg = read_release_file(path)
 
-    if cfg.unanchorable:
+    if cfg.unrecoverable:
         return ReleaseRecordEntry(version=version, path=path, candidate_sha=None,
-                           unanchorable=True)
+                           unrecoverable=True)
 
     sha = cfg.candidate_sha
     if not sha or not _HASH_RE.match(sha):
-        raise _missing_anchor_error(version, path, tag_glob, cwd)
+        raise _missing_release_commit_error(version, path, tag_glob, cwd)
 
     tag = tag_for_version(tag_glob, version)
     tag_commit = _resolve_ref(tag, cwd)
@@ -364,7 +365,7 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
         raise ReleaseRecordError(
             f"the release record and the git tag disagree about {version}:\n"
             f'  tag "{tag}" points at   {tag_commit}\n'
-            f"  the archive's anchor is {sha}\n"
+            f"  the archive's release commit is {sha}\n"
             f"  archive: {path}\n"
             f"  The archive is the record the release flow itself wrote, and rlsbl\n"
             f"  rewrites an archive only through its own documented unlock paths, so\n"
@@ -372,7 +373,7 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
             f"  re-point it, or a hand-made tag on the wrong commit. (The archive's\n"
             f"  file mode is hygiene, not the guarantee: git records no read-only\n"
             f"  bit, so a fresh clone's archives are writable.) Re-point the tag at\n"
-            f"  the anchor (git tag -f\n"
+            f"  the release commit (git tag -f\n"
             f"  {tag} {sha}), or, if the rewrite was intended, run "
             f"`rlsbl release reconcile`\n"
             f"  to repair the release metadata from the rewrite journal. rlsbl will\n"
@@ -380,7 +381,7 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
         )
 
     return ReleaseRecordEntry(version=version, path=path, candidate_sha=sha,
-                       unanchorable=False)
+                       unrecoverable=False)
 
 
 def _indeterminable_error(entry: ReleaseRecordEntry, head: str) -> ReleaseRecordError:
@@ -399,7 +400,7 @@ def _indeterminable_error(entry: ReleaseRecordEntry, head: str) -> ReleaseRecord
     )
 
 
-def range_anchor(releases_dir: str, *, tag_glob: str | None = None,
+def nearest_release_commit(releases_dir: str, *, tag_glob: str | None = None,
                  cwd: str | None = None, head: str = "HEAD") -> ReleaseRecordEntry | None:
     """The highest archived release whose commit this checkout CONTAINS.
 
@@ -407,7 +408,7 @@ def range_anchor(releases_dir: str, *, tag_glob: str | None = None,
     walk is highest-first and stops at the first version whose
     ``candidate_sha`` is an ancestor of *head*, so the ordinary case opens one
     archive.  An ``unanchorable`` version is skipped -- it has no commit to
-    anchor on, so its neighbours bound the range instead.
+    release commit on, so its neighbours bound the range instead.
 
     Returns None when the release record records nothing this checkout contains: a
     project before its first release, or a checkout that predates every
@@ -422,7 +423,7 @@ def range_anchor(releases_dir: str, *, tag_glob: str | None = None,
     _require_backfilled_release_record(releases_dir, versions, tag_glob, cwd)
     for version in versions:
         entry = read_entry(releases_dir, version, tag_glob=tag_glob, cwd=cwd)
-        if entry.unanchorable:
+        if entry.unrecoverable:
             continue
         verdict = ancestry(entry.candidate_sha, head, cwd)
         if verdict is Ancestry.TRUE:
@@ -441,7 +442,7 @@ def unreleased_range(releases_dir: str, *, tag_glob: str | None = None,
     predecessor produced, computed from the release record instead of from
     ``git describe``.
     """
-    entry = range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd)
+    entry = nearest_release_commit(releases_dir, tag_glob=tag_glob, cwd=cwd)
     if entry is None:
         return "HEAD"
     return f"{entry.candidate_sha}..HEAD"
@@ -458,10 +459,10 @@ def release_at_commit(releases_dir: str, sha: str, *,
 
     Costs ONE archive read, not a scan: the highest release contained in
     *sha*'s own history is *sha* itself exactly when *sha* is a released
-    candidate, so :func:`range_anchor` answered at *sha* either names it or
+    candidate, so :func:`nearest_release_commit` answered at *sha* either names it or
     names an earlier release -- and an earlier one means *sha* shipped nothing.
     """
-    entry = range_anchor(releases_dir, tag_glob=tag_glob, cwd=cwd, head=sha)
+    entry = nearest_release_commit(releases_dir, tag_glob=tag_glob, cwd=cwd, head=sha)
     if entry is None or not _same_commit(entry.candidate_sha, sha):
         return None
     return entry
@@ -488,9 +489,9 @@ def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
 
     version = versions[0]
     entry = read_entry(releases_dir, version, tag_glob=tag_glob, cwd=cwd)
-    if entry.unanchorable:
+    if entry.unrecoverable:
         return LatestReleaseFact(version=version, in_checkout=None,
-                                 unanchorable=True)
+                                 unrecoverable=True)
 
     verdict = ancestry(entry.candidate_sha, head, cwd)
     if verdict is Ancestry.INDETERMINABLE:

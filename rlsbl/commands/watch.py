@@ -29,7 +29,7 @@ def _release_at(commit_sha):
     Outside an rlsbl project there is no release record to read and no label to give:
     None. A directory whose release record holds no archive answers None too --
     nothing was released here -- while a release record that CANNOT answer (a tag
-    disagreeing with an anchor, an ancestry git cannot decide) raises, because
+    disagreeing with a release commit, an ancestry git cannot decide) raises, because
     a label derived from a release record rlsbl could not read would be a guess
     presented as a fact.
     """
@@ -142,7 +142,7 @@ _INFRA_SIGNATURES = tuple(
 )
 
 # Deterministic: the failure will recur identically on retry -> never retry.
-# MULTILINE so ^-anchored patterns match at the start of any log line, not
+# MULTILINE so ^-pinned patterns match at the start of any log line, not
 # just the start of the whole tail.
 _DETERMINISTIC_SIGNATURES = tuple(
     re.compile(p, re.IGNORECASE | re.MULTILINE) for p in (

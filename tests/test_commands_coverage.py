@@ -102,16 +102,16 @@ def _latest_release_stub(uc):
 # reads it out of the release ARCHIVE (the release record), which these fixtures do not
 # have on disk, so the two archive reads are stubbed alongside
 # ``_find_latest_release``.
-_UNDO_ANCHOR_SHA = "a" * 40
+_UNDO_RELEASE_COMMIT_SHA = "a" * 40
 
 
-def _undo_anchor_stub(_uc, _version, _tag):
-    """Stand-in for the version's own release record anchor."""
-    return _UNDO_ANCHOR_SHA
+def _undo_release_commit_stub(_uc, _version, _tag):
+    """Stand-in for the version's own recorded release commit."""
+    return _UNDO_RELEASE_COMMIT_SHA
 
 
 def _undo_predecessor_stub(_uc, _version):
-    """Stand-in for the predecessor's anchor: there is no earlier release."""
+    """Stand-in for the predecessor's release commit: there is no earlier release."""
     return None
 
 
@@ -227,7 +227,7 @@ def _undo_run_stub(*, fail_on=None, release_sha=None, commits=None, record=None)
     when given, is a list every argv is appended to.
     """
     if commits is None:
-        commits = [(release_sha or _UNDO_ANCHOR_SHA, "v1.0.0")]
+        commits = [(release_sha or _UNDO_RELEASE_COMMIT_SHA, "v1.0.0")]
     log_output = "\n".join(f"{sha}\x1f{subject}" for sha, subject in commits)
 
     def _run(cmd, args=None, **kwargs):
@@ -239,7 +239,7 @@ def _undo_run_stub(*, fail_on=None, release_sha=None, commits=None, record=None)
         if argv[:1] == ["describe"]:
             return "v1.0.0"
         if argv[:3] == ["rev-list", "-n", "1"]:
-            return release_sha or _UNDO_ANCHOR_SHA
+            return release_sha or _UNDO_RELEASE_COMMIT_SHA
         if argv[:1] == ["log"]:
             return log_output
         return ""
@@ -258,8 +258,8 @@ class TestUndoGhDeleteFails:
     """Covers lines 118-120: gh release delete fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -287,8 +287,8 @@ class TestUndoRemoteTagDeleteFails:
     """Covers lines 128-130: git push origin :tag fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -314,8 +314,8 @@ class TestUndoLocalTagDeleteFails:
     """Covers lines 136-138: git tag -d fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -356,8 +356,8 @@ class TestUndoRevertException:
     """
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -389,8 +389,8 @@ class TestUndoRevertException:
             ["revert", "--abort"]):]), "nothing may be committed after the stop"
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -438,8 +438,8 @@ class TestUndoChangelogRestoreFails:
     """Covers lines 216-218: changelog restoration exception."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.generate_changelog", side_effect=Exception("gen failed"))
     @patch(f"{MOD_UNDO}.unfinalize_version", return_value=["unreleased.jsonl"])
     @patch(f"{MOD_UNDO}.get_changes_dir", return_value="/fake/.rlsbl/changes")
@@ -457,7 +457,7 @@ class TestUndoChangelogRestoreFails:
 
         mock_run.side_effect = _undo_run_stub(commits=[
             ("b" * 40, "chore: finalize changelog for 1.0.0"),
-            (_UNDO_ANCHOR_SHA, "v1.0.0"),
+            (_UNDO_RELEASE_COMMIT_SHA, "v1.0.0"),
         ])
         with patch("sys.stdout", new_callable=StringIO) as out:
             with patch("sys.stderr", new_callable=StringIO):
@@ -471,8 +471,8 @@ class TestUndoReleaseFileRestoreFails:
     """Covers lines 232-234: release file restore exception."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", side_effect=Exception("bad"))
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -496,8 +496,8 @@ class TestUndoPushDeclined:
     """Covers lines 240-244: user declines push after revert."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
@@ -517,8 +517,8 @@ class TestUndoPushDeclined:
         # No push_if_needed called -- verified by no push call in mock_run
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.get_current_branch", return_value="main")
@@ -541,8 +541,8 @@ class TestUndoPushFails:
     """Covers lines 255-257: push_if_needed fails."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed", side_effect=Exception("push boom"))
@@ -567,8 +567,8 @@ class TestUndoReleaseFileFinalize:
     """Covers lines 179-182: release-file finalize commit at HEAD is peeled."""
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=["unreleased.toml"])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -590,13 +590,13 @@ class TestUndoReleaseFileFinalize:
         issued = []
         mock_run.side_effect = _undo_run_stub(record=issued, commits=[
             ("b" * 40, "chore: finalize release file for 1.0.0"),
-            (_UNDO_ANCHOR_SHA, "v1.0.0"),
+            (_UNDO_RELEASE_COMMIT_SHA, "v1.0.0"),
         ])
         with patch("sys.stdout", new_callable=StringIO):
             run_cmd("npm", [], {}, ctx=_ctx())
 
         reverted = [a[-1] for a in issued if a[:2] == ["revert", "--no-edit"]]
-        assert reverted == ["b" * 40, _UNDO_ANCHOR_SHA], (
+        assert reverted == ["b" * 40, _UNDO_RELEASE_COMMIT_SHA], (
             "both release commits are reverted, newest first"
         )
         commit_msgs = [a[2] for a in issued if a[:2] == ["commit", "-m"]]
@@ -611,7 +611,7 @@ class TestUndoReleaseFileFinalize:
 class TestUndoFinalizeOnlyReverted:
     """A release with no locatable version-bump commit is REFUSED.
 
-    The archive anchors the release at a finalize-changelog commit and nothing
+    The archive records the release at a finalize-changelog commit and nothing
     in the release's range carries the version-bump subject. This used to be
     treated as a legitimate "finalize-only release": undo reverted the finalize
     commit, deleted the tag and the GitHub Release, and reported success -- the
@@ -620,8 +620,8 @@ class TestUndoFinalizeOnlyReverted:
     registry gate are mocked.
     """
 
-    # No anchor stubs here: this fixture has a REAL archive on disk, and the
-    # anchor it records is the whole point.
+    # No release commit stubs here: this fixture has a REAL archive on disk, and the
+    # release commit it records is the whole point.
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
     @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
     @patch(f"{MOD_UNDO}.push_if_needed")
@@ -684,8 +684,8 @@ class TestUndoCoverageNeverPollutesRealRepo:
     """
 
     @patch(f"{MOD_UNDO}._find_latest_release", new=_latest_release_stub)
-    @patch(f"{MOD_UNDO}._release_anchor", new=_undo_anchor_stub)
-    @patch(f"{MOD_UNDO}._predecessor_anchor", new=_undo_predecessor_stub)
+    @patch(f"{MOD_UNDO}._release_commit", new=_undo_release_commit_stub)
+    @patch(f"{MOD_UNDO}._predecessor_release_commit", new=_undo_predecessor_stub)
     @patch(f"{MOD_UNDO}.run_evidence_gate", side_effect=_undo_cleared_gate)
     @patch(f"{MOD_UNDO}.unfinalize_release_file", return_value=[])
     @patch(f"{MOD_UNDO}.find_workspace_root", return_value=None)
@@ -791,7 +791,7 @@ class TestStatusBranchException:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", side_effect=RuntimeError("boom")), \
-             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.nearest_release_commit", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(version=None, in_checkout=None)), \
              patch(f"{MOD_STATUS}.effects.run",
@@ -835,7 +835,7 @@ class TestStatusNonReleasableProject:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {None: mock_target, "npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
-             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.nearest_release_commit", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(version=None, in_checkout=None)), \
              patch(f"{MOD_STATUS}.effects.run",
@@ -865,7 +865,7 @@ class TestStatusTextOutputPaths:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
-             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.nearest_release_commit", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(version=None, in_checkout=None)), \
              patch(f"{MOD_STATUS}.effects.run",
@@ -877,8 +877,8 @@ class TestStatusTextOutputPaths:
         assert "Changelog: (not found)" in out
         assert "Released:  (none)" in out
 
-    def test_unanchorable_latest_is_annotated(self, capsys, tmp_path):
-        """An unanchorable latest release says so on the status line.
+    def test_unrecoverable_latest_is_annotated(self, capsys, tmp_path):
+        """An unrecoverable latest release says so on the status line.
 
         ``LatestReleaseFact.label()`` is the one renderer of this annotation;
         status re-implemented it by hand and knew only the
@@ -901,10 +901,10 @@ class TestStatusTextOutputPaths:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
-             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.nearest_release_commit", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(
-                       version="1.0.0", in_checkout=None, unanchorable=True)), \
+                       version="1.0.0", in_checkout=None, unrecoverable=True)), \
              patch(f"{MOD_STATUS}.effects.run",
                    side_effect=_status_git_log(returncode=128)), \
              patch(f"{MOD_STATUS}.is_clean_tree", return_value=True):
@@ -931,7 +931,7 @@ class TestStatusTextOutputPaths:
              patch(f"{MOD_STATUS}.detect_targets", return_value=[entry]), \
              patch(f"{MOD_STATUS}.TARGETS", {"npm": mock_target}), \
              patch(f"{MOD_STATUS}.get_current_branch", return_value="main"), \
-             patch(f"{MOD_STATUS}.range_anchor", return_value=None), \
+             patch(f"{MOD_STATUS}.nearest_release_commit", return_value=None), \
              patch(f"{MOD_STATUS}.latest_release_fact",
                    return_value=LatestReleaseFact(
                        version="2.0.0", in_checkout=False)), \
@@ -969,7 +969,7 @@ class TestUnreleasedNonReleasable:
         # every exception.
         with patch("rlsbl.commands.unreleased.resolve_release_scope",
                    return_value=(mock_proj, None, "/ws/devnode/.rlsbl/changes", None)), \
-             patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
+             patch("rlsbl.commands.unreleased.nearest_release_commit", return_value=None), \
              patch("rlsbl.commands.unreleased.latest_release_fact",
                    return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
              patch("rlsbl.commands.unreleased._get_commits_since", return_value=commits):
@@ -994,7 +994,7 @@ class TestUnreleasedNonReleasable:
         # every exception.
         with patch("rlsbl.commands.unreleased.resolve_release_scope",
                    return_value=(mock_proj, None, "/ws/devnode/.rlsbl/changes", None)), \
-             patch("rlsbl.commands.unreleased.range_anchor", return_value=None), \
+             patch("rlsbl.commands.unreleased.nearest_release_commit", return_value=None), \
              patch("rlsbl.commands.unreleased.latest_release_fact",
                    return_value=LatestReleaseFact(version="1.0.0", in_checkout=True)), \
              patch("rlsbl.commands.unreleased._get_commits_since", return_value=commits):
@@ -1082,12 +1082,12 @@ class TestReleaseEnvFile:
         release_config.description = "test"
         release_config.context = ""
         release_config.blog = False
-        # A pre-release file carries no anchor and no unanchorable marker --
+        # A pre-release file carries no release commit and no unrecoverable marker --
         # the release flow writes those into the archive. A MagicMock answers
         # every attribute, so all three are pinned to their absent value.
         release_config.candidate_sha = None
         release_config.tree_hashes = None
-        release_config.unanchorable = None
+        release_config.unrecoverable = None
 
         # Patch load_env_file to actually set the env var
         monkeypatch.setenv("CF_ACCOUNT_ID", "test123")

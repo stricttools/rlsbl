@@ -8,7 +8,7 @@ from .config import LanguageLintConfig
 from .result import LintResult
 from .utils import walk_source_files
 
-# Regex patterns for source analysis (anchored to reduce false positives in strings)
+# Regex patterns for source analysis (pinned to reduce false positives in strings)
 _IMPORT_RE = re.compile(r"^import\s+(\w+)")
 _FROM_IMPORT_RE = re.compile(r"^from\s+(\w+)")
 _PRINT_RE = re.compile(r"\bprint\s*\(")

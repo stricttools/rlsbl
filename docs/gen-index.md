@@ -14,7 +14,7 @@ order: 90
 - [rlsbl.__main__](../rlsbl-__main__/)
 - [rlsbl._effects_direct](../rlsbl-_effects_direct/)
 - [rlsbl.action_versions](../rlsbl-action_versions/)
-- [rlsbl.anchor_remap](../rlsbl-anchor_remap/)
+- [rlsbl.release_commit_remap](../rlsbl-release_commit_remap/)
 - [rlsbl.changelog.exemptions](../rlsbl-changelog-exemptions/)
 - [rlsbl.changelog.files](../rlsbl-changelog-files/)
 - [rlsbl.changelog.generate](../rlsbl-changelog-generate/)

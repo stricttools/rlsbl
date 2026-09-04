@@ -41,7 +41,7 @@ def register_release_checks(app):
 
     @app.error_check("unpublished-refs")
     def check_unpublished_refs(ctx, reporter):
-        """Every released version's refs exist at its anchor, and its tag carries a Release."""
+        """Every released version's refs exist at its release commit, and its tag carries a Release."""
         from ..commands.release_reconcile import ReconcileError, list_releases
         from ..errors import RlsblError
         from ..release_file import (
@@ -125,7 +125,7 @@ def register_release_checks(app):
         wrong_commit = 0
         missing_release = 0
         unrecoverable = 0
-        # Releases absent for versions the release record records unanchorable. Counted
+        # Releases absent for versions the release record records unrecoverable. Counted
         # for the same reason as their absent refs: reconcile skips such a
         # version entirely, so there is no marker to write and no repair to
         # name.
@@ -148,7 +148,7 @@ def register_release_checks(app):
                     f"so the refs it should own are unknown."
                 )
                 continue
-            anchor = None if archive.unanchorable else archive.candidate_sha
+            release_commit = None if archive.unrecoverable else archive.candidate_sha
 
             try:
                 expected = target.expected_refs(version, ref_ctx)
@@ -163,8 +163,8 @@ def register_release_checks(app):
             for ref in expected.tags:
                 local_commit = local.commits.get(ref)
                 if local_commit is None:
-                    if anchor is None:
-                        # The archive records this version as UNANCHORABLE:
+                    if release_commit is None:
+                        # The archive records this version as UNRECOVERABLE:
                         # its commit is permanently unrecoverable, so there is
                         # nothing to recreate the ref at and no repair to name.
                         # Counted and surfaced rather than passed over silently,
@@ -179,11 +179,11 @@ def register_release_checks(app):
                     )
                     continue
 
-                if anchor and not _same_commit(local_commit, anchor):
+                if release_commit and not _same_commit(local_commit, release_commit):
                     wrong_commit += 1
                     reporter.error(
                         f"{version}: the ref {ref} points at {local_commit} but "
-                        f"the release anchored {anchor}. The archive is the "
+                        f"the release recorded {release_commit}. The archive is the "
                         f"record the release flow wrote, and rlsbl rewrites one "
                         f"only through its own documented unlock paths, so the "
                         f"ref moved. {_REMEDY}"
@@ -212,7 +212,7 @@ def register_release_checks(app):
                 continue
             if primary in releases:
                 continue
-            if anchor is None:
+            if release_commit is None:
                 unrecoverable_release += 1
                 continue
             missing_release += 1
@@ -233,12 +233,12 @@ def register_release_checks(app):
             if unrecoverable:
                 scope += (
                     f"; {unrecoverable} ref(s) absent for versions recorded "
-                    f"unanchorable, which have no commit to recreate them at"
+                    f"unrecoverable, which have no commit to recreate them at"
                 )
             if unrecoverable_release:
                 scope += (
                     f"; {unrecoverable_release} GitHub Release(s) absent for "
-                    f"versions recorded unanchorable, which have no anchor to "
+                    f"versions recorded unrecoverable, which have no release commit to "
                     f"mark them with"
                 )
             subjects = "every ref and GitHub Release" if releases is not None \
@@ -440,7 +440,7 @@ def register_networked_release_checks(app):
 def _same_commit(a, b):
     """Do two git object names denote the same commit, allowing abbreviation?
 
-    An anchor may be recorded abbreviated (the schema accepts 7 to 40 hex
+    A release commit may be recorded abbreviated (the schema accepts 7 to 40 hex
     characters) while a resolved ref is always full, so the comparison is by
     common prefix -- the same rule the release record applies.
     """
