@@ -1272,6 +1272,37 @@ class TestOverrides:
         plan = backfill.build_plan(str(repo), use_gh=False, overrides=overrides)
         assert plan.changed_versions == []
 
+    def test_a_context_carrying_file_is_idempotent_too(self, repo, tmp_path):
+        """The context branch had no equality guard, so a second run with the
+        same reviewed file planned a write forever."""
+        overrides = backfill.read_overrides(write_overrides(
+            tmp_path,
+            '[versions."0.1.0"]\ndescription = "The reviewed summary."\n'
+            'context = "Why the release happened."\n',
+        ))
+        run_backfill(repo, overrides=overrides)
+        assert read_toml(
+            repo / ".rlsbl" / "releases" / "v0.1.0.toml"
+        )["context"] == "Why the release happened."
+
+        plan = backfill.build_plan(str(repo), use_gh=False, overrides=overrides)
+        assert plan.changed_versions == []
+
+    def test_a_changed_context_is_still_written(self, repo, tmp_path):
+        run_backfill(repo, overrides=backfill.read_overrides(write_overrides(
+            tmp_path,
+            '[versions."0.1.0"]\ndescription = "d"\ncontext = "The first take."\n',
+        )))
+        overrides = backfill.read_overrides(write_overrides(
+            tmp_path,
+            '[versions."0.1.0"]\ndescription = "d"\ncontext = "The reviewed take."\n',
+            name="second.toml",
+        ))
+        run_backfill(repo, overrides=overrides)
+        assert read_toml(
+            repo / ".rlsbl" / "releases" / "v0.1.0.toml"
+        )["context"] == "The reviewed take."
+
     def test_a_version_the_pass_does_not_have_is_a_hard_error(self, repo, tmp_path):
         overrides = backfill.read_overrides(write_overrides(
             tmp_path, '[versions."9.9.9"]\ndescription = "nothing has this"\n',

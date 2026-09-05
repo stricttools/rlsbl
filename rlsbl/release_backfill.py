@@ -535,6 +535,7 @@ class ArchiveState:
     never_released: bool
     shipped_as: str | None
     description: str
+    context: str
     candidate_sha: str
 
     @property
@@ -553,6 +554,7 @@ def read_archive_state(path):
         except tomllib.TOMLDecodeError as exc:
             raise BackfillError(f"{path}: unparseable TOML: {exc}") from exc
     description = data.get("description")
+    context = data.get("context")
     return ArchiveState(
         present={k for k in REQUIRED_FIELDS if k in data},
         recorded=any(f in data for f in RELEASE_COMMIT_FIELDS),
@@ -567,6 +569,10 @@ def read_archive_state(path):
         never_released=bool(data.get(NEVER_RELEASED_FIELD)),
         shipped_as=data.get(SHIPPED_AS_FIELD),
         description=description if isinstance(description, str) else "",
+        # Read for the same reason the description is: an override that
+        # restates what the archive already says is not a change, and a
+        # re-plan of it on every run would make the pass never settle.
+        context=context if isinstance(context, str) else "",
         candidate_sha=(
             data["candidate_sha"] if isinstance(data.get("candidate_sha"), str)
             else ""
@@ -1251,7 +1257,11 @@ def _plan_version(repo, scope, version, *, predecessor, archives, changelogs,
         vp.description = override.description
         vp.description_source = "overrides-file"
         vp.fill_fields["description"] = (vp.description, "overrides-file")
-    if override is not None and override.context:
+    if (
+        override is not None
+        and override.context
+        and state.context.strip() != override.context
+    ):
         vp.context = override.context
         vp.fill_fields["context"] = (override.context, "overrides-file")
     for name, (value, source) in vp.fill_fields.items():
