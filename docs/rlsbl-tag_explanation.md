@@ -1,6 +1,6 @@
 ---
 title: rlsbl.tag_explanation
-description: "The one consultation over whether a tag is accounted for: by an archived version under the current scheme, by an archive's recorded shipped_as spelling, or by the transition record."
+description: "The one consultation over whether a tag is accounted for: by an archived version whose refs include it, by an archive's recorded shipped_as spelling, or by the transition record."
 generated: true
 nav_group: "API Reference"
 nav_order: 151
