@@ -3432,6 +3432,16 @@
       "needs_network": false,
       "depends_on": []
     },
+    "stash-free": {
+      "tags": [
+        "project"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": []
+    },
     "strictspec-certificate-gate": {
       "tags": [
         "project",
