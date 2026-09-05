@@ -1214,16 +1214,16 @@ def cmd_release_yank(ctx, reason, use, version):
 # two `Requires` constraints that used to say so from the outside are gone,
 # and `--replace` under `--file` is now a scope error naming both sides.
 
-@strictcli.choice("pattern", help="Match mode: rewrite every occurrence of a regex throughout history")
+@strictcli.choice("pattern", help="Match mode: rewrite every occurrence of a regular expression throughout the repository's history, in every file of every commit the chosen range covers")
 class ScrubPattern:
-    value: str = strictcli.member_value(help="regex pattern to match against file contents")
+    value: str = strictcli.member_value(help="regular expression matched against file contents in every commit of the chosen range; each match is replaced by --replace, or by same-length random ASCII under --mangle")
     replace: str = strictcli.sub_flag(presence="optional", help="literal text to substitute for each match (mutually exclusive with --mangle)")
     mangle: bool = strictcli.sub_flag(presence="optional", negatable=False, help="replace matched content with random ASCII of the same length (mutually exclusive with --replace)")
 
 
-@strictcli.choice("file", help="File mode: rewrite one file throughout history")
+@strictcli.choice("file", help="File mode: rewrite one file throughout the repository's history, replacing every past version of it with the copy on disk now")
 class ScrubFile:
-    value: str = strictcli.member_value(help="path of the file to rewrite throughout history; it is replaced with its current on-disk content, or removed if absent (requires --from-commit)")
+    value: str = strictcli.member_value(help="repository-relative path of the file to rewrite throughout history; every commit's version of it is replaced with its current on-disk content, or removed from that commit if the file is absent on disk (requires --from-commit)")
 
 
 @strictcli.choice("recipe", help="Recipe mode: execute a scrub recipe TOML via safegit scrub run")
@@ -1231,9 +1231,9 @@ class ScrubRecipe:
     value: str = strictcli.member_value(help="path to a scrub recipe TOML file; per-operation pattern/replace/mangle live inside the recipe")
 
 
-@strictcli.choice("from-commit", help="Rewrite from one commit onward")
+@strictcli.choice("from-commit", help="Rewrite the commits descended from one named commit onward, leaving every commit before it exactly as it is")
 class ScrubFromCommit:
-    value: str = strictcli.member_value(help="SHA of the earliest commit to rewrite (all descendants are also rewritten)")
+    value: str = strictcli.member_value(help="SHA of the earliest commit to rewrite; every commit descended from it is rewritten too, and every commit before it keeps its current hash")
 
 
 @strictcli.choice("entire-history", help="Rewrite every commit in the repository from the initial commit onward (match and recipe modes only; file mode requires --from-commit)")
@@ -2514,7 +2514,7 @@ rewrite = app.group("rewrite", help="Sweeping rewrites of the current working tr
 
 @rewrite.command(name="go-module-path", help="Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-scoped. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, non-Go files and vendored trees are never touched. Use --dry-run to print the per-file plan with occurrence counts.", effect="mutating")
 @strictcli.flag(name="from-module", type=str, presence="required", help="The Go module path being renamed away from. It need not be DECLARED here: a repository that only references the module is a consumer following an upstream move, and the plan reports that as a fact while rewriting the references. What is required is that something references it -- a path with zero occurrences anywhere in the repository is a hard error, because the overwhelmingly likely cause is a typo.")
-@strictcli.flag(name="to-module", type=str, presence="required", help="The Go module path to rename to")
+@strictcli.flag(name="to-module", type=str, presence="required", help="The Go module path to rename to. It is written into every go.mod token naming the old path and into every import site under it, so it must be the module path consumers will resolve after the move -- not a directory, and not a package path inside the module.")
 @effects.handler
 def cmd_rewrite_go_module_path(ctx, from_module, to_module):
     """Rename a Go module path across every go.mod and import site."""
