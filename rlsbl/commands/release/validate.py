@@ -1575,9 +1575,11 @@ def _patch_schema_version(project_dir, version):
     replacement = f'  "version": {json.dumps(version, ensure_ascii=False)}{match.group(1)}'
     patched = content[:match.start()] + replacement + content[match.end():]
 
-    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
-    # here before the chokepoint absorbed it (see the effects module).
-    effects.atomic_write_text(schema_path, patched, file_mode=0o600)
+    # preserve_mode: this is a REWRITE of a committed file strictcli dumped, so
+    # the patch changes what it says and nothing else. Pinning 0o600 here (the
+    # mode the older mkstemp-based hand-rolled write happened to leave) turned
+    # an ordinary 0o644 schema into an owner-only one on the first release.
+    effects.atomic_write_text(schema_path, patched, preserve_mode=True)
 
 
 def validate_blog_body(project_dir, blog_enabled, *, releases_dir=None):

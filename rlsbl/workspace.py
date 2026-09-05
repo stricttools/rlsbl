@@ -84,9 +84,12 @@ def write_releasable_version(workspace_root, releasable_name, version):
     target_dir = os.path.dirname(path)
     effects.makedirs(target_dir, exist_ok=True)
 
-    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
-    # here before the chokepoint absorbed it (see the effects module).
-    effects.atomic_write_text(path, version + "\n", file_mode=0o600)
+    # preserve_mode: the version file is committed and read by humans, and every
+    # write after the first is a rewrite. Pinning 0o600 (the mode the older
+    # mkstemp-based hand-rolled write happened to leave) narrowed it to
+    # owner-only on the releasable's first bump; a file that does not exist yet
+    # is created at the umask default, like any other new file.
+    effects.atomic_write_text(path, version + "\n", preserve_mode=True)
 
 
 def find_workspace_root(start_path="."):

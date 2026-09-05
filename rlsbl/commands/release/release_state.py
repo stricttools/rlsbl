@@ -295,8 +295,13 @@ def save_release_state(state_path: str, state_dict: dict) -> None:
     # for a directory that already exists.
     if parent and not os.path.isdir(parent):
         effects.makedirs(parent, exist_ok=True)
-    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
-    # here before the chokepoint absorbed it (see the effects module).
+    # 0o600 is DELIBERATE here, not the historical accident it was at the
+    # rewriter call sites (which preserve an existing file's bits instead).
+    # in-progress.json is gitignored, transient, tool-owned bookkeeping: rlsbl
+    # alone creates it, rewrites it step by step and deletes it, and no human or
+    # other tool reads it. Stating the mode outright keeps it identical whichever
+    # of its two writers ran last (the other is ``_do_record_candidate`` in
+    # phase_a) rather than inheriting whatever umask started the release.
     effects.atomic_write_text(
         state_path, json.dumps(state_dict, indent=2) + "\n", file_mode=0o600,
     )

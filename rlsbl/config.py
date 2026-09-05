@@ -1085,9 +1085,12 @@ def write_project_config(key, value, project_root):
     effects.makedirs(parent, exist_ok=True)
     existing = read_json_config(config_path)
     existing[key] = value
-    # file_mode pins the 0o600 the mkstemp-based hand-rolled write produced
-    # here before the chokepoint absorbed it (see the effects module).
+    # preserve_mode: .rlsbl/config.json is committed and hand-edited, so a key
+    # write must not narrow it. Pinning 0o600 (the mode the older mkstemp-based
+    # hand-rolled write happened to leave) made an ordinary 0o644 config
+    # owner-only the first time any command set a key. A config that does not
+    # exist yet is created at the umask default, like any other new file.
     effects.atomic_write_text(
-        config_path, json.dumps(existing, indent=2) + "\n", file_mode=0o600,
+        config_path, json.dumps(existing, indent=2) + "\n", preserve_mode=True,
     )
     return existing

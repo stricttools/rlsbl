@@ -1149,8 +1149,14 @@ class _Executor:
         return None
 
     def _do_bump_selfdoc(self, step):
+        # preserve_mode: selfdoc.json is committed, and this step is a pure
+        # REWRITE -- the plan builder derives no content at all when the file is
+        # absent (``_bump_selfdoc_version_content`` returns None), so the step
+        # never creates one. Pinning 0o600 (the mode the older mkstemp-based
+        # hand-rolled write happened to leave) narrowed an ordinary 0o644
+        # selfdoc.json to owner-only on the first release that bumped it.
         effects.atomic_write_text(
-            step.payload["path"], step.payload["content"], file_mode=0o600,
+            step.payload["path"], step.payload["content"], preserve_mode=True,
         )
         self._log("Synced version to selfdoc.json")
         return None
@@ -1363,6 +1369,10 @@ class _Executor:
         content = self._resolve(
             dataclasses.replace(step.payload["ref"], template=template)
         )
+        # 0o600 is deliberate: this is the release-state file, gitignored
+        # transient tool-owned bookkeeping, and the mode is stated outright by
+        # both of its writers so it never depends on which step wrote last. See
+        # ``save_release_state``, the other one.
         effects.atomic_write_text(path, content, file_mode=0o600)
         return None
 

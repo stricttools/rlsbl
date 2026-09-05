@@ -173,7 +173,10 @@ class NativeIosTarget(BaseTarget):
 def _atomic_write(path, content):
     """Write content to path atomically.
 
-    file_mode pins the 0o600 this helper's mkstemp-based body produced before
-    the chokepoint absorbed it (see the effects module).
+    ``preserve_mode``: every caller rewrites a file the consumer's project
+    already carries (project.pbxproj, Info.plist, Project.swift), so bumping the
+    version must not change what those files ARE. Pinning 0o600 -- the mode this
+    helper's older mkstemp-based body happened to leave -- made them owner-only
+    on the first release.
     """
-    effects.atomic_write_text(path, content, file_mode=0o600)
+    effects.atomic_write_text(path, content, preserve_mode=True)
