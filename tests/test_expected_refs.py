@@ -1,10 +1,15 @@
 """``expected_refs`` is the single authority for a version's full ref set.
 
-Three sources compose into one answer -- the primary tag, the ecosystem's
-companion tags, and the aliases the transition record attributes to the version --
-and the release's tag step creates exactly that set. These tests pin both: the
-composition itself, and the equality between what the release pushes and what
-the authority names.
+Three groups compose into one answer -- the primary tag, the ecosystem's
+companion tags, and the aliases this repository's own records attribute to the
+version -- and the release's tag step creates exactly that set. These tests pin
+both: the composition itself, and the equality between what the release pushes
+and what the authority names.
+
+The alias group has two sources. The ``boundary-alias`` events pinned here are
+one; the archives' ``shipped_as`` fields are the other, pinned in
+``tests/test_shipped_as_expected_refs.py`` together with the hard error the two
+raise when they disagree about one version.
 """
 
 import json

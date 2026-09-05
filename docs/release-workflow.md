@@ -292,6 +292,10 @@ An archive recording none of the three is a hard error at every read-for-use sit
 
 `shipped_as` is orthogonal to the three. It names the historical tag spelling a version actually shipped under when that differs from the scheme in effect today (`strictcli@v0.12.0` on a version now tagged `v0.12.0`, say). Legal on a recorded and on an unrecoverable archive; refused on a never-released one, which shipped under nothing.
 
+**`shipped_as` is a recorded alias, and the current spelling is what the version expects.** `expected_refs` — the single authority for the refs one version owns — reads the field alongside the `boundary-alias` events in the transition record, and both groups feed the same answer: the old spelling is an explained ref belonging to that version, while the version's expected *primary* ref is the current scheme's spelling. So a renamed releasable's past versions are repairable rather than permanently half-tagged: `rlsbl release reconcile` finds the current spelling absent and mints it at the archive's release commit through its ordinary materialize verdict (create the tag at that commit, push it — no other write), and the old-spelling tag stands where it is, explained, neither moved nor deleted.
+
+When both sources cover one version and name *different* spellings, the ref set cannot be derived: the error names both sources with both spellings and stops there. Neither outranks the other — they are contradictory statements about which ref a published version owns — so correcting whichever one is wrong is the operator's call, not a precedence rule's.
+
 ### The CI gate
 
 The gate blocks the irreversible half of the release until the repository's own CI has spoken about the candidate commit, and it distinguishes four outcomes rather than collapsing them into pass/fail. The distinction matters because the right operator response differs sharply between a definite failure, an unfinished wait, and a repository that simply has no CI to wait for:
