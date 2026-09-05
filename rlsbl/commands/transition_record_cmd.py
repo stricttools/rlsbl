@@ -65,12 +65,13 @@ from ..transition_record import (
 )
 from ..utils import commit_files
 
-#: The kinds this door writes, each with the flag that elects it and the name
-#: of the event field its value goes into. The two operator-declared kinds and
-#: nothing else: every other kind is written by the surgery that produced it.
+#: The kinds this door writes, each with the flag that elects it. The two
+#: operator-declared kinds and nothing else: every other kind is written by the
+#: surgery that produced it. The CLI boundary reads the flag name from here to
+#: refuse an empty subject under the spelling the caller actually typed.
 OPERATOR_KINDS = {
-    KIND_NON_VERSION_TAG: ("--non-version-tag", "tag"),
-    KIND_RELEASE_HISTORY_CLOSED: ("--release-history-closed", "subject"),
+    KIND_NON_VERSION_TAG: "--non-version-tag",
+    KIND_RELEASE_HISTORY_CLOSED: "--release-history-closed",
 }
 
 

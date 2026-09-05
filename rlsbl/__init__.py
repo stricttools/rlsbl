@@ -2504,7 +2504,7 @@ def cmd_transition_record(
     )
     # The subject's flag is whichever member elected, and OPERATOR_KINDS is
     # what already knows its spelling.
-    subject_flag = OPERATOR_KINDS[kind][0].lstrip("-").replace("-", "_")
+    subject_flag = OPERATOR_KINDS[kind].lstrip("-").replace("-", "_")
     _refuse_empty_flags(reason=reason, **{subject_flag: fact.value})
     root = _require_project_root()
     from .workspace import find_workspace_root
