@@ -82,6 +82,13 @@ class RefContext:
             fields may name a version's historical tag spelling, in read order.
             Derived from the same fork as ``transition_record_paths``, so the
             two alias sources are always read for the same project.
+        tag_explanation_record_paths: the transition records consulted for facts
+            about the repository's TAG NAMESPACE -- "is this tag explained?" --
+            in read order. This project's own record PLUS the repository-scoped
+            one, because a tag name is repository-unique and
+            ``rlsbl transition record`` writes its ``non-version-tag``
+            declarations repository-wide. Wider than
+            ``transition_record_paths`` on purpose: see :func:`ref_context`.
     """
 
     repo_root: str
@@ -93,6 +100,7 @@ class RefContext:
     releasable_config_dir: str | None = None
     transition_record_paths: tuple[str, ...] = ()
     releases_dirs: tuple[str, ...] = ()
+    tag_explanation_record_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -133,20 +141,35 @@ def ref_context(
     member_package_paths=None,
     releasable_config_dir=None,
 ) -> RefContext:
-    """Build a :class:`RefContext`, deriving which alias sources to consult.
+    """Build a :class:`RefContext`, deriving which records to consult.
 
-    Exactly ONE transition record and ONE releases directory are consulted, and
-    which ones follows the project's release identity: a releasable's own state
-    directory when a releasable owns the versioning, otherwise the project's
-    standalone ``.rlsbl/``. The two are derived from the same fork, so an alias
-    event and a ``shipped_as`` field can only ever be read for the same
-    project. The workspace-scoped record is deliberately NOT consulted -- it
-    holds facts about the repository (which tag globs departed), and an alias
-    recorded there for a different releasable could carry the same version
-    number as this one.
+    TWO different questions read transition records here, and they are scoped
+    differently on purpose:
+
+    * **Version-keyed alias derivation** (``transition_record_paths``, and the
+      ``releases_dirs`` whose ``shipped_as`` fields say the same kind of thing)
+      consults exactly ONE record and ONE releases directory, following the
+      project's release identity: a releasable's own state directory when a
+      releasable owns the versioning, otherwise the project's standalone
+      ``.rlsbl/``. The two are derived from the same fork, so an alias event and
+      a ``shipped_as`` field can only ever be read for the same project. The
+      repository-scoped record is deliberately NOT consulted for this: an alias
+      recorded there for a DIFFERENT releasable could carry the same version
+      number as this one, and versions collide across releasables.
+    * **The tag-namespace question** (``tag_explanation_record_paths``, read by
+      :mod:`rlsbl.tag_explanation`) consults that record AND the
+      repository-scoped one. It is keyed by TAG NAME, which is unique across a
+      repository, so nothing can collide -- and the operator's door for the
+      declaration, ``rlsbl transition record --non-version-tag``, writes the
+      repository-scoped record for exactly that reason. Consulting only the
+      releasable's record would leave the declaration unread and keep
+      ``rlsbl release reconcile`` firing its tripwire on the tag it silences.
     """
     from ..release_file import get_releases_dir
-    from ..transition_record import get_transition_record_path
+    from ..transition_record import (
+        get_transition_record_path,
+        repository_transition_record_path,
+    )
 
     root = str(repo_root)
     if releasable_config_dir:
@@ -156,6 +179,10 @@ def ref_context(
         project_dir = os.path.join(root, project_path) if project_path else root
         paths = (get_transition_record_path(project_dir),)
         releases = (get_releases_dir(project_dir),)
+
+    namespace_paths = tuple(dict.fromkeys(
+        (*paths, repository_transition_record_path(root))
+    ))
 
     return RefContext(
         repo_root=root,
@@ -172,6 +199,7 @@ def ref_context(
         ),
         transition_record_paths=paths,
         releases_dirs=releases,
+        tag_explanation_record_paths=namespace_paths,
     )
 
 

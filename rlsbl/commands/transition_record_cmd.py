@@ -25,12 +25,17 @@ in a committed store is worth a typed door.
 WHERE IT WRITES: the repository-scoped record --
 ``<root>/.rlsbl-monorepo/transitions.jsonl`` in a workspace, and
 ``<root>/.rlsbl/transitions.jsonl`` in a standalone repository, which is
-:func:`rlsbl.release_backfill.repository_transition_record`'s answer and
+:func:`rlsbl.transition_record.repository_transition_record_path`'s answer and
 therefore exactly the file the backfill's refusal names and reads back.  Both
 kinds go there rather than into a releasable's own state directory: a tag
 namespace belongs to the repository, and a releasable whose release history
 just closed may be a releasable whose state directory is about to leave with
 it.
+
+The same resolution is what :func:`rlsbl.targets.refs.ref_context` adds to the
+records the TAG-NAMESPACE question consults, so a ``non-version-tag`` declared
+here is seen by ``rlsbl release reconcile`` in a workspace as well as in a
+standalone repository.
 
 WHAT IT REFUSES: an empty subject or reason (the schema calls both non-empty,
 and a declaration with no stated reason is not an audit trail), a second
@@ -46,7 +51,6 @@ import os
 import sys
 
 from .. import effects
-from ..release_backfill import repository_transition_record
 from ..transition_record import (
     KIND_NON_VERSION_TAG,
     KIND_RELEASE_HISTORY_CLOSED,
@@ -54,6 +58,7 @@ from ..transition_record import (
     ReleaseHistoryClosedEvent,
     append_event,
     read_events,
+    repository_transition_record_path,
     serialize_event,
 )
 from ..utils import commit_files
@@ -115,7 +120,7 @@ def run_cmd(flags, *, ctx):
     # The whole repository, not one member: the record this writes is the one
     # the readers of the repository's tag namespace consult.
     repo = str(ctx.workspace_root or ctx.project_root)
-    path = repository_transition_record(repo)
+    path = repository_transition_record_path(repo)
 
     for existing in read_events(path, kinds=[kind]):
         if _subject_of(existing) != subject:

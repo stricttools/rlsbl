@@ -91,7 +91,10 @@ from .release_file import (
 )
 from .tag_explanation import SOURCE_NON_VERSION_TAG, build as build_tag_explanations
 from .tag_glob import TagMode, parse_version_tag
-from .transition_record import get_transition_record_path
+from .transition_record import (
+    get_transition_record_path,
+    repository_transition_record_path,
+)
 from .utils import commit_files, extract_changelog_entry_from_text
 
 
@@ -369,18 +372,6 @@ def discover_scopes(repo):
         )
 
     return scopes
-
-
-def repository_transition_record(repo):
-    """The record a fact about THIS REPOSITORY's tag namespace belongs in.
-
-    A workspace has no ``<root>/.rlsbl/`` at all, so a repository-wide fact
-    goes in the workspace-scoped record; a standalone repository has only the
-    one.  This is what the unexplained-tag error names.
-    """
-    if os.path.isfile(os.path.join(repo, ".rlsbl-monorepo", "workspace.toml")):
-        return get_transition_record_path(repo, workspace=True)
-    return get_transition_record_path(repo)
 
 
 # ---------------------------------------------------------------------------
@@ -817,7 +808,7 @@ def build_plan(repo, *, use_gh=True, gh=None, overrides=None):
     overrides = dict(overrides or {})
     plan = Plan(
         repo=repo, scopes=scopes,
-        transition_record_path=repository_transition_record(repo),
+        transition_record_path=repository_transition_record_path(repo),
     )
 
     known_tags = {}   # tag -> version, for every scope spelling that resolves

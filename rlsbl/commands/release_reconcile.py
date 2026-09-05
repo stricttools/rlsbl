@@ -1243,8 +1243,13 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
     # non-version-tag answer changes anything here: the two archive-backed
     # sources name a version, which the release-record pass below judges on its
     # own terms.
+    #
+    # The records read are the TAG-NAMESPACE set, which is wider than the
+    # version-keyed alias set: it carries the repository-scoped record too,
+    # because that is where `rlsbl transition record --non-version-tag` writes
+    # and a tag name is unique across a repository.
     outside_the_model = build_tag_explanations(
-        transition_record_paths=ref_ctx.transition_record_paths,
+        transition_record_paths=ref_ctx.tag_explanation_record_paths,
     ).non_version_tags
     for tag in outside_the_model:
         claimed.add(f"refs/tags/{tag}")

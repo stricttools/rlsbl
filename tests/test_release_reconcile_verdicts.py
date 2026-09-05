@@ -345,6 +345,105 @@ class TestRecordedNonVersionTags:
         assert "nightly" in out
 
 
+class TestRecordedNonVersionTagsInAWorkspace:
+    """The declaration is written repository-wide, so it must be READ that way.
+
+    ``rlsbl transition record --non-version-tag`` writes the REPOSITORY-scoped
+    record (``.rlsbl-monorepo/transitions.jsonl`` in a workspace), because a tag
+    namespace belongs to the repository rather than to any one releasable. A
+    reconcile that consulted only the releasable's own record would never see
+    the declaration an operator just made, and would keep firing the publication
+    tripwire on the very tag the command exists to silence.
+    """
+
+    def _workspace(self, tmp_path):
+        from conftest import make_workspace
+
+        repo = tmp_path / "ws"
+        core = repo / "packages" / "core"
+        (core / ".rlsbl").mkdir(parents=True)
+        (core / ".rlsbl" / "config.json").write_text(
+            json.dumps({"publish_mode": "ci", "targets": ["plain"]}) + "\n",
+            encoding="utf-8",
+        )
+        rel_dir = repo / ".rlsbl-monorepo" / "releasables" / "core"
+        (rel_dir / "releases").mkdir(parents=True)
+        make_workspace(
+            repo,
+            [{"path": "packages/core", "name": "core", "releasable": "core"}],
+            releasables=[{"name": "core", "tag_format": "{name}@v{version}"}],
+        )
+        write_archived_release_file(
+            str(rel_dir / "releases"), "1.0.0", bump="minor", include=["plain"],
+            description="The first release.",
+            candidate_sha=NEW, tree_hashes={"packages/core": "f" * 40},
+        )
+        return repo, rel_dir
+
+    def _preview(self, repo, rel_dir):
+        return build_preview(
+            observation=Observation(
+                remote_refs={
+                    "refs/tags/core@v1.0.0": NEW,
+                    "refs/tags/core@v1.0.0^{}": NEW,
+                    "refs/tags/nightly": UNRELATED,
+                    "refs/tags/nightly^{}": UNRELATED,
+                },
+                local_refs={
+                    "refs/tags/core@v1.0.0": NEW,
+                    "refs/tags/core@v1.0.0^{}": NEW,
+                    "refs/tags/nightly": OLD,
+                    "refs/tags/nightly^{}": OLD,
+                },
+                releases=frozenset({"core@v1.0.0"}), releases_known=True,
+            ),
+            explanations=Explanations(),
+            target=BaseTarget(),
+            ref_ctx=ref_context(
+                repo_root=str(repo),
+                project_path="packages/core",
+                primary_tag_format="{name}@v{version}",
+                releasable_name="core",
+                member_package_paths=["packages/core"],
+                releasable_config_dir=str(rel_dir),
+            ),
+            releases_dir=str(rel_dir / "releases"),
+        )
+
+    def test_the_cli_recorded_declaration_is_seen_by_reconcile(self, tmp_path):
+        repo, rel_dir = self._workspace(tmp_path)
+        append_event(
+            get_transition_record_path(str(repo), workspace=True),
+            NonVersionTagEvent(tag="nightly", reason="a nightly build marker"),
+        )
+
+        preview = self._preview(repo, rel_dir)
+
+        assert refusals(preview) == [], (
+            "the repository-scoped record is where `rlsbl transition record` "
+            "writes, so reconcile must consult it"
+        )
+        assert preview.by_key("refs/tags/nightly") is None
+
+    def test_without_the_declaration_the_divergence_still_trips_the_wire(
+        self, tmp_path,
+    ):
+        repo, rel_dir = self._workspace(tmp_path)
+        preview = self._preview(repo, rel_dir)
+        assert [i.key for i in refusals(preview)] == ["refs/tags/nightly"]
+
+    def test_the_releasables_own_record_is_still_consulted(self, tmp_path):
+        repo, rel_dir = self._workspace(tmp_path)
+        append_event(
+            get_transition_record_path(str(repo), releasable_dir=str(rel_dir)),
+            NonVersionTagEvent(tag="nightly", reason="recorded per releasable"),
+        )
+
+        preview = self._preview(repo, rel_dir)
+
+        assert refusals(preview) == []
+
+
 class TestTheTripwire:
 
     def test_one_refusal_is_reported_over_every_repairable_subject(

@@ -61,6 +61,10 @@ The first two mirror :func:`rlsbl.release_file.get_releases_dir` exactly -- the
 same ``releasable_dir``-or-``.rlsbl`` fork, so the two state homes never drift
 apart.
 
+:func:`repository_transition_record_path` picks between the second and the
+third by repository shape, and is the one resolution every reader and writer of
+a repository-scoped fact asks.
+
 The third exists because some surgery facts are scoped to the REPOSITORY rather
 than to any releasable in it. A departure record is the case that forced it:
 when a releasable is extracted, its tag globs stop belonging to the source, and
@@ -145,7 +149,7 @@ from typing import ClassVar
 
 from . import effects
 from .errors import RlsblError
-from .workspace_types import WORKSPACE_DIR
+from .workspace_types import WORKSPACE_DIR, WORKSPACE_FILE
 
 
 TRANSITION_RECORD_FILENAME = "transitions.jsonl"
@@ -210,6 +214,24 @@ def get_transition_record_path(
     if workspace:
         return os.path.join(project_dir, WORKSPACE_DIR, TRANSITION_RECORD_FILENAME)
     return os.path.join(project_dir, ".rlsbl", TRANSITION_RECORD_FILENAME)
+
+
+def repository_transition_record_path(repo_root: str) -> str:
+    """The record a fact about THIS REPOSITORY belongs in, by repository shape.
+
+    A workspace has no ``<root>/.rlsbl/`` at all, so a repository-wide fact goes
+    in the workspace-scoped record; a standalone repository has only the one.
+
+    This is the single resolution for the question, and every reader and writer
+    of a repository-scoped fact asks it: ``rlsbl transition record`` writes the
+    two operator-declared kinds here, ``rlsbl release backfill``'s
+    unexplained-tag refusal names this file, and
+    :func:`rlsbl.targets.refs.ref_context` adds it to the records the
+    TAG-NAMESPACE question consults.
+    """
+    if os.path.isfile(os.path.join(repo_root, WORKSPACE_DIR, WORKSPACE_FILE)):
+        return get_transition_record_path(repo_root, workspace=True)
+    return get_transition_record_path(repo_root)
 
 
 def transition_record_file_exists(path: str) -> bool:
