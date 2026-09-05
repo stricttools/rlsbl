@@ -39,8 +39,8 @@ EXPECTED_EFFECTS = {
     "discover": "read_only",
     # Watching a FAILED run auto-retries it with `gh run rerun`, which
     # re-dispatches CI: a real change to state on GitHub, so the command is
-    # mutating. It is not consequential -- rerunning a run that already failed
-    # is cheap and reversible, and this command is invoked constantly.
+    # mutating. It is not consequential -- the rerun re-attempts a publication
+    # the operator already authorized at `release run`, deciding nothing new.
     "watch": "mutating",
     "pre-push-check": "read_only",
     "prs": "read_only",
