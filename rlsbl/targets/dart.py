@@ -40,8 +40,9 @@ class DartTarget(BaseTarget):
         pubspec = os.path.join(dir_path, "pubspec.yaml")
         if not os.path.exists(pubspec):
             return False
-        # A pubspec.yaml with a flutter: section is a Flutter project,
-        # not a plain Dart project. Leave those for a future Flutter target.
+        # A pubspec.yaml with a flutter: section is a Flutter project, not a
+        # plain Dart project: FlutterTarget claims it, with the complementary
+        # detection (``"flutter" in data``), so exactly one of the two answers.
         yaml = YAML(typ="safe")
         with open(pubspec, "r", encoding="utf-8") as f:
             data = yaml.load(f)

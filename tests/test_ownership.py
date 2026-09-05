@@ -17,8 +17,6 @@ from rlsbl.ownership import (
     owner_names_of_files,
     releasable_state_dir,
     tool_owned_rule,
-    tool_owned_rules,
-    unowned_paths,
 )
 
 
@@ -93,12 +91,6 @@ class TestToolOwnedSet:
         # ...while the real ones, at the root, stay exempt.
         assert is_tool_owned_path(".rlsbl-monorepo/workspace.toml") is True
         assert is_tool_owned_path(".github/workflows/ci-router.yml") is True
-
-    def test_rules_are_static(self):
-        """No dynamic input: the same path answers the same way, always."""
-        assert tool_owned_rules()
-        for rule in tool_owned_rules():
-            assert not rule.startswith("/")
 
     def test_workspace_machinery_stays_exempt(self):
         """The verify item for 3.7: workspace-machinery paths need no owner."""
@@ -182,7 +174,7 @@ class TestOwnerOf:
     def test_no_root_member_leaves_residual_unowned(self):
         members = [member("pkg")]
         assert owner_of("README.md", members) is None
-        assert unowned_paths(["README.md", "pkg/a.py"], members) == ["README.md"]
+        assert owner_of("pkg/a.py", members)["name"] == "pkg"
 
     def test_owner_names_of_files(self):
         members = [ROOT, member("pkg"), member("lib")]
@@ -230,7 +222,6 @@ class TestSingleOwnerInvariant:
             # The resolver picks exactly one, and it is the most specific claim.
             deepest = max(owners, key=lambda m: len(member_prefix(m)))
             assert resolved["name"] == deepest["name"]
-            assert unowned_paths([path], layout) == []
 
     @pytest.mark.parametrize("layout", LAYOUTS)
     def test_exemption_set_is_excluded_before_attribution(self, layout):

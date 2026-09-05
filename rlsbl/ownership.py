@@ -172,16 +172,6 @@ def is_tool_owned_path(path) -> bool:
     return tool_owned_rule(path) is not None
 
 
-def tool_owned_rules() -> tuple[str, ...]:
-    """Every static rule in the tool-owned set, for messages and tests."""
-    return (
-        tuple(tree + "**" for tree in _TOOL_OWNED_TREES)
-        + _TOOL_OWNED_FILES
-        + tuple(tree + "**" for tree in _ROOT_ONLY_TREES)
-        + _ROOT_ONLY_FILES
-    )
-
-
 # ---------------------------------------------------------------------------
 # Member accessors (WorkspaceProject or plain dict)
 # ---------------------------------------------------------------------------
@@ -294,11 +284,6 @@ def owner_name_of(filepath, members) -> str | None:
     return None if owner is None else member_name(owner)
 
 
-def owners_of_files(files, members) -> dict:
-    """Map each path in *files* to its owning member (or ``None``)."""
-    return {path: owner_of(path, members) for path in files}
-
-
 def owner_names_of_files(files, members) -> set:
     """Return the set of member names owning any path in *files*."""
     names = set()
@@ -357,11 +342,6 @@ class OwnershipScope:
         """Scope covering exactly one member."""
         return cls.for_members(all_members, [one_member])
 
-    @classmethod
-    def everything(cls, all_members) -> "OwnershipScope":
-        """Scope covering every member of the workspace."""
-        return cls.for_members(all_members, all_members)
-
     def owner_name_of(self, filepath) -> str | None:
         """Name of the member owning *filepath* (any member, in scope or not)."""
         return owner_name_of(filepath, self.members)
@@ -413,19 +393,3 @@ class OwnershipScope:
         if claims:
             described += " (and " + ", ".join(f"{c}/" for c in claims) + ")"
         return described
-
-
-def unowned_paths(files, members) -> list:
-    """Return the paths in *files* that are neither tool-owned nor claimed.
-
-    Empty for every loaded workspace, since a root member is mandatory.  Used
-    by the invariant tests and by diagnostics that have to explain a member
-    list built by hand.
-    """
-    return [
-        path
-        for path in files
-        if not is_tool_owned_path(path)
-        and normalize_path(path)
-        and owner_of(path, members) is None
-    ]
