@@ -5,7 +5,9 @@ inferred "mutating => confirm" rule is gone: 63% of the fleet classified
 `mutating`, so two thirds of every CLI prompted while the commands that could
 really hurt you were a tenth of that. This file pins BOTH halves of the
 judgement -- the small set that must ask, and the everyday set that must never
-ask -- so a future registration cannot quietly widen or narrow it.
+ask -- so a future registration cannot quietly widen or narrow it. Every
+mutating command must appear in exactly one of the two sets: a registration
+pinned by neither, or claimed by both, is a test failure.
 
 THE CRITERION IS HUMAN AUTHORITY, NOT RECOVERABILITY.
 
@@ -69,11 +71,24 @@ CONSEQUENTIAL = {
 # the prompt. The bar is whose decision it is, not how heavy the machinery
 # sounds.
 MUST_NOT_PROMPT = [
-    "commit", "scaffold", "check", "status", "targets", "deploy",
+    "commit", "scaffold", "check", "status", "targets",
+    # `watch` is mutating because watching a FAILED run re-dispatches it, but
+    # that rerun re-attempts a publication the operator already authorized at
+    # `release run`. It decides nothing new.
+    "watch",
     "changelog add", "changelog generate", "changelog amend", "changelog edit",
+    # `remove` joins amend and edit: rewriting the record of an
+    # already-authorized release declares nothing new. `remap` repairs stale
+    # hashes to match a rewrite that has already happened.
+    "changelog remove", "changelog remap",
     "release init", "release edit",
     "monorepo init", "monorepo add", "monorepo sync", "monorepo snapshot",
     "monorepo cleanup",
+    # `remove` unregisters a member in workspace.toml and deletes nothing on
+    # disk -- the departure of a releasable from the repository is `extract`,
+    # which does prompt. `graph` is mutating only because `--output` writes the
+    # rendering to the file the caller just named.
+    "monorepo remove", "monorepo graph",
     "monorepo release init",
     "dev install", "dev sync", "dev status",
     # The rewrite group sweeps the working tree and nothing else. Renaming a
@@ -82,7 +97,6 @@ MUST_NOT_PROMPT = [
     # command -- there is no second decision here that only a human may make.
     "rewrite go-module-path", "rewrite uv-path-sources",
 ]
-MUST_NOT_PROMPT = [c for c in MUST_NOT_PROMPT if c not in CONSEQUENTIAL]
 
 
 def test_exactly_these_commands_are_consequential():
@@ -101,6 +115,46 @@ def test_no_read_only_command_is_consequential():
     for path, cmd in _all_commands().items():
         if getattr(cmd, "consequential", False):
             assert cmd.effect == "mutating", path
+
+
+def test_the_two_sets_are_disjoint():
+    """A name in both sets asserts nothing about it and misleads the reader.
+
+    ``deploy`` sat in both for a while, and a filter that dropped the duplicate
+    from ``MUST_NOT_PROMPT`` made the contradiction invisible.
+    """
+    both = sorted(set(CONSEQUENTIAL) & set(MUST_NOT_PROMPT))
+    assert not both, (
+        f"{both} appear in both CONSEQUENTIAL and MUST_NOT_PROMPT; a command "
+        "either interrupts the operator or it does not"
+    )
+
+
+def test_every_mutating_command_is_pinned():
+    """Neither half of the judgement may be left unstated.
+
+    A registration that lands in neither set is an unclassified command: it
+    inherits whatever the flag happened to be, and no test would notice if that
+    flipped. Pinning is therefore mandatory -- add the command to
+    ``CONSEQUENTIAL`` with the act that earns the interruption, or to
+    ``MUST_NOT_PROMPT`` as ordinary work.
+    """
+    pinned = set(CONSEQUENTIAL) | set(MUST_NOT_PROMPT)
+    unpinned = sorted(
+        path for path, cmd in _all_commands().items()
+        if cmd.effect == "mutating" and path not in pinned
+    )
+    assert not unpinned, (
+        f"{unpinned} are mutating but pinned by neither set; every mutating "
+        "command must be declared in exactly one of them"
+    )
+
+
+def test_every_pinned_name_is_a_registered_command():
+    """A stale name pins nothing; it just reads as though it did."""
+    registered = set(_all_commands())
+    missing = sorted((set(CONSEQUENTIAL) | set(MUST_NOT_PROMPT)) - registered)
+    assert not missing, f"{missing} are pinned but not registered commands"
 
 
 def test_the_everyday_commands_never_prompt():
