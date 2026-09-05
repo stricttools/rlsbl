@@ -866,3 +866,178 @@ releasable = "core"
         # The monorepo group must expose the cleanup command
         result = app.test(["monorepo", "--help"])
         assert "cleanup" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# releasable-residue: release state on a member that releases nothing
+# ---------------------------------------------------------------------------
+
+
+class TestResidueOnANonReleasableMember:
+    """A dev node or ``releasable = false`` member carrying release state.
+
+    The check's first half asks whether a RELEASABLE member carries per-package
+    release state that belongs in its releasable's state directory.  This half
+    asks the other question: a member that releases nothing at all should carry
+    no release state at all -- no archives, no changelog directory, no version
+    tags in its own scheme -- because nothing in the workspace will ever read,
+    finalize or advance any of it.
+
+    The one legitimate exception is a member that USED to release and
+    deliberately stopped.  What it left behind is then a record of what it
+    released rather than residue, and only an operator can say so: the
+    ``release-history-closed`` transition record event naming that member.
+    """
+
+    def _ctx(self, root):
+        from pathlib import Path
+
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace import load_releasables, load_workspace
+
+        projects = load_workspace(str(root))
+        return WorkspaceCheckContext(
+            project_root=Path(str(root)),
+            workspace_root=Path(str(root)),
+            config={},
+            projects=projects,
+            graph=None,
+            releasables=load_releasables(str(root), projects=projects),
+        )
+
+    def _impl(self):
+        from rlsbl import app
+        return app._check_defs["releasable-residue"].impl
+
+    def _workspace(self, root, *, dev_only=False):
+        """A releasable member plus a retired member that releases nothing."""
+        import subprocess as sp
+
+        def git(*args):
+            sp.run(["git", *args], cwd=str(root), check=True,
+                   capture_output=True, text=True)
+
+        git("init", "-q", "-b", "main")
+        git("config", "user.email", "t@t.local")
+        git("config", "user.name", "T")
+
+        _make_rlsbl_dir(root / "live", files=["managed-files.json"])
+        retired = root / "retired"
+        retired.mkdir(parents=True, exist_ok=True)
+        dev_only_line = "dev_only = true\n" if dev_only else ""
+        _write_workspace(root, f"""\
+[[releasables]]
+name = "core"
+
+[[projects]]
+path = "live"
+name = "live"
+releasable = "core"
+
+[[projects]]
+path = "retired"
+name = "retired"
+releasable = false
+{dev_only_line}""")
+        (root / "README.md").write_text("hi\n")
+        git("add", "-A")
+        git("commit", "-q", "-m", "initial")
+        return retired
+
+    def _leave_release_state(self, root, retired):
+        """Archives, a changelog directory and a version tag in retired's scheme."""
+        import subprocess as sp
+
+        _make_rlsbl_dir(retired, subdirs=["changes", "releases"])
+        (retired / ".rlsbl" / "releases" / "v0.3.0.toml").write_text(
+            'bump = "patch"\ndescription = "last one"\n'
+        )
+        (retired / ".rlsbl" / "changes" / "0.3.0.jsonl").write_text("")
+        sp.run(["git", "tag", "retired@v0.3.0"], cwd=str(root), check=True,
+               capture_output=True, text=True)
+
+    def test_release_state_on_a_non_releasable_member_is_a_finding(self, tmp_project):
+        retired = self._workspace(tmp_project)
+        self._leave_release_state(tmp_project, retired)
+
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "fail", result.message
+        texts = "\n".join(p.text for p in result.problems)
+        # Names the member...
+        assert "retired" in texts
+        # ...what was found, all three kinds of it...
+        assert "releases" in texts
+        assert "changes" in texts
+        assert "retired@v" in texts
+        # ...and every way out.
+        assert "releasable" in texts
+        assert "rlsbl transition record --release-history-closed retired" in texts
+
+    def test_a_dev_node_is_covered_too(self, tmp_project):
+        retired = self._workspace(tmp_project, dev_only=True)
+        self._leave_release_state(tmp_project, retired)
+
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "fail", result.message
+        assert any("retired" in p.text for p in result.problems)
+
+    def test_a_member_that_never_released_is_not_a_finding(self, tmp_project):
+        self._workspace(tmp_project)
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "pass", result.message
+
+    def test_a_recorded_closed_history_silences_it(self, tmp_project):
+        """The remedy the finding names, followed through the command itself."""
+        from rlsbl.commands.transition_record_cmd import run_cmd
+        from rlsbl.context import create_context
+        from rlsbl.transition_record import KIND_RELEASE_HISTORY_CLOSED
+
+        retired = self._workspace(tmp_project)
+        self._leave_release_state(tmp_project, retired)
+        assert self._impl()(self._ctx(tmp_project)).status == "fail"
+
+        run_cmd(
+            {
+                "kind": KIND_RELEASE_HISTORY_CLOSED,
+                "subject": "retired",
+                "reason": "extracted into its own repository",
+                "dry-run": False,
+                "auto-commit": False,
+            },
+            ctx=create_context(tmp_project, workspace_root=tmp_project),
+        )
+
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "pass", result.message
+
+    def test_a_closed_history_for_another_member_does_not_silence_it(self, tmp_project):
+        """The event is about a named subject, so it exempts that subject only."""
+        from rlsbl.commands.transition_record_cmd import run_cmd
+        from rlsbl.context import create_context
+        from rlsbl.transition_record import KIND_RELEASE_HISTORY_CLOSED
+
+        retired = self._workspace(tmp_project)
+        self._leave_release_state(tmp_project, retired)
+
+        run_cmd(
+            {
+                "kind": KIND_RELEASE_HISTORY_CLOSED,
+                "subject": "somebody-else",
+                "reason": "retired",
+                "dry-run": False,
+                "auto-commit": False,
+            },
+            ctx=create_context(tmp_project, workspace_root=tmp_project),
+        )
+
+        assert self._impl()(self._ctx(tmp_project)).status == "fail"
+
+    def test_a_releasable_member_is_still_judged_by_the_other_half(self, tmp_project):
+        """Extending the check must not stop it reporting what it always did."""
+        self._workspace(tmp_project)
+        _make_rlsbl_dir(tmp_project / "live", subdirs=["changes"], files=["version"])
+
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "fail", result.message
+        texts = "\n".join(p.text for p in result.problems)
+        assert "core/live" in texts

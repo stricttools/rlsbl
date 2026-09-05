@@ -427,12 +427,11 @@ class ReleaseHistoryClosedEvent(_TransitionRecordEventBase):
     Operator-declared, through ``rlsbl transition record
     --release-history-closed <subject>``.
 
-    NOT YET CONSUMED. The reader this kind exists for is the
-    ``releasable-residue`` check, which reports a member's leftover version
-    file, changelog directory and release archives as residue to clean up: a
-    subject with a recorded closed history has left a deliberate RECORD of what
-    it released, and the check should exempt it rather than propose deleting
-    it. Wiring that exemption is its own piece of work.
+    Read by the ``releasable-residue`` check, which reports the release
+    archives, changelog directory and version tags of a member that releases
+    nothing: a subject with a recorded closed history has left a deliberate
+    RECORD of what it released rather than residue, so the check exempts it
+    instead of proposing that it be moved or deleted.
     """
 
     KIND: ClassVar[str] = KIND_RELEASE_HISTORY_CLOSED

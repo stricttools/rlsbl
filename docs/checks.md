@@ -156,7 +156,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
 | `root-rlsbl-conflict` | error | Root `.rlsbl/` does not coexist with `.rlsbl-monorepo/` |
 | `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version; a broken member config is a hard failure |
-| `releasable-residue` | error | Releasable member packages carry no per-package release state (`.rlsbl/changes/`, `.rlsbl/releases/`, `.rlsbl/version`, etc.); `hooks/` and root-path members are exempt |
+| `releasable-residue` | error | Release state sits where something will read it. A releasable member carries no per-package release state (`.rlsbl/changes/`, `.rlsbl/releases/`, `.rlsbl/version`, etc.) -- `hooks/` and root-path members are exempt -- and a member that releases nothing (a dev node, or any member declared `releasable = false`) carries no release archives, changelog directory or version tags in its own scheme, unless a `release-history-closed` transition record event names it |
 | `member-pytest-config` | error | When the workspace root has a `conftest.py`, every member with a `tests/` directory pins its own pytest rootdir, so a member run cannot escape into the root config |
 | `mixed-tag-schemes` | error | No member directory declares both Go's path-based `{path}/v*` tags and `{name}@v*` tags, which would make the publish-router prefix ordering-dependent |
 

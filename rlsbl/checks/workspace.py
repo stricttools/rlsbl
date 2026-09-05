@@ -22,6 +22,135 @@ from . import PROJECT_MANIFESTS
 from .. import effects
 
 
+def _closed_release_history_subjects(root):
+    """Names whose release history an operator declared deliberately closed.
+
+    Read from the repository-scoped transition record, which is where
+    ``rlsbl transition record`` writes both operator-declared kinds. A
+    malformed record raises rather than reading as "nothing is closed": a
+    record that cannot be read is not evidence that no exemption was declared.
+    """
+    from ..transition_record import (
+        KIND_RELEASE_HISTORY_CLOSED,
+        read_events,
+        repository_transition_record_path,
+    )
+
+    path = repository_transition_record_path(root)
+    return {
+        event.subject
+        for event in read_events(path, kinds=[KIND_RELEASE_HISTORY_CLOSED])
+    }
+
+
+def _member_tag_glob(root, proj):
+    """The glob matching the version tags *proj* would own in this workspace.
+
+    A member outside every releasable has no ``tag_format`` of its own, so the
+    scheme is the one a member releasing under the workspace's own convention
+    would use: the target's ``monorepo_tag_glob``, and the workspace default
+    ``{name}@v*`` for a member with no detectable target.
+    """
+    from ..targets import TARGETS, detect_targets
+
+    try:
+        entries = detect_targets(os.path.join(root, proj["path"]))
+    except Exception:
+        entries = []
+    if entries:
+        return TARGETS[entries[0].name].monorepo_tag_glob(
+            proj["name"], path=proj["path"],
+        )
+    return f"{proj['name']}@v*"
+
+
+def _unreleasing_member_state(ctx):
+    """Release state on members that release nothing, minus the declared exemptions.
+
+    Returns ``(findings, tags_unreadable)``. There is one finding per such
+    MEMBER -- not per item -- because the member is the unit the operator acts
+    on: every remedy (move it into a releasable, delete the state, record the
+    history as closed) applies to all of that member's state at once.
+
+    ``tags_unreadable`` is the reason the local tag namespace could not be read,
+    or ``None``. It is returned rather than swallowed: with the namespace
+    unreadable the tag half of the question was not asked at all, and the
+    caller says so in its outcome instead of reporting the narrower answer as
+    if it were the whole one.
+    """
+    import fnmatch
+
+    from ..utils import local_tag_commits
+    from ..workspace import project_is_releasable
+
+    root = str(ctx.workspace_root)
+    candidates = [p for p in ctx.projects if not project_is_releasable(p)]
+    if not candidates:
+        return [], None
+
+    closed = _closed_release_history_subjects(root)
+    candidates = [p for p in candidates if p["name"] not in closed]
+    if not candidates:
+        return [], None
+
+    # One pass over the whole namespace rather than one probe per member.
+    tag_map = local_tag_commits(cwd=root)
+    tag_names = sorted(tag_map.commits) if tag_map.conclusive else []
+
+    findings = []
+    for proj in candidates:
+        abs_pkg = os.path.join(root, proj["path"])
+        state = []
+
+        releases_dir = os.path.join(abs_pkg, ".rlsbl", "releases")
+        archives = sorted(
+            name for name in _listdir(releases_dir)
+            if name.startswith("v") and name.endswith(".toml")
+        )
+        if archives:
+            state.append(
+                f"{len(archives)} release archive(s) in "
+                f"{proj['path']}/.rlsbl/releases/ ({archives[0]}...)"
+                if len(archives) > 1
+                else f"the release archive {proj['path']}/.rlsbl/releases/{archives[0]}"
+            )
+
+        if os.path.isdir(os.path.join(abs_pkg, ".rlsbl", "changes")):
+            state.append(f"a changelog directory at {proj['path']}/.rlsbl/changes/")
+
+        glob = _member_tag_glob(root, proj)
+        matched = [name for name in tag_names if fnmatch.fnmatch(name, glob)]
+        if matched:
+            state.append(
+                f"{len(matched)} version tag(s) matching {glob} ({matched[0]}...)"
+                if len(matched) > 1
+                else f"the version tag {matched[0]}"
+            )
+
+        if not state:
+            continue
+
+        findings.append(
+            f"{proj['name']}: releases nothing (declared "
+            f"`releasable = false`) yet carries " + ", ".join(state) + ". "
+            f"Either move it into a releasable (give it "
+            f"`releasable = \"<name>\"` in workspace.toml), or delete the "
+            f"state, or -- if this member deliberately stopped releasing and "
+            f"what it left is the record of what it released -- declare that "
+            f"with `rlsbl transition record --release-history-closed "
+            f"{proj['name']} --reason \"...\"`."
+        )
+    return findings, tag_map.error
+
+
+def _listdir(path):
+    """Directory entries of *path*, or nothing when it is not a directory."""
+    try:
+        return os.listdir(path)
+    except OSError:
+        return []
+
+
 def _is_manifestless_root_member(ctx, proj):
     """Is *proj* the root member of a repository with no manifest at its root?
 
@@ -1260,7 +1389,23 @@ def register_workspace_checks(app):
 
     @app.error_check("releasable-residue")
     def check_releasable_residue(ctx, reporter):
-        """Releasable member packages must not carry per-package release state."""
+        """Release state sitting where nothing will ever read it.
+
+        Two halves, for the two ways that happens:
+
+        A RELEASABLE member must not carry per-package release state, because
+        its releasable's state directory is where that state belongs; the
+        per-package copy is a leftover of the pre-releasable model and
+        ``rlsbl monorepo cleanup`` removes it.
+
+        A member that releases NOTHING -- a dev node, or any member declared
+        ``releasable = false`` -- must not carry release state at all. No
+        release flow will finalize its changelog, advance its version or add to
+        its archives, so what it has is frozen. Unless that is the point: a
+        member that used to release and deliberately stopped leaves a RECORD of
+        what it released, and the operator says so with a
+        ``release-history-closed`` transition record event naming it.
+        """
         from ..releasable_cleanup import verify_minimal_rlsbl
 
         if not ctx.releasables:
@@ -1276,14 +1421,39 @@ def register_workspace_checks(app):
                 for entry in verify_minimal_rlsbl(abs_pkg):
                     findings.append(f"{rel.name}/{proj['name']}: .rlsbl/{entry}")
 
+        from ..errors import RlsblError
+
+        cleanup_count = len(findings)
+        try:
+            unreleasing, tags_unreadable = _unreleasing_member_state(ctx)
+        except RlsblError as exc:
+            reporter.error(str(exc))
+            return reporter.found(str(exc))
+        findings.extend(unreleasing)
+
+        # Said out loud rather than folded into the answer: with the namespace
+        # unreadable the tag half of the question was never asked, and a
+        # narrower answer must not be reported as the whole one.
+        caveat = (
+            ""
+            if tags_unreadable is None
+            else (
+                f" (version tags were NOT examined: the local tag namespace "
+                f"was not readable -- {tags_unreadable})"
+            )
+        )
+
         if findings:
             for f in findings:
                 reporter.error(f)
-            return reporter.found(
-                f"{len(findings)} per-package release-state residue item(s); "
-                f"run `rlsbl monorepo cleanup` to remove them"
-            )
-        return reporter.passed("no per-package release-state residue")
+            summary = f"{len(findings)} misplaced release-state item(s)"
+            if cleanup_count:
+                summary += (
+                    f"; `rlsbl monorepo cleanup` removes the {cleanup_count} "
+                    f"per-package one(s)"
+                )
+            return reporter.found(summary + caveat)
+        return reporter.passed("no misplaced release state" + caveat)
 
     @app.error_check("member-pytest-config")
     def check_member_pytest_config(ctx, reporter):
