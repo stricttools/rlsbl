@@ -535,6 +535,38 @@ def _coverage_column(release_commit, changes_dir, scope):
     return f"{covered}/{len(non_exempt)}{suffix}"
 
 
+def _suppressed_member_version(root, proj, releasable_name, releasable_config_dir):
+    """The releasable's version when *proj* is a publish-suppressed member, else None.
+
+    "Publish-suppressed" is the member's EFFECTIVE ``publish_mode`` -- the
+    releasable-level config merged with the member's own -- which is the same
+    resolution ``version-consistency`` performs before it decides to read the
+    version file instead of the manifest. Both questions therefore get the same
+    answer from the same place.
+
+    None means the ordinary manifest reading applies: a published member, a
+    member outside every releasable, a releasable with no version file, or a
+    config that cannot answer what its publish mode is (which is the
+    ``version-consistency`` check's finding to report, not this table's).
+    """
+    if not releasable_name:
+        return None
+
+    from ...member_context import resolve_member_context
+    from ...workspace import read_releasable_version
+
+    try:
+        member = resolve_member_context(
+            os.path.join(root, proj["path"]),
+            releasable_config_dir=releasable_config_dir,
+        )
+        if member.publish_mode != "none":
+            return None
+        return read_releasable_version(root, releasable_name) or None
+    except Exception:
+        return None
+
+
 def _cmd_status_explicit(root, projects):
     """Render per-releasable status rows for a workspace.
 
@@ -665,10 +697,24 @@ def _cmd_status(flags, project_root):
         target_names = [e.name for e in target_entries]
         target_display = ", ".join(target_names) if target_names else "none"
 
-        # Read version (use first target -- one version per project)
+        # Read version (use first target -- one version per project).
+        #
+        # A publish-suppressed member is the exception: it publishes nothing,
+        # so nothing bumps its manifest and the `version-consistency` check
+        # deliberately never reads it -- it passes such a member on the
+        # releasable's version file alone. Reporting the manifest here showed
+        # the member frozen at whatever version it was created with while its
+        # releasable shipped release after release, so the row reports the same
+        # authority the check uses, annotated so a reader knows which file
+        # answered.
         version = "?"
         first_target_name = target_entries[0].name if target_entries else None
-        if first_target_name and first_target_name in TARGETS:
+        suppressed_version = _suppressed_member_version(
+            root, proj, releasable_map.get(name, ""), rel_dir,
+        )
+        if suppressed_version is not None:
+            version = f"{suppressed_version} (version file)"
+        elif first_target_name and first_target_name in TARGETS:
             try:
                 version = TARGETS[first_target_name].read_version(target_entries[0].path)
             except Exception:
