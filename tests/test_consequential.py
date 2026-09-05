@@ -20,8 +20,10 @@ rewrite of the working tree need not be. Each entry below therefore names the
 DECISION being reserved, not the machinery it runs.
 """
 
+import re
 import subprocess
 import sys
+from pathlib import Path
 
 from rlsbl import app
 
@@ -196,3 +198,78 @@ class TestNonInteractiveStdin:
     def test_a_non_consequential_command_is_not_gated(self, tmp_path):
         result = self._run(["changelog", "generate"], tmp_path)
         assert "stdin is not interactive" not in result.stderr, result.stderr
+
+
+# ---------------------------------------------------------------------------
+# The README's own list of the commands that prompt
+# ---------------------------------------------------------------------------
+
+README = Path(__file__).resolve().parents[1] / "README.md"
+
+_PROMPTING_SENTENCE = re.compile(
+    r"declares itself `consequential`\s*\((.*?)\) and asks", re.S,
+)
+
+
+def _expand(head, token, known):
+    """Every registered command path *token* can mean under *head*'s prefixes.
+
+    The README writes the set in a shorthand a reader expands from context:
+    ``release run``/``resume`` means `release run` and `release resume`, and
+    ``monorepo release run``/``mirror`` means `monorepo release run` and
+    `monorepo mirror` -- the continuation attaches to whichever prefix of the
+    head makes a real command. Longest prefix first, so a continuation that
+    genuinely extends the head wins over a shorter reading.
+    """
+    words = head.split()
+    found = []
+    for i in range(len(words), -1, -1):
+        candidate = " ".join(words[:i] + [token])
+        if candidate in known and candidate not in found:
+            found.append(candidate)
+    return found
+
+
+def _readme_prompting_commands():
+    """The command paths the README's prompting sentence names."""
+    match = _PROMPTING_SENTENCE.search(README.read_text(encoding="utf-8"))
+    assert match, (
+        "README's prompting sentence changed shape; this test parses it, so "
+        "the pattern here has to be updated with it"
+    )
+    known = set(_all_commands())
+    names = set()
+    for group in match.group(1).split(","):
+        tokens = [
+            " ".join(token.replace("`", "").split())
+            for token in group.split("/")
+        ]
+        tokens = [token for token in tokens if token]
+        if not tokens:
+            continue
+        head = tokens[0]
+        assert head in known, f"README names an unregistered command: {head!r}"
+        names.add(head)
+        for token in tokens[1:]:
+            candidates = _expand(head, token, known)
+            assert len(candidates) == 1, (
+                f"README's `{head}`/`{token}` shorthand resolves to "
+                f"{candidates or 'no registered command'}; a reader cannot "
+                f"expand it either -- write the command out in full"
+            )
+            names.add(candidates[0])
+    return names
+
+
+def test_the_readme_names_exactly_the_commands_that_prompt():
+    """The README's list was hand-maintained beside this file's pinned set.
+
+    Two statements of the same set, in different words, with nothing holding
+    them together: adding a consequential command updated one and left the
+    other quietly wrong. Edit `docs/_README.md` (the template) and run
+    `selfdoc gen`; README.md itself is generated and read-only.
+    """
+    assert _readme_prompting_commands() == set(CONSEQUENTIAL), (
+        "the README's prompting list and the pinned CONSEQUENTIAL set "
+        "disagree; they must name the same commands"
+    )
