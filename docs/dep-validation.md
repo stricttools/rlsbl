@@ -76,6 +76,7 @@ Detects source files that are unreachable from any entry point via BFS on the fi
 | Go | `find_dead_go_packages()` | Packages imported by any non-test file outside the package | Only `internal/` packages (Go enforces visibility elsewhere) |
 | npm | `find_dead_npm_modules()` | `package.json` exports/main/bin fields, resolved to source | All production `.js`/`.ts`/`.mjs`/`.cjs`/`.tsx` files |
 | Dart | `find_dead_dart_modules()` | `lib/<name>.dart` barrel file + `bin/*.dart` scripts | All production `.dart` files |
+| Flutter | `find_dead_dart_modules()` | The Dart entry points **plus `lib/main.dart`**, which a Flutter app has instead of a barrel or a `bin/` script | All production `.dart` files |
 
 #### Declarative dead-module exclusions
 

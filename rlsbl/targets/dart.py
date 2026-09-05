@@ -16,6 +16,12 @@ class DartTarget(BaseTarget):
     detection_files = ("pubspec.yaml",)
     ecosystem = "Dart / pub.dev"
 
+    # Repo-relative files this ecosystem treats as an entry point by naming
+    # convention alone, on top of the two the manifest yields (the
+    # ``lib/<package>.dart`` barrel and every ``bin/*.dart`` script). Empty for
+    # plain Dart, where the manifest is the only authority; Flutter overrides it.
+    _convention_entry_points: tuple[str, ...] = ()
+
     @property
     def name(self):
         return "dart"
@@ -26,7 +32,11 @@ class DartTarget(BaseTarget):
 
         return [
             (path, "not reachable from any entry point")
-            for path in find_dead_dart_modules(root, exclude_dirs=exclude_dirs)
+            for path in find_dead_dart_modules(
+                root,
+                exclude_dirs=exclude_dirs,
+                extra_entry_points=self._convention_entry_points,
+            )
             if path not in suppress
         ]
 

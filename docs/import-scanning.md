@@ -123,6 +123,7 @@ Dead-module analysis requires knowing which files serve as roots for BFS reachab
 | Go | Internal packages only -- checks whether any non-test file outside the package directory imports the package path |
 | npm | `package.json` fields: `exports` (recursive path collection), `main`, `bin` (string or dict of paths) |
 | Dart | `lib/<package_name>.dart` (barrel file from `pubspec.yaml` name field) + all `bin/*.dart` scripts |
+| Flutter | Everything Dart derives, plus `lib/main.dart` -- the entry point Flutter itself defaults to. A Flutter app has neither a barrel nor a `bin/` script, so without it the analysis has no root to traverse from and reports nothing at all |
 
 ## Source modules
 

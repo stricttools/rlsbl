@@ -1029,12 +1029,24 @@ def _read_dart_package_name(project_dir: str) -> str | None:
     return data.get("name")
 
 
-def _resolve_dart_entry_points(project_dir: str) -> set[str]:
+def _resolve_dart_entry_points(
+    project_dir: str,
+    extra_entry_points: tuple[str, ...] = (),
+) -> set[str]:
     """Determine Dart entry point files for reachability analysis.
 
     Entry points are:
     - lib/<package_name>.dart  (barrel file / main library entry)
     - bin/*.dart               (executable scripts)
+    - each existing path in *extra_entry_points*, repo-relative
+
+    *extra_entry_points* is how an ecosystem built ON Dart names an entry point
+    the manifest does not: a Flutter app has neither a barrel nor a bin script,
+    and its ``lib/main.dart`` is an entry point by the framework's convention
+    alone. It ADDS to the two derivations rather than replacing them, so a
+    package that has both keeps both. A named path that does not exist is
+    simply not an entry point -- a Flutter package with no main.dart is a real
+    and ordinary shape, not a misconfiguration.
 
     Returns a set of absolute file paths.
     """
@@ -1054,6 +1066,11 @@ def _resolve_dart_entry_points(project_dir: str) -> set[str]:
                 entry_points.add(
                     os.path.realpath(os.path.join(bin_dir, name))
                 )
+
+    for relative in extra_entry_points:
+        candidate = os.path.join(project_dir, relative)
+        if os.path.isfile(candidate):
+            entry_points.add(os.path.realpath(candidate))
 
     return entry_points
 
@@ -1150,11 +1167,13 @@ def _build_dart_import_graph(
 def find_dead_dart_modules(
     project_dir: str,
     exclude_dirs: list[str] | None = None,
+    extra_entry_points: tuple[str, ...] = (),
 ) -> list[str]:
     """Find Dart source files unreachable from any entry point.
 
     A .dart file is "dead" if there is no path through the import/export
-    graph from any entry point (barrel file, bin scripts) to that file.
+    graph from any entry point (barrel file, bin scripts, and any path in
+    *extra_entry_points*) to that file.
 
     Test files (test/, *_test.dart) are excluded from the scan.
 
@@ -1162,6 +1181,9 @@ def find_dead_dart_modules(
         project_dir: absolute path to the Dart project root.
         exclude_dirs: directory paths to skip during the walk
             (relative to project_dir or absolute).
+        extra_entry_points: repo-relative paths an ecosystem built on Dart
+            treats as entry points by convention (see
+            :func:`_resolve_dart_entry_points`).
 
     Returns:
         sorted list of relative paths of dead source files.
@@ -1171,7 +1193,7 @@ def find_dead_dart_modules(
     if not os.path.isfile(os.path.join(project_dir, "pubspec.yaml")):
         return []
 
-    entry_points = _resolve_dart_entry_points(project_dir)
+    entry_points = _resolve_dart_entry_points(project_dir, extra_entry_points)
     if not entry_points:
         return []
 

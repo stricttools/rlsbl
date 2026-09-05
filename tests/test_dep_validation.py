@@ -2879,6 +2879,111 @@ class TestFindDeadDartModules:
         assert "core_test.dart" not in rel_paths
 
 
+# Minimal Flutter pubspec: the ``flutter:`` section is what makes FlutterTarget
+# rather than DartTarget claim the directory.
+_FLUTTER_PUBSPEC = (
+    'name: {name}\nversion: 0.1.0\n'
+    'environment:\n  sdk: ">=3.0.0 <4.0.0"\n'
+    'dependencies:\n  flutter:\n    sdk: flutter\n'
+    'flutter:\n  uses-material-design: true\n'
+)
+
+
+def _flutter_app(root, name="myapp"):
+    """A Flutter APP: lib/main.dart, no barrel file, no bin/ scripts.
+
+    That shape is the whole point.  A Flutter app's entry point is
+    ``lib/main.dart`` by the framework's own convention -- there is no
+    ``lib/<package>.dart`` barrel, because nothing imports the app as a
+    library, and no ``bin/`` directory, because ``flutter run`` is the runner.
+    Both of the Dart derivations therefore find nothing.
+    """
+    (root / "pubspec.yaml").write_text(_FLUTTER_PUBSPEC.format(name=name))
+    lib = root / "lib"
+    lib.mkdir()
+    (lib / "main.dart").write_text("import 'src/app.dart';\nvoid main() {}\n")
+    src = lib / "src"
+    src.mkdir()
+    (src / "app.dart").write_text("void app() {}\n")
+    (src / "orphan.dart").write_text("void orphan() {}\n")
+    return root
+
+
+class TestFlutterAppEntryPoint:
+    """A Flutter app analyses from lib/main.dart, not from nothing at all."""
+
+    def test_dart_derivation_alone_finds_no_entry_point(self, tmp_path):
+        """The failure this exists to prevent: no entry point, so no analysis.
+
+        With neither a barrel nor a bin/ script, the Dart derivation returns an
+        empty entry-point set and ``find_dead_dart_modules`` returns ``[]`` --
+        indistinguishable, to the caller, from "analysed and found nothing".
+        """
+        from rlsbl.dep_validation import _resolve_dart_entry_points
+
+        _flutter_app(tmp_path)
+        assert _resolve_dart_entry_points(str(tmp_path)) == set()
+        assert find_dead_dart_modules(str(tmp_path)) == []
+
+    def test_flutter_target_analyses_from_main_dart(self, tmp_path):
+        """FlutterTarget names lib/main.dart, so the analysis really runs."""
+        from rlsbl.targets import TARGETS
+
+        _flutter_app(tmp_path)
+        target = TARGETS["flutter"]
+        assert target.detect(str(tmp_path))
+
+        findings = target.find_dead_modules(str(tmp_path))
+        paths = [path for path, _reason in findings]
+        # Reachable from main.dart -- alive.
+        assert os.path.join("lib", "main.dart") not in paths
+        assert os.path.join("lib", "src", "app.dart") not in paths
+        # Reachable from nothing -- and now actually reported.
+        assert os.path.join("lib", "src", "orphan.dart") in paths
+
+    def test_a_flutter_package_keeps_its_barrel_entry_point(self, tmp_path):
+        """The override ADDS to the Dart derivation; it does not replace it.
+
+        A Flutter package (a plugin, say) has a ``flutter:`` section AND a
+        barrel file, and nothing named main.dart.  Its barrel must still be the
+        entry point it always was.
+        """
+        from rlsbl.targets import TARGETS
+
+        (tmp_path / "pubspec.yaml").write_text(_FLUTTER_PUBSPEC.format(name="myplugin"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "myplugin.dart").write_text("export 'src/used.dart';\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "used.dart").write_text("void used() {}\n")
+        (src / "orphan.dart").write_text("void orphan() {}\n")
+
+        paths = [p for p, _r in TARGETS["flutter"].find_dead_modules(str(tmp_path))]
+        assert os.path.join("lib", "src", "used.dart") not in paths
+        assert os.path.join("lib", "src", "orphan.dart") in paths
+
+    def test_a_plain_dart_package_gains_no_main_entry_point(self, tmp_path):
+        """The convention is Flutter's, so DartTarget must not adopt it.
+
+        A plain Dart package with an unreferenced ``lib/main.dart`` is a file
+        nothing imports, and that is exactly what it should be reported as.
+        """
+        from rlsbl.targets import TARGETS
+
+        (tmp_path / "pubspec.yaml").write_text(_PUBSPEC.format(name="mylib"))
+        lib = tmp_path / "lib"
+        lib.mkdir()
+        (lib / "mylib.dart").write_text("export 'src/used.dart';\n")
+        (lib / "main.dart").write_text("void main() {}\n")
+        src = lib / "src"
+        src.mkdir()
+        (src / "used.dart").write_text("void used() {}\n")
+
+        paths = [p for p, _r in TARGETS["dart"].find_dead_modules(str(tmp_path))]
+        assert os.path.join("lib", "main.dart") in paths
+
+
 class TestDeadDartModulesCheck:
     """Integration tests: dead-modules check for Dart projects."""
 

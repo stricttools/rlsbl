@@ -17,6 +17,20 @@ class FlutterTarget(DartTarget):
     # A Flutter app IS Dart sources, so the inherited Dart import analysers
     # answer for it -- flutter is in scope for import analysis and cycle
     # detection exactly as dart is.
+    #
+    # It needs one thing plain Dart does not: an entry point. A Flutter APP has
+    # no ``lib/<package>.dart`` barrel (nothing imports an app as a library)
+    # and no ``bin/`` scripts (``flutter run`` is the runner), so both Dart
+    # derivations come back empty -- and an empty entry-point set makes the
+    # dead-module analysis return nothing, which reads as "clean" rather than
+    # as "never ran". ``lib/main.dart`` is the entry point Flutter itself
+    # defaults to, and naming it here is what makes the analysis actually run.
+    #
+    # Only that one file. Flavour entry points (``lib/main_dev.dart`` and the
+    # like) are a per-project ``--target`` argument, not something Flutter
+    # defines, so they are reported like any other unreferenced file and
+    # suppressed per project if that is wrong for a given app.
+    _convention_entry_points = ("lib/main.dart",)
 
     @property
     def name(self):
