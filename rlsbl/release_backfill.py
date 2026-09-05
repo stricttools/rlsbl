@@ -262,9 +262,12 @@ class Scope:
 
     ``released_paths`` are the repo-relative paths whose trees the release
     commit records: ``["."]`` for a standalone repository, one entry per member
-    directory for a workspace releasable. ``tag_formats`` are the tag spellings
-    this scope's versions may be tagged under, as format strings taking
-    ``{version}``.
+    directory for a workspace releasable.
+
+    ``target`` and ``ref_ctx`` are what this scope asks the ref question with.
+    They are not a second opinion about tag naming: they are the very inputs the
+    release flow builds for a release of this scope, so
+    :meth:`tag_candidates` and the refs a release creates are one derivation.
     """
 
     label: str
@@ -272,11 +275,102 @@ class Scope:
     changes_dir: str  # absolute
     changelog_md: str  # absolute
     released_paths: list
-    tag_formats: list
+    target: object  # the BaseTarget subclass that answers ref questions here
+    ref_ctx: object  # rlsbl.targets.refs.RefContext
     transition_record_path: str = ""
+    #: Reasons a part of this scope's ref set could not be derived, recorded as
+    #: they are hit and reported with the plan. Empty is the normal state.
+    undecidable: list = field(default_factory=list)
+    _tags: dict = field(default_factory=dict, repr=False, compare=False)
 
     def tag_candidates(self, version):
-        return [fmt.format(version=version) for fmt in self.tag_formats]
+        """Every tag spelling *version* is addressable under, in ref order.
+
+        ``expected_refs`` is the single authority for a version's ref set --
+        primary tag, the companion tags its members' ecosystems require, and the
+        aliases this repository's own records attribute to it -- and this pass
+        asks it rather than rendering a tag format of its own. A private
+        rendering saw only the primary spelling, so every Go companion tag a
+        monorepo release creates read as unexplained, and one unexplained tag
+        refuses the whole apply.
+
+        Cached per version: the answer resolves each member's config, and the
+        pass asks it several times per version.
+        """
+        if version not in self._tags:
+            self._tags[version] = list(self._expected(version))
+        return list(self._tags[version])
+
+    def _expected(self, version):
+        """``expected_refs`` for *version*, minus any part that is underivable.
+
+        COMPANION tags are the one part that can be unanswerable: they are
+        collected from the members' own effective configs, and a repository this
+        pass exists to repair may have a member (commonly a root member, which
+        may not carry a ``.rlsbl/`` of its own at all) whose config names no
+        targets and no publish mode. The primary tag and the recorded aliases
+        never depend on that.
+
+        So the question is asked again with NO member set -- the same authority,
+        told there are no members to consult -- and the reason is recorded on
+        :attr:`undecidable`, which the plan prints and the unexplained-tag
+        refusal repeats. Nothing is guessed and nothing is silent: a companion
+        tag whose derivation failed is then reported as an unexplained tag, with
+        the three resolutions and the reason its scope could not account for it.
+        """
+        from dataclasses import replace
+
+        try:
+            return self.target.expected_refs(version, self.ref_ctx).tags
+        except RlsblError as exc:
+            reason = (
+                f"{self.label}: the companion tags its members' ecosystems "
+                f"require cannot be derived ({exc})"
+            )
+            if reason not in self.undecidable:
+                self.undecidable.append(reason)
+            return self.target.expected_refs(
+                version, replace(self.ref_ctx, member_package_paths=None),
+            ).tags
+
+    def tag_spellings(self):
+        """The scope's ref set rendered as format strings, for the plan header.
+
+        Asked at the literal ``{version}`` placeholder rather than at a real
+        version: every spelling any target produces is a plain concatenation
+        around the version, so rendering at the placeholder yields exactly the
+        format strings -- from the same authority as every decision below,
+        instead of a display-only rendering that could disagree with them. No
+        alias joins in, because ``{version}`` parses as no version.
+        """
+        return self._expected("{version}")
+
+
+def scope_target(dir_path, *, releasable_config_dir=None):
+    """The target that answers ref questions for the project at *dir_path*.
+
+    The first detected target, exactly as ``rlsbl release reconcile`` resolves
+    it. A directory with no detectable target still gets an answer rather than a
+    refusal, and the answer is not a guess: ref naming has a defined default
+    (``v{version}``, :class:`~rlsbl.targets.base.BaseTarget`'s own
+    ``tag_format``) that holds independently of any ecosystem.
+
+    A config that cannot be read yields the same default. This is an
+    observation of a repository whose state predates the current model -- the
+    pass exists BECAUSE the project's records are incomplete -- so an
+    unreadable config must not stop it from reading the rest of the namespace.
+    """
+    from .errors import ConfigError
+    from .targets import TARGETS, detect_targets
+    from .targets.base import BaseTarget
+
+    try:
+        entries = detect_targets(dir_path, releasable_config_dir=releasable_config_dir)
+    except (ConfigError, OSError):
+        entries = []
+    if not entries:
+        return BaseTarget()
+    return TARGETS.get(entries[0].name) or BaseTarget()
 
 
 def discover_scopes(repo):
@@ -289,6 +383,8 @@ def discover_scopes(repo):
     ``.rlsbl/changes/``. A workspace file that exists but does not load is a
     hard error carrying the loader's own message.
     """
+    from .targets.refs import ref_context
+
     workspace_file = os.path.join(repo, ".rlsbl-monorepo", "workspace.toml")
     if not os.path.isfile(workspace_file):
         return [
@@ -298,7 +394,8 @@ def discover_scopes(repo):
                 changes_dir=os.path.join(repo, ".rlsbl", "changes"),
                 changelog_md=os.path.join(repo, "CHANGELOG.md"),
                 released_paths=["."],
-                tag_formats=["v{version}"],
+                target=scope_target(repo),
+                ref_ctx=ref_context(repo_root=repo),
                 transition_record_path=get_transition_record_path(repo),
             )
         ]
@@ -332,8 +429,8 @@ def discover_scopes(repo):
         for m in members:
             releasable_members.add(m.path)
         rel_dir = os.path.join(repo, ".rlsbl-monorepo", "releasables", rel.name)
-        paths = [m.path for m in members] or ["."]
-        tag_format = rel.effective_tag_format.replace("{name}", rel.name)
+        member_paths = [m.path for m in members]
+        paths = member_paths or ["."]
         scopes.append(
             Scope(
                 label=rel.name,
@@ -341,7 +438,20 @@ def discover_scopes(repo):
                 changes_dir=os.path.join(rel_dir, "changes"),
                 changelog_md=os.path.join(repo, "CHANGELOG.md"),
                 released_paths=paths,
-                tag_formats=[tag_format],
+                target=scope_target(
+                    os.path.join(repo, paths[0]), releasable_config_dir=rel_dir,
+                ),
+                # Exactly the context a release of this releasable builds: the
+                # releasable owns the naming, and its members are what the
+                # companion tags are collected from.
+                ref_ctx=ref_context(
+                    repo_root=repo,
+                    project_path=member_paths[0] if member_paths else None,
+                    primary_tag_format=rel.effective_tag_format,
+                    releasable_name=rel.name,
+                    member_package_paths=member_paths,
+                    releasable_config_dir=rel_dir,
+                ),
                 transition_record_path=get_transition_record_path(
                     repo, releasable_dir=rel_dir,
                 ),
@@ -363,10 +473,17 @@ def discover_scopes(repo):
                 changes_dir=changes_dir,
                 changelog_md=os.path.join(proj_dir, "CHANGELOG.md"),
                 released_paths=[proj.path],
-                tag_formats=[
-                    proj.name + "@v{version}",
-                    proj.path + "/v{version}",
-                ],
+                target=scope_target(proj_dir),
+                # A member outside every releasable is its own release unit, so
+                # it is its own member set: its primary tag is the target's
+                # monorepo spelling, and a Go member still owes the module proxy
+                # the ``{path}/v{version}`` companion the ecosystem resolves by.
+                ref_ctx=ref_context(
+                    repo_root=repo,
+                    project_path=proj.path,
+                    monorepo_name=proj.name,
+                    member_package_paths=[proj.path],
+                ),
                 transition_record_path=get_transition_record_path(proj_dir),
             )
         )
@@ -828,15 +945,21 @@ def build_plan(repo, *, use_gh=True, gh=None, overrides=None):
         in_scope.update(versions)
         for version in versions:
             state = states.get(version)
+            # EVERY spelling that resolves, not just the first. A version can
+            # stand under several live spellings at once -- reconcile's own
+            # repair MINTS the current scheme's tag beside the historical one an
+            # archive names in shipped_as, and a Go member's companion tag
+            # stands beside its releasable's primary -- and a spelling this pass
+            # stops at is a spelling nothing explains on the next run.
             for candidate in _probe_order(scope, version, state):
                 if rev_parse(repo, f"{candidate}^{{commit}}"):
                     known_tags[candidate] = version
-                    break
 
     # Pass two: version tags this repository's own scheme produces that NO
     # store records. They are evidence of a release nothing wrote down, so they
     # are adopted rather than reported.
     adopted = []
+    adopting_tag = {}  # (scope label, version) -> the spelling adopted from
     for tag in all_tags(repo):
         if tag in known_tags:
             continue
@@ -846,7 +969,13 @@ def build_plan(repo, *, use_gh=True, gh=None, overrides=None):
         archives, changelogs, states, versions = per_scope_versions[scope.label]
         if version in versions:
             continue
-        adopted.append((scope, version, tag))
+        # A version adopted under one spelling is adopted once. Every FURTHER
+        # spelling of it that exists is explained by the same release, so it
+        # joins ``known_tags`` without proposing a second archive.
+        key = (scope.label, version)
+        if key not in adopting_tag:
+            adopting_tag[key] = tag
+            adopted.append((scope, version, tag))
         known_tags[tag] = version
         in_scope.add(version)
 
@@ -1233,6 +1362,22 @@ def build_preview(plan):
     return Preview(tuple(items))
 
 
+def undecidable_reasons(plan):
+    """Every part of a scope's ref set that could not be derived, in order.
+
+    Empty for a repository whose members all resolve, which is the normal
+    state. When it is not empty, a tag reported unexplained may be one of the
+    spellings the underivable part would have accounted for, so the refusal
+    repeats these reasons.
+    """
+    reasons = []
+    for scope in plan.scopes:
+        for reason in scope.undecidable:
+            if reason not in reasons:
+                reasons.append(reason)
+    return reasons
+
+
 def unexplained_error(plan):
     """The message an unexplained tag refuses the whole apply with."""
     lines = [
@@ -1243,6 +1388,13 @@ def unexplained_error(plan):
     for entry in plan.unexplained:
         lines.append(f"  {entry.tag}")
         lines.append(_resolutions(entry, plan))
+        lines.append("")
+    for reason in undecidable_reasons(plan):
+        lines.append(
+            f"  NOTE {reason}\n"
+            f"       A tag above may be one of the spellings that part would "
+            f"have accounted for."
+        )
         lines.append("")
     lines.append(
         "NOTHING has been written -- not the unexplained tags and not the "
@@ -1371,9 +1523,11 @@ def render(plan, out=None):
             f"releases={os.path.relpath(scope.releases_dir, plan.repo)} "
             f"changes={os.path.relpath(scope.changes_dir, plan.repo)} "
             f"released_paths={scope.released_paths} "
-            f"tag_spellings={scope.tag_formats}",
+            f"tag_spellings={list(scope.tag_spellings())}",
             file=stream,
         )
+    for reason in undecidable_reasons(plan):
+        print(f"  NOTE {reason}", file=stream)
     print("", file=stream)
     render_preview(build_preview(plan), show_keys=True, out=stream)
     if plan.outside_the_model:

@@ -158,7 +158,10 @@ class TestTheRepositoryItWorksOn:
         repo = tmp_path / "ws"
         repo.mkdir()
         init_repo(repo)
-        (repo / "pkgs" / "core").mkdir(parents=True)
+        (repo / "pkgs" / "core" / ".rlsbl").mkdir(parents=True)
+        (repo / "pkgs" / "core" / ".rlsbl" / "config.json").write_text(
+            '{"publish_mode": "ci", "targets": ["pypi"]}\n', encoding="utf-8",
+        )
         state = repo / ".rlsbl-monorepo" / "releasables" / "core"
         (state / "changes").mkdir(parents=True)
         (state / "releases").mkdir(parents=True)

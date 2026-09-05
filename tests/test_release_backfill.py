@@ -533,7 +533,10 @@ def test_releasable_tag_scheme_records_normally(tmp_path, monkeypatch):
     repo = tmp_path / "ws"
     repo.mkdir()
     init_repo(repo)
-    (repo / "pkgs" / "core").mkdir(parents=True)
+    (repo / "pkgs" / "core" / ".rlsbl").mkdir(parents=True)
+    (repo / "pkgs" / "core" / ".rlsbl" / "config.json").write_text(
+        '{"publish_mode": "ci", "targets": ["pypi"]}\n', encoding="utf-8",
+    )
     (repo / ".rlsbl-monorepo" / "releasables" / "core" / "changes").mkdir(parents=True)
     (repo / ".rlsbl-monorepo" / "releasables" / "core" / "releases").mkdir(parents=True, exist_ok=True)
     make_workspace(
@@ -568,7 +571,10 @@ def test_released_path_absent_at_the_commit_falls_back_to_the_root_tree(tmp_path
     repo = tmp_path / "ws"
     repo.mkdir()
     init_repo(repo)
-    (repo / "pkgs" / "core").mkdir(parents=True)
+    (repo / "pkgs" / "core" / ".rlsbl").mkdir(parents=True)
+    (repo / "pkgs" / "core" / ".rlsbl" / "config.json").write_text(
+        '{"publish_mode": "ci", "targets": ["pypi"]}\n', encoding="utf-8",
+    )
     (repo / ".rlsbl-monorepo" / "releasables" / "core" / "changes").mkdir(parents=True)
     make_workspace(
         repo,
@@ -715,6 +721,9 @@ class TestArchiveNameGrammar:
     """
 
     def _scope(self, tmp_path):
+        from rlsbl.targets.base import BaseTarget
+        from rlsbl.targets.refs import ref_context
+
         releases = tmp_path / ".rlsbl" / "releases"
         releases.mkdir(parents=True)
         return backfill.Scope(
@@ -723,7 +732,8 @@ class TestArchiveNameGrammar:
             changes_dir=str(tmp_path / ".rlsbl" / "changes"),
             changelog_md=str(tmp_path / "CHANGELOG.md"),
             released_paths=["."],
-            tag_formats=["v{version}"],
+            target=BaseTarget(),
+            ref_ctx=ref_context(repo_root=str(tmp_path)),
         ), releases
 
     def test_the_same_files_are_archives_for_both(self, tmp_path):
@@ -971,6 +981,180 @@ class TestShippedAsConsultation:
         )
         plan = backfill.build_plan(str(repo), use_gh=False)
         assert [e.tag for e in plan.unexplained] == ["strictcli@v0.12.0"]
+
+
+# ---------------------------------------------------------------------------
+# The spellings a version's refs are actually spelled with
+# ---------------------------------------------------------------------------
+
+
+def make_releasable_workspace(tmp_path, *, targets, name="ws"):
+    """A workspace with one releasable ``core`` over ``packages/core``.
+
+    The member declares *targets*, so the ref set a release of it would create
+    -- primary plus every companion its ecosystems require -- is derivable from
+    the same authority the release flow itself asks.
+    """
+    repo = tmp_path / name
+    repo.mkdir()
+    init_repo(repo)
+    core = repo / "packages" / "core"
+    (core / ".rlsbl").mkdir(parents=True)
+    (core / ".rlsbl" / "config.json").write_text(
+        '{"publish_mode": "ci", "targets": %s}\n' % (
+            "[" + ", ".join(f'"{t}"' for t in targets) + "]"
+        ),
+        encoding="utf-8",
+    )
+    rel_dir = repo / ".rlsbl-monorepo" / "releasables" / "core"
+    (rel_dir / "changes").mkdir(parents=True)
+    (rel_dir / "releases").mkdir(parents=True)
+    make_workspace(
+        repo,
+        [{"path": "packages/core", "name": "core", "releasable": "core"}],
+        releasables=[{"name": "core", "tag_format": "{name}@v{version}"}],
+    )
+    return repo, rel_dir
+
+
+class TestCompanionTagsAreExplained:
+    """The tags a RELEASE creates are the tags the backfill must account for.
+
+    A releasable whose primary tag is not Go-compatible gets one companion tag
+    per publishing Go member (``packages/core/v0.1.0``), created and pushed by
+    the release flow and declared by ``expected_refs``. The backfill used to
+    render the releasable's ``tag_format`` and nothing else, so every companion
+    tag in a monorepo was unexplained -- and one unexplained tag refuses the
+    whole apply.
+    """
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        repo, rel_dir = make_releasable_workspace(tmp_path, targets=["npm", "go"])
+        commit_file(repo, "packages/core/thing.js", "x\n", "release")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "workspace")
+        git(repo, "tag", "core@v0.1.0")
+        git(repo, "tag", "packages/core/v0.1.0")
+        write_changelog_jsonl(rel_dir / "changes", "0.1.0")
+        return repo, rel_dir
+
+    def test_the_companion_tag_is_not_unexplained(self, repo):
+        repo, _rel_dir = repo
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        assert [e.tag for e in plan.unexplained] == []
+
+    def test_the_apply_proceeds_and_records_the_version(self, repo):
+        repo, rel_dir = repo
+        code, output = run_backfill(repo)
+        assert code == 0, output
+        data = read_toml(rel_dir / "releases" / "v0.1.0.toml")
+        assert data["candidate_sha"] == git(repo, "rev-parse", "core@v0.1.0^{commit}")
+
+    def test_a_second_run_plans_nothing(self, repo):
+        repo, _rel_dir = repo
+        run_backfill(repo)
+        assert backfill.build_plan(str(repo), use_gh=False).changed_versions == []
+
+    def test_a_tag_no_ref_set_produces_is_still_unexplained(self, repo):
+        repo, _rel_dir = repo
+        git(repo, "tag", "packages/other/v0.1.0")
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        assert [e.tag for e in plan.unexplained] == ["packages/other/v0.1.0"]
+
+
+class TestAnUnderivableCompanionSetIsReported:
+    """A member with no resolvable config still gets a pass, and a note.
+
+    The companion tags come from the members' own effective configs, and the
+    repositories this pass exists to repair can carry a member (a root member
+    especially, which may not have a ``.rlsbl/`` at all) whose config names
+    neither targets nor a publish mode. The primary tag and the recorded aliases
+    never depend on that, so the pass proceeds on those and SAYS what it could
+    not derive -- rather than failing the whole repository over one member, or
+    silently pretending the version owns no companions.
+    """
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        repo, rel_dir = make_releasable_workspace(
+            tmp_path, targets=["npm", "go"], name="unconfigured",
+        )
+        (repo / "packages" / "core" / ".rlsbl" / "config.json").write_text(
+            "{}\n", encoding="utf-8",
+        )
+        commit_file(repo, "packages/core/thing.js", "x\n", "release")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "workspace")
+        git(repo, "tag", "core@v0.1.0")
+        git(repo, "tag", "packages/core/v0.1.0")
+        write_changelog_jsonl(rel_dir / "changes", "0.1.0")
+        return repo
+
+    def test_the_primary_spelling_still_resolves(self, repo):
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        vp = next(v for v in plan.versions if v.version == "0.1.0")
+        assert vp.tag == "core@v0.1.0"
+
+    def test_the_reason_is_reported(self, repo):
+        _code, output = run_backfill(repo, dry_run=True)
+        assert "companion tags" in output
+        assert "packages/core/v0.1.0" in output
+
+    def test_the_underivable_companion_is_reported_unexplained(self, repo):
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        assert [e.tag for e in plan.unexplained] == ["packages/core/v0.1.0"]
+        assert "companion tags" in backfill.unexplained_error(plan)
+
+
+class TestEverySpellingOfAKnownVersionIsExplained:
+    """A version can stand under more than one live spelling at once.
+
+    ``rlsbl release reconcile`` MINTS the current scheme's spelling beside the
+    historical one an archive records in ``shipped_as`` -- that is the documented
+    repair for a renamed project. The backfill recorded only the FIRST spelling
+    that resolved and stopped, so the tag reconcile had just created came back
+    unexplained on the next pass, and one unexplained tag refuses the whole
+    apply.
+    """
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        repo = make_standalone(tmp_path, name="minted")
+        commit_file(repo, "a.txt", "a\n", "release")
+        git(repo, "tag", "strictcli@v0.12.0")
+        write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.12.0")
+        path = Path(repo / ".rlsbl" / "releases") / "v0.12.0.toml"
+        path.write_text(
+            "format_version = 1\n"
+            'bump = "minor"\ninclude = ["pypi"]\nexclude = []\n'
+            'description = "Shipped under the old name."\n'
+            'shipped_as = "strictcli@v0.12.0"\n'
+            'candidate_sha = "%s"\n'
+            'tree_hashes = { "." = "%s" }\n' % (
+                git(repo, "rev-parse", "strictcli@v0.12.0^{commit}"),
+                git(repo, "rev-parse", "strictcli@v0.12.0^{tree}"),
+            ),
+            encoding="utf-8",
+        )
+        os.chmod(path, 0o444)
+        # What reconcile's materialize verdict does: mint the current scheme's
+        # spelling at the archive's release commit.
+        git(repo, "tag", "v0.12.0", "strictcli@v0.12.0^{commit}")
+        return repo
+
+    def test_the_minted_spelling_is_explained(self, repo):
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        assert [e.tag for e in plan.unexplained] == []
+
+    def test_the_historical_spelling_stays_explained(self, repo):
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        assert "strictcli@v0.12.0" not in [e.tag for e in plan.unexplained]
+
+    def test_a_post_mint_pass_plans_nothing(self, repo):
+        code, output = run_backfill(repo)
+        assert code == 0, output
+        assert backfill.build_plan(str(repo), use_gh=False).changed_versions == []
 
 
 # ---------------------------------------------------------------------------

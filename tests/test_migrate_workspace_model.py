@@ -629,8 +629,15 @@ def make_git_workspace(tmp_path, text=OLD_MODEL):
 
     repo = tmp_path / "ws"
     init_repo(repo)
-    (repo / "pkgs" / "core").mkdir(parents=True)
-    (repo / "pkgs" / "cli").mkdir(parents=True)
+    for member in ("core", "cli"):
+        (repo / "pkgs" / member / ".rlsbl").mkdir(parents=True)
+        # A member's effective config is what names its targets, and therefore
+        # the companion tags its releases owe. The backfill the migration runs
+        # asks the same question the release flow does, so a member with no
+        # resolvable config has no derivable ref set.
+        (repo / "pkgs" / member / ".rlsbl" / "config.json").write_text(
+            '{"publish_mode": "ci", "targets": ["pypi"]}\n', encoding="utf-8",
+        )
     write_workspace(repo, text)
     (repo / "README.md").write_text("hi\n", encoding="utf-8")
     git(repo, "add", "-A")
