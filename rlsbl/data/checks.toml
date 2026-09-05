@@ -608,10 +608,11 @@ pure = true
 needs_network = false
 depends_on = []
 
-# stash-free: a stash is uncommitted work with no branch of its own. The
-# release flow, a resume and a reconcile apply each refuse one outright, since
-# each commits, rewrites or force-pushes the working tree; this reports it
-# first. Not pure -- it shells out to `git stash list`.
+# stash-free: a stash is uncommitted work with no branch of its own. Every
+# operation that commits, rewrites or force-pushes this working tree refuses
+# one outright -- the release flow, a resume, a reconcile apply, a backfill --
+# and this reports it before any of them is reached. Not pure -- it shells out
+# to `git stash list`.
 [checks.stash-free]
 tags = ["project"]
 severity = "error"

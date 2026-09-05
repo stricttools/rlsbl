@@ -57,7 +57,7 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | `description-consistency` | warn | Package description is consistent across manifest files |
 | `license-file` | error | A LICENSE file exists in the project root |
 | `license-consistency` | warn | License identifier matches across manifest files |
-| `config-schema` | error | `.rlsbl/config.json` conforms to the expected schema (no unknown keys, correct types) |
+| `config-schema` | error | The three things `.rlsbl/config.json` may not say: the retired `private` key (`publish_mode` is required in its place), an empty `targets` list (`publish_mode: "none"` is how publishing is suppressed), and a `release.mode` key (PR mode was removed). Plus the shape of the `pipelines` section and its links to the declared targets. An unknown key is NOT policed here — see [policed configuration surfaces](configuration.md#policed-configuration-surfaces) |
 | `private-hook-stale` | error | Detects leftover private repo hook files that should be deleted |
 | `publish-mode-workflow` | error | `publish_mode: "none"` repos must not have a publish workflow that pushes to public registries |
 | `npm-private-mismatch` | error | `package.json` private field matches `.rlsbl/config.json` private flag (npm targets only) |

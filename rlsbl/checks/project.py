@@ -1272,8 +1272,9 @@ def register_project_checks(app):
         A stash is uncommitted work with no branch of its own: nothing records
         what it belongs to, and every operation that commits, rewrites or
         force-pushes this working tree would either leave it behind silently
-        or outlive it. The release flow, a resume and a reconcile apply each
-        refuse one outright; this reports it before any of them is reached.
+        or outlive it. Every one of those refuses a stash outright -- the
+        release flow, a resume, a reconcile apply, a backfill -- and this
+        reports it before any of them is reached.
         """
         from ..git_util import stash_entries
 
