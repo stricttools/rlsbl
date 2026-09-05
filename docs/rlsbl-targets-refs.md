@@ -1,6 +1,6 @@
 ---
 title: rlsbl.targets.refs
-description: "The value types expected_refs speaks: a version's primary tag, the companion tags its ecosystem requires, and the aliases a rename or conversion recorded."
+description: "The value types expected_refs speaks: a version's primary tag, the companion tags its ecosystem requires, and the aliases its own records attribute to it."
 generated: true
 nav_group: "API Reference"
 nav_order: 173

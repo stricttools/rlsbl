@@ -1,8 +1,7 @@
 ---
 title: rlsbl transition
-description: "Record the transition-record facts that no surgery writes."
+description: "Declare the two transition-record facts nothing can derive: a tag that stands outside the version model, and a release history that is deliberately closed."
 generated: true
-seeded: true
 nav_group: "CLI Reference"
 nav_order: 17
 ---

@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.transition_record_cmd
-description: "``rlsbl transition record``: the typed door onto the operator-declared facts."
+description: "The command behind rlsbl transition record: which two kinds it writes, which record file it appends to, and the duplicate and empty-reason refusals."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 74
 ---
