@@ -1296,7 +1296,18 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
                 f"point at. Backfill it before reconciling."
             )
 
-        expected = target.expected_refs(version, ref_ctx)
+        try:
+            expected = target.expected_refs(version, ref_ctx)
+        except RlsblError as exc:
+            # A ref set that cannot be derived -- two records disagreeing about
+            # the spelling this version shipped under, a member whose config
+            # does not resolve -- is a stated refusal, and the reconcile's own
+            # error type is what its command surface catches. The reason is
+            # carried verbatim: expected_refs already names both records.
+            raise ReconcileError(
+                f"the refs of {version} cannot be derived, so the reconcile "
+                f"cannot say whether origin is right about them: {exc}"
+            ) from exc
         for tag in expected.tags:
             refname = f"refs/tags/{tag}"
             claimed.add(refname)

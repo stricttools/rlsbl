@@ -444,6 +444,130 @@ class TestRecordedNonVersionTagsInAWorkspace:
         assert refusals(preview) == []
 
 
+class TestAnUnderivableRefSetIsAReconcileError:
+    """Two records disagreeing about a version's spelling stop the reconcile.
+
+    ``expected_refs`` refuses to derive a ref set when the transition record's
+    alias events and the archive's ``shipped_as`` name DIFFERENT spellings for
+    one version -- neither outranks the other. That refusal reaches reconcile
+    through the one call it makes to derive a version's refs, and reconcile's
+    own error type is what its command surface catches: an
+    ``ExpectedRefsError`` escaping unwrapped is a traceback where a stated
+    refusal belongs.
+    """
+
+    def _disagreeing(self, tmp_path):
+        from rlsbl.transition_record import BoundaryAlias, BoundaryAliasEvent
+
+        releases = tmp_path / ".rlsbl" / "releases"
+        write_archived_release_file(
+            str(releases), "1.0.0", bump="minor", include=["plain"],
+            description="The first release.", candidate_sha=NEW,
+            tree_hashes={".": "f" * 40}, shipped_as="old@v1.0.0",
+        )
+        append_event(
+            get_transition_record_path(str(tmp_path)),
+            BoundaryAliasEvent(aliases=[BoundaryAlias(
+                alias_tag="other@v1.0.0", aliased_tag="another@v1.0.0",
+                commit=NEW,
+            )]),
+        )
+        return releases
+
+    def test_build_preview_raises_the_reconciles_own_error(self, tmp_path):
+        from rlsbl.commands.release_reconcile import ReconcileError
+
+        releases = self._disagreeing(tmp_path)
+        with pytest.raises(ReconcileError) as exc:
+            build_preview(
+                observation=Observation(
+                    remote_refs=_refs(v1_0_0=NEW), local_refs=_refs(v1_0_0=NEW),
+                    releases=frozenset({"v1.0.0"}), releases_known=True,
+                ),
+                explanations=Explanations(),
+                target=BaseTarget(),
+                ref_ctx=ref_context(repo_root=str(tmp_path)),
+                releases_dir=str(releases),
+            )
+
+        message = str(exc.value)
+        assert "old@v1.0.0" in message, "the archive's spelling is named"
+        assert "other@v1.0.0" in message, "the record's spelling is named"
+        assert "1.0.0" in message
+
+    def test_the_command_presents_it_as_a_refusal(self, tmp_path, capsys):
+        """Through `rlsbl release reconcile` itself: a stated error, exit 1."""
+        from unittest.mock import patch
+
+        from rlsbl.commands.release_reconcile import run_cmd
+        from rlsbl.context import ProjectContext
+        from rlsbl.transition_record import BoundaryAlias, BoundaryAliasEvent
+
+        repo = tmp_path / "repo"
+        init_repo(repo)
+        sha = commit_file(repo, "a.txt", "a\n", "the release")
+        write_archived_release_file(
+            str(repo / ".rlsbl" / "releases"), "1.0.0", bump="minor",
+            include=["plain"], description="The first release.",
+            candidate_sha=sha, tree_hashes={".": git(repo, "rev-parse", "HEAD^{tree}")},
+            shipped_as="old@v1.0.0",
+        )
+        append_event(
+            get_transition_record_path(str(repo)),
+            BoundaryAliasEvent(aliases=[BoundaryAlias(
+                alias_tag="other@v1.0.0", aliased_tag="another@v1.0.0",
+                commit=sha,
+            )]),
+        )
+
+        observation = Observation(
+            remote_refs=_refs(v1_0_0=sha), local_refs=_refs(v1_0_0=sha),
+            releases=frozenset({"v1.0.0"}), releases_known=True,
+        )
+        ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
+        with patch(
+            "rlsbl.commands.release_reconcile.observe_world",
+            return_value=observation,
+        ):
+            with pytest.raises(SystemExit) as exc:
+                run_cmd({"mode": "plan"}, ctx=ctx)
+
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert err.startswith("Error: ") or "\nError: " in err
+        assert "old@v1.0.0" in err and "other@v1.0.0" in err
+
+    def test_a_never_released_version_still_absorbs_it(self, tmp_path):
+        """The claim-only path already tolerated an underivable ref set: a
+        version that was never released owes nothing either way."""
+        from rlsbl.transition_record import BoundaryAlias, BoundaryAliasEvent
+
+        releases = tmp_path / ".rlsbl" / "releases"
+        write_archived_release_file(
+            str(releases), "2.0.0", bump="major", include=["plain"],
+            description="Claimed, never shipped.", candidate_sha=None,
+            tree_hashes=None, never_released=True,
+        )
+        append_event(
+            get_transition_record_path(str(tmp_path)),
+            BoundaryAliasEvent(aliases=[BoundaryAlias(
+                alias_tag="other@v2.0.0", aliased_tag="another@v2.0.0",
+                commit=NEW,
+            )]),
+        )
+        preview = build_preview(
+            observation=Observation(
+                remote_refs={}, local_refs={},
+                releases=frozenset(), releases_known=True,
+            ),
+            explanations=Explanations(),
+            target=BaseTarget(),
+            ref_ctx=ref_context(repo_root=str(tmp_path)),
+            releases_dir=str(releases),
+        )
+        assert preview.items == ()
+
+
 class TestTheTripwire:
 
     def test_one_refusal_is_reported_over_every_repairable_subject(
