@@ -37,11 +37,13 @@ records the TAG-NAMESPACE question consults, so a ``non-version-tag`` declared
 here is seen by ``rlsbl release reconcile`` in a workspace as well as in a
 standalone repository.
 
-WHAT IT REFUSES: an empty subject or reason (the schema calls both non-empty,
-and a declaration with no stated reason is not an audit trail), a second
-declaration of the same kind about the same subject (the record is
-append-only, so a duplicate would stand beside the first forever with no way
-to say which one is meant), and -- defensively -- a kind outside the two.  The
+WHAT IT REFUSES: a second declaration of the same kind about the same subject
+(the record is append-only, so a duplicate would stand beside the first
+forever with no way to say which one is meant), and -- defensively -- a kind
+outside the two.  A supplied-but-empty subject or reason is refused one step
+earlier, at the CLI boundary (``rlsbl._refuse_empty_flags``), which is the one
+place in rlsbl that decides what an explicitly-empty value means, so this
+command's message for it is every other command's message for it.  The
 choice flag admits only those two, so no argv reaches that last refusal; it
 exists so that widening the choice without teaching this router is a hard
 error rather than an event written with a shape nobody checked.
@@ -106,15 +108,6 @@ def run_cmd(flags, *, ctx):
             f"This door writes only "
             f"{', '.join(sorted(OPERATOR_KINDS))}; every other kind is written "
             f"by the operation that performed the surgery."
-        )
-    flag_name, field = OPERATOR_KINDS[kind]
-
-    if not subject:
-        _fail(f"{flag_name} requires a non-empty value")
-    if not reason:
-        _fail(
-            f"--reason requires a non-empty value: the record's {field} field "
-            f"is the fact, and the reason is why an operator declared it"
         )
 
     # The whole repository, not one member: the record this writes is the one

@@ -76,13 +76,16 @@ def repo(tmp_path):
 
 
 class TestValidation:
+    """The per-command refusals.
+
+    A supplied-but-empty ``--from-module``/``--to-module`` is NOT among them:
+    an explicitly-empty flag value is one class with one message, refused at
+    the CLI boundary, and pinned in tests/test_empty_flag_refusal.py.
+    """
+
     def test_identical_paths_refuse(self):
         with pytest.raises(GoModuleRewriteError, match="same path"):
             validate_module_paths(OLD, OLD)
-
-    def test_empty_path_refuses(self):
-        with pytest.raises(GoModuleRewriteError, match="--from-module"):
-            validate_module_paths("", NEW)
 
     def test_whitespace_refuses(self):
         with pytest.raises(GoModuleRewriteError, match="whitespace"):

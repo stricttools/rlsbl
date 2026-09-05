@@ -1229,6 +1229,7 @@ def cmd_release_scrub(
     reason,
 ):
     """Scrub sensitive content from git history and update release metadata."""
+    _refuse_empty_flags(reason=reason)
     dry_run = ctx.dry_run
 
     # Election says WHICH member was named; the value it carries is still the
@@ -2418,6 +2419,7 @@ rewrite = app.group("rewrite", help="Sweeping rewrites of the current working tr
 @effects.handler
 def cmd_rewrite_go_module_path(ctx, from_module, to_module):
     """Rename a Go module path across every go.mod and import site."""
+    _refuse_empty_flags(from_module=from_module, to_module=to_module)
     root = _require_project_root()
     from .commands.rewrite.go_module_path import cmd_go_module_path
     cmd_go_module_path(
@@ -2493,11 +2495,17 @@ def cmd_transition_record(
     """Record one operator-declared fact in the transition record."""
     from .transition_record import KIND_NON_VERSION_TAG, KIND_RELEASE_HISTORY_CLOSED
 
+    from .commands.transition_record_cmd import OPERATOR_KINDS
+
     dry_run = ctx.dry_run
     kind = (
         KIND_NON_VERSION_TAG if isinstance(fact, TransitionNonVersionTag)
         else KIND_RELEASE_HISTORY_CLOSED
     )
+    # The subject's flag is whichever member elected, and OPERATOR_KINDS is
+    # what already knows its spelling.
+    subject_flag = OPERATOR_KINDS[kind][0].lstrip("-").replace("-", "_")
+    _refuse_empty_flags(reason=reason, **{subject_flag: fact.value})
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))

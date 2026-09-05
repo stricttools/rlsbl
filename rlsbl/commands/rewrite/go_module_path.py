@@ -89,10 +89,14 @@ class FileRewrite:
 
 
 def validate_module_paths(old, new):
-    """Reject module paths that cannot be renamed between."""
+    """Reject module paths that cannot be renamed between.
+
+    A supplied-but-empty path is not refused here: that is one class with one
+    message, and the CLI boundary owns it (``rlsbl._refuse_empty_flags``), so
+    ``--from-module ""`` reads the same as every other empty flag value in
+    rlsbl rather than a message only this command uses.
+    """
     for label, value in (("--from-module", old), ("--to-module", new)):
-        if not value or not value.strip():
-            raise GoModuleRewriteError(f"{label} must name a module path")
         if value != value.strip() or any(c.isspace() for c in value):
             raise GoModuleRewriteError(
                 f"{label} must not contain whitespace: {value!r}"

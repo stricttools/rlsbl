@@ -21,6 +21,7 @@ import pytest
 
 from githarness import commit_file, git, init_repo
 
+import rlsbl
 from rlsbl.commands.transition_record_cmd import run_cmd
 from rlsbl.context import create_context
 from rlsbl.transition_record import (
@@ -149,24 +150,35 @@ class TestTheDryRun:
 
 
 class TestTheRefusals:
+    """The two empty-value refusals are driven through the CLI on purpose.
 
-    def test_an_empty_reason_is_refused(self, tmp_path):
+    An explicitly-empty flag value is one class with one message, decided at
+    the CLI boundary rather than by each command, so these assert what an
+    operator actually gets -- and that the record file is never created.
+    """
+
+    def test_an_empty_reason_is_refused(self, tmp_path, monkeypatch):
         repo = make_repo(tmp_path)
-        with pytest.raises(SystemExit) as exc:
-            run_cmd(
-                _flags(kind=KIND_NON_VERSION_TAG, subject="nightly", reason="   "),
-                ctx=ctx_for(repo),
-            )
-        assert exc.value.code == 1
+        monkeypatch.chdir(repo)
+        result = rlsbl.app.test([
+            "transition", "record", "--non-version-tag", "nightly",
+            "--reason", "   ", "--approve-consequential",
+        ])
+        assert result.exit_code == 1
+        assert "--reason" in (result.stderr or "")
+        assert "empty" in (result.stderr or "")
         assert not record_path(repo).exists()
 
-    def test_an_empty_subject_is_refused(self, tmp_path):
+    def test_an_empty_subject_is_refused(self, tmp_path, monkeypatch):
         repo = make_repo(tmp_path)
-        with pytest.raises(SystemExit):
-            run_cmd(
-                _flags(kind=KIND_NON_VERSION_TAG, subject="  "),
-                ctx=ctx_for(repo),
-            )
+        monkeypatch.chdir(repo)
+        result = rlsbl.app.test([
+            "transition", "record", "--non-version-tag", "  ",
+            "--reason", "a nightly build marker", "--approve-consequential",
+        ])
+        assert result.exit_code == 1
+        assert "--non-version-tag" in (result.stderr or "")
+        assert "empty" in (result.stderr or "")
         assert not record_path(repo).exists()
 
     def test_a_duplicate_declaration_names_the_existing_event(self, tmp_path, capsys):

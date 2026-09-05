@@ -97,15 +97,17 @@ def _select_and_validate_mode(flags):
       ``--from``/``--entire-history`` and ``--reason``; per-operation
       pattern/replace/mangle live inside the recipe file.
 
+    ``--reason`` is not checked here: it is a required flag, and a supplied
+    empty value is refused at the CLI boundary (``rlsbl._refuse_empty_flags``),
+    which is the one place in rlsbl that decides what an explicitly-empty value
+    means.
+
     Returns the mode string: "match", "file", or "recipe".
     """
     selectors = [name for name in ("pattern", "file", "recipe") if flags.get(name)]
     if len(selectors) != 1:
         _fail("exactly one of --pattern, --file, or --recipe must be provided.")
     mode = {"pattern": "match", "file": "file", "recipe": "recipe"}[selectors[0]]
-
-    if not flags.get("reason"):
-        _fail("--reason is required.")
 
     if mode == "match":
         if not flags.get("replace") and not flags.get("mangle"):
