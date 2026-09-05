@@ -302,6 +302,28 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     if releasable_name and monorepo_root:
         from ...workspace import get_releasable_dir
         _rel_cfg_dir = get_releasable_dir(str(monorepo_root), releasable_name)
+
+    # The flow-owned fields, re-checked at the resume's own entry. A resume
+    # skips the validation phase by design -- it already ran -- but the release
+    # FILE is read again at the archive step, and it sits editable on disk for
+    # the whole time a stopped release waits. A marker hand-written into it
+    # between the failure and the resume would otherwise be archived as this
+    # version's permanent record, asserting something the release never
+    # verified. Refused here, before the mutating phase, rather than at the
+    # write. (Nothing to check once the file has been archived, and a release
+    # driven by --bump never had one.)
+    from ...release_file import (
+        get_release_file_path as _get_release_file_path,
+        read_release_file as _read_release_file,
+    )
+    _resume_release_file = _get_release_file_path(
+        project_dir, releasable_dir=_rel_cfg_dir,
+    )
+    if os.path.isfile(_resume_release_file):
+        validate_no_authored_release_commit(
+            _read_release_file(_resume_release_file)
+        )
+
     target = TARGETS[registry]
     target_paths = resolve_target_paths(project_dir, releasable_config_dir=_rel_cfg_dir)
     primary_path = target_paths.get(registry, project_dir)

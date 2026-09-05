@@ -534,6 +534,113 @@ class TestFlowRefusesAnAuthoredReleaseCommit:
         assert _git(tmp_project, "rev-parse", "HEAD") == head_before
 
 
+class TestResumeRefusesAnAuthoredReleaseFile:
+    """A resume re-enters the mutating phase, so it re-checks the release file.
+
+    `release resume` skips the validation phase on purpose -- it already ran in
+    the original run. But the release FILE is read again at the archive step,
+    and it is editable on disk for the whole time a stopped release sits there:
+    an operator who hand-writes a fate marker into unreleased.toml between the
+    failure and the resume would otherwise have that claim archived as the
+    version's permanent record, with nothing having verified it.
+    """
+
+    def _resumable_state(self, repo, version="1.0.1"):
+        from rlsbl.commands.release.release_state import (
+            get_state_path,
+            save_release_state,
+        )
+
+        state_path = get_state_path(str(repo))
+        save_release_state(state_path, {
+            "new_version": version,
+            "tag": f"v{version}",
+            "branch": "main",
+            "pre_release_sha": _git(repo, "rev-parse", "HEAD"),
+            "bump_type": "patch",
+            "registry": "npm",
+            "completed_steps": [
+                "VERSION_BUMPED", "COMMITTED", "SNAPSHOT_REGENERATED",
+                "BRANCH_PUSHED", "CI_VERIFIED", "CHANGELOG_FINALIZED",
+            ],
+            "failed_steps": {},
+            "companion_tags": [],
+            "monorepo_name": None,
+            "releasable_name": None,
+            "commit_msg": f"v{version}",
+            "description": "test release",
+            "context": "",
+            "include": ["npm"],
+            "exclude": [],
+            "preid": "",
+            "blog": False,
+        })
+        return state_path
+
+    def _resume(self, repo, state_path):
+        from rlsbl.commands.release import resume_cmd
+        from rlsbl.commands.release.release_state import load_release_state
+        from rlsbl.utils import run as real_run
+
+        def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
+            if cmd == "gh":
+                return ""
+            if cmd == "git" and args and args[0] in ("push", "fetch"):
+                return ""
+            return real_run(cmd, args=args, timeout=timeout, env=env, cwd=cwd)
+
+        with (
+            patch("rlsbl.commands.release.push_if_needed"),
+            patch("rlsbl.commands.release.run_gh", return_value=""),
+            patch("rlsbl.commands.release.run", side_effect=fake_run),
+        ):
+            resume_cmd(
+                load_release_state(state_path),
+                {"quiet": True, "skip-lock": True},
+                ctx=ProjectContext(
+                    project_root=Path(str(repo)), workspace_root=None,
+                    config={"publish_mode": "ci", "pipelines": {}},
+                ),
+            )
+
+    def test_a_marker_carrying_release_file_aborts_the_resume(
+        self, tmp_project, capsys,
+    ):
+        _setup_npm_project(
+            tmp_project,
+            release_file=_RELEASE_FILE + "never_released = true\n",
+        )
+        state_path = self._resumable_state(tmp_project)
+
+        with pytest.raises(SystemExit) as exc:
+            self._resume(tmp_project, state_path)
+
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "flow-owned" in err and "never_released" in err
+        # The archive step never ran: the editable file is still where it was,
+        # and no archive claiming a fate nothing verified exists.
+        assert (tmp_project / ".rlsbl" / "releases" / "unreleased.toml").exists()
+        assert not (tmp_project / ".rlsbl" / "releases" / "v1.0.1.toml").exists()
+
+    def test_a_release_commit_in_the_release_file_aborts_the_resume(
+        self, tmp_project, capsys,
+    ):
+        _setup_npm_project(
+            tmp_project,
+            release_file=_RELEASE_FILE + f'candidate_sha = "{_SHA}"\n',
+        )
+        state_path = self._resumable_state(tmp_project)
+
+        with pytest.raises(SystemExit) as exc:
+            self._resume(tmp_project, state_path)
+
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "flow-owned" in err and "candidate_sha" in err
+        assert not (tmp_project / ".rlsbl" / "releases" / "v1.0.1.toml").exists()
+
+
 def _setup_two_member_releasable_workspace(root):
     """One releasable ('alpha') with TWO member packages, npm targets.
 
