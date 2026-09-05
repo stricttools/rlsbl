@@ -240,7 +240,8 @@ in place and creates only the absent ones),
 `rlsbl release scrub` (the rewrite), `rlsbl release edit` (re-syncs one
 Release's notes), `rlsbl release deprecate` and `rlsbl release yank` (rewrite a
 Release body and set its pre-release flag; `yank` also performs the registry's
-removal), `rlsbl changelog amend` and `rlsbl changelog edit` (re-sync a released
+removal), `rlsbl changelog amend`, `rlsbl changelog edit` and
+`rlsbl changelog remove` (re-sync a released
 version's Release notes), and `rlsbl monorepo rename-releasable` (pushes one
 boundary alias tag). A write from anywhere else is not rlsbl's.
 

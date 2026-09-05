@@ -101,7 +101,10 @@ This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestrat
 - `changelog edit` is a declared sparse update of one `changelog-entry`: at least one of
   `--description`/`--type`/`--user-facing` is required, an unsupplied property is
   untouched, and `--unset-description`/`--unset-type` clear a field rather than writing
-  an empty string to it.
+  an empty string to it. Deleting an entry is therefore `changelog remove`, a command of
+  its own -- a removal writes no property, which the update declaration refuses -- and
+  its `--id`/`--commits` are an exactly-one election, since a removal that deletes the
+  wrong line cannot be corrected by re-running with a better flag.
 
 ## Who writes which ref namespace
 
@@ -130,7 +133,7 @@ rlsbl's:
 | `rlsbl release scrub` | The rewrite itself: force-push, tag re-pointing, GitHub Release documents rewritten in place. |
 | `rlsbl release edit` | Re-syncs one Release's notes from CHANGELOG.md. |
 | `rlsbl release deprecate` / `rlsbl release yank` | Rewrites a Release's body and sets its pre-release flag; `yank` also performs the registry's own removal. |
-| `rlsbl changelog amend` / `rlsbl changelog edit` | Rewrites a released version's JSONL and re-syncs that version's GitHub Release notes. |
+| `rlsbl changelog amend` / `rlsbl changelog edit` / `rlsbl changelog remove` | Rewrites a released version's JSONL and re-syncs that version's GitHub Release notes. |
 | `rlsbl monorepo rename-releasable` | Pushes one boundary alias tag at the renamed releasable's current version. |
 
 ## Release pipeline order
