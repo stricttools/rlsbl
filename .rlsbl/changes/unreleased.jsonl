@@ -29,3 +29,4 @@
 {"format_version":1,"id":"18d2463bbc2e5e25c14d96975e53422586470a59edb430b5","commits":["f4ed12a5a77a06c8a9bdde0b4a44667d33ab5119"],"user_facing":false,"description":"Internal: the no-fate archive error and the editable-release-file refusal each gain a test that performs the remedy the message prints, exactly as printed, and asserts the error clears."}
 {"format_version":1,"id":"18d2468508d364e3e090a2e98f01490496e86974a5450ef6","commits":["bc2bdb329dc9f01892d3fc2cb828fdbfcdcbff8e"],"user_facing":false,"description":"Internal: the monorepo and release-workflow doc pages' frontmatter descriptions were refreshed to match the sections this release changed."}
 {"format_version":1,"id":"18d24737a1262d7a3deae8a5b3044d5197778f9302f8af9d","commits":["c4b7f441f847e0d77749a7d323e119c48afdc17e"],"user_facing":false}
+{"format_version":1,"id":"18d2475fc3d9a3eb6b5ad6fb4dd74ae3a323f5cdd1d4a120","commits":["c78d3df462883d4c3b6a64e8555be77a85368d76"],"user_facing":false}
