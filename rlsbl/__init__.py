@@ -813,6 +813,44 @@ _STATUS_PAYLOAD_SCHEMA = {
 }
 
 
+def _refuse_status_at_bare_workspace_root(target, root, workspace_root):
+    """Refuse `rlsbl status` at a workspace root that is not itself a project.
+
+    `status` reports on ONE project. A root member that declares a manifest is
+    a real project and resolves like any other member -- this refuses only the
+    root member that declares none, where the generic "no package.json,
+    pyproject.toml, or go.mod found" is true of the directory and useless to
+    the reader: they are standing in a workspace, and the command that reports
+    on a workspace is `rlsbl monorepo status`.
+
+    A `--target` the caller named is honored as named; the refusal is about
+    auto-detection having nothing to find.
+    """
+    if target is not None or workspace_root is None:
+        return
+    if Path(workspace_root).resolve() != Path(root).resolve():
+        return
+    from .targets import detect_targets
+    # A config-declared target set counts: a root member can declare one
+    # without carrying a manifest auto-detection recognizes. A config that
+    # cannot be read raises on its own, with its own message.
+    if detect_targets(str(root)):
+        return
+    print(
+        "Error: this is a workspace root and its root member declares no "
+        "release target, so there is no single project for `rlsbl status` to "
+        "report on.",
+        file=sys.stderr,
+    )
+    print(
+        "Run `rlsbl monorepo status` for every project's version, release "
+        "tag and changelog coverage, or cd into one member and run "
+        "`rlsbl status` there.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 @app.command(name="status", help="Display the current project version, branch, latest release, unreleased commit count, and changelog coverage. The latest release comes from the project's release archives and is annotated when this checkout does not contain it. Outputs plain text by default or structured JSON with the --json flag.", effect="read_only", payload_schema=_STATUS_PAYLOAD_SCHEMA)
 @strictcli.flag(name="target", type=str, presence="optional", help="Target a specific registry (auto-detected if omitted)")
 @strictcli.flag(name="registry", type=bool, default=False, help="Query the package registry for the latest published version")
@@ -826,6 +864,7 @@ def cmd_status(ctx, target, registry):
     root = _require_sub_project_root()
     from .workspace import find_workspace_root
     ws_root = find_workspace_root(str(root))
+    _refuse_status_at_bare_workspace_root(target, root, ws_root)
     # The project context is a different object from the dispatch context, so
     # it gets its own name: `ctx` stays the strictcli one the payload goes to.
     project_ctx = create_context(root, workspace_root=Path(ws_root) if ws_root else None)

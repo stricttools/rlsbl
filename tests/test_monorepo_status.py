@@ -1001,3 +1001,55 @@ class TestMonorepoStatusDeps:
         rdeps_pos = header_line.index("Rdeps")
         remote_pos = header_line.index("Remote")
         assert deps_pos < rdeps_pos < remote_pos
+
+
+class TestStatusAtAWorkspaceRoot:
+    """`rlsbl status` at the workspace root: redirect only when it must.
+
+    The command reports on ONE project. At a workspace root whose root member
+    declares no manifest there is nothing for it to report on, and it used to
+    say "no package.json, pyproject.toml, or go.mod found" -- true of the
+    directory, and useless: the reader is standing in a workspace, and the
+    command that reports on a workspace is `rlsbl monorepo status`. A root
+    member that DOES declare a manifest is a real project and still resolves.
+    """
+
+    def test_a_root_without_a_manifest_names_monorepo_status(
+        self, mock_git_repo, capsys,
+    ):
+        _cmd_init({"root-dev-node": True}, project_root=".")
+        _make_npm_project(mock_git_repo, "core", version="1.0.0")
+        _cmd_add(["core"], {"releasable": "false"}, project_root=".")
+        capsys.readouterr()
+
+        import rlsbl
+
+        result = rlsbl.app.test(["status"])
+        assert result.exit_code == 1
+        assert "rlsbl monorepo status" in result.stderr
+        # The manifest-hunting sentence is not what the reader needs here.
+        assert "no package.json, pyproject.toml, or go.mod found" not in (
+            result.stderr
+        )
+
+    def test_a_root_with_a_manifest_still_resolves(self, mock_git_repo, capsys):
+        """The root member is a real project when it declares one."""
+        with open(str(mock_git_repo / "package.json"), "w") as f:
+            json.dump({"name": "rootpkg", "version": "1.0.0"}, f)
+        subprocess.run(
+            ["git", "add", "package.json"], cwd=str(mock_git_repo), check=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "root manifest"],
+            cwd=str(mock_git_repo), check=True,
+        )
+        _cmd_init({"root-dev-node": True}, project_root=".")
+        _make_npm_project(mock_git_repo, "core", version="1.0.0")
+        _cmd_add(["core"], {"releasable": "false"}, project_root=".")
+        capsys.readouterr()
+
+        import rlsbl
+
+        result = rlsbl.app.test(["status"])
+        assert result.exit_code == 0, result.stderr
+        assert "rootpkg" in result.stdout
