@@ -2434,10 +2434,6 @@ def cmd_mono_rename_releasable(ctx, old_name, new_name):
             print(result["note"])
         return
 
-    if result.get("aborted"):
-        print("Aborted.")
-        return
-
     print(f"Renamed releasable '{old_name}' -> '{new_name}'")
     if result.get("members"):
         print(f"  Members updated: {', '.join(result['members'])}")
