@@ -134,8 +134,12 @@ avoid it, both explicit:
   and commit `unreleased.jsonl` yourself when the code commit is settled.
 
 If a code commit does move after its entry was recorded, the hash-resolution
-and orphan-detection checks catch the stale hash loudly (see Validation below);
-`rlsbl changelog edit` repoints the entry at the new hash.
+and orphan-detection checks report the stale hash loudly (see Validation below).
+`rlsbl changelog remap` repoints the entry at the new hash -- from a map file,
+from safegit's rewrite journal, or from stdin -- and `rlsbl changelog remove`
+deletes the entry when the work it described is gone rather than moved.
+`rlsbl changelog edit` is neither: it changes an entry's description, type or
+user-facing status, and cannot rewrite the commits an entry names.
 
 ## Validation
 
@@ -144,9 +148,9 @@ and orphan-detection checks catch the stale hash loudly (see Validation below);
 | # | Check | What it verifies |
 | --- | --- | --- |
 | 1 | Hash resolution | Every hash in every entry resolves via `git rev-parse` |
-| 2 | Tag-based range | Every resolved hash is in the unreleased range (`<last_tag>..HEAD`). Uses `git describe --tags --abbrev=0 --match 'v*'` to find the last tag. |
+| 2 | Range | Every resolved hash is in the unreleased range -- the commits after the release this checkout is anchored to, read from the release archives beside `changes/`. In a workspace, a hash IN that range whose commit belongs to another releasable's territory is reported separately, as out of SCOPE rather than out of range, naming the owning member and releasable and the invocations that move the entry there. |
 | 3 | Commit coverage | Every unreleased commit appears in at least one entry. Commits that only touch `.rlsbl/changes/` or `CHANGELOG.md` are auto-exempted. |
-| 4 | Orphan detection | Entries where ALL hashes are unresolvable (stale from amended/rebased commits) |
+| 4 | Orphan detection | Entries with no hash that is both resolvable and in this scope's range. The finding counts the unresolvable, the out-of-range and the out-of-scope hashes apart, and its remedy names a real `rlsbl changelog remap` or `rlsbl changelog remove` invocation carrying the entry's own identifier. |
 | 5 | Schema conformance | User-facing entries have `description` and `type`; type is one of `feature`/`fix`/`breaking` |
 | 6 | User-facing requirement | At least one entry must be user-facing (warning in check mode, hard error during release) |
 | 7 | Batch size (commits) | No single entry may reference more commits than `max_commits_per_entry` (default 5) |
@@ -250,13 +254,48 @@ The command declares itself as an update: the resource is `changelog-entry`, the
 
 Naming no entry at all is refused too, by the `entry-selection` constraint: at least one of `--commits`, `--id`.
 
-The following table distinguishes the four commands that interact with changelog entries and GitHub Release notes:
+## Removing an entry
+
+`rlsbl changelog remove` deletes exactly one entry, from `unreleased.jsonl` or
+from a released version's file. It is a separate command rather than a mode of
+`changelog edit` because `edit` declares itself a sparse update and the
+framework refuses an invocation that writes no property -- and a removal writes
+none.
+
+The entry is addressed by its ULID identifier or by the commits it covers, and
+the two are an exactly-one election: naming neither, or both, is refused before
+the command runs.
+
+```bash
+rlsbl changelog remove --id 18c9...
+rlsbl changelog remove --commits a1b2c3d --no-auto-commit
+```
+
+Exactly one entry is removed. A selector matching several is refused with every
+match named and its identifier printed, so the re-run can name one; a selector
+matching none is refused too. Neither refusal writes anything.
+
+Unlike `changelog edit`, `remove` accepts a commit hash git can no longer
+resolve. The entry a removal is usually for is exactly the one a rebase or a
+scrub left naming commits that are gone -- which is when the orphan check prints
+a removal as its remedy -- so an unresolvable hash is matched literally against
+the full SHAs the line stores.
+
+On a released version's file the flow is the one `amend` and `edit` use:
+temporarily unlock (chmod 644), rewrite atomically without that line, re-lock
+(chmod 444), regenerate CHANGELOG.md, and sync that version's GitHub Release
+notes.
+
+The following table distinguishes the commands that interact with changelog
+entries and GitHub Release notes:
 
 | Command | What it does | Target file | Use case |
 | --- | --- | --- | --- |
 | `changelog add` | Append new entry | `unreleased.jsonl` | Document new work |
 | `changelog amend` | Append new entry | Released `.jsonl` (read-only, temporarily unlocked) | Add missing coverage to a past release |
 | `changelog edit` | Modify existing entry in-place | Any `.jsonl` (auto-detected by commit hash) | Fix wrong type, description, or user-facing status |
+| `changelog remove` | Delete one existing entry | Any `.jsonl` (addressed by id or by commits) | Drop an entry whose work is gone, or one filed under the wrong releasable |
+| `changelog remap` | Repoint entries at rewritten commits | Every `.jsonl` in the project | Repair hashes after a rebase or a history rewrite |
 | `release edit` | Sync GitHub Release notes from CHANGELOG.md | GitHub Release | Update release notes after CHANGELOG.md changes |
 
 ## Changelog discipline

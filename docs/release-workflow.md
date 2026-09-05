@@ -351,7 +351,7 @@ Each of these writes one of the namespaces above deliberately, and the list is c
 | `rlsbl release edit` | Re-syncs one version's GitHub Release notes from CHANGELOG.md. | Releases |
 | `rlsbl release deprecate` | Prepends a deprecation notice to a Release's body and sets its pre-release flag. | Releases |
 | `rlsbl release yank` | Prepends a yank notice and sets the pre-release flag, plus the registry's own removal (npm deprecate, Go retract, a PyPI checklist). | Releases (and registries) |
-| `rlsbl changelog amend` / `rlsbl changelog edit` | Rewrites a released version's JSONL, regenerates CHANGELOG.md, and re-syncs that version's GitHub Release notes. | Releases |
+| `rlsbl changelog amend` / `rlsbl changelog edit` / `rlsbl changelog remove` | Rewrites a released version's JSONL -- appending an entry, changing one, or deleting one -- regenerates CHANGELOG.md, and re-syncs that version's GitHub Release notes. | Releases |
 | `rlsbl monorepo rename-releasable` | Creates and pushes one boundary alias tag at the renamed releasable's current version, when the tag format carries `{name}`. Historical releases stay under the old prefix. | tags |
 
 ## Publish gating

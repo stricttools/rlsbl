@@ -124,9 +124,9 @@ It replaced three narrower checks (`local-tag`, `remote-tag`, `github-release`) 
 | Check | Severity | Description |
 | --- | --- | --- |
 | `changelog-hashes` | error | Every commit hash in JSONL entries resolves via `git rev-parse` |
-| `changelog-range` | error | Every resolved hash falls within the unreleased range (after the last version tag) |
+| `changelog-range` | error | Every resolved hash falls within the unreleased range -- the commits after the release this checkout is anchored to. In a workspace, a hash in that range owned by another releasable is reported as out of SCOPE, naming that owner, rather than as out of range |
 | `changelog-coverage` | error | Every unreleased commit appears in at least one JSONL entry |
-| `changelog-orphans` | error | No entries where ALL hashes are unresolvable (stale from rebased/amended commits) |
+| `changelog-orphans` | error | No entries whose every hash is unresolvable, out of range, or owned by another releasable (stale from rebased/amended commits, or cross-filed) |
 | `changelog-schema` | error | User-facing entries have `description` and `type`; type is one of `feature`/`fix`/`breaking` |
 | `changelog-user-facing` | warn | At least one entry is user-facing (hard error during release, warning in check mode) |
 | `changelog-batch-commits` | error | No single entry references more commits than `max_commits_per_entry` (default 5) |
