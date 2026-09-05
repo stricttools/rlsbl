@@ -198,6 +198,64 @@ def _releasable_representative(workspace_root, releasable, *, invocation, verb,
     return members[0]
 
 
+def _require_releasable_membership(workspace_root, project, *, invocation, verb):
+    """Exit unless *project* -- the member the cwd resolves to -- has a releasable.
+
+    Inside a workspace, resolution is by MEMBERSHIP and never falls through to
+    reading the repository root as a standalone project.  The fall-through was
+    not a theoretical hazard: ``_require_project_root`` answers by walking up to
+    the nearest marker directory, so a member whose per-package ``.rlsbl/`` was
+    cleaned up left the member entirely and stopped at the workspace root --
+    where a command that reads release state read an empty
+    ``<root>/.rlsbl/releases`` that nothing writes and reported that there was
+    nothing to do, over a releasable that had work outstanding.
+
+    Membership answering is not the same as a releasable answering: a dev node,
+    and any member declaring ``releasable = false``, is a directory inside the
+    workspace that owns no version, no changelog and no release records.  A
+    command whose subject is a releasable therefore refuses there and names both
+    routes, rather than picking one silently or reading a release record that is
+    not this directory's.
+    """
+    from .workspace import (
+        load_releasables,
+        load_workspace,
+        resolve_releasable_for_project,
+    )
+
+    projects = load_workspace(workspace_root)
+    releasables = load_releasables(workspace_root, projects)
+    if project is not None and resolve_releasable_for_project(project, releasables):
+        return
+
+    member = (project or {}).get("name") if project else None
+    print(
+        f"Error: `{invocation}` cannot tell which releasable to {verb} here: "
+        + (
+            f"the member {member!r} belongs to no releasable."
+            if member else
+            "no declared member claims this directory."
+        ),
+        file=sys.stderr,
+    )
+    names = sorted(rel.name for rel in releasables)
+    if names:
+        print(
+            "Run it from a member directory of the releasable, or from the "
+            "workspace root naming it:",
+            file=sys.stderr,
+        )
+        for name in names:
+            print(f"  {invocation} --releasable {name} ...", file=sys.stderr)
+    else:
+        print(
+            f"This workspace declares no releasables, so there is nothing to "
+            f"{verb}.",
+            file=sys.stderr,
+        )
+    sys.exit(1)
+
+
 def _refuse_releasable_selector(*, standalone, subject):
     """Exit refusing ``--releasable`` where the directory already answers.
 
@@ -1182,7 +1240,12 @@ def cmd_release_undo(ctx, target, version):
     # the LATEST release -- the deletion the caller did not ask for.
     _refuse_empty_flags(target=target, version=version)
     dry_run = ctx.dry_run
-    root = _require_project_root()
+    # Resolved by MEMBERSHIP: undo reverts ONE project's latest release, and a
+    # member whose per-package `.rlsbl/` was cleaned up has no marker to walk up
+    # to -- the walk left the member, stopped at the workspace root, and undo
+    # then answered for the ROOT member, reporting "no releases recorded" over a
+    # releasable that had one.
+    root = _require_sub_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
     ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
@@ -1434,7 +1497,13 @@ def cmd_release_reconcile(ctx, mode: ReconcilePlanMode | ReconcileApplyMode,
     """Reconcile published refs and Releases with the repository's records."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
-    root = _require_project_root()
+    # Resolved by MEMBERSHIP, not by walking up to the nearest marker
+    # directory: a member whose per-package `.rlsbl/` was cleaned up has no
+    # marker of its own, and the walk then left the member and stopped at the
+    # workspace root -- where this command read an empty `<root>/.rlsbl/releases`
+    # and reported "Nothing to reconcile" over a releasable whose tags origin
+    # was missing.
+    root = _require_sub_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
     # A releasable owns the refs, the release records and the tag format this
@@ -1451,8 +1520,15 @@ def cmd_release_reconcile(ctx, mode: ReconcilePlanMode | ReconcileApplyMode,
                 invocation="rlsbl release reconcile", verb="reconcile",
             )
             root = Path(monorepo_root) / project["path"]
-        elif releasable is not None:
-            _refuse_releasable_selector(standalone=False, subject="reconciled")
+        else:
+            if releasable is not None:
+                _refuse_releasable_selector(
+                    standalone=False, subject="reconciled",
+                )
+            _require_releasable_membership(
+                monorepo_root, _resolved_project,
+                invocation="rlsbl release reconcile", verb="reconcile",
+            )
     elif releasable is not None:
         _refuse_releasable_selector(standalone=True, subject="reconciled")
 

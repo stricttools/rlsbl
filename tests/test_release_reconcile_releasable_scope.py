@@ -195,6 +195,160 @@ class TestFromTheWorkspaceRoot:
         assert "nope" in result.stderr
 
 
+@pytest.fixture
+def markerless_workspace(tmp_path):
+    """The same world, but the member carries no ``.rlsbl/`` of its own.
+
+    That is the ordinary state of a member whose per-package release state was
+    cleaned up (``rlsbl monorepo cleanup``): its config is the releasable's, and
+    the only directory that names it is ``workspace.toml``. Resolution that
+    walks UP looking for a marker therefore leaves the member entirely and finds
+    the workspace root -- which is a different project with different release
+    records.
+
+    A dev-node member (``tools/dev``) stands beside it: a directory inside the
+    workspace that belongs to no releasable at all.
+    """
+    repo = tmp_path / "ws"
+    repo.mkdir()
+    init_repo(repo)
+
+    core = repo / "packages" / "core"
+    core.mkdir(parents=True)
+    (core / "pyproject.toml").write_text(
+        '[project]\nname = "core"\nversion = "0.1.0"\n', encoding="utf-8",
+    )
+    dev = repo / "tools" / "dev"
+    dev.mkdir(parents=True)
+    (dev / "notes.txt").write_text("dev tooling\n", encoding="utf-8")
+
+    rel_dir = repo / ".rlsbl-monorepo" / "releasables" / "core"
+    (rel_dir / "changes").mkdir(parents=True)
+    (rel_dir / "releases").mkdir(parents=True)
+    (rel_dir / "version").write_text("0.1.0\n", encoding="utf-8")
+    (rel_dir / "config.json").write_text(
+        json.dumps({"publish_mode": "ci", "targets": ["pypi"]}) + "\n",
+        encoding="utf-8",
+    )
+    (rel_dir / "changes" / "unreleased.jsonl").write_text("", encoding="utf-8")
+    jsonl = rel_dir / "changes" / f"{VERSION}.jsonl"
+    jsonl.write_text(
+        '{"format_version":1,"commits":["0000000"],"user_facing":false}\n',
+        encoding="utf-8",
+    )
+    os.chmod(jsonl, 0o444)
+
+    make_workspace(
+        repo,
+        [
+            {"path": "packages/core", "name": "core", "releasable": "core"},
+            {"path": "tools/dev", "name": "dev", "dev_only": True,
+             "releasable": False},
+        ],
+        releasables=[{"name": "core", "tag_format": "{name}@v{version}"}],
+    )
+    commit_file(repo, "packages/core/thing.py", "x = 1\n", "core 0.1.0")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "workspace")
+    git(repo, "tag", TAG)
+
+    head = git(repo, "rev-parse", "HEAD")
+    write_archived_release_file(
+        str(rel_dir / "releases"), VERSION,
+        bump="minor", include=["pypi"], description="The first release.",
+        candidate_sha=head,
+        tree_hashes={"packages/core": git(repo, "rev-parse", f"{head}:packages/core")},
+    )
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "archive")
+
+    add_remote(repo, tmp_path / "remote", push=False)
+    git(repo, "push", "-q", "--no-verify", "origin", "main")
+    return repo, rel_dir
+
+
+class TestAMemberWithNoMarkerOfItsOwn:
+    """Resolution inside a workspace never falls through to a standalone read.
+
+    Walking up from a marker-less member finds the workspace root, whose root
+    member here is a dev node with no release records at all -- so the reconcile
+    read an empty release record and reported "Nothing to reconcile": a false
+    all-clear over a releasable with a tag origin does not have.
+    """
+
+    def test_the_missing_releasable_tag_is_planned(
+        self, markerless_workspace, monkeypatch,
+    ):
+        repo, _rel_dir = markerless_workspace
+        monkeypatch.chdir(repo / "packages" / "core")
+
+        result = _reconcile(["release", "reconcile", "--plan",
+                             "--approve-consequential"])
+
+        assert result.exit_code == 0, result.stderr
+        assert "Nothing to reconcile" not in result.stdout, (
+            "the member resolved to the workspace root instead of its own "
+            "releasable; stdout was:\n" + result.stdout
+        )
+        assert f"refs/tags/{TAG}" in result.stdout, result.stdout
+        assert "materialize" in result.stdout, result.stdout
+
+    def test_the_plan_is_written_beside_the_releasable_records(
+        self, markerless_workspace, monkeypatch,
+    ):
+        repo, rel_dir = markerless_workspace
+        monkeypatch.chdir(repo / "packages" / "core")
+
+        result = _reconcile(["release", "reconcile", "--plan",
+                             "--approve-consequential"])
+
+        assert result.exit_code == 0, result.stderr
+        assert (rel_dir / "releases" / "reconcile-plan.toml").is_file()
+        assert not (repo / ".rlsbl").exists(), (
+            "a workspace root has no .rlsbl/; writing one there invents a "
+            "release record nothing else reads"
+        )
+
+    def test_a_subdirectory_of_the_member_resolves_the_same_way(
+        self, markerless_workspace, monkeypatch,
+    ):
+        repo, _rel_dir = markerless_workspace
+        nested = repo / "packages" / "core" / "src"
+        nested.mkdir()
+        monkeypatch.chdir(nested)
+
+        result = _reconcile(["release", "reconcile", "--plan",
+                             "--approve-consequential"])
+
+        assert result.exit_code == 0, result.stderr
+        assert f"refs/tags/{TAG}" in result.stdout, result.stdout
+
+
+class TestADirectoryBelongingToNoReleasable:
+    def test_it_hard_errors_and_names_both_routes(
+        self, markerless_workspace, monkeypatch,
+    ):
+        repo, _rel_dir = markerless_workspace
+        monkeypatch.chdir(repo / "tools" / "dev")
+
+        result = _reconcile(["release", "reconcile", "--plan",
+                             "--approve-consequential"])
+
+        assert result.exit_code == 1, result.stdout
+        assert "Nothing to reconcile" not in result.stdout
+        assert "--releasable" in result.stderr
+        assert "core" in result.stderr
+
+    def test_it_writes_no_plan_anywhere(self, markerless_workspace, monkeypatch):
+        repo, rel_dir = markerless_workspace
+        monkeypatch.chdir(repo / "tools" / "dev")
+
+        _reconcile(["release", "reconcile", "--plan", "--approve-consequential"])
+
+        assert not (rel_dir / "releases" / "reconcile-plan.toml").exists()
+        assert not (repo / ".rlsbl").exists()
+
+
 class TestStandaloneIsUnchanged:
     def test_the_selector_is_refused_in_a_standalone_repository(
         self, tmp_path, monkeypatch,
