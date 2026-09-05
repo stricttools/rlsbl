@@ -201,6 +201,28 @@ class TestRefContextConstruction:
             os.path.join(str(tmp_path), "packages", "mylib", ".rlsbl", "transitions.jsonl"),
         )
 
+    def test_both_alias_sources_come_from_the_same_fork(self, tmp_path):
+        """The record and the archives are always read for the SAME project."""
+        rel_dir = tmp_path / ".rlsbl-monorepo" / "releasables" / "core"
+        releasable = ref_context(
+            repo_root=str(tmp_path), releasable_config_dir=str(rel_dir),
+        )
+        assert releasable.releases_dirs == (
+            os.path.join(str(rel_dir), "releases"),
+        )
+
+        package = ref_context(repo_root=str(tmp_path), project_path="packages/mylib")
+        assert package.releases_dirs == (
+            os.path.join(
+                str(tmp_path), "packages", "mylib", ".rlsbl", "releases",
+            ),
+        )
+
+        standalone = ref_context(repo_root=str(tmp_path))
+        assert standalone.releases_dirs == (
+            os.path.join(str(tmp_path), ".rlsbl", "releases"),
+        )
+
     def test_member_paths_none_is_preserved_as_none(self, tmp_path):
         assert ref_context(repo_root=str(tmp_path)).member_package_paths is None
         assert ref_context(
