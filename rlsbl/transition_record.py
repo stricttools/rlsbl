@@ -168,6 +168,7 @@ KIND_DEPARTED_GLOBS = "departed-globs"
 KIND_BOUNDARY_ALIAS = "boundary-alias"
 KIND_IDENTITY_TRANSITION = "identity-transition"
 KIND_PROMOTION_SPLIT_MAP = "promotion-split-map"
+KIND_RELEASABLE_RENAME = "releasable-rename"
 
 
 class TransitionRecordError(RlsblError):
@@ -457,6 +458,30 @@ class NonVersionTagEvent(_TransitionRecordEventBase):
 
 
 @dataclass(kw_only=True)
+class ReleasableRenameEvent(_TransitionRecordEventBase):
+    """A releasable group was renamed.
+
+    A tag-SPELLING fact, on the same side of the rename-versus-identity line as
+    :class:`TagMapEvent` and :class:`BoundaryAliasEvent`: the releasable's
+    future tags are spelled with the new name, the artifacts already published
+    keep the names they were published under, and nothing a consumer resolves
+    by has changed. ``rlsbl release reconcile``'s ``refuse-identity-mismatch``
+    therefore does not match on it.
+
+    Written by ``rlsbl monorepo rename-releasable`` beside the boundary alias
+    it creates, and declarable through ``rlsbl transition record
+    --releasable-rename <old> --to <new>`` by an operator who renamed one
+    another way.
+    """
+
+    KIND: ClassVar[str] = KIND_RELEASABLE_RENAME
+
+    old_name: str
+    new_name: str
+    reason: str
+
+
+@dataclass(kw_only=True)
 class PromotionSplitMapEvent(_TransitionRecordEventBase):
     """The subtree-split correspondence persisted when a mirror is promoted."""
 
@@ -479,6 +504,7 @@ TransitionRecordEvent = (
     | PromotionSplitMapEvent
     | ReleaseHistoryClosedEvent
     | NonVersionTagEvent
+    | ReleasableRenameEvent
 )
 
 EVENT_CLASSES: dict[str, type] = {
@@ -493,6 +519,7 @@ EVENT_CLASSES: dict[str, type] = {
         PromotionSplitMapEvent,
         ReleaseHistoryClosedEvent,
         NonVersionTagEvent,
+        ReleasableRenameEvent,
     )
 }
 

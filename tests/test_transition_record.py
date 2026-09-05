@@ -32,6 +32,7 @@ from rlsbl.transition_record import (
     DepartedGlobsEvent,
     IdentityTransitionEvent,
     NonVersionTagEvent,
+    ReleasableRenameEvent,
     ReleaseHistoryClosedEvent,
     TransitionRecordEndpoint,
     TransitionRecordError,
@@ -137,6 +138,14 @@ def make_non_version_tag():
     )
 
 
+def make_releasable_rename():
+    return ReleasableRenameEvent(
+        old_name="widget",
+        new_name="gadget",
+        reason="the package was renamed on the registry it publishes to",
+    )
+
+
 def make_promotion_split_map():
     return PromotionSplitMapEvent(
         subtree_path="packages/widget",
@@ -156,6 +165,7 @@ ALL_MAKERS = {
     "promotion-split-map": make_promotion_split_map,
     "release-history-closed": make_release_history_closed,
     "non-version-tag": make_non_version_tag,
+    "releasable-rename": make_releasable_rename,
 }
 
 
@@ -713,6 +723,7 @@ class TestModuleSurface:
             transition_record.KIND_PROMOTION_SPLIT_MAP,
             transition_record.KIND_RELEASE_HISTORY_CLOSED,
             transition_record.KIND_NON_VERSION_TAG,
+            transition_record.KIND_RELEASABLE_RENAME,
         }
 
     def test_generated_validator_is_paired_with_the_runtime(self):

@@ -2739,11 +2739,12 @@ def cmd_rewrite_uv_path_sources(ctx):
 # ---------------------------------------------------------------------------
 
 # The transition record is written by the surgery that performs it -- an extract
-# writes its conversion, a rewrite writes its commit remap. Two kinds have no
-# such writer because they are not things a command did: they are declarations
-# an operator makes about a repository they read. This group is their door, and
-# the kind selection is a required choice so that WHICH fact is being declared
-# is stated in argv rather than inferred from which other flags were passed.
+# writes its conversion, a rewrite writes its commit remap. Some facts reach
+# nobody that way: two kinds no command writes at all (they are not things a
+# command did), and a releasable rename performed by hand, whose command would
+# have recorded it. This group is their door, and the kind selection is a
+# required choice so that WHICH fact is being declared is stated in argv rather
+# than inferred from which other flags were passed.
 
 @strictcli.choice("non-version-tag", help="Declare that a tag stands outside the version model on purpose: not a release and not an alias of one. Every reader of the tag namespace accounts for it afterwards instead of reporting it as unexplained.")
 class TransitionNonVersionTag:
@@ -2755,46 +2756,67 @@ class TransitionReleaseHistoryClosed:
     value: str = strictcli.member_value(help="the releasable or member name whose release history is closed -- a name, never a path, in the vocabulary workspace.toml uses")
 
 
-transition = app.group("transition", help="Record the transition-record facts that no surgery writes. Most events in a repository's transition record are written by the operation that performed them; the ones here are declarations an operator makes about a repository they read, and nothing can derive them.")
+# The rename carries TWO names, so the new one is a flag scoped INSIDE this
+# member -- the same shape `release scrub` uses for --replace under --pattern.
+# `--to` is meaningless under either other fact, and passing it there names both
+# sides rather than being silently ignored.
+@strictcli.choice("releasable-rename", help="Declare that a releasable group was renamed. A tag-SPELLING fact: the releasable's future tags are spelled with the new name, everything already published keeps the name it was published under, and nothing a consumer resolves by has changed -- so `rlsbl release reconcile` still repairs the refs of releases made under the old spelling. `rlsbl monorepo rename-releasable` records this itself; declare it here for a rename performed another way.")
+class TransitionReleasableRename:
+    value: str = strictcli.member_value(help="the releasable's name BEFORE the rename, in the vocabulary workspace.toml uses")
+    to: str = strictcli.sub_flag(presence="required", help="the releasable's name AFTER the rename")
+
+
+transition = app.group("transition", help="Record the transition-record facts an operator states. Most events in a repository's transition record are written by the operation that performed them; the ones here are statements about a repository somebody read -- two that nothing can derive at all, and one whose command exists but which a rename performed by hand leaves unrecorded.")
 
 
 @transition.command(
     name="record",
     effect="mutating",
     # Consequential because only a human may declare what this repository's
-    # history IS. Both facts silence a reader that would otherwise keep
+    # history IS. Every fact here silences a reader that would otherwise keep
     # reporting a divergence -- a tag nothing accounts for, a release history
-    # that looks abandoned -- and an agent that could write them could silence
-    # its own findings. (The campaign's later classification re-derivation
-    # reviews this entry along with the rest of the consequential set.)
+    # that looks abandoned, a tag prefix nothing explains -- and an agent that
+    # could write them could silence its own findings. (The campaign's later
+    # classification re-derivation reviews this entry along with the rest of
+    # the consequential set.)
     consequential=True,
-    help="Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), or a member's or releasable's deliberately closed release history (--release-history-closed). Exactly one of the two must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.",
+    help="Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), a member's or releasable's deliberately closed release history (--release-history-closed), or a releasable that was renamed (--releasable-rename <old> --to <new>). Exactly one must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.",
 )
 @strictcli.choice_flag(
     "fact", help="Which fact is being declared. Exactly one must be elected, and the elected member carries the subject it is about.",
     presence="required",
     elect_by="member-flags",
-    choices=[TransitionNonVersionTag, TransitionReleaseHistoryClosed],
+    choices=[
+        TransitionNonVersionTag,
+        TransitionReleaseHistoryClosed,
+        TransitionReleasableRename,
+    ],
 )
 @strictcli.flag(name="reason", type=str, presence="required", help="Why this fact holds, in the operator's own words (e.g. \"a nightly build marker\", \"extracted into its own repository\"). Recorded verbatim and shown by every reader that explains the fact, so it is the audit trail for a declaration nothing can derive.")
 @strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Commit the transition record with the Autogenerated trailer (the handler commits when neither --auto-commit nor --no-auto-commit is passed)")
 @effects.handler
 def cmd_transition_record(
     ctx,
-    fact: TransitionNonVersionTag | TransitionReleaseHistoryClosed,
+    fact: TransitionNonVersionTag | TransitionReleaseHistoryClosed | TransitionReleasableRename,
     reason,
     auto_commit,
 ):
     """Record one operator-declared fact in the transition record."""
-    from .transition_record import KIND_NON_VERSION_TAG, KIND_RELEASE_HISTORY_CLOSED
+    from .transition_record import (
+        KIND_NON_VERSION_TAG,
+        KIND_RELEASABLE_RENAME,
+        KIND_RELEASE_HISTORY_CLOSED,
+    )
 
     from .commands.transition_record_cmd import OPERATOR_KINDS
 
     dry_run = ctx.dry_run
-    kind = (
-        KIND_NON_VERSION_TAG if isinstance(fact, TransitionNonVersionTag)
-        else KIND_RELEASE_HISTORY_CLOSED
-    )
+    if isinstance(fact, TransitionNonVersionTag):
+        kind = KIND_NON_VERSION_TAG
+    elif isinstance(fact, TransitionReleaseHistoryClosed):
+        kind = KIND_RELEASE_HISTORY_CLOSED
+    else:
+        kind = KIND_RELEASABLE_RENAME
     # The subject's flag is whichever member elected, and OPERATOR_KINDS is
     # what already knows its spelling.
     # Spelled as a join rather than str.replace: strictcli's effects-bypass
@@ -2802,6 +2824,12 @@ def cmd_transition_record(
     # `<str>.replace(...)` reads to it as a filesystem effect call.
     subject_flag = "_".join(OPERATOR_KINDS[kind].lstrip("-").split("-"))
     _refuse_empty_flags(reason=reason, **{subject_flag: fact.value})
+    # The rename is the one fact carrying a second name, in a flag scoped to
+    # its own member -- so it is refused for emptiness under the spelling the
+    # caller typed, exactly like the subject.
+    renamed_to = fact.to if kind == KIND_RELEASABLE_RENAME else None
+    if renamed_to is not None:
+        _refuse_empty_flags(to=renamed_to)
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
@@ -2813,6 +2841,7 @@ def cmd_transition_record(
         {
             "kind": kind,
             "subject": fact.value,
+            "renamed-to": renamed_to,
             "reason": reason,
             "dry-run": dry_run,
             "auto-commit": _opt_default(auto_commit, True),

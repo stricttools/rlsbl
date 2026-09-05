@@ -200,6 +200,65 @@ class TestFullRename:
         assert result["tag"]["status"] == "already_done"
 
 
+class TestTheRenameIsRecorded:
+    """A rename leaves a `releasable-rename` event beside its boundary alias.
+
+    Recorded in the REPOSITORY-scoped record: after the rename the releasable's
+    own state directory exists only under the NEW name, while the old name is
+    the spelling a reader holding a pre-rename tag will look up.
+    """
+
+    def _events(self, root):
+        from rlsbl.transition_record import (
+            KIND_RELEASABLE_RENAME,
+            read_events,
+            repository_transition_record_path,
+        )
+
+        return read_events(
+            repository_transition_record_path(str(root)),
+            kinds=[KIND_RELEASABLE_RENAME],
+        )
+
+    def test_the_event_names_both_spellings(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        rr.rename_releasable(str(root), "beta", "beta2")
+
+        events = self._events(root)
+        assert len(events) == 1, events
+        assert (events[0].old_name, events[0].new_name) == ("beta", "beta2")
+        assert events[0].reason
+        # Committed with everything else the rename wrote.
+        assert rr._is_clean_tree(str(root))
+
+    def test_a_re_run_does_not_duplicate_it(self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+
+        rr.rename_releasable(str(root), "beta", "beta2")
+        rr.rename_releasable(str(root), "beta", "beta2")
+
+        assert len(self._events(root)) == 1
+
+    def test_a_name_only_rename_is_recorded_too(self, tmp_path, monkeypatch, _gh_ok):
+        """No alias tag is created, but the releasable was still renamed."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root, tag_format="v{version}")
+
+        rr.rename_releasable(str(root), "beta", "beta2")
+
+        events = self._events(root)
+        assert [(e.old_name, e.new_name) for e in events] == [("beta", "beta2")]
+
+
 class TestCrashHealing:
     def test_crash_between_commit_and_tag_push_is_healed(self, tmp_path, monkeypatch, _gh_ok):
         root = tmp_path / "repo"

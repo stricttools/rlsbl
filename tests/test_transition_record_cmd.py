@@ -1,16 +1,19 @@
 """``rlsbl transition record``: the typed door onto the operator-declared facts.
 
-Two of the transition record's event kinds are not written by any surgery --
-they are DECLARATIONS an operator makes about a repository they read:
+These event kinds are DECLARATIONS an operator makes about a repository they
+read, rather than records of what a command did:
 
 * ``non-version-tag`` -- this tag stands outside the version model on purpose;
 * ``release-history-closed`` -- this member's or releasable's release history
-  is deliberately over.
+  is deliberately over;
+* ``releasable-rename`` -- this releasable used to be called something else.
+  ``rlsbl monorepo rename-releasable`` records this one itself; the door exists
+  for a rename performed another way.
 
-Before this command the only way to write either was a Python snippet the
-backfill's own error message spelled out.  These tests pin the door: what it
-accepts, where it writes, what it refuses, and -- the point of recording a fact
-at all -- that the two readers of the tag namespace change their answer once
+Before this command the only way to write the first two was a Python snippet
+the backfill's own error message spelled out.  These tests pin the door: what
+it accepts, where it writes, what it refuses, and -- the point of recording a
+fact at all -- that the readers of the tag namespace change their answer once
 the fact exists.
 """
 
@@ -27,6 +30,7 @@ from rlsbl.context import create_context
 from rlsbl.transition_record import (
     KIND_CONVERSION,
     KIND_NON_VERSION_TAG,
+    KIND_RELEASABLE_RENAME,
     KIND_RELEASE_HISTORY_CLOSED,
     get_transition_record_path,
     read_events,
@@ -112,6 +116,100 @@ class TestRecordingAClosedReleaseHistory:
         assert [e.KIND for e in events] == [KIND_RELEASE_HISTORY_CLOSED]
         assert events[0].subject == "widget"
         assert events[0].reason == "extracted into its own repository"
+
+
+class TestRecordingAReleasableRename:
+    """The rename is the one fact carrying two names, so the CLI carries two.
+
+    ``--releasable-rename <old>`` elects the fact and names the releasable it
+    was; ``--to <new>`` is a flag scoped INSIDE that member (the shape
+    ``release scrub`` uses for ``--replace`` under ``--pattern``), so it is
+    meaningless -- and refused -- under either other fact.
+    """
+
+    def test_it_appends_the_validated_event(self, tmp_path):
+        repo = make_repo(tmp_path)
+        run_cmd(
+            _flags(kind=KIND_RELEASABLE_RENAME, subject="widget",
+                   reason="renamed on the registry it publishes to",
+                   **{"renamed-to": "gadget"}),
+            ctx=ctx_for(repo),
+        )
+        events = read_events(str(record_path(repo)))
+        assert [e.KIND for e in events] == [KIND_RELEASABLE_RENAME]
+        assert events[0].old_name == "widget"
+        assert events[0].new_name == "gadget"
+        assert events[0].reason == "renamed on the registry it publishes to"
+
+    def test_the_cli_carries_both_names(self, tmp_path, monkeypatch):
+        repo = make_repo(tmp_path)
+        monkeypatch.chdir(repo)
+        result = rlsbl.app.test([
+            "transition", "record", "--releasable-rename", "widget",
+            "--to", "gadget", "--reason", "renamed by hand in workspace.toml",
+            "--approve-consequential",
+        ])
+        assert result.exit_code == 0, result.stderr
+        events = read_events(str(record_path(repo)))
+        assert (events[0].old_name, events[0].new_name) == ("widget", "gadget")
+
+    def test_the_new_name_is_required(self, tmp_path, monkeypatch):
+        repo = make_repo(tmp_path)
+        monkeypatch.chdir(repo)
+        result = rlsbl.app.test([
+            "transition", "record", "--releasable-rename", "widget",
+            "--reason", "renamed by hand", "--approve-consequential",
+        ])
+        assert result.exit_code == 1
+        assert "--to" in (result.stderr or ""), result.stderr
+        assert not record_path(repo).exists()
+
+    def test_the_new_name_is_refused_under_another_fact(self, tmp_path, monkeypatch):
+        repo = make_repo(tmp_path)
+        monkeypatch.chdir(repo)
+        result = rlsbl.app.test([
+            "transition", "record", "--non-version-tag", "nightly",
+            "--to", "gadget", "--reason", "a nightly marker",
+            "--approve-consequential",
+        ])
+        assert result.exit_code == 1, result.stdout
+        assert not record_path(repo).exists()
+
+    def test_an_empty_new_name_is_refused(self, tmp_path, monkeypatch):
+        repo = make_repo(tmp_path)
+        monkeypatch.chdir(repo)
+        result = rlsbl.app.test([
+            "transition", "record", "--releasable-rename", "widget",
+            "--to", "  ", "--reason", "renamed by hand",
+            "--approve-consequential",
+        ])
+        assert result.exit_code == 1
+        assert "--to" in (result.stderr or "")
+        assert not record_path(repo).exists()
+
+    def test_the_duplicate_refusal_is_keyed_on_both_names(self, tmp_path):
+        """Renaming back is a different fact, not a repeat of the first."""
+        repo = make_repo(tmp_path)
+        run_cmd(
+            _flags(kind=KIND_RELEASABLE_RENAME, subject="widget",
+                   **{"renamed-to": "gadget"}),
+            ctx=ctx_for(repo),
+        )
+        run_cmd(
+            _flags(kind=KIND_RELEASABLE_RENAME, subject="gadget",
+                   **{"renamed-to": "widget"}),
+            ctx=ctx_for(repo),
+        )
+        assert len(read_events(str(record_path(repo)))) == 2
+
+        with pytest.raises(SystemExit) as exc:
+            run_cmd(
+                _flags(kind=KIND_RELEASABLE_RENAME, subject="widget",
+                       **{"renamed-to": "gadget"}),
+                ctx=ctx_for(repo),
+            )
+        assert exc.value.code == 1
+        assert len(read_events(str(record_path(repo)))) == 2
 
 
 # ---------------------------------------------------------------------------

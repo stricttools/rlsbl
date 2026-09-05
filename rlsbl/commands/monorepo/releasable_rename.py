@@ -12,6 +12,14 @@ Renaming a releasable is a coordinated, idempotent operation:
 4. Re-run ``monorepo sync`` to regenerate the publish gate prefixes and CI
    router.
 5. Commit all of the above as a single commit.
+6. Record the rename itself as a ``releasable-rename`` event in the
+   REPOSITORY-scoped transition record, and commit that. It is a tag-SPELLING
+   fact -- the releasable's future tags are spelled with the new name and
+   nothing a consumer resolves by changed -- so it never makes ``rlsbl release
+   reconcile`` refuse to repair a ref released under the old spelling. It goes
+   in the repository's record rather than the releasable's own because after
+   the rename the releasable's state directory exists only under the NEW name,
+   while the old name is the spelling a reader with an old tag in hand has.
 
 Then, last, when the releasable's ``tag_format`` contains ``{name}`` (so the
 tag prefix actually changes), a boundary alias tag for the current version is
@@ -274,6 +282,53 @@ def _record_alias_in_transition_record(root, releasable_name, alias_tag, aliased
     return True
 
 
+def _record_rename_in_transition_record(root, old_name, new_name):
+    """Append the rename itself to the REPOSITORY-scoped transition record.
+
+    The boundary alias records one tag standing for another; this records the
+    fact that produced it -- the releasable's whole tag prefix changed, so
+    every historical tag spelled with the old name belongs to this releasable
+    too. It is a tag-SPELLING fact, never an identity change: ``rlsbl release
+    reconcile`` still repairs the refs of releases made under the old spelling,
+    which is exactly what an ``identity-transition`` would forbid.
+
+    It goes in the repository-scoped record rather than the releasable's own,
+    because after the rename the releasable's state directory exists only under
+    the NEW name -- and the old name is the spelling a reader with an old tag
+    in hand will be looking up. That is also where ``rlsbl transition record
+    --releasable-rename`` writes it, so the fact has one home whichever wrote
+    it.
+
+    Idempotent by CONTENT: the same rename is not appended twice, so the
+    command's own re-run path (a crash between the local commit and the tag
+    push) heals without duplicating the record.
+    """
+    from ...transition_record import (
+        KIND_RELEASABLE_RENAME,
+        ReleasableRenameEvent,
+        append_events,
+        read_events,
+        repository_transition_record_path,
+    )
+
+    path = repository_transition_record_path(root)
+    for event in read_events(path, kinds=[KIND_RELEASABLE_RENAME]):
+        if event.old_name == old_name and event.new_name == new_name:
+            return False
+
+    append_events(path, [ReleasableRenameEvent(
+        old_name=old_name, new_name=new_name,
+        reason=f"renamed with `rlsbl monorepo rename-releasable {old_name} {new_name}`",
+    )])
+    commit_files_if_changed(
+        f"monorepo: record the {old_name} -> {new_name} releasable rename",
+        [os.path.relpath(path, root)],
+        skip_message="rename transition record already committed; nothing to commit.",
+        cwd=root,
+    )
+    return True
+
+
 def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout,
                       releasable_name=None):
     """Create the boundary alias tag, record it, and push it, idempotently.
@@ -440,6 +495,7 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         )
 
         _apply_local_rename(root, old_name, new_name)
+        _record_rename_in_transition_record(root, old_name, new_name)
         if name_in_format:
             result["tag"] = _finish_alias_tag(
                 root, old_tag, new_tag, remote,
@@ -546,6 +602,12 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
 
     # ---- mutations (steps 1-5) ----
     _apply_local_rename(root, old_name, new_name)
+
+    # The rename itself, recorded before the alias tag it explains: a crash
+    # between the two leaves a recorded rename with no alias yet, which the
+    # re-run finishes. The reverse order would push a tag whose reason nothing
+    # in the repository states.
+    _record_rename_in_transition_record(root, old_name, new_name)
 
     # ---- alias tag + push (last) ----
     if name_in_format:

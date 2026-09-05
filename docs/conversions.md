@@ -352,21 +352,26 @@ The workspace-scoped home exists because a departure is a fact about the source 
 | `promotion-split-map` | A mirror was promoted: the subtree-split correspondence it produced |
 | `release-history-closed` | A member's or releasable's release history is deliberately closed: the subject and an operator reason. Not written by a conversion — an operator declares it with `rlsbl transition record` |
 | `non-version-tag` | One tag stands deliberately outside the version model: its name and an operator reason. Not written by a conversion — an operator declares it with `rlsbl transition record` |
+| `releasable-rename` | A releasable group was renamed: the name before, the name after, and the reason. Written by `rlsbl monorepo rename-releasable` beside the boundary alias it creates, and declarable with `rlsbl transition record` for a rename performed another way |
 
-### The two facts an operator declares
+### The facts an operator declares
 
-Every other event above is written by the operation that performed the surgery. The last two are not things a command did -- they are statements about a repository somebody read, and nothing can derive them. `rlsbl transition record` is their door:
+Every other event above is written by the operation that performed the surgery. The ones below are not: two are statements about a repository somebody read that nothing can derive, and the third has a command that writes it but is left unrecorded by a rename performed by hand. `rlsbl transition record` is their door:
 
 ```
 rlsbl transition record --non-version-tag nightly-2026-01-01 \
     --reason "a nightly build marker"
 rlsbl transition record --release-history-closed widget \
     --reason "extracted into its own repository"
+rlsbl transition record --releasable-rename widget --to gadget \
+    --reason "renamed by hand in workspace.toml"
 ```
 
-Exactly one of the two facts must be elected, `--reason` is required and states why in the operator's own words, and the event is appended to the **repository-scoped** record -- `.rlsbl-monorepo/transitions.jsonl` in a workspace, `.rlsbl/transitions.jsonl` in a standalone repository -- and committed. A tag namespace belongs to the repository rather than to any one releasable, and a releasable whose release history just closed may be one whose state directory is about to leave with it.
+Exactly one fact must be elected, `--reason` is required and states why in the operator's own words, and the event is appended to the **repository-scoped** record -- `.rlsbl-monorepo/transitions.jsonl` in a workspace, `.rlsbl/transitions.jsonl` in a standalone repository -- and committed. A tag namespace belongs to the repository rather than to any one releasable; a releasable whose release history just closed may be one whose state directory is about to leave with it; and a renamed releasable's state directory exists only under the NEW name, while the old name is the spelling a reader holding a pre-rename tag will look up.
 
-The command is consequential: only a human may declare what a repository's history *is*, because both facts silence a reader that would otherwise keep reporting a divergence. A second declaration of the same kind about the same subject is refused, naming the event already recorded -- the record is append-only, so a duplicate would stand beside the first forever with nothing to say which one is meant. `--dry-run` prints the line it would append and writes nothing.
+The rename is the one fact carrying two names, so `--to` is a flag scoped inside `--releasable-rename` -- the same shape `release scrub` uses for `--replace` under `--pattern`. Passing it under either other fact names both sides rather than being silently ignored, and its subject is the PAIR: renaming `widget` to `gadget` and later renaming it back are two facts, not one repeated.
+
+The command is consequential: only a human may declare what a repository's history *is*, because every fact here silences a reader that would otherwise keep reporting a divergence. A second declaration of the same kind about the same subject is refused, naming the event already recorded -- the record is append-only, so a duplicate would stand beside the first forever with nothing to say which one is meant. `--dry-run` prints the line it would append and writes nothing.
 
 Recording a `release-history-closed` changes one answer immediately: the `releasable-residue` check stops reporting that member's release archives, changelog directory and version tags. Without the declaration they are a member's frozen release state that no release flow will ever finalize, advance or add to, and the check says so and names three ways out (move the member into a releasable, delete the state, or record the history as closed). With it they are the record of what that member released, and the check leaves them alone.
 

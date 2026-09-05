@@ -39,6 +39,12 @@
 # The two are recorded by different kinds on purpose, and a rename must never
 # be written as an `identity-transition` to "be safe": doing so would make
 # reconcile refuse to repair refs it is entitled to repair, permanently.
+#
+# `releasable-rename` is on the SPELLING side of that line, with `tag-map` and
+# `boundary-alias`. It records that a releasable group changed its name, which
+# changes what its future tags are called and nothing a consumer resolves by --
+# so `rlsbl release reconcile`'s `refuse-identity-mismatch` must NOT match on
+# it, exactly as it does not match on the other two.
 
 name = "rlsbl-transition-record-event"
 meta_version = 1
@@ -606,6 +612,56 @@ required = true
 non_empty = true
 description = "Why this tag is outside the version model, in the operator's own words (e.g. \"a nightly build marker\", \"an upstream vendor tag imported with the history\"). Free text: it explains the decision to a human, it is never dispatched on."
 
+[types.ReleasableRenameEvent]
+type = "record"
+description = "A releasable group was renamed. A tag-SPELLING fact, on the same side of the rename-versus-identity line as `tag-map` and `boundary-alias`: it changes what the releasable's future tags are called and nothing a consumer resolves by, so reconcile's `refuse-identity-mismatch` does not match on it. Written by `rlsbl monorepo rename-releasable` and declarable by an operator who renamed one another way."
+
+[types.ReleasableRenameEvent.fields.format_version]
+type = "integer"
+required = true
+description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+
+[types.ReleasableRenameEvent.fields.id]
+type = "string"
+required = true
+non_empty = true
+description = "Stable identifier for this event, unique within the file."
+
+[types.ReleasableRenameEvent.fields.recorded_at]
+type = "datetime"
+required = true
+datetime_kind = "offset"
+description = "When the event was appended (RFC 3339, with offset)."
+
+[types.ReleasableRenameEvent.fields.kind]
+type = "literal"
+value = "releasable-rename"
+required = true
+
+[types.ReleasableRenameEvent.fields.related_to]
+type = "string"
+required = false
+non_empty = true
+description = "The id of a related event -- typically the `boundary-alias` event recording the alias tag the rename created at the current version."
+
+[types.ReleasableRenameEvent.fields.old_name]
+type = "string"
+required = true
+non_empty = true
+description = "The releasable's name before the rename, in the vocabulary workspace.toml uses. Historical releases keep the tags spelled with it."
+
+[types.ReleasableRenameEvent.fields.new_name]
+type = "string"
+required = true
+non_empty = true
+description = "The releasable's name after the rename. Future tags are spelled with it."
+
+[types.ReleasableRenameEvent.fields.reason]
+type = "string"
+required = true
+non_empty = true
+description = "Why the releasable was renamed, in the writer's own words. Free text: it explains the rename to a human, it is never dispatched on."
+
 # ---------------------------------------------------------------------------
 # The document root: one line is exactly one event, selected by `kind`.
 # ---------------------------------------------------------------------------
@@ -641,3 +697,6 @@ type = "ReleaseHistoryClosedEvent"
 
 [types.TransitionRecordEvent.arms.non-version-tag]
 type = "NonVersionTagEvent"
+
+[types.TransitionRecordEvent.arms.releasable-rename]
+type = "ReleasableRenameEvent"
