@@ -83,7 +83,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.119.0",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 55 commands organized into 13 top-level commands and 6 command groups (release, changelog, monorepo, dev, rewrite, transition). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 56 commands organized into 13 top-level commands and 6 command groups (release, changelog, monorepo, dev, rewrite, transition). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
   "proc_observe_allowlist": [
     [
       "git",
@@ -1351,11 +1351,11 @@
               "choices": [
                 {
                   "name": "pattern",
-                  "help": "Match mode: rewrite every occurrence of a regex throughout history",
+                  "help": "Match mode: rewrite every occurrence of a regular expression throughout the repository's history, in every file of every commit the chosen range covers",
                   "flags": [
                     {
                       "name": "value",
-                      "help": "regex pattern to match against file contents",
+                      "help": "regular expression matched against file contents in every commit of the chosen range; each match is replaced by --replace, or by same-length random ASCII under --mangle",
                       "value_schema": {
                         "type": "string"
                       },
@@ -1382,11 +1382,11 @@
                 },
                 {
                   "name": "file",
-                  "help": "File mode: rewrite one file throughout history",
+                  "help": "File mode: rewrite one file throughout the repository's history, replacing every past version of it with the copy on disk now",
                   "flags": [
                     {
                       "name": "value",
-                      "help": "path of the file to rewrite throughout history; it is replaced with its current on-disk content, or removed if absent (requires --from-commit)",
+                      "help": "repository-relative path of the file to rewrite throughout history; every commit's version of it is replaced with its current on-disk content, or removed from that commit if the file is absent on disk (requires --from-commit)",
                       "value_schema": {
                         "type": "string"
                       },
@@ -1418,11 +1418,11 @@
               "choices": [
                 {
                   "name": "from-commit",
-                  "help": "Rewrite from one commit onward",
+                  "help": "Rewrite the commits descended from one named commit onward, leaving every commit before it exactly as it is",
                   "flags": [
                     {
                       "name": "value",
-                      "help": "SHA of the earliest commit to rewrite (all descendants are also rewritten)",
+                      "help": "SHA of the earliest commit to rewrite; every commit descended from it is rewritten too, and every commit before it keeps its current hash",
                       "value_schema": {
                         "type": "string"
                       },
@@ -1793,6 +1793,58 @@
                   "when": "present"
                 }
               ]
+            }
+          ]
+        },
+        "remove": {
+          "name": "remove",
+          "help": "Delete one entry from a JSONL changelog file, selected by its ULID identifier or by the commits it covers. The file is rewritten atomically without that line; a released version's file is temporarily unlocked, re-locked, and followed by a CHANGELOG.md regeneration and a GitHub Release notes sync. Exactly one entry is removed: a selector matching several is refused with every match named, and a selector matching none is refused too.",
+          "effect": "mutating",
+          "flags": [
+            {
+              "name": "entry",
+              "help": "Which entry to remove. Exactly one addressing mode must be elected, and it must select exactly one entry.",
+              "presence": "required",
+              "choices": [
+                {
+                  "name": "id",
+                  "help": "Address the entry by its stable ULID identifier, which survives every unrelated edit to the file it sits in",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "the entry's ULID identifier, as written in the JSONL line's own `id` member",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                },
+                {
+                  "name": "commits",
+                  "help": "Address the entry by the commits it covers, which is how an entry is named when its identifier is not at hand",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "comma-separated commit hashes; the entry covering any of them is removed, and a list covering several entries is refused with each match named",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                }
+              ],
+              "elect_by": "member-flags"
+            },
+            {
+              "name": "auto-commit",
+              "help": "Auto-commit the rewritten JSONL file (and, for a released version, the regenerated CHANGELOG.md) after removing the entry (the handler commits when neither form is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
             }
           ]
         },
@@ -2676,7 +2728,7 @@
             },
             {
               "name": "to-module",
-              "help": "The Go module path to rename to",
+              "help": "The Go module path to rename to. It is written into every go.mod token naming the old path and into every import site under it, so it must be the module path consumers will resolve after the move -- not a directory, and not a package path inside the module.",
               "value_schema": {
                 "type": "string"
               },
