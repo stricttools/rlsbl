@@ -2,11 +2,35 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "The version-fate model (recorded / unrecoverable / never-released), the release backfill promoted to a first-class command, operator-declared transition facts, and fleet-wide strictness."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+This release ships one campaign: every version number or tag a repository
+carries now has exactly one declared fate, and every surface that reads or
+repairs release history answers from the same authorities.
+
+The release archives gained a three-state fate model -- recorded (the
+release commit and trees), unrecoverable, or never released -- with a new
+shipped_as field carrying the historical tag spelling a version actually
+shipped under. The old backfill maintenance script is retired in favor of
+`rlsbl release backfill` (consequential, preview/apply, with a
+description-recovery chain and a hard refusal on unexplained tags), and
+`rlsbl transition record` is the typed door for the two operator-declared
+history facts. `changelog remove` completes the changelog surface.
+
+Strictness grew in the same direction: unknown keys on the policed
+configuration surfaces are refused at load, the dev_node alias is gone,
+explicitly-empty flag values are refused centrally, a present git stash
+blocks the guarded operations, and consequential classification now means
+exactly one thing -- only a human may authorize the act.
+
+Three banned vocabularies were renamed throughout: the release record
+(formerly "ledger"), the transition record (formerly "lineage"), and the
+release commit family (formerly "anchor"), including the archive marker
+key rename to `unrecoverable`.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
