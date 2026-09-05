@@ -571,7 +571,9 @@ rlsbl release reconcile --plan
 rlsbl release reconcile --apply --approve-consequential
 ```
 
-`--plan` observes origin once (one `git ls-remote`, one `gh release list`), prints the preview, and writes `.rlsbl/releases/reconcile-plan.toml` — that file *is* the preview's output artifact. It stamps a digest of the world it judged, and it is written even when it found nothing, so applying an empty plan is a clean no-op rather than an instruction to run the plan you just ran. `--dry-run` renders and writes nothing at all — under `--plan` the plan file is not written, and under `--apply` the plan is checked and the writes are only described.
+In a workspace the command acts on one **releasable**, whose records and tag format decide every ref it judges. Standing in a member directory names it; standing at the workspace root does not (the root directory names the whole workspace), so there `--releasable <name>` is required and is refused anywhere else — the same rule `rlsbl release run` follows.
+
+`--plan` observes origin once (one `git ls-remote`, one `gh release list`), prints the preview, and writes `reconcile-plan.toml` beside the release records it reconciled — `.rlsbl/releases/` in a standalone repository, the releasable's own `releases/` in a workspace. That file *is* the preview's output artifact. It stamps a digest of the world it judged, and it is written even when it found nothing, so applying an empty plan is a clean no-op rather than an instruction to run the plan you just ran. `--dry-run` renders and writes nothing at all — under `--plan` the plan file is not written, and under `--apply` the plan is checked and the writes are only described.
 
 `--apply` performs **exactly the repairable items the plan named**. It re-observes and refuses on two different grounds:
 

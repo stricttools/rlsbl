@@ -62,8 +62,11 @@ exactly one class:
 Consent is file-driven
 ----------------------
 
-``--plan`` observes and writes ``.rlsbl/releases/reconcile-plan.toml``; that
-file IS the preview's output artifact, and it is written even when the plan is
+``--plan`` observes and writes ``reconcile-plan.toml`` beside the release
+records it reconciled -- ``.rlsbl/releases/`` in a standalone repository, the
+releasable's own ``releases/`` directory in a workspace, resolved by the same
+identity resolution the ref checks use, never assembled from the project root.
+That file IS the preview's output artifact, and it is written even when the plan is
 empty, so an apply on it is a clean no-op rather than an instruction to run the
 plan that was just run. ``--apply`` reads it, re-observes, and performs exactly
 the repairable items the plan named: a subject the fresh observation grew, or a
@@ -1663,7 +1666,7 @@ def _resolve_identity(ctx):
     half -- the divergences the publication tripwire judges -- and those need no
     target at all.
     """
-    from ..checks._common import _resolve_release_identity
+    from ..checks._common import _resolve_release_identity, _resolve_release_record_dir
     from ..targets.base import BaseTarget
     from ..targets.refs import ref_context
 
@@ -1671,10 +1674,15 @@ def _resolve_identity(ctx):
     if resolved is not None:
         return resolved
     root = str(ctx.workspace_root or ctx.project_root)
+    # Even with no target to name refs for, the release records are still the
+    # ones this project actually keeps -- a releasable's own directory in a
+    # workspace. Assembling ``<project>/.rlsbl/releases`` here would read an
+    # empty directory that nothing else writes, and the plan file would then
+    # be written into a directory this project does not have.
     return (
         BaseTarget(),
         ref_context(repo_root=root),
-        os.path.join(str(ctx.project_root), ".rlsbl", "releases"),
+        _resolve_release_record_dir(ctx),
     )
 
 

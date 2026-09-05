@@ -1485,11 +1485,11 @@
               "choices": [
                 {
                   "name": "plan",
-                  "help": "Observe origin and write the reconcile plan to .rlsbl/releases/reconcile-plan.toml. Writes nothing to origin."
+                  "help": "Observe origin and write the reconcile plan as reconcile-plan.toml beside the release records being reconciled (.rlsbl/releases/ in a standalone repository, the releasable's own releases/ in a workspace). Writes nothing to origin."
                 },
                 {
                   "name": "apply",
-                  "help": "Perform the plan in .rlsbl/releases/reconcile-plan.toml, after re-observing origin and refusing if it moved since the plan was written."
+                  "help": "Perform the reconcile-plan.toml beside the release records being reconciled, after re-observing origin and refusing if it moved since the plan was written."
                 }
               ],
               "elect_by": "member-flags"
@@ -1499,6 +1499,14 @@
               "help": "Timeout in seconds for each ref push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.",
               "value_schema": {
                 "type": "integer"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "releasable",
+              "help": "Which releasable to reconcile. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it.",
+              "value_schema": {
+                "type": "string"
               },
               "presence": "optional"
             }

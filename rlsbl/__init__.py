@@ -135,13 +135,21 @@ def _at_workspace_root(workspace_root):
     return Path(workspace_root).resolve() == Path.cwd().resolve()
 
 
-def _releasable_representative(workspace_root, releasable):
+def _releasable_representative(workspace_root, releasable, *, invocation, verb,
+                               batch_hint=None):
     """The member whose directory stands in for *releasable*, or exit.
 
-    A releasable is released by running the flow from one of its members; the
+    A releasable is acted on by running the flow from one of its members; the
     first declared member is that one.  Which member it is has no effect on
-    the release: version, changelog and release state all belong to the
+    the outcome: version, changelog and release state all belong to the
     releasable, not to the member.
+
+    *invocation* is the command line the caller is (``rlsbl release run``,
+    ``rlsbl release reconcile``) and *verb* what it does to the releasable, so
+    the refusal names the command the operator actually typed instead of the
+    first one that needed this resolution.  *batch_hint* is the sentence
+    pointing at a command that acts on several at once, for the callers that
+    have one.
     """
     from .workspace import load_releasables, load_workspace, members_of
 
@@ -151,25 +159,23 @@ def _releasable_representative(workspace_root, releasable):
 
     if releasable is None:
         print(
-            "Error: `rlsbl release run` at the workspace root must say which "
-            "releasable to release -- the root directory names the whole "
-            "workspace, not one of them.",
+            f"Error: `{invocation}` at the workspace root must say which "
+            f"releasable to {verb} -- the root directory names the whole "
+            f"workspace, not one of them.",
             file=sys.stderr,
         )
         if names:
             print("Declared releasables:", file=sys.stderr)
             for name in names:
-                print(f"  rlsbl release run --releasable {name} ...", file=sys.stderr)
+                print(f"  {invocation} --releasable {name} ...", file=sys.stderr)
         else:
             print(
-                "This workspace declares none, so there is nothing to "
-                "release from here.",
+                f"This workspace declares none, so there is nothing to "
+                f"{verb} from here.",
                 file=sys.stderr,
             )
-        print(
-            "Use `rlsbl monorepo release run` to release several at once.",
-            file=sys.stderr,
-        )
+        if batch_hint:
+            print(batch_hint, file=sys.stderr)
         sys.exit(1)
 
     if releasable not in names:
@@ -190,6 +196,30 @@ def _releasable_representative(workspace_root, releasable):
         )
         sys.exit(1)
     return members[0]
+
+
+def _refuse_releasable_selector(*, standalone, subject):
+    """Exit refusing ``--releasable`` where the directory already answers.
+
+    Two positions can never take the selector: a member directory, which names
+    one releasable by standing in it, and a standalone repository, which has
+    exactly one thing to name.  *subject* is what the command acts on, so the
+    member-directory refusal reads as the command's own sentence.
+    """
+    if standalone:
+        print(
+            "Error: --releasable is a monorepo selector and this is a "
+            "standalone repository, which has exactly one thing to release.",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"Error: --releasable is only accepted at the workspace root. "
+            f"Here the directory already names what is being {subject}; drop "
+            f"the flag, or run from the workspace root to choose.",
+            file=sys.stderr,
+        )
+    sys.exit(1)
 
 
 def _opt_default(value, fallback):
@@ -404,11 +434,19 @@ app = strictcli.App(
 )
 
 
-def _check_context_factory():
+def _check_context_factory(project_root=None):
     """Create the appropriate check context for the current project.
 
     Returns WorkspaceCheckContext if in a monorepo, otherwise ProjectCheckContext.
     Imports are deferred to avoid circular dependencies and to keep the factory lazy.
+
+    *project_root* is the directory the context describes; the current one
+    when it is not stated, which is what strictcli's check runner wants.  A
+    command that has already resolved WHICH project it acts on -- a releasable
+    named by ``--releasable`` at a workspace root, whose directory is not the
+    one the operator is standing in -- passes it, so it gets the very context
+    the checks would build there rather than a second, plainer resolution of
+    its own.
     """
     import os
     from pathlib import Path
@@ -418,8 +456,9 @@ def _check_context_factory():
     from .workspace import find_workspace_root, load_workspace
 
     push_stdin = os.environ.get("RLSBL_PUSH_STDIN")
+    root = Path.cwd() if project_root is None else Path(project_root)
 
-    workspace_root = find_workspace_root()
+    workspace_root = find_workspace_root(str(root))
     if workspace_root is not None:
         from .workspace_graph import WorkspaceGraph
         from .workspace import load_releasables
@@ -427,7 +466,7 @@ def _check_context_factory():
         projects = load_workspace(workspace_root)
         graph = WorkspaceGraph(workspace_root, projects)
         releasables = load_releasables(workspace_root, projects=projects)
-        ctx = create_context(Path.cwd(), workspace_root=Path(workspace_root))
+        ctx = create_context(root, workspace_root=Path(workspace_root))
         wctx = WorkspaceCheckContext(
             project_root=ctx.project_root,
             workspace_root=ctx.workspace_root,
@@ -440,7 +479,7 @@ def _check_context_factory():
         return wctx
     from .workspace import create_standalone_releasable
 
-    ctx = create_context(Path.cwd())
+    ctx = create_context(root)
     ctx.push_stdin = push_stdin
     ctx.releasable = create_standalone_releasable(ctx.project_root)
     return ctx
@@ -535,27 +574,22 @@ def cmd_release_run(ctx, allow_dirty, watch, releasable, push_timeout, ci_timeou
             # than guess (the old behaviour refused outright, then silently
             # released whatever the root member belonged to), the invocation
             # has to say which one.
-            project = _releasable_representative(monorepo_root, releasable)
+            project = _releasable_representative(
+                monorepo_root, releasable,
+                invocation="rlsbl release run", verb="release",
+                batch_hint=(
+                    "Use `rlsbl monorepo release run` to release several at "
+                    "once."
+                ),
+            )
             root = Path(monorepo_root) / project["path"]
         else:
             if releasable is not None:
-                print(
-                    "Error: --releasable is only accepted at the workspace "
-                    "root. Here the directory already names what is being "
-                    "released; drop the flag, or run from the workspace root "
-                    "to choose.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+                _refuse_releasable_selector(standalone=False, subject="released")
             project = resolve_project(monorepo_root, ".")
         project_dir = os.path.join(monorepo_root, project["path"])
     elif releasable is not None:
-        print(
-            "Error: --releasable is a monorepo selector and this is a "
-            "standalone repository, which has exactly one thing to release.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        _refuse_releasable_selector(standalone=True, subject="released")
 
     ctx = create_context(root, workspace_root=Path(monorepo_root) if monorepo_root else None)
 
@@ -1371,12 +1405,12 @@ def cmd_release_backfill(ctx, overrides, auto_commit):
 # members of one required choice: `--plan` observes and writes the plan file,
 # `--apply` consumes it. Neither is a default -- which half of a
 # force-pushing repair you are running is not something to leave implicit.
-@strictcli.choice("plan", help="Observe origin and write the reconcile plan to .rlsbl/releases/reconcile-plan.toml. Writes nothing to origin.")
+@strictcli.choice("plan", help="Observe origin and write the reconcile plan as reconcile-plan.toml beside the release records being reconciled (.rlsbl/releases/ in a standalone repository, the releasable's own releases/ in a workspace). Writes nothing to origin.")
 class ReconcilePlanMode:
     pass
 
 
-@strictcli.choice("apply", help="Perform the plan in .rlsbl/releases/reconcile-plan.toml, after re-observing origin and refusing if it moved since the plan was written.")
+@strictcli.choice("apply", help="Perform the reconcile-plan.toml beside the release records being reconciled, after re-observing origin and refusing if it moved since the plan was written.")
 class ReconcileApplyMode:
     pass
 
@@ -1394,17 +1428,36 @@ class ReconcileApplyMode:
     elect_by="member-flags", choices=[ReconcilePlanMode, ReconcileApplyMode],
 )
 @strictcli.flag(name="push-timeout", type=int, presence="optional", help="Timeout in seconds for each ref push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.")
+@strictcli.flag(name="releasable", type=str, presence="optional", help="Which releasable to reconcile. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it.")
 @effects.handler
-def cmd_release_reconcile(ctx, mode: ReconcilePlanMode | ReconcileApplyMode, push_timeout):
+def cmd_release_reconcile(ctx, mode: ReconcilePlanMode | ReconcileApplyMode,
+                          releasable, push_timeout):
     """Reconcile published refs and Releases with the repository's records."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
     root = _require_project_root()
     from .workspace import find_workspace_root
     monorepo_root = find_workspace_root(str(root))
-    ctx = create_context(
-        root, workspace_root=Path(monorepo_root) if monorepo_root else None,
-    )
+    # A releasable owns the refs, the release records and the tag format this
+    # command judges, so the reconcile has to resolve WHICH releasable it is
+    # acting on before it resolves anything else -- exactly as `release run`
+    # does, and through the same helper. The context then comes from the check
+    # context factory, so the reconcile reads the identity the ref checks read;
+    # a plainer context of its own made every releasable release invisible to
+    # it.
+    if monorepo_root:
+        if _at_workspace_root(monorepo_root):
+            project = _releasable_representative(
+                monorepo_root, releasable,
+                invocation="rlsbl release reconcile", verb="reconcile",
+            )
+            root = Path(monorepo_root) / project["path"]
+        elif releasable is not None:
+            _refuse_releasable_selector(standalone=False, subject="reconciled")
+    elif releasable is not None:
+        _refuse_releasable_selector(standalone=True, subject="reconciled")
+
+    ctx = _check_context_factory(project_root=root)
     from .commands.release_reconcile import run_cmd
     run_cmd(
         {
