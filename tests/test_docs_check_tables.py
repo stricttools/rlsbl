@@ -10,6 +10,12 @@ A check is "documented" when its name appears in a table row of the section
 for one of its tags (or, for untagged checks, the untagged section). Checks
 carrying several tags need one row plus the prose cross-reference the page
 already uses ("`test-suite` (see prepush checks) is also tagged `quality`").
+
+The checks strictcli registers into the same registry are in none of those
+sections and in no count on the page, because they are in no rlsbl file the
+page derives from -- they had no row at all, while the page said it covered
+every check. They are documented in their own section, bound here to the live
+registry rather than to ``checks.toml``.
 """
 
 import re
@@ -144,3 +150,65 @@ def test_no_undocumented_tag_exists():
     assert f"{len(TAG_SECTIONS)} primary tags" in intro
     assert "Three further tags" in intro and len(internal) == 3
     assert body
+
+
+def _framework_checks():
+    """The checks strictcli registers into rlsbl's registry, from the registry.
+
+    Materializing the providers is what puts them there; before that call the
+    registry holds exactly ``checks.toml``.
+    """
+    import rlsbl
+
+    rlsbl.app._materialize_check_providers()
+    return {
+        name: rlsbl.app._check_defs[name]
+        for name in rlsbl.app._check_defs
+        if name not in _checks()
+    }
+
+
+def _framework_rows():
+    """``{name: (severity, tags)}`` from the framework-checks table."""
+    body = _section("Framework checks")
+    rows = {}
+    for m in re.finditer(
+        r"^\| `([a-z][a-z0-9-]*)` \| (error|warn) \| ([^|]+) \|", body, re.M,
+    ):
+        tags = {t.strip(" `") for t in m.group(3).split(",")}
+        rows[m.group(1)] = (m.group(2), tags)
+    return rows
+
+
+def test_every_framework_check_has_a_row():
+    live = _framework_checks()
+    assert live, "no provider-registered checks found -- the binding is vacuous"
+    documented = _framework_rows()
+    assert set(documented) == set(live), (
+        f"docs/checks.md documents framework checks {sorted(documented)}; "
+        f"the registry carries {sorted(live)}"
+    )
+
+
+def test_framework_rows_state_the_real_severity_and_tags():
+    live = _framework_checks()
+    for name, (severity, tags) in _framework_rows().items():
+        assert severity == live[name].severity, (
+            f"docs/checks.md gives `{name}` severity {severity}; "
+            f"it is registered {live[name].severity}"
+        )
+        assert tags == set(live[name].tags), (
+            f"docs/checks.md gives `{name}` tags {sorted(tags)}; "
+            f"it is registered with {sorted(live[name].tags)}"
+        )
+
+
+def test_a_framework_check_is_in_no_tag_section():
+    """They belong to their own section, not to the checks.toml-derived ones.
+
+    The tag sections are counted from ``checks.toml``, so a framework check
+    listed in one of them would make that section disagree with its own count.
+    """
+    live = set(_framework_checks())
+    for heading in list(TAG_SECTIONS.values()) + ["Untagged checks"]:
+        assert not (_row_names(_section(heading)) & live), heading

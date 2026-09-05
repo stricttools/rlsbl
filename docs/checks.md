@@ -1,12 +1,12 @@
 ---
-description: "Every rlsbl check by tag: project, release, changelog, workspace, quality, prepush and untagged, plus check metadata, severity, target applicability, and how unpublished-refs treats a version recorded unrecoverable or never released."
+description: "Every check rlsbl runs, by tag: project, release, changelog, workspace, quality, prepush, untagged, and the framework checks strictcli registers; plus check metadata, severity, target applicability, and how unpublished-refs treats a version recorded unrecoverable or never released."
 ---
 
 # Check system
 
 :-: check-count
 
-Run checks via the `rlsbl check` command. Checks are organized across 6 primary tags (project, release, changelog, workspace, quality, prepush) and validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement. Four additional untagged checks run only with `--all` or `--name`. Three further tags exist for pipeline and target-specific grouping: `preflight` and `preflight-changelog` are run internally by `rlsbl release run`, and `maven` groups the Maven-specific check.
+Run checks via the `rlsbl check` command. Checks are organized across 6 primary tags (project, release, changelog, workspace, quality, prepush) and validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement. Four additional untagged checks run only with `--all` or `--name`. Three further tags exist for pipeline and target-specific grouping: `preflight` and `preflight-changelog` are run internally by `rlsbl release run`, and `maven` groups the Maven-specific check. A few more checks come from strictcli rather than from rlsbl's own `checks.toml` and are therefore outside every count on this page; they are documented under [framework checks](#framework-checks).
 
 ## Running checks
 
@@ -208,6 +208,17 @@ These 4 checks have no tag assignment and run only when explicitly requested via
 | `deps-unused` | error | Declared dependencies that are never imported |
 | `deps-undeclared` | error | Imported packages that are not declared as dependencies |
 | `deps-stale` | error | Workspace dependency versions that are outdated relative to available versions |
+
+## Framework checks
+
+Every check above is declared in rlsbl's own `checks.toml`, and so are the counts on this page. The checks below are not: [strictcli](https://github.com/smm-h/strictcli) registers them into the same registry when rlsbl builds its CLI, so they run under `rlsbl check --all` and under the tags they carry, but no rlsbl-side count includes them. They carry the framework's own tags (`test`, `effects`), and the three effects lints also carry `quality`, so `rlsbl check --tag quality` runs them.
+
+| Check | Severity | Tags | Description |
+| --- | --- | --- | --- |
+| `cli-test-coverage` | error | `test` | Every registered command path appears in the committed coverage manifest (`.strictcli/test-coverage.json`), taken together with any per-process shard files under `.strictcli/coverage/`. Failure names each uncovered command. It skips when neither the manifest nor a shard exists -- an installed rlsbl running checks from someone else's project reports that instead of listing its whole command surface as uncovered |
+| `effects-bypass` | error | `effects`, `quality` | No process, filesystem-mutation or network call reachable from a registered command handler is made directly. Each finding names the file, the line and the function being called, and the remedy is always the same: route it through `ctx.effects` |
+| `observe-allowlist-breadth` | warn | `effects`, `quality` | No `proc_observe_allowlist` prefix is a single token. A one-token prefix makes every invocation of that binary an observe, so it really executes under `--dry-run`, is never written to the would-do log, and is legal inside a `read_only` command. A warning, because the allowlist is a declared, source-visible choice |
+| `consequential-grant-agreement` | warn | `effects`, `quality` | Every command declaring a grant whose kind leaves this process (`proc_mutate` runs another program, `net_mutate` changes remote state) also declares itself consequential. A warning, because the two declarations can legitimately disagree -- making it an error would push consumers to declare `consequential` reflexively |
 
 ## Target applicability
 
