@@ -499,7 +499,8 @@ release_group = app.group("release", help="Release orchestration commands coveri
     name="run",
     effect="mutating",
     # Tags, pushes, creates a GitHub Release and triggers the registry
-    # publish. A published version cannot be unpublished.
+    # publish. Shipping this project's next version to the public is the
+    # operator's call, never an agent's.
     consequential=True,
     help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, --approve-consequential to skip the confirmation prompt in non-interactive contexts, and --allow-dirty to skip the clean working tree check.",
 )
@@ -710,8 +711,9 @@ def cmd_release_init(ctx):
 @release_group.command(
     name="retry",
     effect="mutating",
-    # Dispatches the publish workflows, so it causes the same irreversible
-    # registry publish the release itself would have.
+    # Dispatches the publish workflows, so it performs the same public
+    # registry publish the release itself would have. Re-dispatching a
+    # publication is the operator's call.
     consequential=True,
     help="Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is auto-scaffolded with sensible defaults if missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered against the configured ref (defaults to the release tag).",
 )
@@ -1072,9 +1074,10 @@ def cmd_check_name(ctx, target, delay):
     name="claim-name",
     help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.",
     effect="mutating",
-    # The one command in rlsbl that takes a permanent, unrecoverable name on a
-    # public registry -- and the command whose "dry run that published for
-    # real" incident started the effects campaign.
+    # Claiming a name on a public registry is the operator's call: it decides
+    # what this project is called to everyone outside it. (It is also the
+    # command whose "dry run that published for real" incident started the
+    # effects campaign.)
     consequential=True,
     # The publish is irreversible on both registries rlsbl supports, so the
     # preview says why it is there rather than listing it like any other step.
@@ -1244,8 +1247,9 @@ class ScrubEntireHistory:
 @release_group.command(
     name="scrub",
     effect="mutating",
-    # Rewrites git history and force-pushes it. Every clone of the repo is
-    # invalidated and the old history is gone from the remote.
+    # Rewrites this repository's published history and force-pushes it.
+    # Deciding that what was published is not what the history will say is the
+    # operator's call.
     consequential=True,
     help="Scrub sensitive content from git history and update release metadata to match the rewritten commits. Supports 3 modes: match (--pattern), file (--file), or recipe (--recipe). After rewriting, remaps commit hashes in JSONL changelog files, regenerates CHANGELOG.md, force-pushes, re-points the tags, and rewrites each tag's GitHub Release document in place. A Release is never deleted, so a failure mid-step leaves the previous document standing rather than a tag with no Release at all.",
 )
@@ -1431,9 +1435,9 @@ def cmd_discover(ctx, mine):
 # `gh run rerun`, which re-dispatches CI -- a real change to state on GitHub.
 # While this was declared read_only the effects handle refused that argv at
 # call time and the retry path swallowed the refusal, so a watch over a failed
-# run silently gave up instead of re-dispatching. Not `consequential`: a rerun
-# of a run that already failed is cheap and reversible, and the command is
-# invoked constantly for monitoring.
+# run silently gave up instead of re-dispatching. Not `consequential`: the
+# rerun re-attempts a publication the operator already authorized at `release
+# run`, and decides nothing new. There is no decision here reserved to a human.
 @app.command(name="watch", help="Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.", effect="mutating")
 @strictcli.flag(name="target", type=str, presence="optional", help="Registry whose CI workflow to watch (auto-detected if omitted)")
 @strictcli.flag(name="run-id", type=str, presence="optional", help="GitHub Actions workflow run ID to poll directly instead of searching by SHA", repeatable=True, unique=True)
@@ -2256,7 +2260,8 @@ mono_release = mono.group("release", help="Release commands for monorepo workspa
 @mono_release.command(
     name="run",
     effect="mutating",
-    # `release run` once per package, in one uninterruptible sweep.
+    # `release run` once per package. Shipping this workspace's next versions
+    # to the public is the operator's call, never an agent's.
     consequential=True,
     help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --approve-consequential and --allow-dirty flags.",
 )
@@ -2312,11 +2317,11 @@ def cmd_mono_release_order(ctx):
     _cmd_release_order({}, project_root=root)
 
 
-# Consequential: it deletes the extracted members and the releasable's whole
-# release state from the repository you are standing in, and commits that.
-# The old classification rested on the claim that the source is barely touched
-# -- true of the previous implementation, which only dropped a workspace.toml
-# entry, and false of this one, which completes the move.
+# Consequential: moving a releasable across a repository boundary is the
+# operator's decision. It settles which repository owns that code, its history
+# and its release record from here on. The old classification argued instead
+# that the source was barely touched -- but whose decision it is was never a
+# question about how much the command writes.
 @mono.command(name="extract", help="Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their release commits, config and hooks -- is transplanted, the release commits and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. A mirrored releasable is extracted by promotion instead of by filtering: the destination is cloned from the mirror and adopts the standalone history consumers already resolve, with the monorepo-to-mirror commit correspondence derived by subtree split and recorded in the destination's transition record. A promotion refuses a mirror whose contract is violated or whose split ancestry cannot be established, and one whose tree is behind the source. Refuses a releasable owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.", effect="mutating", consequential=True)
 # Positional order is declaration order (top decorator first) since strictcli
 # 0.41 fixed the stacked-@arg binding; these stacks used to be written
