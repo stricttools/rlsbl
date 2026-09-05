@@ -15,10 +15,11 @@ The three explanations
 ----------------------
 
 ``archived-version``
-    The tag is the spelling this repository's own tag scheme produces for a
-    version its release archives record.  The caller supplies that mapping --
-    it is the caller's scheme (``expected_refs`` for reconcile, the scope's
-    ``tag_format`` for the backfill), and this module never guesses one.
+    The tag is one of the refs a version its release archives record OWNS.  The
+    caller supplies that mapping, and it comes from ``expected_refs`` -- the
+    single authority for a version's ref set -- in both consumers: reconcile
+    asks it per archived version, and the backfill asks it per scope.  This
+    module never derives a spelling of its own.
 
 ``shipped-as``
     An archive records ``shipped_as = "<tag>"``: the historical spelling that
@@ -156,8 +157,8 @@ def non_version_tag_index(transition_record_paths) -> dict:
 def build(*, version_tags=None, releases_dirs=(), transition_record_paths=()) -> TagExplanations:
     """Assemble the explanations available in one repository.
 
-    *version_tags* is the caller's own ``tag -> version`` mapping for the
-    spellings its scheme produces.  The two other sources are read here: every
+    *version_tags* is the caller's own ``tag -> version`` mapping, every
+    spelling the versions it knows about own.  The two other sources are read here: every
     ``shipped_as`` across *releases_dirs*, and every ``non-version-tag`` event
     across *transition_record_paths*.
 

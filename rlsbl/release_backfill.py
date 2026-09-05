@@ -18,9 +18,10 @@ verdict:
     A tag in the namespace that nothing accounts for.  Listed FIRST, and a
     single one refuses the whole apply -- see :func:`unexplained_error`.
 ``adopt``
-    A version tag this repository's own scheme produces, for a version no
-    archive and no changelog file records.  It gets an archive recording the
-    release the tag is evidence of.
+    A tag that is one of the refs some version of this repository would own --
+    asked of ``expected_refs``, never rendered here -- for a version no archive
+    and no changelog file records.  It gets an archive recording the release the
+    tag is evidence of.
 ``materialize``
     A version the changelog records as released, with no archive at all.
 ``repair``
@@ -955,11 +956,11 @@ class Plan:
 
 
 def _scope_for_tag(scopes, tag):
-    """The scope whose own tag scheme produces *tag*, with the version. Or None.
+    """The scope one of whose refs IS *tag*, with the version. Or None.
 
-    Answered by CONSTRUCTION -- rendering each scope's format at the version the
-    tag parses as, and comparing -- rather than by pattern-matching the tag, so
-    a scope can never claim a spelling it would not itself write.
+    Answered by CONSTRUCTION -- deriving each scope's whole ref set at the
+    version the tag parses as, and comparing -- rather than by pattern-matching
+    the tag, so a scope can never claim a spelling it would not itself write.
     """
     parsed = parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
     if parsed is None:
@@ -1007,8 +1008,8 @@ def build_plan(repo, *, use_gh=True, gh=None, overrides=None):
                 if rev_parse(repo, f"{candidate}^{{commit}}"):
                     known_tags[candidate] = version
 
-    # Pass two: version tags this repository's own scheme produces that NO
-    # store records. They are evidence of a release nothing wrote down, so they
+    # Pass two: version tags that belong to some scope's own ref set and that
+    # NO store records. They are evidence of a release nothing wrote down, so they
     # are adopted rather than reported.
     adopted = []
     adopting_tag = {}  # (scope label, version) -> the spelling adopted from
@@ -1371,9 +1372,9 @@ def _resolutions(entry, plan):
     """The three cheap resolutions, spelled out so each can be performed."""
     return (
         f"  Resolve it in one of three ways, then re-run:\n"
-        f"    1. ADOPT IT AS RELEASED. A tag whose spelling this repository's\n"
-        f"       own tag scheme produces is adopted automatically, and this one\n"
-        f"       was not -- so it is spelled the way an older scheme spelled it.\n"
+        f"    1. ADOPT IT AS RELEASED. A tag that is one of the refs some\n"
+        f"       version here would own is adopted automatically, and this one\n"
+        f"       is not -- so it is spelled the way an older scheme spelled it.\n"
         f"       Record that version's archive with\n"
         f'       {SHIPPED_AS_FIELD} = "{entry.tag}", and the pass records its\n'
         f"       commit from this tag.\n"

@@ -369,7 +369,7 @@ Exactly one of the two facts must be elected, `--reason` is required and states 
 
 The command is consequential: only a human may declare what a repository's history *is*, because both facts silence a reader that would otherwise keep reporting a divergence. A second declaration of the same kind about the same subject is refused, naming the event already recorded -- the record is append-only, so a duplicate would stand beside the first forever with nothing to say which one is meant. `--dry-run` prints the line it would append and writes nothing.
 
-Recording a `non-version-tag` changes two answers immediately: `rlsbl release backfill` stops listing the tag as unexplained, and `rlsbl release reconcile` stops owing a verdict on it.
+Recording a `non-version-tag` changes two answers immediately: `rlsbl release backfill` stops listing the tag as unexplained, and `rlsbl release reconcile` stops owing a verdict on it. Both readers ask the tag-namespace question over the repository-scoped record as well as the project's own, in a workspace exactly as in a standalone repository — the declaration is about a tag name, which is unique across a repository. (Version-keyed alias derivation stays scoped to the one project, because version numbers do collide across releasables.)
 
 The `tag-map`, `release-commit-remap` and `boundary-alias` events a conversion writes carry `related_to`, pointing at the id of the `conversion` event that heads them, so the events of one conversion are recoverable as a group from a file that has accumulated several. A `departed-globs` event stands alone: it is written in the source, where the conversion event it would point at does not exist.
 
