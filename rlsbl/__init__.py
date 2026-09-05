@@ -206,8 +206,8 @@ def _opt_default(value, fallback):
     return fallback if value is None else value
 
 
-def _refuse_empty_flags(**supplied):
-    """Refuse any named string flag that was supplied with an empty value.
+def _refuse_empty(kind, supplied, extra=""):
+    """The one refusal of a supplied-but-empty value, for flags and for args.
 
     ``--name ""`` is a statement, and it is not the statement ``--name`` was
     omitted. strictcli delivers an omitted optional flag as ``None``, so a
@@ -217,25 +217,62 @@ def _refuse_empty_flags(**supplied):
     where an empty filter selected EVERY releasable instead of the none it
     named.
 
-    This is the one place that decides it, so no handler grows a check of its
-    own. Whitespace counts as empty: ``--root "   "`` names nothing either.
+    Whitespace counts as empty: ``--root "   "`` names nothing either. A
+    repeatable flag is checked element by element, so one empty element in
+    ``--run-id a --run-id ""`` is refused like a single empty value.
 
-    Call it with the handler's own parameter names; underscores are rendered
-    as the hyphens the flag is spelled with.
+    *kind* decides how the name is rendered and what remedy is offered. A flag
+    can be dropped; a positional argument cannot be renamed into one, and a
+    required one cannot be dropped at all, so its message names the ARGUMENT
+    and asks for a real value. *extra* appends one site-specific sentence (the
+    flag that clears a field, where one exists).
     """
     for parameter, value in supplied.items():
-        if value is None or not isinstance(value, str):
-            continue
-        if value.strip():
-            continue
-        flag = parameter.replace("_", "-")
-        print(
-            f"Error: --{flag} was given an empty value. An empty value is not "
-            f"the same as omitting the flag: it states nothing, and rlsbl will "
-            f"not read it as absence. Pass a value, or drop --{flag}.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        values = value if isinstance(value, (list, tuple)) else (value,)
+        for item in values:
+            if item is None or not isinstance(item, str):
+                continue
+            if item.strip():
+                continue
+            if kind == "flag":
+                flag = "--" + parameter.replace("_", "-")
+                message = (
+                    f"Error: {flag} was given an empty value. An empty value "
+                    f"is not the same as omitting the flag: it states nothing, "
+                    f"and rlsbl will not read it as absence. Pass a value, or "
+                    f"drop {flag}."
+                )
+            else:
+                message = (
+                    f"Error: the {parameter} argument was given an empty "
+                    f"value. An empty value is not the same as omitting it: it "
+                    f"states nothing, and rlsbl will not read it as absence. "
+                    f"Pass a real value."
+                )
+            print(message + (f" {extra}" if extra else ""), file=sys.stderr)
+            sys.exit(1)
+
+
+def _refuse_empty_flags(_extra="", **supplied):
+    """Refuse any named string flag that was supplied with an empty value.
+
+    This is the one place that decides it, so no handler grows a check of its
+    own. Call it with the handler's own parameter names; underscores are
+    rendered as the hyphens the flag is spelled with. ``_extra`` appends a
+    site-specific sentence, for a flag whose value has a way to be CLEARED
+    (``--description ""`` versus ``--unset-description``).
+    """
+    _refuse_empty("flag", supplied, extra=_extra)
+
+
+def _refuse_empty_args(**supplied):
+    """Refuse any positional argument that was supplied with an empty value.
+
+    Separate from :func:`_refuse_empty_flags` because the message is not the
+    same fact: ``rlsbl monorepo add ""`` has no ``--path`` to drop, and telling
+    the caller to drop one names a flag that does not exist.
+    """
+    _refuse_empty("arg", supplied)
 
 
 # ---------------------------------------------------------------------------
@@ -1801,8 +1838,9 @@ def cmd_mono_add(ctx, name, target, depends_on, library, dev_only, releasable, t
     _refuse_empty_flags(
         name=name, target=target, depends_on=depends_on, library=library,
         dev_only=dev_only, releasable=releasable, tag_format=tag_format,
-        registry_name=registry_name, path=path,
+        registry_name=registry_name,
     )
+    _refuse_empty_args(path=path)
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
     root = _require_project_root()
@@ -2158,9 +2196,9 @@ def cmd_mono_extract(ctx, releasable_name, target_path, delete_with_rm):
 @effects.handler
 def cmd_mono_absorb(ctx, source_repo, dest_path, name, registry_name, releasable, tag_format, delete_with_rm):
     """Absorb an external repository into this workspace as a releasable."""
+    _refuse_empty_args(source_repo=source_repo, dest_path=dest_path)
     _refuse_empty_flags(
-        source_repo=source_repo, dest_path=dest_path, name=name,
-        registry_name=registry_name, releasable=releasable,
+        name=name, registry_name=registry_name, releasable=releasable,
         tag_format=tag_format,
     )
     root = _require_project_root()
