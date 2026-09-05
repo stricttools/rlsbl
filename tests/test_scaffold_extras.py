@@ -28,6 +28,40 @@ def test_hook_templates_not_scaffolded():
     )
 
 
+def test_release_dispatch_template_removed():
+    """The remote-release dispatch workflow template is gone for good."""
+    tpl = (
+        Path(__file__).resolve().parent.parent
+        / "rlsbl"
+        / "templates"
+        / "shared"
+        / ".github"
+        / "workflows"
+        / "release-dispatch.yml.tpl"
+    )
+    assert not tpl.exists(), (
+        "release-dispatch.yml.tpl must not exist -- the remote-release "
+        "dispatch feature was deleted."
+    )
+
+
+def test_scaffold_never_writes_a_release_dispatch_workflow(mock_git_repo):
+    """Even a config still carrying remote_release scaffolds no dispatch workflow."""
+    import json as _json
+
+    from rlsbl.commands.init_cmd import run_cmd
+
+    (mock_git_repo / "package.json").write_text(
+        _json.dumps({"name": "dispatchpkg", "version": "0.1.0"}, indent=2) + "\n"
+    )
+    ctx = make_ctx(mock_git_repo, config={"remote_release": True})
+    run_cmd("npm", [], {"auto-commit": False, "auto-tag": False}, ctx=ctx)
+
+    assert not (
+        mock_git_repo / ".github" / "workflows" / "release-dispatch.yml"
+    ).exists()
+
+
 def test_scaffold_does_not_overwrite_changelog(tmp_project):
     """Scaffold must NOT overwrite CHANGELOG.md if it already exists (USER_OWNED)."""
     assert "CHANGELOG.md" in USER_OWNED
