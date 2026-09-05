@@ -83,7 +83,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.119.0",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 54 commands organized into 13 top-level commands and 5 command groups (release, changelog, monorepo, dev, rewrite). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 55 commands organized into 13 top-level commands and 6 command groups (release, changelog, monorepo, dev, rewrite, transition). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
   "proc_observe_allowlist": [
     [
       "git",
@@ -2688,6 +2688,73 @@
           "name": "uv-path-sources",
           "help": "Convert path- and workspace-sourced Python dependencies into registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra and every PEP 735 [dependency-groups] group, and deletes the matching [tool.uv.sources] entry so it stops overriding the new constraint. Each converted name is added to internal_dep_floors in .rlsbl/config.json. A locked version that is not published on PyPI is a hard error naming the remedy (release that dependency first), and so is a registry probe that fails to answer. Use --dry-run to print the per-dependency plan with entry counts.",
           "effect": "mutating"
+        }
+      }
+    },
+    "transition": {
+      "name": "transition",
+      "help": "Record the transition-record facts that no surgery writes. Most events in a repository's transition record are written by the operation that performed them; the ones here are declarations an operator makes about a repository they read, and nothing can derive them.",
+      "commands": {
+        "record": {
+          "name": "record",
+          "help": "Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), or a member's or releasable's deliberately closed release history (--release-history-closed). Exactly one of the two must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.",
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "fact",
+              "help": "Which fact is being declared. Exactly one must be elected, and the elected member carries the subject it is about.",
+              "presence": "required",
+              "choices": [
+                {
+                  "name": "non-version-tag",
+                  "help": "Declare that a tag stands outside the version model on purpose: not a release and not an alias of one. Every reader of the tag namespace accounts for it afterwards instead of reporting it as unexplained.",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "the tag name, exactly as it stands in the repository's tag namespace",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                },
+                {
+                  "name": "release-history-closed",
+                  "help": "Declare that a member's or releasable's release history is deliberately over. The version file, changelog directory and release archives it leaves behind are a record of what it released, not residue to clean up.",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "the releasable or member name whose release history is closed -- a name, never a path, in the vocabulary workspace.toml uses",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                }
+              ],
+              "elect_by": "member-flags"
+            },
+            {
+              "name": "reason",
+              "help": "Why this fact holds, in the operator's own words (e.g. \"a nightly build marker\", \"extracted into its own repository\"). Recorded verbatim and shown by every reader that explains the fact, so it is the audit trail for a declaration nothing can derive.",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "auto-commit",
+              "help": "Commit the transition record with the Autogenerated trailer (the handler commits when neither --auto-commit nor --no-auto-commit is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
+            }
+          ]
         }
       }
     }
