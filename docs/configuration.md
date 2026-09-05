@@ -1,5 +1,5 @@
 ---
-description: "Configuration reference: config.json pipelines, batch limits, the sandboxed test runner, dependency floors, external checks, and workspace.toml."
+description: "Configuration reference: config.json pipelines, batch limits, the sandboxed test runner, dependency floors, external checks, workspace.toml, and which configuration surfaces refuse an unknown key at load."
 ---
 
 # Configuration reference
