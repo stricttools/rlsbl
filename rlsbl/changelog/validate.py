@@ -304,6 +304,22 @@ def check_coverage(entries: list[ChangelogEntry], releases_dir: str,
     return (uncovered == 0, details)
 
 
+def _removal_remedy(entry: ChangelogEntry, stale_hashes: list[str]) -> str:
+    """The ``changelog remove`` invocation that deletes *entry*.
+
+    Printed verbatim into a finding, so it has to be runnable as written. The
+    entry's ULID id addresses it exactly and survives every unrelated edit to
+    the file, so it is preferred. A legacy line written before ids existed
+    carries none and is addressed by a commit it names instead -- which
+    ``changelog remove`` accepts even when git cannot resolve that commit,
+    since an unresolvable hash is the very condition this remedy is printed
+    under.
+    """
+    if entry.id:
+        return f"rlsbl changelog remove --id {entry.id}"
+    return f"rlsbl changelog remove --commits {stale_hashes[0]}"
+
+
 def check_no_orphans(
     entries: list[ChangelogEntry],
     releases_dir: str,
@@ -343,7 +359,7 @@ def check_no_orphans(
                 f"entry {i + 1} in unreleased.jsonl: all commits are stale "
                 f"({n_unresolvable} unresolvable: {stale_list}) — run "
                 f"`rlsbl changelog remap` to update stale SHAs, or "
-                f"`rlsbl changelog edit --commits <hash> --remove` if "
+                f"`{_removal_remedy(entry, list(entry.commits))}` if "
                 f"the entry is genuinely obsolete"
             )
         elif n_in_range == 0 and (n_unresolvable > 0 or n_out_of_range > 0):
@@ -364,7 +380,7 @@ def check_no_orphans(
                 f"entry {i + 1} in unreleased.jsonl: all commits are stale "
                 f"({', '.join(parts)}: {stale_list}) — run "
                 f"`rlsbl changelog remap` to update stale SHAs, or "
-                f"`rlsbl changelog edit --commits <hash> --remove` if "
+                f"`{_removal_remedy(entry, stale_hashes)}` if "
                 f"the entry is genuinely obsolete"
             )
 

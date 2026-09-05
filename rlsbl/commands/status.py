@@ -419,9 +419,15 @@ def run_cmd(registry, args, flags, ctx):
         and commits_ahead_tag is not None
     ):
         plural = "commit" if commits_ahead == 1 else "commits"
+        # The whole invocation, not the group name. `rlsbl release` alone is a
+        # command GROUP -- typed as printed it renders help and releases
+        # nothing -- and `release run` declares --allow-dirty and --watch as
+        # required negatable booleans with no defaults, so the subcommand
+        # without them is refused at parse time.
         print(
             f"! {commits_ahead} {plural} ahead of {commits_ahead_tag} "
-            f"— run `rlsbl release` or investigate"
+            f"— run `rlsbl release run --no-allow-dirty --watch "
+            f"--approve-consequential` or investigate"
         )
 
     # Monorepo awareness (detection already done above)

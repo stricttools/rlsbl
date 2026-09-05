@@ -300,14 +300,42 @@ class TestRemoveRefusals:
         assert "rlsbl changelog remove --id" in err
         assert open(path, encoding="utf-8").read() == before
 
-    def test_unresolvable_hash_is_refused(self, rlsbl_repo, capsys):
+    def test_an_unresolvable_hash_matching_nothing_is_a_no_match(
+        self, rlsbl_repo, capsys,
+    ):
         with pytest.raises(SystemExit) as exc:
             cmd_remove(
                 {"commits": "deadbeefdeadbeef", "auto-commit": False},
                 project_root=rlsbl_repo,
             )
         assert exc.value.code == 1
-        assert "does not resolve" in capsys.readouterr().err
+        assert "No changelog entry found" in capsys.readouterr().err
+
+    def test_an_unresolvable_hash_an_entry_stores_still_selects_it(
+        self, rlsbl_repo,
+    ):
+        """Removal accepts a hash git can no longer resolve.
+
+        Unlike `changelog edit`, which keeps the entry and so must be able to
+        find its commits, `changelog remove` deletes it -- and the entry a
+        removal is usually for is exactly the one a rebase or a scrub left
+        naming commits that are gone. Refusing the hash would make the orphan
+        check's own remedy unfollowable.
+        """
+        stale = "b2" * 20
+        path = os.path.join(get_changes_dir(str(rlsbl_repo)), "unreleased.jsonl")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "commits": [stale],
+                "user_facing": True,
+                "description": "Stale entry",
+                "type": "feature",
+            }, separators=(",", ":")) + "\n")
+
+        cmd_remove(
+            {"commits": stale, "auto-commit": False}, project_root=rlsbl_repo,
+        )
+        assert _unreleased_entries(rlsbl_repo) == []
 
 
 class TestRemoveCliSurface:

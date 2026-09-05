@@ -843,7 +843,10 @@ def run_cmd(registry, args, flags):
     names = args if args else []
     if not names:
         print(
-            "Error: missing package name(s). Usage: rlsbl check <name> [<name2> ...] --target <npm|pypi|go|github>",
+            # `rlsbl check` is the project-check command and takes no package
+            # names at all, so the usage line that named it sent every reader
+            # of this refusal to a command that would refuse them again.
+            "Error: missing package name(s). Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go|github>",
             file=sys.stderr,
         )
         return 1, []

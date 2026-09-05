@@ -782,13 +782,25 @@ def cmd_amend(flags, project_root):
     commit_files(commit_msg, changed_files, allow_failure=True)
 
 
-def _resolve_selector_commits(commits_raw):
-    """Resolve a ``--commits`` selector string to the full SHAs it names.
+def _resolve_selector_commits(commits_raw, *, require_resolvable):
+    """Resolve a ``--commits`` selector string to the hashes it names.
 
     Shared by ``changelog edit`` and ``changelog remove``: both address an
-    existing entry by the commits it covers, and both must resolve an
-    abbreviated hash the same way before comparing it against what the JSONL
-    stores (always full SHAs).
+    existing entry by the commits it covers, and both need an abbreviated hash
+    expanded before it is compared against what the JSONL stores (always full
+    SHAs).
+
+    *require_resolvable* is the one place they differ, and it is a statement
+    about what each command is FOR rather than a tolerance setting:
+
+    - ``changelog edit`` requires resolution. Editing an entry means keeping
+      it, so a hash git cannot find is a mistake to report, not a selection.
+    - ``changelog remove`` does not. The entry a removal deletes is very often
+      the one whose commits a rebase or a scrub took out of the history --
+      that is precisely when the orphan check prints the removal remedy -- so
+      an unresolvable hash is carried through as a literal selector and
+      matched against the full SHAs the line stores. A hash that matches no
+      entry is then reported as the no-match it is.
     """
     commits = [h.strip() for h in commits_raw.split(",") if h.strip()]
     if not commits:
@@ -799,8 +811,10 @@ def _resolve_selector_commits(commits_raw):
     for h in commits:
         full = resolve_hash(h)
         if full is None:
-            print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
-            sys.exit(1)
+            if require_resolvable:
+                print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
+                sys.exit(1)
+            full = h
         resolved.append(full)
     return resolved
 
@@ -932,7 +946,10 @@ def cmd_edit(flags, project_root):
     id_filter = flags.get("id") or None
     commits_raw = flags.get("commits") or ""
 
-    resolved_search = _resolve_selector_commits(commits_raw) if commits_raw else []
+    resolved_search = (
+        _resolve_selector_commits(commits_raw, require_resolvable=True)
+        if commits_raw else []
+    )
 
     # Search for matching entries across all JSONL files
     changes_dir = _resolve_changes_dir(ws_context, project_root)
@@ -1077,7 +1094,12 @@ def cmd_remove(flags, project_root):
 
     id_filter = flags.get("id") or None
     commits_raw = flags.get("commits") or ""
-    resolved_search = _resolve_selector_commits(commits_raw) if commits_raw else []
+    # A removal accepts a hash git can no longer resolve: the entry whose
+    # commits vanished is exactly the one a removal is usually for.
+    resolved_search = (
+        _resolve_selector_commits(commits_raw, require_resolvable=False)
+        if commits_raw else []
+    )
 
     changes_dir = _resolve_changes_dir(ws_context, project_root)
     matches = _find_entry_matches(
