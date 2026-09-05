@@ -56,6 +56,7 @@ sys.path.insert(0, _SCRIPT_ROOT)
 
 from rlsbl.changelog.files import list_versioned_files  # noqa: E402
 from rlsbl.release_file import (  # noqa: E402
+    NEVER_RELEASED_FIELD,
     RELEASE_COMMIT_FIELDS,
     UNRECOVERABLE_FIELD,
     archive_sort_key,
@@ -333,6 +334,14 @@ def read_archive_state(path: str) -> dict:
         "format_version": "format_version" in data,
         "recorded": any(f in data for f in RELEASE_COMMIT_FIELDS),
         "unrecoverable": bool(data.get(UNRECOVERABLE_FIELD)),
+        # The third fate. A never-released version has no tag and no
+        # version-bump commit BY CONSTRUCTION -- that is what "no release was
+        # published under this number" means -- so a pass that reads only the
+        # first two fates sees an unsettled archive, plans the unrecoverable
+        # marker for it, and turns a correct one-fate archive into a two-fate
+        # document. It is read here so the pass can recognize the fate as
+        # settled and leave it alone.
+        "never_released": bool(data.get(NEVER_RELEASED_FIELD)),
     }
 
 
@@ -561,6 +570,23 @@ def build_plan(repo: str, *, use_gh: bool) -> Plan:
 
             if version not in changelogs:
                 vp.notes.append("no changelog JSONL for this version")
+
+            # A settled NEVER-RELEASED archive is done, and the pass proposes
+            # nothing for it. Everything below derives a commit for a version
+            # that SHIPPED -- and a version no release ever used has no tag and
+            # no version-bump commit by construction, so the derivation would
+            # conclude "unrecoverable" and plan a marker beside the one already
+            # there. (No archive can carry this fate without the strictspec
+            # gate: the field is newer than the gate, so there is no
+            # format_version stamping left to do here either.)
+            if state and state["never_released"]:
+                vp.notes.append(
+                    f"archive records {NEVER_RELEASED_FIELD} = true (the "
+                    f"version number exists, no release does); the fate is "
+                    f"settled and nothing is proposed"
+                )
+                plan.versions.append(vp)
+                continue
 
             already_recorded = bool(state and (state["recorded"] or state["unrecoverable"]))
 

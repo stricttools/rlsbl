@@ -21,6 +21,8 @@ import pytest
 from conftest import make_workspace
 from githarness import commit_file, git, init_repo
 
+from rlsbl.release_file import write_archived_release_file
+
 # Load the script by path (it is a script, not a package module) -- the same
 # convention tests/test_backfill.py uses for the changelog backfill script.
 _SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "backfill_release_anchors.py"
@@ -282,6 +284,80 @@ class TestTaglessVersion:
         _code, output = run_backfill(repo)
 
         assert "(b) TAGLESS versions: 1 version(s), 1 needing work" in output
+
+
+# ---------------------------------------------------------------------------
+# A version whose fate is already settled as NEVER RELEASED
+# ---------------------------------------------------------------------------
+
+
+class TestNeverReleasedArchive:
+    """A phantom version's archive is settled, and the pass leaves it alone.
+
+    ``never_released = true`` says the version NUMBER exists but no release
+    does. Such a version has no tag and no version-bump commit -- by
+    construction, that is what "never released" means -- so a pass that reads
+    only the recorded/unrecoverable pair sees an unsettled archive, plans the
+    unrecoverable marker for it, and turns a correct one-fate archive into a
+    two-fate document.
+    """
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        repo = make_standalone(tmp_path)
+        commit_file(repo, "a.txt", "a\n", "v0.1.0")
+        git(repo, "tag", "v0.1.0")
+        write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.1.0")
+        # The phantom: finalized changelog files exist (entries were written
+        # and locked before the release was abandoned), the archive records the
+        # never-released fate, and no tag was ever created.
+        write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.9.0")
+        write_archived_release_file(
+            str(repo / ".rlsbl" / "releases"), "0.9.0",
+            bump="minor", include=["pypi"], description="claimed, never shipped",
+            candidate_sha=None, tree_hashes=None, never_released=True,
+        )
+        return repo
+
+    def _phantom(self, plan):
+        return next(v for v in plan.versions if v.version == "0.9.0")
+
+    def test_the_pass_proposes_no_change_for_it(self, repo):
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        assert self._phantom(plan).changed is False
+        assert "0.9.0" not in [v.version for v in plan.changed_versions]
+
+    def test_the_plan_says_the_fate_is_already_settled(self, repo):
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        notes = " ".join(self._phantom(plan).notes)
+        assert "never_released" in notes
+        assert "settled" in notes
+        assert self._phantom(plan).actions == []
+
+    def test_a_run_leaves_the_archive_byte_identical(self, repo):
+        archive = repo / ".rlsbl" / "releases" / "v0.9.0.toml"
+        before = archive.read_bytes()
+
+        code, _output = run_backfill(repo)
+
+        assert code == 0
+        assert archive.read_bytes() == before
+        # And the second run, with the released version's archive now written
+        # too, has nothing left at all.
+        _code, output = run_backfill(repo)
+        assert "Nothing to do" in output
+
+    def test_the_archive_stays_a_readable_one_fate_document(self, repo):
+        run_backfill(repo)
+        data = read_toml(repo / ".rlsbl" / "releases" / "v0.9.0.toml")
+        assert data["never_released"] is True
+        assert "unrecoverable" not in data
+        assert "candidate_sha" not in data
+
+    def test_a_second_run_plans_nothing(self, repo):
+        run_backfill(repo)
+        plan = backfill.build_plan(str(repo), use_gh=False)
+        assert plan.changed_versions == []
 
 
 # ---------------------------------------------------------------------------
