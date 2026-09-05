@@ -66,7 +66,6 @@ class ArchiveMetadata:
     context: str = ""
     bump: str = ""
     never_released: bool = False
-    shipped_as: str | None = None
 
 
 _ABSENT_ARCHIVE = ArchiveMetadata()
@@ -143,7 +142,6 @@ def read_archive_metadata(project_path: str, version: str, *,
         context=cfg.context.strip(),
         bump=cfg.bump.strip(),
         never_released=bool(cfg.never_released),
-        shipped_as=cfg.shipped_as,
     )
 
 

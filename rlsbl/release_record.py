@@ -133,6 +133,11 @@ class ReleaseRecordEntry:
 
     Exactly one holds. An archive carrying none of them raises rather than
     being constructed; one carrying two is refused by the schema.
+
+    ``shipped_as`` is orthogonal to the fate: the historical tag spelling this
+    version ACTUALLY shipped under, when it differs from the scheme in effect
+    today. None when the archive records none, and always None on a
+    never-released entry -- a version nothing shipped shipped under no name.
     """
 
     version: str
@@ -140,20 +145,11 @@ class ReleaseRecordEntry:
     candidate_sha: str | None
     unrecoverable: bool
     never_released: bool = False
+    shipped_as: str | None = None
 
     @property
     def recorded(self) -> bool:
         return self.candidate_sha is not None
-
-    @property
-    def released(self) -> bool:
-        """Did a release ever happen under this version number?
-
-        True for recorded and unrecoverable entries, False for a never-released
-        one. This is the question every "what did this project release?" read
-        asks, and the one a phantom version must answer no to.
-        """
-        return not self.never_released
 
 
 @dataclass(frozen=True)
@@ -431,7 +427,7 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
 
     if cfg.unrecoverable:
         return ReleaseRecordEntry(version=version, path=path, candidate_sha=None,
-                           unrecoverable=True)
+                           unrecoverable=True, shipped_as=cfg.shipped_as)
 
     sha = cfg.candidate_sha
     if not sha or not _HASH_RE.match(sha):
@@ -459,7 +455,7 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
         )
 
     return ReleaseRecordEntry(version=version, path=path, candidate_sha=sha,
-                       unrecoverable=False)
+                       unrecoverable=False, shipped_as=cfg.shipped_as)
 
 
 def _indeterminable_error(entry: ReleaseRecordEntry, head: str) -> ReleaseRecordError:

@@ -391,7 +391,7 @@ def _commit(repo, message):
 
 
 def _archive(releases_dir, version, sha, *, unrecoverable=False,
-             never_released=False):
+             never_released=False, shipped_as=None):
     os.makedirs(releases_dir, exist_ok=True)
     recorded = not (unrecoverable or never_released)
     return write_archived_release_file(
@@ -401,6 +401,7 @@ def _archive(releases_dir, version, sha, *, unrecoverable=False,
         tree_hashes={".": _TREE} if recorded else None,
         unrecoverable=unrecoverable,
         never_released=never_released,
+        shipped_as=shipped_as,
     )
 
 
@@ -475,3 +476,46 @@ class TestReleaseRecordReadsNeverReleased:
         assert "0.2.0" in label
         assert "0.3.0" in label
         assert "never released" in label
+
+
+class TestTheRecordAnswersShippedAs:
+    """The tag spelling a version shipped under is readable from the record.
+
+    ``shipped_as`` is what a version's refs are actually named when the
+    project's tag scheme changed after it shipped, so the entry that answers
+    "what did this project release?" has to answer it too -- otherwise every
+    caller has to go around the record layer and re-read the archive.
+    """
+
+    def _repo(self, tmp_path, monkeypatch, **archive_kwargs):
+        r = _init_repo(tmp_path / "spelling")
+        monkeypatch.chdir(r)
+        sha = _commit(r, "v0.1.0")
+        _git(r, "tag", "v0.1.0")
+        _archive(r / ".rlsbl" / "releases", "0.1.0", sha, **archive_kwargs)
+        return r
+
+    def test_a_recorded_entry_binds_it(self, tmp_path, monkeypatch):
+        r = self._repo(tmp_path, monkeypatch, shipped_as="mylib@v0.1.0")
+        entry = release_record.read_entry(_releases(r), "0.1.0")
+        assert entry.shipped_as == "mylib@v0.1.0"
+
+    def test_an_archive_without_it_binds_none(self, tmp_path, monkeypatch):
+        r = self._repo(tmp_path, monkeypatch)
+        assert release_record.read_entry(_releases(r), "0.1.0").shipped_as is None
+
+    def test_an_unrecoverable_entry_binds_it(self, tmp_path, monkeypatch):
+        r = _init_repo(tmp_path / "unrec")
+        monkeypatch.chdir(r)
+        _commit(r, "one")
+        _archive(r / ".rlsbl" / "releases", "0.1.0", None,
+                 unrecoverable=True, shipped_as="mylib@v0.1.0")
+        entry = release_record.read_entry(_releases(r), "0.1.0")
+        assert entry.unrecoverable is True
+        assert entry.shipped_as == "mylib@v0.1.0"
+
+    def test_a_never_released_entry_has_none(self, phantom_topped):
+        # The schema refuses shipped_as on a never-released archive: a version
+        # nothing shipped shipped under no name.
+        repo, _shas = phantom_topped
+        assert release_record.read_entry(_releases(repo), "0.3.0").shipped_as is None
