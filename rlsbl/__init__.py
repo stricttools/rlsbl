@@ -1596,6 +1596,9 @@ chlog = app.group("changelog", help="Structured changelog management using JSONL
 @effects.handler
 def cmd_chlog_add(ctx, commits, description, type, user_facing, auto_commit, allow_batch):
     """Append a structured changelog entry to unreleased.jsonl."""
+    # Both were already hard errors -- and both said the value was MISSING,
+    # which sent a caller who had supplied it looking for the wrong mistake.
+    _refuse_empty_flags(commits=commits, description=description)
     dry_run = ctx.dry_run
     user_facing = _opt_default(user_facing, True)
     auto_commit = _opt_default(auto_commit, True)
@@ -1643,6 +1646,9 @@ def cmd_chlog_generate(ctx, auto_commit):
 @effects.handler
 def cmd_chlog_amend(ctx, version, commits, id, description, type, user_facing, validate_hashes):
     """Append a changelog entry to a released version's JSONL file."""
+    _refuse_empty_flags(
+        version=version, commits=commits, id=id, description=description,
+    )
     dry_run = ctx.dry_run
     user_facing = _opt_default(user_facing, True)
     validate_hashes = _opt_default(validate_hashes, True)
@@ -1739,8 +1745,14 @@ def cmd_chlog_edit(ctx, commits, id, type, description, user_facing, auto_commit
         # The sources MAY co-occur (they merge, later wins); what is refused is
         # naming none of them. That is at-least-one, and the bool members say
         # which election they mean so `--no-stdin` never engages the rule.
+        #
+        # `--map-file` elects on PRESENCE, not on non-emptiness: under
+        # `when="non_empty"` a supplied `--map-file ""` elected nothing and the
+        # caller was told to name a source they had just named. Electing on
+        # presence hands the empty value to the handler, where the shared
+        # supplied-but-empty refusal names it for what it is.
         strictcli.AtLeastOne("map-source", [
-            strictcli.Member("map-file", when="non_empty"),
+            strictcli.Member("map-file"),
             strictcli.Member("from-journal", when="true"),
             strictcli.Member("stdin", when="true"),
         ]),
@@ -1752,6 +1764,7 @@ def cmd_chlog_edit(ctx, commits, id, type, description, user_facing, auto_commit
 @effects.handler
 def cmd_chlog_remap(ctx, map_file, from_journal, stdin):
     """Remap stale commit hashes in JSONL files using an old-to-new SHA mapping."""
+    _refuse_empty_flags(map_file=map_file)
     dry_run = ctx.dry_run
     root = _require_sub_project_root()
     flags = {
