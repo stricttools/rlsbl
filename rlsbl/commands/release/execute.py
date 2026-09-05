@@ -9,7 +9,7 @@ import time
 
 from ...ci_checks import RUN_ALL_REMEDY
 from ...errors import RlsblError
-from ...git_util import Ancestry, ancestry
+from ...git_util import Ancestry, ancestry, tree_rev_spec
 from ...router_filters import any_path_matches
 
 from .release_state import (
@@ -1657,10 +1657,7 @@ def release_commit_tree_hashes(verified_sha, *, run, git_root,
 
     trees = {}
     for path in paths:
-        rev = (
-            f"{verified_sha}^{{tree}}" if path in (".", "")
-            else f"{verified_sha}:{path}"
-        )
+        rev = tree_rev_spec(verified_sha, path)
         try:
             trees[path] = run(
                 "git", ["rev-parse", rev],

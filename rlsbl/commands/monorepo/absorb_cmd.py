@@ -89,6 +89,7 @@ from ...changelog.files import load_filter_repo_commit_map, remap_jsonl_hashes
 from ...changelog.schema import entry_content_key, parse_jsonl, serialize_entry
 from ...config import read_json_config
 from ...errors import ConfigError
+from ...git_util import tree_rev_spec
 from ...transition_record import (
     ReleaseCommitMapping,
     ReleaseCommitRemapEvent,
@@ -304,8 +305,7 @@ class Applied:
 
 def _tree_hash(repo, path, rev="HEAD"):
     """The git tree object of ``path`` in ``repo`` at ``rev``."""
-    spec = f"{rev}^{{tree}}" if path in ("", ".") else f"{rev}:{path}"
-    return _run_git(repo, "rev-parse", spec)
+    return _run_git(repo, "rev-parse", tree_rev_spec(rev, path))
 
 
 def _git_tag_names(repo, pattern=None):

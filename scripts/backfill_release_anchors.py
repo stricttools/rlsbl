@@ -66,6 +66,7 @@ from rlsbl.release_file import (  # noqa: E402
     write_unrecoverable_marker,
     writable_release_file,
 )
+from rlsbl.git_util import tree_rev_spec  # noqa: E402
 from rlsbl.tag_glob import TagMode, parse_version_tag  # noqa: E402
 from rlsbl.utils import commit_files, extract_changelog_entry_from_text  # noqa: E402
 
@@ -452,18 +453,13 @@ def tree_hashes_at(repo: str, sha: str, released_paths: list[str]) -> tuple[dict
     trees: dict[str, str] = {}
     notes: list[str] = []
     for path in released_paths:
-        if path == ".":
-            root = rev_parse(repo, f"{sha}^{{tree}}")
-            if root:
-                trees["."] = root
-            continue
-        tree = rev_parse(repo, f"{sha}:{path}")
+        tree = rev_parse(repo, tree_rev_spec(sha, path))
         if tree:
             trees[path] = tree
-        else:
+        elif path != ".":
             notes.append(f"path {path!r} did not exist at {sha[:8]}")
     if not trees:
-        root = rev_parse(repo, f"{sha}^{{tree}}")
+        root = rev_parse(repo, tree_rev_spec(sha, "."))
         if root:
             trees["."] = root
             notes.append("no declared path existed at this commit; recorded the root tree as \".\"")

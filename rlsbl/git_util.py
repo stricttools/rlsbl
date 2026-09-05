@@ -7,6 +7,14 @@ commit-level half of file attribution -- retrieving the files a commit changed
 and asking :mod:`rlsbl.ownership` who owns them -- and the SSH host check for
 subtree remotes and manual-push detection.
 
+It also holds :func:`tree_rev_spec`, the one place rlsbl decides how a released
+path's tree is named at a commit.  Five call sites wrote that decision out
+themselves -- the release flow's release-commit writer, the release-commit
+remap, extract, absorb, and the archive backfill -- and each carried its own
+copy of the rule that ``"."`` means ``rev^{tree}`` while a subdirectory means
+``rev:path``.  The runners stay per-caller (they differ in timeout, error
+wording and which seam they go through); the SPELLING is decided here.
+
 Attribution itself (which member owns a path) is decided in
 :mod:`rlsbl.ownership` and nowhere else.  This module only supplies the git
 reads it needs.
@@ -124,6 +132,46 @@ def _is_shallow(cwd: str | None, *, timeout: int | None) -> bool:
     if result.returncode != 0:
         return False
     return result.stdout.strip() == "true"
+
+
+def tree_rev_spec(sha: str, path: str) -> str:
+    """The git rev spec naming the tree of *path* at commit *sha*.
+
+    ``"."`` and ``""`` both mean the repository root, which git spells
+    ``<rev>^{tree}`` -- ``<rev>:.`` is not the same thing and ``<rev>:`` is not
+    a spec at all.  Every other path is ``<rev>:<path>``.
+
+    The one derivation for a rule that used to be restated at each site that
+    records or verifies a released tree.  Resolving the spec is the caller's:
+    they run it through different seams, with different timeouts and different
+    words for a read that could not answer.
+    """
+    return f"{sha}^{{tree}}" if path in (".", "") else f"{sha}:{path}"
+
+
+def tree_at(sha: str, path: str, *, cwd: str | None = None,
+            timeout: int | None = 10) -> str | None:
+    """The tree object of *path* at *sha*, or None when it does not resolve.
+
+    The tolerant resolver, for a caller that treats an absent path as a fact
+    to record rather than an error -- a workspace's member directories did not
+    exist during its standalone era, and the archive backfill notes that
+    instead of failing.  A caller that needs a resolution failure to be fatal
+    runs :func:`tree_rev_spec` through its own runner and raises its own error.
+    """
+    try:
+        result = effects.run(
+            ["git", "rev-parse", "--verify", "--quiet", tree_rev_spec(sha, path)],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    if effects.unsettled(result) or getattr(result, "returncode", 1) != 0:
+        return None
+    return (result.stdout or "").strip() or None
 
 
 def get_commit_files(sha):

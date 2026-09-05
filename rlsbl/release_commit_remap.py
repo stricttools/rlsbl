@@ -47,6 +47,7 @@ from dataclasses import dataclass
 
 from . import effects
 from .errors import RlsblError
+from .git_util import tree_rev_spec
 from .release_file import (
     archived_release_path,
     list_archived_versions,
@@ -108,9 +109,10 @@ def _tree_at(sha, path, *, cwd):
     """The git tree object for *path* at commit *sha*.
 
     ``"."`` (and the empty path) resolve to the commit's root tree, matching
-    exactly how the release flow writes the release commit's content half.
+    exactly how the release flow writes the release commit's content half --
+    both go through :func:`~rlsbl.git_util.tree_rev_spec`.
     """
-    rev = f"{sha}^{{tree}}" if path in (".", "") else f"{sha}:{path}"
+    rev = tree_rev_spec(sha, path)
     try:
         result = effects.run(
             ["git", "rev-parse", rev],

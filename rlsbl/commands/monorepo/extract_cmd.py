@@ -95,6 +95,7 @@ from dataclasses import dataclass, field
 from ...changelog.files import load_filter_repo_commit_map
 from ...config import read_json_config
 from ...errors import ConfigError, WorkspaceError
+from ...git_util import tree_rev_spec
 from ...transition_record import (
     ReleaseCommitMapping,
     ReleaseCommitRemapEvent,
@@ -292,12 +293,11 @@ class Applied:
 def _tree_hash(repo, path, rev="HEAD"):
     """The git tree object of ``path`` in ``repo`` at ``rev``.
 
-    ``path`` of ``""`` or ``"."`` means the repository root, which is the
-    ``rev^{tree}`` spelling rather than ``rev:``. The whole tree-identity
-    verification funnels through here, so a test can make one side lie.
+    The spelling is :func:`~rlsbl.git_util.tree_rev_spec`'s; the whole
+    tree-identity verification funnels through here, so a test can make one
+    side lie.
     """
-    spec = f"{rev}^{{tree}}" if path in ("", ".") else f"{rev}:{path}"
-    return _run_git(repo, "rev-parse", spec)
+    return _run_git(repo, "rev-parse", tree_rev_spec(rev, path))
 
 
 #: The git file mode of a gitlink -- the entry a submodule occupies in a tree.
@@ -1720,7 +1720,7 @@ def _apply_promotion_trees(dep, item, run):
     for rev in ("HEAD", "HEAD^"):
         try:
             commit = _run_git(dep.target_path, "rev-parse", rev)
-            tree = _run_git(dep.target_path, "rev-parse", f"{rev}^{{tree}}")
+            tree = _run_git(dep.target_path, "rev-parse", tree_rev_spec(rev, "."))
         except subprocess.CalledProcessError:
             continue
         candidates.append((rev, commit, tree))
