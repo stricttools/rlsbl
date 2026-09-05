@@ -241,16 +241,38 @@ Under the rejected model every one of those refusals would be unnecessary — an
 
 #### Backfilling an existing repository
 
-`scripts/backfill_release_anchors.py` records a repository's release commits in one reviewed pass. For every archived version it resolves the version's tag under the repository's own tag spellings (`v{version}` standalone, the releasable's `tag_format` in a workspace), takes that tag's commit as `candidate_sha`, and records the tree of every released path at that commit. It also stamps the strictspec `format_version` gate onto archives written before the gate existed, and materializes an archive for a released version that never got one — recovering the description from the GitHub Release notes, then from the CHANGELOG.md section, and otherwise writing a placeholder that names the recovery obligation.
+`rlsbl release backfill` brings a repository's release archives into the fate model in one reviewed pass. Run the preview first; the apply is `consequential`, because reconstructing the record of what a project released is a decision only a human makes:
 
-Two cases do not resolve to a tag, and neither is passed over silently:
+```
+rlsbl release backfill --dry-run
+rlsbl release backfill --approve-consequential
+```
 
-| Case | What the pass does |
+For every version it knows about, it resolves the version's tag under the repository's own tag spellings (`v{version}` standalone, the releasable's `tag_format` in a workspace — and, first of all, the historical spelling an archive names in `shipped_as`), takes that tag's commit as `candidate_sha`, and records the tree of every released path at that commit. Beyond that it **completes** an archive rather than merely stamping it: every required field the document lacks is written, the strictspec `format_version` gate included, and each reconstructed value names the source it came from.
+
+The pass sorts every version and every tag into one verdict:
+
+| Verdict | What it means |
 | --- | --- |
-| A released version with **no tag** | Looks for the version-bump commit (whose whole message is the tag string) and records the release commit from it, noting that it did. Only when that also fails does the archive get `unrecoverable = true` — a permanent record that the commit is unrecoverable, not a temporary gap. |
-| A **tag matching no released version** that still parses under a recognized scheme | Reported as operator input, with the tag name and every spelling that was probed, and the pass exits non-zero. It never guesses which version such a tag belongs to. |
+| `settled` | The archive records one of the three fates and carries every required field. Nothing is proposed — this is what makes the pass idempotent. |
+| `repair` | The archive exists and is incomplete: missing required fields, missing the gate, missing its fate, or all three. |
+| `materialize` | The changelog records the version as released, and there is no archive at all. |
+| `adopt` | A version tag this repository's own scheme produces, for a version no archive and no changelog file records. The tag is evidence of a release, so the release is recorded. |
+| `unexplained-tag` | A tag nothing in the repository accounts for. Listed **first**, and a single one refuses the whole apply. |
 
-Tags that parse under no recognized scheme are listed and left alone. The pass is idempotent: an archive whose fate is already settled and which carries the gate is proposed for no change. That covers every fate, `never_released` included — a version no release ever used has no tag and no version-bump commit by construction, so a pass that failed to recognize the fate would conclude "unrecoverable" and write that marker beside it, turning a correct archive into one no reader accepts. It is recognized, and such an archive is proposed for no change at all.
+A reconstructed description comes from the first source that yields one, and the archive says which:
+
+1. an operator-reviewed `--overrides` file (`[versions."X.Y.Z"]` tables carrying a `description` and an optional `context`), applied before any derivation — a version the file names that the repository does not have is a hard error;
+2. the version's **GitHub Release body**, unless it carries no substantive content: auto-generated compare-link boilerplate is not content, while bullets, prose and blockquote openings are;
+3. the version's **CHANGELOG.md** section;
+4. the **commit subjects** in the version's tag range;
+5. otherwise a placeholder that names the recovery obligation.
+
+A version with **no tag** is not passed over: the pass looks for the version-bump commit (whose whole message is the tag string) and records the release commit from it, saying so. Only when that also fails does the archive get `unrecoverable = true` — a permanent record that the commit is unrecoverable, not a temporary gap.
+
+**The one fate the pass will not derive is `never_released`.** A version no release ever used has no tag and no version-bump commit *by construction*, which is indistinguishable from a released version whose commit is gone. So it is DECLARED, not inferred: write the archive with `never_released = true` before running the backfill, and the pass leaves that fate alone forever. The note it prints on a version it is about to record from a version-bump commit says exactly this — there is deliberately no flag and no input file for the declaration, because the archive *is* the declaration.
+
+**An unexplained tag refuses the whole apply, all-or-nothing.** A tag is explained when this repository's own scheme produces it for an archived version, when an archive records it in `shipped_as`, or when the transition record carries a `non-version-tag` event naming it. Anything else stops the pass with the three cheap resolutions spelled out: adopt it as released (recording the archive with `shipped_as` naming the historical spelling), record it as a non-version tag in the transition record, or delete it on your own explicit decision. A stash present in the repository is a hard error on the apply too — it is uncommitted work with no branch of its own, and the pass commits what it writes.
 
 `unrecoverable` is written by the backfill and by nothing else — a flow that is releasing always knows its own candidate — and `rlsbl release undo` strips it alongside the release commit when it restores an archive as the editable release file.
 

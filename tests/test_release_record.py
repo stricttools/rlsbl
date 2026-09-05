@@ -335,14 +335,15 @@ class TestReadEntry:
         with pytest.raises(ReleaseRecordError) as exc:
             release_record.read_entry(_releases(repo), "0.2.0")
         text = str(exc.value)
-        # The complete single-version recovery: the derived value, the unlock,
-        # the edit, the relock, and the re-validation.
+        # The evidence about THIS version -- the commit its tag points at, so
+        # the reader knows what the backfill will find -- and the command that
+        # does the recovery. The four-step manual procedure this message used to
+        # print is exactly what `rlsbl release backfill` performs.
         assert repo.shas["0.2.0"] in text
-        assert "writable_release_file" in text
-        assert "chmod 644" in text
-        assert "chmod 444" in text
-        assert "tree_hashes" in text
-        assert "Re-run the check" in text
+        assert "rlsbl release backfill --dry-run" in text
+        assert "rlsbl release backfill --approve-consequential" in text
+        # And the one thing the command deliberately will not decide for you.
+        assert "never_released = true" in text
 
     def test_missing_release_commit_without_a_tag_says_there_is_nothing_to_derive(self, repo):
         path = archived_release_path(_releases(repo), "0.2.0")
@@ -497,8 +498,8 @@ def _assert_names_the_backfill(text):
     assert "the release record is empty" in text
     assert "version tags" in text
     assert "v0.2.0" in text and "v0.1.0" in text
-    assert "scripts/backfill_release_anchors.py --dry-run" in text
-    assert "scripts/backfill_release_anchors.py\n" in text
+    assert "rlsbl release backfill --dry-run" in text
+    assert "rlsbl release backfill --approve-consequential" in text
     assert "genuinely never released" in text
 
 
@@ -622,65 +623,52 @@ class TestEmptyReleaseRecordLeftAlone:
 class TestTheBackfillItselfIsNotBlocked:
     """The remedy has to run on exactly the repository the guard refuses.
 
-    The script never calls the guarded reads -- it reads archives and tags
-    directly -- so it needs no bypass, and is given none. This is the test that
-    keeps that structural property true.
+    The backfill engine never calls the guarded reads -- it reads archives and
+    tags directly -- so it needs no bypass, and is given none. This is the test
+    that keeps that structural property true.
     """
 
-    def test_the_script_imports_no_guarded_read(self):
-        """The script never IMPORTS or CALLS the release record module.
+    def test_the_engine_imports_no_guarded_read(self):
+        """The engine never IMPORTS or CALLS the release record module.
 
-        Asserted against the script's code, not its prose: a comment may
-        legitimately explain what the release record would do with the files this pass
-        writes, and a bare word search made that a failure.
+        Asserted against the engine's code, not its prose: a comment may
+        legitimately explain what the release record would do with the files
+        this pass writes, and a bare word search made that a failure.
         """
         import ast
 
         path = (
             pathlib.Path(__file__).resolve().parent.parent
-            / "scripts" / "backfill_release_anchors.py"
+            / "rlsbl" / "release_backfill.py"
         )
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    assert "release record" not in alias.name, alias.name
+                    assert "release_record" not in alias.name, alias.name
             elif isinstance(node, ast.ImportFrom):
-                assert "release record" not in (node.module or ""), node.module
+                assert "release_record" not in (node.module or ""), node.module
                 for alias in node.names:
-                    assert "release record" not in alias.name, alias.name
+                    assert "release_record" not in alias.name, alias.name
             elif isinstance(node, ast.Attribute):
-                assert node.attr != "release record"
+                assert node.attr != "release_record"
             elif isinstance(node, ast.Name):
-                assert node.id != "release record"
+                assert node.id != "release_record"
 
-    def test_the_script_runs_on_an_unbackfilled_repository(self, unbackfilled):
-        import importlib.util
-
-        path = (
-            pathlib.Path(__file__).resolve().parent.parent
-            / "scripts" / "backfill_release_anchors.py"
-        )
-        spec = importlib.util.spec_from_file_location(
-            "backfill_release_commits_release_record_probe", path
-        )
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
+    def test_the_engine_runs_on_an_unbackfilled_repository(self, unbackfilled):
+        from rlsbl import release_backfill
 
         out = io.StringIO()
-        code = module.run(
+        code = release_backfill.run(
             str(unbackfilled), dry_run=False, use_gh=False,
             auto_commit=False, out=out,
         )
         assert code == 0, out.getvalue()
-        # And the guard is satisfied by what the script wrote.
-        assert release_record.nearest_release_commit(_releases(unbackfilled)).version == "0.2.0"
+        # And the guard is satisfied by what the pass wrote.
+        assert release_record.nearest_release_commit(
+            _releases(unbackfilled)
+        ).version == "0.2.0"
 
-
-# --------------------------------------------------------------------------- #
-# Labelling one commit with the release it IS
-# --------------------------------------------------------------------------- #
 
 class TestReleaseAtCommit:
 

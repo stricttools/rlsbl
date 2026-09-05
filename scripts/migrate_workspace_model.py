@@ -25,8 +25,9 @@ loader itself refuses the old model and so cannot be used to read one, then
 loads the result and prints any remaining loader error verbatim as the
 operator's residue list.
 
-Finally it runs the release-commit backfill (``backfill_release_anchors.py``) in
-the same repository, which is idempotent and commits its own writes.
+Finally it runs the release-archive backfill (the engine behind ``rlsbl release
+backfill``) in the same repository, which is idempotent and commits its own
+writes.
 
 Usage:
     uv run python scripts/migrate_workspace_model.py --root-dev-node --dry-run
@@ -42,7 +43,6 @@ the migration was refused before writing anything.
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import os
 import sys
 from dataclasses import dataclass, field
@@ -684,22 +684,16 @@ def run(
 
 
 def _load_backfill():
-    """The release commit backfill, imported from this checkout's scripts directory.
+    """The release-archive backfill engine, from this checkout's rlsbl.
 
-    In-process rather than as a subprocess: the pass already exposes exactly the
-    entry this one needs (``run(repo, dry_run=..., out=...)``), it already
-    imports rlsbl from this same checkout, and running it in-process keeps one
-    output stream, one exit status, and one dry-run decision instead of two.
+    In-process rather than as a subprocess: the engine exposes exactly the entry
+    this pass needs (``run(repo, dry_run=..., out=...)``), it is imported from
+    the same checkout as everything else here, and running it in-process keeps
+    one output stream, one exit status and one dry-run decision instead of two.
     """
-    name = "backfill_release_anchors"
-    if name in sys.modules:
-        return sys.modules[name]
-    path = os.path.join(_SCRIPT_DIR, f"{name}.py")
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    from rlsbl import release_backfill
+
+    return release_backfill
 
 
 def main(argv=None) -> int:

@@ -93,12 +93,12 @@ They fire where the release record is READ FOR USE, never while scanning:
 Who does NOT go through these
 -----------------------------
 
-``scripts/backfill_release_anchors.py`` -- the remedy the fourth error names --
-reads archives and tags directly and never calls the guarded reads, so it can
-run on exactly the repository the guard refuses.  So does
-``rlsbl release reconcile``, whose observe layer is the tag namespace itself.
-Neither needs a bypass, and neither is given one: the structure is what keeps
-them clear.
+``rlsbl release backfill`` -- the remedy the fourth error names -- reads
+archives and tags directly through :mod:`rlsbl.release_backfill` and never calls
+the guarded reads, so it can run on exactly the repository the guard refuses.
+So does ``rlsbl release reconcile``, whose observe layer is the tag namespace
+itself.  Neither needs a bypass, and neither is given one: the structure is what
+keeps them clear.
 """
 
 from __future__ import annotations
@@ -253,30 +253,32 @@ def _resolve_ref(ref: str, cwd: str | None, *, timeout: int = 10) -> str | None:
 
 def _missing_release_commit_error(version: str, path: str, tag_glob: str | None,
                           cwd: str | None) -> ReleaseRecordError:
-    """Build the MISSING-RELEASE-COMMIT error, with the complete recovery for it.
+    """Build the MISSING-RELEASE-COMMIT error, naming the command that fixes it.
 
-    The recovery is single-version and mechanical: the value to write is the
-    commit the version's own tag already points at, and the archive is
-    read-only, so writing it means unlocking, editing and relocking.  Printed
-    in full rather than pointing at a document, because the operator hitting
-    this has one archive to fix and no reason to go read about the class.
+    The recovery used to be printed here as a four-step manual procedure --
+    unlock the 0444 archive, hand-write ``candidate_sha`` and a ``[tree_hashes]``
+    table, relock, re-run. ``rlsbl release backfill`` does exactly that,
+    correctly, for every archive in the repository at once, so the message names
+    the command instead of asking an operator to reproduce it by hand.
+
+    The tag observation stays: it is EVIDENCE about this particular version --
+    what the backfill will find, or why it will find nothing -- and it is what
+    tells an operator whether to expect a recorded fate or an unrecoverable one.
     """
     tag = tag_for_version(tag_glob, version)
     resolved = _resolve_ref(tag, cwd)
     if resolved:
         derived = (
-            f'  Its tag "{tag}" points at {resolved}, so that is the\n'
-            f"  candidate_sha to record."
+            f'  Its tag "{tag}" points at {resolved}, which is the commit the\n'
+            f"  backfill will record."
         )
-        sha_line = f'candidate_sha = "{resolved}"'
     else:
         derived = (
-            f'  Its tag "{tag}" does not exist locally, so there is no value to\n'
-            f"  derive: fetch the tag (git fetch origin --tags) and re-run, or -- if\n"
-            f"  the commit is genuinely gone -- record the version as unrecoverable\n"
-            f"  instead (unrecoverable = true, and no candidate_sha/tree_hashes)."
+            f'  Its tag "{tag}" does not exist locally, so the backfill will look\n'
+            f"  for the version-bump commit instead, and record the version as\n"
+            f"  unrecoverable only if that also fails. If the tag merely was not\n"
+            f"  fetched, fetch it first (git fetch origin --tags)."
         )
-        sha_line = 'candidate_sha = "<the released commit>"'
     return ReleaseRecordError(
         f"the release record entry for {version} records no fate: {path}\n"
         f"  An archive records exactly one of three: the release commit the\n"
@@ -288,20 +290,13 @@ def _missing_release_commit_error(version: str, path: str, tag_glob: str | None,
         f"  cannot tell which commit {version} shipped from, or whether it\n"
         f"  shipped at all.\n"
         f"{derived}\n"
-        f"  Recover this one version:\n"
-        f"    1. Unlock the archive -- it is chmod 444. In Python:\n"
-        f"         from rlsbl.release_file import writable_release_file\n"
-        f"         with writable_release_file({path!r}) as p: ...\n"
-        f"       or from a shell: chmod 644 {path}\n"
-        f"    2. Append the release commit to it:\n"
-        f"         {sha_line}\n"
-        f"         [tree_hashes]\n"
-        f'         "." = "<the tree that commit shipped>"\n'
-        f"       (one tree_hashes entry per released path; \".\" for a standalone\n"
-        f"       repository, one per member directory for a releasable. Read a\n"
-        f"       tree with: git rev-parse <commit>^{{tree}})\n"
-        f"    3. Relock it: chmod 444 {path}\n"
-        f"    4. Re-run the check -- the next run validates the archive you wrote."
+        f"  Backfill it -- preview first, then write:\n"
+        f"    rlsbl release backfill --dry-run\n"
+        f"    rlsbl release backfill --approve-consequential\n"
+        f"  If {version} was never actually released, declare that FIRST by\n"
+        f"  writing never_released = true into the archive (unlock it with\n"
+        f"  chmod 644, add the line, relock with chmod 444); the backfill leaves\n"
+        f"  a declared fate alone."
     )
 
 
@@ -371,10 +366,11 @@ def _unbackfilled_release_record_error(releases_dir: str, tag_glob: str | None,
         f"  ENTIRE history as unreleased and silently widen every range computed\n"
         f"  from it, so rlsbl refuses instead of answering.\n"
         f"  Backfill the archives -- preview first, then write:\n"
-        f"    uv run python scripts/backfill_release_anchors.py --dry-run\n"
-        f"    uv run python scripts/backfill_release_anchors.py\n"
-        f"  (the script ships in the rlsbl repository: run it from a checkout of\n"
-        f"  rlsbl with --repo pointing at this repository's root.)\n"
+        f"    rlsbl release backfill --dry-run\n"
+        f"    rlsbl release backfill --approve-consequential\n"
+        f"  (run both from this repository; the preview lists every tag the\n"
+        f"  repository cannot account for, and the apply refuses while one\n"
+        f"  remains.)\n"
         f"  A project that has genuinely never released carries no tag under its\n"
         f"  scheme and is unaffected: there, an empty release record IS the answer."
     )

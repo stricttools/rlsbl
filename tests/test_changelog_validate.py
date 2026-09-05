@@ -649,7 +649,7 @@ class TestRangeReleaseCommitSelection:
         unreleased.
         """
         _run_git(git_repo, "tag", "v0.1.0")
-        with pytest.raises(ReleaseRecordError, match="backfill_release_anchors"):
+        with pytest.raises(ReleaseRecordError, match="rlsbl release backfill"):
             nearest_release_commit(_release_record_dir(git_repo))
 
     def test_each_project_reads_its_own_release_record(self, git_repo):
@@ -720,7 +720,7 @@ class TestUnreleasedRange:
 
     def test_version_tags_over_an_empty_release_record_are_a_hard_error(self, git_repo):
         _run_git(git_repo, "tag", "v0.1.0")
-        with pytest.raises(ReleaseRecordError, match="backfill_release_anchors"):
+        with pytest.raises(ReleaseRecordError, match="rlsbl release backfill"):
             unreleased_range(_release_record_dir(git_repo))
 
 

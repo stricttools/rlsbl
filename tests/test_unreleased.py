@@ -56,7 +56,7 @@ class TestBaselineReleaseSelection:
         # A repository that HAS released and was never backfilled. This used to
         # select nothing and report the entire history as unreleased.
         subprocess.run(["git", "tag", "v1.0.0"], cwd=str(mock_git_repo), check=True)
-        with pytest.raises(ReleaseRecordError, match="backfill_release_anchors"):
+        with pytest.raises(ReleaseRecordError, match="rlsbl release backfill"):
             nearest_release_commit(release_record_dir(mock_git_repo))
 
     def test_returns_the_highest_archived_release(self, mock_git_repo):

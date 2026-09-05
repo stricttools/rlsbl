@@ -411,8 +411,7 @@ def _release_commit(uc, version, tag):
             "deleting the tag while",
             "  leaving the version files bumped is the half-undone state this "
             "command exists to avoid.",
-            "  Backfill the release commit (scripts/backfill_release_anchors.py) and "
-            "re-run.",
+            "  Backfill the release commit (`rlsbl release backfill`) and re-run.",
         )
     release_commit = cfg.candidate_sha
     try:
