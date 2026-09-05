@@ -93,14 +93,14 @@
     "schema_hash": "8ec11c80f2ba2db1ea6f1ccdb6d2f8aebce1c0386f499a42919083e4215beb23"
   },
   "en/cli-release.md": {
-    "content": "13ee29e846c0203dbb94a4417c38e72e2fc84d575fbd64eda171a1348ba72e8a",
+    "content": "83698a2dd918089a65b7129119ded7dc64f797deb51fb2d1ef5aa82f4b291b5a",
     "description": "bb2a581b51bf84274ab9195a3fc9d7e27737750d5236f95b789b40f82fca7b89",
-    "schema_hash": "ff65a1ced8020ec3a3a608214c97a60e99c831c7ee916ae3805d377709474e06"
+    "schema_hash": "472a5ea17704260c2908bb56b383f75d60a409efbf692d34fb678bd21aeee3fd"
   },
   "en/cli-rewrite.md": {
-    "content": "b377edd673a8d9071f74c931c52554d18b9f5258fe21d52363e2b2468886cfb3",
+    "content": "0366ec4fa9b3aaa13024f1f1005cfff5a4efa9e3ae3cabedea62b04cdf1771f1",
     "description": "bd7f712832e2605733ec9333003b3edbc6c767fc0ae425cc8e4182927fe9ae35",
-    "schema_hash": "69eeec7a3529b9cb97a976e086a4a06fb0418f159f1fecc345ae3187588029fe"
+    "schema_hash": "11804cf075e66d5619ca4d0f5aedf3e20876e694b45eb2b2f8aa53bbb5e08e52"
   },
   "en/cli-scaffold.md": {
     "content": "3db39f121a192d1f6d468878cf953dbc630c7b030406bf7e80571f6124930a2d",
