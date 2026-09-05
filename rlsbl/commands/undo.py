@@ -629,8 +629,16 @@ def _plan_companion_tags(uc, tag, version):
     """Enumerate the version's non-primary refs to delete (releasable mode only).
 
     Asks the same ``expected_refs`` authority the release's tag step asked when
-    it CREATED them, so undo cannot leave behind a ref the release made. A
-    recorded alias is included: it addresses the version being undone.
+    it CREATED them, so undo cannot leave behind a ref the release made. An
+    alias a ``boundary-alias`` event records is included: it addresses the
+    version being undone and was created alongside it.
+
+    A ``shipped_as``-derived alias is EXCLUDED, and that is the whole reason
+    the ref set states which aliases came from that field. It names the
+    spelling the version ACTUALLY shipped under, from before a rename or a
+    repository boundary moved -- a ref the release being undone never created,
+    that consumers already resolve, and that the ledger's own rule keeps where
+    it is: neither moved nor deleted.
 
     Degrades to an empty list on any failure, with the traceback printed. Undo
     is a repair path, and refusing to remove the primary tag because a member's
@@ -676,7 +684,8 @@ def _plan_companion_tags(uc, tag, version):
                 releasable_config_dir=rel_cfg_dir,
             ),
         )
-        return [t for t in expected.tags if t != tag]
+        historical = set(expected.shipped_as_aliases)
+        return [t for t in expected.tags if t != tag and t not in historical]
     except Exception:
         traceback.print_exc()
         return []

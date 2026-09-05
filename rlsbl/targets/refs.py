@@ -112,12 +112,22 @@ class ExpectedRefs:
     ecosystem cannot resolve the module, and a missing alias means a recorded
     fact has no ref behind it. :attr:`tags` is the flat, deduplicated,
     primary-first order anything that creates or pushes them uses.
+
+    :attr:`shipped_as_aliases` is the SUBSET of :attr:`aliases` that came from
+    an archive's ``shipped_as`` field rather than from a ``boundary-alias``
+    event -- the spelling a version ACTUALLY shipped under, from before a
+    rename or a repository boundary moved. It is stated here so a caller that
+    treats the ref set as "what this release created" can tell the two apart:
+    ``rlsbl release undo`` deletes the refs the release it is undoing created,
+    and a historical spelling predates that release. It stands where it is,
+    neither moved nor deleted.
     """
 
     version: str
     primary: str
     companions: tuple[str, ...] = ()
     aliases: tuple[str, ...] = ()
+    shipped_as_aliases: tuple[str, ...] = ()
 
     @property
     def tags(self) -> tuple[str, ...]:
@@ -255,6 +265,23 @@ def _shipped_as_aliases(context: RefContext, version: str) -> list[tuple[str, st
             if tagged_version == version:
                 found.append((tag, archived_release_path(releases_dir, version)))
     return found
+
+
+def recorded_alias_groups(context: RefContext, version: str):
+    """``(every recorded alias, the shipped_as-derived ones)`` for *version*.
+
+    The full answer :func:`recorded_aliases` returns, plus which of those tags
+    came from an archive's ``shipped_as`` rather than from a ``boundary-alias``
+    event. Both groups are aliases and both belong to the version's ref set;
+    the split exists because a caller asking "which of these did the release I
+    am undoing CREATE?" must not count a spelling that predates it.
+    """
+    aliases = recorded_aliases(context, version)
+    shipped = tuple(
+        tag for tag, _path in _shipped_as_aliases(context, version)
+        if tag in aliases
+    )
+    return aliases, shipped
 
 
 def recorded_aliases(context: RefContext, version: str) -> tuple[str, ...]:

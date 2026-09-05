@@ -356,7 +356,7 @@ def release_record_dir(project_dir, *, releasable_dir=None):
 
 
 def archive_release(releases_dir, version, sha, *, tree=None, unrecoverable=False,
-                    never_released=False):
+                    never_released=False, shipped_as=None):
     """Write one release record entry -- an archive in one of the three fates.
 
     Tests that exercise the unreleased range need a RELEASE RECORD, not a tag: the
@@ -368,6 +368,9 @@ def archive_release(releases_dir, version, sha, *, tree=None, unrecoverable=Fals
     nothing can name; ``never_released`` writes the archive of a version NUMBER
     no release ever used.  Both are commitless, so ``sha`` and ``tree`` are
     ignored for them.
+
+    ``shipped_as`` records the historical tag spelling this version actually
+    shipped under, for the repositories whose naming scheme has since changed.
     """
     from rlsbl.release_file import write_archived_release_file
 
@@ -380,6 +383,7 @@ def archive_release(releases_dir, version, sha, *, tree=None, unrecoverable=Fals
         tree_hashes=None if commitless else {".": tree or ("b" * 40)},
         unrecoverable=unrecoverable,
         never_released=never_released,
+        shipped_as=shipped_as,
     )
 
 

@@ -350,14 +350,16 @@ class BaseTarget:
         (``tag_format``, ``monorepo_tag_format``, ``companion_tags``) are the
         axes, and this is the assembly of them.
         """
-        from .refs import ExpectedRefs, recorded_aliases
+        from .refs import ExpectedRefs, recorded_alias_groups
 
         primary = self._primary_ref(version, context)
+        aliases, shipped_as = recorded_alias_groups(context, version)
         return ExpectedRefs(
             version=version,
             primary=primary,
             companions=self._companion_refs(version, context, primary),
-            aliases=recorded_aliases(context, version),
+            aliases=aliases,
+            shipped_as_aliases=shipped_as,
         )
 
     def _primary_ref(self, version, context):

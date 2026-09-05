@@ -255,6 +255,68 @@ class TestUndoReleasablePaths:
         assert (Path(rel_dir) / "undo-audit.json").exists()
 
 
+class TestUndoLeavesAHistoricalSpellingAlone:
+    """A ``shipped_as`` tag is history, not a companion of this release.
+
+    ``expected_refs`` groups a version's recorded aliases with its refs, and the
+    archive's ``shipped_as`` is one of them -- the spelling the version ACTUALLY
+    shipped under before a rename. Undo deletes the refs THIS release created;
+    the historical spelling predates it, consumers already resolve it, and the
+    ruling on it is explicit: it stands where it is, neither moved nor deleted.
+    """
+
+    def _setup(self, root):
+        core = _setup_released_releasable_workspace(root)
+        rel_dir = get_releasable_dir(str(root), "alpha")
+        releases = os.path.join(rel_dir, "releases")
+        # Rewrite 1.0.1's archive to record the spelling it shipped under,
+        # before the releasable was renamed to `alpha`.
+        os.chmod(os.path.join(releases, "v1.0.1.toml"), 0o644)
+        archive_release(
+            releases, "1.0.1", _git(root, "rev-parse", "HEAD~1"),
+            shipped_as="widget@v1.0.1",
+        )
+        _git(root, "tag", "widget@v1.0.1", "HEAD~1")
+        _git(root, "push", "-q", "origin", "widget@v1.0.1")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "record the historical spelling")
+        return core
+
+    def test_the_historical_tag_survives_the_undo(self, tmp_project, monkeypatch):
+        core = self._setup(tmp_project)
+        monkeypatch.chdir(core)
+        ctx = create_context(Path(str(core)), workspace_root=Path(str(tmp_project)))
+
+        _run_undo(ctx)
+
+        tags = _git(tmp_project, "tag", "-l").split()
+        assert "alpha@v1.0.1" not in tags, "the release's own tag is deleted"
+        assert "widget@v1.0.1" in tags, (
+            "the spelling the version shipped under is not this release's to "
+            "delete"
+        )
+        assert remote_ref(tmp_project, "refs/tags/widget@v1.0.1") != ""
+
+    def test_the_ref_set_marks_which_aliases_came_from_shipped_as(
+        self, tmp_project,
+    ):
+        from rlsbl.targets.base import BaseTarget
+        from rlsbl.targets.refs import ref_context
+
+        self._setup(tmp_project)
+        rel_dir = get_releasable_dir(str(tmp_project), "alpha")
+        expected = BaseTarget().expected_refs("1.0.1", ref_context(
+            repo_root=str(tmp_project),
+            project_path="packages/core",
+            primary_tag_format="{name}@v{version}",
+            releasable_name="alpha",
+            member_package_paths=["packages/core"],
+            releasable_config_dir=rel_dir,
+        ))
+        assert "widget@v1.0.1" in expected.aliases
+        assert expected.shipped_as_aliases == ("widget@v1.0.1",)
+
+
 class TestNonLatestAuditFailureRefusesTheUndo:
     """The ``--version`` path is fail-closed on the audit record too.
 
