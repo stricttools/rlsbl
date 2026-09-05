@@ -2521,6 +2521,7 @@
           "name": "rename-releasable",
           "help": "Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: re-running heals a crash between the commit and the tag push.",
           "effect": "mutating",
+          "consequential": true,
           "args": [
             {
               "name": "old_name",
