@@ -1499,6 +1499,21 @@ class TestReleaseBodySubstance:
         assert backfill.body_is_substantive(body) is True
         assert backfill.description_from_body(body) == "**Deprecated:** use 0.3.0."
 
+    def test_a_table_is_content_but_not_a_description(self):
+        """A table row is data, not a summary, so the chain continues.
+
+        The body carries content -- it is not the boilerplate a body nobody
+        authored consists of -- but no line in it is a sentence about the
+        release, so this source yields nothing and the next one answers.
+        """
+        body = (
+            "| Asset | Platform |\n"
+            "| --- | --- |\n"
+            "| tool-linux-amd64 | linux |\n"
+        )
+        assert backfill.body_is_substantive(body) is True
+        assert backfill.description_from_body(body) is None
+
 
 class TestTheReleaseBodySource:
     """The first link of the chain, driven through an injected reader."""
@@ -1532,6 +1547,17 @@ class TestTheReleaseBodySource:
         ))
         data = read_toml(repo / ".rlsbl" / "releases" / "v0.1.0.toml")
         assert data["description"] == "The changelog paragraph."
+
+    def test_a_table_only_body_falls_through_and_says_so(self, repo):
+        """The recorded source names the link that actually answered."""
+        run_backfill(repo, gh=self._gh(
+            "| Asset | Platform |\n| --- | --- |\n| tool-linux | linux |\n"
+        ))
+        path = repo / ".rlsbl" / "releases" / "v0.1.0.toml"
+        assert read_toml(path)["description"] == "The changelog paragraph."
+        text = path.read_text()
+        assert "This archive's description came from: changelog-md." in text
+        assert "github-release" not in text.split("came from:")[1]
 
     def test_an_unreadable_release_falls_through(self, repo):
         def boom(args, config=None):

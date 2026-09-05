@@ -647,6 +647,16 @@ def description_from_body(body):
     into its bullets (the common shape for generated-then-edited notes) yields
     its first bullet instead, and one that opens with a blockquote yields that
     -- both are content by the same rule :func:`body_is_substantive` applies.
+
+    A body whose only content is a MARKDOWN TABLE -- an asset matrix, a
+    platform list -- deliberately yields None even though
+    :func:`body_is_substantive` calls it content. The two answer different
+    questions: the body carries something (so it is not the boilerplate a body
+    nobody authored consists of), but a table cell is data rather than a
+    sentence about the release, and quoting one as the version's description
+    would put a filename where a summary belongs. The chain then continues to
+    the CHANGELOG.md section, and the archive records THAT as its source, so
+    what the reader is told is what actually answered.
     """
     if not body_is_substantive(body):
         return None
