@@ -84,12 +84,18 @@ def _unreleasing_member_state(ctx):
     from ..workspace import project_is_releasable
 
     root = str(ctx.workspace_root)
-    candidates = [p for p in ctx.projects if not project_is_releasable(p)]
-    if not candidates:
-        return [], None
-
+    # The record is read FIRST, before any member-list shortcut: whether this
+    # repository's transition record is readable is a fact about the
+    # repository, not about who its members happen to be. Reading it only when
+    # some member releases nothing left a corrupt transitions.jsonl unreported
+    # by this check in every workspace where every member belongs to a
+    # releasable -- the state a workspace is normally in.
     closed = _closed_release_history_subjects(root)
-    candidates = [p for p in candidates if p["name"] not in closed]
+
+    candidates = [
+        p for p in ctx.projects
+        if not project_is_releasable(p) and p["name"] not in closed
+    ]
     if not candidates:
         return [], None
 

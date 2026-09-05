@@ -1072,6 +1072,63 @@ releasable = false
         # it is a wrong one.
         assert "releases nothing" not in texts, texts
 
+    def test_a_malformed_record_is_an_error_even_with_no_unreleasing_member(
+        self, tmp_project,
+    ):
+        """The record is parsed whatever the member list happens to be.
+
+        The exemption read used to sit behind an early return taken when no
+        member releases nothing -- so in a workspace where every member belongs
+        to a releasable, a corrupt transitions.jsonl was never opened and this
+        check reported a clean workspace. Whether the repository's record is
+        readable cannot depend on who its members are.
+        """
+        import subprocess as sp
+
+        from rlsbl.transition_record import repository_transition_record_path
+
+        def git(*args):
+            sp.run(["git", *args], cwd=str(tmp_project), check=True,
+                   capture_output=True, text=True)
+
+        git("init", "-q", "-b", "main")
+        git("config", "user.email", "t@t.local")
+        git("config", "user.name", "T")
+        _make_rlsbl_dir(tmp_project / "live", files=["managed-files.json"])
+        # Every member -- the root member included -- belongs to a releasable,
+        # so nothing here "releases nothing" and the member half of the check
+        # has no candidate at all.
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "core"
+tag_format = "v{version}"
+
+[[projects]]
+path = "live"
+name = "live"
+releasable = "core"
+
+[[projects]]
+path = "."
+name = "root"
+releasable = "core"
+""")
+        (tmp_project / "README.md").write_text("hi\n")
+        git("add", "-A")
+        git("commit", "-q", "-m", "initial")
+
+        record = repository_transition_record_path(str(tmp_project))
+        os.makedirs(os.path.dirname(record), exist_ok=True)
+        with open(record, "w", encoding="utf-8") as f:
+            f.write("{not json at all\n")
+
+        result = self._impl()(self._ctx(tmp_project))
+
+        assert result.status == "fail", result.message
+        texts = "\n".join(p.text for p in result.problems)
+        assert "transitions.jsonl" in texts, texts
+        assert "malformed JSON" in texts, texts
+
     def test_an_unreadable_tag_namespace_is_stated_in_the_outcome(self, tmp_project):
         """The tag half of the question was never asked, and the answer says so.
 
