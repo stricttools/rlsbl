@@ -249,12 +249,14 @@ class TestReconcileMintsTheCurrentSpelling:
             changelog_path=str(tmp_path / "CHANGELOG.md"),
             push_timeout=30, git=git, log=lambda *_: None,
         )
-        assert calls[0] == ("git", ["tag", "-f", "core@v1.0.0", SHA])
-        pushes = [c for c in calls if "push" in c[1]]
-        assert len(pushes) == 1
-        push = pushes[0][1]
-        assert "refs/tags/core@v1.0.0" in " ".join(push)
-        assert not any("widget@v1.0.0" in token for token in push), (
-            "the mint writes the current spelling only; the old tag is not "
-            "moved, deleted or re-pushed by it"
-        )
+        # Exactly two writes, and no third: create the tag at the archive's
+        # release commit, push it. The old spelling is not moved, deleted or
+        # re-pushed by the mint.
+        assert calls == [
+            ("git", ["tag", "-f", "core@v1.0.0", SHA]),
+            ("git", [
+                "push", "--no-verify",
+                "--force-with-lease=refs/tags/core@v1.0.0:",
+                "origin", "refs/tags/core@v1.0.0:refs/tags/core@v1.0.0",
+            ]),
+        ]
