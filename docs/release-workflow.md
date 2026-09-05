@@ -1,5 +1,5 @@
 ---
-description: "The rlsbl release flow: the untagged candidate and its CI check, the release commit and what the release record is authoritative over, the three fates an archived version can record, and the bump types."
+description: "The rlsbl release flow: the untagged candidate and its CI check, the release commit and the flow-owned fields only the flow may write, the three fates an archived version can record, and the bump types."
 ---
 
 # Release workflow
