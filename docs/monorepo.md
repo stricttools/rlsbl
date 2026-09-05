@@ -85,7 +85,7 @@ unrestricted = ["tests"]
 
 ### Project fields
 
-Each `[[projects]]` block declares the project's identity, release target, inter-project relationships, and behavioral flags. `path` is always required, and `releasable` is required of every project that is not opted out of versioning -- every other field either has a sensible default (like deriving `name` from the path basename) or is an opt-in feature that activates additional checks and behaviors. Note what is NOT declarable: what CI reacts to. The router's paths filters are derived from the workspace (see [Router paths filters](#router-paths-filters)), and a `watch` key is refused at load time.
+Each `[[projects]]` block declares the project's identity, its inter-project relationships, and its behavioral flags. `path` is always required, and `releasable` is required of every project that is not opted out of versioning -- every other field either has a sensible default (like deriving `name` from the path basename) or is an opt-in feature that activates additional checks and behaviors. Note what is NOT declarable: what CI reacts to. The router's paths filters are derived from the workspace (see [Router paths filters](#router-paths-filters)), and a `watch` key is refused at load time.
 
 | Field | Required | Type | Description |
 | ----- | -------- | ---- | ----------- |
@@ -101,7 +101,7 @@ Each `[[projects]]` block declares the project's identity, release target, inter
 | `test_only` | no | bool | Mark as test infrastructure; carried into the workspace snapshot |
 | `lint_allow` | no | list of strings | Imports the `library-lint` check allows for this member |
 
-The table is the member surface in full: it is bound in the suite to `rlsbl.workspace.MEMBER_KEYS`, the one constant the loader refuses against, so a key added there and not documented here fails a test. A release target is not among them — targets are detected from the member's own manifests. So is `watch`, `subtree_remote` and `dev_node`: each is refused by name with its own remedy (see [What the loader refuses](#what-the-loader-refuses)).
+The table is the member surface in full: it is bound in the suite to `rlsbl.workspace.MEMBER_KEYS`, the one constant the loader refuses against, so a key added there and not documented here fails a test. A release target is not among them — targets are detected from the member's own manifests, never declared here — and neither is any retired key, each of which is refused by name with its own remedy (see [What the loader refuses](#what-the-loader-refuses)).
 
 ### The root member
 
