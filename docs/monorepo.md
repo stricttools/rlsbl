@@ -55,7 +55,6 @@ releasable = false
 [[projects]]
 path = "packages/mylib"
 name = "mylib"
-target = "pypi"
 library = true
 releasable = "mylib"
 depends_on = []
@@ -63,7 +62,6 @@ depends_on = []
 [[projects]]
 path = "packages/cli"
 name = "cli"
-target = "npm"
 releasable = "cli"
 depends_on = ["mylib"]
 registry_name = "@org/cli"

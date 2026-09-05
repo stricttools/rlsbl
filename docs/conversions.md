@@ -269,7 +269,6 @@ name = "pkgb"
 [[projects]]
 path = "pkgb"
 name = "pkgb"
-target = "pypi"
 releasable = "pkgb"
 ```
 

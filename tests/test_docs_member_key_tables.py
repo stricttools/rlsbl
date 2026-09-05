@@ -67,6 +67,64 @@ class TestTheProjectFieldsTable:
             )
 
 
+def _documented_member_blocks():
+    """Every ``[[projects]]`` table declared in a docs code block.
+
+    Yields ``(page, line number, {key: ...})``. The scan is over the whole
+    docs tree rather than one page: an example is a thing readers copy, and a
+    copied member table the loader refuses is the same defect wherever it sits.
+    """
+    for page in sorted(DOCS.rglob("*.md")):
+        lines = page.read_text(encoding="utf-8").splitlines()
+        in_block = False
+        keys = None
+        start = 0
+        for number, line in enumerate(lines, start=1):
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_block = not in_block
+                if keys is not None:
+                    yield page, start, keys
+                    keys = None
+                continue
+            if not in_block:
+                continue
+            if stripped == "[[projects]]":
+                if keys is not None:
+                    yield page, start, keys
+                keys, start = {}, number
+                continue
+            if stripped.startswith("[") or not stripped:
+                if keys is not None:
+                    yield page, start, keys
+                    keys = None
+                continue
+            if keys is not None and "=" in stripped:
+                keys[stripped.split("=")[0].strip()] = stripped
+        if keys is not None:
+            yield page, start, keys
+
+
+class TestTheDocumentedExamples:
+    """A member table a reader copies must be one the loader accepts."""
+
+    def test_every_documented_member_block_declares_known_keys_only(self):
+        offenders = []
+        for page, number, keys in _documented_member_blocks():
+            for key in keys:
+                if key not in MEMBER_KEYS:
+                    offenders.append(f"{page.name}:{number} declares '{key}'")
+        assert not offenders, (
+            "documented [[projects]] examples the loader would refuse: "
+            + "; ".join(offenders)
+        )
+
+    def test_the_scan_finds_the_examples_it_is_guarding(self):
+        """A scan that matched nothing would pass the test above forever."""
+        found = list(_documented_member_blocks())
+        assert found, "no [[projects]] example found in docs/"
+
+
 class TestThePolicedSurfacesTable:
     """docs/configuration.md's known-key list IS the member surface."""
 
