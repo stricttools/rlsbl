@@ -125,8 +125,9 @@ mode, is in [docs/release-workflow.md](docs/release-workflow.md).
 
 Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
 would-do log rather than performed. A small set of commands declares itself `consequential`
-(`release run`/`resume`/`retry`/`undo`/`deprecate`/`yank`/`scrub`/`reconcile`, `claim-name`,
-`deploy`, `monorepo release run`/`mirror`/`absorb`/`extract`) and asks
+(`release run`/`resume`/`retry`/`undo`/`deprecate`/`yank`/`scrub`/`reconcile`/`backfill`,
+`claim-name`, `deploy`, `transition record`,
+`monorepo release run`/`mirror`/`absorb`/`extract`/`rename-releasable`) and asks
 for confirmation before running; pass `--approve-consequential` in non-interactive contexts
 (CI, AI agents), where the prompt is a hard error instead. Every other command runs without
 asking.
