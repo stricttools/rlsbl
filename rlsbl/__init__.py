@@ -1671,6 +1671,11 @@ def cmd_chlog_generate(ctx, auto_commit):
     cmd_generate(flags, project_root=root)
 
 
+# Reviewed against the human-authority criterion and deliberately kept
+# NON-consequential: appending an entry to a released version's file, and the
+# Release-notes re-sync that follows, restate the record of a release the
+# operator already authorized. Nothing new is declared and nothing is
+# published. Kept on purpose -- do not re-derive this silently.
 @chlog.command(name="amend", help="Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-validate-hashes to skip hash validation for old or amended commits.", effect="mutating")
 @strictcli.flag(name="version", type=str, presence="required", help="Semver of the already-released version whose JSONL to amend (e.g. 0.39.0)")
 @strictcli.flag(name="commits", type=str, presence="required", help="Comma-separated commit hashes to associate with the amended changelog entry")
@@ -1716,6 +1721,12 @@ def cmd_chlog_amend(ctx, version, commits, id, description, type, user_facing, v
 # invocation that supplies no property, and `--unset-description` /
 # `--unset-type` exist because those two fields are genuinely clearable (a
 # non-user-facing entry carries neither).
+#
+# Reviewed against the human-authority criterion and deliberately kept
+# NON-consequential, for the same reason as `changelog amend`: correcting the
+# wording or type of an entry restates an already-authorized release rather
+# than declaring anything new. Kept on purpose -- do not re-derive this
+# silently.
 @chlog.command(
     name="edit",
     help="Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash or entry ID, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.",
@@ -1800,6 +1811,10 @@ class RemoveByCommits:
     value: str = strictcli.member_value(help="comma-separated commit hashes; the entry covering any of them is removed, and a list covering several entries is refused with each match named")
 
 
+# Reviewed against the human-authority criterion and deliberately kept
+# NON-consequential, alongside `changelog amend` and `changelog edit`: removing
+# one entry rewrites the record of an already-authorized release rather than
+# declaring anything new. Kept on purpose -- do not re-derive this silently.
 @chlog.command(
     name="remove",
     help="Delete one entry from a JSONL changelog file, selected by its ULID identifier or by the commits it covers. The file is rewritten atomically without that line; a released version's file is temporarily unlocked, re-locked, and followed by a CHANGELOG.md regeneration and a GitHub Release notes sync. Exactly one entry is removed: a selector matching several is refused with every match named, and a selector matching none is refused too.",
