@@ -291,7 +291,7 @@ def _in_flight_past_the_gate(repo, *, extra_release_commit=True):
         "pre_release_sha": pin_sha,
         "pin_sha": pin_sha,
         "candidate_sha": candidate_sha,
-        "release_commits": trail,
+        "release_created_commits": trail,
         "bump_type": "patch",
         "registry": "npm",
         "completed_steps": completed,

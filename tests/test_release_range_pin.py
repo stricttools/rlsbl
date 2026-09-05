@@ -6,7 +6,7 @@ session sharing the worktree can land commits on the release branch, and they
 used to join the release silently, shipping unreviewed under its changelog.
 
 The release now pins HEAD at the top of its entry and records every commit it
-creates in the state file's ``release_commits`` trail. Anything in
+creates in the state file's ``release_created_commits`` trail. Anything in
 ``pin..HEAD`` that is not in the trail is foreign, and the release hard-errors
 naming it. This is the forward twin of the rollback clobber guard: that one
 refuses to DESTROY a concurrent session's commits, this one refuses to SHIP
@@ -72,7 +72,7 @@ class TestGuardInIsolation:
     def test_an_empty_range_passes(self, tmp_path):
         repo = _repo(tmp_path)
         state = str(tmp_path / "state.json")
-        save_release_state(state, {"release_commits": []})
+        save_release_state(state, {"release_created_commits": []})
         _guard_foreign_commits(
             head_sha(cwd=str(repo)), state, cwd=str(repo), phase="entry",
         )
@@ -86,7 +86,7 @@ class TestGuardInIsolation:
             _commit(repo, "final.txt", "chore: finalize changelog for 1.0.1"),
         ]
         state = str(tmp_path / "state.json")
-        save_release_state(state, {"release_commits": own})
+        save_release_state(state, {"release_created_commits": own})
         _guard_foreign_commits(pin, state, cwd=str(repo), phase="entry")
 
     def test_a_foreign_commit_aborts_and_is_named(self, tmp_path):
@@ -95,7 +95,7 @@ class TestGuardInIsolation:
         mine = _commit(repo, "bump.txt", "v1.0.1")
         theirs = _commit(repo, "todo.md", "todo: file a note from another session")
         state = str(tmp_path / "state.json")
-        save_release_state(state, {"release_commits": [mine]})
+        save_release_state(state, {"release_created_commits": [mine]})
 
         with pytest.raises(ForeignCommitError) as exc:
             _guard_foreign_commits(pin, state, cwd=str(repo), phase="candidate push")
@@ -114,7 +114,7 @@ class TestGuardInIsolation:
         rollback guard takes the same stance."""
         repo = _repo(tmp_path)
         state = str(tmp_path / "state.json")
-        save_release_state(state, {"release_commits": []})
+        save_release_state(state, {"release_created_commits": []})
         _guard_foreign_commits("f" * 40, state, cwd=str(repo), phase="entry")
         _guard_foreign_commits(None, state, cwd=str(repo), phase="entry")
 
@@ -216,7 +216,7 @@ class TestRideInDuringRelease:
             "before the pre-mutating selfdoc auto-commit"
         )
         # The trail covers every commit between the pin and the candidate.
-        trail = set(captured.get("release_commits", []))
+        trail = set(captured.get("release_created_commits", []))
         candidate = captured.get("candidate_sha")
         assert candidate
         rev_list = subprocess.run(

@@ -58,7 +58,7 @@ def _seed_member_states(root, bump_shas):
             "registry": "npm",
             "monorepo_name": project_name,
             "releasable_name": rel_name,
-            "release_commits": [bump_shas[rel_name]],
+            "release_created_commits": [bump_shas[rel_name]],
             "completed_steps": ["VERSION_BUMPED", "COMMITTED"],
         })
         pending.append((rel_name, os.path.join(str(root), rel_name), state_path))
@@ -85,7 +85,7 @@ def _seed_stranded_member_states(root, bump_shas, candidate_sha):
             "registry": "npm",
             "monorepo_name": project_name,
             "releasable_name": rel_name,
-            "release_commits": [bump_shas[rel_name]],
+            "release_created_commits": [bump_shas[rel_name]],
             "candidate_sha": candidate_sha,
             "completed_steps": [
                 "VERSION_BUMPED", "COMMITTED", "BRANCH_PUSHED",

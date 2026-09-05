@@ -831,7 +831,7 @@ class TestBatchSeedsStrandedMembers:
                 "branch": "main",
                 "registry": "pypi",
                 "completed_steps": completed_steps,
-                "release_commits": [],
+                "release_created_commits": [],
             }, f)
         return state_path
 

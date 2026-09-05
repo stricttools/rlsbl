@@ -212,7 +212,7 @@ def _prepare_resumable_candidate(root, core, unrelated_path="docs/notes.md",
             "VERSION_BUMPED", "COMMITTED", "SNAPSHOT_REGENERATED",
             *(["BRANCH_PUSHED"] if published else []),
         ],
-        "release_commits": [bump_sha],
+        "release_created_commits": [bump_sha],
         **({"candidate_sha": bump_sha} if published else {}),
     })
     return state_path, bump_sha
@@ -467,7 +467,7 @@ class TestStrandedResumeDispatchesRunAllItself:
         state_path = get_state_path(str(tmp_project), releasable_dir=rel_dir)
         os.makedirs(os.path.dirname(state_path), exist_ok=True)
         save_release_state(state_path, {
-            "release_commits": [],
+            "release_created_commits": [],
             "completed_steps": ["VERSION_BUMPED", "COMMITTED"],
         })
 
@@ -549,7 +549,7 @@ class TestCandidateAlreadyOnTheRemote:
         rel_dir = get_releasable_dir(str(tmp_project), "alpha")
         state_path = get_state_path(str(tmp_project), releasable_dir=rel_dir)
         os.makedirs(os.path.dirname(state_path), exist_ok=True)
-        save_release_state(state_path, {"release_commits": []})
+        save_release_state(state_path, {"release_created_commits": []})
 
         with pytest.raises(Exception) as exc:
             _guard_empty_candidate_window(

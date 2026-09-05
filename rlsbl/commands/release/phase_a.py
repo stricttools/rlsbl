@@ -986,7 +986,7 @@ class _Executor:
     #    result cannot exist before the step runs, so the builder names the
     #    observe rather than performing it.
     # 2. The release-state record (``save_step`` in :meth:`run`,
-    #    ``_track_release_commit`` in :meth:`_settle`, ``load_release_state``
+    #    ``_track_release_created_commit`` in :meth:`_settle`, ``load_release_state``
     #    in :meth:`_do_record_candidate`). The release record is the executor's own
     #    writing surface -- it records how far this walk has got -- and reading
     #    it back is part of writing it. A builder-time snapshot could not
@@ -1081,13 +1081,13 @@ class _Executor:
         if step.produces:
             self._values[step.produces] = captured
         if step.kind in (COMMIT, SNAPSHOT):
-            # The drift guard's trail. ``_track_release_commit`` resolves HEAD
+            # The drift guard's trail. ``_track_release_created_commit`` resolves HEAD
             # itself, through the same direct ``effects.run`` the guard uses to
             # read the range -- the two must name commits the same way or the
             # release's own commit looks foreign to its own guard.
-            from .execute import _track_release_commit
+            from .execute import _track_release_created_commit
 
-            _track_release_commit(self._inp.state_path)
+            _track_release_created_commit(self._inp.state_path)
 
     def _issue(self, step):
         """Issue one step's effect. Returns the carrier/result it produced."""

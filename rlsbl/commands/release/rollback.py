@@ -27,7 +27,7 @@ def _cleanup_release_artifacts(project_dir: str, version: str, *,
                                releases_dir: str | None = None) -> None:
     """Best-effort removal of generated files that become orphaned after rollback.
 
-    After `git reset --hard` reverts the release commits, files created during
+    After `git reset --hard` reverts the release-created commits, files created during
     finalization (renamed JSONL, per-version markdown, renamed release TOML) are
     left as untracked because they never existed in the pre-release history.
     Removing them prevents a dirty working tree that blocks the next attempt.

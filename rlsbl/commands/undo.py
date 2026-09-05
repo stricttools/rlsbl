@@ -2,7 +2,7 @@
 
 The undo flow is plan-driven: an :class:`UndoPlan` is computed UPFRONT (for
 both the latest-release path and the ``--version`` non-latest path) before
-anything is mutated. The plan enumerates the release commits to revert,
+anything is mutated. The plan enumerates the release-created commits to revert,
 companion tags to delete, whether a GitHub Release exists, and the registry
 evidence verdict. ``--dry-run`` prints the plan and exits without touching
 anything; a real run consumes the identical plan object.
@@ -17,19 +17,19 @@ rename, release-file archive, per-version .md) sit ABOVE it. A resumed release
 moves the tag further still: after a fix-forward the verified commit is the tip
 at resume time, several commits above the bump.
 
-So the release commits are found from the RELEASE RECORD, not by walking down from the
-tag: the archive for the version records the commit that was verified and
-tagged (the release commit), the predecessor's archive records where the previous
-release ended, and the release's own commits are the ones between those two
-whose subjects the release itself writes (the version bump and the
-finalization commits). Walking down from the tag and stopping at the first
+So the release-created commits are found from the RELEASE RECORD, not by
+walking down from the tag: the archive for the version records the commit that
+was verified and tagged (the release commit), the predecessor's archive records
+where the previous release ended, and the release-created commits are the ones
+between those two whose subjects the release itself writes (the version bump
+and the finalization commits). Walking down from the tag and stopping at the first
 subject the release did not write collected ZERO commits on a resumed release,
 and undo reported success with the version files still bumped.
 
 What is reverted, and what is repaired
 --------------------------------------
 
-Reverted: the release's own commits at or below the release commit (always the version
+Reverted: the release-created commits at or below the release commit (always the version
 bump; also the finalization commits on the older shape where they sat below the
 tag). Repaired rather than reverted: the finalization ABOVE the release commit -- the
 changelog is un-finalized and CHANGELOG.md regenerated, and the archived
@@ -348,8 +348,8 @@ def _build_tag_from_version(uc, version):
     return target_obj.tag_format(version)
 
 
-def _classify_release_commit(subject, expected_msg):
-    """Return the shape of a release commit, or None if it is not one."""
+def _classify_release_created_commit(subject, expected_msg):
+    """Return the shape of a release-created commit, or None if it is not one."""
     if subject == expected_msg:
         return "version_bump"
     if _FINALIZE_CHANGELOG_RE.match(subject):
@@ -407,7 +407,7 @@ def _release_commit(uc, version, tag):
     if cfg.unrecoverable or not cfg.candidate_sha:
         _die(
             f"Error: the release archive for {version} records no commit: {path}",
-            "  Undo cannot find the release's own commits without it, and "
+            "  Undo cannot find the release-created commits without it, and "
             "deleting the tag while",
             "  leaving the version files bumped is the half-undone state this "
             "command exists to avoid.",
@@ -488,8 +488,8 @@ def _log_commits(range_spec):
     return commits
 
 
-def _collect_release_commits(uc, version, tag, expected_msg):
-    """The release's own commits, newest-first, located through the RELEASE RECORD.
+def _collect_release_created_commits(uc, version, tag, expected_msg):
+    """The release-created commits, newest-first, located through the RELEASE RECORD.
 
     The search range is ``<predecessor's release commit>..<this release's release commit>``,
     both read from the archives. Inside it the version-bump commit is
@@ -502,7 +502,7 @@ def _collect_release_commits(uc, version, tag, expected_msg):
     Returns ``(revert_shas, captured_finalize_changelog,
     captured_finalize_release_file, release commit)``. Refuses -- loudly, before
     anything is destroyed -- when the version-bump commit cannot be found: a
-    silent "no release commits found" is how undo used to delete a tag and a
+    silent "no release-created commits found" is how undo used to delete a tag and a
     GitHub Release while leaving the version files bumped.
     """
     release_commit = _release_commit(uc, version, tag)
@@ -519,7 +519,7 @@ def _collect_release_commits(uc, version, tag, expected_msg):
 
     bump_indexes = [
         i for i, (_sha, subject) in enumerate(commits)
-        if _classify_release_commit(subject, expected_msg) == "version_bump"
+        if _classify_release_created_commit(subject, expected_msg) == "version_bump"
     ]
     if not bump_indexes:
         release_commit_subject = commits[0][1] if commits else "(no commits in range)"
@@ -555,7 +555,7 @@ def _collect_release_commits(uc, version, tag, expected_msg):
     captured_cl = False
     captured_rf = False
     for sha, subject in span:
-        shape = _classify_release_commit(subject, expected_msg)
+        shape = _classify_release_created_commit(subject, expected_msg)
         if shape is None:
             continue
         collected.append((sha, subject))
@@ -732,7 +732,7 @@ def _build_plan(uc, flags, ctx):
     if is_latest:
         version, tag = _find_latest_release(uc)
         _tag_version, expected_msg = _version_and_msg(uc, tag)
-        revert_shas, cap_cl, cap_rf, release_commit = _collect_release_commits(
+        revert_shas, cap_cl, cap_rf, release_commit = _collect_release_created_commits(
             uc, version, tag, expected_msg,
         )
         # The one guard left, and it fires before anything is destroyed: work
@@ -871,7 +871,7 @@ def _restore_changelog(plan, uc, results):
     Runs on BOTH paths. It first un-finalizes the version's JSONL (renaming
     ``{version}.jsonl`` back to ``unreleased.jsonl``; a no-op when a revert
     already restored it, and the repair when it didn't -- e.g. the non-latest
-    path or a finalize commit outside the collected release commits). It then
+    path or a finalize commit outside the collected release-created commits). It then
     ALWAYS regenerates CHANGELOG.md so the generated file matches the restored
     ``unreleased.jsonl`` -- reverting the finalize commit restores the JSONL
     but leaves CHANGELOG.md showing the released version rather than
@@ -1027,7 +1027,7 @@ def _execute_plan(plan, uc, flags, ctx):
         )
         print(
             f"Undo refused: nothing was destroyed. The GitHub Release, the "
-            f"tag {tag} and the release commits are untouched. Repair or move "
+            f"tag {tag} and the release-created commits are untouched. Repair or move "
             f"aside the audit file, then re-run.",
             file=sys.stderr,
         )
@@ -1062,7 +1062,7 @@ def _execute_plan(plan, uc, flags, ctx):
                 pass  # local tag may not exist
         results.append(("Delete companion tags", OK, f"deleted {len(plan.companion_tags)} companion tag(s)"))
 
-    # 5. Revert release commits, newest-first, targeting the collected SHAs
+    # 5. Revert release-created commits, newest-first, targeting the collected SHAs
     #    explicitly (never re-deriving from HEAD). Newest-first so each revert
     #    applies cleanly against the working tree.
     if plan.revert_shas:

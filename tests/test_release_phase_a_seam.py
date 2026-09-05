@@ -205,7 +205,7 @@ _READ_CALLS = {"run", "run_gh", "head_sha", "_git_read", "_git_answer"}
 # and every step that follows -- writing back a stale document would erase the
 # markers the walk itself had just recorded. Each site below is tolerated for
 # that reason and no other; anything new here has to earn its own line.
-_RELEASE_RECORD_CALLS = {"load_release_state", "save_step", "_track_release_commit"}
+_RELEASE_RECORD_CALLS = {"load_release_state", "save_step", "_track_release_created_commit"}
 
 _TOLERATED_RELEASE_RECORD_READS = {
     # Records each marker as the walk reaches it. The walk is the only thing
@@ -213,7 +213,7 @@ _TOLERATED_RELEASE_RECORD_READS = {
     "run": {"save_step"},
     # The drift guard's trail: which commits this release created. A commit's
     # SHA does not exist until the commit step has run.
-    "_settle": {"_track_release_commit"},
+    "_settle": {"_track_release_created_commit"},
     # Reads back the document the walk has been writing, so the candidate SHA
     # joins the markers already recorded instead of replacing them.
     "_do_record_candidate": {"load_release_state"},

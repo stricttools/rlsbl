@@ -532,7 +532,7 @@ def _widened_window_base(state_path, *, cwd):
     window widens to start just before the version-bump commit.
     """
     state = load_release_state(state_path) or {}
-    trail = [sha for sha in (state.get("release_commits") or []) if sha]
+    trail = [sha for sha in (state.get("release_created_commits") or []) if sha]
     for sha in trail:
         parent = _git_read(["rev-parse", f"{sha}^"], cwd=cwd)
         if parent:
@@ -785,12 +785,18 @@ def _reconcile_ci_sha_marker(pub, *, config, log):
     return True
 
 
-def _track_release_commit(state_path, sha=None, cwd=None):
-    """Record a release commit SHA in the state file.
+def _track_release_created_commit(state_path, sha=None, cwd=None):
+    """Record a RELEASE-CREATED commit SHA in the state file.
+
+    These are the commits the release flow itself writes -- the version bump,
+    the finalization commits, the snapshot -- and NOT the release commit, which
+    is the one a version shipped from (the archive's ``candidate_sha``). One is
+    the work the flow made on top; the other is the single commit that work
+    produced and CI proved.
 
     Called immediately after each ``commit_files()`` /
     ``commit_files_if_changed()`` invocation so the rollback guard can
-    distinguish release-owned commits from foreign ones.
+    distinguish release-created commits from foreign ones.
 
     Best-effort: failures are silently ignored. When tracking fails
     (e.g., in test environments without a real git repo), the rollback
@@ -814,7 +820,7 @@ def _track_release_commit(state_path, sha=None, cwd=None):
         state = load_release_state(state_path)
         if state is None:
             state = {}
-        commits = state.setdefault("release_commits", [])
+        commits = state.setdefault("release_created_commits", [])
         if sha not in commits:
             commits.append(sha)
         save_release_state(state_path, state)
@@ -826,8 +832,8 @@ def _guard_rollback(pre_release_sha, state_path, cwd=None):
     """Refuse rollback if foreign commits exist between pre_release_sha and HEAD.
 
     Compares commits between ``pre_release_sha`` and HEAD against the
-    ``release_commits`` list persisted in the state file.  Any commit
-    not in ``release_commits`` is a foreign commit (from a concurrent
+    ``release_created_commits`` list persisted in the state file.  Any commit
+    not in ``release_created_commits`` is a foreign commit (from a concurrent
     session).
 
     Dirty files (uncommitted modifications) are NOT checked because the
@@ -843,7 +849,7 @@ def _guard_rollback(pre_release_sha, state_path, cwd=None):
     recovery instructions when rollback is unsafe.
     """
     state = load_release_state(state_path)
-    release_commits = set((state or {}).get("release_commits", []))
+    release_created_commits = set((state or {}).get("release_created_commits", []))
 
     # Find all commits between pre_release_sha and HEAD
     try:
@@ -864,7 +870,7 @@ def _guard_rollback(pre_release_sha, state_path, cwd=None):
     else:
         all_commits = []
 
-    foreign_commits = [c for c in all_commits if c not in release_commits]
+    foreign_commits = [c for c in all_commits if c not in release_created_commits]
 
     if not foreign_commits:
         return  # Safe to roll back
@@ -927,7 +933,7 @@ def head_sha(cwd=None):
     Uses ``effects.run`` directly rather than the release flow's ``run``: this
     is bookkeeping for the drift guard, and it must never consume a mock side
     effect (or shift a call sequence) in tests that stub the release's git
-    calls. Same rationale as :func:`_track_release_commit`.
+    calls. Same rationale as :func:`_track_release_created_commit`.
     """
     try:
         result = effects.run(
@@ -1127,7 +1133,7 @@ def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
     state = load_release_state(state_path)
     guard_foreign_commits(
         pin_sha,
-        (state or {}).get("release_commits", []),
+        (state or {}).get("release_created_commits", []),
         cwd=cwd,
         phase=phase,
     )
@@ -1829,8 +1835,8 @@ class ReleaseState:
     # callers in tests).
     git_root: str | None = None
     # Commits this release created BEFORE the state file existed (the selfdoc
-    # auto-commit). They seed the state file's release_commits trail.
-    prior_release_commits: list[str] = dataclasses.field(default_factory=list)
+    # auto-commit). They seed the state file's release_created_commits trail.
+    prior_release_created_commits: list[str] = dataclasses.field(default_factory=list)
     companion_tags: list[str] = dataclasses.field(default_factory=list)
     completed_steps: list[str] = dataclasses.field(default_factory=list)
 
@@ -2125,9 +2131,9 @@ def _run_release_mutating(state: ReleaseState):
     # state file existed (the pre-mutating selfdoc auto-commit), preserving
     # anything a prior attempt recorded.
     _prior_trail = list(
-        (_existing_state or {}).get("release_commits", [])
+        (_existing_state or {}).get("release_created_commits", [])
     )
-    for _sha in state.prior_release_commits or []:
+    for _sha in state.prior_release_created_commits or []:
         if _sha and _sha not in _prior_trail:
             _prior_trail.append(_sha)
     # Start from what a prior attempt recorded, THEN overwrite this attempt's
@@ -2145,7 +2151,7 @@ def _run_release_mutating(state: ReleaseState):
         "branch": branch,
         "pre_release_sha": pre_release_sha,
         "pin_sha": state.pin_sha or pre_release_sha,
-        "release_commits": _prior_trail,
+        "release_created_commits": _prior_trail,
         "bump_type": bump_type,
         "registry": registry,
         "completed_steps": list(_prior_completed),
@@ -2666,7 +2672,7 @@ def _run_release_mutating(state: ReleaseState):
                 if md_path.endswith(".md") and md_path not in finalize_files:
                     finalize_files.append(md_path)
             commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
-            _track_release_commit(_state_path)
+            _track_release_created_commit(_state_path)
             log(f"Committed finalized changelog files")
             save_step(_state_path, "CHANGELOG_FINALIZED")
             _completed.add("CHANGELOG_FINALIZED")
@@ -2693,7 +2699,7 @@ def _run_release_mutating(state: ReleaseState):
                     [config_rel],
                     cwd=_git_root,
                 )
-                _track_release_commit(_state_path)
+                _track_release_created_commit(_state_path)
                 log(f"Cleaned {removed} stale batch exclusion(s) from config.json")
 
         # Finalize release file: rename unreleased.toml to vX.Y.Z.toml
@@ -2787,7 +2793,7 @@ def _run_release_mutating(state: ReleaseState):
                 if blog_body_dst:
                     release_finalize_files.append(_rel_to_git_root(blog_body_dst, _git_root))
             commit_files(f"chore: finalize release file for {new_version}", release_finalize_files, cwd=_git_root)
-            _track_release_commit(_state_path)
+            _track_release_created_commit(_state_path)
             log(f"Finalized release file for {new_version}")
 
             # Now that v{version}.toml is archived, regenerate the per-version
@@ -2813,7 +2819,7 @@ def _run_release_mutating(state: ReleaseState):
                         [md_regen_rel],
                         cwd=_git_root,
                     )
-                    _track_release_commit(_state_path)
+                    _track_release_created_commit(_state_path)
             save_step(_state_path, "RELEASE_FILE_FINALIZED")
             _completed.add("RELEASE_FILE_FINALIZED")
 
@@ -3609,7 +3615,7 @@ def _run_release_mutating(state: ReleaseState):
             rel_path = write_snapshot(monorepo_root, snapshot)
             did_commit = commit_files_if_changed("snapshot", [rel_path], skip_message="Snapshot unchanged.", autogenerated=True, cwd=monorepo_root)
             if did_commit:
-                _track_release_commit(_state_path)
+                _track_release_created_commit(_state_path)
             log(f"Regenerated monorepo snapshot (post-hoc): {rel_path}")
         except Exception as e:
             print(f"Warning: snapshot regeneration failed: {e}", file=sys.stderr)

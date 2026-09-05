@@ -15,7 +15,7 @@ import pytest
 from rlsbl.commands.release.execute import (
     RollbackClobberError,
     _guard_rollback,
-    _track_release_commit,
+    _track_release_created_commit,
 )
 from rlsbl.commands.release.release_state import (
     load_release_state,
@@ -65,8 +65,8 @@ def _setup_repo(tmp_path):
     return repo, pre_release_sha
 
 
-class TestTrackReleaseCommit:
-    """Tests for _track_release_commit: captures HEAD SHA into state."""
+class TestTrackReleaseCreatedCommit:
+    """Tests for _track_release_created_commit: captures HEAD SHA into state."""
 
     def test_tracks_single_commit(self, tmp_path):
         """A single release commit is recorded in state."""
@@ -82,11 +82,11 @@ class TestTrackReleaseCommit:
         _git(repo, "commit", "-q", "-m", "v1.0.0")
         release_sha = _git_head(repo)
 
-        _track_release_commit(state_path, cwd=str(repo))
+        _track_release_created_commit(state_path, cwd=str(repo))
 
         state = load_release_state(state_path)
-        assert "release_commits" in state
-        assert release_sha in state["release_commits"]
+        assert "release_created_commits" in state
+        assert release_sha in state["release_created_commits"]
 
     def test_tracks_multiple_commits(self, tmp_path):
         """Multiple release commits are all recorded."""
@@ -101,15 +101,15 @@ class TestTrackReleaseCommit:
             _git(repo, "add", f"file{i}.txt")
             _git(repo, "commit", "-q", "-m", f"release commit {i}")
             shas.append(_git_head(repo))
-            _track_release_commit(state_path, cwd=str(repo))
+            _track_release_created_commit(state_path, cwd=str(repo))
 
         state = load_release_state(state_path)
-        assert len(state["release_commits"]) == 3
+        assert len(state["release_created_commits"]) == 3
         for sha in shas:
-            assert sha in state["release_commits"]
+            assert sha in state["release_created_commits"]
 
     def test_deduplicates_same_sha(self, tmp_path):
-        """Calling _track_release_commit twice for the same HEAD is idempotent."""
+        """Calling _track_release_created_commit twice for the same HEAD is idempotent."""
         repo, pre_release_sha = _setup_repo(tmp_path)
         state_path = str(repo / ".rlsbl" / "releases" / "in-progress.json")
 
@@ -119,17 +119,44 @@ class TestTrackReleaseCommit:
         _git(repo, "add", "file.txt")
         _git(repo, "commit", "-q", "-m", "commit")
 
-        _track_release_commit(state_path, cwd=str(repo))
-        _track_release_commit(state_path, cwd=str(repo))
+        _track_release_created_commit(state_path, cwd=str(repo))
+        _track_release_created_commit(state_path, cwd=str(repo))
 
         state = load_release_state(state_path)
-        assert len(state["release_commits"]) == 1
+        assert len(state["release_created_commits"]) == 1
+
+    def test_the_state_key_names_the_commits_the_release_created(self, tmp_path):
+        """The trail is the commits the release FLOW created, not release commits.
+
+        "Release commit" is the ruled term for the commit a version shipped
+        from -- what an archive's candidate_sha records and what a released tag
+        points at. This trail is the opposite kind of thing: the version bump
+        and the finalization commits the flow writes on top, which the range
+        pin recognizes as its own and which a rollback reverts. Two senses
+        under one spelling is how a reader concludes that reverting the trail
+        reverts the release commit.
+        """
+        repo, pre_release_sha = _setup_repo(tmp_path)
+        state_path = str(repo / ".rlsbl" / "releases" / "in-progress.json")
+        save_release_state(state_path, {"pre_release_sha": pre_release_sha})
+
+        (repo / "file.txt").write_text("data\n")
+        _git(repo, "add", "file.txt")
+        _git(repo, "commit", "-q", "-m", "v1.0.0")
+        _track_release_created_commit(state_path, cwd=str(repo))
+
+        state = load_release_state(state_path)
+        assert "release_created_commits" in state
+        assert "release_commits" not in state, (
+            "the old spelling collides with the ruled term for the commit a "
+            "version shipped from"
+        )
 
 
 class TestGuardRollback:
     """Tests for _guard_rollback: blocks rollback when foreign work exists."""
 
-    def test_allows_rollback_with_only_release_commits(self, tmp_path):
+    def test_allows_rollback_with_only_release_created_commits(self, tmp_path):
         """Normal rollback (no foreign commits, no dirty files) succeeds."""
         repo, pre_release_sha = _setup_repo(tmp_path)
         state_path = str(repo / ".rlsbl" / "releases" / "in-progress.json")
@@ -141,7 +168,7 @@ class TestGuardRollback:
             (repo / f"release{i}.txt").write_text(f"release {i}\n")
             _git(repo, "add", f"release{i}.txt")
             _git(repo, "commit", "-q", "-m", f"release {i}")
-            _track_release_commit(state_path, cwd=str(repo))
+            _track_release_created_commit(state_path, cwd=str(repo))
 
         # Guard should NOT raise
         _guard_rollback(pre_release_sha, state_path, cwd=str(repo))
@@ -157,7 +184,7 @@ class TestGuardRollback:
         (repo / "release.txt").write_text("release\n")
         _git(repo, "add", "release.txt")
         _git(repo, "commit", "-q", "-m", "release commit")
-        _track_release_commit(state_path, cwd=str(repo))
+        _track_release_created_commit(state_path, cwd=str(repo))
 
         # Make a foreign commit (NOT tracked -- simulates concurrent session)
         (repo / "foreign.txt").write_text("concurrent work\n")
@@ -190,7 +217,7 @@ class TestGuardRollback:
         (repo / "release.txt").write_text("release\n")
         _git(repo, "add", "release.txt")
         _git(repo, "commit", "-q", "-m", "release commit")
-        _track_release_commit(state_path, cwd=str(repo))
+        _track_release_created_commit(state_path, cwd=str(repo))
 
         # Create dirty files (simulates version-bump writes before commit)
         (repo / "dirty.txt").write_text("uncommitted work\n")
@@ -210,7 +237,7 @@ class TestGuardRollback:
         (repo / "release.txt").write_text("release\n")
         _git(repo, "add", "release.txt")
         _git(repo, "commit", "-q", "-m", "release commit")
-        _track_release_commit(state_path, cwd=str(repo))
+        _track_release_created_commit(state_path, cwd=str(repo))
 
         # Foreign commit
         (repo / "foreign.txt").write_text("foreign\n")
@@ -236,12 +263,12 @@ class TestGuardRollback:
         # No commits made -- HEAD is still pre_release_sha
         _guard_rollback(pre_release_sha, state_path, cwd=str(repo))
 
-    def test_allows_rollback_with_empty_release_commits(self, tmp_path):
-        """When state has no release_commits and no new commits, rollback is safe."""
+    def test_allows_rollback_with_empty_release_created_commits(self, tmp_path):
+        """When state has no release_created_commits and no new commits, rollback is safe."""
         repo, pre_release_sha = _setup_repo(tmp_path)
         state_path = str(repo / ".rlsbl" / "releases" / "in-progress.json")
 
-        # State without release_commits key
+        # State without release_created_commits key
         save_release_state(state_path, {"pre_release_sha": pre_release_sha})
 
         _guard_rollback(pre_release_sha, state_path, cwd=str(repo))

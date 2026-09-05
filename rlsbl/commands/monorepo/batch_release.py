@@ -152,7 +152,7 @@ def _batch_release_trail(pending, inline_commits):
     trail = set(inline_commits)
     for entry in pending:
         state = read_state_for_resume(entry[2])
-        trail.update((state or {}).get("release_commits", []))
+        trail.update((state or {}).get("release_created_commits", []))
     return trail
 
 

@@ -602,7 +602,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     _git_root = _resolve_git_root(str(project_root))
     # Commits the release makes before its state file exists. These seed the
     # trail the drift guard compares against.
-    _prior_release_commits = []
+    _prior_release_created_commits = []
 
     # --- Validate inputs and environment ---
     # Consolidated config schema validation (banned keys, structural invariants).
@@ -1013,7 +1013,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             # drift guard does not mistake it for a concurrent session's work.
             _selfdoc_sha = head_sha(cwd=str(project_root))
             if _selfdoc_sha:
-                _prior_release_commits.append(_selfdoc_sha)
+                _prior_release_created_commits.append(_selfdoc_sha)
 
     if _use_releasable_hooks:
         # Check if releasable-level pre-release hook is customized
@@ -1300,7 +1300,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             hook_generated=hook_generated,
             pin_sha=_pin_sha,
             git_root=_git_root,
-            prior_release_commits=_prior_release_commits,
+            prior_release_created_commits=_prior_release_created_commits,
             include=list(release_config.include),
             exclude=list(release_config.exclude),
             preid=release_config.preid,
