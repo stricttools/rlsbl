@@ -319,6 +319,16 @@
         },
         {
           "level": 3,
+          "text": "`_foreign_owner_description`",
+          "anchor": "_foreign_owner_description"
+        },
+        {
+          "level": 3,
+          "text": "`_out_of_scope_detail`",
+          "anchor": "_out_of_scope_detail"
+        },
+        {
+          "level": 3,
           "text": "`check_in_range`",
           "anchor": "check_in_range"
         },
@@ -326,6 +336,11 @@
           "level": 3,
           "text": "`check_coverage`",
           "anchor": "check_coverage"
+        },
+        {
+          "level": 3,
+          "text": "`_removal_remedy`",
+          "anchor": "_removal_remedy"
         },
         {
           "level": 3,
@@ -550,13 +565,23 @@
         },
         {
           "level": 2,
+          "text": "changelog remove",
+          "anchor": "changelog-remove"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-4"
+        },
+        {
+          "level": 2,
           "text": "changelog remap",
           "anchor": "changelog-remap"
         },
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-4"
+          "anchor": "flags-5"
         },
         {
           "level": 3,
@@ -4209,6 +4234,16 @@
         },
         {
           "level": 3,
+          "text": "`_foreign_owner_description`",
+          "anchor": "_foreign_owner_description"
+        },
+        {
+          "level": 3,
+          "text": "`_out_of_scope_detail`",
+          "anchor": "_out_of_scope_detail"
+        },
+        {
+          "level": 3,
           "text": "`check_in_range`",
           "anchor": "check_in_range"
         },
@@ -4216,6 +4251,11 @@
           "level": 3,
           "text": "`check_coverage`",
           "anchor": "check_coverage"
+        },
+        {
+          "level": 3,
+          "text": "`_removal_remedy`",
+          "anchor": "_removal_remedy"
         },
         {
           "level": 3,
@@ -5071,8 +5111,43 @@
         },
         {
           "level": 3,
+          "text": "`_resolve_selector_commits`",
+          "anchor": "_resolve_selector_commits"
+        },
+        {
+          "level": 3,
+          "text": "`_find_entry_matches`",
+          "anchor": "_find_entry_matches"
+        },
+        {
+          "level": 3,
+          "text": "`_selector_description`",
+          "anchor": "_selector_description"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_no_match`",
+          "anchor": "_refuse_no_match"
+        },
+        {
+          "level": 3,
+          "text": "`_rewrite_entries`",
+          "anchor": "_rewrite_entries"
+        },
+        {
+          "level": 3,
+          "text": "`_finish_released_write`",
+          "anchor": "_finish_released_write"
+        },
+        {
+          "level": 3,
           "text": "`cmd_edit`",
           "anchor": "cmd_edit"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_remove`",
+          "anchor": "cmd_remove"
         },
         {
           "level": 3,
@@ -12293,6 +12368,11 @@
         },
         {
           "level": 3,
+          "text": "`state_dir_releasable`",
+          "anchor": "state_dir_releasable"
+        },
+        {
+          "level": 3,
           "text": "`normalize_path`",
           "anchor": "normalize_path"
         },
@@ -18720,6 +18800,11 @@
         },
         {
           "level": 3,
+          "text": "`_refuse_status_at_bare_workspace_root`",
+          "anchor": "_refuse_status_at_bare_workspace_root"
+        },
+        {
+          "level": 3,
           "text": "`cmd_status`",
           "anchor": "cmd_status"
         },
@@ -18867,6 +18952,21 @@
           "level": 3,
           "text": "`cmd_chlog_edit`",
           "anchor": "cmd_chlog_edit"
+        },
+        {
+          "level": 3,
+          "text": "`RemoveById`",
+          "anchor": "removebyid"
+        },
+        {
+          "level": 3,
+          "text": "`RemoveByCommits`",
+          "anchor": "removebycommits"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_chlog_remove`",
+          "anchor": "cmd_chlog_remove"
         },
         {
           "level": 3,
@@ -20244,6 +20344,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T05:51:10.588667+00:00",
+  "last_gen": "2026-09-05T06:33:34.018939+00:00",
   "theme": "minimal"
 }
