@@ -831,7 +831,7 @@ class TestCmdMonoGraph:
     @patch("rlsbl._require_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.monorepo._cmd_graph")
     def test_delegates_with_options(self, mock_graph, _):
-        rlsbl.cmd_mono_graph(cli_ctx(), format="dot", output="graph.dot", root="core", reverse="", depth=3)
+        rlsbl.cmd_mono_graph(cli_ctx(), format="dot", output="graph.dot", root="core", reverse=None, depth=3)
         mock_graph.assert_called_once()
         flags = mock_graph.call_args[0][0]
         assert flags["format"] == "dot"
@@ -943,8 +943,8 @@ class TestCmdMonoAbsorb:
     def test_exits_when_no_workspace(self, *_):
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_mono_absorb(
-                cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name="",
-                registry_name="", releasable="", tag_format="",
+                cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name=None,
+                registry_name=None, releasable=None, tag_format=None,
                 delete_with_rm=False,
             )
         assert exc.value.code == 1
@@ -955,7 +955,7 @@ class TestCmdMonoAbsorb:
     def test_dry_run(self, mock_absorb, *_):
         rlsbl.cmd_mono_absorb(
             cli_ctx(dry_run=True), source_repo="/src", dest_path="pkgs/pkg",
-            name="", registry_name="", releasable="core", tag_format="",
+            name=None, registry_name=None, releasable="core", tag_format=None,
             delete_with_rm=False,
         )
         mock_absorb.assert_called_once()
@@ -969,7 +969,7 @@ class TestCmdMonoAbsorb:
     def test_real_run_forwards_every_choice(self, mock_absorb, *_):
         rlsbl.cmd_mono_absorb(
             cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name="thing",
-            registry_name="acme-thing", releasable="",
+            registry_name="acme-thing", releasable=None,
             tag_format="pkgs/pkg/v{version}", delete_with_rm=True,
         )
         kwargs = mock_absorb.call_args.kwargs
@@ -987,8 +987,8 @@ class TestCmdMonoAbsorb:
     def test_error_exits(self, *_):
         with pytest.raises(SystemExit) as exc:
             rlsbl.cmd_mono_absorb(
-                cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name="",
-                registry_name="", releasable="", tag_format="",
+                cli_ctx(), source_repo="/src", dest_path="pkgs/pkg", name=None,
+                registry_name=None, releasable=None, tag_format=None,
                 delete_with_rm=False,
             )
         assert exc.value.code == 1
@@ -1014,7 +1014,7 @@ class TestCmdDevInstall:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.dev.run_install", return_value=0)
     def test_delegates_global_mode(self, mock_run, _):
-        rlsbl.cmd_dev_install(cli_ctx(), all=False, include="core", exclude="", uninstall=False, target="global")
+        rlsbl.cmd_dev_install(cli_ctx(), all=False, include="core", exclude=None, uninstall=False, target="global")
         mock_run.assert_called_once()
         flags = mock_run.call_args[0][0]
         assert flags["target"] == "global"
@@ -1022,7 +1022,7 @@ class TestCmdDevInstall:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.dev.run_install", return_value=0)
     def test_delegates_venv_mode(self, mock_run, _):
-        rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, target="venv")
+        rlsbl.cmd_dev_install(cli_ctx(), all=False, include=None, exclude=None, uninstall=False, target="venv")
         flags = mock_run.call_args[0][0]
         assert flags["target"] == "venv"
 
@@ -1030,7 +1030,7 @@ class TestCmdDevInstall:
     @patch("rlsbl.commands.dev.run_install", return_value=1)
     def test_exits_on_nonzero_return(self, mock_run, _):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_dev_install(cli_ctx(), all=False, include="", exclude="", uninstall=False, target="venv")
+            rlsbl.cmd_dev_install(cli_ctx(), all=False, include=None, exclude=None, uninstall=False, target="venv")
         assert exc.value.code == 1
 
 
@@ -1268,7 +1268,7 @@ class TestCmdScaffold:
         with patch("rlsbl.detect_registries", return_value=[]):
             with patch("rlsbl.utils.find_project_root", return_value=None):
                 with pytest.raises(SystemExit) as exc:
-                    rlsbl.cmd_scaffold(cli_ctx(), target="", publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
+                    rlsbl.cmd_scaffold(cli_ctx(), target=None, publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
                 assert exc.value.code == 1
 
     def test_single_target_auto_detected(self, tmp_project):
@@ -1276,7 +1276,7 @@ class TestCmdScaffold:
             with patch("rlsbl.context.create_context") as mock_ctx:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
-                    rlsbl.cmd_scaffold(cli_ctx(), target="", publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
+                    rlsbl.cmd_scaffold(cli_ctx(), target=None, publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
                     mock_run.assert_called_once()
 
     def test_multi_target_auto_detected(self, tmp_project):
@@ -1284,7 +1284,7 @@ class TestCmdScaffold:
             with patch("rlsbl.context.create_context") as mock_ctx:
                 mock_ctx.return_value = _ctx(config={})
                 with patch("rlsbl.commands.init_cmd.run_cmd_multi") as mock_run_multi:
-                    rlsbl.cmd_scaffold(cli_ctx(), target="", publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
+                    rlsbl.cmd_scaffold(cli_ctx(), target=None, publish_mode="ci", auto_commit=True, skip_shared=False, auto_tag=True)
                     mock_run_multi.assert_called_once()
 
     def test_explicit_unknown_target_exits(self, tmp_project):

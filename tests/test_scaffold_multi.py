@@ -681,7 +681,7 @@ class TestTargetFlagOnMultiTargetRepo:
     along with its stored merge base.
     """
 
-    def _scaffold(self, target=""):
+    def _scaffold(self, target=None):
         import rlsbl
         from conftest import cli_ctx
 

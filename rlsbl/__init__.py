@@ -206,6 +206,38 @@ def _opt_default(value, fallback):
     return fallback if value is None else value
 
 
+def _refuse_empty_flags(**supplied):
+    """Refuse any named string flag that was supplied with an empty value.
+
+    ``--name ""`` is a statement, and it is not the statement ``--name`` was
+    omitted. strictcli delivers an omitted optional flag as ``None``, so a
+    handler holding the empty string was handed one on the command line -- and
+    every handler that then wrote ``if name:`` turned that statement back into
+    silence. The sharpest case was ``monorepo release init --releasables ""``,
+    where an empty filter selected EVERY releasable instead of the none it
+    named.
+
+    This is the one place that decides it, so no handler grows a check of its
+    own. Whitespace counts as empty: ``--root "   "`` names nothing either.
+
+    Call it with the handler's own parameter names; underscores are rendered
+    as the hyphens the flag is spelled with.
+    """
+    for parameter, value in supplied.items():
+        if value is None or not isinstance(value, str):
+            continue
+        if value.strip():
+            continue
+        flag = parameter.replace("_", "-")
+        print(
+            f"Error: --{flag} was given an empty value. An empty value is not "
+            f"the same as omitting the flag: it states nothing, and rlsbl will "
+            f"not read it as absence. Pass a value, or drop --{flag}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 # ---------------------------------------------------------------------------
 # Derived target facts for help strings
 # ---------------------------------------------------------------------------
@@ -781,6 +813,7 @@ def cmd_status(ctx, target, registry):
 @effects.handler
 def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
     """Generate or update CI/CD workflows, hooks, and changelog infrastructure."""
+    _refuse_empty_flags(target=target)
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
     auto_tag = _opt_default(auto_tag, True)
@@ -1715,6 +1748,11 @@ class RootReleasable:
 @effects.handler
 def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
     """Create a new monorepo workspace with .rlsbl-monorepo/ and workspace.toml."""
+    if isinstance(root_member, RootReleasable):
+        _refuse_empty_flags(
+            root_releasable=root_member.value,
+            tag_format=root_member.tag_format,
+        )
     auto_commit = _opt_default(auto_commit, True)
     # monorepo init does NOT require a pre-existing .rlsbl/ marker --
     # it bootstraps a fresh workspace. Resolve to CWD instead of
@@ -1760,6 +1798,11 @@ def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
 @effects.handler
 def cmd_mono_add(ctx, name, target, depends_on, library, dev_only, releasable, tag_format, registry_name, auto_commit, path):
     """Register a project directory in the monorepo workspace.toml."""
+    _refuse_empty_flags(
+        name=name, target=target, depends_on=depends_on, library=library,
+        dev_only=dev_only, releasable=releasable, tag_format=tag_format,
+        registry_name=registry_name, path=path,
+    )
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
     root = _require_project_root()
@@ -1951,6 +1994,9 @@ _MONO_GRAPH_PAYLOAD_SCHEMA = {
 @effects.handler
 def cmd_mono_graph(ctx, format, output, root, reverse, depth=None):
     """Export the monorepo dependency graph as DOT or a text tree."""
+    _refuse_empty_flags(
+        format=format, output=output, root=root, reverse=reverse,
+    )
     flags = {"format": _opt_default(format, "text"), "json": ctx.json}
     if output:
         flags["output"] = output
@@ -1992,6 +2038,7 @@ _MONO_IMPACT_PAYLOAD_SCHEMA = {
 @effects.handler
 def cmd_mono_impact(ctx, depth=None, since=None):
     """Analyze the impact of changes on the monorepo dependency graph."""
+    _refuse_empty_flags(since=since)
     args = _variadic_args
     flags = {"json": ctx.json}
     if depth is not None:
@@ -2052,6 +2099,7 @@ def cmd_mono_release_run(ctx, allow_dirty, watch, push_timeout, ci_timeout, chec
 @effects.handler
 def cmd_mono_release_init(ctx, releasables):
     """Scaffold a batch release file for all workspace projects."""
+    _refuse_empty_flags(releasables=releasables)
     root = _require_project_root()
     from .commands.monorepo import _cmd_batch_release_init
     _cmd_batch_release_init(project_root=root, releasables=releasables)
@@ -2110,6 +2158,11 @@ def cmd_mono_extract(ctx, releasable_name, target_path, delete_with_rm):
 @effects.handler
 def cmd_mono_absorb(ctx, source_repo, dest_path, name, registry_name, releasable, tag_format, delete_with_rm):
     """Absorb an external repository into this workspace as a releasable."""
+    _refuse_empty_flags(
+        source_repo=source_repo, dest_path=dest_path, name=name,
+        registry_name=registry_name, releasable=releasable,
+        tag_format=tag_format,
+    )
     root = _require_project_root()
     from .commands.monorepo.absorb_cmd import _cmd_absorb
     _cmd_absorb(
@@ -2230,6 +2283,7 @@ dev = app.group("dev", help="Developer utilities for locally working with rlsbl 
 @effects.handler
 def cmd_dev_install(ctx, all, include, exclude, uninstall, target):
     """Install the project locally using the detected target's editable install."""
+    _refuse_empty_flags(include=include, exclude=exclude, target=target)
     all = _opt_default(all, False)
     uninstall = _opt_default(uninstall, False)
     root = _require_sub_project_root()
