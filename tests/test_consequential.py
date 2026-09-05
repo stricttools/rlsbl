@@ -52,6 +52,7 @@ CONSEQUENTIAL = {
     "monorepo absorb":            "rewrites another repo's history and merges it in",
     "monorepo extract":           "deletes the extracted members and the releasable's release state from this repository, and commits that",
     "monorepo release run":       "release run, once per package, in one sweep",
+    "transition record":          "declares what this repository's history IS, silencing a reader that would otherwise keep reporting the divergence",
 }
 
 # Everyday commands that must NEVER prompt. These are the ones the old

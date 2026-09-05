@@ -351,8 +351,25 @@ The workspace-scoped home exists because a departure is a fact about the source 
 | `departed-globs` | Written in the **source** of an extract: the tag globs that stopped belonging here, and where they went |
 | `identity-transition` | A published identity changed (a Go module path, a package name), effective from a stated version |
 | `promotion-split-map` | A mirror was promoted: the subtree-split correspondence it produced |
-| `release-history-closed` | A member's or releasable's release history is deliberately closed: the subject and an operator reason. Not written by a conversion — an operator records it |
-| `non-version-tag` | One tag stands deliberately outside the version model: its name and an operator reason. Not written by a conversion — an operator records it |
+| `release-history-closed` | A member's or releasable's release history is deliberately closed: the subject and an operator reason. Not written by a conversion — an operator declares it with `rlsbl transition record` |
+| `non-version-tag` | One tag stands deliberately outside the version model: its name and an operator reason. Not written by a conversion — an operator declares it with `rlsbl transition record` |
+
+### The two facts an operator declares
+
+Every other event above is written by the operation that performed the surgery. The last two are not things a command did -- they are statements about a repository somebody read, and nothing can derive them. `rlsbl transition record` is their door:
+
+```
+rlsbl transition record --non-version-tag nightly-2026-01-01 \
+    --reason "a nightly build marker"
+rlsbl transition record --release-history-closed widget \
+    --reason "extracted into its own repository"
+```
+
+Exactly one of the two facts must be elected, `--reason` is required and states why in the operator's own words, and the event is appended to the **repository-scoped** record -- `.rlsbl-monorepo/transitions.jsonl` in a workspace, `.rlsbl/transitions.jsonl` in a standalone repository -- and committed. A tag namespace belongs to the repository rather than to any one releasable, and a releasable whose release history just closed may be one whose state directory is about to leave with it.
+
+The command is consequential: only a human may declare what a repository's history *is*, because both facts silence a reader that would otherwise keep reporting a divergence. A second declaration of the same kind about the same subject is refused, naming the event already recorded -- the record is append-only, so a duplicate would stand beside the first forever with nothing to say which one is meant. `--dry-run` prints the line it would append and writes nothing.
+
+Recording a `non-version-tag` changes two answers immediately: `rlsbl release backfill` stops listing the tag as unexplained, and `rlsbl release reconcile` stops owing a verdict on it.
 
 The `tag-map`, `release-commit-remap` and `boundary-alias` events a conversion writes carry `related_to`, pointing at the id of the `conversion` event that heads them, so the events of one conversion are recoverable as a group from a file that has accumulated several. A `departed-globs` event stands alone: it is written in the source, where the conversion event it would point at does not exist.
 

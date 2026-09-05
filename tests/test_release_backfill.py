@@ -516,7 +516,10 @@ class TestUnexplainedTags:
         assert "RECORD IT AS A NON-VERSION TAG" in message
         assert "DELETE IT" in message
         assert "shipped_as" in message
-        assert "NonVersionTagEvent" in message
+        # The typed door, not the Python snippet the message used to spell out.
+        assert (
+            "rlsbl transition record --non-version-tag milestone-3" in message
+        )
         assert "git tag -d milestone-3" in message
 
 
@@ -1320,20 +1323,26 @@ class TestEveryRemedyClearsItsError:
         with pytest.raises(BackfillError) as exc:
             run_backfill(repo)
         message = str(exc.value)
-        assert "NonVersionTagEvent" in message
-
-        # Perform it, exactly as the message spells it out.
-        from rlsbl.transition_record import (
-            NonVersionTagEvent, append_event, get_transition_record_path,
+        assert (
+            "rlsbl transition record --non-version-tag vendor-import" in message
         )
 
-        record = get_transition_record_path(str(repo))
-        assert repr(record) in message
-        append_event(
-            record,
-            NonVersionTagEvent(
-                tag="vendor-import", reason="imported with the history",
-            ),
+        # Perform it as the command the message now names, not as the Python
+        # snippet it used to spell out.
+        from rlsbl.commands.transition_record_cmd import run_cmd as record_cmd
+        from rlsbl.context import create_context
+        from rlsbl.transition_record import (
+            KIND_NON_VERSION_TAG, get_transition_record_path,
+        )
+
+        assert get_transition_record_path(str(repo)) in message
+        record_cmd(
+            {
+                "kind": KIND_NON_VERSION_TAG, "subject": "vendor-import",
+                "reason": "imported with the history",
+                "dry-run": False, "auto-commit": True,
+            },
+            ctx=create_context(Path(repo)),
         )
 
         code, _output = run_backfill(repo)

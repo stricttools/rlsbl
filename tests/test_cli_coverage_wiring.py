@@ -771,6 +771,63 @@ class TestRewriteWiring:
         assert _flags(m) == {"dry-run": True}
 
 
+class TestTransitionWiring:
+
+    def test_record_a_non_version_tag(self):
+        result, m = _dispatch(
+            ["transition", "record", "--non-version-tag", "nightly",
+             "--reason", "a nightly build marker"],
+            "rlsbl.commands.transition_record_cmd.run_cmd",
+        )
+        assert result.exit_code == 0, result.stderr
+        f = _flags(m)
+        assert f["kind"] == "non-version-tag"
+        assert f["subject"] == "nightly"
+        assert f["reason"] == "a nightly build marker"
+        assert f["dry-run"] is False
+        # The opt-out boolean's fallback: absent means commit.
+        assert f["auto-commit"] is True
+
+    def test_record_a_closed_release_history(self):
+        result, m = _dispatch(
+            ["transition", "record", "--release-history-closed", "widget",
+             "--reason", "extracted into its own repository",
+             "--no-auto-commit", "--dry-run"],
+            "rlsbl.commands.transition_record_cmd.run_cmd",
+        )
+        assert result.exit_code == 0, result.stderr
+        f = _flags(m)
+        assert f["kind"] == "release-history-closed"
+        assert f["subject"] == "widget"
+        assert f["auto-commit"] is False
+        assert f["dry-run"] is True
+
+    def test_it_requires_a_fact(self):
+        """Which fact is being declared is never implicit."""
+        result, _m = _dispatch(
+            ["transition", "record", "--reason", "why"],
+            "rlsbl.commands.transition_record_cmd.run_cmd",
+        )
+        assert result.exit_code != 0
+        assert "--non-version-tag" in result.stderr or "fact" in result.stderr
+
+    def test_the_two_facts_are_mutually_exclusive(self):
+        result, _m = _dispatch(
+            ["transition", "record", "--non-version-tag", "nightly",
+             "--release-history-closed", "widget", "--reason", "why"],
+            "rlsbl.commands.transition_record_cmd.run_cmd",
+        )
+        assert result.exit_code != 0
+
+    def test_it_requires_a_reason(self):
+        result, _m = _dispatch(
+            ["transition", "record", "--non-version-tag", "nightly"],
+            "rlsbl.commands.transition_record_cmd.run_cmd",
+        )
+        assert result.exit_code != 0
+        assert "reason" in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # The committed coverage manifest
 # ---------------------------------------------------------------------------

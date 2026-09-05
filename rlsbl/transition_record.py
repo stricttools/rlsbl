@@ -9,6 +9,12 @@ purpose. It is written by the operation that performs the surgery and read
 afterwards by anything that has to explain how the repository reached its
 current shape.
 
+Two of the kinds have no such writer, because they are not things a command
+did: ``non-version-tag`` and ``release-history-closed`` are DECLARATIONS an
+operator makes about a repository they read, and nothing can derive either.
+``rlsbl transition record`` (:mod:`rlsbl.commands.transition_record_cmd`) is
+their door.
+
 It records history; it never drives it. Nothing here decides anything -- a
 reader consults the record to EXPLAIN a divergence it already observed.
 
@@ -394,7 +400,18 @@ class IdentityTransitionEvent(_TransitionRecordEventBase):
 
 @dataclass(kw_only=True)
 class ReleaseHistoryClosedEvent(_TransitionRecordEventBase):
-    """A member's or releasable's release history is deliberately closed."""
+    """A member's or releasable's release history is deliberately closed.
+
+    Operator-declared, through ``rlsbl transition record
+    --release-history-closed <subject>``.
+
+    NOT YET CONSUMED. The reader this kind exists for is the
+    ``releasable-residue`` check, which reports a member's leftover version
+    file, changelog directory and release archives as residue to clean up: a
+    subject with a recorded closed history has left a deliberate RECORD of what
+    it released, and the check should exempt it rather than propose deleting
+    it. Wiring that exemption is its own piece of work.
+    """
 
     KIND: ClassVar[str] = KIND_RELEASE_HISTORY_CLOSED
 
@@ -404,7 +421,13 @@ class ReleaseHistoryClosedEvent(_TransitionRecordEventBase):
 
 @dataclass(kw_only=True)
 class NonVersionTagEvent(_TransitionRecordEventBase):
-    """A tag deliberately outside the version model."""
+    """A tag deliberately outside the version model.
+
+    Operator-declared, through ``rlsbl transition record --non-version-tag
+    <tag>``. Read by :mod:`rlsbl.tag_explanation`, so ``rlsbl release
+    backfill`` stops listing the tag as unexplained and ``rlsbl release
+    reconcile`` stops owing a verdict on it.
+    """
 
     KIND: ClassVar[str] = KIND_NON_VERSION_TAG
 

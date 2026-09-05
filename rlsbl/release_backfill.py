@@ -1195,13 +1195,11 @@ def _resolutions(entry, plan):
         f'       {SHIPPED_AS_FIELD} = "{entry.tag}", and the pass records its\n'
         f"       commit from this tag.\n"
         f"    2. RECORD IT AS A NON-VERSION TAG, if it is not a release at all\n"
-        f"       (a nightly marker, a vendor tag imported with the history).\n"
-        f"       In Python:\n"
-        f"         from rlsbl.transition_record import (\n"
-        f"             NonVersionTagEvent, append_event)\n"
-        f"         append_event(\n"
-        f"             {plan.transition_record_path!r},\n"
-        f'             NonVersionTagEvent(tag="{entry.tag}", reason="<why>"))\n'
+        f"       (a nightly marker, a vendor tag imported with the history):\n"
+        f"         rlsbl transition record --non-version-tag {entry.tag} \\\n"
+        f"             --reason \"<why>\"\n"
+        f"       The declaration is appended to\n"
+        f"       {plan.transition_record_path}.\n"
         f"    3. DELETE IT, on your own explicit decision:\n"
         f"         git tag -d {entry.tag}\n"
         f"       (and on origin too, if it was ever pushed).\n"
