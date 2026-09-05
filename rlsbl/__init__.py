@@ -208,8 +208,9 @@ def _refuse_releasable_selector(*, standalone, subject):
     """
     if standalone:
         print(
-            "Error: --releasable is a monorepo selector and this is a "
-            "standalone repository, which has exactly one thing to release.",
+            f"Error: --releasable is a monorepo selector and this is a "
+            f"standalone repository, which has exactly one thing to be "
+            f"{subject}.",
             file=sys.stderr,
         )
     else:
