@@ -100,13 +100,24 @@ class TestValidateReplaceOrMangleRequired:
 
 
 class TestValidateReasonRequired:
-    """run_cmd must exit 1 when --reason is not provided."""
+    """--reason is required at registration: the framework refuses a scrub
+    invocation lacking it before the handler runs. (The old in-handler check
+    was removed when empty-value refusal moved to the CLI boundary, so a
+    reason-less flags dict can no longer reach run_cmd; this drives argv.)"""
 
-    def test_exits_with_error(self):
-        flags = {"pattern": "secret", "replace": "XXX", "from-commit": "abc"}
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(flags, ctx=_ctx("/fake"))
-        assert exc_info.value.code == 1
+    def test_parser_refuses_a_missing_reason(self):
+        import strictcli
+
+        from rlsbl import app
+
+        argv = [
+            "release", "scrub",
+            "--pattern", "secret", "--replace", "XXX",
+            "--from-commit", "abc",
+        ]
+        with pytest.raises(strictcli._ParseError) as exc_info:
+            app._parse(argv)
+        assert "reason" in str(exc_info.value)
 
 
 class TestValidateFromOrEntireHistoryRequired:
