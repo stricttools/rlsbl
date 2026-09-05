@@ -399,6 +399,27 @@ def _cmd_remove(args, flags, project_root):
     print(f"Removed project at {path}")
 
 
+#: The member flags a listing renders, each with the word it is shown as.
+#: Derived facts (``dev_node``) are deliberately absent: the row shows what
+#: the member DECLARES, and "dev-only outside every releasable" is already
+#: readable from the two columns beside each other.
+_LISTED_MEMBER_FLAGS = (
+    ("library", "library"),
+    ("dev_only", "dev-only"),
+    ("test_only", "test-only"),
+)
+
+
+def _listed_releasable(proj):
+    """How a member's releasable membership renders in a listing."""
+    value = proj.get("releasable")
+    if value is False:
+        return "false"
+    if isinstance(value, str) and value:
+        return value
+    return "--"
+
+
 def _cmd_list(flags, project_root):
     start = str(project_root)
     root = find_workspace_root(start)
@@ -412,12 +433,31 @@ def _cmd_list(flags, project_root):
         print("No projects in workspace.")
         return
 
-    name_width = max(len("Name"), max(len(p["name"]) for p in projects))
-    header_name = "Name".ljust(name_width)
-    print(f"{header_name}  Path")
+    # Name and path alone answer almost nothing: which releasable a member is
+    # versioned under, and what kind of member it is, are the two facts every
+    # other monorepo command branches on.
+    rows = []
     for proj in projects:
-        name_col = proj["name"].ljust(name_width)
-        print(f"{name_col}  {proj['path']}")
+        flags_shown = ", ".join(
+            word for key, word in _LISTED_MEMBER_FLAGS if proj.get(key)
+        )
+        rows.append((
+            proj["name"], proj["path"], _listed_releasable(proj), flags_shown,
+        ))
+
+    headers = ("Name", "Path", "Releasable", "Flags")
+    widths = [
+        max(len(headers[i]), max(len(row[i]) for row in rows))
+        for i in range(3)
+    ]
+
+    def _render(cells):
+        padded = "  ".join(cells[i].ljust(widths[i]) for i in range(3))
+        return f"{padded}  {cells[3]}".rstrip()
+
+    print(_render(headers))
+    for row in rows:
+        print(_render(row))
 
 
 def _latest_release_for_row(changes_dir, tag_glob):

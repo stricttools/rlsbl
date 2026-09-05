@@ -242,6 +242,42 @@ class TestList:
         assert "tooling" in captured.out
         assert "core" in captured.out
 
+    def test_it_lists_the_member_facts_its_help_promises(
+        self, mock_git_repo, capsys
+    ):
+        """Name and path alone answer almost nothing about a workspace.
+
+        The row that matters is which releasable a member is versioned under,
+        and what kind of member it is: the two facts every other monorepo
+        command branches on.
+        """
+        _cmd_init({"root-dev-node": True}, project_root=".")
+        _make_npm_project(mock_git_repo, "core")
+        _make_npm_project(mock_git_repo, "harness")
+        _cmd_add(
+            ["core"], {"releasable": "core", "library": "true"},
+            project_root=".",
+        )
+        _cmd_add(
+            ["harness"], {"releasable": "false", "dev_only": "true"},
+            project_root=".",
+        )
+        capsys.readouterr()
+        _cmd_list({}, project_root=".")
+        out = capsys.readouterr().out
+
+        assert "Releasable" in out
+        assert "Flags" in out
+        core_row = next(line for line in out.splitlines() if line.startswith("core"))
+        assert "core" in core_row.split()[2]
+        assert "library" in core_row
+        harness_row = next(
+            line for line in out.splitlines() if line.startswith("harness")
+        )
+        assert "dev-only" in harness_row
+        root_row = next(line for line in out.splitlines() if line.startswith("root"))
+        assert "dev-only" in root_row
+
     def test_fresh_workspace_lists_its_root_member(self, mock_git_repo, capsys):
         """A workspace always has at least its root member, so it is never empty."""
         _cmd_init({"root-dev-node": True}, project_root=".")

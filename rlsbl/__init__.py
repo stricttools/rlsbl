@@ -1931,7 +1931,7 @@ def cmd_mono_remove(ctx, path):
     _cmd_remove([path], {}, project_root=root)
 
 
-@mono.command(name="list", help="Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as subtree remotes, inter-project dependencies, and whether the project is marked as a library.", effect="read_only")
+@mono.command(name="list", help="Display every member registered in the monorepo workspace.toml file, one row each: the member's name, its path relative to the repo root, the releasable it is versioned under (or false when it is opted out of versioning, or -- when it declares none), and the member flags it carries (library, dev-only, test-only). A release target is not among them -- targets are detected from each member's own manifests, never declared in workspace.toml -- and neither is a mirror destination, which belongs to the releasable rather than the member.", effect="read_only")
 @effects.handler
 def cmd_mono_list(ctx):
     """Display all projects registered in the monorepo workspace."""
