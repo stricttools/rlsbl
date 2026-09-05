@@ -107,8 +107,21 @@ def _resolve_version_and_tag(ctx):
     return version, tag
 
 
+# Sentinel for the per-context memo caches below: ``None`` is a real answer
+# from both resolutions ("no changelog context here"), so absence cannot be
+# spelled as ``None`` without re-resolving on every miss-that-was-a-hit.
+_UNRESOLVED = object()
+
+
 def _get_changelog_context(ctx):
     """Resolve changes_dir, tag_glob, scope, and entries for changelog checks.
+
+    Memoized on the check-run context object, which is what makes the answer
+    cacheable at all: every input -- the workspace root, the project root, the
+    member list, the releasable list -- is fixed for the life of one context,
+    so within one context the resolution is a constant.  A FRESH context
+    resolves fresh, so nothing here can serve an answer across a tree that
+    moved; the cache never outlives the run that built it.
 
     Returns ``(changes_dir, tag_glob, scope, entries)`` or ``None`` when the
     changes directory does not exist (caller should return skip).
@@ -124,6 +137,16 @@ def _get_changelog_context(ctx):
     directory (``.rlsbl-monorepo/releasables/{name}/changes/``) and
     ``tag_glob`` is derived from the releasable's ``tag_format``.
     """
+    cached = getattr(ctx, "_changelog_context_cache", _UNRESOLVED)
+    if cached is not _UNRESOLVED:
+        return cached
+    resolved = _resolve_changelog_context(ctx)
+    ctx._changelog_context_cache = resolved
+    return resolved
+
+
+def _resolve_changelog_context(ctx):
+    """Do the work :func:`_get_changelog_context` memoizes.  Never call directly."""
     from ..ownership import OwnershipScope
     from ..changelog.files import get_changes_dir, read_unreleased
     from ..workspace import (
@@ -299,7 +322,22 @@ def _get_all_changelog_contexts(ctx):
 
     Returns a list of ``(changes_dir, tag_glob, scope, entries)`` tuples,
     or an empty list when no contexts are available (caller should skip).
+
+    Memoized on the check-run context for the same reason
+    :func:`_get_changelog_context` is: every changelog check asks for this same
+    list, and re-deriving it per check re-walked the workspace and re-read every
+    releasable's ``unreleased.jsonl`` from disk once per check.
     """
+    cached = getattr(ctx, "_all_changelog_contexts_cache", _UNRESOLVED)
+    if cached is not _UNRESOLVED:
+        return cached
+    resolved = _resolve_all_changelog_contexts(ctx)
+    ctx._all_changelog_contexts_cache = resolved
+    return resolved
+
+
+def _resolve_all_changelog_contexts(ctx):
+    """Do the work :func:`_get_all_changelog_contexts` memoizes.  Never call directly."""
     from ..changelog.files import read_unreleased
     from ..ownership import OwnershipScope
     from ..workspace import (
