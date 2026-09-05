@@ -15,6 +15,7 @@ import time
 
 from ..member_context import resolve_member_context
 from ..publication_probe import PublicationStatus
+from ..release_publication import read_release_body
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
@@ -216,8 +217,10 @@ def _mark_github_release(tag, reason, use, dry_run):
     """Mark GitHub release as pre-release with a yank notice."""
     notice = _build_yank_notice(reason, use)
 
+    # Read through the one Release-document reader; an unreadable body leaves
+    # the notice standing alone rather than aborting the yank.
     try:
-        current_body = run_gh(["release", "view", tag, "--json", "body", "--jq", ".body"])
+        current_body = read_release_body(tag, gh=run_gh)
     except Exception:
         current_body = ""
 

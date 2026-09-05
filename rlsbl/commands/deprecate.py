@@ -5,6 +5,7 @@ import sys
 import time
 
 from ..member_context import resolve_member_context
+from ..release_publication import read_release_body
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
@@ -121,9 +122,11 @@ def _soft_deprecate(tag, reason, use, dry_run):
     # Build deprecation notice
     notice = _build_notice(reason, use)
 
-    # Get current release body
+    # The existing body, read through the one reader that knows how a Release
+    # document is fetched. Unreadable (no gh, no Release, a network failure) is
+    # not fatal: the notice is the point, and it stands on its own.
     try:
-        current_body = run_gh(["release", "view", tag, "--json", "body", "--jq", ".body"])
+        current_body = read_release_body(tag, gh=run_gh)
     except Exception:
         current_body = ""
 
