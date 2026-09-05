@@ -293,6 +293,53 @@ class TestMissingArchive:
             assert source in text, source
 
 
+class TestThePredecessorIsResolvedUnderEverySpelling:
+    """"This version's commits" is a RANGE, and the range's start is a tag.
+
+    When the predecessor shipped under a historical spelling -- the case a
+    rename leaves behind, recorded in its archive's ``shipped_as`` -- resolving
+    the predecessor under the current scheme alone finds nothing, the range
+    opens on the left, and the description quotes commits belonging to earlier
+    versions as if they were this one's.
+    """
+
+    @pytest.fixture
+    def repo(self, tmp_path):
+        repo = make_standalone(tmp_path, name="renamed-range")
+        commit_file(repo, "a.txt", "a\n", "the first release's own work")
+        git(repo, "tag", "old-name@v0.1.0")
+        path = Path(repo / ".rlsbl" / "releases") / "v0.1.0.toml"
+        path.write_text(
+            "format_version = 1\n"
+            'bump = "minor"\ninclude = ["pypi"]\nexclude = []\n'
+            'description = "Shipped under the old name."\n'
+            'shipped_as = "old-name@v0.1.0"\n',
+            encoding="utf-8",
+        )
+        os.chmod(path, 0o444)
+        write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.1.0")
+        commit_file(repo, "b.txt", "b\n", "the second release's own work")
+        git(repo, "tag", "v0.2.0")
+        write_changelog_jsonl(repo / ".rlsbl" / "changes", "0.2.0")
+        return repo
+
+    def test_the_range_starts_at_the_historical_spelling(self, repo):
+        run_backfill(repo)
+        data = read_toml(repo / ".rlsbl" / "releases" / "v0.2.0.toml")
+        assert "the second release's own work" in data["description"]
+        assert "the first release's own work" not in data["description"], (
+            "the predecessor resolved under its recorded spelling, so the "
+            "range excludes the commits that shipped in it"
+        )
+
+    def test_the_source_note_names_a_bounded_span(self, repo):
+        run_backfill(repo)
+        text = (repo / ".rlsbl" / "releases" / "v0.2.0.toml").read_text()
+        assert "commit-subjects:" in text
+        span = text.split("commit-subjects:")[1].split(".\n")[0]
+        assert ".." in span, "an open-ended range means no predecessor resolved"
+
+
 def test_derive_bump_arithmetic():
     assert backfill.derive_bump("1.0.0", "0.9.3") == "major"
     assert backfill.derive_bump("0.4.0", "0.3.9") == "minor"

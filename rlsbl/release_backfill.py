@@ -1211,6 +1211,11 @@ def _plan_version(repo, scope, version, *, predecessor, archives, changelogs,
         if override is not None:
             return override.description, "overrides-file"
         if predecessor and predecessor_sha is None:
+            # Under EVERY spelling the predecessor owns, its recorded aliases
+            # included: a predecessor that shipped before a rename stands under
+            # the spelling its archive names in shipped_as, and resolving it
+            # under today's scheme alone would leave the range open on the left
+            # and quote earlier versions' commits as if they were this one's.
             for candidate in scope.tag_candidates(predecessor):
                 predecessor_sha = rev_parse(repo, f"{candidate}^{{commit}}")
                 if predecessor_sha:
