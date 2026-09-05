@@ -566,7 +566,7 @@ class TestCmdDiscover:
 class TestCmdWatch:
     def test_sha_and_run_id_mutual_exclusion(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_watch(cli_ctx(), target="", run_id=["123"], sha="abc")
+            rlsbl.cmd_watch(cli_ctx(), target=None, run_id=["123"], sha="abc")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.watch.run_cmd")
@@ -577,7 +577,7 @@ class TestCmdWatch:
 
     @patch("rlsbl.commands.watch.run_cmd")
     def test_no_args_uses_head(self, mock_run):
-        rlsbl.cmd_watch(cli_ctx(), target="", run_id=[])
+        rlsbl.cmd_watch(cli_ctx(), target=None, run_id=[])
         mock_run.assert_called_once()
         assert mock_run.call_args[0][1] == []
 
@@ -787,7 +787,7 @@ class TestCmdMonoCheckNames:
     @patch("rlsbl.commands.monorepo._cmd_check_names")
     def test_delegates(self, mock_check, _):
         rlsbl._variadic_args = ["pkg-a"]
-        rlsbl.cmd_mono_check_names(cli_ctx(), target="npm", prefix="@scope/", suffix="", delay="500")
+        rlsbl.cmd_mono_check_names(cli_ctx(), target="npm", prefix="@scope/", suffix=None, delay="500")
         mock_check.assert_called_once()
         flags = mock_check.call_args[0][1]
         assert flags["prefix"] == "@scope/"

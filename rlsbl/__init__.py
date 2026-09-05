@@ -819,6 +819,7 @@ _STATUS_PAYLOAD_SCHEMA = {
 @effects.handler
 def cmd_status(ctx, target, registry):
     """Display project version, branch, last tag, and changelog coverage."""
+    _refuse_empty_flags(target=target)
     # --json is framework-owned: strictcli reserves the name at every level and
     # delivers the value on the Context.
     json = ctx.json
@@ -1078,6 +1079,8 @@ def cmd_claim_name(ctx, target, force_publish):
 @effects.handler
 def cmd_release_edit(ctx, version=None):
     """Sync GitHub Release notes with the CHANGELOG.md entry for a version."""
+    # Absence still means the current version; an empty argument names none.
+    _refuse_empty_args(version=version)
     dry_run = ctx.dry_run
     root = _require_sub_project_root()
     args = [version] if version else []
@@ -1096,6 +1099,9 @@ def cmd_release_edit(ctx, version=None):
 @effects.handler
 def cmd_release_undo(ctx, target, version):
     """Revert a release by deleting the GitHub Release, tag, and version commit."""
+    # An empty --version used to reach `is_latest = not version_flag` and undo
+    # the LATEST release -- the deletion the caller did not ask for.
+    _refuse_empty_flags(target=target, version=version)
     dry_run = ctx.dry_run
     root = _require_project_root()
     from .workspace import find_workspace_root
@@ -1117,6 +1123,8 @@ def cmd_release_undo(ctx, target, version):
 @effects.handler
 def cmd_release_deprecate(ctx, reason, use, version):
     """Mark a past release as deprecated on GitHub."""
+    _refuse_empty_flags(reason=reason, use=use)
+    _refuse_empty_args(version=version)
     dry_run = ctx.dry_run
     root = _require_sub_project_root()
     args = [version]
@@ -1140,6 +1148,8 @@ def cmd_release_deprecate(ctx, reason, use, version):
 @effects.handler
 def cmd_release_yank(ctx, reason, use, version):
     """Remove a published version from package registries."""
+    _refuse_empty_flags(reason=reason, use=use)
+    _refuse_empty_args(version=version)
     dry_run = ctx.dry_run
     root = _require_sub_project_root()
     args = [version]
@@ -1290,6 +1300,7 @@ def cmd_release_scrub(
 @effects.handler
 def cmd_release_backfill(ctx, overrides, auto_commit):
     """Backfill this repository's release archives from its real history."""
+    _refuse_empty_flags(overrides=overrides)
     dry_run = ctx.dry_run
     root = _require_project_root()
     from .workspace import find_workspace_root
@@ -1390,6 +1401,11 @@ def cmd_discover(ctx, mine):
 @effects.handler
 def cmd_watch(ctx, target, run_id, sha=None):
     """Poll GitHub Actions CI workflow runs for a commit and report status."""
+    # --run-id is repeatable, so the refusal walks its elements: one empty
+    # element names no run, and a list that silently drops it would watch the
+    # others as though the caller had asked for exactly them.
+    _refuse_empty_flags(target=target, run_id=run_id)
+    _refuse_empty_args(sha=sha)
     if sha and run_id:
         print("Error: cannot use both SHA and --run-id", file=sys.stderr)
         sys.exit(1)
@@ -1518,6 +1534,10 @@ def cmd_targets(ctx):
 @effects.handler
 def cmd_deploy(ctx, target, target_name=None):
     """Run the configured deployment pipeline for the project."""
+    _refuse_empty_flags(target=target)
+    # Absence still means the pipeline's default target; an empty argument
+    # names none.
+    _refuse_empty_args(target_name=target_name)
     dry_run = ctx.dry_run
     root = _require_sub_project_root()
     ctx = create_context(root)
@@ -1683,6 +1703,14 @@ def cmd_chlog_amend(ctx, version, commits, id, description, type, user_facing, v
 @effects.handler
 def cmd_chlog_edit(ctx, commits, id, type, description, user_facing, auto_commit):
     """Modify an existing changelog entry by commit hash or entry ID."""
+    # An empty --description used to be read as "no description was asked
+    # for", so the edit ran, wrote nothing, and reported success. Clearing the
+    # field is a different statement, and it has its own flag.
+    _refuse_empty_flags(commits=commits, id=id)
+    _refuse_empty_flags(
+        "To clear the entry's description instead, pass --unset-description.",
+        description=description,
+    )
     dry_run = ctx.dry_run
     auto_commit = _opt_default(auto_commit, True)
     root = _require_sub_project_root()
@@ -1881,6 +1909,9 @@ def cmd_mono_add(ctx, name, target, depends_on, library, dev_only, releasable, t
 @effects.handler
 def cmd_mono_remove(ctx, path):
     """Unregister a project from the monorepo workspace.toml by path."""
+    # An empty path matched no member and exited 0 with a warning, so a
+    # scripted removal reported success having removed nothing.
+    _refuse_empty_args(path=path)
     root = _require_project_root()
     from .commands.monorepo import _cmd_remove
     _cmd_remove([path], {}, project_root=root)
@@ -1928,6 +1959,7 @@ def cmd_mono_status(ctx):
 @effects.handler
 def cmd_mono_check_names(ctx, target, prefix, suffix, delay):
     """Check package name availability across registries for all workspace projects."""
+    _refuse_empty_flags(prefix=prefix, suffix=suffix, delay=delay)
     root = _require_project_root()
     flags = {"target": target, "prefix": prefix or "", "suffix": suffix or "", "delay": delay}
     from .commands.monorepo import _cmd_check_names
