@@ -519,3 +519,135 @@ class TestTheRecordAnswersShippedAs:
         # nothing shipped shipped under no name.
         repo, _shas = phantom_topped
         assert release_record.read_entry(_releases(repo), "0.3.0").shipped_as is None
+
+
+# --------------------------------------------------------------------------- #
+# The remedies these two errors print are PERFORMED here, exactly as printed,
+# and the error must then be gone. An error that names a remedy is a promise;
+# these tests are what keep the promise true as the messages are edited.
+# --------------------------------------------------------------------------- #
+
+class TestTheNoFateRemedyPerformedVerbatim:
+    """The archive-records-no-fate error's own four-step recovery."""
+
+    def _repo_with_a_fateless_archive(self, tmp_path, monkeypatch):
+        r = _init_repo(tmp_path / "fateless")
+        monkeypatch.chdir(r)
+        sha = _commit(r, "v0.1.0")
+        _git(r, "tag", "v0.1.0")
+        releases = r / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        archive = releases / "v0.1.0.toml"
+        archive.write_text(_BASE)
+        # Locked like every real archive, so step 1 of the remedy is real work.
+        os.chmod(archive, 0o444)
+        return r, sha, archive
+
+    def _remedy_lines(self, message):
+        """The exact lines the error tells the operator to append."""
+        sha_line = next(
+            line.strip() for line in message.splitlines()
+            if line.strip().startswith("candidate_sha = ")
+        )
+        assert '"' in sha_line, "the error must name the value to record"
+        return sha_line
+
+    def test_performing_the_printed_recovery_clears_the_error(
+        self, tmp_path, monkeypatch,
+    ):
+        r, sha, archive = self._repo_with_a_fateless_archive(tmp_path, monkeypatch)
+
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(_releases(r), "0.1.0")
+        message = str(exc.value)
+
+        # The error derives the value from the version's own tag.
+        assert f'Its tag "v0.1.0" points at {sha}' in message
+        sha_line = self._remedy_lines(message)
+        assert sha in sha_line
+
+        # Step 1: unlock the archive -- "chmod 644 <path>".
+        os.chmod(archive, 0o644)
+        # Step 2: append the release commit, in the form the error printed.
+        #         The tree comes from the command the error names.
+        tree = _git(r, "rev-parse", f"{sha}^{{tree}}")
+        with open(archive, "a", encoding="utf-8") as f:
+            f.write(f"{sha_line}\n[tree_hashes]\n\".\" = \"{tree}\"\n")
+        # Step 3: relock it.
+        os.chmod(archive, 0o444)
+
+        # Step 4: re-run the read. The error is gone, and the entry is recorded.
+        entry = release_record.read_entry(_releases(r), "0.1.0")
+        assert entry.recorded is True
+        assert entry.candidate_sha == sha
+        assert entry.unrecoverable is False
+        assert entry.never_released is False
+
+    def test_the_alternative_the_error_names_also_clears_it(
+        self, tmp_path, monkeypatch,
+    ):
+        """With no tag to derive from, the error offers the marker instead.
+
+        Its words: "record the version as unrecoverable instead (unrecoverable
+        = true, and no candidate_sha/tree_hashes)".
+        """
+        r = _init_repo(tmp_path / "tagless")
+        monkeypatch.chdir(r)
+        _commit(r, "one")
+        releases = r / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        archive = releases / "v0.1.0.toml"
+        archive.write_text(_BASE)
+        os.chmod(archive, 0o444)
+
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(_releases(r), "0.1.0")
+        assert f"{UNRECOVERABLE_FIELD} = true" in str(exc.value)
+
+        os.chmod(archive, 0o644)
+        with open(archive, "a", encoding="utf-8") as f:
+            f.write(f"{UNRECOVERABLE_FIELD} = true\n")
+        os.chmod(archive, 0o444)
+
+        entry = release_record.read_entry(_releases(r), "0.1.0")
+        assert entry.unrecoverable is True
+
+
+class TestTheEditableFileRemedyPerformedVerbatim:
+    """"Remove them from the release file and re-run." -- performed."""
+
+    def test_removing_the_named_fields_clears_the_refusal(self, tmp_path):
+        path = _write(
+            tmp_path,
+            _BASE
+            + f'{SHIPPED_AS_FIELD} = "lib@v0.4.0"\n'
+            + f'candidate_sha = "{_SHA}"\n',
+            name="unreleased.toml",
+        )
+
+        with pytest.raises(ReleaseValidationError) as exc:
+            validate_no_authored_release_commit(read_release_file(path))
+        message = str(exc.value)
+        assert "Remove them from" in message
+
+        # The remedy is performed on the named fields and nothing else: every
+        # field the error listed is deleted from the file, in place.
+        named = [
+            name for name in (SHIPPED_AS_FIELD, NEVER_RELEASED_FIELD,
+                              UNRECOVERABLE_FIELD, "candidate_sha",
+                              "tree_hashes")
+            if name in message
+        ]
+        assert SHIPPED_AS_FIELD in named and "candidate_sha" in named
+        kept = [
+            line for line in open(path, encoding="utf-8").read().splitlines()
+            if not any(line.startswith(f"{name} = ") for name in named)
+        ]
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(kept) + "\n")
+
+        # Re-run: clean, and the rest of the release file survived.
+        cfg = read_release_file(path)
+        validate_no_authored_release_commit(cfg)
+        assert cfg.bump == "patch"
+        assert cfg.description == "x"
