@@ -19,7 +19,11 @@ from ..changelog.files import (
 from ..changelog.generate import generate_changelog
 from ..changelog.resolve import resolve_hash
 from ..changelog.schema import ChangelogEntry, generate_entry_id, parse_jsonl, serialize_entry, validate_schema
-from ..changelog.validate import _get_batch_limits_config
+from ..changelog.validate import (
+    NO_DECLARED_OWNER,
+    _foreign_owner_description,
+    _get_batch_limits_config,
+)
 from ..config import read_project_config
 from ..git_util import filter_commits_for_scope
 from ..ownership import OwnershipError, OwnershipScope, releasable_state_dir
@@ -177,11 +181,41 @@ def _check_project_scope(resolved_commits, ws_context):
                 f"Every file belongs to exactly one workspace member: the "
                 f"most specific declared path in workspace.toml wins, and the "
                 f"root member owns whatever no other member claims."
-                f"{state_claim} Add the entry from the owning member's "
-                f"directory instead.",
+                f"{state_claim} {_out_of_scope_remedy(sha, scope)}",
                 file=sys.stderr,
             )
             sys.exit(1)
+
+
+def _out_of_scope_remedy(sha, scope):
+    """What to do about a commit this changelog's scope does not cover.
+
+    Two cases, because there are two worlds. When another member owns the
+    commit's files there is a directory to file the entry from, and the remedy
+    names its owner. When NOTHING owns them -- every path the commit touches is
+    tool-owned, rlsbl's own bookkeeping (a regenerated snapshot, a generated
+    router) -- there is no owning member's directory anywhere, so telling the
+    reader to go to one names a place that does not exist. Such a commit needs
+    no changelog coverage at all, so the answer is to add no entry.
+
+    The sibling reader-side finding
+    (:func:`rlsbl.changelog.validate._out_of_scope_detail`) splits on exactly
+    the same condition, and both ask
+    :func:`~rlsbl.changelog.validate._foreign_owner_description` who the owner
+    is, so the two never disagree about whether one exists.
+    """
+    owner = _foreign_owner_description(sha, scope)
+    if owner == NO_DECLARED_OWNER:
+        return (
+            "Every file it touches is tool-owned, so no changelog covers it "
+            "and there is nowhere to add the entry: commits like this are "
+            "exempt from changelog coverage, and no entry should be added for "
+            "this one anywhere."
+        )
+    return (
+        f"Its files belong to {owner}: add the entry from the owning member's "
+        f"directory instead."
+    )
 
 
 def _entry_ref(entry, ordinal):

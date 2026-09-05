@@ -221,6 +221,80 @@ class TestChangelogAddRejectsOutOfScopeCommit:
         assert releasable_state_dir("alpha") in captured.err
 
 
+class TestChangelogAddRefusesAToolOwnedCommit:
+    """A commit whose every file is rlsbl's own bookkeeping has no owner.
+
+    No member's declared path claims a tool-owned path and no releasable claims
+    one outside its own state directory, so "add the entry from the owning
+    member's directory instead" names a directory that does not exist. Such a
+    commit needs no changelog coverage anywhere -- it is exempt -- so the
+    refusal has to say that instead of sending the reader hunting.
+    """
+
+    def _snapshot_commit(self, root):
+        """A commit touching only the workspace's generated snapshot."""
+        return make_commit(
+            root, f"{WORKSPACE_DIR}/snapshot.json", '{"packages": []}\n',
+        )
+
+    def _add(self, root, monkeypatch):
+        alpha_dir = root / "alpha"
+        monkeypatch.chdir(alpha_dir)
+        sha = self._snapshot_commit(root)
+        flags = {
+            "commits": sha[:12],
+            "description": "Should fail",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        with pytest.raises(SystemExit) as exc_info:
+            cmd_add(flags, project_root=alpha_dir)
+        assert exc_info.value.code == 1
+        return sha
+
+    def test_it_says_the_files_are_tool_owned_and_need_no_coverage(
+        self, monorepo_with_projects, monkeypatch, capsys,
+    ):
+        sha = self._add(monorepo_with_projects, monkeypatch)
+
+        err = capsys.readouterr().err
+        assert sha[:12] in err
+        assert "tool-owned" in err
+        assert "no changelog covers it" in err
+
+    def test_it_does_not_name_a_directory_that_does_not_exist(
+        self, monorepo_with_projects, monkeypatch, capsys,
+    ):
+        self._add(monorepo_with_projects, monkeypatch)
+
+        err = capsys.readouterr().err
+        assert "owning member's directory" not in err
+
+    def test_a_commit_another_member_owns_still_says_where_to_file_it(
+        self, monorepo_with_projects, monkeypatch, capsys,
+    ):
+        """The owned branch keeps its remedy: there IS a directory to go to."""
+        root = monorepo_with_projects
+        alpha_dir = root / "alpha"
+        monkeypatch.chdir(alpha_dir)
+        sha = make_commit(root, "beta/src.py", "beta change")
+
+        flags = {
+            "commits": sha[:12],
+            "description": "Should fail",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+        }
+        with pytest.raises(SystemExit):
+            cmd_add(flags, project_root=alpha_dir)
+
+        err = capsys.readouterr().err
+        assert "owning member's directory" in err
+        assert "tool-owned" not in err
+
+
 class TestChangelogAddSkipsValidationStandalone:
     """Standalone projects (no monorepo) skip scope validation entirely."""
 
