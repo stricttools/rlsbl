@@ -779,6 +779,19 @@ def _release_commit_tree_table(tree_hashes: dict):
     return table
 
 
+def _fate_markers_in(doc) -> list[str]:
+    """Which fate markers a parsed release document already carries.
+
+    PRESENCE, not truth, exactly as the schema's mutual-exclusion rule judges
+    it: rlsbl writes a marker only when it is true, so ``unrecoverable = false``
+    beside a release commit is a hand-authored document either way, and reading
+    it as "no marker" would let a writer produce the very document the schema
+    refuses.
+    """
+    return [name for name in (UNRECOVERABLE_FIELD, NEVER_RELEASED_FIELD)
+            if name in doc]
+
+
 def write_release_commit(path: str, *, candidate_sha: str, tree_hashes: dict) -> None:
     """Author the release commit into an already-written release file.
 
@@ -788,13 +801,35 @@ def write_release_commit(path: str, *, candidate_sha: str, tree_hashes: dict) ->
     archive is never observable as a writable file that already records its
     release commit, and never as a locked file that does not.
 
+    Refuses a document that already carries a fate marker. An archive has ONE
+    fate, and a release commit written beside ``unrecoverable`` or
+    ``never_released`` is a document the schema rejects and every later read
+    raises on -- so the conflict is refused here, where the file is still
+    intact, rather than discovered by whoever reads the archive next.
+
     The document is otherwise preserved as written -- tomlkit round-trips the
     operator's comments, ordering and formatting -- so the archive still reads
-    as the file the operator authored, plus the two fields the flow owns.
+    as the file the operator authored, plus the two fields the flow owns.  Only
+    the release-commit fields are cleared before they are re-authored: this is
+    also the writer the release-commit remap goes through, and ``shipped_as``
+    (which is not a fate, and which no rewrite invalidates) must survive it.
     """
     _check_release_commit(candidate_sha, tree_hashes)
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.loads(f.read())
+    markers = _fate_markers_in(doc)
+    if markers:
+        raise ReleaseFileError(
+            f"refusing to write a release commit into {path}: it already "
+            f"records the {', '.join(markers)} fate. A release document states "
+            f"ONE fate -- a recorded release commit (candidate_sha + "
+            f"tree_hashes), {UNRECOVERABLE_FIELD} = true, or "
+            f"{NEVER_RELEASED_FIELD} = true -- and candidate_sha beside "
+            f"{markers[0]} is a document the schema refuses and every reader "
+            f"raises on. If this version's fate really changed, remove the "
+            f"marker first: unlock the file (chmod 644), delete the "
+            f"{markers[0]} line, relock it (chmod 444), and re-run."
+        )
     for f_name in RELEASE_COMMIT_FIELDS:
         if f_name in doc:
             del doc[f_name]
@@ -838,16 +873,36 @@ def write_unrecoverable_marker(path: str) -> None:
     The counterpart to :func:`write_release_commit` for the backfill pass: a
     released version with no tag under any recognized scheme and no version-bump
     commit in history cannot be recorded, and the archive says so permanently
-    rather than being passed over in silence. Refuses an archive that already
-    carries a release commit -- a recorded version is by definition not unrecoverable.
+    rather than being passed over in silence.
+
+    Refuses an archive whose fate is already settled the other way: one
+    carrying a release commit (a recorded version is by definition not
+    unrecoverable), and one carrying ``never_released`` (a version no release
+    ever used did not ship from a commit that could be lost). Either
+    combination would produce a two-fate document the schema refuses.
     """
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.loads(f.read())
     present = [name for name in RELEASE_COMMIT_FIELDS if name in doc]
     if present:
         raise ReleaseFileError(
-            f"refusing to mark {path} unrecoverable: it already carries "
-            f"{', '.join(present)}"
+            f"refusing to mark {path} {UNRECOVERABLE_FIELD}: it already "
+            f"carries {', '.join(present)}, which records that this version "
+            f"shipped from a known commit. A release document states ONE "
+            f"fate, and the two together are a document the schema refuses."
+        )
+    if NEVER_RELEASED_FIELD in doc:
+        raise ReleaseFileError(
+            f"refusing to mark {path} {UNRECOVERABLE_FIELD}: it already "
+            f"records {NEVER_RELEASED_FIELD} = true. Those are different "
+            f"claims about different things -- {UNRECOVERABLE_FIELD} says a "
+            f"version SHIPPED from a commit nothing can name, while "
+            f"{NEVER_RELEASED_FIELD} says no release was ever published under "
+            f"this version number at all -- and a document carrying both is "
+            f"one the schema refuses and every reader raises on. If this "
+            f"version really did ship, remove the {NEVER_RELEASED_FIELD} line "
+            f"first: unlock the file (chmod 644), delete it, relock it "
+            f"(chmod 444), and re-run."
         )
     doc[UNRECOVERABLE_FIELD] = True
     effects.atomic_write_text(path, tomlkit.dumps(doc))

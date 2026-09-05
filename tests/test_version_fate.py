@@ -41,6 +41,8 @@ from rlsbl.release_file import (
     ReleaseConfig,
     read_release_file,
     write_archived_release_file,
+    write_release_commit,
+    write_unrecoverable_marker,
 )
 
 _SHA = "a" * 40
@@ -273,6 +275,92 @@ class TestWriter:
                 description="d", candidate_sha=None, tree_hashes=None,
                 never_released=True, shipped_as="lib@v0.4.0",
             )
+
+
+# --------------------------------------------------------------------------- #
+# The two primitives that edit an ALREADY-WRITTEN archive keep the one-fate
+# rule too. `write_archived_release_file` composes a whole document and refuses
+# a mixed one on the way out; these two ADD a fate to a document somebody else
+# wrote, so each has to read the fate already there and refuse the combination
+# rather than produce a two-fate document the schema rejects and every reader
+# then raises on.
+# --------------------------------------------------------------------------- #
+
+class TestEditingPrimitivesRefuseASecondFate:
+
+    def _archive(self, tmp_path, body, name="v0.4.0.toml"):
+        return _write(tmp_path, body, name=name)
+
+    def test_the_marker_refuses_a_never_released_archive(self, tmp_path):
+        path = self._archive(
+            tmp_path, _BASE + f"{NEVER_RELEASED_FIELD} = true\n",
+        )
+        with pytest.raises(ReleaseFileError) as exc:
+            write_unrecoverable_marker(path)
+        text = str(exc.value)
+        assert path in text
+        assert NEVER_RELEASED_FIELD in text
+        assert UNRECOVERABLE_FIELD in text
+        # And the file it refused to write is still the readable one-fate
+        # document it was.
+        assert read_release_file(path).never_released is True
+
+    def test_the_marker_still_refuses_a_recorded_archive(self, tmp_path):
+        path = self._archive(tmp_path, _recorded())
+        with pytest.raises(ReleaseFileError) as exc:
+            write_unrecoverable_marker(path)
+        assert "candidate_sha" in str(exc.value)
+
+    def test_the_release_commit_writer_refuses_a_never_released_archive(
+        self, tmp_path,
+    ):
+        path = self._archive(
+            tmp_path, _BASE + f"{NEVER_RELEASED_FIELD} = true\n",
+        )
+        with pytest.raises(ReleaseFileError) as exc:
+            write_release_commit(path, candidate_sha=_SHA,
+                                 tree_hashes={".": _TREE})
+        text = str(exc.value)
+        assert path in text
+        assert NEVER_RELEASED_FIELD in text
+        assert read_release_file(path).never_released is True
+
+    def test_the_release_commit_writer_refuses_an_unrecoverable_archive(
+        self, tmp_path,
+    ):
+        path = self._archive(
+            tmp_path, _BASE + f"{UNRECOVERABLE_FIELD} = true\n",
+        )
+        with pytest.raises(ReleaseFileError) as exc:
+            write_release_commit(path, candidate_sha=_SHA,
+                                 tree_hashes={".": _TREE})
+        text = str(exc.value)
+        assert path in text
+        assert UNRECOVERABLE_FIELD in text
+        assert read_release_file(path).unrecoverable is True
+
+    def test_the_release_commit_writer_preserves_shipped_as(self, tmp_path):
+        """`shipped_as` is not a fate, and the remap path re-writes through here.
+
+        The writer clears the release-commit fields it is about to re-author;
+        clearing every flow-owned field instead would silently drop the tag
+        spelling a version shipped under, on every scrub that moves a commit.
+        """
+        path = self._archive(
+            tmp_path,
+            _recorded(f'{SHIPPED_AS_FIELD} = "lib@v0.4.0"\n'),
+        )
+        write_release_commit(path, candidate_sha="c" * 40,
+                             tree_hashes={".": "d" * 40})
+        cfg = read_release_file(path)
+        assert cfg.shipped_as == "lib@v0.4.0"
+        assert cfg.candidate_sha == "c" * 40
+
+    def test_a_recorded_archive_is_still_re_recordable(self, tmp_path):
+        path = self._archive(tmp_path, _recorded())
+        write_release_commit(path, candidate_sha="c" * 40,
+                             tree_hashes={".": "d" * 40})
+        assert read_release_file(path).candidate_sha == "c" * 40
 
 
 # --------------------------------------------------------------------------- #
