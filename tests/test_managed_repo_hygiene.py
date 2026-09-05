@@ -163,6 +163,59 @@ class TestStashRefusesTheGuardedOperations:
         combined = capsys.readouterr()
         assert "git stash drop" in (combined.err + combined.out)
 
+    def test_performing_the_named_remedy_clears_the_refusal(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """The remedy the refusal names is followed here, not just quoted.
+
+        A refusal is only as good as the way out it offers, so this runs the
+        exact command the message prints and asserts the same operation stops
+        refusing -- once for the check that reports the stash first, and once
+        for the operation that would otherwise have run over it.
+        """
+        from rlsbl.commands.release_reconcile import run_cmd
+        from rlsbl.git_util import stash_entries
+
+        repo = _repo_with_stash(tmp_path, name="stash-remedy")
+        monkeypatch.chdir(repo)
+        checks = capture_all_checks()
+
+        def _stash_free():
+            return checks["stash-free"](ProjectContext(
+                project_root=repo, workspace_root=None, config={},
+            ))
+
+        def _reconcile_output():
+            # Whatever stops the apply, the question here is only whether the
+            # stash is still what stops it -- so every failure shape is caught
+            # and answered from the output.
+            try:
+                run_cmd(
+                    {"mode": "apply", "quiet": True},
+                    ctx=ProjectContext(
+                        project_root=Path("."), workspace_root=None,
+                        config={"publish_mode": "ci", "pipelines": {}},
+                    ),
+                )
+            except BaseException:  # noqa: BLE001 -- SystemExit included
+                pass
+            captured = capsys.readouterr()
+            return captured.err + captured.out
+
+        refused = _reconcile_output()
+        assert "stash" in refused
+        assert _stash_free().status == "fail"
+
+        # The remedy, verbatim from the refusal.
+        assert "git stash drop" in refused
+        git(repo, "stash", "drop")
+
+        assert stash_entries(str(repo)) == []
+        assert _stash_free().status == "pass"
+        # The reconcile still cannot run in this fixture -- there is no plan to
+        # apply -- but the stash is no longer what stops it.
+        assert "stash" not in _reconcile_output()
+
 
 # ---------------------------------------------------------------------------
 # The check
@@ -256,6 +309,37 @@ class TestNonReleasableMemberChangesDir:
         from rlsbl.changelog.files import enumerate_changelog_dirs
 
         root = _workspace_with_member_changes(tmp_path, releasable=True)
+        dirs = enumerate_changelog_dirs(str(root), str(root))
+        assert any("tools" in d for d in dirs)
+
+    def test_the_named_remedy_clears_the_refusal_on_the_same_repository(
+        self, tmp_path
+    ):
+        """One of the three remedies is performed on the OFFENDING fixture.
+
+        The refusal offers three ways out: delete the directory, move its
+        entries into a releasable's changes directory, or give the member a
+        `releasable = "<name>"`. This follows the third one on the repository
+        that was just refused -- same directory, same entries -- and asserts
+        the reading path that refused now answers.
+        """
+        from rlsbl.changelog.files import enumerate_changelog_dirs
+
+        root = _workspace_with_member_changes(tmp_path, releasable=False)
+        with pytest.raises(ChangelogError) as exc:
+            enumerate_changelog_dirs(str(root), str(root))
+        assert 'releasable = "<name>"' in str(exc.value)
+
+        # The remedy: 'tools' joins a releasable of its own.
+        make_workspace(
+            root,
+            [
+                {"path": "core", "name": "core", "releasable": "core"},
+                {"path": "tools", "name": "tools", "releasable": "tools"},
+            ],
+            releasables=["core", "tools"],
+        )
+
         dirs = enumerate_changelog_dirs(str(root), str(root))
         assert any("tools" in d for d in dirs)
 
