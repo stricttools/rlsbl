@@ -73,3 +73,4 @@
 {"format_version":1,"id":"18d256c8410b36105d53d1809f404fe9a6bd52537bce4b1e","commits":["21c7ded6d988fc2e127164eb4e1b08ada836183d"],"user_facing":true,"description":"**The documented `workspace.toml` examples are ones the loader accepts.** The monorepo and conversions guides showed `[[projects]]` blocks carrying a `target` key, which `workspace.toml`'s loader refuses -- copying either example produced a workspace that would not load.","type":"fix"}
 {"format_version":1,"id":"18d256f83b999a9fddfe012c8a1b455aa206db8bba77ec99","commits":["54cd4dc1a207445408c70854273f07fb0df093e9"],"user_facing":false}
 {"format_version":1,"id":"18d2572c1a9c7f9874897b361a484acc9907b54965554bc6","commits":["c4b2de437863dcef9df1f0f84a19861b35caa86d"],"user_facing":false}
+{"format_version":1,"id":"18d2574e0f1086c669f3ffd25f074b54a925ab599fe1daaa","commits":["cbb8c2f4b70a96c5278ec6a95c028cb42ec06d88"],"user_facing":false}
