@@ -35,6 +35,7 @@
   "monorepo.sync",
   "pre-push-check",
   "prs",
+  "release.backfill",
   "release.deprecate",
   "release.edit",
   "release.init",
@@ -50,6 +51,7 @@
   "scaffold",
   "status",
   "targets",
+  "transition.record",
   "unreleased",
   "watch"
 ]
