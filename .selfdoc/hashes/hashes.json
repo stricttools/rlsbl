@@ -58,7 +58,7 @@
     "schema_hash": "63051ca6feb717547434aa33f97fbb1b4565809886e4c59edc33d192396e7c03"
   },
   "en/cli-index.md": {
-    "content": "6543ad38147badf48f7d0d4d397f727b9fb418ddd3561d923ab114991d92587f",
+    "content": "ffba7dad5ec136bf8877f8913bc467cce027f1eebd4c3a52b8de808f840f4d0b",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -508,7 +508,8 @@
   "en/rlsbl-commands-release_backfill.md": {
     "content": "bb4fb006c637162dacea772a62e8bc481c8e02a41e4a78831eef084dcdb34392",
     "description": "f0c6e1c1139acee2e537c5046e37d134d9358820290b11c4d26b56c5060d62e9",
-    "seed_hash": "f0c6e1c1139acee2e537c5046e37d134d9358820290b11c4d26b56c5060d62e9"
+    "seed_hash": "f0c6e1c1139acee2e537c5046e37d134d9358820290b11c4d26b56c5060d62e9",
+    "source_docstring": "207b8f288a1eeaba9545847ffe689f81fa7e1a96c7b34ee4738a1edc4ae7f0e6"
   },
   "en/rlsbl-commands-release_init.md": {
     "content": "3097de78ff628033c6b7fcdb7291208744aa1daebc5e09484ca157eabf8ac15e",
@@ -912,7 +913,8 @@
   "en/rlsbl-release_backfill.md": {
     "content": "536035b3ccf0872eb1f106a3426cefc343905d39ecca6060096cdebea512c819",
     "description": "457bece3ecdf5f524de9fd0504867e3d38c100bf7c6ae8232d6eafc6227dfac4",
-    "seed_hash": "457bece3ecdf5f524de9fd0504867e3d38c100bf7c6ae8232d6eafc6227dfac4"
+    "seed_hash": "457bece3ecdf5f524de9fd0504867e3d38c100bf7c6ae8232d6eafc6227dfac4",
+    "source_docstring": "6f97ae43819d2004d1fda3078410e496b89f2f74161544fa4e184ca7f67e6813"
   },
   "en/rlsbl-release_commit_remap.md": {
     "content": "1c8038d90e6fe9439cc58f59d30af482e5070112667c2dce83ff3edcc88c80d6",
@@ -992,7 +994,8 @@
   "en/rlsbl-tag_explanation.md": {
     "content": "cb958acd95ea9815318297fe21e7fa16c329a819327e22409fa40028bc2b1d13",
     "description": "9372e3ff8ad11259d5b667db0309f8cc90d4b78c3064f6c382711781eacb7627",
-    "seed_hash": "9372e3ff8ad11259d5b667db0309f8cc90d4b78c3064f6c382711781eacb7627"
+    "seed_hash": "9372e3ff8ad11259d5b667db0309f8cc90d4b78c3064f6c382711781eacb7627",
+    "source_docstring": "d6bf68ee44fb8abc4b15481c00aa0f5e9849bf41fa97ca9b0652c41b782b4193"
   },
   "en/rlsbl-tag_glob.md": {
     "content": "8972b90adb08eeb7f33baccb12870213c7734c43f8611ba6dbb0fb1af28c6903",
