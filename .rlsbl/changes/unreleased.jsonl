@@ -45,3 +45,4 @@
 {"format_version":1,"id":"18d24b164b4606f6e219fc223bef44c59dc6399dfb4242c6","commits":["8952a1d4d10b569adc8a456f34450564c48556a4"],"user_facing":false}
 {"format_version":1,"id":"18d24b2033ddfa6a6c7448e06771467992694fd8518ab61f","commits":["e55a4fb48fcbb581f2366b5826a60eea32ed0350"],"user_facing":false}
 {"format_version":1,"id":"18d24b4bc270771f2835dc5f18584d4eb13cab0ff6ed5fd3","commits":["f29720e56f96dc765e071b676af95ebfc14b28d3"],"user_facing":false}
+{"format_version":1,"id":"18d24d0e27658a830c37ed1698b94261b13466b1ab67fb24","commits":["23f3f25fd1aa0ed98989886ffaad53bd6aea6f61"],"user_facing":true,"description":"**Non-version tags recorded in a monorepo are now seen.** A tag declared with `rlsbl transition record --non-version-tag` is written to the repository-scoped transition record; `rlsbl release reconcile` in a workspace read only the releasable's own record, so it kept firing its publication tripwire on the very tag the declaration silences.","type":"fix"}
