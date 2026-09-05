@@ -41,3 +41,7 @@ key rename to `unrecoverable`.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "15fcb51b29dd154e0a7828b1021f02473a97a388"
+
+[tree_hashes]
+"." = "9e22942df83ccd4966bc6f83dbd6e0bf7bd882ee"
