@@ -94,12 +94,16 @@ Each `[[projects]]` block declares the project's identity, release target, inter
 | `path` | yes | string | Relative path from repo root to the project directory |
 | `releasable` | yes | string or `false` | The `[[releasables]]` entry this project is versioned under, or `false` to opt out of versioning entirely |
 | `name` | no | string | Project name (defaults to basename of `path`; the member at `path = "."` must be named `root`) |
-| `target` | no | string | Release target (auto-detected if omitted) |
 | `depends_on` | no | list of strings | Explicit intra-workspace dependencies (project names) |
 | `library` | no | bool | Mark as a shared library (enables library-lint check) |
 | `dev_only` | no | bool | Mark as a dev-only project (no changelog, no CHANGELOG.md). A dev-only project outside every releasable is a **dev node** |
+| `import_name` | no | string | The name this member is imported under, when it differs from the project name (the import scanner attributes imports with it) |
 | `registry_name` | no | string | Override package name on the registry (e.g., scoped npm name) |
 | `description` | no | string | Short project description for documentation |
+| `test_only` | no | bool | Mark as test infrastructure; carried into the workspace snapshot |
+| `lint_allow` | no | list of strings | Imports the `library-lint` check allows for this member |
+
+The table is the member surface in full: it is bound in the suite to `rlsbl.workspace.MEMBER_KEYS`, the one constant the loader refuses against, so a key added there and not documented here fails a test. A release target is not among them — targets are detected from the member's own manifests. So is `watch`, `subtree_remote` and `dev_node`: each is refused by name with its own remedy (see [What the loader refuses](#what-the-loader-refuses)).
 
 ### The root member
 
@@ -118,13 +122,19 @@ Its **kind** is a choice, and `rlsbl monorepo init` makes it a required one rath
 
 `workspace.toml` is validated as a whole every time it is loaded, and each refusal carries its own remedy. Structural facts about the member list are reported before per-member key errors, so a remedy for a stray key never presumes a member list that is itself unsound.
 
+The rows are in the order the loader reports them.
+
 | Refusal | Remedy |
 | --- | --- |
+| A key at the top level that is neither section | Delete it, or fix the spelling of the section header it was meant to be. A workspace has no top-level scalar settings; the sections with a reader are `projects`, `releasables` and `layers`. It is reported first because a misspelled section header is why the sections below look wrong. |
 | No `[[releasables]]` section at all — the retired implicit mode | Add the section and give every releasable member a `releasable` key (a name, or `false`). The error also names the last rlsbl version that reads such a workspace, for a repository that genuinely cannot convert right now. |
 | More than one root member, or two members whose paths normalize to the same territory | Keep one and give the other a path of its own. Two members cannot own one territory. |
 | No root member | Add one, choosing its kind. The error prints both declarations in full. |
 | A `watch` key on any member | Delete it. Territory is derived from declared paths, never enumerated. A member that genuinely needs to own files outside its own directory declares that directory as a member of its own. |
 | A `subtree_remote` key on any member | Move the line into that member's `[[releasables]]` entry. A mirror's destination belongs to the unit that owns a version, a changelog and a tag scheme. |
+| A `dev_node` key on any member | Replace it with both halves it stood for: `dev_only = true` (what the member IS) and `releasable = false` (where it sits). If the member is not actually dev-only, give it `releasable = "<name>"` instead. |
+| Any other key a member table does not know | Delete it, or fix its spelling. The known keys are the [project fields](#project-fields) above. The retired keys are refused before this one so each keeps its own remedy. |
+| A key a `[[releasables]]` table does not know | Delete it, or fix its spelling. That surface's known keys are derived from the releasable model itself. |
 | A root member named anything but `root` | Set `name = "root"`, or omit `name` entirely. |
 | A non-root member named `root` | Rename it, or give it `path = "."` in place of the root member declared today. Which member owns the repository root is your decision, and rlsbl will not guess it. |
 | A releasable that owns the root member and declares no `tag_format` | Declare it: `v{version}` for bare version tags, `{name}@v{version}` to keep the workspace scheme. The repository's existing tags decide which, and only you can read them. |

@@ -424,17 +424,17 @@ The file uses TOML format with a `[[projects]]` array. Each entry has a `path` k
 
 A configuration surface is **policed** when rlsbl refuses, at load, a key it does not know. A tolerated unknown key is a line that was written and never read: the file says something the tools never do, and a misspelled key silently means nothing at all. The refusal names the surface, the key and the file.
 
-This section is the authority; the loader's behavior mirrors it.
+Where a surface's known keys are one declared constant or one model, that declaration is the authority and this section mirrors it — the suite binds the two, so a key added to the code and not to the table fails a test.
 
 | Surface | Policed? | Known keys |
 | --- | --- | --- |
-| `.rlsbl-monorepo/workspace.toml` — a `[[projects]]` member table | Yes | Declared as one constant, `rlsbl.workspace.MEMBER_KEYS`: `path`, `name`, `library`, `dev_only`, `releasable`, `depends_on`, `import_name`, `registry_name`, `description`, `test_only`, `lint_allow`. The suite binds both the loader's refusal set and `WorkspaceProject`'s accessors to it, so the two cannot drift. A member table has no schema of its own yet; the constant is the stated interim until it gets one and the set is generated from it. |
+| `.rlsbl-monorepo/workspace.toml` — a `[[projects]]` member table | Yes | Declared as one constant, `rlsbl.workspace.MEMBER_KEYS`, which is the authority: `path`, `name`, `library`, `dev_only`, `releasable`, `depends_on`, `import_name`, `registry_name`, `description`, `test_only`, `lint_allow`. The suite binds the loader's refusal set, `WorkspaceProject`'s accessors, this list and the [project fields table](monorepo.md#project-fields) to it, so none of them can drift from it. A member table has no schema of its own yet; the constant is the stated interim until it gets one and the set is generated from it. |
 | `.rlsbl-monorepo/workspace.toml` — a `[[releasables]]` table | Yes | Derived from the `Releasable` model's own fields, so a field added to the model stops being unknown on the same edit that adds it. |
 | `.rlsbl-monorepo/workspace.toml` — the top level | Yes | The sections with a reader: `projects`, `releasables`, `layers`. A workspace has no top-level scalar settings. |
 | `.rlsbl/releasable.toml` (a standalone repository's releasable) | Yes | `name` and `tag_format`. A standalone repository has no mirror, so `subtree_remote` is not among them. |
 | `.rlsbl/config.json` | **No — not policed yet** | An unknown key is accepted silently. Completing the config schema and wiring the loader to it is its own work item; until that ships, a typo in `config.json` still means nothing at all and nothing says so. |
 
-Three retired member keys are refused by name rather than as generic unknowns, each with its own remedy: `watch` (territory is derived from declared member paths), `subtree_remote` (a releasable-level key), and `dev_node` (replaced by the two-key form `dev_only = true` plus `releasable = false`).
+The retired member keys are refused by name rather than as generic unknowns, each with its own remedy: `watch` (territory is derived from declared member paths), `subtree_remote` (a releasable-level key), and `dev_node` (replaced by the two-key form `dev_only = true` plus `releasable = false`).
 
 Writing is policed too. `save_workspace` strips the bookkeeping keys a caller attached at runtime (`monorepo sync` hangs its inlined-CI state off the member dicts it walks; the convention is a leading underscore) and hard-errors on any other key outside the member surface — so a load/save cycle can never produce a workspace.toml the loader then refuses.
 
