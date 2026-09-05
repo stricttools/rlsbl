@@ -92,6 +92,10 @@ EXPECTED_EFFECTS = {
     # and revertible with git, so neither is consequential.
     "rewrite.go-module-path": "mutating",
     "rewrite.uv-path-sources": "mutating",
+    # Appends one line to the committed transition record and commits it.
+    # Mutating, previewable, and consequential -- what a repository's history
+    # IS is a human's call, not an agent's.
+    "transition.record": "mutating",
 }
 
 
