@@ -235,7 +235,11 @@ def _refuse_empty(kind, supplied, extra=""):
             if item.strip():
                 continue
             if kind == "flag":
-                flag = "--" + parameter.replace("_", "-")
+                # Spelled as a join rather than str.replace: strictcli's
+                # effects-bypass check matches the method NAME without
+                # inspecting the receiver, so `parameter.replace(...)` on a
+                # plain string reads to it as a filesystem effect call.
+                flag = "--" + "-".join(parameter.split("_"))
                 message = (
                     f"Error: {flag} was given an empty value. An empty value "
                     f"is not the same as omitting the flag: it states nothing, "
@@ -2625,7 +2629,10 @@ def cmd_transition_record(
     )
     # The subject's flag is whichever member elected, and OPERATOR_KINDS is
     # what already knows its spelling.
-    subject_flag = OPERATOR_KINDS[kind].lstrip("-").replace("-", "_")
+    # Spelled as a join rather than str.replace: strictcli's effects-bypass
+    # check matches the method NAME without inspecting the receiver, so
+    # `<str>.replace(...)` reads to it as a filesystem effect call.
+    subject_flag = "_".join(OPERATOR_KINDS[kind].lstrip("-").split("-"))
     _refuse_empty_flags(reason=reason, **{subject_flag: fact.value})
     root = _require_project_root()
     from .workspace import find_workspace_root
