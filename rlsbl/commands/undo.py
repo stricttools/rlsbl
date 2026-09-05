@@ -637,8 +637,8 @@ def _plan_companion_tags(uc, tag, version):
     the ref set states which aliases came from that field. It names the
     spelling the version ACTUALLY shipped under, from before a rename or a
     repository boundary moved -- a ref the release being undone never created,
-    that consumers already resolve, and that the ledger's own rule keeps where
-    it is: neither moved nor deleted.
+    that consumers already resolve, and that the release record's own rule
+    keeps where it is: neither moved nor deleted.
 
     Degrades to an empty list on any failure, with the traceback printed. Undo
     is a repair path, and refusing to remove the primary tag because a member's

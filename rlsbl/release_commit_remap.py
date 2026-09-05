@@ -320,12 +320,13 @@ def transition_record_path_for_releases_dir(releases_dir: str) -> str:
 def repair_release_commits(*, project_root, commit_map, rewrite_id,
                    workspace_root=None, workspace_projects=None, cwd=None,
                    on_content_change=ON_CONTENT_CHANGE_REFUSE):
-    """Move every release record release commit in this repository and record that it happened.
+    """Move every release commit the release records name, and record that it happened.
 
     The whole-repository half of the repair: it finds every release-archive
     directory the same walk the JSONL remap uses finds, remaps each one's
-    release commits through *commit_map*, and appends an ``release-commit-remap`` transition record event
-    beside each release record that moved.
+    release commits through *commit_map*, and appends a
+    ``release-commit-remap`` transition record event beside each release record
+    that moved.
 
     Returns ``(remaps, touched)`` -- the :class:`ReleaseCommitRemap` records across
     every release record, and the repo paths a commit must carry (the rewritten

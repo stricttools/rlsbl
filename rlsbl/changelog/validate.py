@@ -307,19 +307,20 @@ def check_in_range(entries: list[ChangelogEntry], releases_dir: str,
                    tag_glob: str | None = None, scope=None) -> tuple[bool, list[str]]:
     """Check that every resolved hash is in the unreleased range.
 
-    Unreleased range: the commits since the release the RELEASE RECORD release commits this
-    checkout to -- the highest archived version whose ``candidate_sha`` this
-    history contains -- or all commits when the release record records none.
-    ``releases_dir`` is that release record; ``tag_glob`` names the tag scheme, used
-    to detect a tag that disagrees with a release commit.
+    Unreleased range: the commits since the release the release record binds
+    this checkout to -- the highest archived version whose ``candidate_sha``
+    this history contains -- or all commits when the release record records
+    none. ``releases_dir`` is that release record; ``tag_glob`` names the tag
+    scheme, used to detect a tag that disagrees with a release commit.
 
     When *scope* is set (monorepo mode), only commits touching files owned
     by the scope's members are considered in-range.  *scope* is an
     :class:`~rlsbl.ownership.OwnershipScope`.
 
     A hash outside that set fails for one of two DIFFERENT reasons, and they
-    get different messages. Out of range means the commit is not between the
-    anchoring release and HEAD -- a stale hash, or work that already shipped.
+    get different messages. Out of range means the commit is not between this
+    checkout's nearest release commit and HEAD -- a stale hash, or work that
+    already shipped.
     Out of scope means it is in the range and belongs to another releasable's
     territory: a cross-filed entry, which used to be reported as out of range
     and sent its reader hunting for a rewrite that never happened.

@@ -259,8 +259,9 @@ class TestTheUpdatedDocument:
     def test_a_version_with_no_archive_is_written_markerless_and_says_so(
         self, tmp_path, monkeypatch, capsys,
     ):
-        """A version the release record cannot release commit still gets its document --
-        without a marker, and with the omission stated rather than hidden."""
+        """A version whose release commit the release record cannot identify
+        still gets its document -- without a marker, and with the omission
+        stated rather than hidden."""
         monkeypatch.chdir(tmp_path)
         gh = Recorder(existing=("v0.1.0",))
 

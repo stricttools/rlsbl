@@ -148,7 +148,7 @@ user-facing status, and cannot rewrite the commits an entry names.
 | # | Check | What it verifies |
 | --- | --- | --- |
 | 1 | Hash resolution | Every hash in every entry resolves via `git rev-parse` |
-| 2 | Range | Every resolved hash is in the unreleased range -- the commits after the release this checkout is anchored to, read from the release archives beside `changes/`. In a workspace, a hash IN that range whose commit belongs to another releasable's territory is reported separately, as out of SCOPE rather than out of range, naming the owning member and releasable and the invocations that move the entry there. |
+| 2 | Range | Every resolved hash is in the unreleased range -- the commits after this checkout's nearest release commit, read from the release archives beside `changes/`. In a workspace, a hash IN that range whose commit belongs to another releasable's territory is reported separately, as out of SCOPE rather than out of range, naming the owning member and releasable and the invocations that move the entry there. |
 | 3 | Commit coverage | Every unreleased commit appears in at least one entry. Commits that only touch `.rlsbl/changes/` or `CHANGELOG.md` are auto-exempted. |
 | 4 | Orphan detection | Entries with no hash that is both resolvable and in this scope's range. The finding counts the unresolvable, the out-of-range and the out-of-scope hashes apart, and its remedy names a real `rlsbl changelog remap` or `rlsbl changelog remove` invocation carrying the entry's own identifier. |
 | 5 | Schema conformance | User-facing entries have `description` and `type`; type is one of `feature`/`fix`/`breaking` |

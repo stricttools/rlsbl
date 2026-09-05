@@ -249,17 +249,17 @@ def release_context_env(ctx):
 
     - ``RLSBL_PROJECT_ROOT`` -- the resolved project root. An entry with a
       ``cwd`` override otherwise has no way to find it.
-    - ``RLSBL_LAST_TAG`` -- the tag name of the release the RELEASE RECORD release commits this
-      checkout to, translated into the project's own tag scheme (so it is
-      monorepo-correct). The EMPTY STRING when the release record records no release
-      this checkout contains, so a check can tell "no baseline yet" from "not
-      injected".
+    - ``RLSBL_LAST_TAG`` -- the tag name of the release the release record
+      binds this checkout to, translated into the project's own tag scheme
+      (so it is monorepo-correct). The EMPTY STRING when the release record
+      records no release this checkout contains, so a check can tell "no
+      baseline yet" from "not injected".
     - ``RLSBL_UNRELEASED_RANGE`` -- ``<candidate_sha>..HEAD``, or ``HEAD`` when
       there is no such release.
 
     The version is SELECTED from the release record and only then translated into a
     tag; the tag namespace no longer decides which release is the baseline.
-    The range is expressed as the release commit commit rather than the tag, so a check
+    The range is expressed as the release commit rather than the tag, so a check
     receives a range that resolves even when the tag was deleted or moved.
 
     Computed once per check run and memoized on the context object.

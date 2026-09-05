@@ -442,7 +442,7 @@ class TestIndeterminable:
 
     def test_truncated_history_is_indeterminable_not_absent(self, tmp_path,
                                                             monkeypatch):
-        # A shallow clone can SEE the release commit commit but cannot walk to it, and
+        # A shallow clone can SEE the release commit but cannot walk to it, and
         # git answers exit 1 -- the same code it gives for a genuine "no".
         origin = _init_repo(tmp_path / "origin")
         base = _commit(origin, "base")

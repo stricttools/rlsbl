@@ -4,7 +4,7 @@ In a workspace, `changelog-range` filters the unreleased commit range to the
 commits this releasable's members own, then reports every entry hash outside
 the filtered set as "not in the unreleased range". For an entry filed under the
 wrong releasable that sentence is false: the commit IS in the range -- it is
-between the release this checkout is anchored to and HEAD -- it just belongs to
+between this checkout's nearest release commit and HEAD -- it just belongs to
 another releasable's territory. The reader is sent to look for a rebase or a
 stale hash, and finds a perfectly current commit.
 
@@ -228,7 +228,7 @@ class TestGenuinelyOutOfRangeEntry:
     def test_a_pre_release_commit_is_still_out_of_range(self, two_releasables):
         repo = two_releasables
         # A commit in alpha's own territory, but BEFORE alpha's release: the
-        # scaffold commit the releasable's archive is anchored to.
+        # scaffold commit the releasable's archive records as its release commit.
         (repo / "libs" / "core" / "old.py").write_text("x = 1\n")
         run_git(repo, "add", "libs/core/old.py")
         run_git(repo, "commit", "-q", "-m", "feat: pre-release change")

@@ -256,9 +256,9 @@ class TestReleasableOwnsItsStateDirectory:
     def test_another_releasables_state_dir_stays_out_of_scope(self, two_releasable_repo):
         """Only the releasable whose directory it is claims the commit.
 
-        And the finding says SCOPE, not range: the commit is between the
-        anchoring release and HEAD, so telling A's reader it is out of range
-        would send them looking for a rewrite that never happened. It names
+        And the finding says SCOPE, not range: the commit is between this
+        checkout's nearest release commit and HEAD, so telling A's reader it is
+        out of range would send them looking for a rewrite that never happened. It names
         B's state directory as the owner instead.
         """
         root, scope_a, scope_b = two_releasable_repo
