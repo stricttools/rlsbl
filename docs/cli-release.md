@@ -151,7 +151,7 @@ Scrub sensitive content from git history and update release metadata to match th
 
 ## release backfill
 
-Bring this repository's release archives into the three-fate model from its real history: record each version's release commit from the tag (or the historical spelling its archive names in shipped_as, or its version-bump commit), complete an archive missing required fields, materialize an archive for a released version that never got one, and adopt a version tag no store records as the release it is evidence of. A reconstructed description comes from the first source that yields one -- an operator-reviewed --overrides file, the version's GitHub Release body, its CHANGELOG.md section, the commit subjects in its tag range -- and the archive names the source it came from. Every tag the repository cannot account for is listed first and refuses the whole apply; --dry-run prints the plan and writes nothing.
+Bring this repository's release archives into the three-fate model from its real history: record each version's release commit from the tag (or the historical spelling its archive names in shipped_as, or its version-bump commit), complete an archive whose required fields are missing or unanswered (a present but empty bump or description is unanswered), materialize an archive for a released version that never got one, and adopt a version tag no store records as the release it is evidence of. A reconstructed description comes from the first source that yields one -- an operator-reviewed --overrides file, the version's GitHub Release body, its CHANGELOG.md section, the commit subjects in its tag range -- and the archive names the source it came from. Every tag the repository cannot account for is listed first and refuses the whole apply; --dry-run prints the plan and writes nothing.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -173,6 +173,7 @@ Reconcile this project's published release metadata with what its own records sa
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `mode` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--plan`, `--apply`. Which half of the reconcile to run: write the plan, or perform it. Exactly one must be elected. |
-| &nbsp;&nbsp;&nbsp;&nbsp;`--plan` |  |  | required |  | Elects `mode` = `plan`. Observe origin and write the reconcile plan to .rlsbl/releases/reconcile-plan.toml. Writes nothing to origin. |
-| &nbsp;&nbsp;&nbsp;&nbsp;`--apply` |  |  | required |  | Elects `mode` = `apply`. Perform the plan in .rlsbl/releases/reconcile-plan.toml, after re-observing origin and refusing if it moved since the plan was written. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--plan` |  |  | required |  | Elects `mode` = `plan`. Observe origin and write the reconcile plan as reconcile-plan.toml beside the release records being reconciled (.rlsbl/releases/ in a standalone repository, the releasable's own releases/ in a workspace). Writes nothing to origin. |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--apply` |  |  | required |  | Elects `mode` = `apply`. Perform the reconcile-plan.toml beside the release records being reconciled, after re-observing origin and refusing if it moved since the plan was written. |
 | `--push-timeout` |  | int | optional |  | Timeout in seconds for each ref push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
+| `--releasable` |  | str | optional |  | Which releasable to reconcile. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it. |
