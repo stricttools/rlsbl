@@ -1823,7 +1823,13 @@ class TestCheckProjectScopeReleasable:
             all_projects=[{"path": ".", "name": "root"}, *members],
         )
 
-        with patch(f"{MOD_CL}.filter_commits_for_scope", return_value=set()):
+        # The refusal names the owner of the files it could not claim, which is
+        # a git question this synthetic sha cannot answer -- so the lookup is
+        # stubbed here alongside the scope filter. Both branches of the remedy
+        # are exercised for real in tests/test_changelog_scope_validation.py.
+        with patch(f"{MOD_CL}.filter_commits_for_scope", return_value=set()), \
+                patch(f"{MOD_CL}._foreign_owner_description",
+                      return_value="member 'pkg-b' (releasable 'other')"):
             with pytest.raises(SystemExit):
                 _check_project_scope(["abc123"], ctx)
 
