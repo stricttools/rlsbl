@@ -249,7 +249,13 @@ class TestReleasableOwnsItsStateDirectory:
         assert passed, f"Expected no orphan for the state-dir commit, got: {details}"
 
     def test_another_releasables_state_dir_stays_out_of_scope(self, two_releasable_repo):
-        """Only the releasable whose directory it is claims the commit."""
+        """Only the releasable whose directory it is claims the commit.
+
+        And the finding says SCOPE, not range: the commit is between the
+        anchoring release and HEAD, so telling A's reader it is out of range
+        would send them looking for a rewrite that never happened. It names
+        B's state directory as the owner instead.
+        """
         root, scope_a, scope_b = two_releasable_repo
         sha = self._state_commit(root, "rel-b")
 
@@ -258,8 +264,10 @@ class TestReleasableOwnsItsStateDirectory:
             entries, _releases_dir(root, "rel-a"),
             tag_glob="rel-a@v*", scope=scope_a,
         )
-        assert not passed, "Expected B's state-dir commit outside A's range"
-        assert any("not in unreleased range" in d for d in details)
+        assert not passed, "Expected B's state-dir commit outside A's scope"
+        assert any("outside this changelog's scope" in d for d in details)
+        assert any("rel-b" in d for d in details)
+        assert not any("not in unreleased range" in d for d in details)
 
     def test_state_dir_commit_needs_no_coverage(self, two_releasable_repo):
         """In scope for attribution, still exempt from coverage.

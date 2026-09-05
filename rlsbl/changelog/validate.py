@@ -219,6 +219,68 @@ def check_hashes_resolve(entries: list[ChangelogEntry]) -> tuple[bool, list[str]
     return (len(details) == 0, details)
 
 
+def _foreign_owner_description(sha: str, scope) -> str:
+    """Who owns the files of a commit the asking *scope* does not claim.
+
+    Named for a message, so it answers in the workspace's own vocabulary: a
+    member (with the releasable it belongs to), or a releasable's own state
+    directory, which belongs to no member at all.  Returns a short phrase, or
+    a plain statement when nothing in the workspace claims the files.
+    """
+    from ..git_util import commit_files as _commit_files
+    from ..ownership import member_name, owner_of, state_dir_releasable
+
+    members: dict[str, str | None] = {}
+    state_owners: set[str] = set()
+
+    for path in _commit_files(sha, operation="changelog range check"):
+        if scope.claims(path):
+            continue
+        owner = owner_of(path, scope.members)
+        if owner is not None:
+            releasable = owner.get("releasable")
+            members[member_name(owner)] = (
+                releasable if isinstance(releasable, str) else None
+            )
+            continue
+        state_owner = state_dir_releasable(path)
+        if state_owner is not None:
+            state_owners.add(state_owner)
+
+    parts = []
+    for name in sorted(members):
+        releasable = members[name]
+        if releasable:
+            parts.append(f"member '{name}' (releasable '{releasable}')")
+        else:
+            parts.append(f"member '{name}' (in no releasable)")
+    for name in sorted(state_owners):
+        parts.append(f"releasable '{name}'s own state directory")
+
+    if not parts:
+        return "no member or releasable this workspace declares"
+    return ", ".join(parts)
+
+
+def _out_of_scope_detail(raw: str, sha: str, entry: ChangelogEntry, scope) -> str:
+    """The finding for an entry filed under the wrong releasable.
+
+    Deliberately NOT the out-of-range sentence: this commit IS between the
+    release this checkout is anchored to and HEAD. What is wrong is where the
+    entry was filed, and the remedy is to move it, not to repair a hash.
+    """
+    return (
+        f"hash in the unreleased range but outside this changelog's scope: "
+        f"{raw} ({sha}) -- its files belong to "
+        f"{_foreign_owner_description(sha, scope)}, while this changelog "
+        f"covers {scope.describe()}. The entry is filed under the wrong "
+        f"releasable: remove it here with "
+        f"`{_removal_remedy(entry, [sha])}`, then add it from the owning "
+        f"member's directory with `rlsbl changelog add --commits {sha} "
+        f"--description \"...\" --type feature`."
+    )
+
+
 def check_in_range(entries: list[ChangelogEntry], releases_dir: str,
                    tag_glob: str | None = None, scope=None) -> tuple[bool, list[str]]:
     """Check that every resolved hash is in the unreleased range.
@@ -232,23 +294,38 @@ def check_in_range(entries: list[ChangelogEntry], releases_dir: str,
     When *scope* is set (monorepo mode), only commits touching files owned
     by the scope's members are considered in-range.  *scope* is an
     :class:`~rlsbl.ownership.OwnershipScope`.
+
+    A hash outside that set fails for one of two DIFFERENT reasons, and they
+    get different messages. Out of range means the commit is not between the
+    anchoring release and HEAD -- a stale hash, or work that already shipped.
+    Out of scope means it is in the range and belongs to another releasable's
+    territory: a cross-filed entry, which used to be reported as out of range
+    and sent its reader hunting for a rewrite that never happened.
     """
     details: list[str] = []
-    unreleased_commits = set(_git_log_hashes(
+    range_commits = set(_git_log_hashes(
         unreleased_range(releases_dir, tag_glob=tag_glob)))
 
-    unreleased_commits = filter_commits_for_scope(
-        unreleased_commits, scope, operation="changelog range check",
+    in_scope = filter_commits_for_scope(
+        range_commits, scope, operation="changelog range check",
     )
 
     all_hashes: list[str] = []
     for entry in entries:
         all_hashes.extend(entry.commits)
-
     resolved = resolve_hashes(all_hashes)
-    for h, full in resolved.items():
-        if full is not None and full not in unreleased_commits:
-            details.append(f"hash not in unreleased range: {h} ({full})")
+
+    reported: set[str] = set()
+    for entry in entries:
+        for raw in entry.commits:
+            full = resolved.get(raw)
+            if full is None or full in in_scope or full in reported:
+                continue
+            reported.add(full)
+            if full in range_commits:
+                details.append(_out_of_scope_detail(raw, full, entry, scope))
+            else:
+                details.append(f"hash not in unreleased range: {raw} ({full})")
 
     return (len(details) == 0, details)
 
@@ -334,13 +411,18 @@ def check_no_orphans(
     ``releases_dir`` — see :func:`check_in_range`) — no commit is both
     valid and in range.  *scope* is an
     :class:`~rlsbl.ownership.OwnershipScope`.
+
+    The two ways a hash can be outside the scoped range are counted apart and
+    named apart, exactly as :func:`check_in_range` names them: a commit
+    another releasable owns is *out of scope*, and calling it out of range
+    would say the history no longer contains it, which is false.
     """
     details: list[str] = []
-    unreleased_commits = set(_git_log_hashes(
+    range_commits = set(_git_log_hashes(
         unreleased_range(releases_dir, tag_glob=tag_glob)))
 
     unreleased_commits = filter_commits_for_scope(
-        unreleased_commits, scope, operation="changelog orphan check",
+        range_commits, scope, operation="changelog orphan check",
     )
 
     for i, entry in enumerate(entries):
@@ -349,8 +431,10 @@ def check_no_orphans(
         resolved = resolve_hashes(entry.commits)
         n_unresolvable = sum(1 for v in resolved.values() if v is None)
         resolvable_shas = {v for v in resolved.values() if v is not None}
-        n_out_of_range = sum(1 for sha in resolvable_shas if sha not in unreleased_commits)
-        n_in_range = len(resolvable_shas) - n_out_of_range
+        outside = {sha for sha in resolvable_shas if sha not in unreleased_commits}
+        n_out_of_scope = sum(1 for sha in outside if sha in range_commits)
+        n_out_of_range = len(outside) - n_out_of_scope
+        n_in_range = len(resolvable_shas) - len(outside)
 
         if n_unresolvable == len(entry.commits):
             # Fully orphaned: all hashes unresolvable
@@ -362,8 +446,10 @@ def check_no_orphans(
                 f"`{_removal_remedy(entry, list(entry.commits))}` if "
                 f"the entry is genuinely obsolete"
             )
-        elif n_in_range == 0 and (n_unresolvable > 0 or n_out_of_range > 0):
-            # Effectively orphaned: mix of unresolvable and out-of-range
+        elif n_in_range == 0 and (n_unresolvable > 0 or outside):
+            # Effectively orphaned: mix of unresolvable, out-of-range and
+            # out-of-scope hashes, with no hash that is both valid and in
+            # this scope's range.
             stale_hashes = [h for h in entry.commits if resolved.get(h) is None]
             stale_hashes.extend(
                 h for h in entry.commits
@@ -376,6 +462,10 @@ def check_no_orphans(
                 parts.append(f"{n_unresolvable} unresolvable")
             if n_out_of_range > 0:
                 parts.append(f"{n_out_of_range} out of range")
+            if n_out_of_scope > 0:
+                parts.append(
+                    f"{n_out_of_scope} in range but owned by another releasable"
+                )
             details.append(
                 f"entry {i + 1} in unreleased.jsonl: all commits are stale "
                 f"({', '.join(parts)}: {stale_list}) — run "

@@ -111,6 +111,23 @@ def releasable_state_dir(releasable_name) -> str:
     return f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/{releasable_name}"
 
 
+def state_dir_releasable(path) -> str | None:
+    """The releasable whose state directory *path* sits in, or ``None``.
+
+    The inverse of :func:`releasable_state_dir`.  A path under
+    ``.rlsbl-monorepo/releasables/<name>/`` belongs to no member -- it is
+    tool-owned, and a releasable is not a member -- so this is the only way to
+    answer "whose is this?" for it.  Used by messages that have to name the
+    owner of a file the asking scope does not claim.
+    """
+    normalized = normalize_path(path)
+    prefix = f"{WORKSPACE_DIR}/{RELEASABLES_DIR}/"
+    if not normalized.startswith(prefix):
+        return None
+    name = normalized[len(prefix):].split("/", 1)[0]
+    return name or None
+
+
 def normalize_path(path) -> str:
     """Return *path* with ``\\`` separators folded and trailing slashes gone."""
     text = str(path).replace("\\", "/").strip()
