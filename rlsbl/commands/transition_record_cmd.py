@@ -137,6 +137,10 @@ def run_cmd(flags, *, ctx):
         effects.render_would_do_log()
         print(f"Would append to {os.path.relpath(path, repo)}:")
         print(f"  {serialize_event(event)}")
+        print(
+            "  (the event id and the recorded_at timestamp are stamped at "
+            "write time, so they are not shown)"
+        )
         print("\nDry run: nothing was written.")
         return
 
