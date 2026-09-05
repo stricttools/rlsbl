@@ -10,7 +10,6 @@ import json
 import os
 import subprocess
 
-import pytest
 
 from conftest import archive_release, release_record_dir, make_ctx
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add

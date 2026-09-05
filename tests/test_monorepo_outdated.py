@@ -2,18 +2,17 @@
 
 import json
 import os
-from unittest.mock import patch
 
 import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 from rlsbl.commands.monorepo import (
     _cmd_outdated,
     _evaluate_constraint,
     _parse_version_tuple,
 )
-from rlsbl.workspace import save_workspace, WORKSPACE_DIR
+from rlsbl.workspace import WORKSPACE_DIR
 
 
 def _make_npm_project(base_path, subdir, version="0.1.0", deps=None):
@@ -280,7 +279,6 @@ class TestOutdatedColumnAlignment:
         assert len(lines) == 2  # header + 1 row
 
         # All lines should have the same number of columns (split by 2+ spaces)
-        header_parts = lines[0].split("  ")
         # Each column pair is separated by at least 2 spaces
         # Just verify the header and data row have the same structure
         assert "Project" in lines[0]

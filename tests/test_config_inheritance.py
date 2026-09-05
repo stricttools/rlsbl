@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 
-import pytest
 
 from rlsbl.config import merge_config, read_project_config
 
@@ -222,7 +221,6 @@ class TestCreateContextReleasable:
 
     def _setup_monorepo(self, tmp_path):
         """Create a monorepo with a releasable and two member packages."""
-        from pathlib import Path
 
         _run_git(tmp_path, "init", "-q", "-b", "main")
         _run_git(tmp_path, "config", "user.email", "test@test.local")
@@ -378,7 +376,7 @@ class TestSyncMemberPackageVersionsInheritance:
         """A package with explicit private: true should be skipped even if
         releasable says private: false."""
         from pathlib import Path
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         from conftest import sync_member_versions
         from rlsbl.context import ProjectContext

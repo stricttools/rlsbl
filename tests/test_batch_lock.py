@@ -9,9 +9,8 @@ Verifies:
 import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from conftest import make_ctx, make_workspace, run_git
 from rlsbl.release_file import BatchReleaseConfig, ReleaseConfig

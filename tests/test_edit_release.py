@@ -2,7 +2,7 @@
 
 import unittest
 from io import StringIO
-from unittest.mock import patch, call, MagicMock
+from unittest.mock import patch, MagicMock
 
 from rlsbl.commands.edit_release import run_cmd
 
@@ -58,7 +58,7 @@ class TestEditRelease(unittest.TestCase):
         with patch("builtins.open", unittest.mock.mock_open()), \
              patch("os.rename"), \
              patch("os.unlink"):
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(["0.23.0"], {}, project_root=".")
 
         # Verify gh release view was called to check existence

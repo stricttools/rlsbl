@@ -22,16 +22,12 @@ targets from config when detect_registries() is empty.
 """
 
 import json
-import os
-from pathlib import Path
-from unittest.mock import patch
 
 import pathlib
 
-import pytest
 
 from rlsbl.commands.init_cmd import run_cmd, _is_non_releasable_project
-from rlsbl.context import ProjectContext, create_context
+from rlsbl.context import create_context
 from conftest import make_workspace
 
 

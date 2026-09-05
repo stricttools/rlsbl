@@ -13,26 +13,21 @@ Covers:
 import json
 import os
 import subprocess
-from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from conftest import sync_member_versions, with_root_member
-from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import validate_pipeline_config
 from rlsbl.member_context import resolve_member_context
 from rlsbl.pipelines import load_pipelines
 from rlsbl.workspace import (
     Releasable,
     get_releasable_dir,
-    load_workspace,
-    members_of,
     save_workspace,
     write_releasable_version,
     get_releasable_changes_dir,
-    WORKSPACE_DIR,
 )
 
 

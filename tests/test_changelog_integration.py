@@ -3,7 +3,6 @@
 import json
 import os
 import subprocess
-import sys
 
 import pytest
 
@@ -13,7 +12,6 @@ from rlsbl.changelog import (
     append_entry,
     changes_dir_exists,
     get_changes_dir,
-    serialize_entry,
 )
 
 
@@ -89,9 +87,10 @@ class TestReleaseWithJsonl:
 
         changes_dir = get_changes_dir(".")
 
-        # Validate should pass
+        # Validate should pass (the range is v0.0.0..HEAD, so every commit made
+        # above is unreleased and must be covered by the entries written above).
         result = validate_unreleased(changes_dir, config={})
-        # Validation uses v0.0.0..HEAD range to find unreleased commits
+        assert result["passed"], result
 
         # Generate should produce CHANGELOG.md
         generate_changelog(".")
@@ -279,7 +278,7 @@ class TestUnreleasedWithJsonl:
         _tag_and_archive(repo, "v1.0.0")
 
         sha1 = _make_commit(repo, "feat.txt", "feat: add widget")
-        sha2 = _make_commit(repo, "fix.txt", "fix: something else")
+        _make_commit(repo, "fix.txt", "fix: something else")
 
         # Only cover sha1
         _setup_jsonl_project(repo, [

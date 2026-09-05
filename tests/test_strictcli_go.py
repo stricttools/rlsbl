@@ -1,7 +1,6 @@
 """Tests for Go and TypeScript strictcli detection, and schema dump branching."""
 
 import json
-import os
 import subprocess
 from unittest.mock import MagicMock, patch
 

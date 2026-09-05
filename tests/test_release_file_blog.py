@@ -1,11 +1,10 @@
 """Tests for the blog field in ReleaseConfig."""
 
-import os
 
 import pytest
 
 from rlsbl.errors import ReleaseFileError
-from rlsbl.release_file import ReleaseConfig, read_release_file
+from rlsbl.release_file import read_release_file
 
 
 class TestBlogFieldValidation:

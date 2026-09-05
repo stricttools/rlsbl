@@ -7,7 +7,6 @@ hand-rolled main.go globbing misdetects: entry files not named main.go
 (root package main with no func main plus a real main under cmd/).
 """
 
-import json
 
 import pytest
 

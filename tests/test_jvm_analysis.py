@@ -2,7 +2,6 @@
 
 import os
 
-import pytest
 
 from rlsbl.dep_validation import (
     _build_jvm_class_index,

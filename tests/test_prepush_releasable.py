@@ -12,7 +12,6 @@ Scenarios:
 4. Pre-push check fails when a commit is missing from its releasable's changelog
 """
 
-import json
 import os
 from pathlib import Path
 
@@ -67,7 +66,7 @@ def _setup_releasable_changes(root, releasable_name):
     changes_dir = get_releasable_changes_dir(str(root), releasable_name)
     os.makedirs(changes_dir, exist_ok=True)
     unreleased = os.path.join(changes_dir, "unreleased.jsonl")
-    with open(unreleased, "w", encoding="utf-8") as f:
+    with open(unreleased, "w", encoding="utf-8"):
         pass  # empty file
     return changes_dir
 
@@ -272,7 +271,7 @@ class TestPrepushReleasableMissingCoverage:
 
         # Make commits in both releasables
         sha_fe = make_commit(root, "fe-app/feature.py", "feat: frontend thing")
-        sha_be = make_commit(root, "be-api/endpoint.py", "feat: backend thing")
+        make_commit(root, "be-api/endpoint.py", "feat: backend thing")
 
         # Only cover the frontend commit
         append_entry(fe_changes, ChangelogEntry(commits=[sha_fe], user_facing=False))

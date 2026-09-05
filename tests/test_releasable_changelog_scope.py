@@ -12,7 +12,7 @@ decides which commits the check considers.
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -109,7 +109,7 @@ class TestReleasableChangelogScope:
         root, scope_a, scope_b = two_releasable_repo
 
         # Commit touching only releasable-A member
-        sha_a = make_commit(root, "pkg-a1/code.py", "change in a1")
+        make_commit(root, "pkg-a1/code.py", "change in a1")
 
         # Set up releasable-B's changes dir with NO entries
         changes_dir_b = get_releasable_changes_dir(str(root), "rel-b")
@@ -187,7 +187,7 @@ class TestReleasableChangelogScope:
         root, scope_a, scope_b = two_releasable_repo
 
         # Commit touching only workspace root
-        sha_root = make_commit(root, "README.md", "update readme")
+        make_commit(root, "README.md", "update readme")
 
         # Coverage check for releasable A should pass (root commit outside scope)
         passed_a, details_a = check_coverage(
@@ -202,6 +202,11 @@ class TestReleasableChangelogScope:
             tag_glob="rel-b@v*", scope=scope_b,
         )
         assert passed_b, f"Expected pass for B, got: {details_b}"
+
+        # Passing is not enough on its own: both sides must report the commit as
+        # SKIPPED, so a pass that came from an empty range would not satisfy this.
+        assert any("outside package directory" in d for d in details_a)
+        assert any("outside package directory" in d for d in details_b)
 
 
 class TestReleasableOwnsItsStateDirectory:

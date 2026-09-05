@@ -13,7 +13,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from conftest import with_root_member
 from githarness import record_release

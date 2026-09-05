@@ -7,15 +7,10 @@ Verifies:
 - Config-driven hooks produce files that appear in hook_generated set
 """
 
-import json
-import os
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 from rlsbl.commands.release.hooks import (
-    _is_hook_effectively_empty,
     is_hook_customized,
     is_releasable_hook_customized,
 )

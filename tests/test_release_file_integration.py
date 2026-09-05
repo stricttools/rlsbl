@@ -8,7 +8,6 @@ Verifies that:
 
 import json
 import os
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -523,7 +522,6 @@ class TestReleaseFileFinalization:
 
     def test_finalize_release_file(self, tmp_path):
         """Simulates the finalization logic: rename, chmod, recreate."""
-        from rlsbl.release_file import get_release_file_path
 
         releases_dir = tmp_path / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
@@ -607,7 +605,7 @@ class TestMonorepoReleaseFilePath:
         versioned_release = os.path.join(str(releases_dir), f"v{new_version}.toml")
         os.rename(release_file_path, versioned_release)
         os.chmod(versioned_release, 0o444)
-        with open(release_file_path, "w", encoding="utf-8") as f:
+        with open(release_file_path, "w", encoding="utf-8"):
             pass
 
         # Verify both files are in the package's directory

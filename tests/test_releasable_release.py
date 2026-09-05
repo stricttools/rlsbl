@@ -16,7 +16,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import make_workspace, sync_member_versions, tag_state_absent, tag_state_present, with_root_member, workspace_toml
+from conftest import make_workspace, sync_member_versions, tag_state_absent, tag_state_present, workspace_toml
 from rlsbl.commands.release.execute import ReleaseState
 from rlsbl.commands.release.validate import (
     _format_releasable_tag,
@@ -24,16 +24,13 @@ from rlsbl.commands.release.validate import (
 )
 from rlsbl.errors import ConfigError, ReleaseFileError, VersionError
 from rlsbl.release_file import (
-    BatchReleaseConfig,
     read_batch_release_file,
 )
 from rlsbl.workspace import (
     Releasable,
     WorkspaceProject,
-    save_workspace,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
-    write_releasable_version,
     get_releasable_changes_dir,
 )
 
@@ -339,7 +336,7 @@ class TestValidateChangelogStateReleasable:
         # Create releasable changes dir with unreleased.jsonl
         changes_dir = get_releasable_changes_dir(ws_root, releasable_name)
         os.makedirs(changes_dir, exist_ok=True)
-        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w"):
             pass
 
         # validate_changelog_state now just resolves the changes dir path
@@ -377,7 +374,7 @@ class TestValidateChangelogStateReleasable:
         project_dir = str(tmp_path)
         changes_dir = os.path.join(project_dir, ".rlsbl", "changes")
         os.makedirs(changes_dir, exist_ok=True)
-        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
+        with open(os.path.join(changes_dir, "unreleased.jsonl"), "w"):
             pass
 
         # validate_changelog_state now just resolves the changes dir path

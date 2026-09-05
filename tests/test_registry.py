@@ -1,6 +1,5 @@
 """Tests for rlsbl.registry version query functions."""
 
-import json
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 

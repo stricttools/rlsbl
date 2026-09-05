@@ -5,21 +5,19 @@ rlsbl monorepo init should work in directories without a pre-existing
 existing workspace or if workspace.toml already exists.
 """
 
-import os
 import subprocess
 
 import pytest
 
 from rlsbl.workspace import (
     find_workspace_root,
-    save_workspace,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
 )
 from rlsbl.commands.monorepo.commands import _cmd_init
 from rlsbl import RootDevNode
 
-from conftest import cli_ctx, with_root_member, make_workspace
+from conftest import cli_ctx, make_workspace
 
 
 class TestMonorepoInitBootstrap:

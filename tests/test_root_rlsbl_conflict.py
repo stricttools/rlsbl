@@ -1,12 +1,10 @@
 """Tests for Phase 4: preventing coexistence of root .rlsbl/ and .rlsbl-monorepo/."""
 
-import os
 
-import pytest
 
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.commands.init_cmd import _is_workspace_root, run_cmd, run_cmd_multi
+from rlsbl.commands.init_cmd import run_cmd, run_cmd_multi
 
 from conftest import workspace_toml
 

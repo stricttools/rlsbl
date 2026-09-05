@@ -9,18 +9,14 @@ import json
 import os
 import stat
 import subprocess
-import sys
-import time
-import urllib.error
 from datetime import datetime, timedelta, timezone
-from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-from conftest import FakeResponse, git_head, make_commit, run_git, with_root_member, make_workspace
+from conftest import git_head, run_git, make_workspace
 
 
 # ============================================================================
@@ -577,9 +573,8 @@ from rlsbl.changelog.files import (
     unfinalize_version,
     writable_jsonl,
     remap_jsonl_hashes,
-    RemapResult,
 )
-from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
+from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
 
 
 class TestAppendEntryToVersion:
@@ -704,7 +699,7 @@ class TestWritableJsonl:
         f.write_text("content\n")
         original_mode = os.stat(str(f)).st_mode
 
-        with writable_jsonl(str(f)) as path:
+        with writable_jsonl(str(f)):
             pass
 
         # Mode should not have changed
@@ -848,7 +843,6 @@ class TestResolveHashes:
 from rlsbl.commands.release_retry import (
     _find_dispatch_workflows,
     _cleanup_retry_file,
-    _scaffold_retry_file,
     run_cmd as retry_run_cmd,
 )
 from rlsbl.release_file import RetryConfig
@@ -1023,7 +1017,6 @@ class TestReleaseRetryDispatchWarning:
 # mirror_cmd.py (additional via mock-heavy approach)
 # ============================================================================
 
-import rlsbl.commands.monorepo.mirror_cmd
 from rlsbl.commands.monorepo import mirror_cmd as mirror_mod
 from rlsbl.commands.monorepo.mirror_cmd import _cmd_mirror, MirrorError, MirrorPlan
 
@@ -1033,7 +1026,7 @@ def _mirror_workspace(mock_git_repo, tmp_path):
     subtree remote, and return the remote path. Shared setup for the
     error-propagation tests below.
     """
-    from rlsbl.workspace import WORKSPACE_DIR, save_workspace
+    from rlsbl.workspace import WORKSPACE_DIR
 
     bare_repo = tmp_path / "bare-remote.git"
     bare_repo.mkdir()

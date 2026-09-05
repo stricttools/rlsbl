@@ -15,7 +15,6 @@ import pytest
 from rlsbl.release_publication import (
     release_commit_from_record,
     create_args,
-    edit_notes_args,
     ensure_marker,
     is_prerelease,
     publication,

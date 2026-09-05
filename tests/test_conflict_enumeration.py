@@ -6,8 +6,7 @@ the matched normalization rule on the result dict for all registries
 every conflicting package and the rule in their text output.
 """
 
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 

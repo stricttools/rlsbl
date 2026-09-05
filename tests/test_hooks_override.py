@@ -486,7 +486,7 @@ class TestExternalChecksVsHookCustomization:
             calls.append((tag_expr, name_glob))
             return ([], [], 0)
 
-        started = [p.start() for p in _FULL_FLOW_PATCHES]
+        [p.start() for p in _FULL_FLOW_PATCHES]
         try:
             with (
                 patch("rlsbl.commands.release.is_hook_customized", return_value=hook_customized),
@@ -553,7 +553,7 @@ class TestExternalChecksVsHookCustomization:
             tmp_project, hook_body="#!/bin/bash\necho custom tests\n"
         )
 
-        started = [p.start() for p in _FULL_FLOW_PATCHES]
+        [p.start() for p in _FULL_FLOW_PATCHES]
         try:
             with (
                 patch("rlsbl.commands.release.is_hook_customized", return_value=True),

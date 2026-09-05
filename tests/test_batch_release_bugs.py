@@ -3,13 +3,11 @@
 import json
 import os
 import subprocess
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 
 import pytest
 
-from conftest import make_state_for_every_releasable, make_workspace, with_root_member
+from conftest import make_state_for_every_releasable, make_workspace
 
 from rlsbl.commands.release import _run_cmd_inner
 from rlsbl.commands.release_init import run_cmd as release_init_run_cmd
@@ -18,7 +16,6 @@ from rlsbl.release_file import ReleaseConfig, get_batch_release_file_path
 from rlsbl.workspace import (
     WORKSPACE_DIR,
     WORKSPACE_FILE,
-    save_workspace,
     write_releasable_version,
 )
 from rlsbl.commands.monorepo.batch_plan import (

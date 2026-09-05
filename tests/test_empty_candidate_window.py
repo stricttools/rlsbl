@@ -31,8 +31,6 @@ from rlsbl.workspace import get_releasable_dir
 from test_representative_write_elimination import (  # noqa: E402
     _git,
     _git_head,
-    _release_patches,
-    _rc,
     _setup_releasable_workspace,
 )
 

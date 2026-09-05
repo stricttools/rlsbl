@@ -10,10 +10,8 @@ Phase 6: verifies that the workspace-targets check correctly:
 - Shows correct counts in the pass message
 """
 
-import os
 from pathlib import Path
 
-import pytest
 
 from conftest import run_git
 

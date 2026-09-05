@@ -6,7 +6,6 @@ through ``_cmd_mirror`` (the command entry point) and the observation helpers.
 """
 
 import json
-import os
 import subprocess
 
 import pytest
@@ -18,9 +17,9 @@ from rlsbl.commands.monorepo.mirror_cmd import (
     compute_split_sha,
     observe,
 )
-from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE, save_workspace
+from rlsbl.workspace import WORKSPACE_DIR
 
-from conftest import run_git, with_root_member, make_workspace
+from conftest import make_workspace
 
 
 # ---------------------------------------------------------------------------

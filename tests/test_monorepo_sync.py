@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 from routerharness import generate_router
 
 from rlsbl.commands.monorepo import (
@@ -22,7 +22,6 @@ from rlsbl.commands.monorepo import (
     parse_ci_workflow,
     emit_ci_workflow,
 )
-from rlsbl.workspace import load_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 
 
 def _member_filter(router_content, member):
@@ -377,11 +376,13 @@ class TestInjectWorkingDirectory:
         )
         doc = parse_ci_workflow(content)
         _inject_working_directory(doc, "myproject")
-        result = emit_ci_workflow(doc)
+        emitted = emit_ci_workflow(doc)
         # Each job should have working-directory
         for job_name in ("build", "test", "lint"):
             job = doc['jobs'][job_name]
             assert job['defaults']['run']['working-directory'] == "myproject"
+        # ...and it survives the round trip back to YAML, once per job.
+        assert emitted.count("working-directory: myproject") == 3
 
     def test_preserves_existing_defaults(self):
         """Job with existing defaults.run.shell keeps shell and gains working-directory."""
@@ -692,7 +693,6 @@ class TestTrailingSlashStripped:
 
         _cmd_init({"root-dev-node": True}, project_root=".")
         # Manually add with trailing-slash path in workspace
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": "python/", "name": "mypkg"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -718,7 +718,6 @@ class TestTrailingSlashStripped:
             f.write(CI_WORKFLOW)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": "lib/", "name": "mylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -780,7 +779,6 @@ class TestVersionFileRewrite:
             f.write(GO_CI_WORKFLOW)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": "gomod", "name": "gomod"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -838,7 +836,6 @@ class TestPackagesDirInjection:
             f.write(PYPI_PUBLISH_WORKFLOW)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -933,7 +930,6 @@ class TestDotPathSelfReference:
             json.dump({"name": "root", "version": "0.1.0"}, f)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": ".", "name": "root", "releasable": False}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -1009,7 +1005,6 @@ class TestTemplateVarResolution:
             f.write(PYPI_CI_WITH_TEMPLATE_VARS)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -1040,7 +1035,6 @@ class TestTemplateVarResolution:
             f.write(GO_CI_WITH_TEMPLATE_VARS)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": "mygomod", "name": "mygomod"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
@@ -1099,7 +1093,6 @@ jobs:
             f.write(ci_content)
 
         _cmd_init({"root-dev-node": True}, project_root=".")
-        from rlsbl.workspace import save_workspace
         make_workspace(".", [{"path": "mypylib", "name": "mypylib"}])
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(

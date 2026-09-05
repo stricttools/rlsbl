@@ -1,17 +1,14 @@
 """Tests for github target support in check-name command."""
 
-import sys
-from io import StringIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from conftest import cli_ctx, FakeResponse
+from conftest import cli_ctx
 from rlsbl.commands.check import (
     _check_single_name,
     _format_single_result,
     _format_table_row,
-    check_github_availability,
     run_cmd,
 )
 
@@ -237,10 +234,9 @@ class TestClaimNameNoGithub:
     def test_claim_name_npm_no_github(self, mock_search, mock_variants, mock_npm, mock_gh):
         """claim_name imports _check_single_name which should not call GitHub."""
         mock_npm.return_value = {"status": "available"}
-        from rlsbl.commands.claim_name import run_cmd as claim_run_cmd
 
         # Simulate the check that claim_name does internally
-        result = _check_single_name("test-pkg", "npm")
+        _check_single_name("test-pkg", "npm")
         mock_gh.assert_not_called()
 
     def test_claim_name_rejects_github_target(self):

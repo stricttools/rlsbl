@@ -5,12 +5,10 @@ import subprocess
 import textwrap
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.maven_central import validate_maven_central_metadata, _validate_pom_metadata, _check_source_javadoc_jars
 from rlsbl.testing import run_project_tests
 from rlsbl.targets.maven import MavenTarget
-from rlsbl.errors import VersionError
 
 
 # ---------------------------------------------------------------------------

@@ -24,7 +24,6 @@ import pytest
 from conftest import run_git
 from rlsbl.errors import ConfigError
 from rlsbl.member_context import resolve_member_context
-from rlsbl.pipelines import load_pipelines
 from rlsbl.pipelines.base import BasePipeline
 from rlsbl.resolved_target import (
     ResolvedTarget,

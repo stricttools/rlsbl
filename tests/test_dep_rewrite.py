@@ -1,9 +1,7 @@
 """Tests for rlsbl.dep_rewrite -- path dependency detection and rewriting."""
 
-import os
 import textwrap
 
-import pytest
 import tomlkit
 
 from rlsbl.dep_rewrite import (

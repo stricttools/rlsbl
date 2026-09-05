@@ -1,9 +1,8 @@
 """Tests for PyPI scanner matching actual PyPI names that differ from workspace names."""
 
-import os
 import textwrap
 
-from rlsbl.workspace_graph import Dependency, PypiScanner, WorkspaceGraph
+from rlsbl.workspace_graph import PypiScanner, WorkspaceGraph
 
 
 class TestPypiScannerPrefixMapping:

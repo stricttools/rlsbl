@@ -134,7 +134,7 @@ class TestDevNodeProjectChecks:
     def test_dev_node_project_skips_user_facing_check(self, dev_node_monorepo):
         """Changelog-user-facing check returns skip for dev node projects."""
         from rlsbl.check_context import WorkspaceCheckContext
-        from rlsbl.workspace import load_workspace, resolve_project
+        from rlsbl.workspace import load_workspace
         from rlsbl.workspace_graph import WorkspaceGraph
 
         root = dev_node_monorepo.root

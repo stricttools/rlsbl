@@ -6,7 +6,6 @@ Covers:
 
 import os
 
-import pytest
 
 from rlsbl.commands.release.publish import _prefix_artifact
 

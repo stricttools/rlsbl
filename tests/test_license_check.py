@@ -1,10 +1,8 @@
 """Tests for the license-file project check."""
 
-import os
 
 from conftest import make_ctx
 
-from rlsbl.checks import register_checks
 from rlsbl import app
 
 

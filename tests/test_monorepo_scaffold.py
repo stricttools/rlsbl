@@ -14,11 +14,10 @@ import os
 import subprocess
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add
 from rlsbl.commands.init_cmd import _trigger_monorepo_sync
-from rlsbl.workspace import load_workspace, WORKSPACE_DIR, WORKSPACE_FILE
+from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
 
 
 CI_WORKFLOW = """\
@@ -90,7 +89,6 @@ class TestScaffoldTriggersSync:
     def test_trigger_noop_without_monorepo(self, mock_git_repo):
         """_trigger_monorepo_sync does nothing when not inside a monorepo."""
         calls = []
-        original_run = subprocess.run
 
         def tracking_run(cmd, *args, **kwargs):
             calls.append(cmd)

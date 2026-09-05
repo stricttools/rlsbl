@@ -17,7 +17,6 @@ import os
 
 import pytest
 
-from rlsbl.config import merge_config, read_project_config
 from rlsbl.targets import detect_targets
 
 
@@ -77,7 +76,6 @@ class TestCollectReleasableTargetsReadsReleasableConfig:
         Expected behavior: releasable-level targets are discovered.
         """
         from rlsbl.targets import collect_releasable_targets
-        from rlsbl.workspace import get_releasable_dir
 
         workspace_root = str(tmp_path)
 

@@ -2,8 +2,7 @@
 
 import json
 import os
-import sys
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 import pytest
 
@@ -60,12 +59,24 @@ class TestAddTargetPlain:
         _cmd_init({"root-dev-node": True}, project_root=".")
         bare_dir = os.path.join(str(mock_git_repo), "mydir")
         os.makedirs(bare_dir)
-        _cmd_add(["mydir"], {"releasable": "false", "target": "plain"}, project_root=".")
+
+        # Stub the scaffold subprocess out, so what remains is exactly what
+        # _cmd_add itself wrote. Letting the real scaffold run would make the
+        # absence of VERSION depend on whether that subprocess succeeded, which
+        # is why this assertion was missing.
+        original_run = __import__("subprocess").run
+
+        def stub_scaffold(cmd, *args, **kwargs):
+            if isinstance(cmd, list) and "rlsbl" in " ".join(cmd):
+                return __import__("subprocess").CompletedProcess(cmd, 0)
+            return original_run(cmd, *args, **kwargs)
+
+        with patch("subprocess.run", side_effect=stub_scaffold), \
+             patch("rlsbl.commands.monorepo.commands.commit_files", return_value=True):
+            _cmd_add(["mydir"], {"releasable": "false", "target": "plain"}, project_root=".")
+
         version_path = os.path.join(str(mock_git_repo), "mydir", "VERSION")
-        # VERSION is created by scaffold subprocess, not by _cmd_add.
-        # In the test environment the scaffold subprocess may or may not succeed,
-        # so we just verify _cmd_add itself doesn't write it before scaffold runs.
-        # The key assertion is that the workspace was updated successfully.
+        assert not os.path.exists(version_path)
         projects = declared_members(load_workspace(str(mock_git_repo)))
         assert len(projects) == 1
 

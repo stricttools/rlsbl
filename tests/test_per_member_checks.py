@@ -6,20 +6,12 @@ Covers:
 """
 
 import json
-import os
-import subprocess
-from pathlib import Path
 
-import pytest
 
 from conftest import workspace_toml
 
 from rlsbl.workspace import (
-    Releasable,
-    save_workspace,
     write_releasable_version,
-    get_releasable_dir,
-    get_releasable_changes_dir,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
 )

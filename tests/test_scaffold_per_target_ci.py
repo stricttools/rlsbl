@@ -5,7 +5,6 @@ import os
 from io import StringIO
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.commands.init_cmd import run_cmd_multi, _is_npm_wrapper
 from rlsbl.context import ProjectContext

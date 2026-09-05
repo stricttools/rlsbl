@@ -9,11 +9,9 @@ handles them as valid nodes.
 import json
 import os
 import subprocess
-import textwrap
 
-import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 from rlsbl.commands.monorepo import (
     _cmd_init,
@@ -21,7 +19,7 @@ from rlsbl.commands.monorepo import (
     _cmd_sync,
     _cmd_status,
 )
-from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
+from rlsbl.workspace import WORKSPACE_DIR
 from rlsbl.workspace_graph import WorkspaceGraph
 
 

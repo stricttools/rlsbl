@@ -357,7 +357,6 @@ class TestArchiveRefusedWithInProgressState:
     plan item still has an in-progress.json on disk."""
 
     def test_in_progress_state_blocks_archive(self, tmp_path):
-        import os
 
         from rlsbl.commands.monorepo.batch_plan import BatchPlan, PlanItem
         from rlsbl.commands.monorepo.batch_release import (

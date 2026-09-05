@@ -1,6 +1,5 @@
 """Tests for the changelog add/generate subcommands."""
 
-import json
 import os
 from unittest import mock
 

@@ -2,7 +2,6 @@
 
 import fcntl
 import json
-import os
 import subprocess
 from io import StringIO
 from unittest.mock import patch

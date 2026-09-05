@@ -2,7 +2,6 @@
 
 import os
 
-import pytest
 
 from rlsbl.commands.init_cmd import _install_or_update_pre_push_hook
 from rlsbl.hook_hashes import (

@@ -1,11 +1,9 @@
 """Tests for subprocess timeout handling in MavenLinter and testing.py."""
 
-import json
 import os
 import subprocess
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from rlsbl.lint.config import LanguageLintConfig
 from rlsbl.lint.maven import MavenLinter

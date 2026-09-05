@@ -14,7 +14,6 @@ raise when they disagree about one version.
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -29,7 +28,7 @@ from rlsbl.transition_record import (
 from rlsbl.targets import TARGETS
 from rlsbl.targets.base import BaseTarget
 from rlsbl.targets.go import GoTarget
-from rlsbl.targets.refs import ExpectedRefs, RefContext, ref_context
+from rlsbl.targets.refs import ExpectedRefs, ref_context
 
 
 # ---------------------------------------------------------------------------

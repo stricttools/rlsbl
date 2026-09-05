@@ -7,17 +7,15 @@ the blog wiring is already handled by the single-project release flow.
 These tests verify that the delegation preserves the blog field correctly.
 """
 
-import json
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
-from rlsbl.release_file import BatchReleaseConfig, ReleaseConfig, read_batch_release_file
+from rlsbl.release_file import read_batch_release_file
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
-from rlsbl.workspace import save_workspace, WORKSPACE_DIR
+from rlsbl.workspace import WORKSPACE_DIR
 
 
 def _write_toml(path, content):

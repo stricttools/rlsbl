@@ -1,14 +1,12 @@
 """Tests for the backfill_changelog script."""
 
 import importlib.util
-import json
 import os
 import stat
 import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 
 # Load backfill_changelog by file path instead of modifying sys.path
 _BACKFILL_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "backfill_changelog.py"

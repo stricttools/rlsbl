@@ -6,7 +6,7 @@ item must leave every other byte of the file untouched -- intra-table
 comments and deliberate key order included.
 """
 
-from conftest import with_root_member, workspace_toml, make_workspace
+from conftest import with_root_member, workspace_toml
 from rlsbl.workspace import (
     Releasable,
     WorkspaceProject,

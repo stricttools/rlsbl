@@ -3,7 +3,6 @@
 from rlsbl.targets import TARGETS
 from rlsbl.targets.introspect import (
     SUPPORT_COLUMNS,
-    HEADERS,
     generate_target_table_data,
 )
 

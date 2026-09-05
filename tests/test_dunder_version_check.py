@@ -1,7 +1,6 @@
 """Tests for the dunder-version-missing project check."""
 
 import json
-import os
 
 from conftest import make_ctx
 

@@ -11,7 +11,6 @@ Covers:
 import json
 import os
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,7 +22,6 @@ from rlsbl.workspace import (
     RELEASABLES_DIR,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
-    WorkspaceProject,
     get_releasable_dir,
     get_releasable_version_path,
     read_releasable_version,

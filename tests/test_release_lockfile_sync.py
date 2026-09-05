@@ -4,7 +4,6 @@ import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from rlsbl.commands.release import _sync_lockfiles
 
@@ -316,7 +315,7 @@ class TestSyncLockfiles:
         with (
             patch("shutil.which", return_value="/usr/bin/uv"),
             patch("rlsbl.effects.run",
-                  side_effect=_make_subprocess_run_side_effect()) as mock_run,
+                  side_effect=_make_subprocess_run_side_effect()),
             patch("rlsbl.commands.release.os.stat", side_effect=fake_stat),
         ):
             _sync_lockfiles(target_paths, files_to_commit, log)

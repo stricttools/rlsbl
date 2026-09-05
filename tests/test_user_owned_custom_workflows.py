@@ -5,7 +5,6 @@ exist as the escape hatch for users who want to add jobs to CI without fighting
 the three-way merge on the scaffold-managed ci.yml/publish.yml.
 """
 
-import os
 
 from rlsbl.commands.init_cmd import (
     USER_OWNED,

@@ -4,10 +4,7 @@ Phase 6.4: scan_artifacts_for_secrets must cover subdirectory targets'
 dist/ directories when target_paths is provided.
 """
 
-import os
-import zipfile
 
-import pytest
 
 from rlsbl.secret_scan import _find_artifacts
 

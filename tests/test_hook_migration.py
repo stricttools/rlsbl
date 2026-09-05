@@ -7,9 +7,7 @@ Verifies:
 4. No warning when no script exists
 """
 
-import os
 
-import pytest
 
 from rlsbl.commands.release.hooks import warn_if_hook_needs_migration
 

@@ -13,11 +13,9 @@ the description ONCE, at release time, and lost it on the next
 later release regenerates every version's file).
 """
 
-import json
 import os
 from pathlib import Path
 
-import pytest
 
 from githarness import git
 

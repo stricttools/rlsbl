@@ -1,6 +1,5 @@
 """Tests for scaffold support of JSONL changelog directory."""
 
-import os
 from pathlib import Path
 
 from rlsbl.commands.init_cmd import USER_OWNED, process_mappings

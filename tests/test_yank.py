@@ -66,7 +66,6 @@ class TestPublicationProbeOnTargets:
     @patch("rlsbl.targets.npm.NpmTarget.read_name", return_value="my-pkg")
     def test_npm_published(self, _):
         from rlsbl.targets.npm import NpmTarget
-        import urllib.error
 
         t = NpmTarget()
         mock_resp = MagicMock()
@@ -205,7 +204,6 @@ class TestCapabilityConsistency:
     def test_non_probe_targets_use_default(self):
         """Targets without publication_probe capability should use the default."""
         from rlsbl.targets import TARGETS
-        from rlsbl.targets.base import BaseTarget
 
         for name, target in TARGETS.items():
             if not target.supports_publication_probe:

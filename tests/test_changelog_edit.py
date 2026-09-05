@@ -2,7 +2,6 @@
 
 import json
 import os
-import stat
 from unittest import mock
 
 import pytest

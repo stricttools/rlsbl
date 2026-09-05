@@ -29,7 +29,6 @@ import pytest
 
 from rlsbl.config import validate_pipelines_config
 from rlsbl.errors import ConfigError
-from rlsbl.pipelines import load_pipelines
 from rlsbl.pipelines.npm import NpmPipeline
 from rlsbl.pipelines.pypi import PypiPipeline
 

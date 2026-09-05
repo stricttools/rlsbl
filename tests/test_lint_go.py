@@ -2,7 +2,7 @@
 
 import pytest
 
-from rlsbl.lint import LintResult, lint_library
+from rlsbl.lint import lint_library
 from rlsbl.lint.config import LanguageLintConfig
 from rlsbl.lint.go_ast import GoAstLinter
 from rlsbl.lint.go_regex import GoRegexLinter

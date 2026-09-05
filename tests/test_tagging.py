@@ -2,9 +2,7 @@
 
 import json
 
-import pytest
 
-from conftest import FakeResponse
 from rlsbl.tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword, ensure_tags
 
 

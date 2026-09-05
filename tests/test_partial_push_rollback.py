@@ -445,7 +445,6 @@ class TestPostTaggedPushResumable:
         _setup_releasable_npm_project(tmp_project)
 
         from rlsbl.commands.release import run_cmd
-        from rlsbl.errors import GitError
         from rlsbl.utils import run as real_run
 
         pre_sha = _git_head(tmp_project)

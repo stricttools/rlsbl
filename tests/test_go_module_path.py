@@ -1,9 +1,7 @@
 """Tests for rlsbl.utils.read_go_module_path -- parsing module path from go.mod files."""
 
-import os
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.utils import read_go_module_path
 

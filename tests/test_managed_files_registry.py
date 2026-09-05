@@ -7,7 +7,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.commands.init_cmd import (
     BASES_DIR,

@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 
-import pytest
 
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_sync
 

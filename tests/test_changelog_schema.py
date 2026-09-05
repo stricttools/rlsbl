@@ -1,7 +1,6 @@
 """Tests for rlsbl.changelog.schema."""
 
 import json
-import os
 
 import pytest
 

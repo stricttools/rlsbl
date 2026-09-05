@@ -1,6 +1,5 @@
 """Tests for the scaffold-unreplaced-vars quality check."""
 
-import os
 
 from conftest import make_ctx
 

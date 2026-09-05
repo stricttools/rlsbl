@@ -11,31 +11,11 @@ Covers:
 - Cache per releasable
 """
 
-import json
 import os
-import subprocess
-import time
 
-import pytest
 
-from rlsbl.changelog.files import (
-    append_entry,
-    finalize_version,
-    get_changes_dir,
-    read_unreleased,
-)
-from rlsbl.changelog.generate import generate_changelog
 from rlsbl.changelog.schema import (
-    ChangelogEntry,
-    parse_entry,
     serialize_entry,
-    validate_schema,
-)
-from rlsbl.changelog.validate import (
-    _read_all_versioned_entries,
-    check_coverage,
-    check_in_range,
-    check_no_orphans,
 )
 from rlsbl.git_util import filter_commits_for_scope
 from rlsbl.ownership import OwnershipScope
@@ -45,13 +25,12 @@ from rlsbl.workspace import (
     get_releasable_changes_dir,
     get_releasable_dir,
     load_releasables,
-    members_of,
     resolve_releasable_for_project,
     WORKSPACE_DIR,
     WORKSPACE_FILE,
 )
 
-from conftest import make_commit, make_workspace, run_git, workspace_toml
+from conftest import make_commit, make_workspace, workspace_toml
 
 
 # ---------------------------------------------------------------------------

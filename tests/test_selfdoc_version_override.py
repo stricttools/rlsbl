@@ -17,7 +17,6 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from rlsbl.commands.release.validate import (
     _run_selfdoc_check,

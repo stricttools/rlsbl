@@ -7,11 +7,9 @@ so the .md file was missing from every release.
 """
 
 import json
-import os
 import subprocess
 from unittest.mock import patch
 
-import pytest
 
 from githarness import record_release
 
@@ -114,7 +112,6 @@ class TestReleaseFinalizeMd:
 
         def fake_run(cmd, args=None, timeout=120, env=None, cwd=None):
             """Intercept gh and git-push calls; let everything else through."""
-            full = [cmd] + (args or [])
             # Skip gh CLI calls
             if cmd == "gh":
                 return ""

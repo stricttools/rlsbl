@@ -15,7 +15,6 @@ than any per-command check.
 import json
 import os
 
-import pytest
 
 import rlsbl
 

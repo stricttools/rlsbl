@@ -11,7 +11,6 @@ import json
 import os
 from pathlib import Path
 
-import pytest
 
 from rlsbl.commands.init_cmd import (
     _get_releasable_config_dir,
@@ -293,7 +292,7 @@ class TestSafermInvocation:
 
     def test_skip_redundant_uses_saferm(self, mock_git_repo, monkeypatch):
         """_skip_redundant_releasable_configs calls saferm to remove identical configs."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
         import subprocess as real_subprocess
 
         proj_dir = mock_git_repo / "app"

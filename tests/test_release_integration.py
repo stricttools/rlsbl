@@ -11,7 +11,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -433,7 +433,6 @@ class TestBuildFailureAbortsRelease:
 
         # Mock target.build to raise RuntimeError (simulating a build failure)
         from rlsbl.targets.npm import NpmTarget
-        original_build = NpmTarget.build
 
         def failing_build(self, dir_path, version, *, config=None):
             raise RuntimeError("build failed: compile error")

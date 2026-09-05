@@ -12,12 +12,10 @@ working, verifying download logic:
 """
 
 import json
-import os
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.commands.init_cmd import run_cmd_multi
 from rlsbl.context import ProjectContext

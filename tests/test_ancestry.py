@@ -36,7 +36,7 @@ import pytest
 from rlsbl import git_util
 from rlsbl.git_util import Ancestry, ancestry
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ class TestMirrorTripwireMapping:
 
     def _mirror(self, tmp_path):
         """A monorepo whose mirror tip is a bare split commit."""
-        from rlsbl.workspace import WORKSPACE_DIR, save_workspace
+        from rlsbl.workspace import WORKSPACE_DIR
 
         root = tmp_path / "mono"
         root.mkdir()

@@ -10,7 +10,6 @@ Follows the pattern from test_release_integration.py.
 """
 
 import json
-import os
 import subprocess
 from pathlib import Path
 from unittest.mock import patch

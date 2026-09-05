@@ -6,7 +6,6 @@ when pipelines are provided, killing the target-name-based template bypass.
 
 import os
 
-import pytest
 
 from rlsbl.commands.init_cmd import _resolve_publish_template
 from rlsbl.pipelines.go import GoPipeline

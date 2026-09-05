@@ -1,11 +1,10 @@
 """Tests for monorepo-aware release behavior in rlsbl.commands.release."""
 
 import json
-import os
 import subprocess
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 import pytest
 
@@ -17,7 +16,6 @@ from rlsbl.targets.base import BaseTarget
 
 from githarness import write_covered_unreleased
 
-from rlsbl.workspace import get_releasable_changes_dir
 
 from conftest import tag_state_present, workspace_toml
 

@@ -2,7 +2,6 @@
 after a release rollback so the working tree stays clean for the next attempt.
 """
 
-import os
 
 from rlsbl.commands.release import _cleanup_release_artifacts
 
@@ -126,7 +125,7 @@ class TestCleanupTrackedGuard:
     def test_untracked_finalized_files_still_removed_in_repo(self, tmp_path):
         """Guard is narrow: genuinely orphaned (untracked) finalize files are
         still removed even inside a git repo."""
-        from githarness import init_repo, commit_file, git
+        from githarness import init_repo, commit_file
 
         repo = tmp_path / "repo"
         init_repo(repo)

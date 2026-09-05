@@ -3,7 +3,6 @@
 from rlsbl.pipelines import PIPELINE_TYPES
 from rlsbl.pipelines.base import TokenPipeline, CredentialPipeline
 from rlsbl.pipelines.introspect import (
-    HEADERS,
     generate_pipeline_table_data,
 )
 

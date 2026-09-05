@@ -8,7 +8,6 @@ mirroring dev-only-boundary (which covers the dev-only variant of the
 same hole).
 """
 
-import pytest
 
 from conftest import capture_all_checks, make_workspace, run_git
 from rlsbl.check_context import WorkspaceCheckContext

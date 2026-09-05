@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import json
 import os
-import stat
 
 import pytest
 
 from githarness import record_release
 
-from conftest import run_git as _run_git, git_head as _git_head, make_commit as _make_commit
+from conftest import run_git as _run_git, make_commit as _make_commit
 from rlsbl.changelog.files import append_entry
 from rlsbl.changelog.schema import ChangelogEntry
 from rlsbl.changelog.validate import (

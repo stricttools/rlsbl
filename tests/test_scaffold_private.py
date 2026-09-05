@@ -1,13 +1,8 @@
 """Tests for private repository scaffold behavior."""
 
-import os
 from pathlib import Path
 
-import pytest
 
-from rlsbl.commands.init_cmd import (
-    process_mappings,
-)
 
 
 class TestPrivateHookTemplateRemoved:

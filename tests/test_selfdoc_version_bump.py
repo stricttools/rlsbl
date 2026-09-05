@@ -9,10 +9,7 @@ configuration.
 
 import json
 import os
-from pathlib import Path
-from unittest.mock import MagicMock
 
-import pytest
 
 from rlsbl import app
 from conftest import issue_phase_a_steps, make_ctx

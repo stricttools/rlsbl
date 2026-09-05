@@ -241,6 +241,7 @@ class TestDryRun:
              patch("rlsbl.commands.release.run") as mock_run:
                 upload_release_assets("v1.0.0", "1.0.0", log, {"dry-run": True}, ctx=ctx)
                 # load_pipelines is called but no build or upload
+                mock_load.assert_called()
                 mock_run.assert_not_called()
 
         assert any("Would build and upload" in m for m in messages)

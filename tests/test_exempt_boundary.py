@@ -5,11 +5,7 @@ have runtime dependencies on dev node projects (since bug fixes
 in dev node projects would silently bypass changelog coverage).
 """
 
-import json
-import os
-from pathlib import Path
 
-import pytest
 
 from conftest import capture_all_checks, make_workspace, run_git
 from rlsbl.check_context import WorkspaceCheckContext

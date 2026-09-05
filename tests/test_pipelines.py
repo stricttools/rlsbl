@@ -1,6 +1,5 @@
 """Tests for rlsbl.pipelines: protocol, base classes, registry, and config validation."""
 
-import os
 
 import pytest
 

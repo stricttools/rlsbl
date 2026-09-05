@@ -7,12 +7,10 @@ each command handler properly parses flags and delegates.
 """
 
 import json
-import os
 import subprocess
 import sys
-from io import StringIO
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -858,7 +858,7 @@ class TestScaffoldRetryFile(unittest.TestCase):
 
             with patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
                  patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml"]), \
-                 patch("rlsbl.commands.release.validate._format_releasable_tag", return_value="core@v2.0.0") as mock_fmt:
+                 patch("rlsbl.commands.release.validate._format_releasable_tag", return_value="core@v2.0.0"):
                 with self.assertRaises(ReleaseFileError):
                     _scaffold_retry_file(
                         retry_path, entry, lambda msg: None,

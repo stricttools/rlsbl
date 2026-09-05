@@ -2,15 +2,14 @@
 
 import json
 import os
-from io import StringIO
 from unittest.mock import patch, call
 
 import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 from rlsbl.commands.monorepo import _cmd_check_names, _cmd_init, _cmd_add
-from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE, load_workspace, save_workspace
+from rlsbl.workspace import load_workspace
 
 
 def _make_npm_project(base_path, subdir):

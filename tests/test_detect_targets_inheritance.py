@@ -10,12 +10,11 @@ Covers:
 """
 
 import json
-import os
 
 import pytest
 
 from rlsbl.errors import ConfigError
-from rlsbl.targets import TargetEntry, detect_targets
+from rlsbl.targets import detect_targets
 
 
 class TestReleasableConfigInheritance:

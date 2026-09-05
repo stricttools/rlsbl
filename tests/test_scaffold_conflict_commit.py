@@ -2,10 +2,8 @@
 must be excluded from the scaffold auto-commit.
 """
 
-import os
 import subprocess
 
-import pytest
 
 from rlsbl.commands.init_cmd import _finalize_scaffold
 

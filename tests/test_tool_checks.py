@@ -10,7 +10,6 @@ These tests pin the invocation shape byte for byte, because the point of the
 declared path list is that the tool's own config cannot silently change it.
 """
 
-import json
 from pathlib import Path
 from types import SimpleNamespace
 

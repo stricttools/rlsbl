@@ -7,7 +7,6 @@ import pytest
 
 from rlsbl.errors import ConfigError
 from rlsbl.dep_validation import (
-    DeadWorkspacePackage,
     _is_inside_python_package,
     check_dev_in_lib,
     check_runtime_test_only,
@@ -1800,7 +1799,6 @@ class TestRootProjectDepScan:
         _capture_all_checks()  # trigger registration side effects
 
         # Access _sibling_exclude_dirs via the module's closure
-        from rlsbl import checks as checks_mod
 
         # Manually test the helper that register_checks defines
         # by constructing the same workspace scenario
@@ -1868,7 +1866,7 @@ class TestRootProjectDepScan:
         captured = _capture_all_checks()
 
         # Run deps-unused which triggers _build_dep_import_cache
-        result = captured["deps-unused"](ctx)
+        captured["deps-unused"](ctx)
 
         # The root project should NOT see root-app as imported
         # (that import lives in sibling/app.py which should be excluded)

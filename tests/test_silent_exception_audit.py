@@ -67,7 +67,7 @@ class TestVersionConsistencyCorruptedTarget:
         ctx = make_ctx(tmp_project)
 
         with patch("rlsbl.targets.pypi.PypiTarget.read_version", side_effect=RuntimeError("corrupt")):
-            result = app._check_defs["version-consistency"].impl(ctx)
+            app._check_defs["version-consistency"].impl(ctx)
 
         captured = capsys.readouterr()
         assert "Warning" in captured.err
@@ -106,7 +106,7 @@ class TestNameConsistencyCorruptedTarget:
         ctx = make_ctx(tmp_project)
 
         with patch("rlsbl.targets.pypi.PypiTarget.read_name", side_effect=RuntimeError("corrupt")):
-            result = app._check_defs["name-consistency"].impl(ctx)
+            app._check_defs["name-consistency"].impl(ctx)
 
         captured = capsys.readouterr()
         assert "Warning" in captured.err

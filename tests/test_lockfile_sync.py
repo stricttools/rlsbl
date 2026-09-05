@@ -7,9 +7,8 @@ Covers:
 """
 
 import os
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from rlsbl.commands.release.execute import _LOCKFILE_SPECS, _sync_lockfiles
 

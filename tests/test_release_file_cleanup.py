@@ -10,10 +10,8 @@ These tests are expected to FAIL on the current code (red phase).
 """
 
 import os
-import stat
 from unittest.mock import patch
 
-import pytest
 
 
 class TestBatchFinalizeDoesNotCreateEmptyFile:

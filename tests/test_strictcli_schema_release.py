@@ -2,13 +2,12 @@
 
 import inspect
 import json
-import os
 import subprocess
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from rlsbl.commands.release import run_cmd, _run_cmd_inner, _run_strictcli_schema_dump
+from rlsbl.commands.release import _run_cmd_inner, _run_strictcli_schema_dump
 from rlsbl.commands.release.validate import ReleaseValidationError
 from rlsbl.release_file import ReleaseConfig
 

@@ -1,7 +1,6 @@
 """Tests for monorepo impact analysis command."""
 
 import json
-import os
 import subprocess
 
 import pytest

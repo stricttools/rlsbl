@@ -1,7 +1,6 @@
 """Tests for the --allow-batch flag in changelog add and related batch size hints."""
 
 import json
-import os
 
 import pytest
 

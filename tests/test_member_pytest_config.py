@@ -10,7 +10,6 @@ blocks the hazard at the workspace level.
 
 import os
 
-import pytest
 
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext

@@ -1,11 +1,8 @@
 """Tests for writable_jsonl context manager and remap_jsonl_hashes function."""
 
-import json
 import os
-import stat
 
 from rlsbl.changelog.files import (
-    RemapResult,
     is_read_only,
     remap_jsonl_hashes,
     writable_jsonl,

@@ -15,14 +15,11 @@ Covers:
 
 import json
 import os
-import subprocess
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from rlsbl.commands.init_cmd import (
-    _is_non_releasable_project,
     _is_releasable_member_project,
     run_cmd,
 )
@@ -37,7 +34,7 @@ from rlsbl.workspace import (
     get_releasable_version_path,
     load_workspace,
 )
-from conftest import make_workspace, with_root_member, workspace_toml, declared_members
+from conftest import make_workspace, workspace_toml, declared_members
 
 
 # ---------------------------------------------------------------------------

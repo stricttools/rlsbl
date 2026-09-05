@@ -1,6 +1,5 @@
 """Tests for monorepo subcommand help registry and dispatch."""
 
-import pytest
 
 from rlsbl import app
 

@@ -534,7 +534,6 @@ class TestReleasableMembersAreAllVerified:
         self, tmp_project
     ):
         """No workspace state may narrow the releasing project out of scope."""
-        from rlsbl.workspace import save_workspace
 
         wf = tmp_project / "packages" / "core" / ".github" / "workflows"
         wf.mkdir(parents=True)

@@ -1,11 +1,9 @@
 """Tests for the ``rlsbl changelog remap`` command (cmd_remap)."""
 
-import os
 import sys
 
 import pytest
 
-from rlsbl.changelog.files import get_changes_dir, remap_jsonl_hashes
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
 from rlsbl.commands.changelog_cmd import _parse_sha_map_lines, cmd_remap
 

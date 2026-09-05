@@ -9,7 +9,7 @@ import unittest
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
-from rlsbl.pipelines.base import BasePipeline, _ALREADY_EXISTS_SIGNATURES
+from rlsbl.pipelines.base import BasePipeline
 from rlsbl.publication_probe import PublicationProbeResult, PublicationStatus
 
 
@@ -125,7 +125,6 @@ class TestPipelineProbeIntegration(unittest.TestCase):
     def test_pypi_publish_calls_probe(self, mock_run):
         """PypiPipeline.publish() calls probe_before_publish."""
         from rlsbl.pipelines.pypi import PypiPipeline
-        import os
 
         pl = PypiPipeline("pypi", "pypi", local=True, config={})
         pl.target = "pypi"
@@ -205,7 +204,7 @@ class TestPublishedTargetsResume(unittest.TestCase):
         from rlsbl.commands.release.release_state import (
             load_release_state, save_release_state,
         )
-        import tempfile, os, json
+        import tempfile, os
 
         with tempfile.TemporaryDirectory() as tmpdir:
             state_path = os.path.join(tmpdir, "in-progress.json")
@@ -616,7 +615,6 @@ class TestRecoveryDispatch(unittest.TestCase):
         )
 
         from io import StringIO
-        import time
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO):
                 run_cmd(config, {}, project_root=".")

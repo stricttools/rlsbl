@@ -6,10 +6,8 @@ post-release) set the enriched environment variables:
 """
 
 import os
-import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 EXPECTED_ENV_KEYS = [

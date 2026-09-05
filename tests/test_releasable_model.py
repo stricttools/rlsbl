@@ -11,7 +11,6 @@ Covers:
 """
 
 import json
-import os
 
 import pytest
 
@@ -30,7 +29,6 @@ from rlsbl.workspace import (
     WORKSPACE_DIR,
     WORKSPACE_FILE,
 )
-from rlsbl.workspace_graph import WorkspaceGraph
 
 
 # ---------------------------------------------------------------------------

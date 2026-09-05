@@ -1,8 +1,7 @@
 """Tests for check-name --target repeatable flag behavior."""
 
-import sys
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from conftest import cli_ctx
 
 

@@ -8,7 +8,7 @@ Covers:
 """
 
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -56,7 +56,6 @@ class TestDetachedHead:
         from rlsbl.context import create_context
 
         # Set up minimal rlsbl project structure for status to work
-        import os
         rlsbl_dir = mock_git_repo / ".rlsbl"
         rlsbl_dir.mkdir(exist_ok=True)
 
@@ -246,7 +245,7 @@ class TestSignalHandlingDuringRelease:
         """Lock file is cleaned up when _run_release_mutating raises KeyboardInterrupt."""
         monkeypatch.chdir(tmp_path)
 
-        from rlsbl.lock import acquire_lock, _lock_fd
+        from rlsbl.lock import acquire_lock
 
         # Create the lock directory structure
         lock_dir = tmp_path / ".rlsbl"

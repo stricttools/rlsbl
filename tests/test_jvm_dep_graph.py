@@ -1,12 +1,10 @@
 """Tests for JVM (Gradle/Maven) dependency graph parsing in workspace_graph.MavenScanner."""
 
-import os
 import textwrap
 
 import pytest
 
 from rlsbl.workspace_graph import (
-    Dependency,
     ManifestScanError,
     MavenScanner,
     SCANNERS,

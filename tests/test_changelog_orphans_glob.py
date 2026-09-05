@@ -11,7 +11,6 @@ it.
 
 import json
 import os
-from pathlib import Path
 
 from conftest import git_head, run_git
 from test_coverage_check_releasable import (

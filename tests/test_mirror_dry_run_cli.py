@@ -20,9 +20,9 @@ carries only genuinely planned mutations.
 import json
 import subprocess
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 import rlsbl
-from rlsbl.workspace import WORKSPACE_DIR, save_workspace
+from rlsbl.workspace import WORKSPACE_DIR
 
 
 def _git(repo, *args):

@@ -13,9 +13,7 @@ Covers:
 """
 
 import json
-import os
 import subprocess
-import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -291,7 +289,6 @@ class TestCompanionTagIntegration:
 
     def test_companion_tag_creation_and_rollback(self, git_repo):
         """Create companion tags, verify they exist, then roll back."""
-        from rlsbl.utils import run
 
         repo = git_repo
         primary_tag = "myreleasable@v1.0.0"
@@ -369,7 +366,6 @@ class TestGoCompanionTagsCheck:
 
     def test_skips_when_no_releasables(self, tmp_path):
         """Check skips when there are no releasables."""
-        from rlsbl.checks.workspace import register_workspace_checks
         from conftest import capture_all_checks
         checks = capture_all_checks()
         check_fn = checks["go-companion-tags"]
@@ -380,7 +376,6 @@ class TestGoCompanionTagsCheck:
 
     def test_warns_when_companion_tag_missing(self, tmp_path):
         """Check warns when a Go companion tag is missing."""
-        from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
         from conftest import capture_all_checks
@@ -428,7 +423,6 @@ class TestGoCompanionTagsCheck:
 
     def test_passes_when_companion_tag_exists(self, tmp_path):
         """Check passes when all Go companion tags exist."""
-        from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
         from conftest import capture_all_checks
@@ -476,7 +470,6 @@ class TestGoCompanionTagsCheck:
 
     def test_skips_when_no_go_members(self, tmp_path):
         """Check skips when releasable has no non-private Go members."""
-        from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
         from conftest import capture_all_checks
@@ -582,7 +575,6 @@ class TestGoCompanionTagsCheck:
         (_sync_member_package_versions_plan propagates ConfigError); the check
         must not silently disagree about the member set.
         """
-        from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
         from conftest import capture_all_checks
@@ -628,7 +620,6 @@ class TestGoCompanionTagsCheck:
         """A releasable whose version file cannot be read must produce a
         check FAILURE naming the releasable, not a silent skip -- same
         no-silent-skip rule as the member-config-error failure."""
-        from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject
 
         from conftest import capture_all_checks
@@ -680,7 +671,6 @@ class TestGoCompanionTagsCheck:
         the merged config has no targets key; the check must surface that
         as a per-member failure.
         """
-        from rlsbl.checks.workspace import register_workspace_checks
         from rlsbl.workspace import Releasable, WorkspaceProject, write_releasable_version
 
         from conftest import capture_all_checks

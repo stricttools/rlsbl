@@ -1,9 +1,7 @@
 """Tests for import extraction from lint AST parsers."""
 
 import json
-import os
 
-import pytest
 
 from rlsbl.lint.npm_ast import NpmAstLinter
 from rlsbl.lint.protocol import ImportScanner

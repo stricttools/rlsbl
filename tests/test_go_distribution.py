@@ -7,7 +7,6 @@ no-config baseline behavior, and publish-time go install for CLI projects.
 
 import json
 import os
-from pathlib import Path
 
 import pytest
 

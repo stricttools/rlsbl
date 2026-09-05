@@ -1,6 +1,5 @@
 """Tests for the release-init command."""
 
-import os
 import subprocess
 from unittest.mock import patch
 

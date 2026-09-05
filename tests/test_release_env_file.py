@@ -18,7 +18,6 @@ release proceeded to publish and deploy with an environment nobody supplied.
 
 import json
 import os
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -28,7 +27,7 @@ from rlsbl.config import load_env_file
 from rlsbl.context import ProjectContext
 from rlsbl.errors import ConfigError
 
-from conftest import make_releasable_state, make_workspace, with_root_member
+from conftest import make_releasable_state, make_workspace
 
 
 _PROBE = "RLSBL_ENV_FILE_PROBE"
@@ -239,7 +238,6 @@ class TestBatchOrchestratorLoadsTheEnvFile:
 
     def _workspace(self, ws, env_file):
         from rlsbl.release_file import get_batch_release_file_path
-        from rlsbl.workspace import save_workspace
 
         make_workspace(str(ws), [{"path": "alpha", "name": "alpha"}])
         # The releasable has shipped 0.1.0 below (the tag), so its release record

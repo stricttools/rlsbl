@@ -2,11 +2,8 @@
 
 import json
 import os
-import sys
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from conftest import make_workspace, run_git, workspace_toml
 from rlsbl.utils import find_project_root
@@ -107,7 +104,7 @@ class TestMainRootDiscovery:
         monkeypatch.chdir(subdir)
         original_cwd = os.getcwd()
 
-        with patch("rlsbl.commands.discover.run_cmd") as mock_run:
+        with patch("rlsbl.commands.discover.run_cmd"):
             from rlsbl import app
             app.test(["discover"])
 
@@ -127,7 +124,7 @@ class TestMainRootDiscovery:
         monkeypatch.chdir(tmp_path)
         original_cwd = os.getcwd()
 
-        with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
+        with patch("rlsbl.commands.init_cmd.run_cmd"):
             with patch("rlsbl.detect_registries", return_value=["npm"]):
                 with patch("rlsbl.config.read_project_config", return_value={}):
                     from rlsbl import app
@@ -146,7 +143,7 @@ class TestMainRootDiscovery:
 
         # First call: cwd check (src/ has no project files -> []).
         # Second call: auto-detect from root (has package.json -> ["npm"]).
-        with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
+        with patch("rlsbl.commands.init_cmd.run_cmd"):
             with patch("rlsbl.detect_registries", side_effect=[[], ["npm"]]):
                 with patch("rlsbl.config.read_project_config", return_value={}):
                     from rlsbl import app
@@ -167,7 +164,7 @@ class TestMainRootDiscovery:
         monkeypatch.chdir(subproject)
         original_cwd = os.getcwd()
 
-        with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
+        with patch("rlsbl.commands.init_cmd.run_cmd"):
             with patch("rlsbl.config.read_project_config", return_value={}):
                 from rlsbl import app
                 app.test(["scaffold"])
@@ -187,7 +184,7 @@ class TestMainRootDiscovery:
         monkeypatch.chdir(subproject)
         original_cwd = os.getcwd()
 
-        with patch("rlsbl.commands.init_cmd.run_cmd") as mock_run:
+        with patch("rlsbl.commands.init_cmd.run_cmd"):
             with patch("rlsbl.config.read_project_config", return_value={}):
                 from rlsbl import app
                 app.test(["scaffold"])
@@ -378,7 +375,6 @@ class TestSymlinkPathNormalization:
         excluded = _sibling_exclude_dirs(str(link), ".", all_projects)
 
         # Both pkg-a and pkg-b should be excluded (they are inside ".")
-        real_root = os.path.realpath(str(real_dir))
         assert os.path.realpath(os.path.join(str(real_dir), "pkg-a")) in excluded
         assert os.path.realpath(os.path.join(str(real_dir), "pkg-b")) in excluded
         assert len(excluded) == 2

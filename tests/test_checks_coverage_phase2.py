@@ -14,9 +14,8 @@ from collections import namedtuple
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
-from conftest import git_head, make_commit, make_ctx, make_workspace, run_git, workspace_toml
+from conftest import git_head, make_ctx, make_workspace, run_git, workspace_toml
 
 from strictcli import SkipCheck
 
@@ -2364,7 +2363,6 @@ class TestWorkspaceUnregistered:
         rlsbl.mkdir()
         (rlsbl / "config.json").write_text('{"publish_mode": "ci", "targets": ["npm"]}\n')
 
-        from rlsbl.workspace import WorkspaceProject
         projects = []  # No projects registered
 
         run_git(repo, "add", ".")
@@ -2892,7 +2890,6 @@ class TestWorkspaceUnregisteredGitignore:
         run_git(repo, "add", ".gitignore")
         run_git(repo, "commit", "-q", "-m", "add gitignore")
 
-        from rlsbl.workspace import WorkspaceProject
 
         projects = []
         ctx = _make_ws_ctx(repo, projects)
@@ -2979,7 +2976,6 @@ class TestWorkspaceDepsChecksWithGraph:
 
         projects = [WorkspaceProject({"name": "alpha", "path": "alpha"})]
 
-        Dep = namedtuple("Dep", ["name", "scope", "dep_type", "constraint"])
         mock_graph = MagicMock()
         mock_graph.dependencies.return_value = []
 
@@ -3421,7 +3417,6 @@ class TestReclassifiedLabels:
 
     def test_library_lint_errors_only_is_fail(self, tmp_path, monkeypatch):
         """library-lint: errors present -> fail."""
-        from rlsbl.checks.quality import register_quality_checks
 
         class FakeLintResult:
             def __init__(self, severity):

@@ -5,11 +5,10 @@ load_workspace() validation and normalization, unknown field preservation,
 save_workspace() round-trips, resolve_project(), and find_workspace_root().
 """
 
-import os
 
 import pytest
 
-from conftest import with_root_member, workspace_toml, make_workspace
+from conftest import with_root_member, workspace_toml
 
 from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (

@@ -18,9 +18,7 @@ file-named error rather than a YAML crash.
 """
 
 import json
-import os
 from io import StringIO
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest

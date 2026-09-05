@@ -4,13 +4,11 @@ import json
 import os
 import re
 import stat
-from io import StringIO
 from pathlib import Path
-from unittest.mock import ANY, call, patch
+from unittest.mock import patch
 
 import pytest
 
-from rlsbl.changelog.files import RemapResult
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
 from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION, run_cmd
 from rlsbl.context import ProjectContext

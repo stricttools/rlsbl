@@ -161,7 +161,7 @@ def test_get_changelog_context_uses_target_specific_tag_glob(tmp_path, monkeypat
 
     monkeypatch.chdir(go_dir)
     with patch("rlsbl.changelog.validate.check_in_range", capture_check_in_range):
-        result = check_fns["changelog-range"](ctx)
+        check_fns["changelog-range"](ctx)
 
     # Go target should produce "go/v*" not "mygolib@v*"
     assert captured["tag_glob"] == "go/v*", (

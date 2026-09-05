@@ -1,14 +1,12 @@
 """Tests for monorepo-aware pre-push helper functions."""
 
-import json
 import os
 from io import StringIO
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import run_git, git_head, make_commit, make_workspace as _make_workspace
+from conftest import run_git, git_head, make_commit
 from rlsbl.prepush_utils import _parse_stdin_refs
 from rlsbl.git_util import (
     get_commit_files,
@@ -205,7 +203,7 @@ class TestGetCommitFiles:
         root = monorepo_fixture.root
         # Create a feature branch with a new file
         run_git(root, "checkout", "-b", "feature")
-        sha_feature = make_commit(root, "go/feature.go", "feature work")
+        make_commit(root, "go/feature.go", "feature work")
         # Switch back to main and make a diverging commit
         run_git(root, "checkout", "main")
         make_commit(root, "python/main_work.py", "main work")

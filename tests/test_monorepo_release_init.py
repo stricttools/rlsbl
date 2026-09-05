@@ -10,7 +10,7 @@ import pytest
 from githarness import record_release
 import tomlkit
 
-from conftest import make_commit, make_workspace, run_git
+from conftest import make_workspace, run_git
 
 from rlsbl.commands.monorepo import _cmd_batch_release_init
 from rlsbl.commands.monorepo.batch_release_init import _render_commented_section
@@ -116,7 +116,7 @@ class TestBatchReleaseInit:
         # Create an empty file
         batch_path = get_batch_release_file_path(str(mock_git_repo))
         os.makedirs(os.path.dirname(batch_path), exist_ok=True)
-        with open(batch_path, "w") as f:
+        with open(batch_path, "w"):
             pass
 
         # Should not raise -- idempotent no-op

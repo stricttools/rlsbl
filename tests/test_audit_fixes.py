@@ -8,14 +8,10 @@ Covers:
 """
 
 import json
-import os
-from unittest.mock import MagicMock, patch
 
-import pytest
-from conftest import git_head, make_commit, make_workspace, run_git, workspace_toml
+from conftest import make_commit, run_git, workspace_toml
 
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.errors import ConfigError
 from rlsbl.workspace import Releasable, WorkspaceProject
 
 

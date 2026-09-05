@@ -3,13 +3,11 @@
 import os
 import subprocess
 
-import tomlkit
-import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 from rlsbl.commands.monorepo import _cmd_init, _sync_import_names
-from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE, WorkspaceProject
+from rlsbl.workspace import load_workspace, WorkspaceProject
 
 
 def _make_python_project_with_hatch(root, subdir, project_name, pkg_dir_name):

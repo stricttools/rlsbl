@@ -1,13 +1,10 @@
 """Tests for JVM import scanners (Java, Kotlin) and Maven read_metadata."""
 
-import os
 
-import pytest
 
 from rlsbl.import_scanners import (
     JavaImportScanner,
     KotlinImportScanner,
-    ImportInfo,
     build_jvm_package_map,
 )
 from rlsbl.targets.maven import MavenTarget

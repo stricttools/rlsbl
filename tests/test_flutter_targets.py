@@ -1,6 +1,5 @@
 """Tests for the unified Flutter target, release file mode validation, and native change detection."""
 
-import json
 import os
 import tempfile
 from unittest.mock import patch, MagicMock

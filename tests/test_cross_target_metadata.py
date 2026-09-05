@@ -5,18 +5,13 @@ read_name/read_metadata, _merge_template_vars,
 and scaffold preservation of version-reference comments.
 """
 
-import json
-import subprocess
-from unittest.mock import patch
 
-import pytest
 
 from conftest import make_ctx
 from rlsbl.commands.init_cmd import (
     process_template,
     process_mappings,
     _merge_template_vars,
-    _load_base,
 )
 from rlsbl.targets import TARGETS
 from rlsbl.targets.utils import normalize_npm, normalize_pypi, normalize_go

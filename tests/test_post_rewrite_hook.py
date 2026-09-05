@@ -4,7 +4,6 @@ import os
 import stat
 import subprocess
 
-import pytest
 
 from rlsbl.commands.init_cmd import (
     _install_or_update_post_rewrite_hook,

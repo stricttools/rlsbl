@@ -1,6 +1,5 @@
 """Tests for MavenCentralPipeline (type: maven-central)."""
 
-import os
 
 import pytest
 

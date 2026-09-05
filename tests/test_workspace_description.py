@@ -1,6 +1,6 @@
 """Tests for description and test_only per-project fields in workspace.toml."""
 
-from conftest import with_root_member, workspace_toml, make_workspace
+from conftest import workspace_toml
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 
 

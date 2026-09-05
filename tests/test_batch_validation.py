@@ -6,16 +6,16 @@ run before any package release, acting as a gate to fail early.
 
 import json
 import os
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 import pytest
 
-from conftest import make_state_for_every_releasable, make_workspace, with_root_member
+from conftest import make_state_for_every_releasable, make_workspace
 
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 from rlsbl.commands.release.validate import ReleaseValidationError
 from rlsbl.release_file import get_batch_release_file_path
-from rlsbl.workspace import save_workspace, WORKSPACE_DIR
+from rlsbl.workspace import WORKSPACE_DIR
 
 
 def _write_toml(path, content):

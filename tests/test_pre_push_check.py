@@ -1,7 +1,6 @@
 """Tests for pre_push_check helper functions used by the check system."""
 
 import json
-from pathlib import Path
 
 import pytest
 

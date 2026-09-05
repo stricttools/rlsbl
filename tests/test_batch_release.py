@@ -3,22 +3,20 @@
 import json
 import os
 import stat
-import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from conftest import make_state_for_every_releasable, make_workspace, with_root_member
+from conftest import make_state_for_every_releasable, make_workspace
 
 from rlsbl.errors import ReleaseFileError
 from rlsbl.release_file import (
     BatchReleaseConfig,
-    ReleaseConfig,
     get_batch_release_file_path,
     read_batch_release_file,
 )
 from rlsbl.commands.monorepo.batch_release import _cmd_batch_release, _finalize_batch_file
-from rlsbl.workspace import save_workspace, WORKSPACE_DIR
+from rlsbl.workspace import WORKSPACE_DIR
 
 
 

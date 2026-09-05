@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock
 from rlsbl.lint import lint_library, _detect_languages, _create_linter
 from rlsbl.lint.config import LanguageLintConfig
 from rlsbl.lint.maven import MavenLinter
-from rlsbl.lint.result import LintResult
 from rlsbl.testing import CHECK_TIMEOUT_HINT
 
 

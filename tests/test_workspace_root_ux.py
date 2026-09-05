@@ -10,9 +10,8 @@ import json
 import subprocess
 
 from rlsbl import app
-from rlsbl.workspace import save_workspace
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 
 def _git(repo, *args):

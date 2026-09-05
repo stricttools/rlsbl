@@ -3,8 +3,6 @@
 import json
 import os
 import subprocess
-from io import StringIO
-from unittest.mock import patch
 
 import pytest
 
@@ -148,6 +146,10 @@ class TestDryRunExistingProject:
         run_cmd("npm", [], {"dry-run": True, "auto-tag": False}, ctx=_ctx())
 
         assert config_path.read_text() == original_content
+        # The sleep above guarantees a rewrite would move the mtime, so an
+        # unchanged mtime means the file was never opened for writing at all --
+        # not merely rewritten with identical bytes.
+        assert config_path.stat().st_mtime == original_mtime
 
 
 class TestDryRunMulti:

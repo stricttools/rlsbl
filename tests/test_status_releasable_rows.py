@@ -10,7 +10,7 @@ shown.
 import os
 import subprocess
 
-from conftest import archive_release, make_ctx, with_root_member
+from conftest import archive_release, with_root_member
 
 from rlsbl.commands.monorepo import _cmd_status
 from rlsbl.tag_glob import resolve_monorepo_tag_glob, releasable_tag_glob

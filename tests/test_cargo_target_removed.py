@@ -17,7 +17,6 @@ import rlsbl
 from rlsbl.pipelines import PIPELINE_TYPES
 from rlsbl.registry import query_registry_version
 from rlsbl.targets import TARGETS, targets_with_version_queries
-from conftest import cli_ctx
 
 app = rlsbl.app
 

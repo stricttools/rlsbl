@@ -1,10 +1,8 @@
 """Tests for circular dependency detection (Tarjan's SCC and per-language wrappers)."""
 
 import json
-import os
 from pathlib import Path
 
-import pytest
 
 from rlsbl.dep_validation import (
     find_circular_deps,

@@ -1,6 +1,5 @@
 """Tests for the scope adapter and scope-based check filtering."""
 
-import os
 from pathlib import Path
 
 from strictcli import SkipCheck

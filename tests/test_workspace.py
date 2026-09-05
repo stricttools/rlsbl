@@ -1,6 +1,5 @@
 """Tests for rlsbl.workspace."""
 
-import os
 
 import pytest
 

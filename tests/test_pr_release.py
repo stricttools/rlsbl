@@ -7,10 +7,9 @@ PR mode has been removed. These tests verify:
 """
 
 import json
-import os
 import subprocess
 from pathlib import Path
-from unittest.mock import call, patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 

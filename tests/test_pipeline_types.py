@@ -1,6 +1,5 @@
 """Tests for concrete pipeline type implementations (npm, pypi, go, deno, hex, maven, docker, cloudflare-pages)."""
 
-import os
 import subprocess
 
 import pytest

@@ -12,7 +12,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl import app
 from rlsbl.commands.release.release_state import (

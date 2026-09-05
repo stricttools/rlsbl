@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from rlsbl.lint import LintResult, lint_library
+from rlsbl.lint import lint_library
 from rlsbl.lint.config import LanguageLintConfig
 from rlsbl.lint.npm_ast import NpmAstLinter
 from rlsbl.lint.npm_regex import NpmRegexLinter

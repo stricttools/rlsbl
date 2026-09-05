@@ -1,6 +1,6 @@
 """Tests for rlsbl.lint -- library boundary linting."""
 
-from rlsbl.lint import LintResult, lint_library
+from rlsbl.lint import lint_library
 
 # Helper to create a minimal Python project marker
 _PYPROJECT = '[project]\nname = "example"\n'

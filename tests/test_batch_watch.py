@@ -7,9 +7,7 @@ Covers:
 - batch release captures SHA after loop
 """
 
-import io
 import re
-from unittest.mock import MagicMock, patch, call
 
 import pytest
 

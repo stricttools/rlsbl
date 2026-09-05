@@ -13,13 +13,11 @@ Covers uncovered paths in:
 
 import json
 import os
-import re
 import stat
 import subprocess
-import time
 from io import StringIO
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

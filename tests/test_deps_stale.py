@@ -1,20 +1,16 @@
 """Tests for deps-stale check and constraint propagation advisory."""
 
 import json
-import os
-import sys
 from io import StringIO
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl import app
 from rlsbl.context import ProjectContext
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.workspace_graph import Dependency, WorkspaceGraph
+from rlsbl.workspace_graph import Dependency
 
-from conftest import make_workspace, run_git
+from conftest import make_workspace
 
 
 # ---------------------------------------------------------------------------

@@ -2,18 +2,16 @@
 
 import json
 import os
-import stat
 from unittest import mock
 
 import pytest
 
 from conftest import git_head as _git_head, run_git as _run_git, make_commit as _make_commit
 from rlsbl.changelog.files import (
-    append_entry_to_version,
     get_changes_dir,
     is_read_only,
 )
-from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl
+from rlsbl.changelog.schema import parse_jsonl
 from rlsbl.commands.changelog_cmd import cmd_amend
 
 

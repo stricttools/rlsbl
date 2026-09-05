@@ -21,7 +21,6 @@ from rlsbl.workspace import (
     Releasable,
     load_releasables,
     load_workspace,
-    read_releasable_version,
     save_workspace,
     get_releasable_changes_dir,
     get_releasable_dir,
@@ -155,7 +154,7 @@ class TestFullRename:
         root = tmp_path / "repo"
         root.mkdir()
         monkeypatch.chdir(root)
-        remote = _build_monorepo(root)
+        _build_monorepo(root)
 
         # Sanity: the OLD prefix is in the generated publish.yml.
         assert "beta@v" in _publish_yml(root)

@@ -2,10 +2,7 @@
 
 import os
 import re
-import unittest
-from io import StringIO
-from pathlib import Path
-from unittest.mock import ANY, MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -313,7 +310,6 @@ class TestGitHubReleasePrerelease:
 
     def test_stable_no_prerelease_flag(self):
         """For stable versions, --prerelease should not appear in gh release args."""
-        from rlsbl.commands.release.execute import _run_release_mutating, ReleaseState
 
         # We verify by checking the gh_release_args construction logic.
         # The relevant code:

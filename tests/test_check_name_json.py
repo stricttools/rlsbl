@@ -26,7 +26,6 @@ from rlsbl.commands.check import (
     _RULE_TOKEN_STDLIB,
     _RULE_TOKEN_SENTENCES,
     _result_to_json,
-    run_cmd,
 )
 
 

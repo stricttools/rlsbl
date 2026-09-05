@@ -5,7 +5,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from rlsbl.commands.deprecate import run_cmd, _build_notice
 from conftest import cli_ctx

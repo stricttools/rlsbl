@@ -32,9 +32,6 @@ import pytest
 
 from rlsbl.changelog.generate import generate_changelog
 from rlsbl.commands.release_reconcile import (
-    ReconcileError,
-    STATE_ALREADY_CORRECT,
-    STATE_MATERIALIZE,
     STATE_REFUSE_FOREIGN,
     STATE_RE_POINT,
     collect_explanations,

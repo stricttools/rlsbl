@@ -1,6 +1,5 @@
 """Tests for scaffold extras: USER_OWNED behavior, auto-commit, and config migration."""
 
-import os
 import subprocess
 from pathlib import Path
 

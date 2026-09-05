@@ -13,7 +13,6 @@ import os
 import textwrap
 from unittest.mock import patch
 
-import pytest
 from ruamel.yaml import YAML
 
 from rlsbl.commands.monorepo.publish_inline import generate_inline_publish_router

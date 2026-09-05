@@ -17,13 +17,12 @@ by the check, and had its primary path resolved without inheritance.
 import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 from conftest import run_git, sync_member_versions, workspace_toml
 from rlsbl.check_context import WorkspaceCheckContext
-from rlsbl.member_context import MemberContext, resolve_member_context
+from rlsbl.member_context import resolve_member_context
 from rlsbl.commands.release.execute import resolve_target_paths
 from rlsbl.targets import TARGETS
 from rlsbl.targets.refs import ref_context

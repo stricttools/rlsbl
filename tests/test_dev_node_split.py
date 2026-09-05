@@ -6,17 +6,13 @@ and that "dev node" is derived from both rather than declared as one key.
 """
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from conftest import (
     archive_release,
     git_head,
-    make_commit,
-    make_workspace,
     run_git,
     workspace_toml,
 )

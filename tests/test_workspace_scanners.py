@@ -1,7 +1,6 @@
 """Tests for the pluggable WorkspaceScanner interface."""
 
 import json
-import os
 import textwrap
 
 from rlsbl.workspace_graph import (

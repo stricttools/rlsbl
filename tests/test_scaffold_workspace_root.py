@@ -6,13 +6,10 @@ Python packages -- the ci-router handles per-package CI. Non-CI scaffold
 files (gitignore, hooks, changelog) should still be generated.
 """
 
-import json
-import os
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.commands.init_cmd import (
     _is_workspace_root,

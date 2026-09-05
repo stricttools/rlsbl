@@ -6,8 +6,7 @@ Verifies:
 """
 
 import json
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -15,7 +14,6 @@ from pathlib import Path
 from rlsbl.context import ProjectContext
 
 import rlsbl.lock
-from rlsbl import app
 from rlsbl.commands.release import run_cmd
 from rlsbl.release_file import ReleaseConfig
 from githarness import write_covered_unreleased

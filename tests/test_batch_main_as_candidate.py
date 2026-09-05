@@ -33,7 +33,6 @@ from rlsbl.commands.release.release_state import get_state_path, load_release_st
 from rlsbl.release_file import get_batch_release_file_path
 from rlsbl.utils import run as real_run
 from rlsbl.workspace import (
-    WORKSPACE_DIR,
     Releasable,
     get_releasable_changes_dir,
     get_releasable_dir,

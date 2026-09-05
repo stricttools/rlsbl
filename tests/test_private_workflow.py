@@ -3,15 +3,13 @@
 import json
 import os
 from io import StringIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from pathlib import Path
 
 from rlsbl.commands.init_cmd import (
-    _resolve_publish_mode,
-    process_mappings,
     run_cmd,
 )
 from rlsbl.config import read_project_config

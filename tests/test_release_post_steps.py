@@ -35,7 +35,7 @@ from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
 from rlsbl.utils import run as real_run
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +193,6 @@ def _setup_subtree_monorepo(repo, project_path="packages/mylib", name="mylib",
     default names a remote nothing can reach, for tests about what happens when
     they fail.
     """
-    from rlsbl.workspace import save_workspace
 
     proj_dir = repo / project_path
     proj_dir.mkdir(parents=True)
@@ -693,7 +692,6 @@ class TestNonFatalFailures:
         the assertion meaningful: publishing the version must add exactly one
         tag and one GitHub Release, and must not move ``main``.
         """
-        from rlsbl.commands.monorepo import mirror_cmd
         from rlsbl.commands.monorepo.mirror_cmd import converge_branch
 
         mirror = _bare_mirror(tmp_path / "mirror.git")

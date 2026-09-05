@@ -1,9 +1,7 @@
 """Tests for deploy integration in the release flow."""
 
 import json
-import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -201,7 +199,6 @@ class TestReleaseDeployFailureContinues:
         monkeypatch.setattr("rlsbl.commands.release.get_current_branch", lambda **k: "main")
 
         # Create a fake post-release hook to verify it still runs after deploy failure
-        import os
         import subprocess as sp
         hooks_dir = mock_git_repo / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True, exist_ok=True)
@@ -211,8 +208,6 @@ class TestReleaseDeployFailureContinues:
 
         # Track subprocess.run calls to verify the post-release hook ran
         post_release_hook_ran = [False]
-        import rlsbl.commands.release as release_mod
-        original_sp = release_mod.subprocess
 
         class FakeSubprocessModule:
             CalledProcessError = sp.CalledProcessError

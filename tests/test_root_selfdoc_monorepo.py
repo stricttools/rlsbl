@@ -5,9 +5,7 @@ the batch release flow must run selfdoc gen + check once at the root
 before per-member releases, and commit any generated files.
 """
 
-import json
-import os
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -137,7 +135,7 @@ class TestRunRootSelfdoc:
         ), patch(
             "rlsbl.commands.monorepo.batch_release.working_tree_paths",
             return_value=[],
-        ) as mock_status, patch(
+        ), patch(
             "rlsbl.commands.monorepo.batch_release.commit_files"
         ) as mock_commit:
             _run_root_selfdoc(flags, str(tmp_path), lambda m: None)

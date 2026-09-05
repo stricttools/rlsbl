@@ -7,7 +7,6 @@ belong to a releasable.
 
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.commands.monorepo.sync import _get_monorepo_tag_prefix
 from rlsbl.workspace import Releasable, WorkspaceProject

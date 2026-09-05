@@ -3,13 +3,12 @@
 import json
 import os
 
-import pytest
 
-from conftest import with_root_member, make_workspace
+from conftest import make_workspace
 
 from rlsbl.commands.monorepo import _cmd_graph, _cmd_status
 from rlsbl.snapshot import generate_snapshot
-from rlsbl.workspace import save_workspace, WORKSPACE_DIR
+from rlsbl.workspace import WORKSPACE_DIR
 from rlsbl.workspace_graph import WorkspaceGraph
 
 

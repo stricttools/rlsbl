@@ -15,10 +15,8 @@ def _make_root_uv_workspace(root, members):
     )
 
 import subprocess
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl import app
 from rlsbl.check_context import WorkspaceCheckContext

@@ -10,7 +10,6 @@ import os
 import subprocess
 from unittest.mock import patch
 
-import pytest
 
 from rlsbl.commands.release import _run_selfblog_post_generate
 from rlsbl.release_file import ReleaseConfig

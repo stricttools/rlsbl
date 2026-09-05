@@ -12,14 +12,12 @@ import json
 import os
 from pathlib import Path
 
-import pytest
 
 from githarness import record_release
 
 from conftest import (
     with_root_member,
     git_head,
-    make_commit,
     make_workspace,
     run_git,
 )

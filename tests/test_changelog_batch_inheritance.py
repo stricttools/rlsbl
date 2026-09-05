@@ -16,7 +16,7 @@ from conftest import (
     run_git as _run_git,
     workspace_toml,
 )
-from rlsbl.changelog.files import get_changes_dir, read_unreleased
+from rlsbl.changelog.files import read_unreleased
 from rlsbl.commands.changelog_cmd import cmd_add
 from rlsbl.workspace import (
     WORKSPACE_DIR,

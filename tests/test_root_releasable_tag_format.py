@@ -17,7 +17,6 @@ through the consumers that parse tag schemes.
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
 
 import pytest

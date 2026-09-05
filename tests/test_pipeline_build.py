@@ -1,12 +1,10 @@
 """Tests for standalone build_assets functions in rlsbl.pipelines.build."""
 
-import glob
 import json
 import os
 import subprocess
 import textwrap
 
-import pytest
 
 from rlsbl.pipelines.build import (
     build_npm_assets,

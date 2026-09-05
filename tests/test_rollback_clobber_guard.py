@@ -6,7 +6,6 @@ their committed work silently discarded during a failed release rollback.
 """
 
 import json
-import os
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
@@ -21,7 +20,6 @@ from rlsbl.commands.release.execute import (
 from rlsbl.commands.release.release_state import (
     load_release_state,
     save_release_state,
-    get_state_path,
 )
 from rlsbl.context import ProjectContext
 

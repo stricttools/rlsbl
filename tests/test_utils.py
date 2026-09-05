@@ -1,6 +1,5 @@
 """Tests for rlsbl.utils -- bump_version, extract_changelog_entry, and timeout helpers."""
 
-import json
 import os
 
 import pytest

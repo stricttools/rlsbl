@@ -10,13 +10,11 @@ Covers:
 """
 
 import os
-from unittest.mock import patch
 
 import pytest
 
 from rlsbl.errors import VersionError
 from rlsbl.import_scanners import (
-    ImportInfo,
     PythonImportScanner,
     build_namespace_map,
 )

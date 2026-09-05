@@ -12,7 +12,7 @@ from conftest import make_ctx, with_root_member, make_workspace
 from rlsbl.release_record import nearest_release_commit as _range_release_commit
 from rlsbl.commands.monorepo import _cmd_init, _cmd_add, _cmd_status
 from rlsbl.errors import ChangelogError, WorkspaceError
-from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
+from rlsbl.workspace import load_workspace, WORKSPACE_DIR
 
 
 def _make_npm_project(base_path, subdir, version="0.1.0"):
@@ -415,7 +415,6 @@ def _unreleasable_member_workspace(repo, name="pkg-a", version="1.0.0",
     scaffolder happened to do. Such a member keeps its own per-package
     changes directory. Returns it.
     """
-    from rlsbl.workspace import save_workspace
 
     _make_npm_project(repo, name, version=version)
     make_workspace(
