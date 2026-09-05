@@ -52,3 +52,4 @@
 {"format_version":1,"id":"18d24dd331e81df141e02f5788f041d0ab46a63246b3dba1","commits":["5f2e69a186136251690c774781f696cc08edcdd2"],"user_facing":false}
 {"format_version":1,"id":"18d24de10d89b4e3feca951e96cd47118277b38050950489","commits":["d82babd71c151930ced87e8333280f402be0c33d"],"user_facing":false}
 {"format_version":1,"id":"18d24dec83ed5b73b9c4ba47985a4743b55d99035c1dae25","commits":["02dcbb49f9f7e52bbeeba5ff000e629aaebefa08"],"user_facing":false}
+{"format_version":1,"id":"18d24e0d9bab456613d74060c6104e52a9c1c1b618e57b98","commits":["43aa32488600fe76f0d7f5fbc64e3d7be4b89d72"],"user_facing":true,"description":"**`rlsbl release reconcile` states the refusal instead of crashing.** When two records disagree about the tag spelling a version shipped under, the ref set cannot be derived; the refusal now arrives as the command's own error naming both records, where it used to escape as a traceback.","type":"fix"}
