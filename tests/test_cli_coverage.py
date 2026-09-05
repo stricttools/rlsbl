@@ -338,7 +338,7 @@ class TestCmdReleaseEdit:
 
 
 class TestCmdReleaseUndo:
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
+    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
@@ -352,7 +352,7 @@ class TestCmdReleaseUndo:
         assert flags["version"] is None
         assert flags["dry-run"] is False
 
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
+    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
@@ -362,7 +362,7 @@ class TestCmdReleaseUndo:
         flags = mock_run.call_args[0][2]
         assert flags["version"] == "0.9.0"
 
-    @patch("rlsbl._require_project_root", return_value=Path("/fake"))
+    @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.workspace.find_workspace_root", return_value=None)
     @patch("rlsbl.context.create_context")
     @patch("rlsbl.commands.undo.run_cmd")
