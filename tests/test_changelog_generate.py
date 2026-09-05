@@ -773,6 +773,78 @@ class TestGenerateChangelog:
         md = (tmp_path / ".rlsbl" / "changes" / "1.1.0.md").read_text()
         assert NEVER_RELEASED_NOTE in md
 
+    def test_a_never_released_prerelease_is_annotated_in_its_subsection(
+        self, tmp_path, monkeypatch,
+    ):
+        """The consolidated section annotates the pre-releases too.
+
+        A stable version with pre-release predecessors renders ONE section: the
+        stable heading, the cycle note, and a ``### x.y.z-alpha.N`` sub-section
+        per pre-release. A pre-release can be claimed and abandoned exactly as
+        a stable version can -- its number is in the record with no release
+        under it -- so its sub-section carries the same annotation. Without it,
+        the only place that version appears in CHANGELOG.md reads as a release
+        that happened.
+        """
+        from rlsbl.changelog.generate import NEVER_RELEASED_NOTE
+
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.1.0": [
+                    _jsonl_line(commits=["a"], user_facing=True,
+                                description="The shipped feature", type="feature"),
+                ],
+                "1.1.0-alpha.0": [
+                    _jsonl_line(commits=["b"], user_facing=True,
+                                description="An early cut", type="feature"),
+                ],
+            },
+        )
+        _archive(tmp_path, "1.1.0", _VALID + 'description = "The release."\n')
+        _archive(
+            tmp_path, "1.1.0-alpha.0",
+            _VALID + 'description = "Claimed, then abandoned."\n'
+            "never_released = true\n",
+        )
+
+        content = generate_changelog(str(tmp_path))
+
+        assert "Pre-release cycle: 1.1.0-alpha.0" in content
+        pre = content[content.index("### 1.1.0-alpha.0"):]
+        assert NEVER_RELEASED_NOTE in pre
+        # The stable version really shipped, so its own heading is unannotated.
+        stable = content[content.index("## 1.1.0"):content.index("### 1.1.0-alpha.0")]
+        assert NEVER_RELEASED_NOTE not in stable
+
+    def test_a_released_prerelease_subsection_is_not_annotated(
+        self, tmp_path, monkeypatch,
+    ):
+        from rlsbl.changelog.generate import NEVER_RELEASED_NOTE
+
+        monkeypatch.chdir(tmp_path)
+        self._setup_project(
+            tmp_path,
+            versions={
+                "1.1.0": [
+                    _jsonl_line(commits=["a"], user_facing=True,
+                                description="The shipped feature", type="feature"),
+                ],
+                "1.1.0-alpha.0": [
+                    _jsonl_line(commits=["b"], user_facing=True,
+                                description="An early cut", type="feature"),
+                ],
+            },
+        )
+        _archive(tmp_path, "1.1.0", _VALID + 'description = "The release."\n')
+        _archive(tmp_path, "1.1.0-alpha.0",
+                 _VALID + 'description = "The alpha."\n')
+
+        content = generate_changelog(str(tmp_path))
+
+        assert NEVER_RELEASED_NOTE not in content
+
     def test_versioned_sections_include_archived_description_and_context(
         self, tmp_path, monkeypatch,
     ):

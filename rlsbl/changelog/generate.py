@@ -346,6 +346,7 @@ def _generate_consolidated_section(
     context: str = "",
     bump_type: str | None = None,
     never_released: bool = False,
+    never_released_prereleases: frozenset[str] | set[str] | tuple = (),
 ) -> str:
     """Generate a consolidated section for a stable version with pre-release predecessors.
 
@@ -353,6 +354,13 @@ def _generate_consolidated_section(
     1. The stable heading (``## 0.43.0``) with ALL entries deduplicated
     2. A note listing the pre-release cycle
     3. Individual pre-release headings (``### 0.43.0-alpha.0``) with their entries
+
+    ``never_released`` annotates the stable heading; ``never_released_prereleases``
+    names the pre-release versions whose own archives record that fate, and
+    annotates each of their sub-headings. A pre-release is claimed and
+    abandoned the same way a stable version is, and its sub-section here is the
+    only place it appears in CHANGELOG.md -- unannotated, it reads as a release
+    that happened.
     """
     # Deduplicate across all entries (stable delta + all pre-releases)
     deduped = _deduplicate_entries(all_entries)
@@ -375,9 +383,13 @@ def _generate_consolidated_section(
     for pre_ver in prerelease_versions:
         pre_entries = prerelease_entries_by_version[pre_ver]
         user_facing = [e for e in pre_entries if e.user_facing]
+        pre_never_released = pre_ver in never_released_prereleases
         if not user_facing:
             parts.append("")
             parts.append(f"### {pre_ver}")
+            if pre_never_released:
+                parts.append("")
+                parts.append(NEVER_RELEASED_NOTE)
             parts.append("")
             parts.append("- No user-facing changes.")
         else:
@@ -389,6 +401,9 @@ def _generate_consolidated_section(
 
             parts.append("")
             parts.append(f"### {pre_ver}")
+            if pre_never_released:
+                parts.append("")
+                parts.append(NEVER_RELEASED_NOTE)
 
             for type_key, header in _TYPE_ORDER:
                 descs = buckets.get(type_key)
@@ -513,11 +528,16 @@ def generate_changelog(
     # then build consolidated sections for CHANGELOG.md.
     versioned = list_versioned_files(changes_dir)
 
-    # Always generate individual per-version .md files.
+    # Always generate individual per-version .md files. Each version's archive
+    # metadata is kept: the section pass below asks for the same versions, and
+    # reading every archive twice is the cost of a hundred-version project's
+    # regeneration paid twice over.
+    meta_by_version: dict[str, ArchiveMetadata] = {}
     for version, _jsonl_path in versioned:
         meta = read_archive_metadata(
             project_path, version, releases_dir=releases_dir_override,
         )
+        meta_by_version[version] = meta
         generate_version_file(
             changes_dir, version, write_to_disk=write_to_disk,
             description=meta.description, context=meta.context,
@@ -558,8 +578,13 @@ def generate_changelog(
             # (group is newest-first from list_versioned_files, reverse it).
             prerelease_asc = list(reversed(prerelease_versions))
 
-            meta = read_archive_metadata(
-                project_path, base, releases_dir=releases_dir_override,
+            meta = meta_by_version[base]
+            # Each pre-release's OWN fate, read from its own archive: the base
+            # version's archive says nothing about whether an alpha in its
+            # cycle was ever released.
+            never_released_pres = frozenset(
+                ver for ver in prerelease_asc
+                if meta_by_version[ver].never_released
             )
             section = _generate_consolidated_section(
                 base,
@@ -570,15 +595,14 @@ def generate_changelog(
                 context=meta.context,
                 bump_type=meta.bump or None,
                 never_released=meta.never_released,
+                never_released_prereleases=never_released_pres,
             )
             sections.append(section)
         else:
             # No consolidation needed: either all pre-releases or a lone stable.
             # Emit each version individually.
             for ver in group:
-                meta = read_archive_metadata(
-                    project_path, ver, releases_dir=releases_dir_override,
-                )
+                meta = meta_by_version[ver]
                 md = generate_version_section(
                     ver,
                     parse_jsonl(os.path.join(changes_dir, f"{ver}.jsonl")),
