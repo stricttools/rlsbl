@@ -9,5 +9,5 @@ format_version = 1
 bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
-description = "Housekeeping release with no user-facing changes. It was never tagged and its commits no longer resolve in the current history, so its archive records no anchor."
+description = "Housekeeping release with no user-facing changes. It was never tagged and its commits no longer resolve in the current history, so its archive records no release commit."
 unrecoverable = true
