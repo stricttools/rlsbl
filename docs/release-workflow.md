@@ -1,5 +1,5 @@
 ---
-description: "The rlsbl release flow: the untagged candidate and its CI check, the release commit and the flow-owned fields only the flow may write, the three fates an archived version can record, and the bump types."
+description: "The rlsbl release flow: the untagged candidate and its CI check, the release commit and the flow-owned fields only the flow may write, the three fates an archived version can record, how `rlsbl release backfill` reconstructs them for an existing repository, and the bump types."
 ---
 
 # Release workflow
@@ -263,7 +263,7 @@ The pass sorts every version and every tag into one verdict:
 A reconstructed description comes from the first source that yields one, and the archive says which:
 
 1. an operator-reviewed `--overrides` file (`[versions."X.Y.Z"]` tables carrying a `description` and an optional `context`), applied before any derivation — a version the file names that the repository does not have is a hard error;
-2. the version's **GitHub Release body**, unless it carries no substantive content: auto-generated compare-link boilerplate is not content, while bullets, prose and blockquote openings are;
+2. the version's **GitHub Release body**, unless it carries no substantive content: auto-generated compare-link boilerplate is not content, while bullets, prose and an opening block quote are;
 3. the version's **CHANGELOG.md** section;
 4. the **commit subjects** in the version's tag range;
 5. otherwise a placeholder that names the recovery obligation.
