@@ -58,7 +58,7 @@
     "schema_hash": "63051ca6feb717547434aa33f97fbb1b4565809886e4c59edc33d192396e7c03"
   },
   "en/cli-index.md": {
-    "content": "ffba7dad5ec136bf8877f8913bc467cce027f1eebd4c3a52b8de808f840f4d0b",
+    "content": "015473e412596384b08e8e441eaedf60a3a2503d1945943a9b4288e5921e2264",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -119,7 +119,8 @@
   },
   "en/cli-transition.md": {
     "content": "261048f30be3b49af8eaec7ba3894a191c67baa67c4d97b0d077aaf292a79ec6",
-    "description": "e947a0bec737b64820ccf022c949e57fd2a40c26e92897ef6b96645bc602735d"
+    "description": "e947a0bec737b64820ccf022c949e57fd2a40c26e92897ef6b96645bc602735d",
+    "schema_hash": "e55edfe0a57856ea7c433e661847fe9415c755cd6b7c20ffe4ddc56b457b376f"
   },
   "en/cli-unreleased.md": {
     "content": "f43c70e793f06549b20bcd8c9585b310f19e0716a343cc48773b19be250d2a5b",
@@ -566,7 +567,8 @@
   },
   "en/rlsbl-commands-transition_record_cmd.md": {
     "content": "714c44262367dc90646c9e6efc288fdd89ffe010492556a89eed6db9f3702b49",
-    "description": "10a4390f5aa1cd98580500d2037de06a3b8585173ca007c6ef87d7fac0f15f7d"
+    "description": "10a4390f5aa1cd98580500d2037de06a3b8585173ca007c6ef87d7fac0f15f7d",
+    "source_docstring": "a2377508bb3c2c6556e38a7bcc75b4a9916beaf8f228a601e0380b71be4f4c6a"
   },
   "en/rlsbl-commands-undo.md": {
     "content": "d1610f906a8c8c2580f6e4e134cac8d718a7e6c989a174a8cb0f50acee85f583",
