@@ -117,6 +117,11 @@
     "description": "e88b9fc69e34553554060dec0c152116dc260f3129fedf2653fc5e73a8c4ef3f",
     "schema_hash": "209d36ca29f663b2f0416508d74616f9945e7c626c4785247179715ff4921efd"
   },
+  "en/cli-transition.md": {
+    "content": "261048f30be3b49af8eaec7ba3894a191c67baa67c4d97b0d077aaf292a79ec6",
+    "description": "62e5f1c5a9871acea544f00390eb7729afca20461034a7f7cb4d54d9d089103a",
+    "seed_hash": "62e5f1c5a9871acea544f00390eb7729afca20461034a7f7cb4d54d9d089103a"
+  },
   "en/cli-unreleased.md": {
     "content": "f43c70e793f06549b20bcd8c9585b310f19e0716a343cc48773b19be250d2a5b",
     "description": "e401686b2eb5bbec49a92f0b1b427564c06a7ae2cb86f25fd8e0074f010d4815",
@@ -559,6 +564,11 @@
     "content": "09d4444f53ed3eec636e9393bdd2dc27db8e1dd8726ed53de96d7497186e5d69",
     "description": "d85af90a4e61b8aece6968f879dce74098730576276ea3e08d0806faa9424908",
     "source_docstring": "30bfa204ad28b029f2157b2895f8ecf46f5644eea078de1f1c32677db206f655"
+  },
+  "en/rlsbl-commands-transition_record_cmd.md": {
+    "content": "714c44262367dc90646c9e6efc288fdd89ffe010492556a89eed6db9f3702b49",
+    "description": "b9cad44009c3b260280589a80ef0b4c175c29c0c04d836771323964d7f244f99",
+    "seed_hash": "b9cad44009c3b260280589a80ef0b4c175c29c0c04d836771323964d7f244f99"
   },
   "en/rlsbl-commands-undo.md": {
     "content": "d1610f906a8c8c2580f6e4e134cac8d718a7e6c989a174a8cb0f50acee85f583",

@@ -83,6 +83,7 @@ order: 90
 - [rlsbl.commands.rewrite.uv_path_sources](../rlsbl-commands-rewrite-uv_path_sources/)
 - [rlsbl.commands.status](../rlsbl-commands-status/)
 - [rlsbl.commands.targets_cmd](../rlsbl-commands-targets_cmd/)
+- [rlsbl.commands.transition_record_cmd](../rlsbl-commands-transition_record_cmd/)
 - [rlsbl.commands.undo](../rlsbl-commands-undo/)
 - [rlsbl.commands.unreleased](../rlsbl-commands-unreleased/)
 - [rlsbl.commands.watch](../rlsbl-commands-watch/)

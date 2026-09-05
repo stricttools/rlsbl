@@ -1138,6 +1138,28 @@
       ]
     },
     {
+      "path": "cli-transition.md",
+      "title": "rlsbl transition",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl transition",
+          "anchor": "rlsbl-transition"
+        },
+        {
+          "level": 2,
+          "text": "transition record",
+          "anchor": "transition-record"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags"
+        }
+      ]
+    },
+    {
       "path": "cli-unreleased.md",
       "title": "rlsbl unreleased",
       "type": "doc",
@@ -1567,6 +1589,11 @@
           "level": 3,
           "text": "What gets recorded",
           "anchor": "what-gets-recorded"
+        },
+        {
+          "level": 3,
+          "text": "The two facts an operator declares",
+          "anchor": "the-two-facts-an-operator-declares"
         },
         {
           "level": 3,
@@ -9115,6 +9142,33 @@
       ]
     },
     {
+      "path": "rlsbl-commands-transition_record_cmd.md",
+      "title": "rlsbl.commands.transition_record_cmd",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.transition_record_cmd",
+          "anchor": "rlsblcommandstransition_record_cmd"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.transition_record_cmd`",
+          "anchor": "rlsblcommandstransition_record_cmd"
+        },
+        {
+          "level": 3,
+          "text": "`_subject_of`",
+          "anchor": "_subject_of"
+        },
+        {
+          "level": 3,
+          "text": "`run_cmd`",
+          "anchor": "run_cmd"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-commands-undo.md",
       "title": "rlsbl.commands.undo",
       "type": "doc",
@@ -16637,6 +16691,11 @@
         },
         {
           "level": 3,
+          "text": "`ExpectedRefsError`",
+          "anchor": "expectedrefserror"
+        },
+        {
+          "level": 3,
           "text": "`RefContext`",
           "anchor": "refcontext"
         },
@@ -16654,6 +16713,16 @@
           "level": 3,
           "text": "`ref_context`",
           "anchor": "ref_context"
+        },
+        {
+          "level": 3,
+          "text": "`_event_aliases`",
+          "anchor": "_event_aliases"
+        },
+        {
+          "level": 3,
+          "text": "`_shipped_as_aliases`",
+          "anchor": "_shipped_as_aliases"
         },
         {
           "level": 3,
@@ -18786,6 +18855,21 @@
         },
         {
           "level": 3,
+          "text": "`TransitionNonVersionTag`",
+          "anchor": "transitionnonversiontag"
+        },
+        {
+          "level": 3,
+          "text": "`TransitionReleaseHistoryClosed`",
+          "anchor": "transitionreleasehistoryclosed"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_transition_record`",
+          "anchor": "cmd_transition_record"
+        },
+        {
+          "level": 3,
           "text": "`_count_leaf_commands`",
           "anchor": "_count_leaf_commands"
         },
@@ -20005,6 +20089,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T01:30:47.668732+00:00",
+  "last_gen": "2026-09-05T02:07:43.304046+00:00",
   "theme": "minimal"
 }
