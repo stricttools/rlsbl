@@ -2,10 +2,20 @@
 
 strictcli prompts ONLY for commands that declare `consequential=True`. The
 inferred "mutating => confirm" rule is gone: 63% of the fleet classified
-`mutating`, so two thirds of every CLI prompted while the genuinely dangerous
-commands were a tenth of that. This file pins BOTH halves of the judgement --
-the small set that must ask, and the everyday set that must never ask -- so a
-future registration cannot quietly widen or narrow it.
+`mutating`, so two thirds of every CLI prompted while the commands that could
+really hurt you were a tenth of that. This file pins BOTH halves of the
+judgement -- the small set that must ask, and the everyday set that must never
+ask -- so a future registration cannot quietly widen or narrow it.
+
+THE CRITERION IS HUMAN AUTHORITY, NOT RECOVERABILITY.
+
+`consequential` marks the decisions only a HUMAN gets to make: an agent must
+never self-approve one, whatever the cost of undoing it. That is a different
+question from how expensive or irreversible the writes are, and the two come
+apart in both directions -- a cheap, fully revertible act can still be one
+nobody but the operator may authorize, and an expensive but purely local
+rewrite of the working tree need not be. Each entry below therefore names the
+DECISION being reserved, not the machinery it runs.
 """
 
 import subprocess
@@ -37,6 +47,7 @@ CONSEQUENTIAL = {
     "release yank":               "removes a published version from public registries",
     "release scrub":              "rewrites history and force-pushes it",
     "release reconcile":          "force-pushes tags and rewrites their Releases",
+    "release backfill":           "reconstructs the record of what this project released",
     "monorepo mirror":            "force-pushes the mirror remote",
     "monorepo absorb":            "rewrites another repo's history and merges it in",
     "monorepo extract":           "deletes the extracted members and the releasable's release state from this repository, and commits that",
@@ -44,14 +55,17 @@ CONSEQUENTIAL = {
 }
 
 # Everyday commands that must NEVER prompt. These are the ones the old
-# inferred rule caught, and catching them is what hollowed the guardrail out.
+# inferred rule swept up, and sweeping them up is what hollowed the guardrail
+# out.
 #
 # `monorepo extract` used to be here, on the reasoning that the filter-repo
 # rewrite happens on a throwaway clone and the source only loses a
 # workspace.toml entry. The rebuilt command completes the move: it deletes the
 # extracted members' directories and the releasable's whole release state from
-# the repository you are standing in and commits that, so it earns the prompt.
-# The bar is still unrecoverability, not how heavy the machinery sounds.
+# the repository you are standing in and commits that -- moving a releasable
+# across a repository boundary is the operator's decision to make, so it earns
+# the prompt. The bar is whose decision it is, not how heavy the machinery
+# sounds.
 MUST_NOT_PROMPT = [
     "commit", "scaffold", "check", "status", "targets", "deploy",
     "changelog add", "changelog generate", "changelog amend", "changelog edit",
@@ -60,10 +74,10 @@ MUST_NOT_PROMPT = [
     "monorepo cleanup",
     "monorepo rename-releasable", "monorepo release init",
     "dev install", "dev sync", "dev status",
-    # The rewrite group sweeps the working tree and nothing else. Both
-    # commands preview the whole plan under --dry-run, refuse to apply when a
-    # count moved, and leave every write revertible with git -- none of which
-    # is a reason to interrupt an operator.
+    # The rewrite group sweeps the working tree and nothing else. Renaming a
+    # module path or flooring a dependency is the operator's own edit, made in
+    # their own checkout, which they are already performing by typing the
+    # command -- there is no second decision here that only a human may make.
     "rewrite go-module-path", "rewrite uv-path-sources",
 ]
 MUST_NOT_PROMPT = [c for c in MUST_NOT_PROMPT if c not in CONSEQUENTIAL]

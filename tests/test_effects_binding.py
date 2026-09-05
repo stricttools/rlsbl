@@ -58,6 +58,7 @@ EXPECTED_EFFECTS = {
     "release.yank": "mutating",
     "release.scrub": "mutating",
     "release.reconcile": "mutating",
+    "release.backfill": "mutating",
     "changelog.add": "mutating",
     "changelog.generate": "mutating",
     "changelog.amend": "mutating",

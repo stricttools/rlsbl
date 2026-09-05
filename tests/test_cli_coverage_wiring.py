@@ -209,6 +209,29 @@ class TestReleaseGroupWiring:
         assert result.exit_code != 0
         assert "--plan" in result.stderr or "mode" in result.stderr
 
+    def test_backfill(self):
+        result, m = _dispatch(
+            ["release", "backfill", "--overrides", "descriptions.toml",
+             "--dry-run"],
+            "rlsbl.commands.release_backfill.run_cmd",
+        )
+        assert result.exit_code == 0, result.stderr
+        flags = m.call_args[0][0]
+        assert flags["overrides"] == "descriptions.toml"
+        assert flags["dry-run"] is True
+        # The opt-out boolean's fallback: absent means commit.
+        assert flags["auto-commit"] is True
+
+    def test_backfill_no_auto_commit(self):
+        result, m = _dispatch(
+            ["release", "backfill", "--no-auto-commit"],
+            "rlsbl.commands.release_backfill.run_cmd",
+        )
+        assert result.exit_code == 0, result.stderr
+        flags = m.call_args[0][0]
+        assert flags["auto-commit"] is False
+        assert flags["overrides"] is None
+
     def test_reconcile_zero_push_timeout_means_unset(self):
         """0 is the "use the configured default" sentinel, not a real timeout."""
         result, m = _dispatch(
