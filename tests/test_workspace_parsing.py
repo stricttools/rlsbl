@@ -71,9 +71,18 @@ class TestWorkspaceProjectProperties:
         wp = WorkspaceProject({"name": "x", "path": "x"})
         assert wp.dev_node is False
 
-    def test_dev_node_explicit_true(self):
-        wp = WorkspaceProject({"name": "x", "path": "x", "dev_node": True})
+    def test_dev_node_is_derived_from_the_two_declared_keys(self):
+        wp = WorkspaceProject({
+            "name": "x", "path": "x", "dev_only": True, "releasable": False,
+        })
         assert wp.dev_node is True
+
+    def test_dev_only_alone_is_not_a_dev_node(self):
+        """A dev-only member INSIDE a releasable is an ordinary member of it."""
+        wp = WorkspaceProject({
+            "name": "x", "path": "x", "dev_only": True, "releasable": "core",
+        })
+        assert wp.dev_node is False
 
     def test_depends_on_default_empty_list(self):
         wp = WorkspaceProject({"name": "x", "path": "x"})
@@ -353,43 +362,48 @@ def _member(projects, name):
 
 
 class TestLoadWorkspaceUnknownFields:
-    """Extra/unknown fields in project entries survive load_workspace()."""
+    """An unknown field in a project entry is refused at load, whatever its type."""
 
-    def test_unknown_scalar_field_preserved(self, tmp_project):
+    def _refused(self, tmp_project, member_body, key):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(
-            workspace_toml('[[projects]]\npath = "p"\nname = "p"\ncustom_field = "hello"\n')
-        )
-        result = _member(load_workspace(str(tmp_project)), "p")
-        assert result["custom_field"] == "hello"
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(member_body))
+        with pytest.raises(WorkspaceError, match=key):
+            load_workspace(str(tmp_project))
 
-    def test_unknown_list_field_preserved(self, tmp_project):
-        ws_dir = tmp_project / WORKSPACE_DIR
-        ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(
-            workspace_toml('[[projects]]\npath = "p"\nname = "p"\ntags = ["a", "b"]\n')
+    def test_unknown_scalar_field_refused(self, tmp_project):
+        self._refused(
+            tmp_project,
+            '[[projects]]\npath = "p"\nname = "p"\ncustom_field = "hello"\n',
+            "custom_field",
         )
-        result = _member(load_workspace(str(tmp_project)), "p")
-        assert result["tags"] == ["a", "b"]
 
-    def test_unknown_bool_field_preserved(self, tmp_project):
-        ws_dir = tmp_project / WORKSPACE_DIR
-        ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(
-            workspace_toml('[[projects]]\npath = "p"\nname = "p"\nexperimental = true\n')
+    def test_unknown_list_field_refused(self, tmp_project):
+        self._refused(
+            tmp_project,
+            '[[projects]]\npath = "p"\nname = "p"\ntags = ["a", "b"]\n',
+            "tags",
         )
-        result = _member(load_workspace(str(tmp_project)), "p")
-        assert result["experimental"] is True
 
-    def test_unknown_fields_accessible_via_get(self, tmp_project):
+    def test_unknown_bool_field_refused(self, tmp_project):
+        self._refused(
+            tmp_project,
+            '[[projects]]\npath = "p"\nname = "p"\nexperimental = true\n',
+            "experimental",
+        )
+
+    def test_the_refusal_names_the_member_and_the_file(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
             workspace_toml('[[projects]]\npath = "p"\nname = "p"\nowner = "alice"\n')
         )
-        result = _member(load_workspace(str(tmp_project)), "p")
-        assert result.get("owner") == "alice"
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_project))
+        message = str(exc.value)
+        assert "owner" in message
+        assert "'p'" in message
+        assert WORKSPACE_FILE in message
 
 
 # ---------------------------------------------------------------------------
@@ -405,7 +419,7 @@ class TestSaveWorkspaceRoundTrip:
             "path": "libs/core",
             "name": "core",
             "library": True,
-            "dev_node": False,
+            "dev_only": False,
             "depends_on": ["util"],
             "registry_name": "my-core",
             "import_name": "core_pkg",
@@ -422,25 +436,24 @@ class TestSaveWorkspaceRoundTrip:
         assert core.registry_name == "my-core"
         assert core.import_name == "core_pkg"
 
-    def test_roundtrip_preserves_unknown_fields(self, tmp_project):
+    def test_save_refuses_unknown_fields(self, tmp_project):
+        """A key the loader would refuse is never written in the first place."""
         data = {
             "path": "pkg",
             "name": "pkg",
             "custom_string": "hello",
-            "custom_int": 42,
-            "custom_list": [1, 2, 3],
         }
         wp = WorkspaceProject(data)
-        save_workspace(str(tmp_project), with_root_member([wp]))
-        loaded = _member(load_workspace(str(tmp_project)), "pkg")
-        assert loaded["custom_string"] == "hello"
-        assert loaded["custom_int"] == 42
-        assert loaded["custom_list"] == [1, 2, 3]
+        with pytest.raises(WorkspaceError, match="custom_string"):
+            save_workspace(str(tmp_project), with_root_member([wp]))
 
     def test_roundtrip_multiple_projects(self, tmp_project):
         projects = [
             WorkspaceProject({"path": "a", "name": "alpha", "library": True}),
-            WorkspaceProject({"path": "b/c", "name": "charlie", "dev_node": True}),
+            WorkspaceProject({
+                "path": "b/c", "name": "charlie",
+                "dev_only": True, "releasable": False,
+            }),
             WorkspaceProject({"path": "d", "name": "delta", "depends_on": ["alpha"]}),
         ]
         save_workspace(str(tmp_project), with_root_member(projects))

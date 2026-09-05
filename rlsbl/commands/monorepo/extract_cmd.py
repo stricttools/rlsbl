@@ -2179,14 +2179,13 @@ def _write_standalone_releasable(dep):
     Stating it explicitly is what makes the successor read back as the same
     releasable that left.
     """
-    from ...workspace import STANDALONE_RELEASABLE_FILE
+    from ...workspace import Releasable, save_standalone_releasable
 
-    path = os.path.join(dep.target_path, ".rlsbl", STANDALONE_RELEASABLE_FILE)
-    effects.makedirs(os.path.dirname(path), exist_ok=True)
-    effects.write_text(
-        path,
-        f'name = "{dep.releasable.name}"\n'
-        f'tag_format = "{STANDALONE_TAG_FORMAT}"\n',
+    # The format is stated, not left absent: a successor repository's tags are
+    # bare version tags, and the file that identifies it says so.
+    save_standalone_releasable(
+        dep.target_path,
+        Releasable(name=dep.releasable.name, tag_format=STANDALONE_TAG_FORMAT),
     )
 
 

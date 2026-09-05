@@ -166,7 +166,7 @@ class TestMakeWorkspaceProjectKeys:
             tmp_path,
             [
                 {"path": "a", "name": "a", "library": True},
-                {"path": "t", "name": "t", "dev_only": True, "dev_node": True},
+                {"path": "t", "name": "t", "dev_only": True, "releasable": False},
             ],
         )
         by_name = {p.name: p for p in load_workspace(str(tmp_path))}
@@ -199,7 +199,7 @@ class TestMakeWorkspaceProjectKeys:
             tmp_path,
             [{
                 "path": "a", "name": "a", "library": True,
-                "dev_only": False, "dev_node": False, "releasable": "core",
+                "dev_only": False, "releasable": "core",
                 "depends_on": [], "registry_name": "a",
                 "import_name": "a",
             }],

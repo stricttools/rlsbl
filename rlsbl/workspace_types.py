@@ -155,13 +155,53 @@ class Releasable:
         return self.tag_format
 
 
+#: Every key a ``[[projects]]`` member table may carry.
+#:
+#: This is the ONE declared authority for the member surface: the loader
+#: refuses a member key outside it, ``save_workspace`` refuses to write one,
+#: and :class:`WorkspaceProject` exposes exactly one accessor per key (the
+#: suite binds both sides to this constant). A member table has no dataclass to
+#: derive the set from -- the releasable surface derives its set from
+#: :class:`Releasable`'s fields -- so it is declared here, as the stated interim
+#: until the member surface gets a schema of its own and this is generated from
+#: it.
+#:
+#: ``watch``, ``subtree_remote`` and ``dev_node`` are absent on purpose: each is
+#: a retired key with its own refusal message naming its remedy.
+MEMBER_KEYS = frozenset({
+    "path",
+    "name",
+    "library",
+    "dev_only",
+    "releasable",
+    "depends_on",
+    "import_name",
+    "registry_name",
+    "description",
+    "test_only",
+    "lint_allow",
+})
+
+
+#: Keys a runtime caller may attach to a member structure that are NEVER
+#: written back. ``monorepo sync`` hangs its inlined-CI bookkeeping off the
+#: member dicts it is walking (``_ci_files``, ``_ci_docs``,
+#: ``_root_publisher``); persisting one would produce a workspace.toml the
+#: loader then refuses. The convention is the leading underscore, so a new
+#: bookkeeping key needs no edit here.
+def is_runtime_member_key(key) -> bool:
+    """Is *key* runtime bookkeeping rather than a declared member key?"""
+    return isinstance(key, str) and key.startswith("_")
+
+
 class WorkspaceProject:
     """Typed wrapper over a workspace.toml project dict.
 
-    Provides typed property access for known fields while preserving the
-    underlying dict for round-trip serialization. Unknown fields are kept
-    intact. Dict-like ``[]``, ``get()``, and ``in`` access is supported
-    for backward compatibility with code that treats projects as dicts.
+    Provides typed property access for the member keys in :data:`MEMBER_KEYS`
+    -- one accessor per key, plus the derived ``dev_node`` and
+    ``is_releasable``. The underlying dict is preserved for serialization.
+    Dict-like ``[]``, ``get()``, and ``in`` access is supported for code that
+    treats projects as dicts.
     """
 
     def __init__(self, data: dict):
@@ -181,26 +221,20 @@ class WorkspaceProject:
 
     @property
     def dev_only(self) -> bool:
-        return bool(self._data.get("dev_only", False) or self._data.get("dev_node", False))
+        return bool(self._data.get("dev_only", False))
 
     @property
     def dev_node(self) -> bool:
-        """Derived shorthand: True when dev_only and not a member of any releasable.
+        """Derived shorthand: True when dev_only and outside every releasable.
 
-        A project is considered non-releasable when ``releasable`` is explicitly
-        ``False``, OR when ``releasable`` is ``None`` and the legacy
-        ``dev_node`` flag is set.
+        Both halves are required, and both are declared: ``dev_only = true``
+        says what the member IS, ``releasable = false`` says it stands outside
+        every releasable. There is no single key for the combination -- the
+        ``dev_node`` key was deleted, and the loader refuses it by name.
         """
         if not self.dev_only:
             return False
-        rel = self._data.get("releasable")
-        if isinstance(rel, str):
-            # Explicitly assigned to a releasable -- not a dev_node
-            return False
-        if rel is False:
-            return True
-        # rel is None: legacy dev_node semantics apply
-        return bool(self._data.get("dev_node", False))
+        return self._data.get("releasable") is False
 
     @property
     def is_releasable(self) -> bool:
@@ -250,6 +284,21 @@ class WorkspaceProject:
     def registry_name(self) -> str:
         return self._data.get("registry_name", "")
 
+    @property
+    def description(self) -> str:
+        """Free-text description, carried into the monorepo snapshot."""
+        return self._data.get("description", "")
+
+    @property
+    def test_only(self) -> bool:
+        """Is this member test infrastructure? Carried into the snapshot."""
+        return bool(self._data.get("test_only", False))
+
+    @property
+    def lint_allow(self) -> list[str]:
+        """Imports the library-lint check allows for this member."""
+        return self._data.get("lint_allow", [])
+
     # There is no ``subtree_remote`` here. The mirror's destination is a
     # RELEASABLE-level key (:attr:`Releasable.subtree_remote`); a member
     # carrying it is refused at load time. Ask
@@ -287,7 +336,18 @@ def project_is_dev_only(proj) -> bool:
     """Check if a project is dev_only (works with WorkspaceProject or dict)."""
     if isinstance(proj, WorkspaceProject):
         return proj.dev_only
-    return bool(proj.get("dev_only", False) or proj.get("dev_node", False))
+    return bool(proj.get("dev_only", False))
+
+
+def project_is_dev_node(proj) -> bool:
+    """Is *proj* a dev node (dev-only AND outside every releasable)?
+
+    Works with :class:`WorkspaceProject` or a raw dict. The two declared keys
+    are the input; "dev node" is derived from them and never declared.
+    """
+    if isinstance(proj, WorkspaceProject):
+        return proj.dev_node
+    return bool(proj.get("dev_only", False)) and proj.get("releasable") is False
 
 
 def project_is_releasable(proj) -> bool:
@@ -295,6 +355,4 @@ def project_is_releasable(proj) -> bool:
     if isinstance(proj, WorkspaceProject):
         return proj.is_releasable
     # For raw dicts: mirror the WorkspaceProject logic
-    if proj.get("dev_node", False):
-        return False
     return proj.get("releasable") is not False

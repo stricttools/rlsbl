@@ -479,12 +479,12 @@ The `release` command group covers the full release lifecycle — from scaffoldi
 Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. Dev nodes cannot be released:
 
 - **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`
-- **No releases**: `rlsbl release run` and `rlsbl release edit` error with "dev_node projects cannot be released"
+- **No releases**: `rlsbl release run` and `rlsbl release edit` error with "non-releasable projects cannot be released"
 - `rlsbl changelog add` errors with "dev node projects don't use changelogs"
 - Scaffold skips changelog infrastructure
 - Pre-push check ignores dev node commits
 - Batch release (`rlsbl monorepo release run`) excludes dev nodes
-- Remove `dev_node = true` from workspace.toml to make a project releasable
+- Give the project a `releasable = "<name>"` in workspace.toml (dropping `dev_only` if it is genuinely not dev-only) to make it releasable
 - The `dev-only-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
 
 ## Scrubbing sensitive content

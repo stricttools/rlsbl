@@ -105,8 +105,13 @@ def _guard_repo_root_litter():
 
 from githarness import git as _git
 from rlsbl.context import ProjectContext
+# _WORKSPACE_PROJECT_KEYS is rlsbl's own declared authority for the member
+# surface: the loader refuses anything outside it and so does save_workspace,
+# so this file's helpers refuse the same set -- with a message a test author
+# can act on rather than a WorkspaceError raised from inside the writer.
 from rlsbl.workspace import (
     DEFAULT_TAG_FORMAT,
+    MEMBER_KEYS as _WORKSPACE_PROJECT_KEYS,
     WORKSPACE_DIR,
     Releasable,
     save_workspace,
@@ -571,23 +576,6 @@ def _normalize_member_path(path):
     return stripped.rstrip("/")
 
 
-# The project keys workspace.toml carries, i.e. everything WorkspaceProject
-# reads back and save_workspace serializes. A key outside this set is a typo,
-# and a typo that serialized silently would produce a workspace not describing
-# what the test declared.
-_WORKSPACE_PROJECT_KEYS = frozenset({
-    "path",
-    "name",
-    "library",
-    "dev_node",
-    "dev_only",
-    "releasable",
-    "depends_on",
-    "import_name",
-    "registry_name",
-})
-
-
 #: The root member this helper supplies when a test does not declare one.
 #: Every workspace has one (the loader refuses a workspace without it) and its
 #: kind is a real decision, so the default is the conservative one: a dev node,
@@ -732,8 +720,6 @@ def _member_is_releasable(entry):
     """Would rlsbl consider this member entry releasable?"""
     if entry.get("releasable") is False:
         return False
-    if entry.get("dev_node"):
-        return False
     if entry.get("dev_only") and not isinstance(entry.get("releasable"), str):
         return False
     return True
@@ -767,7 +753,7 @@ def make_workspace(root, projects, releasables=None):
         root: repository root (Path).
         projects: list of project dicts. Every key ``save_workspace``
             serializes is accepted -- ``path``, ``name``, ``library``,
-            ``dev_node``, ``dev_only``, ``releasable``, ``depends_on``,
+            ``dev_only``, ``releasable``, ``depends_on``,
             ``import_name`` and ``registry_name`` -- and any
             other key is a ``ValueError``. A project may declare the repository
             root itself as a member with ``path = "."`` (``""`` and ``"./"``

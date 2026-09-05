@@ -23,8 +23,6 @@ from rlsbl.workspace import (
 COMMENTED_TOML = """\
 # Top-of-file banner comment
 
-custom_top = 42
-
 [[releasables]]
 name = "alpha"  # the alpha group
 tag_format = "{name}@v{version}"
@@ -78,7 +76,6 @@ class TestFieldEditPreservesRest:
 
         # Everything that was there is still there, verbatim.
         assert "# Top-of-file banner comment" in out
-        assert "custom_top = 42" in out
         assert 'name = "alpha"  # the alpha group' in out
         assert '# alpha-core is the shared library' in out
         assert 'depends_on = ["beta-api"]  # a declared dependency' in out

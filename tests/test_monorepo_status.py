@@ -689,6 +689,23 @@ class TestStatusTagScoping:
         assert captured_calls[0][1] == "root@v*"
 
 
+def _plant_watch_key(member_name, globs):
+    """Write a `watch` key into a member's table as raw text."""
+    import json
+    import os
+
+    from rlsbl.workspace import WORKSPACE_DIR, WORKSPACE_FILE
+
+    ws_file = os.path.join(".", WORKSPACE_DIR, WORKSPACE_FILE)
+    with open(ws_file, encoding="utf-8") as handle:
+        text = handle.read()
+    anchor = f'path = "{member_name}"\nname = "{member_name}"'
+    assert anchor in text, text
+    text = text.replace(anchor, f"{anchor}\nwatch = {json.dumps(globs)}", 1)
+    with open(ws_file, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
 class TestMonorepoStatusWatch:
     """The watch key is gone: a workspace carrying one cannot be read at all."""
 
@@ -697,13 +714,10 @@ class TestMonorepoStatusWatch:
         _make_npm_project(mock_git_repo, "tooling", version="1.0.0")
         _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
 
-        projects = load_workspace(".")
-        for p in projects:
-            if p["name"] == "tooling":
-                p["watch"] = ["Package.swift", "shared/**"]
-        # save_workspace directly: make_workspace refuses the key outright,
-        # and the point here is that the LOADER refuses the file.
-        save_workspace(".", projects)
+        # Planted as text: every writer refuses a key outside the declared
+        # member surface, and the point here is that the LOADER refuses the
+        # file a stale repository already has.
+        _plant_watch_key("tooling", ["Package.swift", "shared/**"])
 
         capsys.readouterr()
         with pytest.raises(WorkspaceError, match="'watch' key is no longer supported"):
@@ -717,11 +731,7 @@ class TestMonorepoStatusWatch:
         _cmd_add(["tooling"], {"releasable": "false"}, project_root=".")
         _cmd_add(["core"], {"releasable": "false"}, project_root=".")
 
-        projects = load_workspace(".")
-        for p in projects:
-            if p["name"] == "tooling":
-                p["watch"] = ["Package.swift"]
-        save_workspace(".", projects)
+        _plant_watch_key("tooling", ["Package.swift"])
 
         capsys.readouterr()
         with pytest.raises(WorkspaceError) as exc:

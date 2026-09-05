@@ -89,7 +89,6 @@ def _workspace(root, *, lock_target="../python", pinned="0.40.0",
     conformance = {"path": "conformance", "name": "conformance"}
     releasables = [Releasable(name="alpha")]
     if dev_node:
-        conformance["dev_node"] = True
         conformance["dev_only"] = True
         conformance["releasable"] = False
     else:

@@ -41,7 +41,13 @@ import pytest
 
 from conftest import make_workspace
 from rlsbl.errors import WorkspaceError
-from rlsbl.workspace import WorkspaceProject, load_workspace, save_workspace
+from rlsbl.workspace import (
+    WORKSPACE_DIR,
+    WORKSPACE_FILE,
+    WorkspaceProject,
+    load_workspace,
+    save_workspace,
+)
 
 
 SOURCE_ROOT = Path(__file__).resolve().parent.parent / "rlsbl"
@@ -180,24 +186,42 @@ class TestTheDetectorSeesTheSpellingsItClaims:
 
 class TestTheKeyIsRefusedEndToEnd:
 
-    def test_the_loader_refuses_a_workspace_carrying_it(self, tmp_path):
+    @staticmethod
+    def _plant_the_key(tmp_path):
+        """Write a workspace.toml carrying the key.
+
+        Hand-written rather than saved: ``save_workspace`` refuses to write a
+        key outside the declared member surface, so the key can only reach the
+        file the way a stale repository already has it -- as text.
+        """
+        make_workspace(str(tmp_path), [{"path": "pkg", "name": "pkg"}])
+        ws_file = tmp_path / WORKSPACE_DIR / WORKSPACE_FILE
+        text = ws_file.read_text()
+        member = 'path = "pkg"\nname = "pkg"'
+        assert member in text, text
+        text = text.replace(
+            member, member + '\nwatch = ["shared/**"]', 1,
+        )
+        ws_file.write_text(text)
+
+    def test_the_writer_refuses_to_write_it(self, tmp_path):
         make_workspace(str(tmp_path), [{"path": "pkg", "name": "pkg"}])
         projects = load_workspace(str(tmp_path))
         for proj in projects:
             if proj["name"] == "pkg":
                 proj["watch"] = ["shared/**"]
-        save_workspace(str(tmp_path), projects)
+
+        with pytest.raises(WorkspaceError, match="watch"):
+            save_workspace(str(tmp_path), projects)
+
+    def test_the_loader_refuses_a_workspace_carrying_it(self, tmp_path):
+        self._plant_the_key(tmp_path)
 
         with pytest.raises(WorkspaceError, match="'watch' key is no longer supported"):
             load_workspace(str(tmp_path))
 
     def test_the_refusal_names_the_member_and_the_way_out(self, tmp_path):
-        make_workspace(str(tmp_path), [{"path": "pkg", "name": "pkg"}])
-        projects = load_workspace(str(tmp_path))
-        for proj in projects:
-            if proj["name"] == "pkg":
-                proj["watch"] = ["shared/**"]
-        save_workspace(str(tmp_path), projects)
+        self._plant_the_key(tmp_path)
 
         with pytest.raises(WorkspaceError) as exc:
             load_workspace(str(tmp_path))

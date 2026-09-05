@@ -525,8 +525,8 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
         raise ReleaseValidationError(
             "non-releasable projects cannot be released. Set "
             "releasable = \"<name>\" in workspace.toml if this project "
-            "should be releasable, or remove dev_node / set "
-            "releasable = false to confirm it is non-releasable."
+            "should be releasable, or keep releasable = false to confirm it "
+            "is non-releasable."
         )
 
     # The project's releasable field names the releasable whose version file

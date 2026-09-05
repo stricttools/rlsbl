@@ -53,7 +53,7 @@ def _make_workspace_with_targets(tmp_path, project_defs):
     """Create workspace dirs with project manifests for snapshot tests.
 
     project_defs is a list of dicts with: name, path, target, version,
-    and optionally: description, library, test_only, depends_on, dev_node,
+    and optionally: description, library, test_only, depends_on, dev_only,
     releasable.
     """
     root = str(tmp_path)
@@ -65,7 +65,7 @@ def _make_workspace_with_targets(tmp_path, project_defs):
 
         proj = {"path": pdef["path"], "name": pdef["name"]}
         for key in ("description", "library", "test_only", "depends_on",
-                     "dev_node", "releasable"):
+                     "dev_only", "releasable"):
             if key in pdef:
                 proj[key] = pdef[key]
         projects.append(proj)
@@ -269,7 +269,8 @@ releasable = "core"
 [[projects]]
 path = "tests"
 name = "tests"
-dev_node = true
+dev_only = true
+releasable = false
 """)
         releasables = load_releasables(str(tmp_project))
         assert len(releasables) == 1
@@ -683,7 +684,7 @@ releasable = "core"
             WorkspaceProject({"path": "b", "name": "b", "releasable": "core"}),
             WorkspaceProject({"path": "c", "name": "c", "releasable": "www"}),
             WorkspaceProject({"path": "d", "name": "d", "releasable": False}),
-            WorkspaceProject({"path": "tests", "name": "tests", "dev_node": True}),
+            WorkspaceProject({"path": "tests", "name": "tests", "dev_only": True, "releasable": False}),
         ]
         save_workspace(str(tmp_project), with_root_member(projects), releasables=rels)
 

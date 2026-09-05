@@ -225,7 +225,8 @@ releasable = "core"
 [[projects]]
 path = "tests"
 name = "tests"
-dev_node = true
+dev_only = true
+releasable = false
 """)
         removed = cleanup_per_package_release_state(str(tmp_project))
         assert removed == []
@@ -300,7 +301,8 @@ releasable = false
 [[projects]]
 path = "b"
 name = "b"
-dev_node = true
+dev_only = true
+releasable = false
 """)
         removed = cleanup_per_package_release_state(str(tmp_project))
         assert removed == []

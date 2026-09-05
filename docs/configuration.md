@@ -420,6 +420,26 @@ Monorepo workspace definition that lists all sub-projects, their relative paths,
 
 The file uses TOML format with a `[[projects]]` array. Each entry has a `path` key (relative to the monorepo root) and an optional `name` key. If `name` is omitted, the directory basename is used.
 
+## Policed configuration surfaces
+
+A configuration surface is **policed** when rlsbl refuses, at load, a key it does not know. A tolerated unknown key is a line that was written and never read: the file says something the tools never do, and a misspelled key silently means nothing at all. The refusal names the surface, the key and the file.
+
+This section is the authority; the loader's behavior mirrors it.
+
+| Surface | Policed? | Known keys |
+| --- | --- | --- |
+| `.rlsbl-monorepo/workspace.toml` — a `[[projects]]` member table | Yes | Declared as one constant, `rlsbl.workspace.MEMBER_KEYS`: `path`, `name`, `library`, `dev_only`, `releasable`, `depends_on`, `import_name`, `registry_name`, `description`, `test_only`, `lint_allow`. The suite binds both the loader's refusal set and `WorkspaceProject`'s accessors to it, so the two cannot drift. A member table has no schema of its own yet; the constant is the stated interim until it gets one and the set is generated from it. |
+| `.rlsbl-monorepo/workspace.toml` — a `[[releasables]]` table | Yes | Derived from the `Releasable` model's own fields, so a field added to the model stops being unknown on the same edit that adds it. |
+| `.rlsbl-monorepo/workspace.toml` — the top level | Yes | The sections with a reader: `projects`, `releasables`, `layers`. A workspace has no top-level scalar settings. |
+| `.rlsbl/releasable.toml` (a standalone repository's releasable) | Yes | `name` and `tag_format`. A standalone repository has no mirror, so `subtree_remote` is not among them. |
+| `.rlsbl/config.json` | **No — not policed yet** | An unknown key is accepted silently. Completing the config schema and wiring the loader to it is its own work item; until that ships, a typo in `config.json` still means nothing at all and nothing says so. |
+
+Three retired member keys are refused by name rather than as generic unknowns, each with its own remedy: `watch` (territory is derived from declared member paths), `subtree_remote` (a releasable-level key), and `dev_node` (replaced by the two-key form `dev_only = true` plus `releasable = false`).
+
+Writing is policed too. `save_workspace` strips the bookkeeping keys a caller attached at runtime (`monorepo sync` hangs its inlined-CI state off the member dicts it walks; the convention is a leading underscore) and hard-errors on any other key outside the member surface — so a load/save cycle can never produce a workspace.toml the loader then refuses.
+
+`tag_format` is explicit or absent on both releasable surfaces. Absence is carried rather than folded into a default at read time, so a rewrite neither invents the key on a file that stated none nor deletes one an operator wrote. What an absent format resolves to is decided by context: the workspace scheme `{name}@v{version}` for a workspace releasable, and `v{version}` for a standalone repository.
+
 ## selfdoc.json
 
 When present in the project root, this file configures documentation builds via selfdoc. It specifies the source directories to scan, the output path for generated pages, the base URL for the published site, and an optional deploy provider such as Cloudflare Pages. Documentation deployment is handled via a `cloudflare-pages` pipeline in `.rlsbl/config.json`, not as a release target. See the [selfdoc documentation](https://github.com/smm-h/selfdoc) for the full schema.

@@ -232,7 +232,7 @@ class TestBatchReleaseInit:
         """Dev-node projects are excluded from the batch release file."""
         make_workspace(mock_git_repo, [
             {"path": "lib", "name": "lib"},
-            {"path": "test-infra", "name": "test-infra", "dev_node": True},
+            {"path": "test-infra", "name": "test-infra", "dev_only": True, "releasable": False},
         ])
 
         lib_dir = mock_git_repo / "lib"

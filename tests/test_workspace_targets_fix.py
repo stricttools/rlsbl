@@ -125,7 +125,7 @@ class TestDevOnlySkipped:
         _make_empty_project(repo, "conformance")
 
         projects = [
-            WorkspaceProject({"name": "conformance", "path": "conformance", "dev_node": True}),
+            WorkspaceProject({"name": "conformance", "path": "conformance", "dev_only": True, "releasable": False}),
         ]
         ctx = _make_ws_ctx(repo, projects)
         result = _run_check("workspace-targets", ctx)

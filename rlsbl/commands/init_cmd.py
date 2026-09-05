@@ -90,13 +90,15 @@ def _skip_publish_scaffold(private, is_ws_root, project_root):
 
     - ``publish_mode: "none"`` -- publishing is suppressed by declaration;
     - a workspace root -- not a package;
-    - a NON-RELEASABLE workspace project (``dev_node = true``, or
-      ``releasable = false``) -- ``rlsbl release run`` hard-errors on these, so
-      a publish workflow for one is unreachable and can only misfire.
+    - a NON-RELEASABLE workspace project (``releasable = false``, whether or
+      not it is also ``dev_only``) -- ``rlsbl release run`` hard-errors on
+      these, so a publish workflow for one is unreachable and can only
+      misfire.
 
     The dev-node case is derived from the project's position in the workspace
-    graph rather than declared twice: ``dev_node`` lives in ``workspace.toml``
-    and ``publish_mode`` in the project's own ``.rlsbl/config.json``, and
+    graph rather than declared twice: ``dev_only`` and ``releasable`` are
+    declared in ``workspace.toml`` and ``publish_mode`` in the project's own
+    ``.rlsbl/config.json``, and
     ``"none"`` carries a different meaning (a private repo suppressing public
     registry publishes). Requiring the operator to also set ``publish_mode:
     "none"`` on every dev node would make correct, ordinary configs a hard

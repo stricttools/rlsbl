@@ -130,7 +130,7 @@ The `dead-workspace-packages` check operates at the workspace level, identifying
 **Criteria:**
 
 - Only checks projects with `library = true` (apps/CLIs are entry points, not consumed)
-- Skips `dev_node = true` projects
+- Skips `dev_only = true` projects
 - Checks both lib and test import contexts from all other workspace projects
 
 **Results:**

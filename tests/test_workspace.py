@@ -186,9 +186,9 @@ class TestLoadWorkspacePathNormalization:
 
 
 class TestWorkspaceExtraKeys:
-    """Tests for extra-key preservation in save_workspace round-trips."""
+    """A key outside the declared member surface never reaches the file."""
 
-    def test_extra_keys_survive_roundtrip(self, tmp_project):
+    def test_extra_keys_are_refused_by_the_writer(self, tmp_project):
         projects = [
             {
                 "path": "packages/foo",
@@ -196,31 +196,27 @@ class TestWorkspaceExtraKeys:
                 "owner": "platform-team",
             }
         ]
-        save_workspace(str(tmp_project), with_root_member(projects))
-        loaded = declared(load_workspace(str(tmp_project)))
-        assert [p.to_dict() for p in loaded] == [
-            {**proj, "releasable": False} for proj in projects
-        ]
-        assert loaded[0]["owner"] == "platform-team"
+        with pytest.raises(WorkspaceError, match="owner"):
+            save_workspace(str(tmp_project), with_root_member(projects))
 
     def test_save_preserves_key_order(self, tmp_project):
         projects = [
             {
                 "path": "libs/bar",
                 "name": "bar",
-                "watch": ["src/**"],
-                "owner": "platform-team",
+                "registry_name": "bar-pkg",
+                "description": "the bar library",
             }
         ]
         save_workspace(str(tmp_project), with_root_member(projects))
         toml_path = tmp_project / ".rlsbl-monorepo" / "workspace.toml"
         content = toml_path.read_text()
-        # path must come before name, name before extras, extras sorted
+        # path must come before name, name before the rest, the rest sorted
         path_pos = content.index("path")
         name_pos = content.index("name")
-        owner_pos = content.index("owner")
-        watch_pos = content.index("watch")
-        assert path_pos < name_pos < owner_pos < watch_pos
+        description_pos = content.index("description")
+        registry_pos = content.index("registry_name")
+        assert path_pos < name_pos < description_pos < registry_pos
 
 
 class TestResolveProject:

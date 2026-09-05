@@ -74,7 +74,7 @@ def test_non_dev_only_filters_dev_node_projects():
     """dev_node is treated as dev_only by project_is_dev_only."""
     projects = [
         {"name": "lib", "path": "lib"},
-        {"name": "tests", "path": "tests", "dev_node": True},
+        {"name": "tests", "path": "tests", "dev_only": True, "releasable": False},
     ]
     ctx = _make_ws_ctx(projects=projects)
     result = scope_adapter(ctx, "non_dev_only")
@@ -108,7 +108,7 @@ def test_non_dev_only_passthrough_for_non_workspace():
 def test_non_dev_node_filters_dev_node_projects():
     projects = [
         {"name": "lib", "path": "lib"},
-        {"name": "tests", "path": "tests", "dev_node": True},
+        {"name": "tests", "path": "tests", "dev_only": True, "releasable": False},
         {"name": "app", "path": "app"},
     ]
     ctx = _make_ws_ctx(projects=projects)
@@ -156,7 +156,7 @@ def test_library_empty_when_no_libraries():
 def test_releasable_filters_to_releasable_projects():
     projects = [
         {"name": "lib", "path": "lib"},
-        {"name": "tests", "path": "tests", "dev_node": True},
+        {"name": "tests", "path": "tests", "dev_only": True, "releasable": False},
         {"name": "app", "path": "app", "releasable": False},
     ]
     ctx = _make_ws_ctx(projects=projects)
@@ -302,7 +302,7 @@ def test_ci_synced_skips_dev_node_via_scope(tmp_path):
     (ws / ".github" / "workflows").mkdir(parents=True)
 
     projects = [
-        {"name": "devtool", "path": "devtool", "dev_node": True},
+        {"name": "devtool", "path": "devtool", "dev_only": True, "releasable": False},
     ]
     ctx = _make_ws_ctx(projects=projects, workspace_root=ws)
 

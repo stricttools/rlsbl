@@ -48,7 +48,7 @@ class TestScaffoldPlainDevNode:
 
         # Set up workspace.toml with the project marked as dev_node
         make_workspace(mock_git_repo, [
-            {"path": subdir, "name": subdir, "dev_node": True},
+            {"path": subdir, "name": subdir, "dev_only": True, "releasable": False},
         ])
 
         return proj_dir
@@ -205,7 +205,7 @@ class TestDevNodeGetsNoPublishWorkflow:
         }, indent=2) + "\n")
         make_workspace(mock_git_repo, [
             dict({"path": subdir, "name": subdir},
-                 **({"dev_node": True} if dev_node else {})),
+                 **({"dev_only": True, "releasable": False} if dev_node else {})),
         ])
         return proj_dir
 
@@ -243,7 +243,7 @@ class TestDevNodeGetsNoPublishWorkflow:
 
         # The project is (re)declared a dev node.
         make_workspace(mock_git_repo, [
-            {"path": "conformance", "name": "conformance", "dev_node": True},
+            {"path": "conformance", "name": "conformance", "dev_only": True, "releasable": False},
         ])
         self._scaffold(proj_dir)
         assert not publish.exists()

@@ -6,7 +6,8 @@ before the check function runs.  Registered via ``app.set_scope_adapter()``.
 Tokens:
 - ``workspace``       -- requires WorkspaceCheckContext
 - ``non_dev_only``    -- filter projects to exclude dev-only
-- ``non_dev_node``    -- filter projects to exclude dev_node
+- ``non_dev_node``    -- filter projects to exclude dev nodes (dev-only
+                         members standing outside every releasable)
 - ``library``         -- filter projects to only library projects
 - ``releasable``      -- filter projects to only releasable projects
 - ``push``            -- requires push_stdin is not None
@@ -17,7 +18,11 @@ from dataclasses import replace
 from strictcli import SkipCheck
 
 from ..check_context import WorkspaceCheckContext
-from ..workspace import project_is_dev_only, project_is_releasable
+from ..workspace import (
+    project_is_dev_node,
+    project_is_dev_only,
+    project_is_releasable,
+)
 
 
 def scope_adapter(ctx, scope_string):
@@ -60,7 +65,7 @@ def _apply_token(ctx, token):
     if token == "non_dev_node":
         if not isinstance(ctx, WorkspaceCheckContext):
             return ctx
-        filtered = [p for p in ctx.projects if not p.get("dev_node", False)]
+        filtered = [p for p in ctx.projects if not project_is_dev_node(p)]
         return replace(ctx, projects=filtered)
 
     if token == "library":

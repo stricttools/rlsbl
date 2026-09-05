@@ -164,7 +164,7 @@ The optional `[layers]` section enforces architectural dependency direction by g
 
 ### Regular projects
 
-Standard projects get the full release experience, including changelog enforcement, CI pipeline generation, and all workspace validation checks. This is the default project type when neither `library` nor `dev_node` flags are set:
+Standard projects get the full release experience, including changelog enforcement, CI pipeline generation, and all workspace validation checks. This is the default project type when neither `library` nor `dev_only` is set:
 
 - JSONL changelog with commit coverage enforcement
 - Generated CHANGELOG.md
@@ -187,7 +187,7 @@ Lint config resolves at two levels: a member's own `.rlsbl/lint/<language>.toml`
 Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. A project is a dev node when it is `dev_only` *and* outside every releasable; a `dev_only` project that still declares `releasable = "<name>"` is an ordinary member of that releasable. Dev nodes cannot be released:
 
 - **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`
-- **No releases**: `rlsbl release run` and `rlsbl release edit` error with "dev_node projects cannot be released"
+- **No releases**: `rlsbl release run` and `rlsbl release edit` error with "non-releasable projects cannot be released"
 - `rlsbl changelog add` errors with "dev node projects don't use changelogs"
 - Scaffold skips changelog infrastructure
 - Pre-push check ignores dev node commits
@@ -525,9 +525,9 @@ See [checks.md](checks.md) for the full check reference across all tags.
 
 ## Dev node boundary
 
-The `dev-only-boundary` check is a structural guardrail that prevents misuse of the `dev_node` flag by ensuring dev-only projects remain true leaf nodes in the dependency graph, consumed by nothing user-facing. The rule:
+The `dev-only-boundary` check is a structural guardrail that prevents misuse of the `dev_only` flag by ensuring dev-only projects remain true leaf nodes in the dependency graph, consumed by nothing user-facing. The rule:
 
-> If a non-dev-node project has a **runtime dependency** on a dev_node project, `rlsbl check --tag workspace` errors.
+> If a non-dev-only project has a **runtime dependency** on a `dev_only` project, `rlsbl check --tag workspace` errors.
 
 This ensures dev nodes are truly leaf nodes consumed by nothing user-facing. The check distinguishes:
 
@@ -535,7 +535,7 @@ This ensures dev nodes are truly leaf nodes consumed by nothing user-facing. The
 - **Dev dependencies** (scope: `dev`) — only affect test/build environments. These are allowed.
 
 If the boundary check fails, either:
-1. Remove the `dev_node` flag from the dependency (it is not actually a dev-only project)
+1. Remove `dev_only = true` from the dependency (it is not actually a dev-only project)
 2. Move the runtime dependency to a dev dependency in the consumer's manifest
 
 ## Examples

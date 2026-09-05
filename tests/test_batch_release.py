@@ -500,7 +500,7 @@ class TestBatchReleaseDevNode:
         _make_npm_project(mock_git_repo, "public", version="0.1.0")
 
         projects = [
-            {"path": "internal", "name": "internal", "dev_node": True},
+            {"path": "internal", "name": "internal", "dev_only": True, "releasable": False},
             {"path": "public", "name": "public"},
         ]
         _init_workspace(mock_git_repo, projects)

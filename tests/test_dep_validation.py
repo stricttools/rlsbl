@@ -2491,7 +2491,7 @@ class TestFindDeadWorkspacePackages:
         """Dev_node with no importers is not flagged -- excluded from checks."""
         projects = [
             {"name": "app", "path": "app"},
-            {"name": "test-utils", "path": "test-utils", "library": True, "dev_node": True},
+            {"name": "test-utils", "path": "test-utils", "library": True, "dev_only": True, "releasable": False},
         ]
         import_cache = {
             "app": (set(), set(), set()),

@@ -1,6 +1,9 @@
 """Tests for save_workspace() preserving top-level TOML sections."""
 
+import pytest
+
 from conftest import with_root_member, workspace_toml, make_workspace
+from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import load_workspace, save_workspace, WORKSPACE_DIR, WORKSPACE_FILE
 
 
@@ -16,10 +19,6 @@ paths = ["libs/core", "libs/util"]
 description = "Application layer"
 paths = ["apps/web", "apps/api"]
 depends_on = ["core"]
-
-[check]
-enabled = true
-strict = false
 
 [[projects]]
 path = "libs/core"
@@ -48,18 +47,17 @@ class TestPreservesTopLevelSections:
         assert 'description = "Core libraries"' in content
         assert 'depends_on = ["core"]' in content
 
-    def test_check_section_survives_roundtrip(self, tmp_project):
+    def test_an_unrecognized_top_level_section_is_refused(self, tmp_project):
+        """[layers] has a reader; an invented section has none, so it is refused."""
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(TOML_WITH_LAYERS))
+        (ws_dir / WORKSPACE_FILE).write_text(
+            workspace_toml(TOML_WITH_LAYERS)
+            + "\n[check]\nenabled = true\n"
+        )
 
-        projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
-
-        content = (ws_dir / WORKSPACE_FILE).read_text()
-        assert "[check]" in content
-        assert "enabled = true" in content
-        assert "strict = false" in content
+        with pytest.raises(WorkspaceError, match="check"):
+            load_workspace(str(tmp_project))
 
     def test_comments_survive_roundtrip(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
@@ -72,31 +70,30 @@ class TestPreservesTopLevelSections:
         content = (ws_dir / WORKSPACE_FILE).read_text()
         assert "# Monorepo configuration" in content
 
-    def test_unknown_toplevel_keys_survive(self, tmp_project):
+    def test_unknown_toplevel_keys_are_refused(self, tmp_project):
         toml_text = """\
-custom_key = "hello"
-another = 42
-
 [[projects]]
 path = "pkg"
 name = "pkg"
+releasable = false
 """
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
-        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
+        (ws_dir / WORKSPACE_FILE).write_text(
+            'custom_key = "hello"\nanother = 42\n\n' + workspace_toml(toml_text)
+        )
 
-        projects = load_workspace(str(tmp_project))
-        save_workspace(str(tmp_project), projects)
-
-        content = (ws_dir / WORKSPACE_FILE).read_text()
-        assert 'custom_key = "hello"' in content
-        assert "another = 42" in content
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_project))
+        message = str(exc.value)
+        assert "custom_key" in message
+        assert "another" in message
 
 
 class TestPreservesProjectData:
     """Project data including unknown per-project keys must be preserved."""
 
-    def test_unknown_project_keys_roundtrip(self, tmp_project):
+    def test_unknown_project_keys_are_refused(self, tmp_project):
         toml_text = """\
 [[projects]]
 path = "libs/foo"
@@ -109,12 +106,30 @@ library = true
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
 
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_project))
+        message = str(exc.value)
+        assert "custom_globs" in message
+        assert "owner" in message
+
+    def test_declared_project_keys_roundtrip(self, tmp_project):
+        toml_text = """\
+[[projects]]
+path = "libs/foo"
+name = "foo"
+description = "the foo library"
+library = true
+releasable = false
+"""
+        ws_dir = tmp_project / WORKSPACE_DIR
+        ws_dir.mkdir()
+        (ws_dir / WORKSPACE_FILE).write_text(workspace_toml(toml_text))
+
         projects = load_workspace(str(tmp_project))
         save_workspace(str(tmp_project), projects)
 
         reloaded = load_workspace(str(tmp_project))
-        assert reloaded[0]["custom_globs"] == ["src/**"]
-        assert reloaded[0]["owner"] == "platform-team"
+        assert reloaded[0]["description"] == "the foo library"
         assert reloaded[0]["library"] is True
 
     def test_project_data_matches_after_roundtrip(self, tmp_project):

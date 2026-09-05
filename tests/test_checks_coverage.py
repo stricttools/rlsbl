@@ -1446,7 +1446,7 @@ class TestPrepushChangelogCoverageMonorepoMembers:
 
         make_workspace(
             repo,
-            [{"path": "packages/devtool", "name": "devtool", "dev_node": True}],
+            [{"path": "packages/devtool", "name": "devtool", "dev_only": True, "releasable": False}],
         )
         run_git(repo, "add", ".")
         run_git(repo, "commit", "-q", "-m", "scaffold")

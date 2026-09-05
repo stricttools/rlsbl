@@ -17,14 +17,17 @@ from .workspace_types import (  # noqa: F401
     WORKSPACE_FILE,
     RELEASABLES_DIR,
     DEFAULT_TAG_FORMAT,
+    MEMBER_KEYS,
     STANDALONE_TAG_FORMAT,
     TAG_FORMAT_ABSENT,
     Releasable,
     WorkspaceProject,
+    is_runtime_member_key,
     get_releasable_dir,
     get_releasable_changes_dir,
     get_releasable_version_path,
     get_releasable_hook_path,
+    project_is_dev_node,
     project_is_dev_only,
     project_is_releasable,
 )
@@ -150,6 +153,61 @@ def load_workspace(root):
     return result
 
 
+#: Every key workspace.toml carries at its top level. All three are sections
+#: with a reader of their own -- the member list, the releasable list, and the
+#: architectural layers (:mod:`rlsbl.layers`). A workspace has no top-level
+#: scalar settings, so anything else there was written and never read.
+WORKSPACE_TOP_LEVEL_KEYS = frozenset({"projects", "releasables", "layers"})
+
+
+def releasable_keys() -> frozenset:
+    """Every key a ``[[releasables]]`` table may carry.
+
+    Derived from :class:`~rlsbl.workspace_types.Releasable`'s own fields rather
+    than restated, so a field added to the model stops being unknown on the
+    same edit that adds it.
+    """
+    return frozenset(f.name for f in dataclasses.fields(Releasable))
+
+
+def _unknown_keys(table, known):
+    """The keys of *table* outside *known*, in the order they were written."""
+    return [key for key in table if key not in known]
+
+
+def _refuse_unknown_keys(table, known, *, surface, file_label):
+    """Refuse a table carrying a key rlsbl does not know.
+
+    The message names the surface (which table, of what kind), the offending
+    key, and the file it was read from -- everything an operator needs to find
+    and delete the line. A tolerated unknown key is a line that was written and
+    never read: the file would say something the tools never do.
+    """
+    unknown = _unknown_keys(table, known)
+    if not unknown:
+        return
+    plural = "keys" if len(unknown) > 1 else "key"
+    listed = ", ".join(f"'{key}'" for key in unknown)
+    raise WorkspaceError(
+        f"{file_label}: {surface} carries unknown {plural} {listed}. rlsbl "
+        f"reads only {', '.join(sorted(known))} there, so a key outside that "
+        f"set is written and never read -- the file would say something rlsbl "
+        f"never does. Delete the line, or correct the spelling."
+    )
+
+
+def _refuse_releasable_unknown_keys(index, raw):
+    """Refuse a ``[[releasables]]`` table carrying a key the model lacks."""
+    name = raw.get("name")
+    label = f"releasables[{index}]"
+    if isinstance(name, str) and name:
+        label += f" ('{name}')"
+    _refuse_unknown_keys(
+        raw, releasable_keys(),
+        surface=f"{label}, a releasable table", file_label=WORKSPACE_FILE,
+    )
+
+
 def is_root_path(path) -> bool:
     """Does *path* spell the repository root (``""``, ``"."``, ``"./"``)?"""
     return str(path).strip().rstrip("/") in ("", ".")
@@ -232,25 +290,37 @@ def validate_workspace_model(data, projects):
     Each condition below is a hard error carrying its own remedy, and they are
     reported in the order an operator can act on them:
 
-    1. an implicit-mode workspace (no ``[[releasables]]``) -- first, because
+    1. a key at the top level that is neither section -- first, because a
+       misspelled section header is why the sections below look wrong;
+    2. an implicit-mode workspace (no ``[[releasables]]``) -- because
        every other remedy below is written for an explicit-mode workspace;
-    2. more than one root member;
-    3. two members whose paths normalize to the same territory;
-    4. no root member;
-    5. a ``watch`` key on any member;
-    6. a ``subtree_remote`` key on any member;
-    7. a root member named anything but ``root``;
-    8. a non-root member named ``root``;
-    9. a releasable owning the root member with no explicit ``tag_format``.
+    3. more than one root member;
+    4. two members whose paths normalize to the same territory;
+    5. no root member;
+    6. a ``watch`` key on any member;
+    7. a ``subtree_remote`` key on any member;
+    8. a ``dev_node`` key on any member;
+    9. any other unknown key on a member table;
+    10. an unknown key on a ``[[releasables]]`` table;
+    11. a root member named anything but ``root``;
+    12. a non-root member named ``root``;
+    13. a releasable owning the root member with no explicit ``tag_format``.
 
-    Structural facts about the member list (2-4) precede per-member key
-    errors (5-7): a remedy for a stray key presumes the member list itself
-    is sound.
+    Structural facts about the member list (3-5) precede per-member key
+    errors (6-9): a remedy for a stray key presumes the member list itself
+    is sound. The retired keys (6-8) precede the generic unknown-key refusal
+    (9) so each keeps its own remedy.
 
     *data* is the raw parsed document (needed for the releasables section and
     for the paths as the operator spelled them), *projects* the already-built
     :class:`WorkspaceProject` list, whose paths are normalized.
     """
+    # -- the top level: two sections and nothing else -------------------------
+    _refuse_unknown_keys(
+        data, WORKSPACE_TOP_LEVEL_KEYS,
+        surface="the top level", file_label=WORKSPACE_FILE,
+    )
+
     # -- (e) implicit mode ---------------------------------------------------
     raw_releasables = data.get("releasables")
     if raw_releasables is None:
@@ -332,6 +402,38 @@ def validate_workspace_model(data, projects):
                 f"one member cannot declare one at all: there would be no "
                 f"single subtree to mirror. " + _MIGRATION_NOTE
             )
+
+    # -- the dev_node key, deleted in favour of the two-key form -------------
+    for i, proj in enumerate(projects):
+        if "dev_node" in proj:
+            raise WorkspaceError(
+                f"projects[{i}] ('{proj['name']}'): the 'dev_node' key is "
+                f"deleted. A dev node is not one flag: it is a member that "
+                f"declares WHAT IT IS (dev-only) and WHERE IT SITS (outside "
+                f"every releasable), and rlsbl derives 'dev node' from the "
+                f"two. Replace the `dev_node = ...` line with both of:\n"
+                f"\n"
+                f"  dev_only = true\n"
+                f"  releasable = false\n"
+                f"\n"
+                f"If this member is not actually dev-only, give it "
+                f"`releasable = \"<name>\"` instead. " + _MIGRATION_NOTE
+            )
+
+    # -- any other unknown member key ---------------------------------------
+    for i, proj in enumerate(projects):
+        _refuse_unknown_keys(
+            proj.to_dict() if isinstance(proj, WorkspaceProject) else proj,
+            MEMBER_KEYS,
+            surface=f"projects[{i}] ('{proj['name']}'), a member table",
+            file_label=WORKSPACE_FILE,
+        )
+
+    # -- unknown keys on a releasable table ----------------------------------
+    if isinstance(raw_releasables, list):
+        for i, raw in enumerate(raw_releasables):
+            if isinstance(raw, dict):
+                _refuse_releasable_unknown_keys(i, raw)
 
     # -- (b)/(c) the reserved name ------------------------------------------
     for i, proj in enumerate(projects):
@@ -442,6 +544,12 @@ def _load_explicit_releasables(raw_releasables, projects):
         if name in seen_names:
             raise WorkspaceError(f"duplicate releasable name: '{name}'")
         seen_names.add(name)
+
+        # Also refused by validate_workspace_model when the workspace is read
+        # through load_workspace; repeated here because a caller may hand this
+        # function a project list it loaded earlier, and every read of the
+        # releasables section is a policed read.
+        _refuse_releasable_unknown_keys(i, raw)
 
         # Absence is carried, not folded into the default: a releasable that
         # owns the repository root must DECLARE its format, and save_workspace
@@ -623,34 +731,6 @@ def _build_releasable_table(d):
     return table
 
 
-def _releasable_extra_keys(existing):
-    """Map each existing ``[[releasables]]`` table's name to its unknown keys.
-
-    "Unknown" is asked of the :class:`~rlsbl.workspace_types.Releasable` model
-    itself rather than restated as a list here, so a field added to the model
-    stops counting as unknown on the same edit that adds it.
-
-    ``existing`` is whatever the document holds under ``releasables`` -- an
-    array-of-tables, the explicit empty array, or nothing at all; only the
-    first carries tables to read.
-    """
-    from tomlkit.items import AoT
-
-    model_keys = {f.name for f in dataclasses.fields(Releasable)}
-    extras = {}
-    if not isinstance(existing, AoT):
-        return extras
-    for table in existing:
-        name = table.get("name")
-        if isinstance(name, str):
-            extras[name] = {
-                key: value
-                for key, value in table.items()
-                if key not in model_keys
-            }
-    return extras
-
-
 def _update_table_fields(table, desired):
     """Update a tomlkit table in place to match ``desired`` (a plain dict).
 
@@ -740,6 +820,26 @@ def _separate_releasables_from_projects(doc):
     last_table.value.add(tomlkit.ws("\n"))
 
 
+def _member_to_write(proj):
+    """The member dict ``save_workspace`` serializes, minus runtime bookkeeping.
+
+    Two things a load->save cycle must never do: persist a key a caller hung
+    off the member at runtime (``monorepo sync`` attaches its inlined-CI
+    bookkeeping to the member dicts it walks), and write a key the loader would
+    then refuse. The first is stripped -- those keys are the tools' own and
+    were never part of the file -- and the second is a hard error here rather
+    than an unreadable workspace.toml discovered on the next load.
+    """
+    data = proj.to_dict() if isinstance(proj, WorkspaceProject) else dict(proj)
+    data = {k: v for k, v in data.items() if not is_runtime_member_key(k)}
+    _refuse_unknown_keys(
+        data, MEMBER_KEYS,
+        surface=f"the member '{data.get('name')}' being written",
+        file_label=WORKSPACE_FILE,
+    )
+    return data
+
+
 def save_workspace(root, projects, releasables=None):
     """Write workspace.toml atomically, editing the existing document in place.
 
@@ -784,14 +884,10 @@ def save_workspace(root, projects, releasables=None):
         # so nothing here has to re-read the file to guess which it was.
         existing_rels = doc.get("releasables")
 
-        # A [[releasables]] table may carry keys this model does not know -- a
-        # line an operator wrote, or one a newer rlsbl writes. The desired dict
-        # is built from the model, and anything missing from it is pruned, so
-        # those keys are carried across explicitly. A [[projects]] table needs
-        # no such step: its desired dict IS the raw loaded dict, unknown keys
-        # included, which is what makes that section's rewrite lossless.
-        extras_by_name = _releasable_extra_keys(existing_rels)
-
+        # A releasable table carries the model's keys and nothing else. A key
+        # outside the model is refused at load, so there is none to carry
+        # across -- writing one back would produce a file rlsbl then refuses
+        # to read.
         desired_rels = []
         for rel in releasables:
             d = {"name": rel.name}
@@ -799,7 +895,6 @@ def save_workspace(root, projects, releasables=None):
                 d["tag_format"] = rel.tag_format
             if rel.is_mirrored:
                 d["subtree_remote"] = rel.subtree_remote
-            d.update(extras_by_name.get(rel.name, {}))
             desired_rels.append(d)
 
         if not desired_rels:
@@ -831,10 +926,7 @@ def save_workspace(root, projects, releasables=None):
         doc.add("releasables", tomlkit.array())
 
     # --- projects section ---
-    desired_projs = [
-        proj.to_dict() if isinstance(proj, WorkspaceProject) else dict(proj)
-        for proj in projects
-    ]
+    desired_projs = [_member_to_write(proj) for proj in projects]
     if not desired_projs:
         # Empty AoT produces no output in tomlkit; use inline array instead.
         if "projects" in doc:
@@ -892,6 +984,13 @@ def resolve_project(root, cwd="."):
 
 STANDALONE_RELEASABLE_FILE = "releasable.toml"
 
+#: Every key ``.rlsbl/releasable.toml`` may carry. A standalone repository's
+#: releasable declares who it is and how its tags are spelled; it has no
+#: mirror (``subtree_remote`` is a monorepo releasable's key -- the standalone
+#: repository IS the thing a mirror would be), so the set is narrower than
+#: :func:`releasable_keys`.
+STANDALONE_RELEASABLE_KEYS = frozenset({"name", "tag_format"})
+
 
 def _derive_standalone_name(project_root, detected_targets=None, targets_map=None):
     """Derive a project name for the standalone releasable.
@@ -941,18 +1040,41 @@ def load_standalone_releasable(project_root):
         return None
     with open(path, "rb") as f:
         data = tomllib.load(f)
+    file_label = f".rlsbl/{STANDALONE_RELEASABLE_FILE}"
+    _refuse_unknown_keys(
+        data, STANDALONE_RELEASABLE_KEYS,
+        surface="the standalone releasable", file_label=file_label,
+    )
     name = data.get("name")
     if not name or not isinstance(name, str):
         raise WorkspaceError(
-            f".rlsbl/{STANDALONE_RELEASABLE_FILE}: missing or invalid 'name' "
+            f"{file_label}: missing or invalid 'name' "
             f"(must be a non-empty string)"
         )
-    tag_format = data.get("tag_format", STANDALONE_TAG_FORMAT)
-    if not isinstance(tag_format, str):
-        raise WorkspaceError(
-            f".rlsbl/{STANDALONE_RELEASABLE_FILE}: tag_format must be a string"
-        )
+    # Absence is carried, exactly as it is for a workspace releasable: this
+    # function answers "what does the file SAY", and a file that states no
+    # format is distinct from one that states the standalone default.
+    # Resolving absence to a usable format is
+    # :func:`create_standalone_releasable`'s job.
+    tag_format = data.get("tag_format", TAG_FORMAT_ABSENT)
+    if tag_format is not TAG_FORMAT_ABSENT and not isinstance(tag_format, str):
+        raise WorkspaceError(f"{file_label}: tag_format must be a string")
     return Releasable(name=name, tag_format=tag_format)
+
+
+def save_standalone_releasable(project_root, releasable):
+    """Write ``.rlsbl/releasable.toml`` for *releasable*.
+
+    ``tag_format`` is written only when the releasable declares one, so a load
+    -> save cycle neither invents the key on a file that stated none nor drops
+    it from a file that did.
+    """
+    path = os.path.join(str(project_root), ".rlsbl", STANDALONE_RELEASABLE_FILE)
+    effects.makedirs(os.path.dirname(path), exist_ok=True)
+    text = f'name = "{releasable.name}"\n'
+    if releasable.declares_tag_format:
+        text += f'tag_format = "{releasable.tag_format}"\n'
+    effects.write_text(path, text)
 
 
 def create_standalone_releasable(project_root):
@@ -974,7 +1096,13 @@ def create_standalone_releasable(project_root):
     """
     explicit = load_standalone_releasable(project_root)
     if explicit is not None:
-        return explicit
+        if explicit.declares_tag_format:
+            return explicit
+        # The file carried no format. In a standalone repository the answer is
+        # the standalone scheme -- decided by the context, not invented at read
+        # time, and never the workspace scheme Releasable.effective_tag_format
+        # would otherwise resolve absence to.
+        return dataclasses.replace(explicit, tag_format=STANDALONE_TAG_FORMAT)
     # Lazy import: targets detection is only needed when no explicit
     # releasable.toml exists. The import happens here (in the caller)
     # rather than in _derive_standalone_name to keep that function

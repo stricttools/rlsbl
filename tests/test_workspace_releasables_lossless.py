@@ -1,16 +1,20 @@
-"""The ``[[releasables]]`` writer rewrites the section losslessly.
+"""The ``[[releasables]]`` reader and writer both hold the section to the model.
 
 ``save_workspace`` reconciles ``[[releasables]]`` from a list of
 :class:`~rlsbl.workspace_types.Releasable` instances, which carry only the keys
-the model knows. A key the model does NOT know -- a line an operator wrote, or
-one a newer rlsbl writes -- must survive that rewrite untouched, exactly as an
-unknown key on a ``[[projects]]`` table does.
+the model knows. A key the model does NOT know is refused at load, so there is
+none to carry across a rewrite -- writing one back would produce a file rlsbl
+then refuses to read. What the rewrite must preserve is every entry the command
+never named, and the formatting around them.
 """
 
 import json
 import os
 
+import pytest
+
 from rlsbl.commands.monorepo import _cmd_add, _cmd_init
+from rlsbl.errors import WorkspaceError
 from rlsbl.workspace import (
     WORKSPACE_DIR,
     WORKSPACE_FILE,
@@ -43,7 +47,7 @@ def _write_workspace_text(root, text):
         f.write(text)
 
 
-class TestUnknownKeysSurviveTheRewrite:
+class TestTheRewriteHoldsTheSectionToTheModel:
     def test_add_creating_a_releasable_keeps_another_entry_intact(self, mock_git_repo):
         """Creating one entry never edits a sibling entry the command never named."""
         _cmd_init({"root-dev-node": True}, project_root=".")
@@ -51,27 +55,24 @@ class TestUnknownKeysSurviveTheRewrite:
             "releasables = []",
             '[[releasables]]\n'
             'name = "legacy"\n'
-            'tag_format = "v{version}"\n'
-            'future_key = "keep me"\n',
+            'tag_format = "v{version}"\n',
         ))
 
         _npm_project(mock_git_repo, "pkg-a")
         _cmd_add(["pkg-a"], {"releasable": "pkg-a"}, project_root=".")
 
         text = _workspace_text(mock_git_repo)
-        assert 'future_key = "keep me"' in text
         assert 'name = "legacy"' in text
         assert 'tag_format = "v{version}"' in text
 
-    def test_save_workspace_preserves_an_unknown_key_directly(self, mock_git_repo):
-        """The writer itself is lossless, whichever command drives it."""
+    def test_save_workspace_preserves_the_entries_it_was_given(self, mock_git_repo):
+        """Appending one entry leaves the existing entry byte-intact."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         _write_workspace_text(mock_git_repo, _workspace_text(mock_git_repo).replace(
             "releasables = []",
             '[[releasables]]\n'
             'name = "core"\n'
-            'tag_format = "v{version}"\n'
-            'future_key = ["a", "b"]\n',
+            'tag_format = "v{version}"\n',
         ))
 
         root = str(mock_git_repo)
@@ -85,8 +86,24 @@ class TestUnknownKeysSurviveTheRewrite:
         )
 
         text = _workspace_text(mock_git_repo)
-        assert 'future_key = ["a", "b"]' in text
+        assert 'name = "core"' in text
+        assert 'tag_format = "v{version}"' in text
         assert 'name = "extra"' in text
+
+    def test_an_unknown_key_on_a_releasable_table_is_refused_at_load(
+        self, mock_git_repo
+    ):
+        """The reason nothing carries unknown releasable keys across a rewrite."""
+        _cmd_init({"root-dev-node": True}, project_root=".")
+        _write_workspace_text(mock_git_repo, _workspace_text(mock_git_repo).replace(
+            "releasables = []",
+            '[[releasables]]\n'
+            'name = "core"\n'
+            'future_key = ["a", "b"]\n',
+        ))
+
+        with pytest.raises(WorkspaceError, match="future_key"):
+            load_workspace(str(mock_git_repo))
 
     def test_an_unknown_key_on_a_freshly_appended_entry_is_not_invented(self, mock_git_repo):
         """A newcomer carries exactly the model's keys and nothing else."""

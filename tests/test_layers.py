@@ -608,7 +608,7 @@ class TestLayersViolationsCheck:
         (ws_dir / "workspace.toml").write_text(
             workspace_toml('[[projects]]\npath = "schema"\nname = "schema"\n\n'
             '[[projects]]\npath = "app"\nname = "app"\n\n'
-            '[[projects]]\npath = "loadtest"\nname = "loadtest"\ndev_node = true\n\n'
+            '[[projects]]\npath = "loadtest"\nname = "loadtest"\ndev_only = true\nreleasable = false\n\n'
             "[layers]\n"
             'order = ["foundation", "app"]\n\n'
             "[layers.assignments]\n"
@@ -623,7 +623,7 @@ class TestLayersViolationsCheck:
         projects = [
             {"name": "schema", "path": "schema"},
             {"name": "app", "path": "app", "depends_on": ["schema"]},
-            {"name": "loadtest", "path": "loadtest", "dev_node": True},
+            {"name": "loadtest", "path": "loadtest", "dev_only": True, "releasable": False},
         ]
         graph = WorkspaceGraph(str(tmp_path), projects)
 

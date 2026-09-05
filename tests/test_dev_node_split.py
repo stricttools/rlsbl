@@ -1,7 +1,8 @@
-"""Tests for the dev_node split into dev_only + is_releasable.
+"""Tests for the two-key dev-node declaration: dev_only + releasable.
 
 Validates that the two independent concerns -- boundary guardrail (dev_only)
-and release lifecycle membership (is_releasable) -- are correctly separated.
+and release lifecycle membership (is_releasable) -- are correctly separated,
+and that "dev node" is derived from both rather than declared as one key.
 """
 
 import json
@@ -28,7 +29,7 @@ from rlsbl.workspace import WorkspaceProject, WORKSPACE_DIR
 
 
 class TestDevOnlyProperty:
-    """dev_only property should reflect dev_only or legacy dev_node flag."""
+    """dev_only reflects the declared dev_only key."""
 
     def test_dev_only_true(self):
         proj = WorkspaceProject({"name": "a", "path": "a", "dev_only": True})
@@ -38,11 +39,6 @@ class TestDevOnlyProperty:
         proj = WorkspaceProject({"name": "a", "path": "a"})
         assert proj.dev_only is False
 
-    def test_legacy_dev_node_implies_dev_only(self):
-        """Legacy dev_node = true should make dev_only True."""
-        proj = WorkspaceProject({"name": "a", "path": "a", "dev_node": True})
-        assert proj.dev_only is True
-
     def test_dev_only_explicit_false(self):
         proj = WorkspaceProject({"name": "a", "path": "a", "dev_only": False})
         assert proj.dev_only is False
@@ -50,11 +46,6 @@ class TestDevOnlyProperty:
 
 class TestDevNodeDerivedProperty:
     """dev_node is now derived: True when dev_only AND not a member of any releasable."""
-
-    def test_legacy_dev_node_still_works(self):
-        """Legacy workspace.toml with dev_node = true: dev_node property is True."""
-        proj = WorkspaceProject({"name": "a", "path": "a", "dev_node": True})
-        assert proj.dev_node is True
 
     def test_dev_only_with_releasable_false(self):
         """dev_only + releasable = false -> dev_node is True."""
@@ -71,10 +62,13 @@ class TestDevNodeDerivedProperty:
         proj = WorkspaceProject({"name": "a", "path": "a"})
         assert proj.dev_node is False
 
-    def test_dev_only_without_dev_node_flag(self):
-        """dev_only without dev_node or releasable field -> dev_node is False."""
+    def test_dev_only_alone_is_not_a_dev_node(self):
+        """dev_only with no releasable key at all -> dev_node is False.
+
+        Both halves are required: standing outside every releasable is
+        declared with `releasable = false`, never assumed.
+        """
         proj = WorkspaceProject({"name": "a", "path": "a", "dev_only": True})
-        # Without legacy dev_node flag or releasable=false, not a dev_node
         assert proj.dev_node is False
 
 
@@ -87,10 +81,6 @@ class TestIsReleasableProperty:
 
     def test_releasable_false_not_releasable(self):
         proj = WorkspaceProject({"name": "a", "path": "a", "releasable": False})
-        assert proj.is_releasable is False
-
-    def test_legacy_dev_node_not_releasable(self):
-        proj = WorkspaceProject({"name": "a", "path": "a", "dev_node": True})
         assert proj.is_releasable is False
 
     def test_dev_only_with_releasable_string_is_releasable(self):
@@ -118,7 +108,6 @@ def split_monorepo(tmp_path, monkeypatch):
 
     - dev_only_releasable: dev_only=true, releasable='tools' (CAN release)
     - dev_only_non_releasable: dev_only=true, releasable=false (CANNOT release)
-    - legacy_dev_node: dev_node=true (backward compat: CANNOT release)
     - regular: no flags (CAN release)
     """
     monkeypatch.chdir(tmp_path)
@@ -149,11 +138,6 @@ def split_monorepo(tmp_path, monkeypatch):
         'releasable = false\n'
         '\n'
         '[[projects]]\n'
-        'path = "legacy"\n'
-        'name = "legacy"\n'
-        'dev_node = true\n'
-        '\n'
-        '[[projects]]\n'
         'path = "regular"\n'
         'name = "regular"\n'
         'releasable = "regular"\n'
@@ -161,7 +145,7 @@ def split_monorepo(tmp_path, monkeypatch):
     )
 
     # Create project directories with minimal structure
-    for subdir in ("dev-rel", "dev-norel", "legacy", "regular"):
+    for subdir in ("dev-rel", "dev-norel", "regular"):
         proj_dir = tmp_path / subdir
         proj_dir.mkdir()
         (proj_dir / ".rlsbl" / "changes").mkdir(parents=True)
@@ -174,14 +158,14 @@ def split_monorepo(tmp_path, monkeypatch):
         )
 
     run_git(tmp_path, "add", WORKSPACE_DIR)
-    for subdir in ("dev-rel", "dev-norel", "legacy", "regular"):
+    for subdir in ("dev-rel", "dev-norel", "regular"):
         run_git(tmp_path, "add", subdir)
     run_git(tmp_path, "commit", "-q", "-m", "add projects")
 
     # Tagged AND archived: a project carrying a version tag over an empty
     # release record is one that shipped and was never backfilled, and the
     # release record refuses to answer any range question for it.
-    for subdir in ("dev-rel", "dev-norel", "legacy", "regular"):
+    for subdir in ("dev-rel", "dev-norel", "regular"):
         run_git(tmp_path, "tag", f"{subdir}@v0.1.0")
         archive_release(
             tmp_path / subdir / ".rlsbl" / "releases", "0.1.0", git_head(tmp_path),
@@ -216,19 +200,6 @@ class TestReleaseGateUsesReleasable:
 
         root = split_monorepo.root
         project_dir = root / "dev-norel"
-
-        with pytest.raises(ReleaseValidationError, match="non-releasable"):
-            resolve_monorepo_context(str(root), project_dir, lambda msg: None)
-
-    def test_legacy_dev_node_still_blocked(self, split_monorepo):
-        """A legacy dev_node=true project should still be blocked."""
-        from rlsbl.commands.release.validate import (
-            ReleaseValidationError,
-            resolve_monorepo_context,
-        )
-
-        root = split_monorepo.root
-        project_dir = root / "legacy"
 
         with pytest.raises(ReleaseValidationError, match="non-releasable"):
             resolve_monorepo_context(str(root), project_dir, lambda msg: None)
@@ -449,15 +420,6 @@ class TestChangelogChecksUseReleasable:
         ctx = self._make_ctx_for_project(root, root / "dev-norel")
         checks = _register_and_get_checks()
         result = checks["changelog-user-facing"](ctx)
-        assert result.status == "skip"
-        assert "non-releasable" in result.message
-
-    def test_legacy_dev_node_skips_coverage(self, split_monorepo):
-        """Legacy dev_node=true project should skip (is_releasable is False)."""
-        root = split_monorepo.root
-        ctx = self._make_ctx_for_project(root, root / "legacy")
-        checks = _register_and_get_checks()
-        result = checks["changelog-coverage"](ctx)
         assert result.status == "skip"
         assert "non-releasable" in result.message
 

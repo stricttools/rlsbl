@@ -44,7 +44,8 @@ def _setup_monorepo(tmp_path, monkeypatch, projects_spec):
     """Set up a monorepo with given projects and return (root, ctx).
 
     projects_spec is a list of dicts with keys:
-      path, name, dev_node (optional bool),
+      path, name, dev_only (optional bool) and releasable (optional; a
+      name, or False -- dev_only plus releasable=False is a dev node),
       deps (optional list of runtime dep names),
       dev_deps (optional list of dev dep names).
     """
@@ -62,8 +63,9 @@ def _setup_monorepo(tmp_path, monkeypatch, projects_spec):
     ws_projects = []
     for spec in projects_spec:
         ws_proj = {"path": spec["path"], "name": spec["name"]}
-        if spec.get("dev_node"):
-            ws_proj["dev_node"] = True
+        if spec.get("dev_only"):
+            ws_proj["dev_only"] = True
+            ws_proj["releasable"] = spec.get("releasable", False)
         ws_projects.append(ws_proj)
 
     make_workspace(tmp_path, ws_projects)
@@ -106,7 +108,7 @@ class TestBoundaryGuardrail:
         """Non-dev-node A depends on dev node B via runtime dep -> FAIL."""
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a", "deps": ["proj-b"]},
-            {"path": "proj-b", "name": "proj-b", "dev_node": True},
+            {"path": "proj-b", "name": "proj-b", "dev_only": True, "releasable": False},
         ])
         checks = _register_and_get_checks()
         result = checks["dev-only-boundary"](ctx)
@@ -119,7 +121,7 @@ class TestBoundaryGuardrail:
         """Non-dev-node A depends on dev node B via dev dep only -> PASS."""
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a", "dev_deps": ["proj-b"]},
-            {"path": "proj-b", "name": "proj-b", "dev_node": True},
+            {"path": "proj-b", "name": "proj-b", "dev_only": True, "releasable": False},
         ])
         checks = _register_and_get_checks()
         result = checks["dev-only-boundary"](ctx)
@@ -130,7 +132,7 @@ class TestBoundaryGuardrail:
         """Dev node B with no dependents at all -> PASS."""
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a"},
-            {"path": "proj-b", "name": "proj-b", "dev_node": True},
+            {"path": "proj-b", "name": "proj-b", "dev_only": True, "releasable": False},
         ])
         checks = _register_and_get_checks()
         result = checks["dev-only-boundary"](ctx)
@@ -145,7 +147,7 @@ class TestBoundaryGuardrail:
         _root, ctx = _setup_monorepo(tmp_path, monkeypatch, [
             {"path": "proj-a", "name": "proj-a", "deps": ["proj-b"]},
             {"path": "proj-b", "name": "proj-b", "deps": ["proj-c"]},
-            {"path": "proj-c", "name": "proj-c", "dev_node": True},
+            {"path": "proj-c", "name": "proj-c", "dev_only": True, "releasable": False},
         ])
         checks = _register_and_get_checks()
         result = checks["dev-only-boundary"](ctx)

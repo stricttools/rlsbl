@@ -74,7 +74,7 @@ def dev_node_monorepo(tmp_path, monkeypatch):
     run_git(tmp_path, "commit", "-q", "-m", "initial")
 
     projects = [
-        {"path": "internal-pkg", "name": "mypkg-internal", "dev_node": True},
+        {"path": "internal-pkg", "name": "mypkg-internal", "dev_only": True, "releasable": False},
         {"path": "regular-pkg", "name": "mypkg-regular"},
     ]
 

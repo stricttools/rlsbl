@@ -494,7 +494,7 @@ class TestRawFacts:
         _make_npm_project(mock_git_repo, "main")
 
         projects = [
-            {"path": "devtool", "name": "devtool", "dev_node": True},
+            {"path": "devtool", "name": "devtool", "dev_only": True, "releasable": False},
             {"path": "main", "name": "main"},
         ]
         _init_workspace(mock_git_repo, projects)
@@ -603,7 +603,7 @@ class TestDOTNodeStyling:
         _make_npm_project(mock_git_repo, "main")
 
         projects = [
-            {"path": "devtool", "name": "devtool", "dev_node": True},
+            {"path": "devtool", "name": "devtool", "dev_only": True, "releasable": False},
             {"path": "main", "name": "main"},
         ]
         _init_workspace(mock_git_repo, projects)
@@ -639,7 +639,7 @@ class TestDOTNodeStyling:
         _make_npm_project(mock_git_repo, "devtool")
 
         projects = [
-            {"path": "devtool", "name": "devtool", "dev_node": True},
+            {"path": "devtool", "name": "devtool", "dev_only": True, "releasable": False},
         ]
         _init_workspace(mock_git_repo, projects)
 
@@ -683,7 +683,7 @@ class TestTextLabels:
         _make_npm_project(mock_git_repo, "devtool")
 
         projects = [
-            {"path": "devtool", "name": "devtool", "dev_node": True},
+            {"path": "devtool", "name": "devtool", "dev_only": True, "releasable": False},
         ]
         _init_workspace(mock_git_repo, projects)
 

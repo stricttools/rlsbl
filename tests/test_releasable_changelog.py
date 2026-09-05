@@ -80,11 +80,8 @@ def _write_workspace_explicit(tmp_path, releasables, projects):
                 lines.append("releasable = false")
             elif isinstance(val, str):
                 lines.append(f'releasable = "{val}"')
-        if "watch" in proj:
-            watch_items = ", ".join(f'"{w}"' for w in proj["watch"])
-            lines.append(f"watch = [{watch_items}]")
-        if proj.get("dev_node"):
-            lines.append("dev_node = true")
+        if proj.get("dev_only"):
+            lines.append("dev_only = true")
         lines.append("")
     (ws_dir / WORKSPACE_FILE).write_text(workspace_toml("\n".join(lines)))
 

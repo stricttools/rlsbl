@@ -159,7 +159,7 @@ The `.git/hooks/pre-push` hook captures git's stdin into the `RLSBL_PUSH_STDIN` 
 
 ### Monorepo behavior
 
-In monorepos, the pre-push hook runs from the repo root. The `test-suite` check hard-errors at workspace root because it needs a specific project directory. The `test-suite-workspace` check handles this: it automatically detects affected projects from push refs, runs tests for each, and skips `dev_node` projects. If changelog coverage fails, `test-suite-workspace` is skipped (it depends on `prepush-changelog-coverage`).
+In monorepos, the pre-push hook runs from the repo root. The `test-suite` check hard-errors at workspace root because it needs a specific project directory. The `test-suite-workspace` check handles this: it automatically detects affected projects from push refs, runs tests for each, and skips dev nodes (`dev_only = true` with `releasable = false`). If changelog coverage fails, `test-suite-workspace` is skipped (it depends on `prepush-changelog-coverage`).
 
 ### Standalone usage
 
@@ -229,7 +229,7 @@ cd ~/Projects/my-monorepo
 rlsbl dev install --target global --all
 #   Installing mylib via: uv tool install -e packages/mylib
 #   Installing cli via: npm link (packages/cli)
-#   Skipping tests (dev_node)
+#   Skipping tests (dev-only)
 
 # Or install specific projects
 rlsbl dev install --target global --include mylib,cli

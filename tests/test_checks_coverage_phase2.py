@@ -2191,7 +2191,7 @@ class TestWorkspaceCiSynced:
 
         projects = [
             WorkspaceProject({"name": "alpha", "path": "alpha"}),
-            WorkspaceProject({"name": "devtool", "path": "devtool", "dev_node": True}),
+            WorkspaceProject({"name": "devtool", "path": "devtool", "dev_only": True, "releasable": False}),
         ]
         ctx = _make_ws_ctx(repo, projects)
 
