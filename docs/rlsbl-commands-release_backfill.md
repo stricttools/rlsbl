@@ -1,8 +1,7 @@
 ---
 title: rlsbl.commands.release_backfill
-description: "``rlsbl release backfill``: bring a repository's release archives into the fate model."
+description: "The command around the backfill engine: it resolves the repository, reads the operator's reviewed descriptions, and runs the observe, preview, apply skeleton."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 63
 ---

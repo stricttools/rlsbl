@@ -1,8 +1,7 @@
 ---
 title: rlsbl.tag_explanation
-description: "Is this tag explained?"
+description: "The one consultation over whether a tag is accounted for: by an archived version under the current scheme, by an archive's recorded shipped_as spelling, or by the transition record."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 150
 ---

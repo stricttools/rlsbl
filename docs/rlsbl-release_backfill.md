@@ -1,8 +1,7 @@
 ---
 title: rlsbl.release_backfill
-description: "The release-archive backfill engine: bring a repository's archives into the fate model."
+description: "The backfill engine: it reads a repository's tags, archives and changelog files, and decides per version whether to repair, materialize, adopt or leave alone."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 137
 ---
