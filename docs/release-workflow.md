@@ -218,7 +218,12 @@ Step 18 does more than preserve the release prose. Before the archive is locked 
 - a **workspace releasable** ships its member directories, so there is one entry per member path. No single git object covers a *set* of subtrees, so one tree hash per member is the honest record — a synthesized hash over the members would be an rlsbl invention that no git command could reproduce or check;
 - a **single-member releasable** ships one directory and gets the single entry for that path.
 
-Both fields are written by the flow and by nothing else. The editable `unreleased.toml` never carries them: neither value exists before the release runs, so one found there is either a claim about a commit that has not happened or an archive copied back without being un-finalized — and it aborts the release at validation, before any mutation. `rlsbl release undo` strips both fields when it restores an archive as the editable release file, so the freed version can be released again.
+The release commit is written by the flow and by nothing else, and it is not alone in that: it belongs to the **flow-owned set**, whose single authority is `FLOW_OWNED_FIELDS` in `rlsbl/release_file.py` — the release-commit fields together with the version-fate fields described below. One rule covers the whole set, and both sides of it read that tuple rather than restating its membership:
+
+- the editable `unreleased.toml` carrying *any* member is refused before any mutation — at `rlsbl release run`'s validation, and again at `rlsbl release resume`'s own entry, since a resume re-enters the mutating phase with the release file still editable on disk;
+- `rlsbl release undo` strips every member when it restores an archive as the editable release file, so the freed version can be released again.
+
+The ground is the same for each: no release-commit value exists before the release runs, and each fate field states something about a version whose fate is already settled. A member found in `unreleased.toml` is therefore either a hand-authored claim about something that has not happened, or an archive copied back without being un-finalized.
 
 Archives written before release commits were recorded carry neither field; readers treat absence as absence and never substitute a value.
 
@@ -245,7 +250,7 @@ Two cases do not resolve to a tag, and neither is passed over silently:
 | A released version with **no tag** | Looks for the version-bump commit (whose whole message is the tag string) and records the release commit from it, noting that it did. Only when that also fails does the archive get `unrecoverable = true` — a permanent record that the commit is unrecoverable, not a temporary gap. |
 | A **tag matching no released version** that still parses under a recognized scheme | Reported as operator input, with the tag name and every spelling that was probed, and the pass exits non-zero. It never guesses which version such a tag belongs to. |
 
-Tags that parse under no recognized scheme are listed and left alone. The pass is idempotent: an archive that already carries the release commit (or the marker) and the gate is proposed for no change.
+Tags that parse under no recognized scheme are listed and left alone. The pass is idempotent: an archive whose fate is already settled and which carries the gate is proposed for no change. That covers every fate, `never_released` included — a version no release ever used has no tag and no version-bump commit by construction, so a pass that failed to recognize the fate would conclude "unrecoverable" and write that marker beside it, turning a correct archive into one no reader accepts. It is recognized, and such an archive is proposed for no change at all.
 
 `unrecoverable` is written by the backfill and by nothing else — a flow that is releasing always knows its own candidate — and `rlsbl release undo` strips it alongside the release commit when it restores an archive as the editable release file.
 

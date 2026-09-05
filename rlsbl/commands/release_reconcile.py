@@ -683,6 +683,11 @@ def dangling_release_commits(releases_dir, *, git=None, cwd=None):
     pruned. The release record is the authority for where a released ref belongs, so
     until this is repaired every released ref reads as disagreeing with it.
 
+    Only a RECORDED archive can be dangling. The other two fates name no
+    commit at all and so can never name a missing one: an ``unrecoverable``
+    version shipped from a commit nothing can name, and a ``never_released``
+    one is a version number no release ever used.
+
     One ``git rev-list --no-walk --ignore-missing`` answers for the whole
     release record, so a repository with a hundred versions pays one git call rather
     than a hundred. An archive that cannot be read is skipped rather than
@@ -705,7 +710,7 @@ def dangling_release_commits(releases_dir, *, git=None, cwd=None):
             )
         except (RlsblError, OSError):
             continue
-        if archive.unrecoverable:
+        if archive.unrecoverable or archive.never_released:
             continue
         release_commit = (archive.candidate_sha or "").strip()
         if release_commit:
