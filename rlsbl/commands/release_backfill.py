@@ -97,7 +97,7 @@ def run_cmd(flags, *, ctx):
     written = state.get("written") or []
     if not written:
         print(
-            "\nNothing to do: every archive records a fate and carries every "
+            "\nNothing to do: every archive records a fate and answers every "
             "required field."
         )
         return

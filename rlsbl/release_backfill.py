@@ -5,9 +5,11 @@ equivalent) is the authoritative record of what a version shipped: the bump
 type, the description and context every later changelog regeneration reads back,
 and the RELEASE COMMIT -- the ``candidate_sha`` the version shipped from and the
 ``tree_hashes`` each released path carried.  Repositories that predate any of
-that carry archives with no release commit, archives missing required fields,
-archives written before the strictspec ``format_version`` gate existed, released
-versions with no archive at all, and version tags no archive accounts for.
+that carry archives with no release commit, archives whose required fields
+are missing or were never answered (an archived scaffold still carrying
+``bump = ""`` and ``description = ""``), archives written before the strictspec
+``format_version`` gate existed, released versions with no archive at all, and
+version tags no archive accounts for.
 
 This module is what ``rlsbl release backfill`` runs, and what
 ``scripts/migrate_workspace_model.py`` calls in-process after it rewrites a
@@ -25,11 +27,13 @@ verdict:
 ``materialize``
     A version the changelog records as released, with no archive at all.
 ``repair``
-    An archive that exists and is incomplete: missing required fields, missing
-    the ``format_version`` gate, missing its fate, or all three.
+    An archive that exists and is incomplete: required fields missing or
+    unanswered, the ``format_version`` gate missing, its fate missing, or all
+    three.  An empty required string is unanswered, not stated -- see
+    :func:`_answered`.
 ``settled``
     Nothing is proposed.  An archive that already records one of the three
-    fates and carries every required field is done -- which is what makes the
+    fates and ANSWERS every required field is done -- which is what makes the
     pass idempotent.
 
 The fate model, and the one fate this pass will not derive
@@ -150,6 +154,25 @@ PLACEHOLDER_DESCRIPTION = (
 # `include`, `exclude` and `description` are the schema's required set;
 # `format_version` is the gate in front of it.
 REQUIRED_FIELDS = ("format_version", "bump", "include", "exclude", "description")
+
+
+def _answered(value):
+    """Whether a required field's value says anything.
+
+    An empty string is not an answer -- it is a scaffolded release file that
+    was archived before anyone filled it in, which is how two workspaces ended
+    up with recorded archives carrying ``bump = ""`` and ``description = ""``.
+    The strict reader refuses those, so every ref set derived from them is
+    underivable, and a completion pass that asked only whether the KEY existed
+    walked past the very files it exists to repair.
+
+    Strings only, deliberately. An empty LIST is a real statement (``exclude =
+    []`` says nothing is excluded), and calling it unanswered would re-plan it
+    on every run, so the pass would never settle.
+    """
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
 
 # How many commit subjects a reconstructed description quotes. A handful says
 # what the release was about; the whole range is the changelog's job.
@@ -550,6 +573,9 @@ class ArchiveState:
     repairs are exactly the ones the reader would reject (no ``format_version``
     gate, a missing required field), so asking the reader first would refuse to
     look at the file the pass exists to fix.
+
+    ``present`` holds the required fields that are ANSWERED, which is not the
+    same as the keys that exist: see :func:`_answered`.
     """
 
     present: set
@@ -579,7 +605,10 @@ def read_archive_state(path):
     description = data.get("description")
     context = data.get("context")
     return ArchiveState(
-        present={k for k in REQUIRED_FIELDS if k in data},
+        present={
+            k for k in REQUIRED_FIELDS
+            if k in data and _answered(data[k])
+        },
         recorded=any(f in data for f in RELEASE_COMMIT_FIELDS),
         unrecoverable=bool(data.get(UNRECOVERABLE_FIELD)),
         # The third fate. A never-released version has no tag and no
@@ -1522,7 +1551,15 @@ def apply_version(vp):
                 doc = tomlkit.loads(f.read())
             for name, (value, source) in vp.fill_fields.items():
                 if name in doc:
+                    # The key is there and its value said nothing (an empty
+                    # required string) or is being overridden. Replace it in
+                    # place -- the key keeps its position and its own header
+                    # comment -- and state the source on the line, so a reader
+                    # of the 0444 archive knows this value was reconstructed
+                    # rather than authored, exactly as a field the pass ADDED
+                    # says so above itself.
                     doc[name] = value
+                    doc.item(name).comment(_completion_comment(name, source))
                     continue
                 doc.add(tomlkit.comment(_completion_comment(name, source)))
                 doc.add(name, value)
