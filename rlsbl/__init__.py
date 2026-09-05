@@ -3116,14 +3116,24 @@ def _extract_check_releasable():
     command other than ``check``). A supplied-but-empty value and a trailing
     ``--releasable`` with nothing after it are hard errors here: an empty value
     is a statement, and it is not the statement that the flag was omitted.
+
+    The command is located as the first token that is not a flag, rather than
+    assumed to be ``argv[1]``: the framework's reserved quartet is recognized
+    anywhere in argv, so ``rlsbl --dry-run check --releasable core`` is the same
+    invocation as ``rlsbl check --releasable core --dry-run``. Every token
+    before the command is one of those, and all four are booleans carrying no
+    value of their own.
     """
     argv = sys.argv[1:]
-    if not argv or argv[0] != "check":
+    command_at = next(
+        (i for i, tok in enumerate(argv) if not tok.startswith("-")), None,
+    )
+    if command_at is None or argv[command_at] != "check":
         return None
 
-    new_argv = [sys.argv[0], "check"]
+    new_argv = [sys.argv[0], *argv[:command_at], "check"]
     value = None
-    i = 1
+    i = command_at + 1
     while i < len(argv):
         tok = argv[i]
         if tok == "--releasable":

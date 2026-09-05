@@ -109,6 +109,33 @@ class TestProjectScopedChecksAtTheRoot:
         assert result.exit_code != 0, result.stdout + result.stderr
 
 
+class TestTheSelectorIsFoundWhereverTheCommandIs:
+    def test_a_reserved_flag_may_precede_the_command(self, workspace):
+        """`rlsbl --quiet check --releasable core` is the same invocation.
+
+        The framework's reserved quartet is recognized anywhere in argv, so the
+        command is not always argv[1]; the selector is lifted out relative to
+        wherever `check` actually is.
+        """
+        with patch.object(
+            sys, "argv",
+            ["rlsbl", "--quiet", "check", "--tag", "changelog",
+             "--releasable", "core"],
+        ):
+            selector = rlsbl._extract_check_releasable()
+            remaining = list(sys.argv[1:])
+
+        assert selector == "core"
+        assert remaining == ["--quiet", "check", "--tag", "changelog"]
+
+    def test_another_command_is_left_alone(self, workspace):
+        with patch.object(
+            sys, "argv", ["rlsbl", "status", "--json"],
+        ):
+            assert rlsbl._extract_check_releasable() is None
+            assert list(sys.argv[1:]) == ["status", "--json"]
+
+
 class TestWorkspaceScopedChecksAtTheRoot:
     def test_they_still_run(self, workspace):
         result = _check(["check", "--tag", "workspace"])
