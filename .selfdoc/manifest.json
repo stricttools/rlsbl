@@ -1440,6 +1440,11 @@
         },
         {
           "level": 2,
+          "text": "Policed configuration surfaces",
+          "anchor": "policed-configuration-surfaces"
+        },
+        {
+          "level": 2,
           "text": "selfdoc.json",
           "anchor": "selfdocjson"
         }
@@ -2853,6 +2858,26 @@
         },
         {
           "level": 3,
+          "text": "`releasable_keys`",
+          "anchor": "releasable_keys"
+        },
+        {
+          "level": 3,
+          "text": "`_unknown_keys`",
+          "anchor": "_unknown_keys"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_unknown_keys`",
+          "anchor": "_refuse_unknown_keys"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_releasable_unknown_keys`",
+          "anchor": "_refuse_releasable_unknown_keys"
+        },
+        {
+          "level": 3,
           "text": "`is_root_path`",
           "anchor": "is_root_path"
         },
@@ -2918,11 +2943,6 @@
         },
         {
           "level": 3,
-          "text": "`_releasable_extra_keys`",
-          "anchor": "_releasable_extra_keys"
-        },
-        {
-          "level": 3,
           "text": "`_update_table_fields`",
           "anchor": "_update_table_fields"
         },
@@ -2935,6 +2955,11 @@
           "level": 3,
           "text": "`_separate_releasables_from_projects`",
           "anchor": "_separate_releasables_from_projects"
+        },
+        {
+          "level": 3,
+          "text": "`_member_to_write`",
+          "anchor": "_member_to_write"
         },
         {
           "level": 3,
@@ -2955,6 +2980,11 @@
           "level": 3,
           "text": "`load_standalone_releasable`",
           "anchor": "load_standalone_releasable"
+        },
+        {
+          "level": 3,
+          "text": "`save_standalone_releasable`",
+          "anchor": "save_standalone_releasable"
         },
         {
           "level": 3,
@@ -3811,6 +3841,11 @@
           "level": 3,
           "text": "`get_changes_dir`",
           "anchor": "get_changes_dir"
+        },
+        {
+          "level": 3,
+          "text": "`refuse_non_releasable_member_changes`",
+          "anchor": "refuse_non_releasable_member_changes"
         },
         {
           "level": 3,
@@ -5653,11 +5688,6 @@
           "level": 3,
           "text": "`_append_deploy_workflow_if_configured`",
           "anchor": "_append_deploy_workflow_if_configured"
-        },
-        {
-          "level": 3,
-          "text": "`_append_release_dispatch_if_configured`",
-          "anchor": "_append_release_dispatch_if_configured"
         },
         {
           "level": 3,
@@ -8302,6 +8332,11 @@
         },
         {
           "level": 3,
+          "text": "`validate_no_stash`",
+          "anchor": "validate_no_stash"
+        },
+        {
+          "level": 3,
           "text": "`validate_clean_tree`",
           "anchor": "validate_clean_tree"
         },
@@ -10836,6 +10871,26 @@
           "level": 3,
           "text": "`get_commit_files`",
           "anchor": "get_commit_files"
+        },
+        {
+          "level": 3,
+          "text": "`StashError`",
+          "anchor": "stasherror"
+        },
+        {
+          "level": 3,
+          "text": "`stash_entries`",
+          "anchor": "stash_entries"
+        },
+        {
+          "level": 3,
+          "text": "`stash_refusal_message`",
+          "anchor": "stash_refusal_message"
+        },
+        {
+          "level": 3,
+          "text": "`refuse_present_stash`",
+          "anchor": "refuse_present_stash"
         },
         {
           "level": 3,
@@ -13380,11 +13435,6 @@
           "level": 3,
           "text": "`all_tags`",
           "anchor": "all_tags"
-        },
-        {
-          "level": 3,
-          "text": "`stash_entries`",
-          "anchor": "stash_entries"
         },
         {
           "level": 3,
@@ -18054,6 +18104,26 @@
         },
         {
           "level": 3,
+          "text": "`releasable_keys`",
+          "anchor": "releasable_keys"
+        },
+        {
+          "level": 3,
+          "text": "`_unknown_keys`",
+          "anchor": "_unknown_keys"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_unknown_keys`",
+          "anchor": "_refuse_unknown_keys"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_releasable_unknown_keys`",
+          "anchor": "_refuse_releasable_unknown_keys"
+        },
+        {
+          "level": 3,
           "text": "`is_root_path`",
           "anchor": "is_root_path"
         },
@@ -18119,11 +18189,6 @@
         },
         {
           "level": 3,
-          "text": "`_releasable_extra_keys`",
-          "anchor": "_releasable_extra_keys"
-        },
-        {
-          "level": 3,
           "text": "`_update_table_fields`",
           "anchor": "_update_table_fields"
         },
@@ -18136,6 +18201,11 @@
           "level": 3,
           "text": "`_separate_releasables_from_projects`",
           "anchor": "_separate_releasables_from_projects"
+        },
+        {
+          "level": 3,
+          "text": "`_member_to_write`",
+          "anchor": "_member_to_write"
         },
         {
           "level": 3,
@@ -18156,6 +18226,11 @@
           "level": 3,
           "text": "`load_standalone_releasable`",
           "anchor": "load_standalone_releasable"
+        },
+        {
+          "level": 3,
+          "text": "`save_standalone_releasable`",
+          "anchor": "save_standalone_releasable"
         },
         {
           "level": 3,
@@ -18408,6 +18483,11 @@
         },
         {
           "level": 3,
+          "text": "`is_runtime_member_key`",
+          "anchor": "is_runtime_member_key"
+        },
+        {
+          "level": 3,
           "text": "`WorkspaceProject`",
           "anchor": "workspaceproject"
         },
@@ -18463,6 +18543,21 @@
         },
         {
           "level": 4,
+          "text": "`description`",
+          "anchor": "description"
+        },
+        {
+          "level": 4,
+          "text": "`test_only`",
+          "anchor": "test_only"
+        },
+        {
+          "level": 4,
+          "text": "`lint_allow`",
+          "anchor": "lint_allow"
+        },
+        {
+          "level": 4,
           "text": "`get`",
           "anchor": "get"
         },
@@ -18475,6 +18570,11 @@
           "level": 3,
           "text": "`project_is_dev_only`",
           "anchor": "project_is_dev_only"
+        },
+        {
+          "level": 3,
+          "text": "`project_is_dev_node`",
+          "anchor": "project_is_dev_node"
         },
         {
           "level": 3,
@@ -18532,6 +18632,11 @@
           "level": 3,
           "text": "`_opt_default`",
           "anchor": "_opt_default"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_empty_flags`",
+          "anchor": "_refuse_empty_flags"
         },
         {
           "level": 3,
@@ -20119,6 +20224,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T03:17:59.164348+00:00",
+  "last_gen": "2026-09-05T04:51:02.429790+00:00",
   "theme": "minimal"
 }
