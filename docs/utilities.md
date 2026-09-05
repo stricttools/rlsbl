@@ -86,8 +86,12 @@ rlsbl status --target go  # target a specific registry
 When unreleased commits exist, a warning line appears:
 
 ```
-! 3 commits ahead of v0.45.0 -- run `rlsbl release` or investigate
+! 3 commits ahead of v0.45.0 — run `rlsbl release run --no-allow-dirty --watch --approve-consequential` or investigate
 ```
+
+The whole invocation is printed, not the group name: `rlsbl release` alone is a
+command group and prints help, and `release run` declares `--allow-dirty` and
+`--watch` as required booleans with no defaults.
 
 ### Monorepo awareness
 
