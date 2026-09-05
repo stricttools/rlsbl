@@ -1,5 +1,5 @@
 ---
-description: "The rlsbl release flow: the untagged candidate and the CI check whose red verdict comes only from a run that really concluded in failure, the release commit and the flow-owned fields only the flow may write, the three fates an archived version can record plus the historical spelling it shipped under, how `rlsbl release backfill` reconstructs them for an existing repository, and the bump types."
+description: "The rlsbl release flow: the untagged candidate and the CI check whose red verdict comes only from a run that really concluded in failure, the release commit and the flow-owned fields only the flow may write, the three fates an archived version can record plus the historical spelling it shipped under, how `rlsbl release backfill` reconstructs them for an existing repository, which releasable a reconcile or an undo is scoped to, and the bump types."
 ---
 
 # Release workflow
@@ -572,6 +572,8 @@ rlsbl release reconcile --apply --approve-consequential
 ```
 
 In a workspace the command acts on one **releasable**, whose records and tag format decide every ref it judges. Standing in a member directory names it; standing at the workspace root does not (the root directory names the whole workspace), so there `--releasable <name>` is required and is refused anywhere else — the same rule `rlsbl release run` follows.
+
+Which member a directory belongs to is the workspace's own answer, never a walk up to the nearest `.rlsbl/`: a member whose per-package `.rlsbl/` was cleaned up has no marker of its own, and the walk left the member and stopped at the workspace root — where the command read an empty `<root>/.rlsbl/releases` and reported "Nothing to reconcile" over a releasable whose tags origin was missing. A directory that belongs to no releasable at all (a dev node, any member declaring `releasable = false`) is a hard error naming both routes rather than a reading of some other project. `rlsbl release undo` resolves its project the same way.
 
 `--plan` observes origin once (one `git ls-remote`, one `gh release list`), prints the preview, and writes `reconcile-plan.toml` beside the release records it reconciled — `.rlsbl/releases/` in a standalone repository, the releasable's own `releases/` in a workspace. That file *is* the preview's output artifact. It stamps a digest of the world it judged, and it is written even when it found nothing, so applying an empty plan is a clean no-op rather than an instruction to run the plan you just ran. `--dry-run` renders and writes nothing at all — under `--plan` the plan file is not written, and under `--apply` the plan is checked and the writes are only described.
 

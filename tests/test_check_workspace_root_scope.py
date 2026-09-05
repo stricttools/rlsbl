@@ -16,7 +16,6 @@ running there untouched.
 """
 
 import json
-import os
 import sys
 from unittest.mock import patch
 

@@ -1,5 +1,5 @@
 ---
-description: "Every check rlsbl runs, by tag: project, release, changelog, workspace, quality, prepush, untagged, and the framework checks strictcli registers; plus check metadata, severity, target applicability, and how unpublished-refs treats a version recorded unrecoverable or never released."
+description: "Every check rlsbl runs, by tag: project, release, changelog, workspace, quality, prepush, untagged, and the framework checks strictcli registers; plus check metadata, severity, target applicability, where a run is scoped in a workspace, and how unpublished-refs treats a version recorded unrecoverable or never released."
 ---
 
 # Check system
@@ -19,7 +19,22 @@ rlsbl check --tag changelog
 
 # Run a single check by name
 rlsbl check --name version-consistency
+
+# Scope a run to one releasable (required at a monorepo workspace root)
+rlsbl check --tag changelog --releasable core
 ```
+
+### Where a check run is scoped
+
+In a standalone repository, and in a workspace member's directory, the cwd names exactly one project and every check answers for it.
+
+A workspace ROOT does not: it names the workspace. The checks that answer for one project -- the whole `project`, `changelog` and `release` families, and every `quality` check that is not workspace-scoped -- therefore refuse there with an error result naming both routes, rather than reading the root as a project of its own (which reported SKIP "no targets detected" and demanded config keys in a `.rlsbl/config.json` a workspace root must not have). Name the releasable with `--releasable <name>` to scope the run to it, or run `rlsbl check` from a member directory.
+
+Two families are untouched at the root, because it is the position they are meant to be run from: the workspace-scoped checks (`--tag workspace`), and the `prepush` family, which the pre-push hook runs at the repository root of every workspace.
+
+`--releasable` is refused anywhere the directory already answers -- a member directory, or a standalone repository.
+
+`check` is strictcli's own auto-registered command and its flags are the framework's, so rlsbl lifts `--releasable` out of argv before the app parses it, exactly as it does for the positional arguments strictcli cannot express. It is therefore absent from `rlsbl check --help` and from the dumped CLI schema; this page and the refusal itself are where it is documented.
 
 ## Check results
 
@@ -156,7 +171,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
 | `root-rlsbl-conflict` | error | Root `.rlsbl/` does not coexist with `.rlsbl-monorepo/` |
 | `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version; a broken member config is a hard failure |
-| `releasable-residue` | error | Release state sits where something will read it. A releasable member carries no per-package release state (`.rlsbl/changes/`, `.rlsbl/releases/`, `.rlsbl/version`, etc.) -- `hooks/` and root-path members are exempt -- and a member that releases nothing (a dev node, or any member declared `releasable = false`) carries no release archives, changelog directory or version tags in its own scheme, unless a `release-history-closed` transition record event names it |
+| `releasable-residue` | error | Release state sits where something will read it. A releasable member carries no per-package release state (`.rlsbl/changes/`, `.rlsbl/releases/`, `.rlsbl/version`, etc.) -- `hooks/` and root-path members are exempt -- and a member that releases nothing (a dev node, or any member declared `releasable = false`) carries no release archives, changelog directory or version tags in its own scheme, unless a `release-history-closed` transition record event names it. The repository's transition record is read on every run, whatever the member list is, so a malformed `transitions.jsonl` reds the check even in a workspace where every member belongs to a releasable |
 | `member-pytest-config` | error | When the workspace root has a `conftest.py`, every member with a `tests/` directory pins its own pytest rootdir, so a member run cannot escape into the root config |
 | `mixed-tag-schemes` | error | No member directory declares both Go's path-based `{path}/v*` tags and `{name}@v*` tags, which would make the publish-router prefix ordering-dependent |
 

@@ -2241,7 +2241,7 @@ def cmd_mono_sync(ctx, auto_commit):
     _cmd_sync({"auto-commit": auto_commit}, project_root=root)
 
 
-@mono.command(name="status", help="Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. Provides a quick overview of which projects have pending changes and are ready for their next release.", effect="read_only")
+@mono.command(name="status", help="Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. A publish-suppressed member's version comes from its releasable's version file, annotated (version file): nothing publishes such a member, so nothing bumps its manifest and the version-consistency check reads the same file rather than the manifest. Provides a quick overview of which projects have pending changes and are ready for their next release.", effect="read_only")
 @effects.handler
 def cmd_mono_status(ctx):
     """Show version, last tag, and changelog coverage for all workspace projects."""
@@ -2763,7 +2763,7 @@ class TransitionReleaseHistoryClosed:
 @strictcli.choice("releasable-rename", help="Declare that a releasable group was renamed. A tag-SPELLING fact: the releasable's future tags are spelled with the new name, everything already published keeps the name it was published under, and nothing a consumer resolves by has changed -- so `rlsbl release reconcile` still repairs the refs of releases made under the old spelling. `rlsbl monorepo rename-releasable` records this itself; declare it here for a rename performed another way.")
 class TransitionReleasableRename:
     value: str = strictcli.member_value(help="the releasable's name BEFORE the rename, in the vocabulary workspace.toml uses")
-    to: str = strictcli.sub_flag(presence="required", help="the releasable's name AFTER the rename")
+    to: str = strictcli.sub_flag(presence="required", help="the releasable's name AFTER the rename -- the spelling its future tags carry, while everything already published keeps the old one")
 
 
 transition = app.group("transition", help="Record the transition-record facts an operator states. Most events in a repository's transition record are written by the operation that performed them; the ones here are statements about a repository somebody read -- two that nothing can derive at all, and one whose command exists but which a rename performed by hand leaves unrecorded.")
