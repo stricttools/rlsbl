@@ -451,6 +451,11 @@
         },
         {
           "level": 2,
+          "text": "Framework checks",
+          "anchor": "framework-checks"
+        },
+        {
+          "level": 2,
           "text": "Target applicability",
           "anchor": "target-applicability"
         },
@@ -5078,6 +5083,11 @@
           "level": 3,
           "text": "`_check_project_scope`",
           "anchor": "_check_project_scope"
+        },
+        {
+          "level": 3,
+          "text": "`_out_of_scope_remedy`",
+          "anchor": "_out_of_scope_remedy"
         },
         {
           "level": 3,
@@ -20359,6 +20369,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T09:46:35.605788+00:00",
+  "last_gen": "2026-09-05T11:20:00.766658+00:00",
   "theme": "minimal"
 }
