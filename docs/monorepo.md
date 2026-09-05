@@ -401,6 +401,7 @@ That makes the tags a second dimension of the same reconciliation. A mirror can 
 | `present` | The mirror already carries the tag. | Nothing. |
 | `materialize` | The mirror has no such tag. The subtree split of the version's recorded release commit is the commit it belongs at. | Push the tag at that commit, then create the mirror's GitHub Release with that version's notes. |
 | `underivable` | No mirror commit for this version can be derived: its release archive records no commit at all, or records one the subtree split cannot answer for — typically a release commit predating the member's own directory, from a release absorbed out of another repository. | **Nothing, and nothing is guessed.** The version is named with the reason it could not be derived; the branch and every other version reconcile as usual. |
+| `never-released` | The version's archive records `never_released = true`: the version number exists in the release record, but no release was ever published under it. Not a failure to derive anything — there is no commit to restore and nothing ever shipped under that number. | **Nothing.** The version is named with that reason, distinctly from `underivable`, so nobody goes looking for a lost commit. |
 
 A tag standing at a **different** commit is never moved. That is a hard error naming both commits: a released tag names what shipped, and choosing which commit a version shipped from is never the reconciler's decision.
 

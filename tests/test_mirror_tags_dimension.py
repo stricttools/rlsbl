@@ -179,6 +179,58 @@ class TestObserveTags:
         # The version that CAN be derived is unaffected.
         assert plans["1.0.0"].state == "materialize"
 
+    def test_a_never_released_version_is_not_underivable(self, tmp_path):
+        """A phantom version is skipped for its own reason, not for a failure.
+
+        ``underivable`` says rlsbl TRIED to name a mirror commit and could not
+        -- a lost commit, or one the split cannot answer for -- and its detail
+        tells the operator to restore the archive's candidate_sha. A version
+        recorded ``never_released`` has no commit to restore and never had one:
+        nothing was ever published under that number, so there is nothing to
+        mirror and nothing to repair.
+        """
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+        state = get_releasable_dir(str(root), "mylib")
+        archive_release(f"{state}/releases", "0.9.0", "", never_released=True)
+
+        plans = {p.version: p for p in _tag_plans(root, remote)}
+        assert plans["0.9.0"].state == "never_released"
+        assert plans["0.9.0"].split_sha is None
+        assert plans["0.9.0"].release_commit_sha is None
+
+    def test_the_never_released_verdict_states_its_own_reason(self, tmp_path):
+        from rlsbl.commands.monorepo.mirror_cmd import tag_verdict_item
+
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+        state = get_releasable_dir(str(root), "mylib")
+        archive_release(f"{state}/releases", "0.9.0", "", never_released=True)
+
+        plans = {p.version: p for p in _tag_plans(root, remote)}
+        item = tag_verdict_item(plans["0.9.0"])
+        assert item.state_label == "never-released"
+        assert "never released" in item.summary
+        assert "nothing to mirror" in (item.summary + item.detail)
+        assert item.actions == ()
+
+    def test_an_unrecoverable_version_is_still_underivable(self, tmp_path):
+        """The two commitless fates are told apart, not merged.
+
+        An unrecoverable version DID ship; only rlsbl's knowledge of the commit
+        is gone, so it keeps the underivable verdict.
+        """
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+        state = get_releasable_dir(str(root), "mylib")
+        archive_release(f"{state}/releases", "0.9.0", "", unrecoverable=True)
+
+        plans = {p.version: p for p in _tag_plans(root, remote)}
+        assert plans["0.9.0"].state == "underivable"
+
     def test_a_releasable_with_no_archives_has_no_tag_plans(self, tmp_path):
         remote = _bare(tmp_path / "mirror.git")
         root = tmp_path / "mono"
@@ -292,6 +344,55 @@ class TestThroughTheCommand:
         _cmd_mirror({"project": "mylib", "dry-run": False}, project_root=root)
         assert observe(remote, str(root), "mylib").state == "converged"
         assert "v1.0.0" in remote_tag_commits(remote_refs(remote, str(root)))
+
+    def test_a_never_released_version_is_named_as_such_in_the_plan(
+        self, tmp_path, capsys, monkeypatch,
+    ):
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+        archive_release(
+            f"{get_releasable_dir(str(root), 'mylib')}/releases",
+            "0.9.0", "", never_released=True,
+        )
+        monkeypatch.setattr(
+            mirror_cmd, "validate_subtree_remote_ssh_host",
+            lambda remote, root: None,
+        )
+
+        _cmd_mirror({"project": "mylib", "dry-run": True}, project_root=root)
+        out = capsys.readouterr().out
+        assert "tag:v0.9.0: never-released" in out
+        assert "underivable" not in out
+        # The version that really is releasable is judged as usual.
+        assert "tag:v1.0.0" in out
+
+    def test_applying_skips_a_never_released_version_by_name(
+        self, tmp_path, capsys, monkeypatch,
+    ):
+        remote = _bare(tmp_path / "mirror.git")
+        root = tmp_path / "mono"
+        _monorepo(root, remote)
+        archive_release(
+            f"{get_releasable_dir(str(root), 'mylib')}/releases",
+            "0.9.0", "", never_released=True,
+        )
+        gh = _FakeGh()
+        monkeypatch.setattr(
+            mirror_cmd, "validate_subtree_remote_ssh_host",
+            lambda remote, root: None,
+        )
+        monkeypatch.setattr(
+            "rlsbl.utils.run_gh_unscoped", lambda args, **kwargs: gh(args),
+        )
+
+        _cmd_mirror({"project": "mylib", "dry-run": False}, project_root=root)
+
+        err = capsys.readouterr().err
+        assert "0.9.0" in err and "never released" in err
+        tags = remote_tag_commits(remote_refs(remote, str(root)))
+        assert "v0.9.0" not in tags
+        assert "v1.0.0" in tags
 
     def test_the_release_notes_file_is_written_beside_the_release_state(
         self, tmp_path, monkeypatch,

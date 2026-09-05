@@ -632,6 +632,11 @@ class MirrorTagPlan:
         answer for (a commit predating the member's directory -- an absorbed-era
         release -- or one the monorepo no longer has). Reported, never guessed,
         and never fatal to the rest of the reconciliation.
+      * ``"never_released"`` -- the archive records ``never_released = true``:
+        the version NUMBER exists and no release ever used it. Not a failure to
+        derive anything, so it is its own state rather than an ``underivable``
+        one: there is no commit to restore, nothing shipped under this number,
+        and there is nothing for the mirror to carry.
     """
 
     version: str
@@ -666,7 +671,10 @@ def observe_tags(remote, root, project_path, *, releases_dir, changes_dir,
         version_notes,
     )
     from ...release_file import list_archived_versions
-    from ...release_publication import release_commit_from_record
+    from ...release_publication import (
+        release_commit_from_record,
+        version_never_released,
+    )
 
     versions = list_archived_versions(releases_dir)
     if not versions:
@@ -685,6 +693,15 @@ def observe_tags(remote, root, project_path, *, releases_dir, changes_dir,
             plans.append(MirrorTagPlan(
                 version=version, tag=tag, state="present",
                 remote_commit=tags[tag],
+            ))
+            continue
+        # Asked before the commit: a version no release ever used has no
+        # commit either, and reporting it as "the commit could not be derived"
+        # would send the operator looking for a candidate_sha to restore that
+        # never existed.
+        if version_never_released(releases_dir, version):
+            plans.append(MirrorTagPlan(
+                version=version, tag=tag, state="never_released",
             ))
             continue
         release_commit = release_commit_from_record(releases_dir, version)
@@ -737,6 +754,20 @@ def tag_verdict_item(plan):
             actions=(
                 f"apply would push {plan.tag} at {plan.split_sha[:12]} and "
                 f"create the mirror's GitHub Release for it.",
+            ),
+            **common,
+        )
+    if plan.state == "never_released":
+        return VerdictItem(
+            summary=(
+                f"{plan.version} was never released -- nothing to mirror."
+            ),
+            detail=(
+                "  Its release archive records never_released = true: the "
+                "version number exists in the release record, but no\n"
+                "  release was ever published under it. Nothing is written "
+                "for it and nothing is missing -- this is not a\n"
+                "  version whose commit could not be derived."
             ),
             **common,
         )
@@ -1210,6 +1241,14 @@ def _apply_tag(plan, remote, root, project_path, *, notes_dir):
 
     if plan.state == "present":
         print(f"Mirror already carries {plan.tag}.")
+        return
+    if plan.state == "never_released":
+        print(
+            f"Skipping {plan.tag}: {plan.version} was never released -- its "
+            f"archive records never_released = true, so nothing shipped under "
+            f"that version number and there is nothing to mirror.",
+            file=sys.stderr,
+        )
         return
     if plan.state == "underivable":
         why = (

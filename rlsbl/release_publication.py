@@ -149,8 +149,14 @@ def release_commit_from_record(releases_dir: str, version: str) -> str | None:
     :func:`rlsbl.release_record.read_entry`: this is asked on repair paths, where the
     tag and the release commit are expected to disagree and the guarded read's
     DISAGREEMENT error would refuse to answer exactly when the answer is needed
-    to end the disagreement. An unrecoverable archive answers None -- there is
-    no commit to name.
+    to end the disagreement.
+
+    Both commitless fates answer None, for different reasons: an
+    ``unrecoverable`` archive records a version that SHIPPED from a commit
+    nothing can name, and a ``never_released`` one records a version NUMBER no
+    release ever used. A caller that must tell the two apart -- to say "the
+    commit could not be derived" rather than "there was never a release here"
+    -- asks :func:`version_never_released` as well.
     """
     from .release_file import archived_release_path, read_release_file
 
@@ -158,9 +164,30 @@ def release_commit_from_record(releases_dir: str, version: str) -> str | None:
     if not os.path.isfile(path):
         return None
     archive = read_release_file(path)
-    if archive.unrecoverable:
+    if archive.unrecoverable or archive.never_released:
         return None
     return archive.candidate_sha
+
+
+def version_never_released(releases_dir: str, version: str) -> bool:
+    """Does *version*'s archive record that no release ever used the number?
+
+    The distinction :func:`release_commit_from_record` cannot draw, because it
+    answers None for every commitless archive: a version that SHIPPED from a
+    commit nothing can name, and a version NUMBER no release ever used, both
+    have no commit to return. A caller deciding what to say about a version --
+    "the commit could not be derived" versus "there was never a release here"
+    -- asks this first.
+
+    False for an absent archive: a version with no record at all is not a
+    version recorded as never released.
+    """
+    from .release_file import archived_release_path, read_release_file
+
+    path = archived_release_path(releases_dir, version)
+    if not os.path.isfile(path):
+        return False
+    return bool(read_release_file(path).never_released)
 
 
 # ---------------------------------------------------------------------------
