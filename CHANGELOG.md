@@ -2,6 +2,31 @@
 
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- **Renamed: the release ledger is now the release record.** The `rlsbl.ledger` module is now `rlsbl.release_record`, and every error message, check result and doc page that said "ledger" now says "the release record" or "the release archives".
+- **Renamed: lineage records are now transition records.** The committed repository-surgery log is written to `transitions.jsonl` (was `lineage.jsonl`), the `rlsbl.lineage` and `rlsbl.lineage_followup` modules are now `rlsbl.transition_record` and `rlsbl.transition_record_followup`, and the mirror reconciler's separate git-ancestry verdict is now `ancestry-undetermined` (was `lineage-undetermined`).
+- **Renamed: the release anchor is now the release commit.** Every message, check result, JSON field and doc that spoke of a release "anchor" now says "release commit": `rlsbl status --json` and `rlsbl unreleased --json` return `nearest_release_commit_tag` / `nearest_release_commit_version` (were `range_anchor_tag` / `range_anchor_version`), an archive is "recorded" or "unrecoverable" rather than "anchored" or "unanchorable", the `rlsbl.anchor_remap` module is now `rlsbl.release_commit_remap`, and the mirror's per-version tag verdict `unanchored` is now `underivable`. The key inside archived release files was renamed too -- `unanchorable` became `unrecoverable` -- as part of the version-fate work shipping in this same release.
+- **Version fate is now a three-state model.** An archived release file records exactly one of: the release commit it shipped from, `unrecoverable = true` (it shipped, from a commit nothing can name), or the new `never_released = true` (the version number exists but no release ever used it). The new optional `shipped_as` records the historical tag spelling a version actually shipped under when it differs from the scheme in effect today. **Breaking:** the marker key is spelled `unrecoverable`; the old `unanchorable` spelling is refused as an unknown key, so an archive carrying it must be renamed.
+- **The transition record gains two event kinds, and its rewrite kind is renamed.** `release-history-closed` records that a member's or releasable's release history is deliberately closed, and `non-version-tag` records one tag deliberately outside the version model; both carry an operator reason. **Breaking:** the rewrite event's kind literal is `release-commit-remap`, and the old `anchor-remap` spelling is refused as an unknown kind.
+
+### Features
+
+- **A version recorded `never_released` keeps its changelog section, annotated as never released.** Such a version can carry finalized changelog files -- entries written and locked before the release was abandoned -- so the section is rendered in full with its own archived description, above a line stating that no release was ever published under that version number.
+
+### Fixes
+
+- **A version recorded `never_released` is no longer mistaken for a release.** It is skipped by the latest-release fact, the unreleased range, and the checkout-contains-latest refusal. `rlsbl release undo` descends past it to the real latest release instead of selecting the phantom and dying on its commitless archive; the `unpublished-refs` check stops demanding refs and a GitHub Release for it; and `rlsbl release reconcile` skips it while claiming the refs it would have owned, so a tag carrying its name can no longer fire the tripwire. `rlsbl status --json` gains `latest_release_state` and `never_released_versions`.
+- **A release archive that cannot be read now stops changelog generation instead of silently emptying a version's description.** The archive read behind every regenerated section went through a raw parse that turned bad TOML, a missing `format_version` gate or a wrong-typed field into an empty description -- which `rlsbl changelog generate` then committed over the version's real prose in both CHANGELOG.md and the read-only per-version `.md`. It goes through the validating reader now and hard-errors naming the file. An absent archive is still empty metadata, as before.
+- **Archive writers refuse a second version fate.** Recording a release commit on an archive that already says `unrecoverable` or `never_released` -- or marking one unrecoverable that says `never_released` -- is now a hard error naming the file and the conflict, instead of silently producing a two-fate archive that every later read rejects.
+- **The release-archive backfill no longer corrupts a never-released archive.** `scripts/backfill_release_anchors.py` recognizes the `never_released` fate as settled and proposes nothing for it, instead of planning an `unrecoverable` marker beside it -- which restores the pass's idempotence on repositories carrying a phantom version.
+- **The mirror plan names a never-released version for what it is.** A version whose archive records `never_released` now gets its own `never-released` verdict (nothing shipped under that number, so there is nothing to mirror) instead of `underivable`, which told the operator to go restore a release commit that never existed.
+- **`rlsbl release resume` re-checks the release file.** A hand-authored `candidate_sha`, `tree_hashes`, `unrecoverable`, `never_released` or `shipped_as` in `unreleased.toml` now aborts a resume before the mutating phase, the same way it aborts `rlsbl release run` -- previously a resume archived it as the version's permanent record.
+- Documentation: the release-workflow page describes the flow-owned field set by reference to its one authority (rather than as a closed pair), states that the backfill pass is idempotent over a never-released archive too, and the reconcile helper's docstring names all three version fates.
+- **A never-released pre-release is annotated in CHANGELOG.md.** When a stable version's section consolidates its pre-release cycle, a pre-release whose archive records `never_released` now carries the never-released note in its own sub-section, instead of reading as a release that happened.
+
 ## 0.119.0
 
 The post-campaign rulings batch: the release file becomes the only way to state release intent (--bump/--description/--preid deleted), monorepo release init --packages becomes --releasables, monorepo add creates the releasable it names, unpublished-refs checks GitHub Release presence, Flutter joins import analysis, releasable state-dir commits attribute to their releasable, and unreadable Gradle dependency lines fail closed in CI filter derivation with a workable depends_on remedy.
@@ -3873,7 +3898,7 @@ Go project support: scaffolding with GoReleaser, CI and publish workflows, name 
 
 ## 0.3.1
 
-Housekeeping release with no user-facing changes. It was never tagged and its commits no longer resolve in the current history, so its archive records no anchor.
+Housekeeping release with no user-facing changes. It was never tagged and its commits no longer resolve in the current history, so its archive records no release commit.
 
 - No user-facing changes.
 
