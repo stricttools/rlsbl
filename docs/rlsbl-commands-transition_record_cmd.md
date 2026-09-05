@@ -1,6 +1,6 @@
 ---
 title: rlsbl.commands.transition_record_cmd
-description: "The command behind rlsbl transition record: which two kinds it writes, which record file it appends to, and the duplicate and empty-reason refusals."
+description: "The command behind rlsbl transition record: which two kinds it writes, which record file it appends to, and the duplicate-declaration refusal it answers with."
 generated: true
 nav_group: "API Reference"
 nav_order: 74
