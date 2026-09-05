@@ -253,6 +253,75 @@ class TestRemoveFromReleased:
         mock_sync.assert_not_called()
 
 
+class TestRewritePreservesFileMode:
+    """A rewrite must not change WHAT the file is, only what it says.
+
+    The atomic rewrite behind `remove` and `edit` used to pin 0o600 -- the mode
+    the older hand-rolled mkstemp write happened to leave -- so an ordinary
+    0o644 changelog silently became owner-only the first time anyone edited or
+    removed an entry. `remap` already carries the same guarantee
+    (``preserve_mode=True``); these pin it for the other two writers.
+    """
+
+    def test_removing_from_unreleased_keeps_the_files_mode(self, rlsbl_repo):
+        sha = _make_commit(rlsbl_repo, "a.txt")
+        other = _make_commit(rlsbl_repo, "b.txt")
+        _add_unreleased_entry(rlsbl_repo, sha, description="Dropped")
+        _add_unreleased_entry(rlsbl_repo, other, description="Kept")
+        path = os.path.join(get_changes_dir(str(rlsbl_repo)), "unreleased.jsonl")
+        os.chmod(path, 0o644)
+
+        cmd_remove(
+            {"commits": sha, "auto-commit": False}, project_root=rlsbl_repo,
+        )
+
+        assert os.stat(path).st_mode & 0o777 == 0o644
+
+    def test_editing_an_unreleased_entry_keeps_the_files_mode(self, rlsbl_repo):
+        from rlsbl.commands.changelog_cmd import cmd_edit
+
+        sha = _make_commit(rlsbl_repo, "a.txt")
+        _add_unreleased_entry(rlsbl_repo, sha, description="Before")
+        path = os.path.join(get_changes_dir(str(rlsbl_repo)), "unreleased.jsonl")
+        os.chmod(path, 0o644)
+
+        cmd_edit(
+            {"commits": sha, "description": "After", "auto-commit": False},
+            project_root=rlsbl_repo,
+        )
+
+        assert os.stat(path).st_mode & 0o777 == 0o644
+        assert [e.description for e in _unreleased_entries(rlsbl_repo)] == ["After"]
+
+    def test_an_unlocked_released_file_keeps_its_mode(self, rlsbl_repo):
+        """A released JSONL someone already unlocked must not narrow either.
+
+        ``writable_jsonl`` relocks a file it found read-only, so the 0o600 was
+        invisible there -- but a released file sitting at 0o644 goes through the
+        same rewrite with no relock to hide the narrowing.
+        """
+        sha = _make_commit(rlsbl_repo, "a.txt")
+        other = _make_commit(rlsbl_repo, "b.txt")
+        jsonl_path = _create_released_jsonl(rlsbl_repo, "1.0.0", [
+            {"commits": [sha], "user_facing": True,
+             "description": "Gone", "type": "feature"},
+            {"commits": [other], "user_facing": True,
+             "description": "Stays", "type": "fix"},
+        ])
+        os.chmod(str(jsonl_path), 0o644)
+
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files"), \
+                mock.patch(
+                    "rlsbl.commands.changelog_cmd._sync_github_release"
+                ):
+            cmd_remove(
+                {"commits": sha, "auto-commit": False},
+                project_root=rlsbl_repo,
+            )
+
+        assert os.stat(str(jsonl_path)).st_mode & 0o777 == 0o644
+
+
 class TestRemoveRefusals:
 
     def test_zero_matches_is_a_hard_error(self, rlsbl_repo, capsys):

@@ -876,11 +876,14 @@ def _refuse_no_match(id_filter, resolved_search):
 def _rewrite_entries(target_path, entries):
     """Atomically rewrite a JSONL file to hold exactly *entries*.
 
-    ``file_mode`` pins the 0o600 the mkstemp-based hand-rolled write produced;
-    a released file is relocked by :func:`writable_jsonl` around the call.
+    ``preserve_mode``: a rewrite changes what the file SAYS, never what it is.
+    Pinning 0o600 here (the mode the older mkstemp-based hand-rolled write
+    happened to leave) turned an ordinary 0o644 changelog into an owner-only
+    one the first time an edit or a removal touched it. A released file is
+    relocked by :func:`writable_jsonl` around the call regardless.
     """
     content = "".join(serialize_entry(e) + "\n" for e in entries)
-    effects.atomic_write_text(target_path, content, file_mode=0o600)
+    effects.atomic_write_text(target_path, content, preserve_mode=True)
 
 
 def _finish_released_write(ws_context, project_root, changes_dir, file_path,
