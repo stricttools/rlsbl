@@ -98,10 +98,14 @@ class TestStatusCommitsAheadStandalone:
         assert len(warning_lines) == 1, f"expected one warning, got {warning_lines!r}"
         warning = warning_lines[0]
         assert "3 commits ahead of v1.0.0" in warning
-        assert "rlsbl release" in warning
+        # The whole invocation, not the bare group: `rlsbl release` alone
+        # prints the group's help, and `release run` refuses without its two
+        # required booleans.
+        assert "rlsbl release run" in warning
+        assert "--no-allow-dirty" in warning and "--watch" in warning
         # The separator is an em-dash (U+2014), not a double hyphen.
-        assert "— run `rlsbl release`" in warning
-        assert "-- run `rlsbl release`" not in warning
+        assert "— run `rlsbl release run" in warning
+        assert "-- run `rlsbl release run" not in warning
 
     def test_singular_form_for_one_commit(self, mock_git_repo, capsys):
         """A single unreleased commit uses 'commit' (singular), not 'commits'."""

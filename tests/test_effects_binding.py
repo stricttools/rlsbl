@@ -63,6 +63,7 @@ EXPECTED_EFFECTS = {
     "changelog.generate": "mutating",
     "changelog.amend": "mutating",
     "changelog.edit": "mutating",
+    "changelog.remove": "mutating",
     "changelog.remap": "mutating",
     "monorepo.init": "mutating",
     "monorepo.add": "mutating",
