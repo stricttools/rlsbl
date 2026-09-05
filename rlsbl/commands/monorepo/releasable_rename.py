@@ -349,10 +349,11 @@ def _check_no_inflight(root, releasables):
 def _announce_rename(old, new, alias_tag):
     """Print what the rename is about to do, before any mutation.
 
-    An announcement, not a gate.  `monorepo rename-releasable` is not
-    `consequential`: the local half is an ordinary commit, and the only thing
-    that leaves the repo is one ADDITIVE alias tag that can be deleted.  The
-    flow is idempotent, so a re-run heals a partial rename.
+    An announcement, not the consent step.  Consent belongs to the framework:
+    `monorepo rename-releasable` declares itself `consequential`, so a real run
+    is confirmed before it starts.  This print exists so that confirmation is
+    an informed one -- it names the local rewrite and, when there is one, the
+    alias tag that will be pushed to the remote.
     """
     lines = [
         f"\nRenaming releasable '{old}' -> '{new}':",

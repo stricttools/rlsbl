@@ -2378,7 +2378,13 @@ def cmd_mono_cleanup(ctx):
     run_cleanup_command(ws_root, dry_run=dry_run)
 
 
-@mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: re-running heals a crash between the commit and the tag push.", effect="mutating")
+# Consequential: the rename declares a fact about this repository's history --
+# a boundary-alias event in the releasable's transition record -- creates the
+# alias tag and pushes it to origin, and changes the tag scheme every future
+# release of the releasable uses. Declaring what the history IS, writing a ref
+# to the shared remote, and re-deciding the naming of every version to come are
+# a human's call, never an agent's.
+@mono.command(name="rename-releasable", help="Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: re-running heals a crash between the commit and the tag push.", effect="mutating", consequential=True)
 @strictcli.arg(name="old_name", help="Current name of the releasable group in workspace.toml", presence="required")
 @strictcli.arg(name="new_name", help="New name for the releasable group in workspace.toml and state directories", presence="required")
 @effects.handler

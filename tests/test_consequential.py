@@ -52,6 +52,7 @@ CONSEQUENTIAL = {
     "monorepo absorb":            "rewrites another repo's history and merges it in",
     "monorepo extract":           "deletes the extracted members and the releasable's release state from this repository, and commits that",
     "monorepo release run":       "release run, once per package, in one sweep",
+    "monorepo rename-releasable": "declares a repository-history fact, pushes an alias tag to origin, and changes the tag scheme every future release of the releasable uses",
     "transition record":          "declares what this repository's history IS, silencing a reader that would otherwise keep reporting the divergence",
 }
 
@@ -73,7 +74,7 @@ MUST_NOT_PROMPT = [
     "release init", "release edit",
     "monorepo init", "monorepo add", "monorepo sync", "monorepo snapshot",
     "monorepo cleanup",
-    "monorepo rename-releasable", "monorepo release init",
+    "monorepo release init",
     "dev install", "dev sync", "dev status",
     # The rewrite group sweeps the working tree and nothing else. Renaming a
     # module path or flooring a dependency is the operator's own edit, made in
