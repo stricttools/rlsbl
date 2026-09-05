@@ -99,6 +99,30 @@ class TestChangelogWiring:
         assert f["description"] == "New thing"
         assert f["user-facing"] is False
 
+    def test_remove_by_id(self):
+        result, m = _dispatch(
+            ["changelog", "remove", "--id", "01HXYZ", "--no-auto-commit"],
+            "rlsbl.commands.changelog_cmd.cmd_remove",
+        )
+        assert result.exit_code == 0, result.stderr
+        f = _flags(m)
+        assert f["id"] == "01HXYZ"
+        assert f["commits"] is None
+        assert f["auto-commit"] is False
+        assert f["dry-run"] is False
+
+    def test_remove_by_commits(self):
+        result, m = _dispatch(
+            ["changelog", "remove", "--commits", "abc123,def456"],
+            "rlsbl.commands.changelog_cmd.cmd_remove",
+        )
+        assert result.exit_code == 0, result.stderr
+        f = _flags(m)
+        assert f["commits"] == "abc123,def456"
+        assert f["id"] is None
+        # The opt-out boolean's absence resolves to the fallback its help names.
+        assert f["auto-commit"] is True
+
     def test_generate(self):
         result, m = _dispatch(
             ["changelog", "generate", "--no-auto-commit"],

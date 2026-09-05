@@ -4,6 +4,7 @@
   "changelog.edit",
   "changelog.generate",
   "changelog.remap",
+  "changelog.remove",
   "check",
   "check-name",
   "claim-name",

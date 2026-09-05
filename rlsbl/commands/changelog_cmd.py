@@ -782,6 +782,122 @@ def cmd_amend(flags, project_root):
     commit_files(commit_msg, changed_files, allow_failure=True)
 
 
+def _resolve_selector_commits(commits_raw):
+    """Resolve a ``--commits`` selector string to the full SHAs it names.
+
+    Shared by ``changelog edit`` and ``changelog remove``: both address an
+    existing entry by the commits it covers, and both must resolve an
+    abbreviated hash the same way before comparing it against what the JSONL
+    stores (always full SHAs).
+    """
+    commits = [h.strip() for h in commits_raw.split(",") if h.strip()]
+    if not commits:
+        print("Error: --commits must contain at least one hash.", file=sys.stderr)
+        sys.exit(1)
+
+    resolved = []
+    for h in commits:
+        full = resolve_hash(h)
+        if full is None:
+            print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
+            sys.exit(1)
+        resolved.append(full)
+    return resolved
+
+
+def _find_entry_matches(changes_dir, *, id_filter=None, search_set=frozenset()):
+    """Every entry an ``--id`` or ``--commits`` selector addresses.
+
+    Returns a list of ``(file_path, line_index, entry, version_or_none)``,
+    unreleased.jsonl first and then the versioned files newest-first, so a
+    caller reporting several matches lists them in a stable order. ``version``
+    is ``None`` for the unreleased file and the bare semver otherwise.
+    """
+    matches = []
+
+    def _entry_matches(entry):
+        if id_filter and entry.id == id_filter:
+            return True
+        if search_set and search_set.intersection(entry.commits):
+            return True
+        return False
+
+    unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
+    if os.path.isfile(unreleased_path):
+        for idx, entry in enumerate(parse_jsonl(unreleased_path)):
+            if _entry_matches(entry):
+                matches.append((unreleased_path, idx, entry, None))
+
+    for version, jsonl_path in list_versioned_files(changes_dir):
+        for idx, entry in enumerate(parse_jsonl(jsonl_path)):
+            if _entry_matches(entry):
+                matches.append((jsonl_path, idx, entry, version))
+
+    return matches
+
+
+def _selector_description(id_filter, resolved_search):
+    """How the selector that produced a match set is named in a message."""
+    if resolved_search:
+        return "--commits " + ", ".join(h[:12] for h in resolved_search)
+    return f"--id {id_filter}"
+
+
+def _refuse_no_match(id_filter, resolved_search):
+    """Exit naming the selector that addressed no entry at all."""
+    if resolved_search:
+        short_hashes = ", ".join(h[:12] for h in resolved_search)
+        print(
+            f"Error: No changelog entry found for commit(s): {short_hashes}",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"Error: No changelog entry found for id: {id_filter}",
+            file=sys.stderr,
+        )
+    sys.exit(1)
+
+
+def _rewrite_entries(target_path, entries):
+    """Atomically rewrite a JSONL file to hold exactly *entries*.
+
+    ``file_mode`` pins the 0o600 the mkstemp-based hand-rolled write produced;
+    a released file is relocked by :func:`writable_jsonl` around the call.
+    """
+    content = "".join(serialize_entry(e) + "\n" for e in entries)
+    effects.atomic_write_text(target_path, content, file_mode=0o600)
+
+
+def _finish_released_write(ws_context, project_root, changes_dir, file_path,
+                           version, *, message, auto_commit, commit_msg):
+    """The tail every write to a RELEASED version's JSONL shares.
+
+    Regenerates CHANGELOG.md at its canonical home, re-syncs that version's
+    GitHub Release notes, and commits the JSONL plus everything the
+    regeneration touched. ``message`` is the one line naming what just happened
+    to the JSONL, printed ahead of the regeneration line.
+    """
+    changelog_outputs = _regenerate_changelog_outputs(
+        ws_context, project_root, changes_dir,
+    )
+    print(message)
+    print("Regenerated CHANGELOG.md")
+
+    # Sync GitHub Release notes (best-effort)
+    _sync_github_release(version)
+
+    if auto_commit:
+        changed_files = [file_path]
+        md_path = os.path.join(changes_dir, f"{version}.md")
+        if os.path.isfile(md_path):
+            changed_files.append(md_path)
+        for changelog_path in changelog_outputs:
+            if os.path.isfile(changelog_path):
+                changed_files.append(changelog_path)
+        commit_files(commit_msg, changed_files, allow_failure=True)
+
+
 def cmd_edit(flags, project_root):
     """Edit an existing changelog entry in unreleased or released JSONL files.
 
@@ -816,61 +932,16 @@ def cmd_edit(flags, project_root):
     id_filter = flags.get("id") or None
     commits_raw = flags.get("commits") or ""
 
-    search_set = set()
-    if commits_raw:
-        commits = [h.strip() for h in commits_raw.split(",") if h.strip()]
-        if not commits:
-            print("Error: --commits must contain at least one hash.", file=sys.stderr)
-            sys.exit(1)
-
-        resolved_search = []
-        for h in commits:
-            full = resolve_hash(h)
-            if full is None:
-                print(f"Error: commit hash does not resolve: {h}", file=sys.stderr)
-                sys.exit(1)
-            resolved_search.append(full)
-        search_set = set(resolved_search)
+    resolved_search = _resolve_selector_commits(commits_raw) if commits_raw else []
 
     # Search for matching entries across all JSONL files
     changes_dir = _resolve_changes_dir(ws_context, project_root)
-    matches = []  # list of (file_path, line_index, entry, version_or_none)
-
-    def _entry_matches(entry):
-        if id_filter and entry.id == id_filter:
-            return True
-        if search_set and search_set.intersection(entry.commits):
-            return True
-        return False
-
-    # Search unreleased.jsonl first
-    unreleased_path = os.path.join(changes_dir, "unreleased.jsonl")
-    if os.path.isfile(unreleased_path):
-        entries = parse_jsonl(unreleased_path)
-        for idx, entry in enumerate(entries):
-            if _entry_matches(entry):
-                matches.append((unreleased_path, idx, entry, None))
-
-    # Then search versioned files (newest first)
-    for version, jsonl_path in list_versioned_files(changes_dir):
-        entries = parse_jsonl(jsonl_path)
-        for idx, entry in enumerate(entries):
-            if _entry_matches(entry):
-                matches.append((jsonl_path, idx, entry, version))
+    matches = _find_entry_matches(
+        changes_dir, id_filter=id_filter, search_set=set(resolved_search),
+    )
 
     if not matches:
-        if commits_raw:
-            short_hashes = ", ".join(h[:12] for h in resolved_search)
-            print(
-                f"Error: No changelog entry found for commit(s): {short_hashes}",
-                file=sys.stderr,
-            )
-        else:
-            print(
-                f"Error: No changelog entry found for id: {id_filter}",
-                file=sys.stderr,
-            )
-        sys.exit(1)
+        _refuse_no_match(id_filter, resolved_search)
 
     # Disambiguate if multiple matches
     if len(matches) > 1:
@@ -957,37 +1028,23 @@ def cmd_edit(flags, project_root):
     def _rewrite_file(target_path):
         all_entries = parse_jsonl(target_path)
         all_entries[line_index] = entry
-        lines = [serialize_entry(e) + "\n" for e in all_entries]
-        content = "".join(lines)
-        # file_mode pins the 0o600 the mkstemp-based hand-rolled write
-        # produced here; released files are relocked by writable_jsonl anyway.
-        effects.atomic_write_text(target_path, content, file_mode=0o600)
+        _rewrite_entries(target_path, all_entries)
 
     if is_released:
         with writable_jsonl(file_path):
             _rewrite_file(file_path)
 
-        # Regenerate CHANGELOG.md at the canonical home (releasable-aware)
-        changelog_outputs = _regenerate_changelog_outputs(
-            ws_context, project_root, changes_dir,
+        desc = entry.description or "entry"
+        _finish_released_write(
+            ws_context,
+            project_root,
+            changes_dir,
+            file_path,
+            version,
+            message=f"Edited entry in {version}.jsonl",
+            auto_commit=flags.get("auto-commit", True),
+            commit_msg=f"changelog: edit {version}: {desc}",
         )
-        print(f"Edited entry in {version}.jsonl")
-        print("Regenerated CHANGELOG.md")
-
-        # Sync GitHub Release notes (best-effort)
-        _sync_github_release(version)
-
-        # Auto-commit
-        if flags.get("auto-commit", True):
-            changed_files = [file_path]
-            md_path = os.path.join(changes_dir, f"{version}.md")
-            if os.path.isfile(md_path):
-                changed_files.append(md_path)
-            for changelog_path in changelog_outputs:
-                if os.path.isfile(changelog_path):
-                    changed_files.append(changelog_path)
-            desc = entry.description or "entry"
-            commit_files(f"changelog: edit {version}: {desc}", changed_files, allow_failure=True)
     else:
         _rewrite_file(file_path)
         print("Edited entry in unreleased.jsonl")
@@ -996,6 +1053,100 @@ def cmd_edit(flags, project_root):
         if flags.get("auto-commit", True):
             desc = entry.description or "entry"
             commit_files(f"changelog: edit unreleased: {desc}", [file_path], allow_failure=True)
+
+
+def cmd_remove(flags, project_root):
+    """Remove one changelog entry from unreleased.jsonl or a released JSONL file.
+
+    Selection is the same as ``changelog edit``'s -- ``--id`` or ``--commits``,
+    resolved by :func:`_find_entry_matches` -- with one deliberate difference:
+    ``edit`` disambiguates several matches with ``--type``, while a removal
+    refuses them. Deleting the wrong line is not correctable by re-running with
+    a better flag, so the ambiguity is reported with every match named and
+    nothing is written.
+
+    The file is rewritten atomically without the removed line. A released file
+    goes through the unlock/relock flow, regenerates CHANGELOG.md and re-syncs
+    that version's GitHub Release notes, exactly as ``amend`` and ``edit`` do.
+
+    Under --dry-run the entry is located and printed but nothing is written: no
+    file rewrite, no CHANGELOG.md regeneration, no GitHub Release sync, no
+    commit.
+    """
+    ws_context = _resolve_workspace_project(project_root)
+
+    id_filter = flags.get("id") or None
+    commits_raw = flags.get("commits") or ""
+    resolved_search = _resolve_selector_commits(commits_raw) if commits_raw else []
+
+    changes_dir = _resolve_changes_dir(ws_context, project_root)
+    matches = _find_entry_matches(
+        changes_dir, id_filter=id_filter, search_set=set(resolved_search),
+    )
+
+    if not matches:
+        _refuse_no_match(id_filter, resolved_search)
+
+    if len(matches) > 1:
+        print(
+            f"Error: {_selector_description(id_filter, resolved_search)} "
+            f"selects {len(matches)} entries, and a removal deletes exactly "
+            f"one. Nothing was written. The matches are:",
+            file=sys.stderr,
+        )
+        for _fp, idx, ent, ver in matches:
+            loc = f"v{ver}" if ver else "unreleased"
+            desc = ent.description or "(no description)"
+            print(
+                f"  [{loc}] {_entry_ref(ent, idx + 1)} type={ent.type}: {desc}",
+                file=sys.stderr,
+            )
+        print(
+            "Name one of them: `rlsbl changelog remove --id <id>`.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    file_path, line_index, entry, version = matches[0]
+    is_released = version is not None
+    location = f"{version}.jsonl" if is_released else "unreleased.jsonl"
+
+    if flags.get("dry-run", False):
+        print(f"Would remove from {location}:")
+        print(serialize_entry(entry))
+        print("(dry-run: no files written)")
+        return
+
+    def _remove_line(target_path):
+        all_entries = parse_jsonl(target_path)
+        del all_entries[line_index]
+        _rewrite_entries(target_path, all_entries)
+
+    desc = entry.description or "entry"
+    auto_commit = flags.get("auto-commit", True)
+
+    if is_released:
+        with writable_jsonl(file_path):
+            _remove_line(file_path)
+        _finish_released_write(
+            ws_context,
+            project_root,
+            changes_dir,
+            file_path,
+            version,
+            message=f"Removed entry from {location}",
+            auto_commit=auto_commit,
+            commit_msg=f"changelog: remove from {version}: {desc}",
+        )
+    else:
+        _remove_line(file_path)
+        print(f"Removed entry from {location}")
+        if auto_commit:
+            commit_files(
+                f"changelog: remove from unreleased: {desc}",
+                [file_path],
+                allow_failure=True,
+            )
 
 
 def _parse_sha_map_lines(lines):
