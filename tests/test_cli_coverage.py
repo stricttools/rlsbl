@@ -1607,21 +1607,31 @@ class TestWatchRetryTimeout:
 
 
 class TestWatchRetryGenericException:
-    """Cover retry generic exception path (lines 117-119)."""
+    """An unexpected error while watching the rerun leaves it UNRESOLVED.
+
+    The error is about the watch, not about the rerun: with the rerun's own
+    state unreadable, nothing was established, so the result is marked
+    unresolved rather than counted as a second failure.
+    """
 
     @patch(f"{MOD_WATCH}.time")
     @patch(f"{MOD_WATCH}.run_gh")
     def test_retry_watch_generic_error(self, mock_run_gh, mock_time, capsys):
-        # In-place rerun: gh run rerun trigger, then gh run watch raises.
+        # In-place rerun: gh run rerun trigger, then gh run watch raises, and
+        # the run-state probe that follows cannot answer either.
         mock_run_gh.side_effect = [
             "",  # gh run rerun trigger
             RuntimeError("unexpected"),  # retry watch fails
+            RuntimeError("unexpected"),  # run-state probe: attempt 1
+            RuntimeError("unexpected"),  # run-state probe: attempt 2
+            RuntimeError("unexpected"),  # run-state probe: attempt 3
         ]
         from rlsbl.commands.watch import _retry_workflow
         result = _retry_workflow("CI", "user/repo", "test", "100")
         assert result is not None
         assert result["passed"] is False
-        assert "retry error" in capsys.readouterr().err
+        assert result["timed_out"] is True
+        assert "retry unresolved" in capsys.readouterr().err
 
 
 class TestWatchSingleRunTimeout:
@@ -1637,14 +1647,48 @@ class TestWatchSingleRunTimeout:
 
 
 class TestWatchSingleRunGenericException:
-    """Cover _watch_single_run generic exception path (lines 168-171)."""
+    """An unexpected error while watching leaves the run UNRESOLVED.
 
+    The error says nothing about the run, and with the run's own state
+    unreadable there is nothing to report but "unresolved": calling it a
+    failure would produce a red verdict on the strength of a broken call.
+    """
+
+    @patch(f"{MOD_WATCH}.time")
     @patch(f"{MOD_WATCH}.run_gh", side_effect=RuntimeError("unexpected"))
-    def test_generic_error(self, _run_gh, capsys):
+    def test_generic_error_is_unresolved(self, _run_gh, _time, capsys):
         from rlsbl.commands.watch import _watch_single_run
         ci_run = {"databaseId": 100, "name": "CI"}
         result = _watch_single_run(ci_run, "test", "user/repo")
         assert result["passed"] is False
+        assert result["timed_out"] is True
+        err = capsys.readouterr().err
+        assert "could not be read" in err
+        assert "unresolved" in err
+
+    @patch(f"{MOD_WATCH}.time")
+    @patch(f"{MOD_WATCH}._retry_workflow", side_effect=RuntimeError("unexpected"))
+    @patch(f"{MOD_WATCH}._fetch_failure_log", return_value="")
+    @patch(f"{MOD_WATCH}.run_gh")
+    def test_a_broken_diagnosis_over_a_real_failure_is_still_red(
+        self, mock_run_gh, _log, _retry, _time, capsys,
+    ):
+        """The run concluded failed, so the verdict stands even when the
+        diagnosis machinery above it breaks."""
+        import json
+
+        def gh(args, **kwargs):
+            if args[:2] == ["run", "watch"]:
+                raise subprocess.CalledProcessError(1, "gh")
+            if args[:1] == ["api"]:
+                return json.dumps({"status": "completed", "conclusion": "failure"})
+            return ""
+
+        mock_run_gh.side_effect = gh
+        from rlsbl.commands.watch import _watch_single_run
+        result = _watch_single_run({"databaseId": 100, "name": "CI"}, "test", "user/repo")
+        assert result["passed"] is False
+        assert result.get("timed_out") is not True
         assert "error: unexpected" in capsys.readouterr().err
 
 

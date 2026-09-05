@@ -555,9 +555,10 @@ class TestAutoRetry:
         """When a workflow fails, _watch_single_run reruns it in place."""
         ci_run = {"databaseId": 100, "name": "CI", "headBranch": "main"}
 
-        # run_gh calls: original watch, log fetch, rerun, retry watch
+        # run_gh calls: original watch, run-state probe, rerun, retry watch
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
             "",  # gh run rerun <id>
             "",  # retry watch (same id) succeeds
         ]
@@ -581,6 +582,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
             "",  # gh run rerun <id>
             "",  # retry watch succeeds
         ]
@@ -598,8 +600,10 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
             "",  # gh run rerun <id>
             subprocess.CalledProcessError(1, "gh"),  # retry watch also fails
+            _run_state_json("completed", "failure"),  # GitHub: the rerun failed too
         ]
 
         with patch("rlsbl.commands.watch._fetch_failure_log",
@@ -620,6 +624,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
             "",  # gh run rerun <id>
             "",  # retry watch succeeds
         ]
@@ -640,6 +645,7 @@ class TestAutoRetry:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
             subprocess.CalledProcessError(1, "gh"),  # gh run rerun trigger fails
         ]
 
@@ -889,6 +895,10 @@ class TestRetryDedup:
                 with lock:
                     rerun_count += 1
                 return ""
+            elif args[:1] == ["api"]:
+                # The run's own state, which is what makes a non-zero watch
+                # exit readable as a failure at all.
+                return _run_state_json("completed", "failure")
             elif args[:2] == ["run", "view"]:
                 return "read tcp: i/o timeout"  # transient tail -> retry gate opens
             return ""
@@ -965,6 +975,8 @@ class TestLatePollRetryDedup:
                 with lock:
                     rerun_count += 1
                 return ""
+            if args[:1] == ["api"]:
+                return _run_state_json("completed", "failure")
             if args[:2] == ["run", "view"]:
                 return "read tcp: i/o timeout"  # transient tail
             return ""
@@ -1027,6 +1039,8 @@ class TestLatePollRetryDedup:
                 with lock:
                     rerun_count += 1
                 return ""
+            if args[:1] == ["api"]:
+                return _run_state_json("completed", "failure")
             if args[:2] == ["run", "view"]:
                 return "read tcp: i/o timeout"  # transient tail
             return ""
@@ -1060,6 +1074,7 @@ class TestRerunFailureLogTail:
         mock_run_gh.side_effect = [
             "",                                      # gh run rerun <id>
             subprocess.CalledProcessError(1, "gh"),  # retry watch fails
+            _run_state_json("completed", "failure"),  # GitHub: the rerun failed
         ]
 
         with patch("rlsbl.commands.watch._fetch_failure_log",
@@ -1083,6 +1098,7 @@ class TestRerunFailureLogTail:
         mock_run_gh.side_effect = [
             "",                                      # gh run rerun <id>
             subprocess.CalledProcessError(1, "gh"),  # retry watch fails
+            _run_state_json("completed", "failure"),  # GitHub: the rerun failed
         ]
 
         with patch("rlsbl.commands.watch._fetch_failure_log",
@@ -1270,6 +1286,7 @@ class TestRetryClassification:
         det_log = "short test summary info\nFAILED tests/test_x.py::test_y - assert"
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),  # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
         ]
 
         with patch("rlsbl.commands.watch._fetch_failure_log", return_value=det_log):
@@ -1277,8 +1294,12 @@ class TestRetryClassification:
 
         assert result["passed"] is False
         assert result["run_id"] == "100"
-        # One gh call, the watch itself -- NO retry trigger.
-        assert mock_run_gh.call_count == 1
+        # Two gh calls -- the watch and the run-state probe that confirms it
+        # really failed -- and NO retry trigger.
+        assert mock_run_gh.call_count == 2
+        assert not any(
+            c[0][0][:2] == ["run", "rerun"] for c in mock_run_gh.call_args_list
+        )
         err = capsys.readouterr().err
         assert "failure log tail:" in err
         assert "FAILED tests/test_x.py" in err  # tail is printed
@@ -1293,6 +1314,7 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),   # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
             "",                                       # gh run rerun <id>
             "",                                       # retry watch (same id) succeeds
         ]
@@ -1316,6 +1338,7 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),   # original watch fails
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
             "",                                       # gh run rerun <id>
             "",                                       # retry watch (same id) succeeds
         ]
@@ -1338,6 +1361,7 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),          # original watch fails
+            _run_state_json("completed", "failure"),         # GitHub: it really failed
             "",                                              # gh run rerun <id>
             "",                                              # retry watch (same id) succeeds
         ]
@@ -1362,6 +1386,7 @@ class TestRetryClassification:
 
         mock_run_gh.side_effect = [
             subprocess.CalledProcessError(1, "gh"),
+            _run_state_json("completed", "failure"),  # GitHub: it really failed
         ]
 
         with patch("rlsbl.commands.watch._fetch_failure_log",
@@ -1389,12 +1414,26 @@ class TestCIWaitTimeoutVerdict:
         assert result["passed"] is False
         assert result["timed_out"] is True
 
-    @patch("rlsbl.commands.watch.run_gh",
-           side_effect=subprocess.CalledProcessError(1, "gh"))
-    def test_a_generic_error_is_not_marked_as_a_timeout(self, _mock_gh):
-        result = _watch_single_run(
-            {"databaseId": 7, "name": "CI"}, "label", "o/r", timeout=5,
-        )
+    def test_a_real_failure_is_not_marked_as_a_timeout(self):
+        """A run GitHub reports as completed-and-failed is red, not unresolved.
+
+        Only that state is: a bare non-zero `gh run watch` exit says nothing
+        about the run (see TestATransientWatchErrorIsNotAVerdict).
+        """
+        def gh(args, **kwargs):
+            if args[:2] == ["run", "watch"]:
+                raise subprocess.CalledProcessError(1, "gh")
+            if args[:1] == ["api"]:
+                return _run_state_json("completed", "failure")
+            return ""
+
+        with patch("rlsbl.commands.watch.run_gh", side_effect=gh), \
+                patch("rlsbl.commands.watch._fetch_failure_log",
+                      return_value="short test summary info"):
+            result = _watch_single_run(
+                {"databaseId": 7, "name": "CI"}, "label", "o/r", timeout=5,
+            )
+        assert result["passed"] is False
         assert result.get("timed_out") is not True
 
     def test_verdict_aggregation(self):
@@ -1721,3 +1760,264 @@ class TestReleaseLabelResolution:
         monkeypatch.chdir(bare)
 
         assert _release_at(sha) is None
+
+
+def _run_state_json(status, conclusion=None):
+    """The payload GitHub's run object carries, as ``gh api`` returns it."""
+    return json.dumps({
+        "id": 100, "status": status, "conclusion": conclusion, "run_attempt": 1,
+    })
+
+
+class TestATransientWatchErrorIsNotAVerdict:
+    """A non-zero `gh run watch` exit is not, by itself, a failed run.
+
+    Regression (observed live): a release's in-process CI wait watched a run
+    that was still IN PROGRESS. `gh run watch --exit-status` exited non-zero
+    because gh itself could not carry the watch through -- the same outage made
+    the follow-up `gh api .../runs/<id>` fail and made `gh run rerun <id>` fail
+    (GitHub refuses to rerun a run that is still running). The watcher read
+    that exit as "the run failed", the release reported a red CI verdict, and
+    the run concluded GREEN minutes later. Only a run GitHub reports as
+    completed with a non-success conclusion may be read as failed.
+    """
+
+    @staticmethod
+    def _gh(watch_outcomes, state):
+        """A `gh` stand-in: `run watch` yields *watch_outcomes* in order.
+
+        *state* is what `gh api .../runs/<id>` answers -- a JSON string, or an
+        exception instance to raise. Every call is recorded on ``.calls``.
+        """
+        calls = []
+        remaining = list(watch_outcomes)
+
+        def side_effect(args, **kwargs):
+            calls.append(args)
+            if args[:2] == ["run", "watch"]:
+                # The last outcome repeats, so a test can say "every attempt
+                # drops out" with one entry.
+                outcome = remaining[0] if len(remaining) == 1 else remaining.pop(0)
+                if isinstance(outcome, Exception):
+                    raise outcome
+                return outcome
+            if args[:1] == ["api"]:
+                if isinstance(state, Exception):
+                    raise state
+                return state
+            if args[:2] == ["repo", "view"]:
+                return json.dumps({"nameWithOwner": "user/repo", "name": "repo"})
+            if args[:2] == ["run", "rerun"]:
+                return ""
+            raise AssertionError(f"unexpected gh call: {args}")
+
+        side_effect.calls = calls
+        return side_effect
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_an_in_progress_run_is_waited_out_not_failed(
+        self, mock_run_gh, _mock_time, capsys,
+    ):
+        """The exact live shape: the watch drops out, the run is in progress,
+        and the resumed watch sees it pass."""
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh"), ""],
+            _run_state_json("in_progress"),
+        )
+        mock_run_gh.side_effect = gh
+
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   return_value="") as mock_log:
+            result = _watch_single_run(
+                {"databaseId": 100, "name": "CI"}, "label", "user/repo",
+                timeout=600,
+            )
+
+        assert result["passed"] is True
+        assert not any(c[:2] == ["run", "rerun"] for c in gh.calls), (
+            "a run that never concluded must never be handed to `gh run rerun`"
+        )
+        mock_log.assert_not_called()
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_a_run_that_concluded_success_is_not_read_as_failed(
+        self, mock_run_gh, _mock_time,
+    ):
+        """gh exited non-zero over a run that GitHub says succeeded."""
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh")],
+            _run_state_json("completed", "success"),
+        )
+        mock_run_gh.side_effect = gh
+
+        result = _watch_single_run(
+            {"databaseId": 100, "name": "CI"}, "label", "user/repo", timeout=600,
+        )
+
+        assert result["passed"] is True
+        assert not any(c[:2] == ["run", "rerun"] for c in gh.calls)
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_an_unreadable_state_is_unresolved_never_failed(
+        self, mock_run_gh, _mock_time,
+    ):
+        """The live case where the state probe itself failed: rlsbl established
+        nothing, so the result is unresolved, not red."""
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh")],
+            subprocess.CalledProcessError(1, "gh"),
+        )
+        mock_run_gh.side_effect = gh
+
+        result = _watch_single_run(
+            {"databaseId": 100, "name": "CI"}, "label", "user/repo", timeout=600,
+        )
+
+        assert result["passed"] is False
+        assert result["timed_out"] is True, (
+            "an unreadable run state resolves nothing; marking it as a plain "
+            "failure produces a red verdict rlsbl has no evidence for"
+        )
+        assert not any(c[:2] == ["run", "rerun"] for c in gh.calls)
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_a_run_still_in_progress_is_never_rerun(self, mock_run_gh, _mock_time):
+        """Every watch attempt drops out and the run stays in progress: the
+        answer is unresolved, and `gh run rerun` is never dispatched at a run
+        GitHub would refuse to rerun anyway."""
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh")],
+            _run_state_json("in_progress"),
+        )
+        mock_run_gh.side_effect = gh
+
+        result = _watch_single_run(
+            {"databaseId": 100, "name": "CI"}, "label", "user/repo", timeout=600,
+        )
+
+        assert result["passed"] is False
+        assert result["timed_out"] is True
+        assert not any(c[:2] == ["run", "rerun"] for c in gh.calls)
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_a_completed_failed_run_is_still_red(self, mock_run_gh, _mock_time, capsys):
+        """The correction does not soften a real failure: a completed run with
+        a failure conclusion keeps its red verdict and its diagnosis."""
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh")],
+            _run_state_json("completed", "failure"),
+        )
+        mock_run_gh.side_effect = gh
+
+        with patch("rlsbl.commands.watch._fetch_failure_log",
+                   return_value="short test summary info\nFAILED tests/test_x.py"):
+            result = _watch_single_run(
+                {"databaseId": 100, "name": "CI"}, "label", "user/repo",
+                timeout=600,
+            )
+
+        assert result["passed"] is False
+        assert result.get("timed_out") is not True
+        err = capsys.readouterr().err
+        assert "FAILED" in err
+        assert "deterministic failure detected" in err
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_a_dropped_rerun_watch_is_not_a_second_failure(
+        self, mock_run_gh, _mock_time,
+    ):
+        """The same correction on the retry path: a watch that drops out over a
+        rerun still in progress is resumed, not called a second failure."""
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh"), ""],
+            _run_state_json("in_progress"),
+        )
+        mock_run_gh.side_effect = gh
+
+        result = _retry_workflow("CI", "user/repo", "label", "100")
+
+        assert result is not None
+        assert result["passed"] is True
+
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    def test_an_unresolved_rerun_watch_is_not_red(self, mock_run_gh, _mock_time):
+        """A rerun whose state cannot be read is unresolved, so the aggregate
+        verdict is a timeout rather than a failure."""
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh")],
+            subprocess.CalledProcessError(1, "gh"),
+        )
+        mock_run_gh.side_effect = gh
+
+        result = _retry_workflow("CI", "user/repo", "label", "100")
+
+        assert result["passed"] is False
+        assert result["timed_out"] is True
+        assert _timeout_verdict([result]) == CI_TIMEOUT
+
+    def test_the_release_gate_reports_a_timeout_not_a_red_verdict(self, tmp_path):
+        """End to end through the release's own CI wait: a candidate whose run
+        is still in progress must not be declared red."""
+        wf = tmp_path / ".github" / "workflows"
+        wf.mkdir(parents=True)
+        (wf / "ci.yml").write_text("name: ci\non: push\n")
+
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh")],
+            _run_state_json("in_progress"),
+        )
+
+        with (
+            patch("rlsbl.commands.watch.poll_runs",
+                  side_effect=[[{"databaseId": 100, "name": "CI"}], []]),
+            patch("rlsbl.commands.watch.run_gh", side_effect=gh),
+            patch("rlsbl.commands.watch.time.sleep"),
+        ):
+            verdict, results = wait_for_ci_green(
+                "0" * 40, timeout=600, check_filters=[], repo_root=str(tmp_path),
+                log=lambda _m: None,
+            )
+
+        assert verdict == CI_TIMEOUT, (
+            "a run that never concluded is unresolved: reporting red sends the "
+            "operator to fix code that CI had not judged"
+        )
+        assert results and all(r["timed_out"] for r in results)
+
+    @patch("rlsbl.commands.watch._release_at", return_value=None)
+    @patch("rlsbl.commands.watch._notify")
+    @patch("rlsbl.commands.watch._print_workflow_audit", return_value=False)
+    @patch("rlsbl.commands.watch.poll_runs")
+    @patch("rlsbl.commands.watch.time")
+    @patch("rlsbl.commands.watch.run_gh")
+    @patch("rlsbl.commands.watch.run")
+    def test_the_standalone_watch_command_has_the_same_correction(
+        self, mock_run, mock_run_gh, _mock_time, mock_poll, _mock_audit,
+        _mock_notify, _mock_release,
+    ):
+        """`rlsbl watch` shares the watcher, so it shared the defect: a dropped
+        watch over a run that then passed exited 1 (CI FAILED)."""
+        ci_run = {"databaseId": 100, "name": "CI"}
+        mock_poll.side_effect = [[ci_run], [ci_run]]
+        mock_run.side_effect = ["abc123full"]
+        gh = self._gh(
+            [subprocess.CalledProcessError(1, "gh"), ""],
+            _run_state_json("in_progress"),
+        )
+        mock_run_gh.side_effect = gh
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_cmd(None, ["abc123"], {})
+
+        assert exc_info.value.code == 0, (
+            "the run concluded green; `rlsbl watch` reported CI FAILED because "
+            "gh dropped the watch"
+        )
+        assert not any(c[:2] == ["run", "rerun"] for c in gh.calls)

@@ -49,6 +49,18 @@ STRANDED_LOG = (
 )
 
 
+def _run_state_json(status="completed", conclusion="failure"):
+    """The run object GitHub answers with, as ``gh api`` returns it.
+
+    A non-zero ``gh run watch`` exit is only read as a failure once the run's
+    own state says completed-and-failed, so every test that stages a failed
+    run has to state it here too.
+    """
+    return json.dumps({
+        "status": status, "conclusion": conclusion, "run_attempt": 1,
+    })
+
+
 class TestInfraClassification:
 
     @pytest.mark.parametrize("log", [
@@ -99,6 +111,7 @@ class TestBoundedRerunOfTheFailedJobs:
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),  # the stale run: failed
+                _run_state_json(),                       # GitHub: completed, failure
                 "",                                      # run rerun --failed
                 "",                                      # watching the rerun: green
             ]
@@ -126,8 +139,10 @@ class TestBoundedRerunOfTheFailedJobs:
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),  # the stale run: failed
+                _run_state_json(),                       # GitHub: completed, failure
                 "",                                      # run rerun --failed
                 subprocess.CalledProcessError(1, "gh"),  # the rerun fails too
+                _run_state_json(),                       # GitHub: completed, failure
             ]
             result = _watch_single_run(ci_run, "candidate", "user/repo")
 
@@ -148,6 +163,7 @@ class TestBoundedRerunOfTheFailedJobs:
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),
+                _run_state_json(),
                 "",
                 "",
             ]
@@ -175,6 +191,7 @@ class TestNotRetryingNamesTheRemedy:
                 patch("rlsbl.commands.watch.run_gh") as gh:
             gh.side_effect = [
                 subprocess.CalledProcessError(1, "gh"),
+                _run_state_json(),
             ]
             _watch_single_run(ci_run, "candidate", "user/repo")
 
@@ -221,7 +238,10 @@ class TestResumedGateRecoversFromAStaleInfraRun:
             if args[0] == "api":
                 path = args[-1]
                 if path.endswith("/actions/runs/77"):
-                    return '{"run_attempt": 1}'
+                    # Carries the run's own state as well as its attempt: the
+                    # watcher confirms a non-zero `gh run watch` exit against
+                    # it before reading the run as failed.
+                    return _run_state_json()
                 if "/attempts/1/jobs" in path:
                     return json.dumps({"jobs": [{
                         "id": 4321, "run_id": 77, "run_attempt": 1,

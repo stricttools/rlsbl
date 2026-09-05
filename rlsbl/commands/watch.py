@@ -8,8 +8,9 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from time import monotonic as _monotonic
 
-from ..ci_checks import verify_project_ci_ran
+from ..ci_checks import PASSING_CONCLUSION, verify_project_ci_ran
 from ..release_record import release_at_commit, tag_for_version
 from ..utils import require_tool, run, run_gh
 from .. import effects
@@ -296,7 +297,7 @@ def _fetch_failure_log(run_id, config=None):
     bounded so a mass failure cannot stall the watch. Propagates any exception
     from the gh calls so the caller can emit a loud note.
     """
-    from ..ci_checks import PASSING_CONCLUSION, SKIPPED_CONCLUSION, fetch_run_jobs
+    from ..ci_checks import SKIPPED_CONCLUSION, fetch_run_jobs
 
     jobs = fetch_run_jobs(str(run_id), config=config)
     failed = [
@@ -327,6 +328,143 @@ def _fetch_failure_log(run_id, config=None):
             f"{', '.join(job['name'] for job in failed[_LOG_FETCH_MAX_JOBS:])} ---"
         )
     return "\n".join(sections)
+
+
+# ---------------------------------------------------------------------------
+# Reaching a conclusion about one run
+# ---------------------------------------------------------------------------
+
+# ``gh run watch --exit-status`` exits non-zero for TWO different reasons: the
+# run it watched concluded in failure, and gh itself could not carry the watch
+# through (an API error, a rate limit, an expired credential, a dropped
+# connection). Those are not the same statement, and reading the second as the
+# first is how a release reported a red CI verdict for a run that was still
+# in progress and later concluded green. Every non-zero exit is therefore
+# confirmed against the run's OWN state before it is allowed to be a verdict.
+
+# The run-state probe: how many times to ask, and how long to wait between
+# asks. A single API blip must not decide the question, and the whole probe is
+# bounded so it can never become the wait itself.
+_STATE_PROBE_ATTEMPTS = 3
+_STATE_PROBE_INTERVAL = 2
+
+# A watch that ended early over a run GitHub reports as still running is
+# resumed: the run is demonstrably alive, so there is something to wait for.
+# Bounded by attempts AND by the caller's own budget.
+_WATCH_RECHECK_ATTEMPTS = 6
+_WATCH_RECHECK_INTERVAL = 15
+
+# What a watch reached. "failed" is the only one that is a verdict about the
+# code; "timeout" and "unresolved" both mean the question is still open.
+WATCH_PASSED = "passed"
+WATCH_FAILED = "failed"
+WATCH_TIMEOUT = "timeout"
+WATCH_UNRESOLVED = "unresolved"
+
+
+def _run_state(run_id, config=None):
+    """The run's own status and conclusion as GitHub reports them, or None.
+
+    ``None`` means the question could not be answered -- gh failed, the payload
+    was unreadable, or the run object carried no ``status``. It never means
+    "the run is fine" or "the run failed": a caller that cannot read the state
+    has no verdict to report.
+
+    Read through ``gh api``, keyed by the run id the caller already holds, so
+    it does not depend on the repo-level Actions collections that 404 on some
+    repositories.
+    """
+    for attempt in range(_STATE_PROBE_ATTEMPTS):
+        try:
+            raw = run_gh(
+                ["api", "--method", "GET",
+                 f"repos/{{owner}}/{{repo}}/actions/runs/{run_id}"],
+                config=config, timeout=_LOG_FETCH_TIMEOUT,
+            )
+            data = json.loads(raw or "{}")
+            status = data.get("status")
+            if status:
+                return {"status": status, "conclusion": data.get("conclusion")}
+        except Exception:
+            pass
+        if attempt + 1 < _STATE_PROBE_ATTEMPTS:
+            time.sleep(_STATE_PROBE_INTERVAL)
+    return None
+
+
+def _watch_to_conclusion(run_id, workflow_name, label, timeout, config=None):
+    """Block until *run_id* concludes, and report only what was established.
+
+    Returns one of :data:`WATCH_PASSED`, :data:`WATCH_FAILED`,
+    :data:`WATCH_TIMEOUT` (the caller's budget ran out with the run still
+    going) or :data:`WATCH_UNRESOLVED` (the watch ended early and the run's
+    state could not be read, so nothing was established at all).
+
+    :data:`WATCH_FAILED` is returned ONLY for a run GitHub reports as
+    ``completed`` with a non-success conclusion. A non-zero ``gh run watch``
+    exit over a run that is still queued or in progress means gh dropped the
+    watch, not that the run failed: the watch is resumed instead, within the
+    same budget. A state that cannot be read at all resolves nothing and is
+    reported as such -- guessing "failed" there would fail-forward a release
+    on the strength of a broken API call, and would fire ``gh run rerun`` at a
+    run that is still running (which GitHub refuses anyway).
+
+    The budget is measured on the monotonic clock, so a system clock
+    adjustment mid-wait cannot shrink or extend it.
+    """
+    deadline = _monotonic() + timeout
+    for attempt in range(_WATCH_RECHECK_ATTEMPTS + 1):
+        remaining = int(deadline - _monotonic())
+        if remaining <= 0:
+            return WATCH_TIMEOUT
+        try:
+            # gh run watch blocks until the run completes; --exit-status makes
+            # it exit 1 on failure, which run_gh raises as CalledProcessError.
+            run_gh(["run", "watch", str(run_id), "--exit-status"], timeout=remaining)
+            return WATCH_PASSED
+        except subprocess.TimeoutExpired:
+            return WATCH_TIMEOUT
+        except Exception as exc:
+            state = _run_state(run_id, config=config)
+            if state is None:
+                print(f"rlsbl: {label}: [{workflow_name}] the watch ended early "
+                      f"({exc}) and the run's state could not be read; nothing "
+                      f"was established about it", file=sys.stderr)
+                return WATCH_UNRESOLVED
+            if state["status"] == "completed":
+                if state["conclusion"] == PASSING_CONCLUSION:
+                    print(f"rlsbl: {label}: [{workflow_name}] gh exited non-zero "
+                          f"({exc}) but the run concluded "
+                          f"{PASSING_CONCLUSION}", file=sys.stderr)
+                    return WATCH_PASSED
+                if state["conclusion"]:
+                    return WATCH_FAILED
+            print(f"rlsbl: {label}: [{workflow_name}] the watch ended early "
+                  f"({exc}) but the run is {state['status']}, not concluded; "
+                  f"resuming the watch", file=sys.stderr)
+            if attempt >= _WATCH_RECHECK_ATTEMPTS:
+                break
+            time.sleep(_WATCH_RECHECK_INTERVAL)
+    return WATCH_UNRESOLVED
+
+
+def _unresolved_result(workflow_name, run_id, label, outcome, timeout):
+    """The result record for a run that reached no conclusion.
+
+    Carries ``timed_out`` so :func:`_timeout_verdict` reports
+    :data:`CI_TIMEOUT` rather than :data:`CI_RED`: the runs may still be in
+    flight, and the remedy is to check them and resume, never to fix code that
+    may be perfectly fine.
+    """
+    if outcome == WATCH_TIMEOUT:
+        print(f"rlsbl: {label}: [{workflow_name}] timed out after {timeout}s",
+              file=sys.stderr)
+    else:
+        print(f"rlsbl: {label}: [{workflow_name}] unresolved: the run never "
+              f"concluded where rlsbl could see it. Check it with "
+              f"`gh run view {run_id}` and resume.", file=sys.stderr)
+    return {"name": workflow_name, "passed": False, "timed_out": True,
+            "run_id": str(run_id)}
 
 
 def _retry_workflow(workflow_name, repo_slug, label, failed_run_id,
@@ -366,11 +504,11 @@ def _retry_workflow(workflow_name, repo_slug, label, failed_run_id,
     retry_id = str(failed_run_id)
     print(f"rlsbl: {label}: [{workflow_name}] watching retry run {retry_id}...", file=sys.stderr)
 
-    try:
-        run_gh(["run", "watch", retry_id, "--exit-status"], timeout=3600)
+    outcome = _watch_to_conclusion(retry_id, workflow_name, label, 3600)
+    if outcome == WATCH_PASSED:
         print(f"rlsbl: {label}: [{workflow_name}] retry passed", file=sys.stderr)
         return {"name": workflow_name, "passed": True, "run_id": retry_id}
-    except subprocess.CalledProcessError:
+    if outcome == WATCH_FAILED:
         print(f"rlsbl: {label}: [{workflow_name}] retry also failed", file=sys.stderr)
         if repo_slug:
             print(f"rlsbl: https://github.com/{repo_slug}/actions/runs/{retry_id}",
@@ -389,12 +527,17 @@ def _retry_workflow(workflow_name, repo_slug, label, failed_run_id,
             print(f"rlsbl: {label}: [{workflow_name}] could not fetch retry "
                   f"failure logs: {exc}", file=sys.stderr)
         return {"name": workflow_name, "passed": False, "run_id": retry_id}
-    except subprocess.TimeoutExpired:
-        print(f"rlsbl: {label}: [{workflow_name}] retry timed out after 1h", file=sys.stderr)
-        return {"name": workflow_name, "passed": False, "run_id": retry_id}
-    except Exception as exc:
-        print(f"rlsbl: {label}: [{workflow_name}] retry error: {exc}", file=sys.stderr)
-        return {"name": workflow_name, "passed": False, "run_id": retry_id}
+    if outcome == WATCH_TIMEOUT:
+        print(f"rlsbl: {label}: [{workflow_name}] retry timed out after 1h",
+              file=sys.stderr)
+    else:
+        print(f"rlsbl: {label}: [{workflow_name}] retry unresolved: the rerun "
+              f"never concluded where rlsbl could see it. Check it with "
+              f"`gh run view {retry_id}` and resume.", file=sys.stderr)
+    # Unresolved is not a failure verdict: the rerun may still be running, so
+    # the caller must report it as unresolved rather than red.
+    return {"name": workflow_name, "passed": False, "timed_out": True,
+            "run_id": retry_id}
 
 
 def _watch_single_run(ci_run, label, repo_slug, retried_lock=None,
@@ -412,21 +555,30 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None,
     run_id = str(ci_run["databaseId"])
     workflow_name = ci_run.get("name", f"run {run_id}")
 
-    try:
-        # gh run watch blocks until the run completes;
-        # --exit-status makes it exit 1 on failure; check=True raises
-        # CalledProcessError so we can distinguish pass from fail
-        run_gh(["run", "watch", run_id, "--exit-status"], timeout=timeout)
+    # Only a run GitHub reports as completed-and-failed reaches the failure
+    # path below: everything else is passed, timed out, or unresolved. That
+    # is what keeps `gh run rerun` (which GitHub refuses on a run still in
+    # progress) off a run that never concluded.
+    outcome = _watch_to_conclusion(run_id, workflow_name, label, timeout)
+
+    if outcome == WATCH_PASSED:
         msg = f"rlsbl: {label}: [{workflow_name}] passed"
         print(msg, file=sys.stderr)
         return {"name": workflow_name, "passed": True, "run_id": run_id}
-    except subprocess.CalledProcessError:
-        msg = f"rlsbl: {label}: [{workflow_name}] FAILED"
-        print(msg, file=sys.stderr)
-        if repo_slug:
-            print(f"rlsbl: https://github.com/{repo_slug}/actions/runs/{run_id}",
-                  file=sys.stderr)
 
+    if outcome != WATCH_FAILED:
+        # NOT a failure: the run never concluded where rlsbl could see it.
+        # Marked so the caller reports "unresolved" instead of the
+        # deterministic-failure remedy (see CI_TIMEOUT in wait_for_ci_green).
+        return _unresolved_result(workflow_name, run_id, label, outcome, timeout)
+
+    msg = f"rlsbl: {label}: [{workflow_name}] FAILED"
+    print(msg, file=sys.stderr)
+    if repo_slug:
+        print(f"rlsbl: https://github.com/{repo_slug}/actions/runs/{run_id}",
+              file=sys.stderr)
+
+    try:
         # Fetch the failing step's log tail and classify the failure before
         # retrying. Deterministic failures (test/compile/config/auth errors)
         # recur identically on retry, so we skip the retry entirely. The tail
@@ -493,15 +645,9 @@ def _watch_single_run(ci_run, label, repo_slug, retried_lock=None,
             if retry_result is not None:
                 return retry_result
         return {"name": workflow_name, "passed": False, "run_id": run_id}
-    except subprocess.TimeoutExpired:
-        # NOT a failure: the local wait ran out, the run itself may still be
-        # going. Marked so the caller can report "unresolved" instead of the
-        # deterministic-failure remedy (see CI_TIMEOUT in wait_for_ci_green).
-        msg = f"rlsbl: {label}: [{workflow_name}] timed out after {timeout}s"
-        print(msg, file=sys.stderr)
-        return {"name": workflow_name, "passed": False, "timed_out": True,
-                "run_id": run_id}
     except Exception as exc:
+        # The run's own state already said completed-and-failed, so the verdict
+        # stands even if the diagnosis machinery above broke.
         msg = f"rlsbl: {label}: [{workflow_name}] error: {exc}"
         print(msg, file=sys.stderr)
         return {"name": workflow_name, "passed": False, "run_id": run_id}
@@ -884,8 +1030,11 @@ def wait_for_ci_green(commit_sha, *, timeout, check_filters, log=None,
     - Push-triggered workflows exist but no run appears for the commit within
       the discovery grace -> :class:`CIWaitError` (hard error).
     - Runs appear and conclude -> :data:`CI_GREEN` / :data:`CI_RED` (transient
-      failures retried once, deterministic ones not).
-    - Runs appear but *timeout* expires with some still unresolved ->
+      failures retried once, deterministic ones not). Only a run GitHub
+      reports as ``completed`` with a non-success conclusion is red -- see
+      :func:`_watch_to_conclusion`.
+    - Runs appear but *timeout* expires with some still unresolved, or a watch
+      ends early over a run whose state cannot be read ->
       :data:`CI_TIMEOUT`. Distinct from red on purpose: nothing was proven
       about those runs, so the remedy is to check their status, not to fix
       code that may be perfectly fine.
