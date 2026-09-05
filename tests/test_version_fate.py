@@ -528,7 +528,14 @@ class TestTheRecordAnswersShippedAs:
 # --------------------------------------------------------------------------- #
 
 class TestTheNoFateRemedyPerformedVerbatim:
-    """The archive-records-no-fate error's own four-step recovery."""
+    """The archive-records-no-fate error names one command; it is run here.
+
+    The message used to print a four-step manual procedure -- unlock the 0444
+    archive, hand-write ``candidate_sha`` and a ``[tree_hashes]`` table, relock,
+    re-run -- and this class performed those steps. It names
+    ``rlsbl release backfill`` now, so the remedy performed here is that
+    command, run exactly as the message spells it.
+    """
 
     def _repo_with_a_fateless_archive(self, tmp_path, monkeypatch):
         r = _init_repo(tmp_path / "fateless")
@@ -539,58 +546,50 @@ class TestTheNoFateRemedyPerformedVerbatim:
         releases.mkdir(parents=True)
         archive = releases / "v0.1.0.toml"
         archive.write_text(_BASE)
-        # Locked like every real archive, so step 1 of the remedy is real work.
+        # Locked like every real archive, so the remedy is real work.
         os.chmod(archive, 0o444)
         return r, sha, archive
 
-    def _remedy_lines(self, message):
-        """The exact lines the error tells the operator to append."""
-        sha_line = next(
-            line.strip() for line in message.splitlines()
-            if line.strip().startswith("candidate_sha = ")
-        )
-        assert '"' in sha_line, "the error must name the value to record"
-        return sha_line
+    def _backfill(self, repo):
+        """Run what the error prints: `rlsbl release backfill`."""
+        from pathlib import Path
 
-    def test_performing_the_printed_recovery_clears_the_error(
+        from rlsbl.commands.release_backfill import run_cmd
+        from rlsbl.context import create_context
+
+        run_cmd(
+            {"dry-run": False, "auto-commit": False},
+            ctx=create_context(Path(str(repo))),
+        )
+
+    def test_running_the_named_command_clears_the_error(
         self, tmp_path, monkeypatch,
     ):
-        r, sha, archive = self._repo_with_a_fateless_archive(tmp_path, monkeypatch)
+        r, sha, _archive = self._repo_with_a_fateless_archive(
+            tmp_path, monkeypatch,
+        )
 
         with pytest.raises(ReleaseRecordError) as exc:
             release_record.read_entry(_releases(r), "0.1.0")
         message = str(exc.value)
 
-        # The error derives the value from the version's own tag.
+        # The error states the evidence about this version, and the command.
         assert f'Its tag "v0.1.0" points at {sha}' in message
-        sha_line = self._remedy_lines(message)
-        assert sha in sha_line
+        assert "rlsbl release backfill --dry-run" in message
+        assert "rlsbl release backfill --approve-consequential" in message
 
-        # Step 1: unlock the archive -- "chmod 644 <path>".
-        os.chmod(archive, 0o644)
-        # Step 2: append the release commit, in the form the error printed.
-        #         The tree comes from the command the error names.
-        tree = _git(r, "rev-parse", f"{sha}^{{tree}}")
-        with open(archive, "a", encoding="utf-8") as f:
-            f.write(f"{sha_line}\n[tree_hashes]\n\".\" = \"{tree}\"\n")
-        # Step 3: relock it.
-        os.chmod(archive, 0o444)
+        self._backfill(r)
 
-        # Step 4: re-run the read. The error is gone, and the entry is recorded.
         entry = release_record.read_entry(_releases(r), "0.1.0")
         assert entry.recorded is True
         assert entry.candidate_sha == sha
         assert entry.unrecoverable is False
         assert entry.never_released is False
 
-    def test_the_alternative_the_error_names_also_clears_it(
+    def test_a_tagless_version_is_recorded_unrecoverable_by_the_same_command(
         self, tmp_path, monkeypatch,
     ):
-        """With no tag to derive from, the error offers the marker instead.
-
-        Its words: "record the version as unrecoverable instead (unrecoverable
-        = true, and no candidate_sha/tree_hashes)".
-        """
+        """With no tag and no version-bump commit, the pass records the marker."""
         r = _init_repo(tmp_path / "tagless")
         monkeypatch.chdir(r)
         _commit(r, "one")
@@ -602,15 +601,51 @@ class TestTheNoFateRemedyPerformedVerbatim:
 
         with pytest.raises(ReleaseRecordError) as exc:
             release_record.read_entry(_releases(r), "0.1.0")
-        assert f"{UNRECOVERABLE_FIELD} = true" in str(exc.value)
+        message = str(exc.value)
+        assert "does not exist locally" in message
+        assert "unrecoverable" in message
 
-        os.chmod(archive, 0o644)
-        with open(archive, "a", encoding="utf-8") as f:
-            f.write(f"{UNRECOVERABLE_FIELD} = true\n")
-        os.chmod(archive, 0o444)
+        self._backfill(r)
 
         entry = release_record.read_entry(_releases(r), "0.1.0")
         assert entry.unrecoverable is True
+
+    def test_the_alternative_the_error_names_is_declaring_the_fate(
+        self, tmp_path, monkeypatch,
+    ):
+        """"If it was never actually released, declare that FIRST" -- performed.
+
+        The pass cannot tell a never-released version from a released one whose
+        commit is gone, so the error says what only the operator can decide, and
+        how to record it. Declaring it is what the backfill then leaves alone.
+        """
+        r = _init_repo(tmp_path / "phantom")
+        monkeypatch.chdir(r)
+        _commit(r, "one")
+        releases = r / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        archive = releases / "v0.1.0.toml"
+        archive.write_text(_BASE)
+        os.chmod(archive, 0o444)
+
+        with pytest.raises(ReleaseRecordError) as exc:
+            release_record.read_entry(_releases(r), "0.1.0")
+        message = str(exc.value)
+        assert f"{NEVER_RELEASED_FIELD} = true" in message
+        assert "chmod 644" in message and "chmod 444" in message
+
+        os.chmod(archive, 0o644)
+        with open(archive, "a", encoding="utf-8") as f:
+            f.write(f"{NEVER_RELEASED_FIELD} = true\n")
+        os.chmod(archive, 0o444)
+
+        entry = release_record.read_entry(_releases(r), "0.1.0")
+        assert entry.never_released is True
+
+        # And the backfill honours the declaration rather than overwriting it.
+        before = archive.read_bytes()
+        self._backfill(r)
+        assert archive.read_bytes() == before
 
 
 class TestTheEditableFileRemedyPerformedVerbatim:
