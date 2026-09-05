@@ -1044,13 +1044,23 @@
         },
         {
           "level": 2,
+          "text": "release backfill",
+          "anchor": "release-backfill"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-7"
+        },
+        {
+          "level": 2,
           "text": "release reconcile",
           "anchor": "release-reconcile"
         },
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-7"
+          "anchor": "flags-8"
         }
       ]
     },
@@ -8443,6 +8453,28 @@
       ]
     },
     {
+      "path": "rlsbl-commands-release_backfill.md",
+      "title": "rlsbl.commands.release_backfill",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.release_backfill",
+          "anchor": "rlsblcommandsrelease_backfill"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.release_backfill`",
+          "anchor": "rlsblcommandsrelease_backfill"
+        },
+        {
+          "level": 3,
+          "text": "`run_cmd`",
+          "anchor": "run_cmd"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-commands-release_init.md",
       "title": "rlsbl.commands.release_init",
       "type": "doc",
@@ -10735,6 +10767,16 @@
           "level": 3,
           "text": "`_is_shallow`",
           "anchor": "_is_shallow"
+        },
+        {
+          "level": 3,
+          "text": "`tree_rev_spec`",
+          "anchor": "tree_rev_spec"
+        },
+        {
+          "level": 3,
+          "text": "`tree_at`",
+          "anchor": "tree_at"
         },
         {
           "level": 3,
@@ -13251,6 +13293,268 @@
       ]
     },
     {
+      "path": "rlsbl-release_backfill.md",
+      "title": "rlsbl.release_backfill",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.release_backfill",
+          "anchor": "rlsblrelease_backfill"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.release_backfill`",
+          "anchor": "rlsblrelease_backfill"
+        },
+        {
+          "level": 3,
+          "text": "`BackfillError`",
+          "anchor": "backfillerror"
+        },
+        {
+          "level": 3,
+          "text": "`_git`",
+          "anchor": "_git"
+        },
+        {
+          "level": 3,
+          "text": "`rev_parse`",
+          "anchor": "rev_parse"
+        },
+        {
+          "level": 3,
+          "text": "`all_tags`",
+          "anchor": "all_tags"
+        },
+        {
+          "level": 3,
+          "text": "`stash_entries`",
+          "anchor": "stash_entries"
+        },
+        {
+          "level": 3,
+          "text": "`find_bump_commits`",
+          "anchor": "find_bump_commits"
+        },
+        {
+          "level": 3,
+          "text": "`commit_subjects`",
+          "anchor": "commit_subjects"
+        },
+        {
+          "level": 3,
+          "text": "`tree_hashes_at`",
+          "anchor": "tree_hashes_at"
+        },
+        {
+          "level": 3,
+          "text": "`Scope`",
+          "anchor": "scope"
+        },
+        {
+          "level": 4,
+          "text": "`tag_candidates`",
+          "anchor": "tag_candidates"
+        },
+        {
+          "level": 3,
+          "text": "`discover_scopes`",
+          "anchor": "discover_scopes"
+        },
+        {
+          "level": 3,
+          "text": "`repository_transition_record`",
+          "anchor": "repository_transition_record"
+        },
+        {
+          "level": 3,
+          "text": "`archived_versions`",
+          "anchor": "archived_versions"
+        },
+        {
+          "level": 3,
+          "text": "`changelog_versions`",
+          "anchor": "changelog_versions"
+        },
+        {
+          "level": 3,
+          "text": "`ArchiveState`",
+          "anchor": "archivestate"
+        },
+        {
+          "level": 4,
+          "text": "`missing`",
+          "anchor": "missing"
+        },
+        {
+          "level": 4,
+          "text": "`settled_fate`",
+          "anchor": "settled_fate"
+        },
+        {
+          "level": 3,
+          "text": "`read_archive_state`",
+          "anchor": "read_archive_state"
+        },
+        {
+          "level": 3,
+          "text": "`body_is_substantive`",
+          "anchor": "body_is_substantive"
+        },
+        {
+          "level": 3,
+          "text": "`description_from_body`",
+          "anchor": "description_from_body"
+        },
+        {
+          "level": 3,
+          "text": "`lead_paragraph`",
+          "anchor": "lead_paragraph"
+        },
+        {
+          "level": 3,
+          "text": "`_subject_description`",
+          "anchor": "_subject_description"
+        },
+        {
+          "level": 3,
+          "text": "`Recovery`",
+          "anchor": "recovery"
+        },
+        {
+          "level": 4,
+          "text": "`release_body`",
+          "anchor": "release_body"
+        },
+        {
+          "level": 3,
+          "text": "`recover_description`",
+          "anchor": "recover_description"
+        },
+        {
+          "level": 3,
+          "text": "`derive_bump`",
+          "anchor": "derive_bump"
+        },
+        {
+          "level": 3,
+          "text": "`detect_include`",
+          "anchor": "detect_include"
+        },
+        {
+          "level": 3,
+          "text": "`Override`",
+          "anchor": "override"
+        },
+        {
+          "level": 3,
+          "text": "`read_overrides`",
+          "anchor": "read_overrides"
+        },
+        {
+          "level": 3,
+          "text": "`VersionPlan`",
+          "anchor": "versionplan"
+        },
+        {
+          "level": 4,
+          "text": "`changed`",
+          "anchor": "changed"
+        },
+        {
+          "level": 4,
+          "text": "`key`",
+          "anchor": "key"
+        },
+        {
+          "level": 3,
+          "text": "`UnexplainedTag`",
+          "anchor": "unexplainedtag"
+        },
+        {
+          "level": 4,
+          "text": "`key`",
+          "anchor": "key-1"
+        },
+        {
+          "level": 3,
+          "text": "`Plan`",
+          "anchor": "plan"
+        },
+        {
+          "level": 4,
+          "text": "`changed_versions`",
+          "anchor": "changed_versions"
+        },
+        {
+          "level": 3,
+          "text": "`_scope_for_tag`",
+          "anchor": "_scope_for_tag"
+        },
+        {
+          "level": 3,
+          "text": "`build_plan`",
+          "anchor": "build_plan"
+        },
+        {
+          "level": 3,
+          "text": "`_probe_order`",
+          "anchor": "_probe_order"
+        },
+        {
+          "level": 3,
+          "text": "`_resolutions`",
+          "anchor": "_resolutions"
+        },
+        {
+          "level": 3,
+          "text": "`build_preview`",
+          "anchor": "build_preview"
+        },
+        {
+          "level": 3,
+          "text": "`unexplained_error`",
+          "anchor": "unexplained_error"
+        },
+        {
+          "level": 3,
+          "text": "`stash_error`",
+          "anchor": "stash_error"
+        },
+        {
+          "level": 3,
+          "text": "`apply_version`",
+          "anchor": "apply_version"
+        },
+        {
+          "level": 3,
+          "text": "`apply_item`",
+          "anchor": "apply_item"
+        },
+        {
+          "level": 3,
+          "text": "`apply_plan`",
+          "anchor": "apply_plan"
+        },
+        {
+          "level": 3,
+          "text": "`commit_message`",
+          "anchor": "commit_message"
+        },
+        {
+          "level": 3,
+          "text": "`render`",
+          "anchor": "render"
+        },
+        {
+          "level": 3,
+          "text": "`run`",
+          "anchor": "run"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-release_commit_remap.md",
       "title": "rlsbl.release_commit_remap",
       "type": "doc",
@@ -14161,6 +14465,68 @@
           "level": 3,
           "text": "`_discharge_unsupported`",
           "anchor": "_discharge_unsupported"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-tag_explanation.md",
+      "title": "rlsbl.tag_explanation",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.tag_explanation",
+          "anchor": "rlsbltag_explanation"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.tag_explanation`",
+          "anchor": "rlsbltag_explanation"
+        },
+        {
+          "level": 3,
+          "text": "`TagExplanation`",
+          "anchor": "tagexplanation"
+        },
+        {
+          "level": 4,
+          "text": "`describe`",
+          "anchor": "describe"
+        },
+        {
+          "level": 3,
+          "text": "`TagExplanations`",
+          "anchor": "tagexplanations"
+        },
+        {
+          "level": 4,
+          "text": "`explain`",
+          "anchor": "explain"
+        },
+        {
+          "level": 4,
+          "text": "`explains`",
+          "anchor": "explains"
+        },
+        {
+          "level": 4,
+          "text": "`non_version_tags`",
+          "anchor": "non_version_tags"
+        },
+        {
+          "level": 3,
+          "text": "`shipped_as_index`",
+          "anchor": "shipped_as_index"
+        },
+        {
+          "level": 3,
+          "text": "`non_version_tag_index`",
+          "anchor": "non_version_tag_index"
+        },
+        {
+          "level": 3,
+          "text": "`build`",
+          "anchor": "build"
         }
       ]
     },
@@ -18200,6 +18566,11 @@
         },
         {
           "level": 3,
+          "text": "`cmd_release_backfill`",
+          "anchor": "cmd_release_backfill"
+        },
+        {
+          "level": 3,
           "text": "`ReconcilePlanMode`",
           "anchor": "reconcileplanmode"
         },
@@ -19634,6 +20005,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T00:51:38.392812+00:00",
+  "last_gen": "2026-09-05T01:30:47.668732+00:00",
   "theme": "minimal"
 }
