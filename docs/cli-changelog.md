@@ -110,4 +110,4 @@ The framework enforces these before the command runs.
 
 | Rule | What it requires |
 | --- | --- |
-| `map-source` | At least one of `--map-file` (when non-empty), `--from-journal` (when true), `--stdin` (when true). |
+| `map-source` | At least one of `--map-file` (when supplied), `--from-journal` (when true), `--stdin` (when true). |

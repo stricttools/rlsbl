@@ -6461,6 +6461,11 @@
         },
         {
           "level": 3,
+          "text": "`_listed_releasable`",
+          "anchor": "_listed_releasable"
+        },
+        {
+          "level": 3,
           "text": "`_latest_release_for_row`",
           "anchor": "_latest_release_for_row"
         },
@@ -6847,6 +6852,11 @@
           "level": 3,
           "text": "`_apply_destination`",
           "anchor": "_apply_destination"
+        },
+        {
+          "level": 3,
+          "text": "`carried_member_keys`",
+          "anchor": "carried_member_keys"
         },
         {
           "level": 3,
@@ -18635,8 +18645,18 @@
         },
         {
           "level": 3,
+          "text": "`_refuse_empty`",
+          "anchor": "_refuse_empty"
+        },
+        {
+          "level": 3,
           "text": "`_refuse_empty_flags`",
           "anchor": "_refuse_empty_flags"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_empty_args`",
+          "anchor": "_refuse_empty_args"
         },
         {
           "level": 3,
@@ -20224,6 +20244,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T04:51:02.429790+00:00",
+  "last_gen": "2026-09-05T05:51:10.588667+00:00",
   "theme": "minimal"
 }

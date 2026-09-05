@@ -71,7 +71,7 @@ Unregister a project from the monorepo workspace.toml by its path. This removes 
 
 ## monorepo list
 
-Display all projects registered in the monorepo workspace.toml file. For each project, shows the project name, relative path from the repo root, target registry for publishing, and any configured options such as subtree remotes, inter-project dependencies, and whether the project is marked as a library.
+Display every member registered in the monorepo workspace.toml file, one row each: the member's name, its path relative to the repo root, the releasable it is versioned under (or false when it is opted out of versioning, or -- when it declares none), and the member flags it carries (library, dev-only, test-only). A release target is not among them -- targets are detected from each member's own manifests, never declared in workspace.toml -- and neither is a mirror destination, which belongs to the releasable rather than the member.
 
 **Effect:** read_only
 
