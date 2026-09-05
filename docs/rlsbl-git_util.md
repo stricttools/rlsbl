@@ -1,6 +1,6 @@
 ---
 title: rlsbl.git_util
-description: "The single implementation of git's is-A-an-ancestor-of-B question, plus the commit-level half of file attribution and the subtree-remote SSH host check."
+description: "The single implementation of git's is-A-an-ancestor-of-B question and of the rev spec naming a released path's tree, plus the commit-level half of file attribution and the subtree-remote SSH host check."
 generated: true
 nav_group: "API Reference"
 nav_order: 90

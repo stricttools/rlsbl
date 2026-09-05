@@ -1,6 +1,6 @@
 ---
 title: rlsbl.release_record
-description: "The archived release files, read as the authoritative record of what this project released -- committed, so they survive what a tag namespace does not."
+description: "The archived release files, read as the authoritative record of what this project released -- committed, so they survive what a tag namespace does not, with every read error naming the backfill command that repairs it."
 generated: true
 nav_group: "API Reference"
 nav_order: 141
