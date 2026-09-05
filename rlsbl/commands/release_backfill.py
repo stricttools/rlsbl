@@ -78,6 +78,20 @@ def run_cmd(flags, *, ctx):
             f"written, {len(plan.unexplained)} unexplained tag(s) would refuse "
             f"the apply. Nothing was written."
         )
+        if plan.stash:
+            # Reported, not refused: the stash blocks the APPLY, and a preview
+            # that failed on it would refuse to show a plan the operator can
+            # act on. It is said here so it is not a surprise later.
+            print(
+                f"\n{len(plan.stash)} stash entry/entries are present. They "
+                f"will refuse the apply -- see `git stash list`."
+            )
+        if plan.unexplained:
+            # Non-zero on a preview that found a blocker, exactly like
+            # `rlsbl release reconcile --plan`: an exit code of 0 would tell a
+            # caller the repository is accounted for when it is not.
+            print(f"\nError: {unexplained_error(plan)}", file=sys.stderr)
+            sys.exit(1)
         return
 
     written = state.get("written") or []

@@ -105,13 +105,36 @@ class TestTheRefusals:
         assert "ADOPT IT AS RELEASED" in err
         assert not archive(repo).exists()
 
-    def test_the_same_repository_previews_fine(self, tmp_path, capsys):
+    def test_the_preview_renders_the_whole_plan_and_still_exits_one(
+        self, tmp_path, capsys,
+    ):
+        """Like `release reconcile --plan`: a preview that found a blocker fails.
+
+        Exit 0 here would tell a caller the repository is accounted for when it
+        is not -- but the plan is rendered in full first, so the operator sees
+        what the apply would have done as well as what stands in its way.
+        """
         repo = make_repo(tmp_path)
         git(repo, "tag", "milestone-3")
+        with pytest.raises(SystemExit) as exc:
+            run_cmd({"dry-run": True, "auto-commit": True}, ctx=ctx_for(repo))
+        assert exc.value.code == 1
+        captured = capsys.readouterr()
+        assert "tag milestone-3" in captured.out
+        assert "1 unexplained tag(s) would refuse the apply" in captured.out
+        assert "ADOPT IT AS RELEASED" in captured.err
+        assert not archive(repo).exists()
+
+    def test_a_stash_is_reported_by_the_preview_without_refusing_it(
+        self, tmp_path, capsys,
+    ):
+        repo = make_repo(tmp_path)
+        (repo / "a.txt").write_text("uncommitted\n", encoding="utf-8")
+        git(repo, "stash")
         run_cmd({"dry-run": True, "auto-commit": True}, ctx=ctx_for(repo))
         out = capsys.readouterr().out
-        assert "tag milestone-3" in out
-        assert "1 unexplained tag(s) would refuse the apply" in out
+        assert "stash entry/entries are present" in out
+        assert "will refuse the apply" in out
 
     def test_a_bad_overrides_file_exits_one(self, tmp_path, capsys):
         repo = make_repo(tmp_path)
