@@ -1199,6 +1199,13 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
       classified, which is what makes the publication tripwire fire for a
       repository that has no archives at all.
 
+    A tag the transition record declares a ``non-version-tag`` is claimed too,
+    for the same reason and by the same mechanism: :mod:`rlsbl.tag_explanation`
+    is the one consultation over "is this tag explained?", and a tag an operator
+    deliberately put OUTSIDE the version model is not a release this reconcile
+    has an account of.  Judging it would make the tripwire fire forever on a
+    nightly marker or an imported vendor tag.
+
     Two archive fates are skipped entirely, for different reasons:
 
     * an ``unrecoverable`` version has no commit, so there is nothing to
@@ -1225,11 +1232,22 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
         list_archived_versions,
         read_release_file,
     )
+    from ..tag_explanation import build as build_tag_explanations
 
     items = []
     claimed = set()
     unrecoverable = []
     never_released = []
+
+    # The one consultation over "is this tag explained?". Only the
+    # non-version-tag answer changes anything here: the two archive-backed
+    # sources name a version, which the release-record pass below judges on its
+    # own terms.
+    outside_the_model = build_tag_explanations(
+        transition_record_paths=ref_ctx.transition_record_paths,
+    ).non_version_tags
+    for tag in outside_the_model:
+        claimed.add(f"refs/tags/{tag}")
 
     for version in list_archived_versions(releases_dir):
         path = archived_release_path(releases_dir, version)
@@ -1306,6 +1324,12 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
         items.append(verdict)
 
     preview = Preview(tuple(items))
+    if outside_the_model:
+        print(
+            f"Skipping {len(outside_the_model)} tag(s) recorded outside the "
+            f"version model (not releases, so no verdict is owed): "
+            f"{', '.join(outside_the_model)}"
+        )
     if never_released:
         print(
             f"Skipping {len(never_released)} version(s) recorded never released "

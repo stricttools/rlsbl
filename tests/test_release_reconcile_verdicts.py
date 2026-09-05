@@ -39,6 +39,7 @@ from rlsbl.commands.release_reconcile import (
 )
 from rlsbl.transition_record import (
     IdentityTransitionEvent,
+    NonVersionTagEvent,
     append_event,
     get_transition_record_path,
 )
@@ -284,6 +285,64 @@ class TestNeverReleasedVersions:
         )
         assert refusals(preview) == []
         assert preview.by_key("refs/tags/v1.1.0") is None
+
+
+class TestRecordedNonVersionTags:
+    """A tag an operator put outside the version model is an EXPLAINED ref.
+
+    ``rlsbl.tag_explanation`` is the one consultation, and reconcile is its
+    second consumer: a tag the transition record declares a ``non-version-tag``
+    is not a release, owns no verdict, and must not fire the publication
+    tripwire the way an unaccounted-for divergence does.
+    """
+
+    def _record_event(self, tmp_path, tag, reason):
+        path = get_transition_record_path(str(tmp_path))
+        append_event(path, NonVersionTagEvent(tag=tag, reason=reason))
+        return path
+
+    def _preview_with(self, tmp_path, release_record, *, record_event):
+        if record_event:
+            self._record_event(tmp_path, "nightly", "a nightly build marker")
+        return build_preview(
+            observation=Observation(
+                remote_refs={
+                    **_refs(v1_0_0=NEW),
+                    "refs/tags/nightly": UNRELATED,
+                    "refs/tags/nightly^{}": UNRELATED,
+                },
+                local_refs={
+                    **_refs(v1_0_0=NEW),
+                    "refs/tags/nightly": OLD,
+                    "refs/tags/nightly^{}": OLD,
+                },
+                releases=frozenset({"v1.0.0"}), releases_known=True,
+            ),
+            explanations=Explanations(),
+            target=BaseTarget(),
+            # ref_context derives the standalone record's path itself, which
+            # is the same file the event above was appended to.
+            ref_ctx=ref_context(repo_root=str(tmp_path)),
+            releases_dir=str(release_record),
+        )
+
+    def test_without_the_event_the_divergence_trips_the_wire(
+        self, tmp_path, release_record,
+    ):
+        preview = self._preview_with(
+            tmp_path, release_record, record_event=False,
+        )
+        assert [i.key for i in refusals(preview)] == ["refs/tags/nightly"]
+
+    def test_the_recorded_event_makes_it_an_explained_ref(
+        self, tmp_path, release_record, capsys,
+    ):
+        preview = self._preview_with(tmp_path, release_record, record_event=True)
+        assert refusals(preview) == []
+        assert preview.by_key("refs/tags/nightly") is None
+        out = capsys.readouterr().out
+        assert "outside the version model" in out
+        assert "nightly" in out
 
 
 class TestTheTripwire:
