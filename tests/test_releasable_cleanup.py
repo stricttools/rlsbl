@@ -1041,3 +1041,85 @@ releasable = false
         assert result.status == "fail", result.message
         texts = "\n".join(p.text for p in result.problems)
         assert "core/live" in texts
+
+    def test_a_malformed_transition_record_is_an_error_not_an_empty_exemption(
+        self, tmp_project,
+    ):
+        """An unreadable record is not evidence that nothing was exempted.
+
+        The exemptions come from the repository's transition record. Reading it
+        as "no member is exempt" on a parse failure would be the safe-looking
+        answer and the wrong one -- the record may exempt exactly the member
+        about to be reported -- so the check fails naming the file instead.
+        """
+        from rlsbl.transition_record import repository_transition_record_path
+
+        retired = self._workspace(tmp_project)
+        self._leave_release_state(tmp_project, retired)
+        record = repository_transition_record_path(str(tmp_project))
+        os.makedirs(os.path.dirname(record), exist_ok=True)
+        with open(record, "w", encoding="utf-8") as f:
+            f.write("{not json at all\n")
+
+        result = self._impl()(self._ctx(tmp_project))
+
+        assert result.status == "fail", result.message
+        texts = "\n".join(p.text for p in result.problems)
+        assert "transitions.jsonl" in texts, texts
+        assert "malformed JSON" in texts, texts
+        # The read failure REPLACES the answer instead of riding beside it: a
+        # member list computed without the exemptions is not a partial answer,
+        # it is a wrong one.
+        assert "releases nothing" not in texts, texts
+
+    def test_an_unreadable_tag_namespace_is_stated_in_the_outcome(self, tmp_project):
+        """The tag half of the question was never asked, and the answer says so.
+
+        Without the caveat, a narrower answer ("no misplaced release state")
+        would read as the whole one, while every version tag the member owns
+        went unexamined.
+        """
+        from unittest import mock
+
+        from rlsbl.utils import TagCommitMap
+
+        self._workspace(tmp_project)
+        unreadable = TagCommitMap({}, error="the local tag namespace was not readable")
+
+        with mock.patch("rlsbl.utils.local_tag_commits", return_value=unreadable):
+            result = self._impl()(self._ctx(tmp_project))
+
+        # It rides a PASSING outcome too -- that is the case where a reader
+        # would otherwise take the narrower answer for the whole one.
+        assert result.status == "pass", result.message
+        assert "version tags were NOT examined" in result.message, result.message
+        assert "not readable" in result.message
+
+    def test_the_remedy_runs_as_written_through_the_cli(self, tmp_project):
+        """The finding prints an invocation; this runs that invocation.
+
+        The sibling test drives the same remedy through the command's module
+        function, which cannot see the flag names, the elected member or the
+        confirmation the operator actually types.
+        """
+        import shlex
+
+        from rlsbl import app
+
+        retired = self._workspace(tmp_project)
+        self._leave_release_state(tmp_project, retired)
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "fail"
+
+        remedies = [
+            text[text.index("rlsbl transition record"):].rstrip(".")
+            for text in (p.text for p in result.problems)
+            if "rlsbl transition record" in text
+        ]
+        assert len(remedies) == 1, remedies
+
+        argv = shlex.split(remedies[0])[1:] + ["--approve-consequential"]
+        run = app.test(argv)
+        assert run.exit_code == 0, run.stderr
+
+        assert self._impl()(self._ctx(tmp_project)).status == "pass"
