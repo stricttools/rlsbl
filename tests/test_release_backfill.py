@@ -293,6 +293,51 @@ class TestMissingArchive:
             assert source in text, source
 
 
+class TestDetectIncludeSwallowsOnlyItsOwnFailures:
+    """A soft source must not swallow the harness that watches it.
+
+    ``include`` is a best-effort observation -- the historical target set is not
+    recoverable, so an unreadable config yields an empty list rather than
+    stopping the pass. A blanket ``except Exception`` also swallowed
+    ``ObserveWriteError``, the effects layer's refusal of a write attempted
+    during an observation, which is a defect report about rlsbl itself and must
+    never be absorbed by the code that triggered it.
+    """
+
+    def _scope(self, tmp_path):
+        from rlsbl.targets.base import BaseTarget
+        from rlsbl.targets.refs import ref_context
+
+        return backfill.Scope(
+            label="standalone",
+            releases_dir=str(tmp_path / ".rlsbl" / "releases"),
+            changes_dir=str(tmp_path / ".rlsbl" / "changes"),
+            changelog_md=str(tmp_path / "CHANGELOG.md"),
+            released_paths=["."],
+            target=BaseTarget(),
+            ref_ctx=ref_context(repo_root=str(tmp_path)),
+        )
+
+    def test_an_unreadable_config_yields_no_targets(self, tmp_path, monkeypatch):
+        from rlsbl.errors import ConfigError
+
+        def boom(*_a, **_k):
+            raise ConfigError("no targets declared anywhere")
+
+        monkeypatch.setattr("rlsbl.targets.detect_targets", boom)
+        assert backfill.detect_include(str(tmp_path), self._scope(tmp_path)) == []
+
+    def test_an_observation_write_refusal_propagates(self, tmp_path, monkeypatch):
+        from rlsbl.preview_apply import ObserveWriteError
+
+        def boom(*_a, **_k):
+            raise ObserveWriteError("a write was attempted during observation")
+
+        monkeypatch.setattr("rlsbl.targets.detect_targets", boom)
+        with pytest.raises(ObserveWriteError):
+            backfill.detect_include(str(tmp_path), self._scope(tmp_path))
+
+
 class TestThePredecessorIsResolvedUnderEverySpelling:
     """"This version's commits" is a RANGE, and the range's start is a tag.
 

@@ -788,7 +788,18 @@ def derive_bump(version, predecessor):
 
 
 def detect_include(repo, scope):
-    """Target names for a materialized archive, detected at backfill time."""
+    """Target names for a materialized archive, detected at backfill time.
+
+    A soft source: the historical target set is not recoverable, so a project
+    whose config cannot answer contributes an empty list rather than stopping
+    the pass. What it absorbs is exactly that -- a config that does not resolve
+    and a directory that cannot be read. Every other failure propagates,
+    ``ObserveWriteError`` above all: that one is the effects layer refusing a
+    write attempted during an observation, a defect report about rlsbl itself,
+    and swallowing it here would hide the very thing the no-writes screen
+    exists to surface.
+    """
+    from .errors import ConfigError
     from .targets import detect_targets
 
     if scope.released_paths == ["."]:
@@ -797,7 +808,7 @@ def detect_include(repo, scope):
         proj_dir = os.path.join(repo, scope.released_paths[0])
     try:
         return [t.name for t in detect_targets(proj_dir)]
-    except Exception:
+    except (ConfigError, OSError):
         return []
 
 
