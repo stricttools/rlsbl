@@ -149,6 +149,79 @@ class TestCrossFiledEntry:
         assert result.status == "pass", problems
 
 
+class TestToolOwnedCommit:
+    """An in-range commit whose every file is rlsbl's own bookkeeping.
+
+    No member owns a tool-owned path and no releasable claims one outside its
+    own state directory, so there is no owning member's directory to file the
+    entry from. The remedy the cross-filed case prints -- "add it from the
+    owning member's directory" -- names a place that does not exist here, so
+    this case gets its own: the entry is simply removed.
+    """
+
+    def _tool_owned_commit(self, repo):
+        """Commit only into a tool-owned path, then file the entry under alpha."""
+        snapshot = repo / ".rlsbl-monorepo" / "snapshot.json"
+        snapshot.write_text('{"packages": []}\n')
+        run_git(repo, "add", ".rlsbl-monorepo/snapshot.json")
+        run_git(repo, "commit", "-q", "-m", "chore: regenerate the snapshot")
+        sha = git_head(repo)
+        _write_alpha_entry(repo, sha, description="tool-owned change")
+        return sha
+
+    def test_it_says_the_files_are_tool_owned_and_need_no_coverage(
+        self, two_releasables,
+    ):
+        sha = self._tool_owned_commit(two_releasables)
+        result, problems = _range_problems(two_releasables)
+
+        assert result.status != "pass", "the entry must still be flagged"
+        text = " ".join(problems)
+        assert sha[:12] in text
+        assert "outside this changelog's scope" in text
+        assert "tool-owned" in text
+        assert "no changelog covers it" in text
+
+    def test_it_does_not_send_the_reader_to_a_directory_that_does_not_exist(
+        self, two_releasables,
+    ):
+        self._tool_owned_commit(two_releasables)
+        _result, problems = _range_problems(two_releasables)
+        text = " ".join(problems)
+
+        assert "owning member's directory" not in text
+        assert "rlsbl changelog add" not in text
+
+    def test_the_only_remedy_is_a_removal_that_clears_the_finding(
+        self, two_releasables, monkeypatch,
+    ):
+        from unittest import mock
+
+        from test_remedy_followability import (
+            assert_invocation_is_real,
+            invocations_in,
+        )
+
+        import rlsbl
+        import shlex
+
+        self._tool_owned_commit(two_releasables)
+        monkeypatch.chdir(two_releasables / "libs" / "core")
+        _result, problems = _range_problems(two_releasables)
+
+        invocations = invocations_in(" ".join(problems))
+        assert len(invocations) == 1, invocations
+        assert invocations[0].startswith("rlsbl changelog remove"), invocations
+        assert_invocation_is_real(invocations[0])
+
+        with mock.patch("rlsbl.commands.changelog_cmd.commit_files"):
+            run = rlsbl.app.test(shlex.split(invocations[0])[1:])
+        assert run.exit_code == 0, run.stderr
+
+        result, problems = _range_problems(two_releasables)
+        assert result.status == "pass", problems
+
+
 class TestGenuinelyOutOfRangeEntry:
     """The message the cross-filed case used to steal stays exactly as it was."""
 

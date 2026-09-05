@@ -219,6 +219,12 @@ def check_hashes_resolve(entries: list[ChangelogEntry]) -> tuple[bool, list[str]
     return (len(details) == 0, details)
 
 
+#: What :func:`_foreign_owner_description` answers when nothing in the
+#: workspace claims a single one of the commit's files -- every path it touches
+#: is tool-owned, so no member and no releasable owns it.
+NO_DECLARED_OWNER = "no member or releasable this workspace declares"
+
+
 def _foreign_owner_description(sha: str, scope) -> str:
     """Who owns the files of a commit the asking *scope* does not claim.
 
@@ -258,23 +264,39 @@ def _foreign_owner_description(sha: str, scope) -> str:
         parts.append(f"releasable '{name}'s own state directory")
 
     if not parts:
-        return "no member or releasable this workspace declares"
+        return NO_DECLARED_OWNER
     return ", ".join(parts)
 
 
 def _out_of_scope_detail(raw: str, sha: str, entry: ChangelogEntry, scope) -> str:
-    """The finding for an entry filed under the wrong releasable.
+    """The finding for an entry naming a commit this changelog does not cover.
 
-    Deliberately NOT the out-of-range sentence: this commit IS between the
-    release this checkout is anchored to and HEAD. What is wrong is where the
+    Deliberately NOT the out-of-range sentence: this commit IS between this
+    checkout's nearest release commit and HEAD. What is wrong is where the
     entry was filed, and the remedy is to move it, not to repair a hash.
+
+    Two remedies, because there are two cases. When another member owns the
+    commit's files the entry belongs in that member's changelog, so it is
+    removed here and added there. When NOTHING owns them -- every path the
+    commit touches is tool-owned, rlsbl's own bookkeeping -- there is no
+    owning member's directory to add it from, and telling the reader to go to
+    one names a place that does not exist. Such a commit needs no changelog
+    coverage anywhere, so the entry is simply removed.
     """
-    return (
+    owner = _foreign_owner_description(sha, scope)
+    finding = (
         f"hash in the unreleased range but outside this changelog's scope: "
-        f"{raw} ({sha}) -- its files belong to "
-        f"{_foreign_owner_description(sha, scope)}, while this changelog "
-        f"covers {scope.describe()}. The entry is filed under the wrong "
-        f"releasable: remove it here with "
+        f"{raw} ({sha}) -- its files belong to {owner}, while this changelog "
+        f"covers {scope.describe()}. "
+    )
+    if owner == NO_DECLARED_OWNER:
+        return finding + (
+            f"Every file it touches is tool-owned, so no changelog covers it "
+            f"and there is nowhere to move the entry to: remove it with "
+            f"`{_removal_remedy(entry, [sha])}`."
+        )
+    return finding + (
+        f"The entry is filed under the wrong releasable: remove it here with "
         f"`{_removal_remedy(entry, [sha])}`, then add it from the owning "
         f"member's directory with `rlsbl changelog add --commits {sha} "
         f"--description \"...\" --type feature`."
