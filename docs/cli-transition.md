@@ -1,6 +1,6 @@
 ---
 title: rlsbl transition
-description: "Declare the two transition-record facts nothing can derive: a tag that stands outside the version model, and a release history that is deliberately closed."
+description: "Declare a transition-record fact an operator states rather than a command records: a tag outside the version model, a deliberately closed release history, or a renamed releasable."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 17
@@ -9,11 +9,11 @@ nav_order: 17
 
 # rlsbl transition
 
-Record the transition-record facts that no surgery writes. Most events in a repository's transition record are written by the operation that performed them; the ones here are declarations an operator makes about a repository they read, and nothing can derive them.
+Record the transition-record facts an operator states. Most events in a repository's transition record are written by the operation that performed them; the ones here are statements about a repository somebody read -- two that nothing can derive at all, and one whose command exists but which a rename performed by hand leaves unrecorded.
 
 ## transition record
 
-Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), or a member's or releasable's deliberately closed release history (--release-history-closed). Exactly one of the two must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.
+Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), a member's or releasable's deliberately closed release history (--release-history-closed), or a releasable that was renamed (--releasable-rename <old> --to <new>). Exactly one must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -21,8 +21,10 @@ Append one operator-declared fact to this repository's transition record: a tag 
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `fact` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--non-version-tag`, `--release-history-closed`. Which fact is being declared. Exactly one must be elected, and the elected member carries the subject it is about. |
+| `fact` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--non-version-tag`, `--release-history-closed`, `--releasable-rename`. Which fact is being declared. Exactly one must be elected, and the elected member carries the subject it is about. |
 | &nbsp;&nbsp;&nbsp;&nbsp;`--non-version-tag` |  | str | required |  | Elects `fact` = `non-version-tag`. Declare that a tag stands outside the version model on purpose: not a release and not an alias of one. Every reader of the tag namespace accounts for it afterwards instead of reporting it as unexplained. Its value: the tag name, exactly as it stands in the repository's tag namespace |
 | &nbsp;&nbsp;&nbsp;&nbsp;`--release-history-closed` |  | str | required |  | Elects `fact` = `release-history-closed`. Declare that a member's or releasable's release history is deliberately over. The version file, changelog directory and release archives it leaves behind are a record of what it released, not residue to clean up. Its value: the releasable or member name whose release history is closed -- a name, never a path, in the vocabulary workspace.toml uses |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--releasable-rename` |  | str | required |  | Elects `fact` = `releasable-rename`. Declare that a releasable group was renamed. A tag-SPELLING fact: the releasable's future tags are spelled with the new name, everything already published keeps the name it was published under, and nothing a consumer resolves by has changed -- so `rlsbl release reconcile` still repairs the refs of releases made under the old spelling. `rlsbl monorepo rename-releasable` records this itself; declare it here for a rename performed another way. Its value: the releasable's name BEFORE the rename, in the vocabulary workspace.toml uses |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--to` |  | str | required |  | Only with `--releasable-rename`. the releasable's name AFTER the rename |
 | `--reason` |  | str | required |  | Why this fact holds, in the operator's own words (e.g. "a nightly build marker", "extracted into its own repository"). Recorded verbatim and shown by every reader that explains the fact, so it is the audit trail for a declaration nothing can derive. |
 | `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the transition record with the Autogenerated trailer (the handler commits when neither --auto-commit nor --no-auto-commit is passed) |

@@ -2754,11 +2754,11 @@
     },
     "transition": {
       "name": "transition",
-      "help": "Record the transition-record facts that no surgery writes. Most events in a repository's transition record are written by the operation that performed them; the ones here are declarations an operator makes about a repository they read, and nothing can derive them.",
+      "help": "Record the transition-record facts an operator states. Most events in a repository's transition record are written by the operation that performed them; the ones here are statements about a repository somebody read -- two that nothing can derive at all, and one whose command exists but which a rename performed by hand leaves unrecorded.",
       "commands": {
         "record": {
           "name": "record",
-          "help": "Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), or a member's or releasable's deliberately closed release history (--release-history-closed). Exactly one of the two must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.",
+          "help": "Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), a member's or releasable's deliberately closed release history (--release-history-closed), or a releasable that was renamed (--releasable-rename <old> --to <new>). Exactly one must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -2788,6 +2788,28 @@
                     {
                       "name": "value",
                       "help": "the releasable or member name whose release history is closed -- a name, never a path, in the vocabulary workspace.toml uses",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    }
+                  ]
+                },
+                {
+                  "name": "releasable-rename",
+                  "help": "Declare that a releasable group was renamed. A tag-SPELLING fact: the releasable's future tags are spelled with the new name, everything already published keeps the name it was published under, and nothing a consumer resolves by has changed -- so `rlsbl release reconcile` still repairs the refs of releases made under the old spelling. `rlsbl monorepo rename-releasable` records this itself; declare it here for a rename performed another way.",
+                  "flags": [
+                    {
+                      "name": "value",
+                      "help": "the releasable's name BEFORE the rename, in the vocabulary workspace.toml uses",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    },
+                    {
+                      "name": "to",
+                      "help": "the releasable's name AFTER the rename",
                       "value_schema": {
                         "type": "string"
                       },

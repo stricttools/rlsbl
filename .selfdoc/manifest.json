@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.120.0",
+  "version": "0.120.1",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -1632,8 +1632,8 @@
         },
         {
           "level": 3,
-          "text": "The two facts an operator declares",
-          "anchor": "the-two-facts-an-operator-declares"
+          "text": "The facts an operator declares",
+          "anchor": "the-facts-an-operator-declares"
         },
         {
           "level": 3,
@@ -4746,6 +4746,41 @@
         },
         {
           "level": 3,
+          "text": "`UnselectedReleasable`",
+          "anchor": "unselectedreleasable"
+        },
+        {
+          "level": 3,
+          "text": "`_repository_scoped_check_names`",
+          "anchor": "_repository_scoped_check_names"
+        },
+        {
+          "level": 3,
+          "text": "`_unselected_refusal`",
+          "anchor": "_unselected_refusal"
+        },
+        {
+          "level": 3,
+          "text": "`_guard_project_scope`",
+          "anchor": "_guard_project_scope"
+        },
+        {
+          "level": 3,
+          "text": "`_ScopeGuardedApp`",
+          "anchor": "_scopeguardedapp"
+        },
+        {
+          "level": 4,
+          "text": "`error_check`",
+          "anchor": "error_check"
+        },
+        {
+          "level": 4,
+          "text": "`warn_check`",
+          "anchor": "warn_check"
+        },
+        {
+          "level": 3,
           "text": "`register_checks`",
           "anchor": "register_checks"
         }
@@ -6596,6 +6631,11 @@
         },
         {
           "level": 3,
+          "text": "`_suppressed_member_version`",
+          "anchor": "_suppressed_member_version"
+        },
+        {
+          "level": 3,
           "text": "`_cmd_status_explicit`",
           "anchor": "_cmd_status_explicit"
         }
@@ -7510,6 +7550,11 @@
         },
         {
           "level": 3,
+          "text": "`_record_rename_in_transition_record`",
+          "anchor": "_record_rename_in_transition_record"
+        },
+        {
+          "level": 3,
           "text": "`_finish_alias_tag`",
           "anchor": "_finish_alias_tag"
         },
@@ -7803,8 +7848,8 @@
         },
         {
           "level": 3,
-          "text": "`_track_release_commit`",
-          "anchor": "_track_release_commit"
+          "text": "`_track_release_created_commit`",
+          "anchor": "_track_release_created_commit"
         },
         {
           "level": 3,
@@ -9400,8 +9445,8 @@
         },
         {
           "level": 3,
-          "text": "`_classify_release_commit`",
-          "anchor": "_classify_release_commit"
+          "text": "`_classify_release_created_commit`",
+          "anchor": "_classify_release_created_commit"
         },
         {
           "level": 3,
@@ -9425,8 +9470,8 @@
         },
         {
           "level": 3,
-          "text": "`_collect_release_commits`",
-          "anchor": "_collect_release_commits"
+          "text": "`_collect_release_created_commits`",
+          "anchor": "_collect_release_created_commits"
         },
         {
           "level": 3,
@@ -17721,6 +17766,11 @@
         },
         {
           "level": 3,
+          "text": "`ReleasableRenameEvent`",
+          "anchor": "releasablerenameevent"
+        },
+        {
+          "level": 3,
           "text": "`PromotionSplitMapEvent`",
           "anchor": "promotionsplitmapevent"
         },
@@ -18765,6 +18815,11 @@
         },
         {
           "level": 3,
+          "text": "`_require_releasable_membership`",
+          "anchor": "_require_releasable_membership"
+        },
+        {
+          "level": 3,
           "text": "`_refuse_releasable_selector`",
           "anchor": "_refuse_releasable_selector"
         },
@@ -19170,6 +19225,11 @@
         },
         {
           "level": 3,
+          "text": "`TransitionReleasableRename`",
+          "anchor": "transitionreleasablerename"
+        },
+        {
+          "level": 3,
           "text": "`cmd_transition_record`",
           "anchor": "cmd_transition_record"
         },
@@ -19187,6 +19247,11 @@
           "level": 3,
           "text": "`_extract_variadic_args`",
           "anchor": "_extract_variadic_args"
+        },
+        {
+          "level": 3,
+          "text": "`_extract_check_releasable`",
+          "anchor": "_extract_check_releasable"
         },
         {
           "level": 3,
@@ -20394,6 +20459,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T14:18:31.728028+00:00",
+  "last_gen": "2026-09-05T22:36:28.230694+00:00",
   "theme": "minimal"
 }
