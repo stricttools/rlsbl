@@ -400,6 +400,11 @@
           "anchor": "running-checks"
         },
         {
+          "level": 3,
+          "text": "Where a check run is scoped",
+          "anchor": "where-a-check-run-is-scoped"
+        },
+        {
           "level": 2,
           "text": "Check results",
           "anchor": "check-results"
@@ -20459,6 +20464,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T22:36:28.230694+00:00",
+  "last_gen": "2026-09-05T22:41:06.840138+00:00",
   "theme": "minimal"
 }

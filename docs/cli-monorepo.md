@@ -89,7 +89,7 @@ Inline every project's CI jobs into a single generated ci-router.yml (and publis
 
 ## monorepo status
 
-Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. Provides a quick overview of which projects have pending changes and are ready for their next release.
+Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. A publish-suppressed member's version comes from its releasable's version file, annotated (version file): nothing publishes such a member, so nothing bumps its manifest and the version-consistency check reads the same file rather than the manifest. Provides a quick overview of which projects have pending changes and are ready for their next release.
 
 **Effect:** read_only
 
