@@ -1,7 +1,7 @@
 {
   "axes": [
     {
-      "doc": "Ecosystem label shown in listings.",
+      "doc": "Human-readable name of the registry or platform, rendered in the docs support matrix.",
       "name": "ecosystem"
     },
     {
@@ -1261,7 +1261,7 @@
       "rows": [
         [
           "ecosystem",
-          "Ecosystem label shown in listings."
+          "Human-readable name of the registry or platform, rendered in the docs support matrix."
         ],
         [
           "auto_detectable",

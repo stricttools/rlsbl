@@ -84,7 +84,7 @@ def _prop(name: str):
 
 TARGET_AXES: tuple[TargetAxis, ...] = (
     # --- identity and versioning ---
-    TargetAxis("ecosystem", "Ecosystem label shown in listings.", lambda t: t.ecosystem),
+    TargetAxis("ecosystem", "Human-readable name of the registry or platform, rendered in the docs support matrix.", lambda t: t.ecosystem),
     TargetAxis(
         "auto_detectable",
         "Whether detection runs without configuration: yes, no, or conditional.",

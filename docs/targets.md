@@ -129,7 +129,7 @@ nothing alongside the result rather than skipping them silently.
 
 ## Ecosystem classification
 
-Each target has an `ecosystem` string used for display and grouping in commands like `rlsbl targets` and `rlsbl monorepo list`. Every target maps to a distinct ecosystem label, providing a human-readable name for each registry and platform; the `Ecosystem` column of the table above is the mapping.
+Each target declares an `ecosystem` string: the human-readable name of the registry or platform it publishes to. It is one of the target protocol's axes, so every target answers it, and the answers are what the `Ecosystem` column of the table above renders — that table is generated from the committed support matrix, not hand-maintained. No command prints the label: `rlsbl targets` names the detected targets, and `rlsbl monorepo list` names each member's releasable and flags.
 
 ## Per-target notes
 
