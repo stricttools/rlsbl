@@ -5,8 +5,11 @@
 # WHAT A TRANSITION RECORD IS: a committed, append-only log of repository-surgery
 # FACTS -- what a conversion did, which tags were renamed, which commits a
 # history rewrite moved. It is written once by the operation that performed the
-# surgery and read afterwards by anything that needs to explain how the
-# repository got to its current shape. It records history; it never drives it.
+# surgery -- or, for the two kinds no surgery writes (`non-version-tag` and
+# `release-history-closed`), declared by an operator through
+# `rlsbl transition record` -- and read afterwards by anything that needs to
+# explain how the repository got to its current shape. It records history; it
+# never drives it.
 #
 # SCOPE: strictspec owns the raw DOCUMENT SHAPE -- the per-line format_version
 # gate, the `kind` discriminator and its arm set, field types, enums, required
