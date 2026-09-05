@@ -259,7 +259,7 @@ class TestWrapperThreading:
     def test_amend_wrapper_threads_dry_run(self, mock_amend, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_amend(cli_ctx(dry_run=True), version="0.1.0", commits="abc", id="", description="d", type="fix", user_facing=True, validate_hashes=True)
+        rlsbl.cmd_chlog_amend(cli_ctx(dry_run=True), version="0.1.0", commits="abc", id=None, description="d", type="fix", user_facing=True, validate_hashes=True)
         flags = mock_amend.call_args[0][0]
         assert flags.get("dry-run") is True
 
@@ -268,6 +268,6 @@ class TestWrapperThreading:
     def test_edit_wrapper_threads_dry_run(self, mock_edit, _root):
         import rlsbl
 
-        rlsbl.cmd_chlog_edit(cli_ctx(dry_run=True), commits="abc", id="", type="fix", description="d", user_facing=None, auto_commit=True)
+        rlsbl.cmd_chlog_edit(cli_ctx(dry_run=True), commits="abc", id=None, type="fix", description="d", user_facing=None, auto_commit=True)
         flags = mock_edit.call_args[0][0]
         assert flags.get("dry-run") is True

@@ -699,7 +699,7 @@ class TestCmdChlogAmend:
     @patch("rlsbl._require_sub_project_root", return_value=Path("/fake"))
     @patch("rlsbl.commands.changelog_cmd.cmd_amend")
     def test_delegates(self, mock_amend, _):
-        rlsbl.cmd_chlog_amend(cli_ctx(), version="1.0.0", commits="abc", id="", description="fix", type="fix", user_facing=True, validate_hashes=False)
+        rlsbl.cmd_chlog_amend(cli_ctx(), version="1.0.0", commits="abc", id=None, description="fix", type="fix", user_facing=True, validate_hashes=False)
         mock_amend.assert_called_once()
         flags = mock_amend.call_args[0][0]
         assert flags["version"] == "1.0.0"
