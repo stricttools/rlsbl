@@ -54,6 +54,12 @@ def _apply_token(ctx, token):
     if token == "workspace":
         if not isinstance(ctx, WorkspaceCheckContext):
             return SkipCheck(reason="not a monorepo workspace")
+        # A workspace-scoped check answers for the WORKSPACE, so standing at
+        # its root is the position it is meant to be run from. Clearing the
+        # marker is what distinguishes it from the checks that answer for one
+        # project, which refuse there until a releasable is named.
+        if ctx.unselected_releasables is not None:
+            return replace(ctx, unselected_releasables=None)
         return ctx
 
     if token == "non_dev_only":

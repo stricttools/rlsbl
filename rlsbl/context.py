@@ -20,6 +20,15 @@ class ProjectContext:
     project: WorkspaceProject | None = field(default=None)
     push_stdin: str | None = field(default=None)
     releasable: "Releasable | None" = field(default=None)
+    # Set ONLY by the check-context factory, and only when the cwd is a
+    # workspace root that named no releasable. ``None`` means the scope is
+    # determined (a standalone repository, a member directory, or a root plus
+    # ``--releasable``); a tuple means it is not, and carries the workspace's
+    # declared releasable names so the refusal can offer them. A check that
+    # answers for ONE project refuses under it; a workspace-scoped check has it
+    # cleared by the scope adapter, because the root position is what those
+    # checks are for.
+    unselected_releasables: tuple[str, ...] | None = field(default=None)
 
 
 def _resolve_releasable_config_dir(

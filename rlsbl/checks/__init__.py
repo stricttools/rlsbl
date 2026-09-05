@@ -326,6 +326,104 @@ def generate_feature_matrix_data() -> tuple[list[str], list[list[str]]]:
     return headers, rows
 
 
+class UnselectedReleasable(Exception):
+    """A check that answers for one project was run at a workspace root.
+
+    Raised from the check impl rather than reported through the reporter,
+    because the refusal has to be an ERROR for every check that earns it and a
+    warn-severity check's reporter cannot mint one. The runner turns a raised
+    exception into that check's own error-severity failure, which is what the
+    ruling asks for: an error result, never a silent skip.
+    """
+
+
+def _repository_scoped_check_names():
+    """Check names that answer for the REPOSITORY, not for one project.
+
+    Derived from the tags in rlsbl's own ``data/checks.toml`` rather than
+    listed here, so a check added to the family joins the set by carrying the
+    tag: a ``prepush``-tagged check is run by the pre-push hook, which runs at
+    the repository root of every workspace, and refusing there would block
+    every monorepo push.
+    """
+    import tomllib
+
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                        "data", "checks.toml")
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    return frozenset(
+        name for name, spec in (data.get("checks") or {}).items()
+        if "prepush" in (spec.get("tags") or [])
+    )
+
+
+def _unselected_refusal(names):
+    """The one-line refusal a project-scoped check raises at a workspace root."""
+    if names:
+        routes = " / ".join(f"rlsbl check --releasable {name}" for name in names)
+        return (
+            f"a workspace root names the workspace, not a releasable in it, so "
+            f"this check has no project to answer for. Run {routes}, or run "
+            f"`rlsbl check` from a member directory."
+        )
+    return (
+        "a workspace root names the workspace, not a releasable in it, and "
+        "this workspace declares no releasable -- so there is no project here "
+        "for this check to answer for."
+    )
+
+
+def _guard_project_scope(name, impl, repository_scoped):
+    """Wrap one check impl with the workspace-root refusal.
+
+    The marker is set by the check-context factory and cleared by the scope
+    adapter for workspace-scoped checks, so what reaches an impl already says
+    whether this position can answer for it.
+    """
+    if name in repository_scoped:
+        return impl
+
+    def guarded(ctx, reporter):
+        unselected = getattr(ctx, "unselected_releasables", None)
+        if unselected is not None:
+            raise UnselectedReleasable(_unselected_refusal(unselected))
+        return impl(ctx, reporter)
+
+    guarded.__name__ = getattr(impl, "__name__", name)
+    guarded.__doc__ = impl.__doc__
+    return guarded
+
+
+class _ScopeGuardedApp:
+    """Registration proxy that guards every check impl it registers.
+
+    Every check rlsbl registers goes through one of the two decorators, so this
+    is the single place the workspace-root refusal is applied -- no check body
+    repeats it, and a check added later gets it by being registered.
+    """
+
+    def __init__(self, app, repository_scoped):
+        self._app = app
+        self._repository_scoped = repository_scoped
+
+    def _wrap(self, decorator, name):
+        def register(impl):
+            return decorator(
+                _guard_project_scope(name, impl, self._repository_scoped),
+            )
+        return register
+
+    def error_check(self, name):
+        return self._wrap(self._app.error_check(name), name)
+
+    def warn_check(self, name):
+        return self._wrap(self._app.warn_check(name), name)
+
+    def __getattr__(self, item):
+        return getattr(self._app, item)
+
+
 def register_checks(app):
     """Register all project checks on *app*.
 
@@ -339,6 +437,8 @@ def register_checks(app):
 
     from .scope import scope_adapter
     app.set_scope_adapter(scope_adapter)
+
+    app = _ScopeGuardedApp(app, _repository_scoped_check_names())
 
     from .project import register_project_checks
     from .release import register_release_checks

@@ -54,6 +54,14 @@ _variadic_args: list[str] = []
 # standalone mode. Command handlers can pass this to create_context().
 _resolved_project = None
 
+# `rlsbl check --releasable <name>`: which releasable the check run is scoped
+# to, or None. Populated by main() before app.run(), from the same argv
+# pre-parse that lifts variadic positionals out -- `check` is the framework's
+# own auto-registered command, so rlsbl cannot declare a flag on it and the
+# selector is lifted out of argv here instead. The check-context factory is its
+# only reader.
+_check_releasable: str | None = None
+
 
 def detect_registries():
     """Detect all registries/targets applicable in the current directory.
@@ -504,6 +512,16 @@ def _check_context_factory(project_root=None):
     one the operator is standing in -- passes it, so it gets the very context
     the checks would build there rather than a second, plainer resolution of
     its own.
+
+    The ``rlsbl check`` selector is honoured only on the framework's own call,
+    the one that passes no *project_root*: a command that already resolved its
+    project has resolved its scope with it.  Standing at a workspace ROOT with
+    no selector is not resolvable at all -- the root names the workspace, not
+    one of the releasables in it -- so the context is marked
+    ``unselected_releasables`` and every check that answers for ONE project
+    refuses under it (:func:`rlsbl.checks.register_checks`). Workspace-scoped
+    checks have the marker cleared by the scope adapter, because the root
+    position is exactly what they are for.
     """
     import os
     from pathlib import Path
@@ -514,11 +532,30 @@ def _check_context_factory(project_root=None):
 
     push_stdin = os.environ.get("RLSBL_PUSH_STDIN")
     root = Path.cwd() if project_root is None else Path(project_root)
+    selector = _check_releasable if project_root is None else None
 
     workspace_root = find_workspace_root(str(root))
     if workspace_root is not None:
         from .workspace_graph import WorkspaceGraph
         from .workspace import load_releasables
+
+        unselected = None
+        if project_root is None:
+            if _at_workspace_root(workspace_root):
+                if selector is None:
+                    unselected = tuple(sorted(
+                        rel.name for rel in load_releasables(
+                            workspace_root, projects=load_workspace(workspace_root),
+                        )
+                    ))
+                else:
+                    project = _releasable_representative(
+                        workspace_root, selector,
+                        invocation="rlsbl check", verb="check",
+                    )
+                    root = Path(workspace_root) / project["path"]
+            elif selector is not None:
+                _refuse_releasable_selector(standalone=False, subject="checked")
 
         projects = load_workspace(workspace_root)
         graph = WorkspaceGraph(workspace_root, projects)
@@ -531,9 +568,12 @@ def _check_context_factory(project_root=None):
             projects=projects,
             graph=graph,
             releasables=releasables,
+            unselected_releasables=unselected,
         )
         wctx.push_stdin = push_stdin
         return wctx
+    if selector is not None:
+        _refuse_releasable_selector(standalone=True, subject="checked")
     from .workspace import create_standalone_releasable
 
     ctx = create_context(root)
@@ -3032,6 +3072,54 @@ def _extract_variadic_args():
     return []
 
 
+def _extract_check_releasable():
+    """Lift ``rlsbl check --releasable <name>`` out of ``sys.argv``.
+
+    ``check`` is strictcli's own auto-registered command: its five flags are the
+    framework's, and a consumer cannot declare a sixth on it. The selector is
+    therefore parsed here and removed from argv before the app sees it, the same
+    shape ``_extract_variadic_args`` already uses for the positionals strictcli
+    cannot express. It follows that ``--releasable`` does not appear in
+    ``rlsbl check --help`` or in the dumped schema; the refusal at a workspace
+    root prints the full invocation instead.
+
+    Returns the name, or None when the flag was not passed (and for every
+    command other than ``check``). A supplied-but-empty value and a trailing
+    ``--releasable`` with nothing after it are hard errors here: an empty value
+    is a statement, and it is not the statement that the flag was omitted.
+    """
+    argv = sys.argv[1:]
+    if not argv or argv[0] != "check":
+        return None
+
+    new_argv = [sys.argv[0], "check"]
+    value = None
+    i = 1
+    while i < len(argv):
+        tok = argv[i]
+        if tok == "--releasable":
+            if i + 1 >= len(argv):
+                print(
+                    "Error: --releasable requires the name of a releasable.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            value = argv[i + 1]
+            i += 2
+            continue
+        if tok.startswith("--releasable="):
+            value = tok[len("--releasable="):]
+            i += 1
+            continue
+        new_argv.append(tok)
+        i += 1
+
+    if value is not None and not value.strip():
+        _refuse_empty_flags(releasable=value)
+    sys.argv = new_argv
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -3060,11 +3148,12 @@ def _enable_line_buffering():
 
 def main():
     """CLI entry point: extract variadic args and run the strictcli app."""
-    global _variadic_args
+    global _variadic_args, _check_releasable
     _enable_line_buffering()
     # strictcli recognizes --dry-run/--approve-consequential/--quiet/--verbose
     # anywhere in argv, so `rlsbl release run --approve-consequential` reaches
     # the framework as written and needs no argv rewriting here.
+    _check_releasable = _extract_check_releasable()
     _variadic_args = _extract_variadic_args()
     try:
         app.run()
