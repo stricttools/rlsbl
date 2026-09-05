@@ -80,6 +80,7 @@ EXPECTED_CHECKS = [
     "dunder-version-missing",
     "selfdoc-version-drift",
     "scaffold-conflicts",
+    "stash-free",
     "cross-repo-path-sources",
     "requires-services",
     "dev-overlay-drift",

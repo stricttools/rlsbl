@@ -19,6 +19,7 @@ Before running `rlsbl release run`, the project must satisfy several preconditio
 | Requirement | How to verify | What happens if missing |
 | --- | --- | --- |
 | Clean working tree | `git status --porcelain` is empty | Hard error (use `--allow-dirty` to override) |
+| No stash | `git stash list` is empty | Hard error, and `--allow-dirty` does not waive it: that flag accounts for the dirty paths git can name, and a stash is exactly the work git names nowhere. `rlsbl release resume` and `rlsbl release reconcile --apply` refuse one too. Drop it (`git stash drop`, or `git stash clear`) after landing the work where it belongs |
 | `gh` CLI authenticated | `gh auth status` | Hard error |
 | Changelog coverage | `rlsbl check --tag changelog` passes | Hard error during validation step |
 | Release file exists | `.rlsbl/releases/unreleased.toml` present | Hard error (run `rlsbl release init`) |

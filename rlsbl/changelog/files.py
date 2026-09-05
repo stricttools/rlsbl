@@ -11,6 +11,7 @@ import sys
 
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
 from ..errors import ChangelogError, ConfigError
+from ..workspace_types import project_is_releasable
 from ..release_file import archive_sort_key, is_release_version
 from .. import effects
 
@@ -109,6 +110,49 @@ def get_changes_dir(project_path: str) -> str:
     return os.path.join(project_path, ".rlsbl", "changes")
 
 
+def refuse_non_releasable_member_changes(workspace_root, projects, *, operation):
+    """Refuse a non-releasable member that carries its own changes directory.
+
+    A member outside every releasable (``releasable = false``, dev node or
+    not) has no version, no release and no changelog: nothing ever finalizes
+    ``unreleased.jsonl`` there, nothing generates a CHANGELOG.md from it, and
+    no release record explains its range. A ``.rlsbl/changes/`` under one is
+    either residue from before the member stopped being releasable, or content
+    that belongs to a releasable -- and every path that reads it silently
+    treats it as a changelog nobody owns.
+
+    Raised where such a directory would be READ, so the state is refused at
+    the point it would take effect rather than merely reported.
+    """
+    offenders = []
+    for proj in projects:
+        if project_is_releasable(proj):
+            continue
+        directory = get_changes_dir(os.path.join(str(workspace_root), proj["path"]))
+        if os.path.isdir(directory):
+            offenders.append((proj["name"], directory))
+    if not offenders:
+        return
+    listed = "\n".join(
+        f"    {name}: {os.path.relpath(d, str(workspace_root))}"
+        for name, d in offenders
+    )
+    raise ChangelogError(
+        f"{operation}: {len(offenders)} non-releasable member(s) carry their "
+        f"own .rlsbl/changes/ directory.\n{listed}\n"
+        f"  A member that stands outside every releasable has no version, no "
+        f"release and no\n"
+        f"  changelog, so nothing finalizes those entries and no release "
+        f"record explains their\n"
+        f"  range. Either the directory is residue and should not exist -- "
+        f"delete it -- or its\n"
+        f"  content belongs to a releasable: move the entries into that "
+        f"releasable's\n"
+        f"  changes directory, or give the member a `releasable = \"<name>\"` "
+        f"in workspace.toml."
+    )
+
+
 def enumerate_changelog_dirs(project_root, workspace_root=None, workspace_projects=None):
     """Enumerate every changelog changes-dir whose JSONL files may reference
     commit hashes.
@@ -134,6 +178,10 @@ def enumerate_changelog_dirs(project_root, workspace_root=None, workspace_projec
 
         if workspace_projects is None:
             workspace_projects = load_workspace(str(workspace_root))
+        refuse_non_releasable_member_changes(
+            workspace_root, workspace_projects,
+            operation="enumerating changelog directories",
+        )
         for proj in workspace_projects:
             d = get_changes_dir(os.path.join(str(workspace_root), proj.path))
             if os.path.isdir(d):

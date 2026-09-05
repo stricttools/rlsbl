@@ -1714,6 +1714,26 @@ def run_cmd(flags, *, ctx):
         )
         sys.exit(1)
 
+    if mode == "apply":
+        # Managed-repo hygiene: the apply force-pushes refs and rewrites
+        # published Release documents. A stash is work with no branch of its
+        # own, and nothing here can carry it through that.
+        from ..git_util import refuse_present_stash
+
+        try:
+            refuse_present_stash(
+                str(ctx.workspace_root or ctx.project_root),
+                operation="reconcile",
+                detail=(
+                    "The apply pushes refs, force-pushes the ones a recorded "
+                    "rewrite moved, and rewrites published Release documents."
+                ),
+                error=ReconcileError,
+            )
+        except ReconcileError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+
     try:
         target, ref_ctx, releases_dir = _resolve_identity(ctx)
     except ReconcileError as exc:

@@ -186,7 +186,7 @@ Lint config resolves at two levels: a member's own `.rlsbl/lint/<language>.toml`
 
 Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. A project is a dev node when it is `dev_only` *and* outside every releasable; a `dev_only` project that still declares `releasable = "<name>"` is an ordinary member of that releasable. Dev nodes cannot be released:
 
-- **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`
+- **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`. This is enforced, not merely expected: a member outside every releasable that carries its own `.rlsbl/changes/` is a hard error wherever that directory would be read — the changelog-directory enumeration behind hash validation and scrub remapping, `rlsbl monorepo status`, and the pre-push coverage check. Nothing finalizes entries there and no release record explains their range, so either the directory is residue and should be deleted, or its content belongs to a releasable
 - **No releases**: `rlsbl release run` and `rlsbl release edit` error with "non-releasable projects cannot be released"
 - `rlsbl changelog add` errors with "dev node projects don't use changelogs"
 - Scaffold skips changelog infrastructure

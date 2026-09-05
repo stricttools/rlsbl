@@ -509,8 +509,19 @@ def _cmd_status_explicit(root, projects):
         members_of,
         read_releasable_version,
     )
-    from ...changelog.files import get_changes_dir
+    from ...changelog.files import (
+        get_changes_dir,
+        refuse_non_releasable_member_changes,
+    )
     from ...tag_glob import resolve_monorepo_tag_glob
+
+    # The per-project rows below fall back to a member's OWN changes dir. A
+    # member outside every releasable has no changelog for that fallback to
+    # read, so the state is refused rather than rendered as a coverage figure
+    # nothing will ever finalize.
+    refuse_non_releasable_member_changes(
+        root, projects, operation="monorepo status",
+    )
 
     releasables = load_releasables(root, projects)
     rows = []  # (name, kind, version, tag, coverage, members)

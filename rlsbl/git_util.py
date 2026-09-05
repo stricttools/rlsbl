@@ -200,6 +200,66 @@ def get_commit_files(sha):
     return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
 
 
+class StashError(Exception):
+    """A managed operation refused to run while a stash is present."""
+
+
+def stash_entries(cwd=None, *, timeout=10):
+    """The repository's stash entries, one line each.
+
+    The ONE stash probe. A stash is uncommitted work with no branch of its
+    own: nothing in the repository records what it belongs to, and every
+    operation that rewrites, commits or force-pushes this working tree can
+    therefore neither carry it along nor tell that it left it behind. Each of
+    those operations asks here.
+
+    A git read that cannot answer yields no entries rather than a failure: the
+    probe is a hygiene check, and an unreadable stash list is not evidence of
+    one.
+    """
+    try:
+        result = effects.run(
+            ["git", "stash", "list"],
+            capture_output=True, text=True, timeout=timeout, cwd=cwd,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return []
+    if effects.unsettled(result) or getattr(result, "returncode", 1) != 0:
+        return []
+    return [line for line in (result.stdout or "").splitlines() if line.strip()]
+
+
+def stash_refusal_message(entries, *, operation, detail):
+    """The message an operation refuses a present stash with.
+
+    *operation* names what is being refused ("release", "backfill"); *detail*
+    is one sentence saying what that operation does to this working tree, so
+    the refusal explains itself rather than merely asserting a rule.
+    """
+    listed = "\n".join(f"    {line}" for line in entries)
+    return (
+        f"Refusing to {operation}: this repository has {len(entries)} stash "
+        f"entry/entries.\n{listed}\n"
+        f"  {detail}\n"
+        f"  A stash is uncommitted work with no branch of its own, and nothing "
+        f"here can tell\n"
+        f"  what it belongs to. Drop it first -- inspect it with `git stash "
+        f"show -p`, land it\n"
+        f"  where it belongs, then `git stash drop` (or `git stash clear` for "
+        f"all of them) --\n"
+        f"  and re-run."
+    )
+
+
+def refuse_present_stash(cwd=None, *, operation, detail, error=StashError):
+    """Raise when the repository has a stash, naming it and the way out."""
+    entries = stash_entries(cwd)
+    if entries:
+        raise error(stash_refusal_message(
+            entries, operation=operation, detail=detail,
+        ))
+
+
 def commit_files(sha, *, operation):
     """Return the files a commit changed, or raise naming the commit.
 

@@ -64,6 +64,11 @@ _MUTATING_GIT_VERBS = {
 # ``git tag``/``git branch``/``git remote`` also have pure listing forms.
 _LIST_FLAGS = {"-l", "--list", "-n", "--contains", "--points-at", "-v"}
 
+# Subcommands whose verb is in the mutating set but whose FIRST argument makes
+# them a read. ``git stash list`` prints the stash and writes nothing; the
+# managed-repo hygiene refusal runs it before any mutating step.
+_READ_ONLY_SUBCOMMANDS = {("stash", "list")}
+
 _FS_MUTATORS = (
     "open_write", "write_text", "append_text", "write_bytes",
     "atomic_write_text", "makedirs", "mkdir", "rename", "replace", "remove",
@@ -88,6 +93,8 @@ def _is_mutating_argv(argv):
         return False
     verb = str(argv[i])
     if verb not in _MUTATING_GIT_VERBS:
+        return False
+    if (verb, str(argv[i + 1]) if i + 1 < len(argv) else "") in _READ_ONLY_SUBCOMMANDS:
         return False
     if verb == "tag" and any(a in _LIST_FLAGS for a in argv[i + 1:]):
         return False

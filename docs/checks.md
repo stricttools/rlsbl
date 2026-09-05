@@ -38,7 +38,7 @@ Severity is declared per-check in metadata. A check with `severity = "error"` re
 
 | Tag | Purpose | Check count |
 | --- | --- | --- |
-| `project` | Project-level metadata, config schema, version consistency | 25 |
+| `project` | Project-level metadata, config schema, version consistency | 26 |
 | `release` | Released-version refs, branch sync, CI credentials, and conversion follow-ups | 6 |
 | `changelog` | JSONL changelog validation and structure | 11 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 19 |
@@ -65,6 +65,7 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | `dunder-version-missing` | error | PyPI targets that keep a version constant in source must use `__version__` |
 | `selfdoc-version-drift` | error | selfdoc-generated version references match the actual project version |
 | `scaffold-conflicts` | error | Unresolved git merge conflict markers in scaffold files (managed-files registry, `.github/workflows/`, all of `.rlsbl/`); also tagged `prepush` and `release` |
+| `stash-free` | error | The repository carries no stash. A stash is uncommitted work with no branch of its own, so nothing records what it belongs to; `rlsbl release run`, `rlsbl release resume`, `rlsbl release reconcile --apply` and `rlsbl release backfill --apply` each refuse one outright, and this reports it before any of them is reached |
 | `cross-repo-path-sources` | error | `[tool.uv.sources]` path entries in the committed `pyproject.toml` must resolve inside the repository (in-repo paths and `workspace = true` are legal; local overrides belong in `dev-sources.toml.local-only`). Also enforced unconditionally by `rlsbl release run` |
 | `dev-overlay-drift` | error | Packages recorded in the `rlsbl dev sync` sentinel are still editable installs of their declared checkouts (a bare `uv sync` silently replaces an overlay with the released wheel) |
 | `requires-services` | error | CI service containers declared under `services`/`test_env` are actually provisioned in the rendered CI workflow |

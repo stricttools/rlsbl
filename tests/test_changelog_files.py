@@ -692,8 +692,9 @@ class TestEnumerateChangelogDirs:
             workspace_toml(
                 'projects = [\n'
                 '  { path = ".", name = "root", dev_only = true, releasable = false },\n'
-                '  { path = "packages/alpha", name = "alpha", releasable = false },\n'
-                ']\n'
+                '  { path = "packages/alpha", name = "alpha", releasable = "core" },\n'
+                ']\n',
+                releasables=["core"],
             )
         )
 
@@ -843,8 +844,9 @@ class TestChangelogRemapGlobs:
             workspace_toml(
                 'projects = [\n'
                 '  { path = ".", name = "root", dev_only = true, releasable = false },\n'
-                '  { path = "packages/alpha", name = "alpha", releasable = false },\n'
-                ']\n'
+                '  { path = "packages/alpha", name = "alpha", releasable = "core" },\n'
+                ']\n',
+                releasables=["core"],
             )
         )
 
@@ -879,9 +881,10 @@ class TestChangelogRemapGlobs:
             workspace_toml(
                 "projects = ["
                 '{ path = ".", name = "root", dev_only = true, releasable = false },'
-                '{ path = "packages/alpha", name = "alpha", releasable = false },'
-                '{ path = "libs/deep/beta", name = "beta", releasable = false },'
-                "]\n"
+                '{ path = "packages/alpha", name = "alpha", releasable = "core" },'
+                '{ path = "libs/deep/beta", name = "beta", releasable = "extra" },'
+                "]\n",
+                releasables=["core", "extra"],
             )
         )
 

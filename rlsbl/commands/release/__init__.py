@@ -79,6 +79,7 @@ from .validate import (
     validate_no_authored_release_commit,
     validate_pipeline_config, validate_gh_cli, validate_gh_push_access,
     validate_clean_tree,
+    validate_no_stash,
     validate_branch_and_remote, resolve_monorepo_context,
     compute_release_version, validate_changelog_state,
     print_dry_run_summary,
@@ -234,6 +235,9 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
         flags = {}
 
     project_root = ctx.project_root
+    # A resume re-enters the mutating phase, so it is held to the same
+    # managed-repo hygiene as the run it continues.
+    validate_no_stash(str(project_root))
     monorepo_root = ctx.workspace_root
     quiet = flags.get("quiet", False)
 
@@ -631,6 +635,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # clean tree, and branch/remote upfront -- skip redundant checks.
     # Batch mode does not support release-from-dev (the orchestrator
     # always runs from the release branch).
+    # Managed-repo hygiene, ahead of the batch-mode split so a batch member
+    # is held to it too: a stash is work with no branch, and the release is
+    # about to commit, tag and push this tree.
+    validate_no_stash(str(project_root))
+
     if flags.get("batch-mode", False):
         pre_existing_dirty = set()
         # The orchestrator resolved and validated the branch once, before the

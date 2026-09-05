@@ -1009,6 +1009,28 @@
         "spec"
       ]
     },
+    "stash-free": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
+    },
     "strictspec-certificate-gate": {
       "kind": "universal",
       "targets": [

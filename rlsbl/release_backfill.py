@@ -75,7 +75,7 @@ import tomlkit
 from . import effects
 from .changelog.files import list_versioned_files
 from .errors import RlsblError
-from .git_util import tree_rev_spec
+from .git_util import stash_entries, stash_refusal_message, tree_rev_spec
 from .preview_apply import Preview, VerdictItem, render_preview
 from .release_file import (
     NEVER_RELEASED_FIELD,
@@ -191,9 +191,6 @@ def all_tags(repo):
     return sorted(t for t in _git(repo, ["tag", "-l"]).splitlines() if t.strip())
 
 
-def stash_entries(repo):
-    """The repository's stash entries, one per line."""
-    return [line for line in _git(repo, ["stash", "list"]).splitlines() if line.strip()]
 
 
 def bump_commit_messages(scope, version):
@@ -1471,17 +1468,12 @@ def unexplained_error(plan):
 
 def stash_error(plan):
     """The message a present stash refuses the apply with."""
-    listed = "\n".join(f"    {line}" for line in plan.stash)
-    return (
-        f"Refusing to backfill: this repository has {len(plan.stash)} stash "
-        f"entry/entries.\n{listed}\n"
-        f"  The pass unlocks, rewrites and relocks archived release files, and "
-        f"commits them.\n"
-        f"  A stash is uncommitted work with no branch of its own, and nothing "
-        f"here can tell\n"
-        f"  what it belongs to. Drop it first -- inspect it with `git stash "
-        f"show -p`, land it\n"
-        f"  where it belongs, then `git stash drop` -- and re-run."
+    return stash_refusal_message(
+        plan.stash, operation="backfill",
+        detail=(
+            "The pass unlocks, rewrites and relocks archived release files, "
+            "and commits them."
+        ),
     )
 
 

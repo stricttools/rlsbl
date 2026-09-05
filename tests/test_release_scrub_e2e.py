@@ -110,8 +110,11 @@ class TestMatchModeFullFlowE2E:
         # c2: unrelated
         c2 = _commit_file(ws, "packages/alpha/main.txt", "hello\n", "add main")
 
-        # Workspace: alpha belongs to releasable "core"; beta is explicitly
-        # unversioned but has its own (standalone-style) changelog tree.
+        # Workspace: alpha belongs to releasable "core"; beta owns a
+        # releasable of its own and still carries its own (standalone-style)
+        # changelog tree, as a member converted from a standalone repo does.
+        # A member outside every releasable may not carry one at all -- the
+        # loader-adjacent hygiene refusal covers that state.
         (ws / ".rlsbl-monorepo").mkdir()
         (ws / ".rlsbl-monorepo" / "workspace.toml").write_text(
             workspace_toml("[[projects]]\n"
@@ -121,9 +124,11 @@ class TestMatchModeFullFlowE2E:
             "[[projects]]\n"
             'path = "packages/beta"\n'
             'name = "beta"\n'
-            "releasable = false\n"
+            'releasable = "beta"\n'
             "[[releasables]]\n"
-            'name = "core"\n')
+            'name = "core"\n'
+            "[[releasables]]\n"
+            'name = "beta"\n')
         )
         _git(ws, "add", ".rlsbl-monorepo/workspace.toml")
         _git(ws, "commit", "-q", "-m", "workspace")
@@ -144,10 +149,21 @@ class TestMatchModeFullFlowE2E:
         (core_changes / "unreleased.jsonl").write_text(_jsonl_line([c1]))
         (core_changes / ".validated").write_text(c2 + "\n")
 
+        # beta owns a releasable, so its member tree has a generated
+        # CHANGELOG.md and per-version .md beside the JSONL. Generated here
+        # through rlsbl's own generator, so the scrub's
+        # regenerate-and-assert-unchanged step compares against what this
+        # version of the generator writes rather than a hand-typed copy.
+        from rlsbl.changelog.generate import generate_changelog
+
+        generate_changelog(str(ws / "packages" / "beta"))
+
         _git(ws, "add",
              "packages/beta/.rlsbl/changes/unreleased.jsonl",
              "packages/beta/.rlsbl/changes/1.0.0.jsonl",
+             "packages/beta/.rlsbl/changes/1.0.0.md",
              "packages/beta/.rlsbl/changes/.validated",
+             "packages/beta/CHANGELOG.md",
              ".rlsbl-monorepo/releasables/core/changes/unreleased.jsonl",
              ".rlsbl-monorepo/releasables/core/changes/.validated")
         _git(ws, "commit", "-q", "-m", "changelog trees")

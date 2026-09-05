@@ -157,6 +157,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "dunder-version-missing": frozenset({"pypi"}),
     "selfdoc-version-drift": None,
     "scaffold-conflicts": None,
+    # A stash is a git fact about the repository; no target decides whether a
+    # repository may carry one.
+    "stash-free": None,
     "cross-repo-path-sources": frozenset({"pypi"}),
     # target-matrix-fresh compares a committed artifact against a regeneration
     # of the whole registry; no target decides whether it applies.

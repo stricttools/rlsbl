@@ -3,7 +3,7 @@
 Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
 publish-mode-workflow, npm-private-mismatch, target-version-readable,
-dunder-version-missing, selfdoc-version-drift, scaffold-conflicts,
+dunder-version-missing, selfdoc-version-drift, scaffold-conflicts, stash-free,
 cross-repo-path-sources, stricttest-floor, dep-floors, dep-locks,
 go-module-identity, strictspec-generated-floor.
 """
@@ -1264,6 +1264,29 @@ def register_project_checks(app):
                 "merge conflict markers"
             )
         return reporter.passed("no unresolved merge conflict markers")
+
+    @app.error_check("stash-free")
+    def check_stash_free(ctx, reporter):
+        """A managed repository carries no stash.
+
+        A stash is uncommitted work with no branch of its own: nothing records
+        what it belongs to, and every operation that commits, rewrites or
+        force-pushes this working tree would either leave it behind silently
+        or outlive it. The release flow, a resume and a reconcile apply each
+        refuse one outright; this reports it before any of them is reached.
+        """
+        from ..git_util import stash_entries
+
+        entries = stash_entries(str(ctx.project_root))
+        if not entries:
+            return reporter.passed("no stash entries")
+        for line in entries:
+            reporter.error(line)
+        return reporter.found(
+            f"{len(entries)} stash entry/entries -- inspect with `git stash "
+            f"show -p`, land the work where it belongs, then `git stash drop` "
+            f"(or `git stash clear`)"
+        )
 
     @app.error_check("target-matrix-fresh")
     def check_target_matrix_fresh(ctx, reporter):

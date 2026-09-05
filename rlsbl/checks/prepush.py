@@ -47,6 +47,21 @@ def register_prepush_checks(app):
                 return reporter.skipped("could not determine changed files")
 
             projects = load_workspace(ws_root)
+            # Coverage is per releasable, so a member's own changes directory
+            # is never consulted -- and a non-releasable member carrying one
+            # holds entries this check would never read and no release would
+            # ever finalize. Refuse instead of covering around it.
+            from ..changelog.files import refuse_non_releasable_member_changes
+            from ..errors import ChangelogError
+
+            try:
+                refuse_non_releasable_member_changes(
+                    ws_root, projects, operation="pre-push changelog coverage",
+                )
+            except ChangelogError as exc:
+                reporter.error(str(exc))
+                return reporter.found(str(exc))
+
             affected = affected_members(changed_files, projects)
             if not affected:
                 return reporter.passed("no affected projects")

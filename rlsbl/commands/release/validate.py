@@ -381,6 +381,27 @@ def is_tool_owned_state_path(path) -> bool:
     )
 
 
+def validate_no_stash(cwd=None):
+    """Refuse a release while the repository has a stash.
+
+    Unlike the clean-tree check, this one is not waived by ``--allow-dirty``:
+    that flag says the operator accounted for the dirty paths git can name,
+    and a stash is exactly the work git names nowhere. The release commits,
+    tags and pushes this tree; a stash would either be silently left behind or
+    quietly outlive the release with nothing recording what it belonged to.
+    """
+    from ...git_util import refuse_present_stash
+
+    refuse_present_stash(
+        cwd, operation="release",
+        detail=(
+            "The release commits, tags and pushes this working tree, and a "
+            "stash rides along in none of it."
+        ),
+        error=ReleaseValidationError,
+    )
+
+
 def validate_clean_tree(flags):
     """Validate working tree is clean (or record pre-existing dirty files).
 
