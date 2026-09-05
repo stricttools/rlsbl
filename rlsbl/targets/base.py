@@ -18,6 +18,21 @@ MATERIALIZATION_POLICIES = (
     MATERIALIZE_UNLESS_IDENTITY_CHANGED,
 )
 
+# A path that is deliberately no ecosystem's project directory, and that never
+# exists. Anything asking a target for its GENERIC shape -- the support axes,
+# the derived help counts -- passes this instead of a real directory.
+#
+# Why it is not ``"."``: a per-target fact must not depend on where the process
+# is standing. Some targets read the directory they are handed (the go target
+# reads ``go.mod`` and ``.rlsbl/config.json``, and hard-errors when the go
+# pipeline declares no ``install_paths``), so probing the cwd made the answers
+# move with the operator -- and, in such a repository, made the import-time
+# assertion that every target answers every axis raise, killing every rlsbl
+# invocation before it parsed a single argument. The remedy for an undeclared
+# ``install_paths`` belongs to ``rlsbl dev install``, which has a real project
+# directory and something to install from it.
+NOT_A_PROJECT_DIR = os.path.join(os.path.dirname(__file__), "__not_a_project__")
+
 
 class TemplateVars(dict):
     """Dict subclass that auto-generates namespaced ``{target}.{key}`` entries.
@@ -605,8 +620,12 @@ class BaseTarget:
         Behavioural rather than override-based: a subclass can inherit a
         ``dev_install_command`` whose specs resolve to nothing for it, and the
         honest answer there is "no".
+
+        Asked of :data:`NOT_A_PROJECT_DIR`, so the answer is the target's, not
+        the current directory's -- see that constant for what asking ``"."``
+        used to do.
         """
-        specs = self.dev_install_command(".")
+        specs = self.dev_install_command(NOT_A_PROJECT_DIR)
         return any(specs.get(mode) is not None for mode in ("global", "venv"))
 
     @property

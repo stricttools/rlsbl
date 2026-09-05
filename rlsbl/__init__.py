@@ -322,15 +322,6 @@ def _refuse_empty_args(**supplied):
 # The registry import is local to each helper on purpose: rlsbl.targets imports
 # back into this package, so importing it at module top would close a cycle.
 
-# A path that is deliberately not a project directory. The go target reads
-# go.mod and .rlsbl/config.json when its argument IS a Go project (and can
-# hard-error there on an undeclared install_paths), so probing the real cwd
-# would make a help string depend on where the user is standing -- and could
-# make `rlsbl --help` fail inside a Go repository. Every target answers its
-# generic shape for a non-project directory.
-_NOT_A_PROJECT_DIR = os.path.join(os.path.dirname(__file__), "__not_a_project__")
-
-
 def _target_names():
     """Every registered release target, in registration order."""
     from .targets import TARGETS
@@ -338,20 +329,27 @@ def _target_names():
 
 
 def _dev_install_targets(mode):
-    """Targets whose `rlsbl dev install --target <mode>` has something to run."""
+    """Targets whose `rlsbl dev install --target <mode>` has something to run.
+
+    Asked of ``NOT_A_PROJECT_DIR`` -- the targets package's own constant, so
+    the help text and the support matrix ask the same question of the same
+    directory, and no help string depends on where the operator is standing.
+    """
     from .targets import TARGETS
+    from .targets.base import NOT_A_PROJECT_DIR
     return [
         name for name, target in TARGETS.items()
-        if target.dev_install_command(_NOT_A_PROJECT_DIR).get(mode) is not None
+        if target.dev_install_command(NOT_A_PROJECT_DIR).get(mode) is not None
     ]
 
 
 def _dev_uninstall_targets():
     """Targets whose dev install can be reversed by `--uninstall`."""
     from .targets import TARGETS
+    from .targets.base import NOT_A_PROJECT_DIR
     names = []
     for name, target in TARGETS.items():
-        specs = target.dev_install_command(_NOT_A_PROJECT_DIR)
+        specs = target.dev_install_command(NOT_A_PROJECT_DIR)
         if any(
             (specs.get(mode) or {}).get("uninstall_args_template") is not None
             for mode in ("global", "venv")

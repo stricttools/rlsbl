@@ -556,8 +556,11 @@ class GoTarget(BaseTarget):
                 )
             args = ["install"] + validate_install_paths(project_dir, declared)
         else:
-            # Not a Go project dir (e.g. docs introspection of the target
-            # table): return the generic shape of the command.
+            # Not a Go project dir -- which is what every generic asker hands
+            # in (the support axes and the derived help counts pass
+            # ``NOT_A_PROJECT_DIR``, never the cwd). Return the generic shape
+            # of the command; the install_paths refusal above is reserved for
+            # a caller that named a real Go project, i.e. `rlsbl dev install`.
             args = ["install", "<install_paths from .rlsbl/config.json>"]
 
         return {

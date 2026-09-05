@@ -157,7 +157,7 @@ Each target declares an `ecosystem` string: the human-readable name of the regis
 - GoReleaser integration for binary projects; library projects need no publish step. Ambiguous multi-main layouts require `install_paths` on the go pipeline config.
 - npm binary wrapper support, activated with `{"npm_wrapper": {"enabled": true}}` in `.rlsbl/config.json`. Per-platform packages publish under bare suffixed names (`<bin>-linux-x64`, `<bin>-darwin-arm64`, ...) plus a meta wrapper named `<bin>`. Scoped npm names (`@scope/name`) are banned by ecosystem policy; each bare per-platform name must be independently approved (`rlsbl check-name`) like any other package name. A stale `npm_wrapper.scope`/`npm_scope` key is a hard error.
 - Homebrew tap support via `homebrew` config
-- `dev_install`: `go install <install_paths>` from the go pipeline config (no venv concept); undeclared `install_paths` is a hard error
+- `dev_install`: `go install <install_paths>` from the go pipeline config (no venv concept); undeclared `install_paths` on a module that has main packages is a hard error from `rlsbl dev install`, which is the command that has a project directory and something to install from it. Nothing that merely enumerates targets — the support axes, the derived help counts — ever hands the target a project directory, so no other command can reach that refusal
 
 ### deno
 

@@ -25,7 +25,11 @@ import textwrap
 import pytest
 
 from rlsbl.targets import TARGETS
-from rlsbl.targets.base import CI_TEMPLATE_FILENAME, BaseTarget
+from rlsbl.targets.base import (
+    CI_TEMPLATE_FILENAME,
+    NOT_A_PROJECT_DIR,
+    BaseTarget,
+)
 
 # The axis -> property mapping, and what each frozenset declared before the
 # deletion. The derived answers must reproduce these exactly, with the single
@@ -150,9 +154,13 @@ class TestEachDerivationIsHonestForItsAxis:
 
     @pytest.mark.parametrize("name", sorted(TARGETS))
     def test_dev_install_is_derived_from_the_specs_not_the_override(self, name):
-        """swift-apple inherits the method but resolves to no specs."""
+        """swift-apple inherits the method but resolves to no specs.
+
+        Asked of ``NOT_A_PROJECT_DIR``, which is the directory the property
+        itself asks about: the answer is the target's, never the cwd's.
+        """
         target = TARGETS[name]
-        specs = target.dev_install_command(".")
+        specs = target.dev_install_command(NOT_A_PROJECT_DIR)
         expected = any(specs.get(mode) is not None for mode in ("global", "venv"))
         assert target.supports_dev_install is expected
 

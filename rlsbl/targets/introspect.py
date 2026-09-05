@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from . import TARGETS
-from .base import BaseTarget
+from .base import NOT_A_PROJECT_DIR, BaseTarget
 
 # The artifact's own schema version. Bumped when the document shape changes,
 # so a stale reader fails loudly instead of reading a renamed section as absent.
@@ -242,7 +242,10 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
     TargetAxis(
         "dev_install_command",
         "The local-install specs, keyed by mode (global, venv).",
-        lambda t: t.dev_install_command("."),
+        # NOT_A_PROJECT_DIR, never ".": the matrix records what a target's
+        # install specs ARE, and a cell that changes with the operator's cwd
+        # is not a per-target fact. See the constant for the whole reason.
+        lambda t: t.dev_install_command(NOT_A_PROJECT_DIR),
     ),
     # --- source analysis, lint and tests ---
     TargetAxis(

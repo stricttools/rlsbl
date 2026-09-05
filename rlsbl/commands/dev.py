@@ -5,6 +5,7 @@ import sys
 
 from ..config import read_project_config
 from ..context import ProjectContext
+from ..errors import RlsblError
 from ..targets import TARGETS, detect_targets
 from ..utils import require_tool
 from ..workspace import find_workspace_root, load_workspace
@@ -52,11 +53,24 @@ def _install_single(project_dir, flags):
         # target's declared directory (== project_dir for root targets).
         target_dir = entry.path
         target = TARGETS.get(name)
-        modes = (
-            target.dev_install_command(target_dir)
-            if target is not None
-            else {"global": None, "venv": None}
-        )
+        # This is where a target gets to refuse a real project directory --
+        # the go target does, when its pipeline declares no `install_paths`
+        # and the module has main packages to install. The refusal is reported
+        # as this command's own hard error, because this is the command the
+        # remedy belongs to; nothing that merely enumerates targets ever hands
+        # in a project directory, so nothing else can reach it.
+        try:
+            modes = (
+                target.dev_install_command(target_dir)
+                if target is not None
+                else {"global": None, "venv": None}
+            )
+        except RlsblError as exc:
+            print(
+                f"Error: cannot install {name} from {target_dir}: {exc}",
+                file=sys.stderr,
+            )
+            return 1
         spec = modes.get(mode)
         if spec is None:
             reason = modes.get("reason")
