@@ -2127,6 +2127,27 @@ def _apply_destination(dep, item, run):
     _assert_destination_loads(dep)
 
 
+#: The member keys the extract WRITES for itself, each for its own reason:
+#: ``path`` and ``name`` identify the member in the new workspace, and
+#: ``releasable`` is re-stated as the arriving releasable's name, while
+#: ``depends_on`` is filtered down to the edges that travelled. Every other
+#: member key is the member's own declaration and travels unchanged -- which is
+#: why the carried set is DERIVED from :data:`~rlsbl.workspace.MEMBER_KEYS`
+#: rather than hand-listed. A hand-listed set silently dropped dev_only,
+#: description, test_only and lint_allow, and would drop the next member key
+#: the same way.
+_EXTRACT_REWRITTEN_MEMBER_KEYS = frozenset({
+    "path", "name", "releasable", "depends_on",
+})
+
+
+def carried_member_keys():
+    """The member keys an extracted member arrives still declaring."""
+    from ...workspace_types import MEMBER_KEYS
+
+    return frozenset(MEMBER_KEYS) - _EXTRACT_REWRITTEN_MEMBER_KEYS
+
+
 def _write_destination_workspace(dep):
     """Write the new repository's workspace.toml.
 
@@ -2135,10 +2156,14 @@ def _write_destination_workspace(dep):
     workspace without a root member does not load), and the releasable with an
     EXPLICIT tag_format -- the tags travelled unchanged, and a format left to
     the default would be a different question than the one they answer.
+
+    Each member arrives declaring what it declared: everything the extract does
+    not rewrite itself travels, so the destination's checks read the same
+    member the source's did.
     """
     from ...workspace_types import Releasable
 
-    carried = ("library", "registry_name", "import_name")
+    carried = sorted(carried_member_keys())
     member_names = set(dep.member_names)
     projects = [WorkspaceProject({
         "path": ".", "name": "root", "dev_only": True, "releasable": False,

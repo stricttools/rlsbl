@@ -1210,6 +1210,41 @@ class TestExtractOnTheReleasableStateLayout:
         assert (target / "pkgA" / "main.py").is_file()
         assert (target / "pkgB" / "main.py").is_file()
 
+    def test_every_member_key_travels_with_the_member(self, tmp_path):
+        """A member arrives declaring what it declared, not a chosen subset.
+
+        The destination workspace used to be written from a hand-listed set of
+        carried keys, so a member's dev_only, description, test_only and
+        lint_allow were silently dropped in the move -- the extracted
+        repository lint-checked a member under rules it never declared, and a
+        dev-only member arrived as an ordinary one.
+        """
+        root, _ = _setup_monorepo_with_releasable_state(tmp_path)
+        ws_file = root / WORKSPACE_DIR / WORKSPACE_FILE
+        text = ws_file.read_text()
+        text = text.replace(
+            'path = "pkgB"\nname = "pkgB"\nreleasable = "core"',
+            'path = "pkgB"\nname = "pkgB"\nreleasable = "core"\n'
+            'dev_only = true\n'
+            'test_only = true\n'
+            'description = "the harness"\n'
+            'lint_allow = ["pkgA"]\n',
+        )
+        ws_file.write_text(text)
+        subprocess.run(
+            ["git", "commit", "-q", "-am", "declare pkgB's member keys"],
+            cwd=str(root), check=True, capture_output=True, text=True,
+        )
+
+        target = tmp_path / "extracted_rel"
+        cmd_extract(str(root), "core", str(target))
+
+        arrived = {p.name: p for p in load_workspace(str(target))}["pkgB"]
+        assert arrived.dev_only is True
+        assert arrived.test_only is True
+        assert arrived.description == "the harness"
+        assert arrived.lint_allow == ["pkgA"]
+
     def test_the_releasable_state_is_transplanted_whole(self, tmp_path):
         """FLIPPED: the releasable's own state directory moves with it.
 
@@ -1664,3 +1699,33 @@ class TestBrokenTargetDeclarationGuard:
             str(root), "core", str(tmp_path / "out"), dry_run=True,
         )
         assert preview.by_key("releasable").state == "extract_to_workspace"
+
+
+class TestTheCarriedMemberKeySetIsDerived:
+    """What travels with an extracted member is derived, never hand-listed.
+
+    The destination workspace is written from MEMBER_KEYS minus the keys the
+    extract writes for itself, so a member key added to the workspace model
+    travels by the act of being declared. A hand-listed set is how dev_only,
+    description, test_only and lint_allow came to be dropped silently.
+    """
+
+    def test_the_carried_set_is_every_key_the_extract_does_not_rewrite(self):
+        from rlsbl.commands.monorepo.extract_cmd import (
+            _EXTRACT_REWRITTEN_MEMBER_KEYS,
+            carried_member_keys,
+        )
+        from rlsbl.workspace import MEMBER_KEYS
+
+        assert carried_member_keys() | _EXTRACT_REWRITTEN_MEMBER_KEYS == set(
+            MEMBER_KEYS
+        )
+        assert not (carried_member_keys() & _EXTRACT_REWRITTEN_MEMBER_KEYS)
+
+    def test_every_rewritten_key_is_a_real_member_key(self):
+        from rlsbl.commands.monorepo.extract_cmd import (
+            _EXTRACT_REWRITTEN_MEMBER_KEYS,
+        )
+        from rlsbl.workspace import MEMBER_KEYS
+
+        assert _EXTRACT_REWRITTEN_MEMBER_KEYS <= set(MEMBER_KEYS)
