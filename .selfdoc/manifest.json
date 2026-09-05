@@ -13388,6 +13388,11 @@
         },
         {
           "level": 3,
+          "text": "`bump_commit_messages`",
+          "anchor": "bump_commit_messages"
+        },
+        {
+          "level": 3,
           "text": "`find_bump_commits`",
           "anchor": "find_bump_commits"
         },
@@ -13412,14 +13417,24 @@
           "anchor": "tag_candidates"
         },
         {
-          "level": 3,
-          "text": "`discover_scopes`",
-          "anchor": "discover_scopes"
+          "level": 4,
+          "text": "`_expected`",
+          "anchor": "_expected"
+        },
+        {
+          "level": 4,
+          "text": "`tag_spellings`",
+          "anchor": "tag_spellings"
         },
         {
           "level": 3,
-          "text": "`repository_transition_record`",
-          "anchor": "repository_transition_record"
+          "text": "`scope_target`",
+          "anchor": "scope_target"
+        },
+        {
+          "level": 3,
+          "text": "`discover_scopes`",
+          "anchor": "discover_scopes"
         },
         {
           "level": 3,
@@ -13565,6 +13580,11 @@
           "level": 3,
           "text": "`build_preview`",
           "anchor": "build_preview"
+        },
+        {
+          "level": 3,
+          "text": "`undecidable_reasons`",
+          "anchor": "undecidable_reasons"
         },
         {
           "level": 3,
@@ -16726,6 +16746,11 @@
         },
         {
           "level": 3,
+          "text": "`recorded_alias_groups`",
+          "anchor": "recorded_alias_groups"
+        },
+        {
+          "level": 3,
           "text": "`recorded_aliases`",
           "anchor": "recorded_aliases"
         }
@@ -17418,6 +17443,11 @@
           "level": 3,
           "text": "`get_transition_record_path`",
           "anchor": "get_transition_record_path"
+        },
+        {
+          "level": 3,
+          "text": "`repository_transition_record_path`",
+          "anchor": "repository_transition_record_path"
         },
         {
           "level": 3,
@@ -20089,6 +20119,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T02:07:43.304046+00:00",
+  "last_gen": "2026-09-05T03:17:59.164348+00:00",
   "theme": "minimal"
 }
