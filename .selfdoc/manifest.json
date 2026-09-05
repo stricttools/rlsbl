@@ -13439,6 +13439,11 @@
         },
         {
           "level": 3,
+          "text": "`_fate_markers_in`",
+          "anchor": "_fate_markers_in"
+        },
+        {
+          "level": 3,
           "text": "`write_release_commit`",
           "anchor": "write_release_commit"
         },
@@ -13576,6 +13581,11 @@
         },
         {
           "level": 3,
+          "text": "`version_never_released`",
+          "anchor": "version_never_released"
+        },
+        {
+          "level": 3,
           "text": "`view_body_args`",
           "anchor": "view_body_args"
         },
@@ -13650,11 +13660,6 @@
           "level": 4,
           "text": "`recorded`",
           "anchor": "recorded"
-        },
-        {
-          "level": 4,
-          "text": "`released`",
-          "anchor": "released"
         },
         {
           "level": 3,
@@ -19629,6 +19634,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-04T23:51:01.048851+00:00",
+  "last_gen": "2026-09-05T00:51:38.392812+00:00",
   "theme": "minimal"
 }
