@@ -1107,6 +1107,50 @@ class TestAnUnderivableCompanionSetIsReported:
         assert "companion tags" in backfill.unexplained_error(plan)
 
 
+class TestTaglessReleasableVersion:
+    """A releasable's version-bump commit says the releasable's name.
+
+    The release flow commits a releasable's version bump as
+    ``{name}: release v{version}`` -- not as the tag string a standalone
+    repository uses. The pass matched only the standalone forms, so a
+    releasable version whose tag is missing was recorded ``unrecoverable``
+    forever, though the commit it shipped from was right there in the history.
+    """
+
+    def _workspace(self, tmp_path, message, *, name="tagless"):
+        repo, rel_dir = make_releasable_workspace(
+            tmp_path, targets=["pypi"], name=name,
+        )
+        commit_file(repo, "packages/core/thing.py", "x = 1\n", "seed")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "workspace")
+        sha = commit_file(repo, "packages/core/thing.py", "x = 2\n", message)
+        write_changelog_jsonl(rel_dir / "changes", "0.1.0")
+        return repo, rel_dir, sha
+
+    def test_the_releasable_bump_commit_is_found(self, tmp_path):
+        repo, rel_dir, sha = self._workspace(tmp_path, "core: release v0.1.0")
+
+        code, output = run_backfill(repo)
+
+        assert code == 0, output
+        data = read_toml(rel_dir / "releases" / "v0.1.0.toml")
+        assert data["candidate_sha"] == sha
+        assert "unrecoverable" not in data
+        assert "recorded from the version-bump commit" in output
+
+    def test_another_releasables_bump_commit_does_not_match(self, tmp_path):
+        repo, rel_dir, _sha = self._workspace(
+            tmp_path, "other: release v0.1.0", name="foreign",
+        )
+
+        run_backfill(repo)
+
+        data = read_toml(rel_dir / "releases" / "v0.1.0.toml")
+        assert data["unrecoverable"] is True
+        assert "candidate_sha" not in data
+
+
 class TestEverySpellingOfAKnownVersionIsExplained:
     """A version can stand under more than one live spelling at once.
 

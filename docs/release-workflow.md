@@ -268,7 +268,7 @@ A reconstructed description comes from the first source that yields one, and the
 4. the **commit subjects** in the version's tag range;
 5. otherwise a placeholder that names the recovery obligation.
 
-A version with **no tag** is not passed over: the pass looks for the version-bump commit (whose whole message is the tag string) and records the release commit from it, saying so. Only when that also fails does the archive get `unrecoverable = true` — a permanent record that the commit is unrecoverable, not a temporary gap.
+A version with **no tag** is not passed over: the pass looks for the version-bump commit — whose whole message is what a release of that scope writes, the releasable's `{name}: release v{version}` or the release's own tag string — and records the release commit from it, saying so. The message is matched whole, so one releasable's bump commit is never mistaken for another's. Only when that also fails does the archive get `unrecoverable = true` — a permanent record that the commit is unrecoverable, not a temporary gap.
 
 **The one fate the pass will not derive is `never_released`.** A version no release ever used has no tag and no version-bump commit *by construction*, which is indistinguishable from a released version whose commit is gone. So it is DECLARED, not inferred: write the archive with `never_released = true` before running the backfill, and the pass leaves that fate alone forever. The note it prints on a version it is about to record from a version-bump commit says exactly this — there is deliberately no flag and no input file for the declaration, because the archive *is* the declaration.
 

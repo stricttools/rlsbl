@@ -195,18 +195,43 @@ def stash_entries(repo):
     return [line for line in _git(repo, ["stash", "list"]).splitlines() if line.strip()]
 
 
-def find_bump_commits(repo, version):
-    """Commits whose whole message is this version's bump message.
+def bump_commit_messages(scope, version):
+    """Every whole commit message a release of *scope* writes for *version*.
 
-    The release flow commits the version bump with the tag string as the message
-    (``v1.2.3``), so that commit IS the release candidate even when the tag that
-    should point at it is missing. Both the tagged spelling and the bare version
-    are accepted, because older flows wrote either.
+    The release flow commits the version bump under one of two shapes, and which
+    one is not a guess:
+
+    * a RELEASABLE's bump commit names the releasable --
+      ``{name}: release v{version}`` (see
+      ``rlsbl.commands.release``'s commit-message step);
+    * everything else commits the release's own TAG STRING, which for a
+      standalone repository is ``v{version}`` and for a member is that member's
+      spelling -- so the scope's own ref set supplies them.
+
+    The bare version is accepted too, because older flows wrote it. Every
+    message is matched WHOLE, so ``core: release v1.2.3`` can never be found by
+    a sibling releasable looking for its own bump commit.
     """
-    pattern = f"^v?{re.escape(version)}$"
+    messages = [f"v{version}", version, *scope.tag_candidates(version)]
+    releasable = getattr(scope.ref_ctx, "releasable_name", None)
+    if releasable:
+        messages.append(f"{releasable}: release v{version}")
+    return list(dict.fromkeys(messages))
+
+
+def find_bump_commits(repo, messages):
+    """Commits whose whole message is one of *messages*.
+
+    That commit IS the release candidate even when the tag that should point at
+    it is missing.
+    """
+    alternatives = "|".join(re.escape(m) for m in messages if m)
+    if not alternatives:
+        return []
     out = _git(
         repo,
-        ["log", "--all", "--extended-regexp", f"--grep={pattern}", "--format=%H"],
+        ["log", "--all", "--extended-regexp", f"--grep=^({alternatives})$",
+         "--format=%H"],
     )
     return [line.strip() for line in out.splitlines() if line.strip()]
 
@@ -1139,7 +1164,9 @@ def _plan_version(repo, scope, version, *, predecessor, archives, changelogs,
     already_recorded = state is not None and (state.recorded or state.unrecoverable)
 
     if not tag and not already_recorded:
-        bump_commits = find_bump_commits(repo, version)
+        bump_commits = find_bump_commits(
+            repo, bump_commit_messages(scope, version),
+        )
         if bump_commits:
             sha = bump_commits[0]
             vp.recorded_from = "bump-commit"
