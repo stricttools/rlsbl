@@ -23,6 +23,7 @@ from ..npm_wrapper import (
     npm_wrapper_enabled,
     npm_wrapper_template_mappings,
 )
+from ..ownership import is_root_path
 from ..utils import read_go_module_path
 from .. import effects
 
@@ -331,25 +332,40 @@ class GoTarget(BaseTarget):
         ``monorepo_tag_format`` output, so it is only useful as a
         *companion* when a different target (e.g. npm) is the primary
         release target and produces a non-Go-compatible primary tag.
+
+        The repository ROOT contributes none: a root module's proxy tag is
+        ``v{version}`` itself, which is the primary the release already
+        creates.  Prefixing the root's path spelling would ask git to create
+        ``./v{version}``, which is not a legal ref name at all.
         """
-        if path is not None:
-            sep = "" if path.endswith("/") else "/"
-            return [f"{path}{sep}v{version}"]
-        return []
+        if path is None or is_root_path(path):
+            return []
+        return [f"{path}{self._path_sep(path)}v{version}"]
 
     def monorepo_tag_format(self, name, version, path=None):
-        """Return a Go module proxy compatible tag using the package path prefix."""
-        if path is not None:
-            sep = "" if path.endswith("/") else "/"
-            return f"{path}{sep}v{version}"
-        return super().monorepo_tag_format(name, version, path)
+        """Return a Go module proxy compatible tag using the package path prefix.
+
+        A root module carries no prefix -- its proxy tag is the standalone
+        ``v{version}``.
+        """
+        if path is None:
+            return super().monorepo_tag_format(name, version, path)
+        if is_root_path(path):
+            return self.tag_format(version)
+        return f"{path}{self._path_sep(path)}v{version}"
 
     def monorepo_tag_glob(self, name, path=None):
         """Return a glob pattern matching Go module proxy tags for a monorepo package."""
-        if path is not None:
-            sep = "" if path.endswith("/") else "/"
-            return f"{path}{sep}v*"
-        return super().monorepo_tag_glob(name, path)
+        if path is None:
+            return super().monorepo_tag_glob(name, path)
+        if is_root_path(path):
+            return "v*"
+        return f"{path}{self._path_sep(path)}v*"
+
+    @staticmethod
+    def _path_sep(path):
+        """The separator between a member path and the ``v{version}`` segment."""
+        return "" if path.endswith("/") else "/"
 
     def template_dir(self):
         """Return the path to the Go-specific template directory."""

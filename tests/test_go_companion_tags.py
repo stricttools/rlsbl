@@ -76,6 +76,67 @@ class TestGoTargetCompanionTags:
         assert tags == ["packages/myproject/v1.2.3"]
 
 
+class TestGoTargetAtTheRepositoryRoot:
+    """A Go module AT the repository root tags under the standalone spelling.
+
+    The root member's path is ``"."`` (``""`` and ``"./"`` are the other
+    spellings of it).  Prefixing it the way a subdirectory member is prefixed
+    yields ``./v1.2.3``, which git refuses outright
+    (``fatal: './v0.39.0' is not a valid tag name``) -- and it refuses it at
+    the release's tag step, after the candidate has been pushed and CI has
+    already run.  A root module's proxy tag IS ``v{version}``, so the root
+    member contributes no companion at all.
+    """
+
+    ROOT_SPELLINGS = ("", ".", "./")
+
+    @pytest.mark.parametrize("path", ROOT_SPELLINGS)
+    def test_no_companion_for_a_root_module(self, path):
+        assert GoTarget().companion_tags("root", "0.39.0", path=path) == []
+
+    @pytest.mark.parametrize("path", ROOT_SPELLINGS)
+    def test_the_monorepo_tag_format_is_the_standalone_one(self, path):
+        assert GoTarget().monorepo_tag_format("root", "0.39.0", path=path) == "v0.39.0"
+
+    @pytest.mark.parametrize("path", ROOT_SPELLINGS)
+    def test_the_monorepo_tag_glob_is_the_standalone_one(self, path):
+        assert GoTarget().monorepo_tag_glob("root", path=path) == "v*"
+
+    def test_a_subdirectory_member_still_gets_its_path_prefix(self):
+        """The non-root answer is untouched."""
+        target = GoTarget()
+        assert target.companion_tags("golib", "0.39.0", path="packages/golib") == [
+            "packages/golib/v0.39.0"
+        ]
+        assert target.monorepo_tag_format("golib", "0.39.0", path="packages/golib") == (
+            "packages/golib/v0.39.0"
+        )
+        assert target.monorepo_tag_glob("golib", path="packages/golib") == "packages/golib/v*"
+
+    def test_a_root_go_member_releases_with_only_its_primary_tag(self, tmp_path):
+        """End to end through ``expected_refs``: the ref set is the primary alone.
+
+        A releasable whose only member is the repository root, declaring
+        ``tag_format = "v{version}"`` -- the shape a repository that used to be
+        standalone keeps when it becomes a workspace.
+        """
+        go_entry = MagicMock()
+        go_entry.name = "go"
+
+        with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
+             patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
+             patch("rlsbl.targets.TARGETS", {"go": GoTarget()}):
+            expected = BaseTarget().expected_refs("0.39.0", ref_context(
+                repo_root=str(tmp_path),
+                primary_tag_format="v{version}",
+                releasable_name="tool",
+                member_package_paths=["."],
+            ))
+
+        assert expected.primary == "v0.39.0"
+        assert expected.companions == ()
+
+
 # ---------------------------------------------------------------------------
 # Unit tests: the companion half of expected_refs
 # ---------------------------------------------------------------------------

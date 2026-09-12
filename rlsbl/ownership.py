@@ -138,6 +138,18 @@ def normalize_path(path) -> str:
     return text.rstrip("/")
 
 
+def is_root_path(path) -> bool:
+    """True when *path* is one of the spellings that mean the repository root.
+
+    The root member declares ``path = "."``; ``""`` and ``"./"`` are the other
+    accepted spellings of the same territory.  Anything that prefixes a member
+    path has to ask, because prefixing the root produces a path with a leading
+    ``./`` that is not the repository root's real spelling -- and for a git tag
+    it is not even a legal ref name.
+    """
+    return normalize_path(path) == ""
+
+
 def tool_owned_rule(path) -> str | None:
     """Return the static rule making *path* tool-owned, or ``None``.
 
