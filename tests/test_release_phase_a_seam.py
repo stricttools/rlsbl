@@ -630,7 +630,7 @@ class TestPreflightIsOutsideThePlan:
         for helper in (
             "run_release_hook", "run_releasable_hooks",
             "_run_selfdoc_gen", "_run_selfdoc_check",
-            "_run_strictcli_schema_dump", "_run_selfblog_post_generate",
+            "_run_strictcli_schema_dump", "_run_selfdoc_blog_post_generate",
             "run_checks",
         ):
             assert helper not in source, (
@@ -653,7 +653,7 @@ class TestPreflightIsOutsideThePlan:
         for module in (validate, publish):
             source = inspect.getsource(module)
             for banned in (
-                "Would run: selfdoc", "Would run: selfblog",
+                "Would run: selfdoc",
                 "Would run: {' '.join(cmd)}",
             ):
                 assert banned not in source, (

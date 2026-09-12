@@ -22,6 +22,9 @@ module beside its npm and PyPI manifests.
   imported from `selfdoc-core`, and the `rlsbl[docs]` extra that pulled it in is
   removed. That removal is the breaking change making this a minor bump: derived
   tables now build under a bare `python3`.
+- A release that generates a blog post now invokes `selfdoc blog post generate`
+  and checks for the `selfdoc` binary, because the separate `selfblog` command
+  no longer exists.
 """
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the

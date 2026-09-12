@@ -1,4 +1,4 @@
-"""Tests for the selfblog post generate wiring in the release flow."""
+"""Tests for the selfdoc blog post generate wiring in the release flow."""
 
 import json
 import os
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from rlsbl.commands.release import _run_selfblog_post_generate
+from rlsbl.commands.release import _run_selfdoc_blog_post_generate
 from rlsbl.commands.release.validate import HookError
 from rlsbl.release_file import ReleaseConfig
 
@@ -25,7 +25,7 @@ def _rc(blog=False, description="test release", context=""):
 
 
 class TestFlagAssembly:
-    """Test that CLI flags are assembled correctly for selfblog post generate."""
+    """Test that CLI flags are assembled correctly for selfdoc blog post generate."""
 
     def test_all_flags_present(self, tmp_path):
         """All parameters produce the correct CLI flags."""
@@ -45,10 +45,10 @@ class TestFlagAssembly:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch("rlsbl._effects_direct.run", side_effect=mock_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True, description="Added feature X", context="Because reasons"),
@@ -59,7 +59,8 @@ class TestFlagAssembly:
                 tag="v1.2.3",
             )
 
-        assert "selfblog" in captured_cmd
+        assert "selfdoc" in captured_cmd
+        assert "blog" in captured_cmd
         assert "post" in captured_cmd
         assert "generate" in captured_cmd
         assert "--from-release" in captured_cmd
@@ -81,6 +82,60 @@ class TestFlagAssembly:
         idx = captured_cmd.index("--release-url")
         assert "github.com/owner/repo/releases/tag/v1.2.3" in captured_cmd[idx + 1]
 
+    def test_exact_argv_is_the_selfdoc_blog_post_group(self, tmp_path):
+        """The whole argv the release flow builds, asserted element for element.
+
+        The binary is ``selfdoc`` and the post commands sit under a ``blog``
+        group, so the invocation is ``selfdoc blog post generate
+        --from-release``. Asserting the complete list (rather than membership
+        of individual flags) is what makes a rename of the binary or the group
+        fail here instead of at release time.
+        """
+        selfdoc_json = tmp_path / "selfdoc.json"
+        selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
+        releases_dir = tmp_path / ".rlsbl" / "releases"
+        releases_dir.mkdir(parents=True, exist_ok=True)
+        body_file = releases_dir / "unreleased.md"
+        body_file.write_text("Blog body content.\n")
+
+        changelog_tmp = str(tmp_path / "changelog.md")
+        fake_effects = MagicMock()
+        fake_effects.temp_file.return_value = changelog_tmp
+
+        with (
+            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
+            patch("rlsbl.commands.release.publish.effects", fake_effects),
+            patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
+        ):
+            _run_selfdoc_blog_post_generate(
+                {},
+                project_dir=str(tmp_path),
+                release_config=_rc(
+                    blog=True,
+                    description="Added feature X",
+                    context="Because reasons",
+                ),
+                new_version="1.2.3",
+                current_version="1.2.2",
+                bump_type="patch",
+                changelog_entry="## 1.2.3\n\n- Added feature X\n",
+                tag="v1.2.3",
+            )
+
+        argv = fake_effects.run.call_args[0][0]
+        assert argv == [
+            "selfdoc", "blog", "post", "generate", "--from-release",
+            "--version", "1.2.3",
+            "--prev-version", "1.2.2",
+            "--bump-type", "patch",
+            "--description", "Added feature X",
+            "--context", "Because reasons",
+            "--changelog-file", changelog_tmp,
+            "--body-file", str(body_file),
+            "--project-name", "myproject",
+            "--release-url", "https://github.com/owner/repo/releases/tag/v1.2.3",
+        ]
+
     def test_optional_flags_omitted_when_empty(self, tmp_path):
         """Optional flags (prev-version, bump-type, context) are omitted when values are empty."""
         selfdoc_json = tmp_path / "selfdoc.json"
@@ -94,10 +149,10 @@ class TestFlagAssembly:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch("rlsbl._effects_direct.run", side_effect=mock_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True, description="First release"),
@@ -114,15 +169,15 @@ class TestFlagAssembly:
 
 
 class TestBlogFalseSkips:
-    """Test that blog=false skips the selfblog post generate call."""
+    """Test that blog=false skips the selfdoc blog post generate call."""
 
     def test_blog_false_skips(self, tmp_path):
         """When blog=false, no subprocess call is made."""
         selfdoc_json = tmp_path / "selfdoc.json"
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
-        with patch("subprocess.run") as mock_run:
-            result = _run_selfblog_post_generate(
+        with patch("rlsbl._effects_direct.run") as mock_run:
+            result = _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=False),
@@ -137,12 +192,12 @@ class TestBlogFalseSkips:
 
 
 class TestMissingSelfdoc:
-    """Test graceful handling when selfblog is not available."""
+    """Test graceful handling when selfdoc is not available."""
 
     def test_no_selfdoc_json_skips(self, tmp_path):
         """When selfdoc.json doesn't exist, skip gracefully."""
-        with patch("subprocess.run") as mock_run:
-            result = _run_selfblog_post_generate(
+        with patch("rlsbl._effects_direct.run") as mock_run:
+            result = _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -155,16 +210,16 @@ class TestMissingSelfdoc:
             assert result is True
             mock_run.assert_not_called()
 
-    def test_selfblog_not_installed_skips(self, tmp_path, capsys):
-        """When selfblog is not installed, skip with a note."""
+    def test_selfdoc_not_installed_skips(self, tmp_path, capsys):
+        """When selfdoc is not installed, skip with a note."""
         selfdoc_json = tmp_path / "selfdoc.json"
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=False),
-            patch("subprocess.run") as mock_run,
+            patch("rlsbl._effects_direct.run") as mock_run,
         ):
-            result = _run_selfblog_post_generate(
+            result = _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -178,7 +233,7 @@ class TestMissingSelfdoc:
             mock_run.assert_not_called()
 
         captured = capsys.readouterr()
-        assert "selfblog is not installed" in captured.out
+        assert "selfdoc is not installed" in captured.out
 
 
 class TestTempFileCleanup:
@@ -202,18 +257,18 @@ class TestTempFileCleanup:
 
         def mock_subprocess_run(cmd, *args, **kwargs):
             # Verify temp file exists during subprocess call
-            if "selfblog" in cmd:
+            if "selfdoc" in cmd:
                 changelog_idx = cmd.index("--changelog-file") + 1
                 assert os.path.exists(cmd[changelog_idx]), "temp file should exist during subprocess call"
             return subprocess.CompletedProcess(args=cmd, returncode=0)
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=mock_subprocess_run),
+            patch("rlsbl._effects_direct.run", side_effect=mock_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
             patch("rlsbl._effects_direct.temp_file", side_effect=tracking_temp),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -229,7 +284,7 @@ class TestTempFileCleanup:
             assert not os.path.exists(tf), f"temp file {tf} should be cleaned up"
 
     def test_temp_file_cleaned_on_failure(self, tmp_path):
-        """Temp changelog file is removed even when selfblog fails."""
+        """Temp changelog file is removed even when selfdoc fails."""
         selfdoc_json = tmp_path / "selfdoc.json"
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
@@ -244,18 +299,18 @@ class TestTempFileCleanup:
             return path
 
         def failing_subprocess_run(cmd, *args, **kwargs):
-            if "selfblog" in cmd:
+            if "selfdoc" in cmd:
                 raise subprocess.CalledProcessError(1, cmd)
             return subprocess.CompletedProcess(args=cmd, returncode=0)
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=failing_subprocess_run),
+            patch("rlsbl._effects_direct.run", side_effect=failing_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
             patch("rlsbl._effects_direct.temp_file", side_effect=tracking_temp),
             pytest.raises(HookError),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -275,14 +330,14 @@ class TestDryRun:
     """Test dry-run behavior."""
 
     def test_dry_run_records_the_real_argv(self, tmp_path):
-        """A preview records the selfblog invocation instead of describing it.
+        """A preview records the selfdoc invocation instead of describing it.
 
-        The hand-rolled ``Would run: selfblog post generate ...`` line that
+        The hand-rolled ``Would run: selfdoc blog post generate ...`` line that
         used to stand in here named only the version; the recorded call
         carries the whole argv (bump type, description, body file, release
         URL) and no subprocess is ever forked.
 
-        ``require_tool`` is patched so the test does not depend on selfblog
+        ``require_tool`` is patched so the test does not depend on selfdoc
         being installed on the machine running the suite: without it the runner
         prints a "not installed" note and returns before recording anything.
         """
@@ -292,10 +347,10 @@ class TestDryRun:
         fake_effects = MagicMock()
         fake_effects.temp_file.return_value = str(tmp_path / "cl.md")
         with (
-            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfblog"),
+            patch("rlsbl.commands.release.require_tool", return_value="/usr/bin/selfdoc"),
             patch("rlsbl.commands.release.publish.effects", fake_effects),
         ):
-            result = _run_selfblog_post_generate(
+            result = _run_selfdoc_blog_post_generate(
                 {"dry-run": True},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -308,30 +363,30 @@ class TestDryRun:
 
         assert result is True
         argv = fake_effects.run.call_args[0][0]
-        assert argv[:4] == ["selfblog", "post", "generate", "--from-release"]
+        assert argv[:5] == ["selfdoc", "blog", "post", "generate", "--from-release"]
         assert "1.0.0" in argv
 
 
 class TestSubprocessFailure:
-    """Test that selfblog failure aborts the release."""
+    """Test that selfdoc failure aborts the release."""
 
-    def test_selfblog_failure_raises_hook_error(self, tmp_path):
-        """When selfblog post generate fails, HookError is raised."""
+    def test_selfdoc_blog_failure_raises_hook_error(self, tmp_path):
+        """When selfdoc blog post generate fails, HookError is raised."""
         selfdoc_json = tmp_path / "selfdoc.json"
         selfdoc_json.write_text(json.dumps({"project_name": "myproject"}))
 
         def failing_subprocess_run(cmd, *args, **kwargs):
-            if "selfblog" in cmd:
+            if "selfdoc" in cmd:
                 raise subprocess.CalledProcessError(1, cmd)
             return subprocess.CompletedProcess(args=cmd, returncode=0)
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=failing_subprocess_run),
+            patch("rlsbl._effects_direct.run", side_effect=failing_subprocess_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
-            pytest.raises(HookError, match="selfblog post generate failed"),
+            pytest.raises(HookError, match="selfdoc blog post generate failed"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),

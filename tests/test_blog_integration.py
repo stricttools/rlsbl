@@ -11,7 +11,7 @@ import subprocess
 from unittest.mock import patch
 
 
-from rlsbl.commands.release import _run_selfblog_post_generate
+from rlsbl.commands.release import _run_selfdoc_blog_post_generate
 from rlsbl.release_file import ReleaseConfig
 
 
@@ -64,7 +64,13 @@ def _setup_project(tmp_path, selfdoc_config=None, blog_body=None, rlsbl_config=N
 
 
 def _capture_subprocess(captured_cmd):
-    """Return a mock subprocess.run that captures the command list."""
+    """Return a mock for the effects primitive that captures the command list.
+
+    The capture is installed on ``rlsbl._effects_direct.run`` rather than on
+    ``subprocess.run``: conftest's autouse fixture already occupies that
+    primitive and short-circuits any argv whose first element is ``selfdoc``,
+    so a capture installed below it would never see the blog invocation.
+    """
 
     def mock_run(cmd, *args, **kwargs):
         captured_cmd.extend(cmd)
@@ -78,7 +84,7 @@ class TestRealisticProjectStructure:
 
     def test_full_project_structure(self, tmp_path):
         """A realistic project with selfdoc.json, .rlsbl/config.json, and blog body
-        produces the correct selfblog invocation."""
+        produces the correct selfdoc invocation."""
         selfdoc_config = _realistic_selfdoc_config("cooltools")
         blog_body = "## What's new\n\nThis release adds the widget feature.\n"
         _setup_project(tmp_path, selfdoc_config=selfdoc_config, blog_body=blog_body)
@@ -87,10 +93,10 @@ class TestRealisticProjectStructure:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:acme/cooltools.git"),
         ):
-            result = _run_selfblog_post_generate(
+            result = _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True, description="Added widget feature"),
@@ -102,7 +108,7 @@ class TestRealisticProjectStructure:
             )
 
         assert result is True
-        assert captured_cmd[:4] == ["selfblog", "post", "generate", "--from-release"]
+        assert captured_cmd[:5] == ["selfdoc", "blog", "post", "generate", "--from-release"]
 
 
 class TestChangelogFileContentVerification:
@@ -117,7 +123,7 @@ class TestChangelogFileContentVerification:
         observed_content = []
 
         def inspecting_run(cmd, *args, **kwargs):
-            if "selfblog" in cmd and "--changelog-file" in cmd:
+            if "selfdoc" in cmd and "--changelog-file" in cmd:
                 idx = cmd.index("--changelog-file") + 1
                 filepath = cmd[idx]
                 with open(filepath, "r", encoding="utf-8") as f:
@@ -126,10 +132,10 @@ class TestChangelogFileContentVerification:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=inspecting_run),
+            patch("rlsbl._effects_direct.run", side_effect=inspecting_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -150,7 +156,7 @@ class TestChangelogFileContentVerification:
         observed_content = []
 
         def inspecting_run(cmd, *args, **kwargs):
-            if "selfblog" in cmd and "--changelog-file" in cmd:
+            if "selfdoc" in cmd and "--changelog-file" in cmd:
                 idx = cmd.index("--changelog-file") + 1
                 with open(cmd[idx], "r", encoding="utf-8") as f:
                     observed_content.append(f.read())
@@ -158,10 +164,10 @@ class TestChangelogFileContentVerification:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=inspecting_run),
+            patch("rlsbl._effects_direct.run", side_effect=inspecting_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -180,7 +186,7 @@ class TestChangelogFileContentVerification:
         observed_content = []
 
         def inspecting_run(cmd, *args, **kwargs):
-            if "selfblog" in cmd and "--changelog-file" in cmd:
+            if "selfdoc" in cmd and "--changelog-file" in cmd:
                 idx = cmd.index("--changelog-file") + 1
                 with open(cmd[idx], "r", encoding="utf-8") as f:
                     observed_content.append(f.read())
@@ -188,10 +194,10 @@ class TestChangelogFileContentVerification:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=inspecting_run),
+            patch("rlsbl._effects_direct.run", side_effect=inspecting_run),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -217,10 +223,10 @@ class TestProjectNameResolution:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -240,10 +246,10 @@ class TestProjectNameResolution:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -263,10 +269,10 @@ class TestProjectNameResolution:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -286,10 +292,10 @@ class TestProjectNameResolution:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -317,10 +323,10 @@ class TestBodyFilePath:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -341,10 +347,10 @@ class TestBodyFilePath:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="git@github.com:owner/repo.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -367,10 +373,10 @@ class TestReleaseURLWithHTTPS:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="https://github.com/acme/toolkit.git"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -389,10 +395,10 @@ class TestReleaseURLWithHTTPS:
 
         with (
             patch("rlsbl.commands.release.require_tool", return_value=True),
-            patch("subprocess.run", side_effect=_capture_subprocess(captured_cmd)),
+            patch("rlsbl._effects_direct.run", side_effect=_capture_subprocess(captured_cmd)),
             patch("rlsbl.commands.release.run", return_value="https://github.com/acme/toolkit"),
         ):
-            _run_selfblog_post_generate(
+            _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=_rc(blog=True),
@@ -411,8 +417,8 @@ class TestNoneReleaseConfig:
         """When release_config is None, returns True without any subprocess call."""
         _setup_project(tmp_path, selfdoc_config=_realistic_selfdoc_config())
 
-        with patch("subprocess.run") as mock_run:
-            result = _run_selfblog_post_generate(
+        with patch("rlsbl._effects_direct.run") as mock_run:
+            result = _run_selfdoc_blog_post_generate(
                 {},
                 project_dir=str(tmp_path),
                 release_config=None,
@@ -427,7 +433,7 @@ class TestNoneReleaseConfig:
         """When release_config is None, selfdoc.json is not even checked."""
         # No selfdoc.json -- but that should not matter because we bail
         # before reaching the selfdoc.json check.
-        result = _run_selfblog_post_generate(
+        result = _run_selfdoc_blog_post_generate(
             {},
             project_dir=str(tmp_path),
             release_config=None,

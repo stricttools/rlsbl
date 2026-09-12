@@ -443,7 +443,7 @@ _FULL_FLOW_PATCHES = (
     patch("rlsbl.commands.release._run_strictcli_schema_dump"),
     patch("rlsbl.commands.release._run_selfdoc_gen"),
     patch("rlsbl.commands.release._run_selfdoc_check"),
-    patch("rlsbl.commands.release._run_selfblog_post_generate"),
+    patch("rlsbl.commands.release._run_selfdoc_blog_post_generate"),
     patch("rlsbl.commands.release.commit_files_if_changed"),
 )
 

@@ -68,7 +68,7 @@ from ...ci_checks import (  # noqa: F401  (same late-bound re-export path)
     release_check_filters,
 )
 from .rollback import _cleanup_release_artifacts
-from .publish import _run_selfblog_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config
+from .publish import _run_selfdoc_blog_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config
 from .validate import (
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
     _abort_on_cross_repo_sources, _abort_on_version_skew,
@@ -984,7 +984,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     _run_selfdoc_gen(flags, project_dir=project_dir, version=new_version)
     _run_selfdoc_check(flags, project_dir=project_dir, version=new_version)
 
-    _run_selfblog_post_generate(
+    _run_selfdoc_blog_post_generate(
         flags,
         project_dir=project_dir,
         release_config=release_config,

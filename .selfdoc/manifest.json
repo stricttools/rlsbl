@@ -8264,8 +8264,8 @@
         },
         {
           "level": 3,
-          "text": "`_run_selfblog_post_generate`",
-          "anchor": "_run_selfblog_post_generate"
+          "text": "`_run_selfdoc_blog_post_generate`",
+          "anchor": "_run_selfdoc_blog_post_generate"
         },
         {
           "level": 3,
