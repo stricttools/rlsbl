@@ -9984,6 +9984,11 @@
         },
         {
           "level": 3,
+          "text": "`find_member_for_root`",
+          "anchor": "find_member_for_root"
+        },
+        {
+          "level": 3,
           "text": "`_resolve_releasable_config_dir`",
           "anchor": "_resolve_releasable_config_dir"
         },
@@ -12485,6 +12490,11 @@
           "level": 3,
           "text": "`normalize_path`",
           "anchor": "normalize_path"
+        },
+        {
+          "level": 3,
+          "text": "`is_root_path`",
+          "anchor": "is_root_path"
         },
         {
           "level": 3,
@@ -15602,6 +15612,11 @@
           "level": 4,
           "text": "`monorepo_tag_glob`",
           "anchor": "monorepo_tag_glob"
+        },
+        {
+          "level": 4,
+          "text": "`_path_sep`",
+          "anchor": "_path_sep"
         },
         {
           "level": 4,
@@ -20464,6 +20479,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-05T22:41:06.840138+00:00",
+  "last_gen": "2026-09-12T23:26:12.283156+00:00",
   "theme": "minimal"
 }
