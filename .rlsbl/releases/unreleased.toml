@@ -2,11 +2,27 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Root Go members release correctly; the docs directives need no selfdoc package"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Four fixes found while releasing a repository whose root member carries a Go
+module beside its npm and PyPI manifests.
+
+- A releasable whose member is the repository root no longer tries to create a
+  `./v1.2.3` companion tag for a root Go module; git refuses that ref name, and
+  the root module's proxy tag is the primary `v1.2.3` tag itself.
+- `mixed-tag-schemes` stops reporting a scheme conflict on a member whose
+  releasable already declares the one `tag_format` it tags under.
+- `version-consistency` reads the `targets` and `publish_mode` the releasable
+  declares for a member whose path is the repository root, which cannot carry a
+  `.rlsbl/config.json` of its own.
+- The documentation directives vendored the Markdown table renderer they
+  imported from `selfdoc-core`, and the `rlsbl[docs]` extra that pulled it in is
+  removed. That removal is the breaking change making this a minor bump: derived
+  tables now build under a bare `python3`.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
