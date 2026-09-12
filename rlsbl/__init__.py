@@ -565,6 +565,11 @@ def _check_context_factory(project_root=None):
             project_root=ctx.project_root,
             workspace_root=ctx.workspace_root,
             config=ctx.config,
+            # The member this context was built for, carried over from the
+            # context that read its config: a check that resolves the
+            # releasable config directory a second time (to read the member's
+            # targets, or its publish mode) must reach the same one.
+            project=ctx.project,
             projects=projects,
             graph=graph,
             releasables=releasables,

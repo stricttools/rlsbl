@@ -31,6 +31,26 @@ class ProjectContext:
     unselected_releasables: tuple[str, ...] | None = field(default=None)
 
 
+def find_member_for_root(root: Path, workspace_root: Path, projects) -> "WorkspaceProject | None":
+    """Return the workspace member whose declared path IS *root*, or None.
+
+    The one place a directory is matched to a member, so the member a context
+    reports and the releasable config its config was merged from can never
+    disagree.
+    """
+    import os
+
+    if projects is None:
+        return None
+
+    ws_root = str(workspace_root)
+    abs_root = os.path.realpath(str(root))
+    for proj in projects:
+        if abs_root == os.path.realpath(os.path.join(ws_root, proj.path)):
+            return proj
+    return None
+
+
 def _resolve_releasable_config_dir(
     root: Path,
     workspace_root: Path,
@@ -48,21 +68,11 @@ def _resolve_releasable_config_dir(
     Returns None if the project is not in the workspace, is not
     releasable, or if the workspace could not be loaded.
     """
-    import os
-
     ws_root = str(workspace_root)
     if projects is None or releasables is None:
         return None
 
-    # Find which project this root corresponds to
-    abs_root = os.path.realpath(str(root))
-    matched_project = None
-    for proj in projects:
-        proj_abs = os.path.realpath(os.path.join(ws_root, proj.path))
-        if abs_root == proj_abs:
-            matched_project = proj
-            break
-
+    matched_project = find_member_for_root(root, workspace_root, projects)
     if matched_project is None:
         return None
 
@@ -128,6 +138,13 @@ def create_context(
     releasable membership and applies config inheritance (releasable-level
     config as base, per-package config on top).
 
+    A caller that does not name *project* gets the member whose declared path
+    is *root* -- the same match the releasable config directory comes from. A
+    context that carried no member could not resolve that directory a second
+    time, so a member configured only by its releasable (a root member, which
+    may not have a ``.rlsbl/`` of its own) read an empty config from every
+    caller that asked the context rather than the path.
+
     Returns an empty dict for config if no config.json exists.
     """
     from .config import read_project_config
@@ -153,6 +170,9 @@ def create_context(
             releasables_loaded = load_releasables(ws_root, projects=projects_loaded)
         except Exception:
             pass
+
+        if project is None:
+            project = find_member_for_root(root, workspace_root, projects_loaded)
 
         releasable_config_dir = _resolve_releasable_config_dir(
             root,
