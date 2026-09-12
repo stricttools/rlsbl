@@ -36,3 +36,7 @@ module beside its npm and PyPI manifests.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "c61ab1fc57ff6660dcfbfe41596ea730ff679ff9"
+
+[tree_hashes]
+"." = "fd358cf64b2340693403478417beaebb5af7aeea"
