@@ -23,6 +23,7 @@ from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.errors import ConfigError
 from rlsbl.commands.monorepo.sync import _get_monorepo_tag_prefix
 from rlsbl.targets import detect_targets
+from rlsbl.workspace import Releasable
 
 import pytest
 
@@ -45,13 +46,14 @@ def _write_pyproject(dir_path, name="dual"):
         f.write(f'[project]\nname = "{name}"\nversion = "0.1.0"\n')
 
 
-def _ctx(root, projects):
+def _ctx(root, projects, releasables=()):
     return WorkspaceCheckContext(
         project_root=str(root),
         workspace_root=str(root),
         config={},
         projects=projects,
         graph=None,
+        releasables=list(releasables),
     )
 
 
@@ -151,3 +153,60 @@ class TestStandaloneDualTargetUnaffected:
         entries = detect_targets(d)
         names = {e.name for e in entries}
         assert names == {"pypi", "npm"}
+
+
+class TestADeclaredTagFormatSettlesTheQuestion:
+    """The check asks "which of the two schemes does this member tag under?".
+
+    A releasable that DECLARES its ``tag_format`` has already answered, in the
+    one place that decides -- so the member's target mix cannot be ambiguous
+    any more.  The shape this matters for is a repository that used to be
+    standalone and became a workspace: its root member carries a Go module at
+    the repository root plus an npm and a PyPI launcher, and the releasable
+    that owns it declares ``tag_format = "v{version}"`` because every one of
+    its existing tags is spelled that way.  Without consulting the
+    declaration, that member reads as go (path-style) mixed with npm and pypi
+    (@-style) and every ``rlsbl check --tag workspace`` run reds.
+    """
+
+    def _root_member_with_three_targets(self, root):
+        _write_go(str(root), module="example.com/tool")
+        _write_package_json(str(root), name="tool")
+        _write_pyproject(str(root), name="tool")
+        return {"name": "root", "path": ".", "releasable": "tool"}
+
+    def test_root_member_with_a_declared_format_passes(self, mock_git_repo):
+        proj = self._root_member_with_three_targets(mock_git_repo)
+        result = app._check_defs["mixed-tag-schemes"].impl(
+            _ctx(
+                mock_git_repo, [proj],
+                releasables=[Releasable(name="tool", tag_format="v{version}")],
+            )
+        )
+        assert result.status == "pass"
+
+    def test_the_same_member_with_no_declared_format_still_fails(self, mock_git_repo):
+        """Absence of a declaration leaves the question open, so it is asked."""
+        member = os.path.join(str(mock_git_repo), "tool")
+        _write_go(member, module="example.com/tool")
+        _write_package_json(member, name="tool")
+        _write_pyproject(member, name="tool")
+        proj = {"name": "tool", "path": "tool", "releasable": "tool"}
+
+        result = app._check_defs["mixed-tag-schemes"].impl(
+            _ctx(mock_git_repo, [proj], releasables=[Releasable(name="tool")])
+        )
+        assert result.status == "fail"
+        blob = " ".join(p.text for p in result.problems) + result.message
+        assert "path-style (go)" in blob
+        assert "@-style" in blob
+
+    def test_a_mixed_member_whose_releasable_is_unknown_still_fails(self, mock_git_repo):
+        """No releasable resolves -- nothing has answered, so the check asks."""
+        member = os.path.join(str(mock_git_repo), "dual")
+        _write_go(member)
+        _write_package_json(member)
+        result = app._check_defs["mixed-tag-schemes"].impl(
+            _ctx(mock_git_repo, [{"name": "dual", "path": "dual"}])
+        )
+        assert result.status == "fail"

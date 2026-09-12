@@ -1519,15 +1519,27 @@ def register_workspace_checks(app):
         Go publishes monorepo tags as ``{path}/v*``; every other target uses
         ``{name}@v*``. A single member dir declaring both schemes yields an
         ordering-dependent publish-router prefix. Report each such member.
+
+        The question is only open while nothing has answered it. A releasable
+        that DECLARES a ``tag_format`` has answered, in the one place that
+        decides what its versions are tagged -- so its members are not asked.
+        That is the shape of a repository that used to be standalone: a Go
+        module at the repository root beside an npm and a PyPI launcher, under
+        a releasable declaring ``tag_format = "v{version}"`` because every tag
+        it has ever pushed is spelled that way.
         """
         from ..errors import ConfigError
         from ..targets import detect_targets, resolve_releasable_config_dir
         from ..tag_glob import _mixed_tag_schemes, _mixed_scheme_error
+        from ..workspace import resolve_releasable_for_project
 
         root = str(ctx.workspace_root)
         findings = []
         for proj in ctx.projects:
             if project_is_dev_only(proj):
+                continue
+            rel = resolve_releasable_for_project(proj, ctx.releasables)
+            if rel is not None and rel.declares_tag_format:
                 continue
             rel_dir = resolve_releasable_config_dir(proj, ctx.workspace_root)
             try:
