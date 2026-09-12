@@ -25,8 +25,7 @@
   "changelog_format_version_enforced": true,
   "internal_dep_floors": [
     "strictcli",
-    "strictspec",
-    "selfdoc-core"
+    "strictspec"
   ],
   "test_sandbox": {
     "runner_path": "scripts/test.sh",

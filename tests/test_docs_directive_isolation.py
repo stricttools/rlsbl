@@ -10,7 +10,9 @@ executed in a subprocess whose import system REFUSES ``rlsbl`` outright: any
 attempt to import it raises, and the run also asserts afterwards that no rlsbl
 module was ever loaded. A directive that reached for the package would fail the
 subprocess rather than quietly succeed because the package happened to be
-installed.
+installed. The subprocess refuses ``selfdoc_core`` the same way: a directive
+script runs under a bare ``python3`` with nothing installed for it, so the
+Markdown table renderer is vendored in ``_matrix.py`` rather than imported.
 """
 
 import os
@@ -41,46 +43,30 @@ _PROBE = r'''
 import importlib.util
 import json
 import sys
-import types
 from pathlib import Path
 
 directive_path = Path(sys.argv[1])
 
 
-class _RefuseRlsbl:
-    """Meta-path finder that makes `import rlsbl` impossible."""
+BANNED = ("rlsbl", "selfdoc_core")
+
+
+class _RefuseImports:
+    """Meta-path finder that makes importing a banned package impossible."""
 
     def find_module(self, fullname, path=None):
         return self.find_spec(fullname, path)
 
     def find_spec(self, fullname, path=None, target=None):
-        if fullname == "rlsbl" or fullname.startswith("rlsbl."):
+        root = fullname.split(".")[0]
+        if root in BANNED:
             raise ImportError(
-                f"the docs directives must not import rlsbl (tried {fullname})"
+                f"the docs directives must not import {root} (tried {fullname})"
             )
         return None
 
 
-sys.meta_path.insert(0, _RefuseRlsbl())
-
-# selfdoc-core is the docs renderer, not something the directive derives from.
-# Stub it so the probe tests the DATA path rather than selfdoc's installation.
-pkg = types.ModuleType("selfdoc_core")
-pkg.__path__ = []
-tables = types.ModuleType("selfdoc_core.tables")
-
-
-def _render(headers, rows, **kwargs):
-    lines = ["| " + " | ".join(str(h) for h in headers) + " |"]
-    lines.append("| " + " | ".join("---" for _ in headers) + " |")
-    for row in rows:
-        lines.append("| " + " | ".join(str(c) for c in row) + " |")
-    return "\n".join(lines) + "\n"
-
-
-tables.render_markdown_table = _render
-sys.modules["selfdoc_core"] = pkg
-sys.modules["selfdoc_core.tables"] = tables
+sys.meta_path.insert(0, _RefuseImports())
 
 spec = importlib.util.spec_from_file_location("directive_under_test", directive_path)
 module = importlib.util.module_from_spec(spec)

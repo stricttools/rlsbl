@@ -1,41 +1,17 @@
 """End-to-end tests for selfdoc directive resolve() functions.
 
-These tests exercise the full resolve() path for both custom selfdoc
-directives (feature_matrix and target_table), verifying that the data
-generation + table rendering pipeline produces correct markdown output.
-
-Since selfdoc is not a runtime dependency of rlsbl, the tests inject a
-minimal render_markdown_table mock into sys.modules before importing the
-directive modules.
+These tests exercise the full resolve() path for the custom selfdoc directives,
+verifying that the data reading + table rendering pipeline produces correct
+markdown output. Nothing is injected: the directives read the committed support
+matrix and render it with the table renderer vendored in ``_matrix.py``, which
+is the whole point -- a directive script runs under a bare ``python3`` with no
+packages installed for it.
 """
 
-import importlib
 import importlib.util
-import sys
-import types
 from pathlib import Path
 
-import pytest
-
-# ---------------------------------------------------------------------------
-# Fixture: inject a minimal selfdoc.tables mock so directive imports succeed
-# ---------------------------------------------------------------------------
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-def _render_markdown_table(headers, rows, *, align=None, pretty=False):
-    """Minimal markdown table renderer matching selfdoc.tables API."""
-    escaped = [str(h).replace("|", "\\|") for h in headers]
-    lines = ["| " + " | ".join(escaped) + " |"]
-    lines.append("| " + " | ".join("---" for _ in headers) + " |")
-    for row in rows:
-        cells = [str(c).replace("|", "\\|") for c in row]
-        # Pad short rows
-        while len(cells) < len(headers):
-            cells.append("")
-        lines.append("| " + " | ".join(cells) + " |")
-    return "\n".join(lines) + "\n"
 
 
 def _load_directive(name):
@@ -47,26 +23,6 @@ def _load_directive(name):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-@pytest.fixture(autouse=True)
-def _inject_selfdoc_tables(monkeypatch):
-    """Inject a mock selfdoc.tables module so directive imports work."""
-    selfdoc_core_pkg = types.ModuleType("selfdoc_core")
-    selfdoc_core_pkg.__path__ = []
-    tables_mod = types.ModuleType("selfdoc_core.tables")
-    tables_mod.render_markdown_table = _render_markdown_table
-
-    monkeypatch.setitem(sys.modules, "selfdoc_core", selfdoc_core_pkg)
-    monkeypatch.setitem(sys.modules, "selfdoc_core.tables", tables_mod)
-
-
-# ---------------------------------------------------------------------------
-# Load directive modules (after mock is in place via autouse fixture)
-# ---------------------------------------------------------------------------
-
-# Module-level loading won't work because the autouse fixture runs after
-# module-level code. Load lazily inside each test class instead.
 
 
 def _feature_matrix_resolve(attrs, config, body):
