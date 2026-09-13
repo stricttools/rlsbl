@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.121.0",
+  "version": "0.121.1",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -7765,6 +7765,56 @@
           "level": 3,
           "text": "`_probe_publication`",
           "anchor": "_probe_publication"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseAssetProbeError`",
+          "anchor": "releaseassetprobeerror"
+        },
+        {
+          "level": 3,
+          "text": "`_binary_artifact_targets`",
+          "anchor": "_binary_artifact_targets"
+        },
+        {
+          "level": 3,
+          "text": "`_goreleaser_document`",
+          "anchor": "_goreleaser_document"
+        },
+        {
+          "level": 3,
+          "text": "`_archive_names_carry_platforms`",
+          "anchor": "_archive_names_carry_platforms"
+        },
+        {
+          "level": 3,
+          "text": "`_goreleaser_platforms`",
+          "anchor": "_goreleaser_platforms"
+        },
+        {
+          "level": 3,
+          "text": "`_expected_release_assets`",
+          "anchor": "_expected_release_assets"
+        },
+        {
+          "level": 3,
+          "text": "`_release_asset_names`",
+          "anchor": "_release_asset_names"
+        },
+        {
+          "level": 3,
+          "text": "`_missing_release_assets`",
+          "anchor": "_missing_release_assets"
+        },
+        {
+          "level": 3,
+          "text": "`_probe_release_assets`",
+          "anchor": "_probe_release_assets"
+        },
+        {
+          "level": 3,
+          "text": "`_release_asset_failure_message`",
+          "anchor": "_release_asset_failure_message"
         },
         {
           "level": 3,
@@ -20611,6 +20661,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-13T21:58:32.920486+00:00",
+  "last_gen": "2026-09-13T23:22:37.314471+00:00",
   "theme": "minimal"
 }
