@@ -75,6 +75,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # go-module-identity compares a go.mod module path against the repository's
     # own origin identity, which only Go has.
     "go-module-identity": frozenset({"go"}),
+    # ldflags-symbol compares a `-X importpath.Symbol=` linker flag against the
+    # Go source it names; the flag and the silent no-op are Go's.
+    "ldflags-symbol": frozenset({"go"}),
     # strictspec-generated-floor compares a python dependency floor against the
     # python validators strictspec generated.
     "strictspec-generated-floor": frozenset({"pypi"}),

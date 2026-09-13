@@ -289,13 +289,13 @@ def _virtual_root_skip_reason(ctx):
     return None
 
 
-def _go_module_dirs(ctx):
+def _go_module_dirs(ctx, check_name):
     """Every directory a Go target occupies, workspace-wide when there is one.
 
     The target registry answers which directories those are, so a Go module
     reached through a ``targets`` entry with a ``path`` is found the same way
     the release finds it. WHICH targets those are is read from ``CHECK_TARGETS``
-    -- the one place this check's scope is written down -- rather than tested
+    -- the one place *check_name*'s scope is written down -- rather than tested
     by name here.
     """
     from . import targets_for_check
@@ -305,7 +305,7 @@ def _go_module_dirs(ctx):
         resolve_releasable_config_dir_for_ctx,
     )
 
-    scope = targets_for_check("go-module-identity")
+    scope = targets_for_check(check_name)
 
     if isinstance(ctx, WorkspaceCheckContext) and ctx.projects:
         roots = [
@@ -844,7 +844,7 @@ def register_project_checks(app):
         """
         from ..go_identity import evaluate_go_module_identity
 
-        module_dirs = _go_module_dirs(ctx)
+        module_dirs = _go_module_dirs(ctx, "go-module-identity")
         if not module_dirs:
             return reporter.skipped("no Go target detected")
 
@@ -861,6 +861,50 @@ def register_project_checks(app):
         for problem in verdict.problems:
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} module path mismatch(es)")
+
+    @app.error_check("ldflags-symbol")
+    def check_ldflags_symbol(ctx, reporter):
+        """Every ``-X importpath.Symbol=`` must name a symbol that exists.
+
+        The linker sets a package-level string var at link time, and a ``-X``
+        naming a symbol that does not exist links SILENTLY: nothing is set,
+        nothing is reported, and every built binary keeps the fallback value in
+        the code. The coupling between the build configuration's chosen symbol
+        name and the Go source is what this compares.
+
+        A symbol that exists and is injectable but that nothing reads produces
+        the same user-visible bug by a different route, and warns -- fixing it
+        can mean adding a version surface rather than renaming a variable.
+        """
+        from ..ldflags_symbols import evaluate_ldflags_symbols
+
+        module_dirs = _go_module_dirs(ctx, "ldflags-symbol")
+        if not module_dirs:
+            return reporter.skipped("no Go target detected")
+
+        verdict = evaluate_ldflags_symbols(module_dirs)
+        if verdict.skip_reason is not None:
+            return reporter.skipped(verdict.skip_reason)
+
+        for note in verdict.notes:
+            reporter.note(note)
+        for problem in verdict.problems:
+            reporter.error(problem)
+        for warning in verdict.warnings:
+            reporter.warn(warning)
+
+        if verdict.problems or verdict.warnings:
+            return reporter.found(
+                f"{len(verdict.problems)} -X symbol mismatch(es), "
+                f"{len(verdict.warnings)} injected symbol(s) nothing reads"
+            )
+        if verdict.verified:
+            return reporter.passed(
+                f"{verdict.verified} -X symbol(s) match the Go source"
+            )
+        return reporter.passed(
+            "no -X linker symbol injection in this project's build configuration"
+        )
 
     @app.error_check("dep-locks")
     def check_dep_locks(ctx, reporter):

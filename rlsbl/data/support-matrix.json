@@ -631,6 +631,12 @@
       "kind": "workspace",
       "targets": []
     },
+    "ldflags-symbol": {
+      "kind": "targets",
+      "targets": [
+        "go"
+      ]
+    },
     "library-lint": {
       "kind": "targets",
       "targets": [
@@ -1597,6 +1603,18 @@
         ],
         [
           "go-module-identity",
+          "no",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "ldflags-symbol",
           "no",
           "yes",
           "no",

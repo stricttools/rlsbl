@@ -877,6 +877,23 @@ pure = true
 needs_network = false
 depends_on = []
 
+# ldflags-symbol: `go build -ldflags "-X importpath.Symbol=value"` sets a
+# package-level string var at link time, and a -X naming a symbol that does not
+# exist links SILENTLY -- nothing is set and the binary reports its fallback
+# version forever. Compares every -X target in the tracked build configuration
+# (goreleaser, Makefiles, shell scripts, CI workflows) against the Go source it
+# names; a symbol that exists but nothing reads warns instead, because fixing
+# that can mean adding a version surface. Pure (reads the build files, the Go
+# source and read-only local git). In "preflight" so a release cannot publish
+# binaries whose injected version goes nowhere.
+[checks.ldflags-symbol]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 [checks.dep-locks]
 tags = ["project", "preflight"]
 severity = "error"

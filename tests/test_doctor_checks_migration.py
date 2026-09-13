@@ -113,6 +113,8 @@ EXPECTED_CHECKS = [
     "dep-locks",
     # a go.mod module path names where the repository actually lives
     "go-module-identity",
+    # every -X linker flag names a symbol the Go source actually declares
+    "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator
     "strictspec-generated-floor",
     # committed target support matrix freshness (regenerate-and-compare)
