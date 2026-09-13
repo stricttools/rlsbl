@@ -105,7 +105,7 @@ class Declaration:
     line: int          # 1-based
     kind: str          # "var", "const", "func", "type"
     description: str   # human-readable, for the message
-    injectable: bool
+    injectable: bool   # can the linker set it: a package-level string var
     name_offsets: tuple[int, ...] = ()   # byte offsets of the name node(s)
 
 
@@ -113,10 +113,15 @@ class Declaration:
 class LdflagsVerdict:
     """Result of comparing every ``-X`` target against the Go source."""
 
+    #: Targets that name nothing the linker can set -- each one fails the check.
     problems: list = field(default_factory=list)
+    #: Targets the linker can set but nothing in the module reads.
     warnings: list = field(default_factory=list)
+    #: Targets left unverified, each carrying why it could not be resolved.
     notes: list = field(default_factory=list)
+    #: Why there was nothing to compare, when the check did not run at all.
     skip_reason: str | None = None
+    #: How many targets were resolved to a symbol the linker can set.
     verified: int = 0
 
     @property

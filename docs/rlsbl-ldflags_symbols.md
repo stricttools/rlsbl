@@ -1,8 +1,7 @@
 ---
 title: rlsbl.ldflags_symbols
-description: "Does every ``-X importpath.Symbol=value`` linker flag name a symbol that exists?"
+description: "Does every -X importpath.Symbol=value linker flag name a symbol the Go source declares, and one the linker can set? A -X naming nothing links silently."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 97
 ---

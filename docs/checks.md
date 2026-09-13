@@ -1,5 +1,5 @@
 ---
-description: "Every check rlsbl runs, by tag: project, release, changelog, workspace, quality, prepush, untagged, and the framework checks strictcli registers; plus check metadata, severity, target applicability, where a run is scoped in a workspace, and how unpublished-refs treats a version recorded unrecoverable or never released."
+description: "Every check rlsbl runs, grouped by tag, with its severity, the targets it applies to, how a workspace run is scoped, and the checks strictcli registers."
 ---
 
 # Check system
