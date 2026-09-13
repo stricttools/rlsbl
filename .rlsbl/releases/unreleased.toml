@@ -2,11 +2,31 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "A new check, ldflags-symbol, verifies that every -X linker flag in a Go project's build configuration names a symbol the Go source actually declares."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+`go build -ldflags "-X importpath.Symbol=value"` overwrites a package-level
+string variable at link time. When the named symbol does not exist, the link
+succeeds silently: no error, no warning, and the flag sets nothing. Five fleet
+projects shipped releases whose binaries reported a fallback version instead of
+the released one, every one of them from a capitalization mismatch between the
+build configuration's `-X main.Version` and the Go source's `var version`.
+Those five are fixed; this check is the durable fix, so no future consumer
+acquires the same defect.
+
+It resolves every `-X` occurrence in the tracked build configuration
+(goreleaser, Makefiles, shell scripts, CI workflow YAML) to a directory and
+verifies the symbol is declared there as a package-level string var the linker
+can set, which is a hard error when it is not. The second route to the same
+user-visible bug -- a symbol that receives the value and that nothing reads --
+warns rather than errors, because fixing that can require adding a version
+surface. It is symbol-agnostic on purpose: `main.version` with `var version`
+and `main.Version` with `var Version` both pass, since enforcing either
+spelling would force churn on working projects and still miss mismatches in
+the other direction.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
