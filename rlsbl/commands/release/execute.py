@@ -3,6 +3,7 @@
 import dataclasses
 import json
 import os
+import pathlib
 import shutil
 import sys
 import time
@@ -248,9 +249,275 @@ def _probe_publication(resolved_targets, version, ctx, *, log, delays=None):
     return missing, checked
 
 
+# ---------------------------------------------------------------------------
+# The release's ASSETS: what a binary pipeline actually ships
+# ---------------------------------------------------------------------------
+
+# A binary pipeline's artifact is not on a registry at all -- it is the set of
+# archives attached to the GitHub Release. The registry probe cannot see that:
+# the Go proxy serves a module from its tag whether or not a single archive was
+# ever built, so a goreleaser run that died still probed green. Observed live: a
+# releasable published its Go module, its PyPI package and its npm package while
+# its Release carried zero assets, and the release reported success.
+_RELEASE_ASSET_PROBE_DELAYS = (0, 15, 30, 60, 60, 60)
+
+# What goreleaser produces: one archive per built platform, plus the checksum
+# file every launcher shim verifies its download against.
+_ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".zip")
+_CHECKSUMS_ASSET = "checksums.txt"
+
+# The archive name templates whose rendered names carry ``_<os>_<arch>.`` --
+# rlsbl's own goreleaser template and goreleaser's default. Only under one of
+# these can a missing platform be identified by name; a project that renamed
+# its archives is checked against the floor (an archive exists at all) instead,
+# and the log says which check ran.
+_PLATFORM_BEARING_NAME_TEMPLATE = "{{.Os}}_{{.Arch}}"
+
+
+class ReleaseAssetProbeError(Exception):
+    """The Release's asset list could not be read.
+
+    Never converted into a pass: a probe that cannot answer is reported as the
+    failure it is, because the whole point of this check is that silence about
+    an artifact used to read as success.
+    """
+
+
+def _binary_artifact_targets(resolved_targets):
+    """The publishable targets whose artifact is binaries on the Release.
+
+    ``artifact_kind`` is the pipeline's own declared ``artifact`` value, so
+    this asks the configuration rather than guessing from a target name.
+    """
+    return [
+        rt for rt in resolved_targets
+        if rt.publish_mode != "none" and rt.artifact_kind == "binary"
+    ]
+
+
+def _goreleaser_document(target_dir):
+    """The target's parsed goreleaser config, or ``None``.
+
+    ``None`` covers both "no config file" and "not readable as goreleaser's" --
+    the caller then checks the floor rather than inventing platform
+    expectations out of a document it could not read.
+    """
+    for name in (".goreleaser.yml", ".goreleaser.yaml"):
+        path = os.path.join(target_dir or ".", name)
+        if not os.path.isfile(path):
+            continue
+        try:
+            from ruamel.yaml import YAML
+            from ruamel.yaml.error import YAMLError
+
+            doc = YAML(typ="safe").load(pathlib.Path(path).read_text())
+        except (YAMLError, OSError, UnicodeDecodeError):
+            return None
+        return doc if isinstance(doc, dict) else None
+    return None
+
+
+def _archive_names_carry_platforms(doc):
+    """Whether this config's archive names contain ``_<os>_<arch>.``.
+
+    An absent ``name_template`` means goreleaser's default, which does.
+    """
+    archives = doc.get("archives")
+    if not isinstance(archives, list) or not archives:
+        return True  # goreleaser's default naming
+    for entry in archives:
+        if not isinstance(entry, dict):
+            continue
+        template = entry.get("name_template")
+        if template is None:
+            continue
+        squeezed = "".join(str(template).split())
+        if _PLATFORM_BEARING_NAME_TEMPLATE not in squeezed:
+            return False
+    return True
+
+
+def _goreleaser_platforms(doc):
+    """The ``(goos, goarch)`` pairs the config declares it builds.
+
+    Only EXPLICIT declarations count. A build that names neither ``goos`` nor
+    ``goarch`` inherits goreleaser's defaults, and asserting those would red a
+    release over platforms the project never asked for -- such a build
+    contributes no expectation and the floor check covers it.
+    """
+    builds = doc.get("builds")
+    if not isinstance(builds, list):
+        return []
+    pairs = set()
+    for build in builds:
+        if not isinstance(build, dict):
+            continue
+        goos = [str(v) for v in build.get("goos") or [] if isinstance(v, str)]
+        goarch = [str(v) for v in build.get("goarch") or [] if isinstance(v, str)]
+        if not goos or not goarch:
+            continue
+        declared = {(o, a) for o in goos for a in goarch}
+        for ignored in build.get("ignore") or []:
+            if isinstance(ignored, dict):
+                declared.discard((
+                    str(ignored.get("goos", "")), str(ignored.get("goarch", "")),
+                ))
+        pairs |= declared
+    return sorted(pairs)
+
+
+def _expected_release_assets(target_dir):
+    """``(platforms, expectation)`` for the target rooted at *target_dir*.
+
+    *platforms* is the list of ``(goos, goarch)`` pairs an archive must exist
+    for; empty means only the floor is checked. *expectation* is the one-line
+    description of what was asserted, so the log never leaves the operator
+    guessing which of the two checks ran.
+    """
+    doc = _goreleaser_document(target_dir)
+    if doc is None:
+        return [], "an archive and checksums.txt (no readable goreleaser config)"
+    if not _archive_names_carry_platforms(doc):
+        return [], "an archive and checksums.txt (custom archive name template)"
+    platforms = _goreleaser_platforms(doc)
+    if not platforms:
+        return [], "an archive and checksums.txt (no declared build matrix)"
+    rendered = ", ".join(f"{o}/{a}" for o, a in platforms)
+    return platforms, f"an archive per built platform ({rendered}) and checksums.txt"
+
+
+def _release_asset_names(tag, ctx):
+    """Every asset name the GitHub Release for *tag* carries."""
+    # Late-bound through the package namespace, like every other gh call here,
+    # so mock.patch("rlsbl.commands.release.run_gh") is honored at call time.
+    from . import run_gh
+
+    try:
+        out = run_gh(["release", "view", tag, "--json", "assets"], config=ctx.config)
+    except Exception as exc:  # subprocess failure, timeout, gh auth loss
+        raise ReleaseAssetProbeError(f"`gh release view {tag}` failed: {exc}") from exc
+    if not isinstance(out, str):
+        # An unsettled effects result (dry-run handle). This check runs only on
+        # a real, watched release, so reaching here is a wiring bug, not a state
+        # to paper over.
+        raise ReleaseAssetProbeError(
+            f"the asset list for {tag} was not read (effects handle returned "
+            f"{type(out).__name__})"
+        )
+    try:
+        data = json.loads(out)
+    except ValueError as exc:
+        raise ReleaseAssetProbeError(
+            f"`gh release view {tag} --json assets` returned unparseable "
+            f"JSON: {exc}"
+        ) from exc
+    assets = data.get("assets") if isinstance(data, dict) else None
+    if not isinstance(assets, list):
+        raise ReleaseAssetProbeError(
+            f"`gh release view {tag} --json assets` carried no assets array"
+        )
+    return [str(a.get("name", "")) for a in assets if isinstance(a, dict)]
+
+
+def _missing_release_assets(assets, platforms):
+    """What the Release still lacks, named the way an operator would name it."""
+    missing = []
+    archives = [n for n in assets if n.endswith(_ARCHIVE_SUFFIXES)]
+    if platforms:
+        for goos, goarch in platforms:
+            token = f"_{goos}_{goarch}."
+            if not any(token in name for name in archives):
+                missing.append(f"an archive for {goos}/{goarch}")
+    elif not archives:
+        missing.append("at least one binary archive (.tar.gz/.tgz/.zip)")
+    if _CHECKSUMS_ASSET not in assets:
+        missing.append(_CHECKSUMS_ASSET)
+    return missing
+
+
+def _probe_release_assets(resolved_targets, tag, ctx, *, log, delays=None):
+    """Assert the Release for *tag* carries what a binary pipeline ships.
+
+    Returns ``(missing, expectation)``: the human-named assets still absent
+    after the retry budget, and the description of what was expected.
+    ``([], None)`` means there is no binary-artifact pipeline here and nothing
+    to check.
+
+    The budget is wider than the registry probe's on purpose: the publish
+    workflow starts when the GitHub Release is created, so it is still building
+    when the CI wait on the pushed commit concludes. A probe that cannot read
+    the Release at all raises :class:`ReleaseAssetProbeError` rather than
+    resolving to either verdict.
+    """
+    binary_targets = _binary_artifact_targets(resolved_targets)
+    if not binary_targets:
+        return [], None
+    if delays is None:
+        delays = _RELEASE_ASSET_PROBE_DELAYS
+
+    # One Release carries every binary target's assets, so the expectations are
+    # the union of what each declares.
+    platforms = []
+    expectations = []
+    for rt in binary_targets:
+        target_platforms, expectation = _expected_release_assets(rt.path)
+        for pair in target_platforms:
+            if pair not in platforms:
+                platforms.append(pair)
+        if expectation not in expectations:
+            expectations.append(expectation)
+    expectation = "; ".join(expectations)
+
+    missing = []
+    probe_error = None
+    for attempt, delay in enumerate(delays):
+        if delay:
+            time.sleep(delay)
+        try:
+            assets = _release_asset_names(tag, ctx)
+        except ReleaseAssetProbeError as exc:
+            probe_error = exc
+            missing = [f"unreadable asset list ({exc})"]
+        else:
+            probe_error = None
+            missing = _missing_release_assets(assets, platforms)
+            if not missing:
+                log(f"  release assets: {tag} carries {expectation}")
+                return [], expectation
+        if attempt < len(delays) - 1:
+            log(
+                f"  waiting for {tag} release assets "
+                f"({', '.join(missing)}) -- attempt {attempt + 1}/{len(delays)}"
+            )
+    if probe_error is not None:
+        raise probe_error
+    return missing, expectation
+
+
+def _release_asset_failure_message(*, tag, version, missing, expectation):
+    """Remediation for a Release that is missing the binaries it ships."""
+    return (
+        f"\nError: {tag} is tagged and released, but its GitHub Release does "
+        f"not carry the binaries this project publishes.\n"
+        f"  Expected: {expectation}\n"
+        f"  Missing: {', '.join(missing)}\n"
+        f"\n"
+        f"The publish workflow runs after the Release is created, so a failure "
+        f"there leaves the tag, the Release and every registry intact while "
+        f"nothing downloadable exists: a launcher shim installing {version} "
+        f"has nothing to fetch.\n"
+        f"\n"
+        f"The tag and the Release exist, so nothing needs re-releasing at a new "
+        f"version. Inspect the publish workflow run for {tag}, fix the cause, "
+        f"and re-dispatch it with `rlsbl release retry`. If the version must "
+        f"not ship at all, `rlsbl release yank {version}`."
+    )
+
+
 def _verify_publication(resolved_targets, version, tag, ctx, *, log,
-                        delays=None):
-    """Assert every publishable target's registry is serving *version*.
+                        delays=None, asset_delays=None):
+    """Assert every publishable target's registry is serving *version*, and
+    that a binary pipeline's Release carries the binaries it ships.
 
     A release verified its PROCESS -- CI green, tag pushed, publish workflow
     dispatched -- and then announced success. It never verified its OUTCOME, so
@@ -260,7 +527,13 @@ def _verify_publication(resolved_targets, version, tag, ctx, *, log,
     check: after CI has concluded, ask each registry whether the version it was
     supposed to publish is actually being served.
 
-    Exits nonzero naming every registry that is not.
+    Exits nonzero naming every registry that is not -- and, for a pipeline
+    whose declared artifact is ``binary``, naming every archive its GitHub
+    Release does not carry. That second half exists because a binary
+    pipeline's artifact never reaches a registry at all: the Go proxy serves
+    a module from its tag whether or not goreleaser produced a single
+    archive, so the registry probe alone reported a Release with zero assets
+    as a shipped release.
 
     **This runs on the ``--watch`` path only, deliberately.** The probe is
     meaningful exactly once CI has concluded, because CI is what runs the
@@ -275,11 +548,39 @@ def _verify_publication(resolved_targets, version, tag, ctx, *, log,
     missing, checked = _probe_publication(
         resolved_targets, version, ctx, log=log, delays=delays,
     )
-    if not checked:
-        log("  no probeable registry targets; nothing to verify")
-        return
     if not missing:
-        log(f"Publication verified on: {', '.join(checked)}")
+        if checked:
+            log(f"Publication verified on: {', '.join(checked)}")
+        else:
+            log("  no probeable registry targets; nothing to verify")
+        # A binary pipeline's artifact is the Release's archives, which no
+        # registry probe can see -- checked whether or not a registry answered.
+        try:
+            asset_missing, expectation = _probe_release_assets(
+                resolved_targets, tag, ctx, log=log, delays=asset_delays,
+            )
+        except ReleaseAssetProbeError as exc:
+            print(
+                f"\nError: {tag} is tagged and released, but its Release "
+                f"assets could not be read, so whether this release ships any "
+                f"binary is unknown.\n"
+                f"  {exc}\n"
+                f"\nCheck `gh auth status`, then re-check with "
+                f"`gh release view {tag} --json assets`. If the publish "
+                f"workflow never uploaded, re-dispatch it with "
+                f"`rlsbl release retry`.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if asset_missing:
+            print(
+                _release_asset_failure_message(
+                    tag=tag, version=version, missing=asset_missing,
+                    expectation=expectation,
+                ),
+                file=sys.stderr,
+            )
+            sys.exit(1)
         return
     print(
         f"\nError: {tag} is tagged and released, but "
@@ -300,7 +601,7 @@ def _verify_publication(resolved_targets, version, tag, ctx, *, log,
     sys.exit(1)
 
 
-def _verify_publication_members(specs, *, log, delays=None):
+def _verify_publication_members(specs, *, log, delays=None, asset_delays=None):
     """Batch form of :func:`_verify_publication`: one verdict per member.
 
     *specs* is an iterable of ``(label, resolved_targets, version, tag, ctx)``
@@ -311,7 +612,10 @@ def _verify_publication_members(specs, *, log, delays=None):
 
     Every member is probed before anything is decided, so one missing artifact
     never hides another: a batch that half-published is reported whole. Exits
-    nonzero naming every (member, registry) pair still not serving its version.
+    nonzero naming every (member, registry) pair still not serving its version,
+    and every member whose GitHub Release lacks the binaries its pipeline
+    declares -- asked per member, because one member shipping no archives is
+    invisible in the batch's registry answers.
 
     Like :func:`_verify_publication`, this belongs on the ``--watch`` path
     only -- see that function's docstring for why.
@@ -321,22 +625,63 @@ def _verify_publication_members(specs, *, log, delays=None):
         return
     log("\nVerifying publication...")
     failures = []
+    asset_failures = []
     verified = []
     for label, resolved_targets, version, tag, ctx in specs:
+        def member_log(line, _l=label):
+            log(f"  [{_l}] {line.strip()}")
+
         missing, checked = _probe_publication(
             resolved_targets, version, ctx,
-            log=lambda line, _l=label: log(f"  [{_l}] {line.strip()}"),
+            log=member_log,
             delays=delays,
         )
-        if not checked:
-            log(f"  {label}: no probeable registry targets; nothing to verify")
-            continue
         if missing:
             failures.append((label, version, tag, missing, checked))
+            continue
+        if not checked:
+            log(f"  {label}: no probeable registry targets; nothing to verify")
         else:
             verified.append(f"{label} {version} ({', '.join(checked)})")
+        # Every member's own Release is asked for its own archives: one member
+        # shipping none is invisible in the batch's registry answers.
+        try:
+            asset_missing, expectation = _probe_release_assets(
+                resolved_targets, tag, ctx, log=member_log, delays=asset_delays,
+            )
+        except ReleaseAssetProbeError as exc:
+            asset_failures.append(
+                (label, version, tag, [f"unreadable asset list ({exc})"],
+                 "the Release's own asset list"),
+            )
+        else:
+            if asset_missing:
+                asset_failures.append(
+                    (label, version, tag, asset_missing, expectation),
+                )
     if verified:
         log("Publication verified: " + "; ".join(verified))
+    if asset_failures and not failures:
+        lines = [
+            "\nError: the batch is tagged and released, but "
+            f"{len(asset_failures)} member(s) did not ship the binaries their "
+            "GitHub Release must carry.",
+        ]
+        for label, version, tag, missing, expectation in asset_failures:
+            lines.append(
+                f"  {label} {version} ({tag}): missing {', '.join(missing)} "
+                f"-- expected {expectation}"
+            )
+        lines.append(
+            "\nEvery tag and GitHub Release above exists, so nothing needs "
+            "re-releasing at a new version. A launcher shim installing those "
+            "versions has nothing to fetch. Inspect each named member's "
+            "publish workflow run, fix the cause, and re-dispatch it with "
+            "`rlsbl release retry` from that member's directory. If a version "
+            "must not ship at all, `rlsbl release yank <version>` there."
+        )
+        print("\n".join(lines), file=sys.stderr)
+        sys.exit(1)
     if not failures:
         return
     lines = [
@@ -349,6 +694,11 @@ def _verify_publication_members(specs, *, log, delays=None):
         lines.append(
             f"  {label} {version} ({tag}): missing on {', '.join(missing)} "
             f"(probed {', '.join(checked)})"
+        )
+    for label, version, tag, missing, expectation in asset_failures:
+        lines.append(
+            f"  {label} {version} ({tag}): GitHub Release missing "
+            f"{', '.join(missing)} -- expected {expectation}"
         )
     lines.append(
         "\nEvery tag and GitHub Release above exists, so nothing needs "
