@@ -36,3 +36,7 @@ config declares, plus checksums.txt -- and per member in a batch.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "c2fbf40d611895ba562560ec13f6d17aa791395d"
+
+[tree_hashes]
+"." = "49a4e3d55b1ccb8e4e5433a6f356fb7b5b6105a4"
