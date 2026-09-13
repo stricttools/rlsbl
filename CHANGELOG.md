@@ -2,6 +2,39 @@
 
 # Changelog
 
+## 0.121.1
+
+A new check, ldflags-symbol, verifies that every -X linker flag in a Go project's build configuration names a symbol the Go source actually declares.
+
+<details>
+<summary>Context</summary>
+
+`go build -ldflags "-X importpath.Symbol=value"` overwrites a package-level
+string variable at link time. When the named symbol does not exist, the link
+succeeds silently: no error, no warning, and the flag sets nothing. Five fleet
+projects shipped releases whose binaries reported a fallback version instead of
+the released one, every one of them from a capitalization mismatch between the
+build configuration's `-X main.Version` and the Go source's `var version`.
+Those five are fixed; this check is the durable fix, so no future consumer
+acquires the same defect.
+
+It resolves every `-X` occurrence in the tracked build configuration
+(goreleaser, Makefiles, shell scripts, CI workflow YAML) to a directory and
+verifies the symbol is declared there as a package-level string var the linker
+can set, which is a hard error when it is not. The second route to the same
+user-visible bug -- a symbol that receives the value and that nothing reads --
+warns rather than errors, because fixing that can require adding a version
+surface. It is symbol-agnostic on purpose: `main.version` with `var version`
+and `main.Version` with `var Version` both pass, since enforcing either
+spelling would force churn on working projects and still miss mismatches in
+the other direction.
+
+</details>
+
+### Features
+
+- **New check.** `ldflags-symbol` verifies that every `-X importpath.Symbol=value` linker flag in a Go project's build configuration names a symbol the Go source actually declares as a package-level string var. A `-X` naming a symbol that does not exist links silently, so the released binary reports its fallback version forever; the check makes that a hard error and blocks the release. A symbol that exists but nothing reads warns instead.
+
 ## 0.121.0
 
 Root Go members release correctly; the docs directives need no selfdoc package
