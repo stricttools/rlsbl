@@ -339,3 +339,132 @@ class TestMergedPublishFeedsTheLauncherVars:
         # No placeholder survived into the generated workflow.
         assert "__UNRESOLVED__assetProject__" not in content
         assert "__UNRESOLVED__tagPrefix__" not in content
+
+
+# ---------------------------------------------------------------------------
+# goreleaser needs the bare tag to EXIST, and its version is pinned
+# ---------------------------------------------------------------------------
+
+
+class TestBareTagIsMaterialized:
+    """The derived bare tag must exist as a ref before goreleaser runs.
+
+    goreleaser reads GORELEASER_CURRENT_TAG's tag contents while collecting git
+    state -- before ``--skip=validate`` excuses anything -- and aborts on a name
+    no tag carries: ``couldn't get tag contents: unexpected git tag output for
+    "v0.2.4": ""``. A monorepo repository carries only ``<name>@vX.Y.Z`` tags,
+    so the bare one has to be created locally. Observed live: a releasable
+    published its Go module, its PyPI package and its npm package with zero
+    archives on the GitHub Release, and the release reported success.
+    """
+
+    def test_the_bare_tag_is_created_when_absent(self):
+        content = _read(GO_PUBLISH)
+        assert 'git tag "${BARE}" "$(git rev-parse HEAD)"' in content
+        assert 'git rev-parse -q --verify "refs/tags/${BARE}"' in content
+
+    def test_creation_happens_before_goreleaser_runs(self):
+        content = _read(GO_PUBLISH)
+        assert content.index('git tag "${BARE}"') < content.index(
+            "goreleaser/goreleaser-action"
+        )
+
+    def test_creation_lives_in_the_bare_tag_step(self):
+        """The tag must be created in the same job/step that derives it --
+        a separate job would run on its own checkout."""
+        content = _read(GO_PUBLISH)
+        step = content[content.index("Derive the bare semver tag"):]
+        step = step[:step.index("- uses:")]
+        assert 'git tag "${BARE}"' in step
+
+    def test_nothing_pushes_the_bare_tag(self):
+        """The bare tag is local scaffolding for goreleaser, never a ref."""
+        content = _read(GO_PUBLISH)
+        assert "git push" not in content
+
+    @pytest.mark.parametrize("tag,bare", [
+        ("alpha@v1.2.3", "v1.2.3"),
+        ("v1.2.3", "v1.2.3"),
+    ])
+    def test_the_shell_creates_the_tag_for_real(self, tmp_path, tag, bare):
+        """Exercised as shell in a real repository, for a prefixed tag and a
+        bare one: after the block, the bare ref exists and points at HEAD."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        env_setup = (
+            "git init -q . && "
+            "git config user.email t@e.st && git config user.name t && "
+            "git commit -q --allow-empty -m c1 && "
+            f"git tag '{tag}'"
+        )
+        subprocess.run(env_setup, shell=True, cwd=repo, check=True,
+                       capture_output=True, text=True)
+        block = (
+            f"RELEASE_TAG='{tag}'\n"
+            "BARE=$(printf '%s' \"${RELEASE_TAG}\" | "
+            r"sed -E 's/^.*(v[0-9]+\.[0-9]+\.[0-9]+.*)$/\1/')" "\n"
+            'if ! git rev-parse -q --verify "refs/tags/${BARE}" >/dev/null; then\n'
+            '  git tag "${BARE}" "$(git rev-parse HEAD)"\n'
+            "fi\n"
+            'git rev-parse "refs/tags/${BARE}^{commit}"\n'
+        )
+        out = subprocess.run(block, shell=True, cwd=repo, check=True,
+                             capture_output=True, text=True)
+        head = subprocess.run("git rev-parse HEAD", shell=True, cwd=repo,
+                              check=True, capture_output=True, text=True)
+        assert out.stdout.strip() == head.stdout.strip()
+        # Idempotent: re-running the block over an existing tag is a no-op.
+        subprocess.run(block, shell=True, cwd=repo, check=True,
+                       capture_output=True, text=True)
+
+
+class TestGoreleaserVersionIsPinned:
+    """The goreleaser distribution is pinned exactly, from the action table.
+
+    ``version: "~> v2"`` adopted each new goreleaser on the next release of
+    every scaffolded project; 2.18.1 arrived that way and broke every
+    prefixed-tag repository at once.
+    """
+
+    def test_no_floating_constraint(self):
+        version_lines = [
+            line for line in _read(GO_PUBLISH).splitlines()
+            if line.strip().startswith("version:")
+        ]
+        assert version_lines
+        for line in version_lines:
+            assert "~>" not in line
+
+    def test_version_comes_from_the_action_table(self):
+        content = _read(GO_PUBLISH)
+        assert '{{actionVersion "goreleaser/goreleaser"}}' in content
+
+    def test_the_pinned_version_is_exact(self):
+        from rlsbl.action_versions import get_action_version
+
+        for name in ("goreleaser/goreleaser", "goreleaser/goreleaser-action"):
+            version = get_action_version(name)
+            assert re.fullmatch(r"v\d+\.\d+\.\d+", version), (
+                f"{name} must be pinned to an exact vX.Y.Z, got {version!r}"
+            )
+
+    def test_rendered_workflow_carries_the_exact_version(self):
+        from rlsbl.action_versions import format_action, get_action_version
+        from rlsbl.commands.init_cmd import _generate_merged_publish
+
+        content = _generate_merged_publish(
+            ["go"],
+            {"name": "alpha", "publishGate": "",
+             "modulePath": "github.com/acme/alpha"},
+            {"go": "."},
+        )
+        assert f"version: {get_action_version('goreleaser/goreleaser')}" in content
+        assert format_action("goreleaser/goreleaser-action") in content
+        assert "{{action" not in content
+        for line in content.splitlines():
+            if line.strip().startswith("version:"):
+                assert "~>" not in line
+        # The tag materialization survives rendering, before goreleaser runs.
+        assert content.index('git tag "${BARE}"') < content.index(
+            "goreleaser/goreleaser-action"
+        )

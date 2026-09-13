@@ -67,12 +67,28 @@ jobs:
           # Strip any "<name>@" / "<path>/" prefix: keep the trailing vX.Y.Z[-pre].
           BARE=$(printf '%s' "${RELEASE_TAG}" | sed -E 's/^.*(v[0-9]+\.[0-9]+\.[0-9]+.*)$/\1/')
           echo "tag=${BARE}" >> "$GITHUB_OUTPUT"
+          # goreleaser reads GORELEASER_CURRENT_TAG's tag contents while getting
+          # git state, BEFORE --skip=validate can excuse anything, so a name no
+          # tag carries aborts the run: `couldn't get tag contents: unexpected
+          # git tag output for "v0.2.4": ""`. A monorepo repository carries only
+          # the prefixed tags, so create the bare one locally at the released
+          # commit. It is a lightweight tag (an annotated one needs a tagger
+          # identity no CI checkout sets) and nothing pushes it: goreleaser runs
+          # --skip=publish, and the upload step below attaches the archives to
+          # the prefixed tag. In a repository whose tags are already bare this
+          # is a no-op.
+          if ! git rev-parse -q --verify "refs/tags/${BARE}" >/dev/null; then
+            git tag "${BARE}" "$(git rev-parse HEAD)"
+          fi
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       - uses: {{action "goreleaser/goreleaser-action"}}
         if: steps.check-go.outputs.skip != 'true'
         with:
-          version: "~> v2"
+          # Pinned exactly, from rlsbl's action-version table. A floating
+          # "~> v2" silently adopts each new goreleaser on the next release:
+          # 2.18.1 arrived that way and broke every prefixed-tag repository.
+          version: {{actionVersion "goreleaser/goreleaser"}}
           args: release --clean --skip=publish,announce,validate
         env:
           # A prefixed tag is not parseable as semver, and validation would

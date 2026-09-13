@@ -8,7 +8,14 @@
 "actions/setup-python" = "v5"
 "astral-sh/setup-uv" = "v7"
 "pypa/gh-action-pypi-publish" = "release/v1"
-"goreleaser/goreleaser-action" = "v7"
+"goreleaser/goreleaser-action" = "v7.2.3"
+# Not an action: the goreleaser DISTRIBUTION the action installs, pinned
+# exactly and consumed through {{actionVersion "..."}} as the action's
+# `version:` input. A floating "~> v2" resolved to 2.18.1, which reads the
+# tag contents of GORELEASER_CURRENT_TAG before --skip=validate applies and
+# aborts when no tag carries that name -- a release that published its
+# module and packages with zero archives on its GitHub Release.
+"goreleaser/goreleaser" = "v2.18.1"
 "dtolnay/rust-toolchain" = "stable"
 "dart-lang/setup-dart" = "v1"
 "denoland/setup-deno" = "v2"

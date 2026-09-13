@@ -27,9 +27,11 @@ TEMPLATES_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "rlsbl", "templates"
 )
 
-# Matches the ``{{action "owner/name"}}`` placeholder. Captures the action
-# name only.
-_PLACEHOLDER_RE = re.compile(r'\{\{action\s+"([^"]+)"\}\}')
+# Matches both placeholder forms -- ``{{action "owner/name"}}`` (the
+# ``uses:`` reference) and ``{{actionVersion "owner/name"}}`` (the bare
+# version, for a tool a workflow pins through an action input). Captures the
+# name only; both resolve against the same table.
+_PLACEHOLDER_RE = re.compile(r'\{\{action(?:Version)?\s+"([^"]+)"\}\}')
 
 
 class TestLoader:
@@ -49,6 +51,14 @@ class TestLoader:
     def test_setup_node_pinned_to_v6(self):
         # Regression: npm_wrapper.py used to hard-code v4 here.
         assert get_action_version("actions/setup-node") == "v6"
+
+    def test_goreleaser_distribution_is_pinned_exactly(self):
+        # The goreleaser CLI the action installs, not the action itself. A
+        # floating "~> v2" in the template adopted 2.18.1 on its own and broke
+        # every prefixed-tag repository's binary publish.
+        assert re.fullmatch(
+            r"v\d+\.\d+\.\d+", get_action_version("goreleaser/goreleaser")
+        )
 
     def test_paths_filter_pinned_to_v4(self):
         # Regression: monorepo router used to hard-code v3 here.

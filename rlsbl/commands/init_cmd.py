@@ -7,7 +7,11 @@ import re
 import subprocess
 import sys
 
-from ..action_versions import format_action, UnknownActionError
+from ..action_versions import (
+    format_action,
+    get_action_version,
+    UnknownActionError,
+)
 from ..ci_yaml import make_ci_workflow_transform
 from ..errors import ConfigError
 from ..config import (
@@ -428,9 +432,14 @@ def process_template(template_content, vars_dict, template_path=None, *, require
     r"""Process a template string with substitution and escape handling.
 
     Pass 1 resolves ``{{action "owner/name"}}`` placeholders against the
-    central action-version table (rlsbl/data/action_versions.toml). An
-    unknown action raises :class:`UnknownActionError` immediately -- no
-    implicit defaults.
+    central action-version table (rlsbl/data/action_versions.toml), and
+    ``{{actionVersion "owner/name"}}`` placeholders against the same table
+    to the bare version string alone. The version-only form exists for the
+    tools a workflow pins through an action *input* rather than through
+    ``uses:`` -- the goreleaser distribution the goreleaser action installs
+    is one -- so those pins live in the same table as every ``uses:`` pin
+    instead of floating in a template. An unknown action raises
+    :class:`UnknownActionError` immediately -- no implicit defaults.
 
     Pass 1.5 resolves conditional blocks ``{{#if varName}}...{{/if}}``.
     If ``vars_dict[varName]`` is truthy (present and non-empty string),
@@ -462,6 +471,20 @@ def process_template(template_content, vars_dict, template_path=None, *, require
     content = template_content.replace(r"\{{", _ESCAPE_SENTINEL)
 
     # Pass 1: action placeholders.
+    def action_version_replacer(match):
+        action_name = match.group(1)
+        try:
+            return get_action_version(action_name)
+        except UnknownActionError as exc:
+            ctx = f" in {template_path}" if template_path else ""
+            raise UnknownActionError(
+                f"Unknown action {action_name!r}{ctx}: {exc}"
+            ) from exc
+
+    content = re.sub(
+        r'\{\{actionVersion\s+"([^"]+)"\}\}', action_version_replacer, content
+    )
+
     def action_replacer(match):
         action_name = match.group(1)
         try:

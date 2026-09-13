@@ -13,7 +13,12 @@ from __future__ import annotations
 
 import pytest
 
-from rlsbl.action_versions import UnknownActionError, format_action, get_all_versions
+from rlsbl.action_versions import (
+    UnknownActionError,
+    format_action,
+    get_action_version,
+    get_all_versions,
+)
 from rlsbl.commands.init_cmd import process_template
 from rlsbl.errors import ConfigError
 
@@ -73,6 +78,59 @@ class TestActionResolution:
         )
         assert content == format_action("actions/checkout")
         assert unreplaced == []
+
+
+# ---------------------------------------------------------------------------
+# 1.5 Version-only action placeholders
+# ---------------------------------------------------------------------------
+
+
+class TestActionVersionResolution:
+    """``{{actionVersion "owner/name"}}`` resolves to the bare version.
+
+    A workflow pins some tools through an action INPUT rather than through
+    ``uses:`` -- the goreleaser distribution the goreleaser action installs is
+    one. Without this form those pins float in the template ("~> v2"), which is
+    how a goreleaser release nobody chose reached every scaffolded Go project.
+    """
+
+    def test_resolves_to_the_bare_version(self):
+        content, unreplaced = process_template(
+            '          version: {{actionVersion "goreleaser/goreleaser"}}', {}
+        )
+        expected = get_action_version("goreleaser/goreleaser")
+        assert content == f"          version: {expected}"
+        assert "@" not in content
+        assert unreplaced == []
+
+    def test_differs_from_the_uses_form(self):
+        both, _ = process_template(
+            '{{action "actions/checkout"}}|{{actionVersion "actions/checkout"}}',
+            {},
+        )
+        uses, version = both.split("|")
+        assert uses == format_action("actions/checkout")
+        assert version == get_action_version("actions/checkout")
+
+    def test_unknown_action_raises(self):
+        with pytest.raises(UnknownActionError, match="nonexistent/action"):
+            process_template('{{actionVersion "nonexistent/action"}}', {})
+
+    def test_unknown_action_error_includes_template_path(self):
+        with pytest.raises(UnknownActionError, match="workflows/publish.yml"):
+            process_template(
+                '{{actionVersion "nonexistent/action"}}',
+                {},
+                template_path="workflows/publish.yml",
+            )
+
+    def test_the_uses_regex_does_not_swallow_it(self):
+        """``{{action ...}}`` must not match the longer name and emit
+        ``goreleaser/goreleaser@v2.18.1`` into a ``version:`` input."""
+        content, _ = process_template(
+            '{{actionVersion "goreleaser/goreleaser"}}', {}
+        )
+        assert content == get_action_version("goreleaser/goreleaser")
 
 
 # ---------------------------------------------------------------------------
