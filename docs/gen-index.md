@@ -106,6 +106,7 @@ order: 90
 - [rlsbl.hook_hashes](../rlsbl-hook_hashes/)
 - [rlsbl.import_scanners](../rlsbl-import_scanners/)
 - [rlsbl.layers](../rlsbl-layers/)
+- [rlsbl.ldflags_symbols](../rlsbl-ldflags_symbols/)
 - [rlsbl.lint](../rlsbl-lint/)
 - [rlsbl.lint.config](../rlsbl-lint-config/)
 - [rlsbl.lint.go_ast](../rlsbl-lint-go_ast/)

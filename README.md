@@ -179,14 +179,14 @@ See [docs/ci-customization.md](docs/ci-customization.md) for an example.
 
 ## Check system
 
-rlsbl includes 84 checks across 9 tags.
+rlsbl includes 85 checks across 9 tags.
 
 Checks are grouped by tag -- `--tag` runs one family, `--name` runs a single check, and `--all` runs everything, including the checks that carry no tag:
 
 | Tag | Checks |
 | --- | --- |
-| `project` | 26 |
-| `preflight` | 20 |
+| `project` | 27 |
+| `preflight` | 21 |
 | `workspace` | 19 |
 | `quality` | 16 |
 | `changelog` | 11 |

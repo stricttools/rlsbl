@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.120.1",
+  "version": "0.121.0",
   "description": "",
   "language": "python",
   "base_url": "https://rlsbl.smmh.dev",
@@ -11465,6 +11465,138 @@
       ]
     },
     {
+      "path": "rlsbl-ldflags_symbols.md",
+      "title": "rlsbl.ldflags_symbols",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.ldflags_symbols",
+          "anchor": "rlsblldflags_symbols"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.ldflags_symbols`",
+          "anchor": "rlsblldflags_symbols"
+        },
+        {
+          "level": 3,
+          "text": "`Occurrence`",
+          "anchor": "occurrence"
+        },
+        {
+          "level": 3,
+          "text": "`Declaration`",
+          "anchor": "declaration"
+        },
+        {
+          "level": 3,
+          "text": "`LdflagsVerdict`",
+          "anchor": "ldflagsverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`git_tracked_files`",
+          "anchor": "git_tracked_files"
+        },
+        {
+          "level": 3,
+          "text": "`is_build_file`",
+          "anchor": "is_build_file"
+        },
+        {
+          "level": 3,
+          "text": "`split_target`",
+          "anchor": "split_target"
+        },
+        {
+          "level": 3,
+          "text": "`find_occurrences`",
+          "anchor": "find_occurrences"
+        },
+        {
+          "level": 3,
+          "text": "`_normalize_main`",
+          "anchor": "_normalize_main"
+        },
+        {
+          "level": 3,
+          "text": "`goreleaser_builds`",
+          "anchor": "goreleaser_builds"
+        },
+        {
+          "level": 3,
+          "text": "`_explicit_build_target`",
+          "anchor": "_explicit_build_target"
+        },
+        {
+          "level": 3,
+          "text": "`_GoSource`",
+          "anchor": "_gosource"
+        },
+        {
+          "level": 4,
+          "text": "`go_files`",
+          "anchor": "go_files"
+        },
+        {
+          "level": 4,
+          "text": "`files_in`",
+          "anchor": "files_in"
+        },
+        {
+          "level": 4,
+          "text": "`symbols`",
+          "anchor": "symbols"
+        },
+        {
+          "level": 4,
+          "text": "`string_var_names`",
+          "anchor": "string_var_names"
+        },
+        {
+          "level": 4,
+          "text": "`is_read`",
+          "anchor": "is_read"
+        },
+        {
+          "level": 3,
+          "text": "`_declarations`",
+          "anchor": "_declarations"
+        },
+        {
+          "level": 3,
+          "text": "`_var_spec_declarations`",
+          "anchor": "_var_spec_declarations"
+        },
+        {
+          "level": 3,
+          "text": "`_references`",
+          "anchor": "_references"
+        },
+        {
+          "level": 3,
+          "text": "`_resolve_directory`",
+          "anchor": "_resolve_directory"
+        },
+        {
+          "level": 3,
+          "text": "`_main_package_dirs`",
+          "anchor": "_main_package_dirs"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_ldflags_symbols`",
+          "anchor": "evaluate_ldflags_symbols"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-lint-config.md",
       "title": "rlsbl.lint.config",
       "type": "doc",
@@ -20479,6 +20611,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-12T23:26:12.283156+00:00",
+  "last_gen": "2026-09-13T21:58:32.920486+00:00",
   "theme": "minimal"
 }
