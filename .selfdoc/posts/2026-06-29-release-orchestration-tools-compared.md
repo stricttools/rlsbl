@@ -6,7 +6,6 @@ description: "A feature-by-feature comparison of semantic-release, release-it, c
 tags: [comparison, release-tools]
 draft: false
 directives: false
-project: rlsbl
 ---
 
 Release orchestration sits at the intersection of version management, changelog generation, CI/CD, and publishing. The JavaScript ecosystem alone has several mature tools, each with a different philosophy. This post compares the major options and explains where rlsbl fits.
