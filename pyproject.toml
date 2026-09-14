@@ -1,12 +1,29 @@
 [project]
 name = "rlsbl"
 version = "0.121.2"
-description = "Release orchestration and project scaffolding across package ecosystems"
+description = "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more"
 license = "MIT"
 authors = [{ name = "smm-h" }]
 readme = "README.md"
 requires-python = ">=3.11"
-keywords = ["release", "npm", "pypi", "go", "goreleaser", "publish", "cli", "scaffold", "rlsbl"]
+keywords = [
+    "release",
+    "release-automation",
+    "changelog",
+    "versioning",
+    "monorepo",
+    "npm",
+    "pypi",
+    "go",
+    "scaffold",
+    "rlsbl",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+]
 dependencies = [
     "ruamel-yaml>=0.19.1",
     "strictcli>=0.41.0",
@@ -20,7 +37,11 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://smmh.dev/rlsbl/"
+Documentation = "https://smmh.dev/rlsbl/"
 Repository = "https://github.com/smm-h/rlsbl"
+Issues = "https://github.com/smm-h/rlsbl/issues"
+Changelog = "https://github.com/smm-h/rlsbl/blob/main/CHANGELOG.md"
 
 [project.scripts]
 rlsbl = "rlsbl:main"

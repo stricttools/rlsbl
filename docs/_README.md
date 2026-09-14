@@ -7,7 +7,7 @@ title: README.md
 
 # rlsbl
 
-:-: target-count
+rlsbl is a release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more. It is for developers and AI agents who ship a repository -- one project, several targets at once, or a monorepo of independently versioned packages -- to public package registries. Its distinctive property is that the version is pushed first as an untagged candidate and becomes a tag only after the repository's own CI passes on that exact commit, so a red build leaves no tag, no GitHub Release and nothing on any registry.
 
 ## Install
 
@@ -35,6 +35,8 @@ rlsbl watch <sha>       # monitor CI for that release
 ```
 
 ## Commands
+
+:-: target-count
 
 All commands auto-detect targets (versioning) from project files (`package.json`, `pyproject.toml`, `go.mod`) and pipelines (publishing) from `.rlsbl/config.json`. Targets handle version bumps; pipelines handle where releases are published.
 
