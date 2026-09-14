@@ -1,5 +1,5 @@
 {
-  "version": "0.121.3",
+  "version": "0.121.4",
   "base_url": "https://smmh.dev/rlsbl",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "search_engine": "pagefind",
@@ -20,7 +20,7 @@
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.121.3"
+      "version": "0.121.4"
     }
   ],
   "locales": [

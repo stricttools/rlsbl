@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.121.4
+
+Documentation frontmatter converted to TOML for the current selfdoc; no user-facing change.
+
+### Infrastructure
+
+- Documentation frontmatter converted to TOML for the current selfdoc; no user-facing change.
+
 ## 0.121.3
 
 The project describes itself consistently on PyPI, npm and in its README, and its documentation base is the unified site.
