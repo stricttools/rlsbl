@@ -2,7 +2,7 @@
 
 # rlsbl
 
-Release orchestration and project scaffolding across package ecosystems
+Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more
 
 Built in Python 3.11+ with ruamel-yaml, tomlkit, strictcli, and tree-sitter. Also distributed as an npm wrapper package. Current version: check `package.json`.
 
