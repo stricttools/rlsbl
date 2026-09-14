@@ -5,7 +5,7 @@
   "version": "0.121.2",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
-  "base_url": "https://rlsbl.smmh.dev",
+  "base_url": "https://smmh.dev/rlsbl",
   "pages": [
     {
       "path": "changelog.md",
@@ -20661,6 +20661,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-14T14:36:41.578644+00:00",
+  "last_gen": "2026-09-14T14:58:50.263829+00:00",
   "theme": "minimal"
 }
