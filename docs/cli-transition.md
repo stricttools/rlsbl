@@ -1,7 +1,8 @@
 +++
 title = "rlsbl transition"
-description = "Declare a transition-record fact an operator states rather than a command records: a tag outside the version model, a deliberately closed release history, or a renamed releasable."
+description = "Record the transition-record facts an operator states."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 17
 +++

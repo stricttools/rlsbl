@@ -1,7 +1,8 @@
 +++
 title = "rlsbl monorepo"
-description = "Manage a monorepo workspace: init, add/remove projects, sync CI router, release coordination, rename releasables, and dependency graph analysis."
+description = "Manage monorepo workspaces with multiple independently-versioned projects."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 9
 +++

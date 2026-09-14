@@ -1,7 +1,8 @@
 +++
 title = "rlsbl watch"
-description = "Poll GitHub Actions for workflow runs tied to a commit SHA and report pass or fail, defaulting to HEAD when no SHA is supplied as argument."
+description = "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 19
 +++

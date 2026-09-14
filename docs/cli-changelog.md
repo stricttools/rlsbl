@@ -1,7 +1,8 @@
 +++
 title = "rlsbl changelog"
-description = "Manage structured JSONL changelog entries: add, amend, edit, remove and remap per-commit entries, validate schema and coverage, and generate CHANGELOG.md."
+description = "Structured changelog management using JSONL entries, each typed feature, fix or breaking."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 1
 +++

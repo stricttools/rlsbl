@@ -1,7 +1,8 @@
 +++
 title = "rlsbl check-name"
-description = "Query npm, PyPI, the Go module proxy, or GitHub for package name availability. Supports repeatable --target, a configurable --delay, and --json output."
+description = "Query npm, PyPI, or other registries to check whether one or more package names are available."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 3
 +++

@@ -1,7 +1,8 @@
 +++
 title = "rlsbl check"
-description = "Run project checks registered via the check framework, covering changelog validation, workspace health, and release preflight."
+description = "Run project checks registered via the check framework and report results"
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 2
 +++

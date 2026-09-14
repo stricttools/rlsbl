@@ -1,7 +1,8 @@
 +++
 title = "rlsbl discover"
-description = "Find every rlsbl-managed repository tagged with the rlsbl topic on GitHub, optionally filtered to your own repositories with the --mine flag."
+description = "Search GitHub for repositories tagged with the rlsbl topic and list them."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 8
 +++

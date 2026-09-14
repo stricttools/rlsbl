@@ -1,7 +1,8 @@
 +++
 title = "rlsbl unreleased"
-description = "List the commits between this checkout's nearest release commit and HEAD, with each one's JSONL changelog coverage, as plain text or as JSON."
+description = "List the commits between this checkout's nearest release commit and HEAD, and check whether each has a corresponding changelog entry."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 18
 +++

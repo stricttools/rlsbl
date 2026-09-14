@@ -1,7 +1,8 @@
 +++
 title = "rlsbl dev"
-description = "Developer utilities for rlsbl projects: per-target local installs, sibling checkout overlays via dev sync, and overlay drift reporting."
+description = "Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install)."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 7
 +++

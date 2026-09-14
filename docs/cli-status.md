@@ -1,7 +1,8 @@
 +++
 title = "rlsbl status"
-description = "Show the project version, branch, the latest release read from the release archives, the unreleased commit count, and changelog coverage. Text or JSON."
+description = "Display the current project version, branch, latest release, unreleased commit count, and changelog coverage."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 15
 +++

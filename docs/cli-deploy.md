@@ -1,7 +1,8 @@
 +++
 title = "rlsbl deploy"
-description = "Run the project configured deploy pipeline against a named target, with dry-run preview and --force to override branch and safety guards."
+description = "Run the configured deployment pipeline for the project."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 6
 +++

@@ -1,7 +1,8 @@
 +++
 title = "API Reference"
-description = "Index of rlsbl's generated API reference: a link to the page of every public module, from the release flow and the checks down to targets and pipelines."
+description = "API reference index for rlsbl covering 189 modules"
 generated = true
+seeded = true
 nav_group = "API Reference"
 nav_order = 90
 +++

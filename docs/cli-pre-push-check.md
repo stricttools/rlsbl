@@ -1,7 +1,8 @@
 +++
 title = "rlsbl pre-push-check"
-description = "Retired stub: the pre-push hook now runs `rlsbl check --tag prepush`, so this command performs no check and only tells you to re-scaffold."
+description = "Removed."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 10
 +++

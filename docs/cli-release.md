@@ -1,7 +1,8 @@
 +++
 title = "rlsbl release"
-description = "Release lifecycle: run, resume, scaffold release files, retry CI, sync notes, undo, deprecate, yank, scrub history, backfill the release archives, reconcile published refs and Releases."
+description = "Release orchestration commands covering the full release lifecycle."
 generated = true
+seeded = true
 nav_group = "CLI Reference"
 nav_order = 12
 +++
