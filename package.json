@@ -1,6 +1,6 @@
 {
   "name": "rlsbl",
-  "version": "0.121.2",
+  "version": "0.121.3",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "homepage": "https://smmh.dev/rlsbl/",
   "license": "MIT",

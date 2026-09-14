@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.121.3
+
+The project describes itself consistently on PyPI, npm and in its README, and its documentation base is the unified site.
+
+### Fixes
+
+- **The project describes itself consistently on PyPI, npm and in its README.** The PyPI summary, the npm description and the README's opening line were three different texts, none of them a definition of the tool, and neither registry carried a homepage, documentation, issues or changelog link.
+- **Documentation links point at the unified site.** The declared docs base was the retired per-project host; it is `https://smmh.dev/rlsbl/` now, so generated sitemaps, feeds and llms.txt name the address that serves the pages.
+
 ## 0.121.2
 
 Go binary releases ship their archives, and a release that ships none fails loudly.
