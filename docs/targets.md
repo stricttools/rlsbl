@@ -1,6 +1,6 @@
----
-description: "The rlsbl release targets including npm, PyPI, Go, Docker and Flutter, with auto-detection, the ReleaseTarget protocol, and per-axis support properties."
----
++++
+description = "The rlsbl release targets including npm, PyPI, Go, Docker and Flutter, with auto-detection, the ReleaseTarget protocol, and per-axis support properties."
++++
 
 # Release targets
 

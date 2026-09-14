@@ -1,6 +1,6 @@
----
-description: "SSH-based deployment system with configurable health checks, automatic rollback on failure, and branch restrictions for safe remote deploys."
----
++++
+description = "SSH-based deployment system with configurable health checks, automatic rollback on failure, and branch restrictions for safe remote deploys."
++++
 
 # Deploy
 

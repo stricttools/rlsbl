@@ -1,7 +1,7 @@
----
-title: Customizing CI workflows
-description: "Add custom GitHub Actions jobs to scaffold-managed projects via ci-custom.yml and publish-custom.yml without conflicting with three-way merge updates."
----
++++
+title = "Customizing CI workflows"
+description = "Add custom GitHub Actions jobs to scaffold-managed projects via ci-custom.yml and publish-custom.yml without conflicting with three-way merge updates."
++++
 
 # Customizing CI workflows
 

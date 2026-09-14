@@ -1,6 +1,6 @@
----
-description: "How rlsbl scaffold generates CI workflows, git hooks, and config files, with three-way merge preserving your customizations on repeated updates."
----
++++
+description = "How rlsbl scaffold generates CI workflows, git hooks, and config files, with three-way merge preserving your customizations on repeated updates."
++++
 
 # Scaffold system
 

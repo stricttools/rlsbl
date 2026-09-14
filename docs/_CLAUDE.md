@@ -1,6 +1,6 @@
----
-description: "Operational reference for AI agents working on rlsbl-managed projects."
----
++++
+description = "Operational reference for AI agents working on rlsbl-managed projects."
++++
 # rlsbl
 
 :-: var key="project.description"

@@ -1,12 +1,12 @@
----
-title: Release Orchestration Tools Compared
-date: 2026-06-29
-slug: release-orchestration-tools-compared
-description: "A feature-by-feature comparison of semantic-release, release-it, changesets, goreleaser and cargo-release — how each handles initiation, changelog format, commit conventions, monorepos and multi-ecosystem publishing — and where rlsbl fits among them."
-tags: [comparison, release-tools]
-draft: false
-directives: false
----
++++
+title = "Release Orchestration Tools Compared"
+date = 2026-06-29
+slug = "release-orchestration-tools-compared"
+description = "A feature-by-feature comparison of semantic-release, release-it, changesets, goreleaser and cargo-release — how each handles initiation, changelog format, commit conventions, monorepos and multi-ecosystem publishing — and where rlsbl fits among them."
+tags = ["comparison", "release-tools"]
+draft = false
+directives = false
++++
 
 Release orchestration sits at the intersection of version management, changelog generation, CI/CD, and publishing. The JavaScript ecosystem alone has several mature tools, each with a different philosophy. This post compares the major options and explains where rlsbl fits.
 

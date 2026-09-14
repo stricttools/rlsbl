@@ -1,6 +1,6 @@
----
-description: "Monorepo architectural layer enforcement — configuring layer order, assignments, overrides, and validating dependency direction."
----
++++
+description = "Monorepo architectural layer enforcement — configuring layer order, assignments, overrides, and validating dependency direction."
++++
 
 # Layers
 

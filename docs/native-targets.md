@@ -1,6 +1,6 @@
----
-description: "Native iOS and Android release targets — the activation conditions, version management, build number handling, and platform constraints."
----
++++
+description = "Native iOS and Android release targets — the activation conditions, version management, build number handling, and platform constraints."
++++
 
 # Native targets
 
