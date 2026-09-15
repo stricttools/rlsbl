@@ -17,3 +17,7 @@ context = ""
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "cce44c5d97688c12b265459f50cf8a0c6a51c331"
+
+[tree_hashes]
+"." = "3457db7dcbfc25d86fc157ae8932a0b15a852349"
