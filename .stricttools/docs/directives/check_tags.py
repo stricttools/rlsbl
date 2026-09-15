@@ -7,7 +7,8 @@ from, and the same file the ``check-count`` sentence reads.
 The README used to hand-type this table. Every count in it had drifted below
 what the registry held, and its per-row descriptions enumerated checks that had
 since been renamed, merged or retired. Counts derived from the registry cannot
-do that; what each tag's checks actually are stays in ``docs/checks.md``, whose
+do that; what each tag's checks actually are stays in
+``.stricttools/docs/checks.md``, whose
 per-tag tables are verified against this same file by
 ``tests/test_docs_check_tables.py``.
 
@@ -34,9 +35,7 @@ _spec = importlib.util.spec_from_file_location(
 _matrix = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_matrix)
 
-CHECKS_PATH = (
-    Path(__file__).resolve().parents[2] / "rlsbl" / "data" / "checks.toml"
-)
+CHECKS_PATH = _matrix.repo_root() / "rlsbl" / "data" / "checks.toml"
 
 # The row for checks that carry no tag at all: they run only under `--all` or
 # `--name`, so they are part of the picture the table gives.

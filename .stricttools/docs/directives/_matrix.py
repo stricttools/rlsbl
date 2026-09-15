@@ -25,9 +25,20 @@ absent.
 import json
 from pathlib import Path
 
-MATRIX_PATH = (
-    Path(__file__).resolve().parents[2] / "rlsbl" / "data" / "support-matrix.json"
-)
+def repo_root():
+    """Return the repository root: the nearest ancestor holding selfdoc.json.
+
+    Found by marker rather than by a parent count, so every directive resolves
+    the repository the same way wherever the docs tree sits inside it.
+    """
+    here = Path(__file__).resolve().parent
+    for candidate in (here, *here.parents):
+        if (candidate / "selfdoc.json").is_file():
+            return candidate
+    raise RuntimeError(f"no selfdoc.json above {__file__}")
+
+
+MATRIX_PATH = repo_root() / "rlsbl" / "data" / "support-matrix.json"
 
 
 def load():
