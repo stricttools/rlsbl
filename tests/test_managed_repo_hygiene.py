@@ -259,7 +259,7 @@ class TestStashFreeCheck:
 
     def test_it_has_a_documented_row(self):
         docs = (
-            Path(__file__).resolve().parent.parent / "docs" / "checks.md"
+            Path(__file__).resolve().parent.parent / ".stricttools" / "docs" / "checks.md"
         ).read_text(encoding="utf-8")
         assert "`stash-free`" in docs
 

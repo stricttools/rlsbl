@@ -1667,7 +1667,12 @@ class TestDocsScrubExamplesParse:
     parse time (wrong flag name like `--from`, or a match-only flag such as
     `--mangle` in file mode) is a broken example."""
 
-    DOCS = Path(__file__).resolve().parent.parent / "docs" / "release-workflow.md"
+    DOCS = (
+        Path(__file__).resolve().parent.parent
+        / ".stricttools"
+        / "docs"
+        / "release-workflow.md"
+    )
 
     def _scrub_examples(self):
         examples = [

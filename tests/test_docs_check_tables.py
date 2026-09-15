@@ -24,7 +24,7 @@ from collections import Counter
 from pathlib import Path
 
 
-DOCS = Path(__file__).resolve().parents[1] / "docs" / "checks.md"
+DOCS = Path(__file__).resolve().parents[1] / ".stricttools" / "docs" / "checks.md"
 CHECKS_TOML = Path(__file__).resolve().parents[1] / "rlsbl" / "data" / "checks.toml"
 
 # Tag -> the "## ..." heading in docs/checks.md that documents it.

@@ -15,8 +15,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _load_directive(name):
-    """Load a directive module from docs/directives/ by name."""
-    path = REPO_ROOT / "docs" / "directives" / f"{name}.py"
+    """Load a directive module from .stricttools/docs/directives/ by name."""
+    path = REPO_ROOT / ".stricttools" / "docs" / "directives" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(
         f"docs.directives.{name}", path
     )

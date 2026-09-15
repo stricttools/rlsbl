@@ -639,7 +639,7 @@ class TestFivePlaceRegistration:
 
     def test_it_has_a_row_in_the_docs_check_reference(self):
         text = open(
-            os.path.join(REPO_ROOT, "docs", "checks.md"), encoding="utf-8",
+            os.path.join(REPO_ROOT, ".stricttools", "docs", "checks.md"), encoding="utf-8",
         ).read()
         assert "| `ldflags-symbol` |" in text
 

@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DIRECTIVES_DIR = REPO_ROOT / "docs" / "directives"
+DIRECTIVES_DIR = REPO_ROOT / ".stricttools" / "docs" / "directives"
 
 # Every directive registered in selfdoc.json, with the attrs its resolve takes.
 DIRECTIVES = [

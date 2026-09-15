@@ -19,7 +19,7 @@ from pathlib import Path
 from rlsbl.workspace import MEMBER_KEYS
 
 
-DOCS = Path(__file__).resolve().parents[1] / "docs"
+DOCS = Path(__file__).resolve().parents[1] / ".stricttools" / "docs"
 MONOREPO = DOCS / "monorepo.md"
 CONFIGURATION = DOCS / "configuration.md"
 

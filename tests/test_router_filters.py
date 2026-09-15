@@ -789,7 +789,7 @@ class TestFivePlaceRegistration:
         assert CHECK_TARGETS["router-filters-fresh"] == "workspace"
 
     def test_it_has_a_row_in_the_docs_check_reference(self):
-        text = (REPO_ROOT / "docs" / "checks.md").read_text(encoding="utf-8")
+        text = (REPO_ROOT / ".stricttools" / "docs" / "checks.md").read_text(encoding="utf-8")
         assert "| `router-filters-fresh` |" in text
 
     def test_it_is_in_the_expected_checks_roster(self):

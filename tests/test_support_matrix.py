@@ -338,7 +338,7 @@ class TestFourPlaceRegistration:
         assert CHECK_TARGETS["target-matrix-fresh"] is None
 
     def test_it_has_a_row_in_the_docs_check_reference(self):
-        text = (REPO_ROOT / "docs" / "checks.md").read_text(encoding="utf-8")
+        text = (REPO_ROOT / ".stricttools" / "docs" / "checks.md").read_text(encoding="utf-8")
         assert "| `target-matrix-fresh` |" in text
 
     def test_the_matrix_records_its_own_scope(self):

@@ -1,6 +1,7 @@
 """Purity is verified by execution, not asserted in a comment.
 
-The rule (``rlsbl/data/checks.toml``, and ``docs/checks.md``): a pure check
+The rule (``rlsbl/data/checks.toml``, and ``.stricttools/docs/checks.md``):
+a pure check
 starts only allowlisted read-only programs.  The allowlist is
 ``rlsbl/observe_allowlist.py`` and its standard is "no user-visible mutation".
 
@@ -128,7 +129,7 @@ class TestTheReclassificationIsDeclared:
 
     def test_the_docs_page_states_the_same_rule(self):
         page = (
-            Path(__file__).resolve().parent.parent / "docs" / "checks.md"
+            Path(__file__).resolve().parent.parent / ".stricttools" / "docs" / "checks.md"
         ).read_text(encoding="utf-8")
         assert "starts only read-only programs on the observe allowlist" in page, (
             "the docs page and the data file are the two statement sites and "
