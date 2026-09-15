@@ -53,22 +53,7 @@
   "topology": {
     "slug": "rlsbl",
     "docs_base": "https://smmh.dev",
-    "posts_base": "https://blog.smmh.dev",
-    "projects": {
-      "pixelweaver": "https://docs.smmh.dev/pixelweaver",
-      "claudestream": "https://docs.smmh.dev/claudestream",
-      "claudewheel": "https://docs.smmh.dev/claudewheel",
-      "go-toml-edit": "https://docs.smmh.dev/go-toml-edit",
-      "howmuchleft": "https://docs.smmh.dev/howmuchleft",
-      "orxtra": "https://docs.smmh.dev/orxtra",
-      "pgdesign": "https://docs.smmh.dev/pgdesign",
-      "predraw": "https://docs.smmh.dev/predraw",
-      "safegit": "https://docs.smmh.dev/safegit",
-      "saferm": "https://docs.smmh.dev/saferm",
-      "selfdoc": "https://docs.smmh.dev/selfdoc",
-      "strictcli": "https://docs.smmh.dev/strictcli",
-      "wesktop": "https://docs.smmh.dev/wesktop"
-    }
+    "posts_base": "https://blog.smmh.dev"
   },
   "posts": {
     "repo": "smm-h/posts"
