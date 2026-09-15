@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.121.5
+
+Documentation moved onto selfdoc's .stricttools/ layout; no user-facing change.
+
+### Infrastructure
+
+- Documentation moved onto selfdoc's .stricttools/ layout; no user-facing change.
+
 ## 0.121.4
 
 Documentation frontmatter converted to TOML for the current selfdoc; no user-facing change.
