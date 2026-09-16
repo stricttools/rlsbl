@@ -11,6 +11,7 @@ consumer `.gitignore` cannot defeat it.  It must NOT swallow genuine dirt,
 and must NOT cover `unreleased.plan.json`, which is deliberately committed.
 """
 
+import json
 import os
 import subprocess
 
@@ -38,6 +39,23 @@ def _write(repo, rel_path, content="{}\n"):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     return path
+
+
+def _track_releases_dir(repo):
+    """Commit the release file, so git reports the state file by name.
+
+    ``git status`` collapses a WHOLLY untracked directory into one
+    ``?? .rlsbl/releases/`` record, which names no file to classify. Every real
+    rlsbl project has committed ``unreleased.toml`` (and its archives) in that
+    directory long before a release writes state into it, so this is the shape
+    the checks actually meet.
+    """
+    rel = os.path.join(".rlsbl", "releases", "unreleased.toml")
+    _write(repo, rel, "")
+    subprocess.run(["git", "add", rel], cwd=str(repo), check=True)
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "release file"], cwd=str(repo), check=True,
+    )
 
 
 class TestToolOwnedStatePathPredicate:
@@ -285,3 +303,179 @@ class TestGitignoreTemplateStateEntries:
             {},
         )
         assert plans[0]["status"] == "unchanged"
+
+
+# ---------------------------------------------------------------------------
+# The shared subtraction, and the other commands that perform it
+# ---------------------------------------------------------------------------
+
+class TestBlockingDirtyPaths:
+    """`blocking_dirty_paths` is the one place the subtraction is spelled."""
+
+    def test_tool_state_alone_yields_nothing(self, mock_git_repo):
+        from rlsbl.commands.release.validate import blocking_dirty_paths
+
+        _write(mock_git_repo, STATE_REL)
+        _write(mock_git_repo, SCRUB_REL)
+        assert blocking_dirty_paths() == []
+
+    def test_other_dirt_is_reported(self, mock_git_repo):
+        from rlsbl.commands.release.validate import blocking_dirty_paths
+
+        _write(mock_git_repo, STATE_REL)
+        _write(mock_git_repo, "notes.txt", "wip\n")
+        assert blocking_dirty_paths() == ["notes.txt"]
+
+    def test_cwd_selects_the_repository(self, mock_git_repo):
+        """The helper answers about the repo it is pointed at, not the process cwd."""
+        from rlsbl.commands.release.validate import blocking_dirty_paths
+
+        _write(mock_git_repo, "notes.txt", "wip\n")
+        assert blocking_dirty_paths(cwd=str(mock_git_repo)) == ["notes.txt"]
+
+
+class TestOtherCleanTreeChecksExemptToolState:
+    """Every clean-tree refusal reuses the predicate, never a second list.
+
+    Each of these commands refuses over a dirty tree and, without the
+    exemption, refused over `.rlsbl/releases/in-progress.json` -- a file rlsbl
+    itself wrote, in a repository whose `.gitignore` never got an entry for it.
+    For the rename and the conversions, the refusal also preempted the specific
+    in-flight-release refusal that follows it and actually explains the state.
+    """
+
+    def test_releasable_rename_exempts_tool_state(self, mock_git_repo):
+        from rlsbl.commands.monorepo.releasable_rename import _blocking_dirty_paths
+
+        _write(mock_git_repo, STATE_REL)
+        assert _blocking_dirty_paths(str(mock_git_repo)) == []
+
+        _write(mock_git_repo, "notes.txt", "wip\n")
+        assert _blocking_dirty_paths(str(mock_git_repo)) == ["notes.txt"]
+
+    def test_extract_exempts_tool_state(self, mock_git_repo):
+        from rlsbl.commands.monorepo.extract_cmd import _dirty_paths
+
+        _track_releases_dir(mock_git_repo)
+        _write(mock_git_repo, STATE_REL)
+        assert _dirty_paths(str(mock_git_repo)) == []
+
+        _write(mock_git_repo, "notes.txt", "wip\n")
+        assert _dirty_paths(str(mock_git_repo)) == ["notes.txt"]
+
+    def test_absorb_exempts_tool_state(self, mock_git_repo):
+        from rlsbl.commands.monorepo.absorb_cmd import _dirty_paths
+
+        _track_releases_dir(mock_git_repo)
+        _write(mock_git_repo, STATE_REL)
+        assert _dirty_paths(str(mock_git_repo)) == []
+
+        _write(mock_git_repo, "notes.txt", "wip\n")
+        assert _dirty_paths(str(mock_git_repo)) == ["notes.txt"]
+
+
+class TestUndoCleanTreeExemption:
+    """`rlsbl release undo` refused over rlsbl's own untracked state file.
+
+    Undo's clean-tree refusal read every dirty path git reported, with no
+    exemption at all -- while the release path exempted the two tool-owned
+    state files. `.rlsbl/releases/in-progress.json` is written untracked, and a
+    consumer repository whose `.gitignore` predates the scaffold entry for it
+    therefore reports it as dirty. Undo refused, printing "commit your changes
+    first" -- a remedy nobody should follow for a file rlsbl wrote and deletes
+    itself, and the refusal fired in the very situation undo exists for.
+    """
+
+    def _repo(self, tmp_path, monkeypatch):
+        """A released 1.0.1 repository whose `.gitignore` covers nothing."""
+        from test_undo import _make_real_shape_repo
+
+        repo = tmp_path / "repo"
+        _make_real_shape_repo(repo)
+        (repo / ".gitignore").write_text("")
+        subprocess.run(["git", "add", ".gitignore"], cwd=str(repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "an ignore file that ignores nothing"],
+            cwd=str(repo), check=True,
+        )
+        monkeypatch.chdir(repo)
+        return repo
+
+    def _state_for(self, repo, version):
+        _write(repo, STATE_REL, json.dumps({
+            "new_version": version,
+            "tag": f"v{version}",
+            "branch": "main",
+            "completed_steps": [],
+        }) + "\n")
+
+    def test_untracked_scrub_state_does_not_block_undo(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        from test_undo import _run_undo
+
+        repo = self._repo(tmp_path, monkeypatch)
+        _write(repo, SCRUB_REL)
+
+        _run_undo(repo, {"dry-run": True})
+
+        assert "v1.0.1" in capsys.readouterr().out
+
+    def test_untracked_release_state_does_not_block_undo(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        """The live case: the state file of the release being undone."""
+        from test_undo import _run_undo
+
+        repo = self._repo(tmp_path, monkeypatch)
+        self._state_for(repo, "1.0.1")
+
+        _run_undo(repo, {"dry-run": True})
+
+        assert "v1.0.1" in capsys.readouterr().out
+
+    def test_any_other_dirty_file_still_refuses_and_names_it(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        from test_undo import _run_undo
+
+        repo = self._repo(tmp_path, monkeypatch)
+        _write(repo, SCRUB_REL)
+        _write(repo, "notes.txt", "wip\n")
+
+        with pytest.raises(SystemExit) as exc:
+            _run_undo(repo, {"dry-run": True})
+
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "notes.txt" in err
+        assert "scrub-result.json" not in err
+
+    def test_following_the_commit_remedy_clears_the_refusal(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        """"Commit your changes first" is executed, and the refusal is gone.
+
+        The remedy is only honest for the paths the refusal names: committing
+        them must actually let undo through, with the tool-owned state file
+        still sitting there untracked.
+        """
+        from test_undo import _run_undo
+
+        repo = self._repo(tmp_path, monkeypatch)
+        _write(repo, STATE_REL, "{}\n")
+        _write(repo, "notes.txt", "wip\n")
+
+        with pytest.raises(SystemExit):
+            _run_undo(repo, {"dry-run": True})
+        assert "notes.txt" in capsys.readouterr().err
+
+        subprocess.run(["git", "add", "notes.txt"], cwd=str(repo), check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "notes"], cwd=str(repo), check=True,
+        )
+
+        _run_undo(repo, {"dry-run": True})
+
+        assert "v1.0.1" in capsys.readouterr().out
+        assert (repo / STATE_REL).exists(), "the state file was left alone"

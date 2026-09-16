@@ -185,7 +185,7 @@ class TestFullRename:
         assert "no longer managed" in result["note"]
 
         # Working tree is clean after the operation.
-        assert rr._is_clean_tree(str(root))
+        assert rr._blocking_dirty_paths(str(root)) == []
 
     def test_second_run_noops(self, tmp_path, monkeypatch, _gh_ok):
         root = tmp_path / "repo"
@@ -233,7 +233,7 @@ class TestTheRenameIsRecorded:
         assert (events[0].old_name, events[0].new_name) == ("beta", "beta2")
         assert events[0].reason
         # Committed with everything else the rename wrote.
-        assert rr._is_clean_tree(str(root))
+        assert rr._blocking_dirty_paths(str(root)) == []
 
     def test_a_re_run_does_not_duplicate_it(self, tmp_path, monkeypatch, _gh_ok):
         root = tmp_path / "repo"
@@ -269,7 +269,7 @@ class TestCrashHealing:
         # Simulate a crash: do the local mutations + commit, but NOT the tag.
         rr._apply_local_rename(str(root), "beta", "beta2")
         assert not rr._tag_exists_local(str(root), "beta2@v0.1.0")
-        assert rr._is_clean_tree(str(root))
+        assert rr._blocking_dirty_paths(str(root)) == []
 
         # Re-run the full command -> resume path finishes the tag step.
         result = rr.rename_releasable(str(root), "beta", "beta2")
@@ -293,7 +293,7 @@ class TestCrashBeforeCommitHealing:
         new_dir = get_releasable_dir(str(root), "beta2")
         os.rename(old_dir, new_dir)
 
-        assert not rr._is_clean_tree(str(root)), "precondition: uncommitted rename"
+        assert rr._blocking_dirty_paths(str(root)), "precondition: uncommitted rename"
         assert not rr._tag_exists_local(str(root), "beta2@v0.1.0")
         assert "beta@v" in _publish_yml(root), "precondition: gate prefix still stale"
 
@@ -304,7 +304,7 @@ class TestCrashBeforeCommitHealing:
         result = rr.rename_releasable(str(root), "beta", "beta2")
 
         # The rename is now committed: clean tree.
-        assert rr._is_clean_tree(str(root)), \
+        assert rr._blocking_dirty_paths(str(root)) == [], \
             "re-run must commit the pending rename, not leave a dirty tree"
         # The gate prefix was regenerated and committed.
         assert "beta2@v" in _publish_yml(root)
@@ -460,7 +460,7 @@ class TestNeverReleasedNoSourceTag:
         assert not rr._tag_exists_local(str(root), "beta2@v0.1.0")
         # The local rename still completed and committed cleanly.
         assert 'name = "beta2"' in _read_ws(root)
-        assert rr._is_clean_tree(str(root))
+        assert rr._blocking_dirty_paths(str(root)) == []
 
 
 class TestAliasIsRecordedInTransitionRecord:
@@ -500,7 +500,7 @@ class TestAliasIsRecordedInTransitionRecord:
         assert alias.aliased_tag == "beta@v0.1.0"
         assert alias.commit == _git(root, "rev-list", "-n", "1", "beta2@v0.1.0")
         # Recorded means committed: the record is repository state.
-        assert rr._is_clean_tree(str(root))
+        assert rr._blocking_dirty_paths(str(root)) == []
 
     def test_re_running_appends_no_duplicate(self, tmp_path, monkeypatch, _gh_ok):
         root = tmp_path / "repo"

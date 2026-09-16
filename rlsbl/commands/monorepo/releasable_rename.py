@@ -91,10 +91,20 @@ def validate_releasable_name(name):
 # ---------------------------------------------------------------------------
 
 
-def _is_clean_tree(root):
-    """Return True when the git working tree at ``root`` is clean."""
-    status = run("git", ["--no-optional-locks", "status", "--porcelain"], cwd=root)
-    return len(status.strip()) == 0
+def _blocking_dirty_paths(root):
+    """The working-tree changes at ``root`` that block a rename.
+
+    Delegates to the shared subtraction so rlsbl's own untracked release state
+    (``in-progress.json``, ``scrub-result.json``) is exempt here as it is on
+    the release path. Without that, a rename refused over a file rlsbl
+    itself wrote -- and refused with "commit your changes", which is not what
+    an operator should do with it -- instead of reaching
+    :func:`_check_no_inflight` below, whose refusal names the release in flight
+    and what to do about it.
+    """
+    from ..release.validate import blocking_dirty_paths
+
+    return blocking_dirty_paths(cwd=root)
 
 
 def _tag_exists_local(root, tag):
@@ -528,9 +538,11 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         raise WorkspaceError(
             f"target releasable directory already exists: {new_dir}."
         )
-    if not _is_clean_tree(root):
+    _dirty = _blocking_dirty_paths(root)
+    if _dirty:
         raise WorkspaceError(
-            "working tree is not clean. Commit or set aside changes first."
+            "working tree is not clean. Commit or set aside changes first.\n"
+            + "\n".join(f"  {path}" for path in _dirty)
         )
     _check_no_inflight(root, releasables)
 

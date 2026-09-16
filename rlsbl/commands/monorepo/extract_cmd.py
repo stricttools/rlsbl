@@ -471,10 +471,19 @@ def _dirty_paths(root):
     This is also the commit list for both repositories: naming what the tree
     actually reports cannot miss a path a step forgot to declare, and cannot
     name a directory whose untracked contents would be swept in with it.
+
+    rlsbl's own untracked release state (``in-progress.json``,
+    ``scrub-result.json``) is subtracted too, through the shared predicate the
+    release path uses: a check that refuses over a file rlsbl itself wrote
+    reads an input the repository does not own, and here the same list is the
+    commit list, where a tool-owned state file has no business either.
     """
+    from ..release.validate import is_tool_owned_state_path
+
     return [
         path for path in working_tree_paths(cwd=root)
         if path.rstrip("/") != LOCK_RELPATH
+        and not is_tool_owned_state_path(path)
     ]
 
 

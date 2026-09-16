@@ -341,10 +341,20 @@ def _commit_exists(repo, sha):
 
 
 def _dirty_paths(root):
-    """Working-tree changes at ``root``, minus rlsbl's own advisory lock."""
+    """Working-tree changes at ``root``, minus rlsbl's own tool-owned files.
+
+    The advisory lock, and rlsbl's own untracked release state
+    (``in-progress.json``, ``scrub-result.json``) through the shared predicate
+    the release path uses: a check that refuses over a file rlsbl itself wrote
+    reads an input the repository does not own, and here the same list is the
+    commit list, where a tool-owned state file has no business either.
+    """
+    from ..release.validate import is_tool_owned_state_path
+
     return [
         path for path in working_tree_paths(cwd=root)
         if path.rstrip("/") != LOCK_RELPATH
+        and not is_tool_owned_state_path(path)
     ]
 
 
