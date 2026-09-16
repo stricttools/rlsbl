@@ -1039,7 +1039,7 @@ class TestUndo:
         monkeypatch.chdir(tmp_path)
         self.tmp_dir = str(tmp_path)
 
-    @patch("rlsbl.commands.undo.is_clean_tree", return_value=True)
+    @patch("rlsbl.commands.undo.blocking_dirty_paths", return_value=[])
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.undo.run")
@@ -1057,7 +1057,7 @@ class TestUndo:
 
     @patch("rlsbl.commands.undo.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.undo.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.undo.is_clean_tree", return_value=False)
+    @patch("rlsbl.commands.undo.blocking_dirty_paths", return_value=["wip.txt"])
     def test_undo_dirty_tree(self, _clean, _gh_auth, _gh_inst):
         """Dirty working tree should cause SystemExit."""
         from pathlib import Path
