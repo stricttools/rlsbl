@@ -73,6 +73,27 @@ import os
 
 from ... import effects
 from ...utils import parse_status_paths, status_argv
+from .steps import (
+    BUILD,
+    BUMP_SELFDOC,
+    CLEAN_ARTIFACTS,
+    COMMIT,
+    ENSURE_KEYWORD,
+    GUARD_CANDIDATE_WINDOW,
+    GUARD_FOREIGN_COMMITS,
+    GUARD_UNEXPECTED_FILES,
+    PUSH_CANDIDATE,
+    RECORD_CANDIDATE,
+    SECRET_SCAN,
+    SNAPSHOT,
+    STEPS_BY_NAME,
+    SYNC_LOCKFILE,
+    WRITE_MARKER,
+    WRITE_MEMBER_VERSIONS,
+    WRITE_RELEASABLE_VERSION,
+    WRITE_TARGET_VERSION,
+    all_plan_kinds,
+)
 
 
 # The one value that crosses the Phase-A seam.
@@ -85,25 +106,15 @@ CARRIER = object()
 
 # ---------------------------------------------------------------------------
 # Step kinds
+#
+# A plan step's KIND is the sub-operation it issues; several of them make up
+# one recorded release step. Both the kinds and the release step each belongs
+# to are declared in :mod:`rlsbl.commands.release.steps`, the release step
+# table, and imported here -- restating them would be the second description
+# the table exists to remove. ``_HANDLERS`` at the bottom of this module is
+# built from the kinds the table declares, so a kind with no handler (or a
+# handler for a kind no step claims) is an import-time hard error.
 # ---------------------------------------------------------------------------
-
-WRITE_RELEASABLE_VERSION = "write-releasable-version"
-WRITE_TARGET_VERSION = "write-target-version"
-WRITE_MEMBER_VERSIONS = "write-member-versions"
-BUMP_SELFDOC = "bump-selfdoc"
-ENSURE_KEYWORD = "ensure-keyword"
-SYNC_LOCKFILE = "sync-lockfile"
-WRITE_MARKER = "write-marker"
-CLEAN_ARTIFACTS = "clean-artifacts"
-BUILD = "build"
-SECRET_SCAN = "secret-scan"
-GUARD_UNEXPECTED_FILES = "guard-unexpected-files"
-COMMIT = "commit"
-SNAPSHOT = "snapshot"
-GUARD_FOREIGN_COMMITS = "guard-foreign-commits"
-GUARD_CANDIDATE_WINDOW = "guard-candidate-window"
-RECORD_CANDIDATE = "record-candidate"
-PUSH_CANDIDATE = "push-candidate"
 
 # Steps whose work is a guard rather than a mutation. A preview executes
 # nothing, so there is nothing for them to guard: they are declared in the plan
@@ -158,6 +169,17 @@ class PlanStep:
     capture: tuple | None = None
     # Release-state markers to record once this step has been issued.
     marks: tuple = ()
+
+    def __post_init__(self):
+        # A plan step that named a release step the table does not declare
+        # would write a marker nothing can interpret -- and ``save_step``
+        # would only refuse it much later, halfway through a real release.
+        for name in (self.release_step, *self.marks):
+            if name not in STEPS_BY_NAME:
+                raise ValueError(
+                    f"plan step {self.kind!r} names release step {name!r}, "
+                    f"which the release step table does not declare"
+                )
 
 
 @dataclasses.dataclass
@@ -1410,7 +1432,11 @@ class _Executor:
         return None
 
 
-_HANDLERS = {
+# The executor's forward dispatch, built from the kinds the release step table
+# declares rather than from a second list of them kept here. Each kind names
+# the method that issues it; the table decides which kinds exist and which
+# release step each one records.
+_IMPLEMENTATIONS = {
     WRITE_RELEASABLE_VERSION: _Executor._do_write_releasable_version,
     WRITE_TARGET_VERSION: _Executor._do_write_target_version,
     WRITE_MEMBER_VERSIONS: _Executor._do_write_member_versions,
@@ -1429,3 +1455,30 @@ _HANDLERS = {
     RECORD_CANDIDATE: _Executor._do_record_candidate,
     PUSH_CANDIDATE: _Executor._do_push_candidate,
 }
+
+
+def _build_dispatch():
+    """Bind every plan kind the table declares to the method that issues it.
+
+    Both directions are hard errors at import: a declared kind with no
+    implementation would fail mid-release with a KeyError, and an
+    implementation for a kind no release step claims would issue work no
+    marker records.
+    """
+    declared = all_plan_kinds()
+    missing = [k for k in declared if k not in _IMPLEMENTATIONS]
+    if missing:
+        raise RuntimeError(
+            f"the release step table declares plan kind(s) with no Phase-A "
+            f"implementation: {', '.join(missing)}"
+        )
+    unclaimed = [k for k in _IMPLEMENTATIONS if k not in declared]
+    if unclaimed:
+        raise RuntimeError(
+            f"Phase-A implements plan kind(s) no release step in the table "
+            f"claims: {', '.join(unclaimed)}"
+        )
+    return {kind: _IMPLEMENTATIONS[kind] for kind in declared}
+
+
+_HANDLERS = _build_dispatch()
