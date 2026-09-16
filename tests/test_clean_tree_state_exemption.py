@@ -463,7 +463,7 @@ class TestUndoCleanTreeExemption:
         from test_undo import _run_undo
 
         repo = self._repo(tmp_path, monkeypatch)
-        _write(repo, STATE_REL, "{}\n")
+        self._state_for(repo, "1.0.1")
         _write(repo, "notes.txt", "wip\n")
 
         with pytest.raises(SystemExit):
