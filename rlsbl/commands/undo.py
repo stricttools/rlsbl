@@ -55,6 +55,9 @@ from ..release_file import unfinalize_release_file
 from ..release_publication import delete_args
 from ..targets import TARGETS
 from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, working_tree_paths
+# The shared clean-tree subtraction, bound at module level so the seam is
+# patchable here rather than resolved inside the call.
+from .release.validate import blocking_dirty_paths
 from ..workspace import find_workspace_root, resolve_project
 
 # Status constants for step results
@@ -1125,8 +1128,6 @@ def run_cmd(registry, args, flags, *, ctx):
     # situation an operator reaches for undo -- and the remedy it printed
     # ("commit your changes first") could not be followed in the repository
     # that needed it.
-    from .release.validate import blocking_dirty_paths
-
     try:
         blocking = blocking_dirty_paths()
     except Exception:

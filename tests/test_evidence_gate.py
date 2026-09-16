@@ -323,7 +323,7 @@ class TestNonLatestUndoIntegration:
 
         with patch("rlsbl.commands.undo.check_gh_installed", return_value=True), \
              patch("rlsbl.commands.undo.check_gh_auth", return_value=True), \
-             patch("rlsbl.commands.undo.is_clean_tree", return_value=True), \
+             patch("rlsbl.commands.undo.blocking_dirty_paths", return_value=[]), \
              patch("rlsbl.commands.undo.find_workspace_root", return_value=None), \
              patch("rlsbl.member_context.resolve_member_context", return_value=mock_member), \
              patch("rlsbl.evidence_gate.run_evidence_gate") as mock_gate, \
