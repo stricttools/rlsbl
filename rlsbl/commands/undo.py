@@ -26,6 +26,17 @@ and the finalization commits). Walking down from the tag and stopping at the fir
 subject the release did not write collected ZERO commits on a resumed release,
 and undo reported success with the version files still bumped.
 
+What undo will not touch
+------------------------
+
+Because the target comes from the record, a release that stopped before its
+archive step is invisible here -- and the version the record does name is the
+PREVIOUS, published one. Undo therefore refuses outright while an in-progress
+release record names a version the archives do not contain, rather than
+reverting the release before it (see
+:func:`_refuse_unrecorded_in_progress`). A record naming a version that IS
+archived is a leftover from a release that got far enough, and changes nothing.
+
 What is reverted, and what is repaired
 --------------------------------------
 
@@ -316,6 +327,133 @@ def _find_latest_release(uc):
         "  Those are version numbers no release ever used, so there is nothing "
         "to undo.",
     )
+
+
+def _in_progress_state_path(uc):
+    """Where this project (or releasable) keeps its in-progress release record."""
+    from .release.release_state import get_state_path, resolve_releasable_dir
+
+    rel_dir = (
+        resolve_releasable_dir(uc.project_path, uc.ws_root) if uc.ws_root else None
+    )
+    return get_state_path(uc.project_path, releasable_dir=rel_dir)
+
+
+def _latest_recorded_version(uc):
+    """The version ``undo`` WOULD select, or None when that cannot be answered.
+
+    Only ever used to make a refusal concrete by naming the release undo was
+    about to delete. Anything unreadable yields None and the refusal simply
+    omits the clause, because a refusal must never fail on its own prose.
+    """
+    from ..release_file import (
+        archived_release_path,
+        list_archived_versions,
+        read_release_file,
+    )
+
+    releases_dir = _release_record_dir(uc)
+    try:
+        for version in list_archived_versions(releases_dir):
+            cfg = read_release_file(archived_release_path(releases_dir, version))
+            if not cfg.never_released:
+                return version
+    except Exception:
+        return None
+    return None
+
+
+def _refuse_unrecorded_in_progress(uc):
+    """Refuse an undo while a release the record does not contain is in flight.
+
+    ``undo`` chooses its target from the committed release archives alone (see
+    :func:`_find_latest_release`). A release that stopped before its archive
+    step is therefore invisible to it, and the version it picks is the PREVIOUS,
+    published one. An operator who believed they were discarding a half-finished
+    release would instead have deleted the tag and the GitHub Release of the
+    release before it -- silently, because nothing in the plan says which
+    version the operator had in mind.
+
+    The two cases are separated here, and only the first is refused:
+
+    - the in-progress record names a version with NO archive: the release never
+      reached the step that records it, so there is no recorded release to
+      revert and undo has nothing to say about this version;
+    - the in-progress record names a version that HAS an archive: that release
+      WAS recorded (a leftover state file from a release that got far enough),
+      undo's selection is the version the operator means, and it proceeds.
+    """
+    from ..release_file import archived_release_path
+    from .release.release_state import load_release_state
+
+    state_path = _in_progress_state_path(uc)
+    try:
+        state = load_release_state(state_path)
+    except Exception as exc:
+        _die(
+            f"Error: the in-progress release record could not be read: {state_path}",
+            f"  {exc}",
+            "  Undo refused: nothing was changed. While a release may be in "
+            "flight and unreadable,",
+            "  undo cannot tell whether the version it would select is the one "
+            "you mean.",
+        )
+    if state is None:
+        return
+
+    version = str(state.get("new_version") or "").strip()
+    if not version:
+        _die(
+            f"Error: a release is in progress, and its record names no "
+            f"version: {state_path}",
+            "  Undo refused: nothing was changed. Undo reverts a version, and "
+            "this record does not say which",
+            "  release is in flight, so undo cannot tell whether the version "
+            "it would select is the one you mean.",
+        )
+
+    releases_dir = _release_record_dir(uc)
+    if os.path.isfile(archived_release_path(releases_dir, version)):
+        # Recorded: a leftover state file from a release that reached its
+        # archive step. Undo's own selection is the version in flight.
+        return
+
+    from .release.release_state import RELEASE_STEPS
+
+    completed = set(state.get("completed_steps") or [])
+    done = len([s for s in RELEASE_STEPS if s in completed])
+    would_select = _latest_recorded_version(uc)
+    # Every variable-length value (a path) ends its own line, so the fixed
+    # wrapping of the prose around it stays readable whatever the repository
+    # is called.
+    lines = [
+        f"Error: a release of {version} is in progress, and this project's "
+        f"record does not contain it.",
+        f"  Undo reverts a RECORDED release: it decides which version to "
+        f"revert from the release",
+        f"  archives, and there is no v{version}.toml among them. "
+        f"{version} stopped before the step",
+        "  that writes one, so it was never recorded as a release.",
+        f"    {releases_dir}",
+    ]
+    if would_select:
+        lines.extend([
+            f"  Undoing now would have reverted {would_select} instead -- the "
+            f"release before this one --",
+            "  deleting its tag and its GitHub Release.",
+        ])
+    lines.extend([
+        "  Nothing was changed.",
+        f"  To finish {version}: run `rlsbl release resume`, which continues "
+        f"from the {done} of",
+        f"  {len(RELEASE_STEPS)} steps it completed. Once {version} is "
+        f"recorded, undo reverts it.",
+        f"  To abandon {version} instead: delete the state file, then reverse "
+        f"by hand whatever the",
+        "  attempt already pushed. No command does that for you.",
+        f"    {state_path}",
+    ])
+    _die(*lines)
 
 
 def _version_and_msg(uc, tag):
@@ -1140,6 +1278,10 @@ def run_cmd(registry, args, flags, *, ctx):
         sys.exit(1)
 
     uc = _resolve_context(ctx)
+    # Before any plan is computed, and so before --dry-run prints one: a
+    # release in flight that the record does not contain makes undo's own
+    # selection the wrong release.
+    _refuse_unrecorded_in_progress(uc)
     plan = _build_plan(uc, flags, ctx)
 
     # Refuse the operation if the evidence gate did not clear (applies to both

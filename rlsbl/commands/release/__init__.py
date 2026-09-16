@@ -572,10 +572,31 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 _parts.append(f"; missing: {', '.join(_ip_missing)}")
             if _ip_fatal:
                 _parts.append(f"; fatal step failure(s): {', '.join(_ip_fatal)}")
-            _parts.append(
-                "). Run `rlsbl release resume` to continue or "
-                "`rlsbl release undo` to roll back."
+            # `rlsbl release undo` reverts a RECORDED release -- one the
+            # release archives contain. A release that stopped before its
+            # archive step is not one of those, and undo refuses it (it would
+            # otherwise have selected the release BEFORE it). So the rollback
+            # half of this remedy is offered only when it can actually be
+            # followed.
+            from ...release_file import archived_release_path
+
+            _ip_recorded = os.path.isfile(
+                archived_release_path(
+                    os.path.dirname(_ip_state_path), _ip_version,
+                )
             )
+            if _ip_recorded:
+                _parts.append(
+                    "). Run `rlsbl release resume` to continue or "
+                    "`rlsbl release undo` to roll back."
+                )
+            else:
+                _parts.append(
+                    "). Run `rlsbl release resume` to continue. "
+                    f"`rlsbl release undo` does not apply yet: v{_ip_version} "
+                    f"stopped before the step that records it, so there is no "
+                    f"recorded release to revert."
+                )
             raise ReleaseValidationError("".join(_parts))
 
     # Per-invocation timeout overrides (--push/--ci/--check/--hook-timeout)

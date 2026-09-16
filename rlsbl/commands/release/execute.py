@@ -1424,14 +1424,34 @@ def require_recorded_candidate(state_path, cwd=None, *, version):
     Falling back to HEAD here is precisely how a commit with zero CI runs was
     tagged, released, and refused by the publish gate.
     """
+    from ...release_file import archived_release_path
+
     state = load_release_state(state_path) or {}
     recorded = (state.get("candidate_sha") or "").strip()
-    remedy = (
-        f"\n\nThe release cannot honestly claim CI verification for "
-        f"{version}. Either roll back with `rlsbl release undo` and release "
-        f"again, or push the intended commit and let a fresh "
-        f"`rlsbl release run` gate it."
-    )
+    # `rlsbl release undo` reverts a RECORDED release -- one the release
+    # archives contain. This error fires mid-release, and a release that
+    # stopped before its archive step has nothing recorded: undo refuses such a
+    # version rather than reverting the release before it. So the rollback half
+    # of the remedy is offered only where it can actually be followed.
+    if os.path.isfile(
+        archived_release_path(os.path.dirname(state_path), version)
+    ):
+        remedy = (
+            f"\n\nThe release cannot honestly claim CI verification for "
+            f"{version}. Either roll back with `rlsbl release undo` and "
+            f"release again, or put the intended commit on this branch and "
+            f"run `rlsbl release resume`."
+        )
+    else:
+        remedy = (
+            f"\n\nThe release cannot honestly claim CI verification for "
+            f"{version}. Put the commit CI verified back on this branch and "
+            f"run `rlsbl release resume`. To abandon the attempt instead, "
+            f"delete {state_path} and reverse by hand whatever it already "
+            f"pushed: `rlsbl release undo` does not apply, because {version} "
+            f"stopped before the step that records it, so there is no "
+            f"recorded release to revert."
+        )
     if not recorded:
         raise UnverifiedCandidateError(
             f"the release state records CI_VERIFIED but carries no "
