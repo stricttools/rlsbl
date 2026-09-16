@@ -10,6 +10,11 @@ release records.  The run guard message, ``save_step`` validation, resume
 skip logic, and auto-clear completeness checks all derive from it — never
 hardcode step counts or step-name lists elsewhere.
 
+It is itself derived: :mod:`rlsbl.commands.release.steps` holds the one
+declarative table, where each step also declares its inverse, its local probe
+and the files it creates.  The tuples below are that table's names, projected
+for the readers that only want names.
+
 Two marker kinds are recorded in the state file:
 
 - **Success markers** (``completed_steps`` list): the step finished (or was
@@ -42,83 +47,34 @@ success, and left in place on failure.
 
 import json
 import os
+
 from ... import effects
+from .steps import (
+    MUTATING_PHASE,
+    POST_RELEASE_PHASE,
+    RELEASE_STEP_TABLE,
+    step_names,
+)
 
 
 STATE_FILENAME = "in-progress.json"
 SCRUB_RESULT_FILENAME = "scrub-result.json"
 
-# Ordered steps of the mutating phase (rolled back or resumed on failure).
+# The canonical ordered list of ALL release steps, and its two phases. Every
+# name, its phase and its fatality are declared once in the step table; these
+# are projections of it for the readers that only want names.
 #
-# Main-as-candidate ordering: the release publishes the version-bump commit to
-# the release branch UNTAGGED (BRANCH_PUSHED), waits for the repository's own
-# CI to go green on exactly that commit (CI_VERIFIED), and only then finalizes
-# the changelog / release file, tags the verified commit, pushes the tag, and
-# creates the GitHub Release. Nothing irreversible or publicly visible as a
-# release exists while CI is red, so a red candidate is fixed forward on the
-# same version instead of burning it.
-#
-# SNAPSHOT_REGENERATED lands BEFORE BRANCH_PUSHED: the monorepo snapshot commit
-# must be part of the candidate CI verifies (and therefore of the tagged tree).
-MUTATING_STEPS = (
-    "VERSION_BUMPED",
-    "COMMITTED",
-    "SNAPSHOT_REGENERATED",
-    "BRANCH_PUSHED",
-    "CI_VERIFIED",
-    "CHANGELOG_FINALIZED",
-    "RELEASE_FILE_FINALIZED",
-    "TAGGED",
-    "PUSHED",
-    "GITHUB_RELEASE",
-)
+# The table also declares, per step, the inverse that undoes it (or an explicit
+# statement that nothing does), the local probe that answers whether its
+# artifact exists (or an explicit statement that only the network can answer),
+# and the repository files it creates. See :mod:`rlsbl.commands.release.steps`
+# for the ordering rationale and the two tiers of "fatal".
+MUTATING_STEPS = step_names(MUTATING_PHASE)
+POST_RELEASE_STEPS = step_names(POST_RELEASE_PHASE)
+RELEASE_STEPS = step_names()
 
-# Ordered steps of the post-release phase (after the GitHub Release).
-#
-# SUBTREE_PUBLISHED / MIRROR_RELEASED only do work for a monorepo member whose
-# RELEASABLE declares a ``subtree_remote``; everywhere else they are marked
-# trivially done. SUBTREE_PUBLISHED converges the mirror's branch through the
-# mirror reconciler; MIRROR_RELEASED publishes that version's tag and GitHub
-# Release on the mirror. They are tracked (rather than left as bare warnings)
-# because an unpublished mirror is a failed step like any other, and the
-# completion epilogue is the single place that turns failed steps into a
-# nonzero exit.
-POST_RELEASE_STEPS = (
-    "SUBTREE_PUBLISHED",
-    "MIRROR_RELEASED",
-    "ASSETS_UPLOADED",
-    "PIPELINES_PUBLISHED",
-    "DEPLOYED",
-    "POST_HOOKS_RUN",
-)
-
-# The canonical ordered list of ALL release steps.
-RELEASE_STEPS = MUTATING_STEPS + POST_RELEASE_STEPS
-
-# Steps whose failure aborts the release (state preserved, resumable). "Fatal"
-# means the release stops; it does NOT mean the same recovery for every step.
-# Fatal steps split into two tiers around the CANDIDATE PUSH:
-#
-#   - Pre-push fatal steps (VERSION_BUMPED, COMMITTED, SNAPSHOT_REGENERATED):
-#     a failure ROLLS BACK -- `git reset --hard` to the pre-release HEAD plus
-#     orphan-artifact cleanup -- leaving the tree as if the release never
-#     started. Nothing left the machine.
-#   - Post-push fatal steps (BRANCH_PUSHED onward, plus ASSETS_UPLOADED and
-#     PIPELINES_PUBLISHED): NO rollback. The candidate commit is on the remote,
-#     so a local reset would diverge from it. The failure is recorded and
-#     `rlsbl release resume` re-attempts from the failed step via idempotent
-#     guards. A red CI_VERIFIED is the canonical case: fix forward on the
-#     release branch and resume at the SAME version.
-#
-# Subtree/mirror, deploy and post-release hooks are NON-FATAL: the release is
-# never rolled back for them and the published artifacts stand. Non-fatal does
-# NOT mean "exit 0" -- their failure markers survive into the completion
-# epilogue, which reports them, keeps the state file, and exits nonzero so
-# `rlsbl release resume` can re-attempt exactly those steps.
-FATAL_STEPS = frozenset(MUTATING_STEPS) | {
-    "ASSETS_UPLOADED",
-    "PIPELINES_PUBLISHED",
-}
+# Steps whose failure aborts the release (state preserved, resumable).
+FATAL_STEPS = frozenset(s.name for s in RELEASE_STEP_TABLE if s.fatal)
 
 
 # ---------------------------------------------------------------------------
