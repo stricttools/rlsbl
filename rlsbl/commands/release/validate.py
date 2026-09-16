@@ -381,6 +381,31 @@ def is_tool_owned_state_path(path) -> bool:
     )
 
 
+def blocking_dirty_paths(cwd=None):
+    """The working-tree changes at *cwd* that a clean-tree refusal may cite.
+
+    Every dirty path git reports, minus rlsbl's own untracked release-state
+    files (:func:`is_tool_owned_state_path`). This is the one place that
+    subtraction is spelled: a second clean-tree check that reads
+    ``working_tree_paths`` directly refuses over the very file rlsbl wrote, in
+    a repository where the remedy it prints ("commit your changes") cannot
+    honestly be followed -- a check reading an input the repository does not
+    own.
+
+    ``untracked="all"`` is required: the default collapses a wholly untracked
+    directory into a single ``?? .rlsbl/releases/`` entry, which cannot be
+    classified per file -- and must NOT be exempted wholesale, because
+    ``unreleased.toml`` lives in that directory and is deliberately committed.
+
+    Raises whatever the status read raises; callers that must refuse rather
+    than assume cleanliness catch it themselves.
+    """
+    return sorted(
+        path for path in working_tree_paths(cwd=cwd, untracked="all")
+        if not is_tool_owned_state_path(path)
+    )
+
+
 def validate_no_stash(cwd=None):
     """Refuse a release while the repository has a stash.
 
@@ -421,23 +446,14 @@ def validate_clean_tree(flags):
     # (in-progress.json, scrub-result.json) are the tool's scratch state and
     # never block -- refusing over them is rlsbl blocking its own `release
     # resume`, which is exactly when those files exist.
-    #
-    # ``--untracked-files=all`` is required: the default collapses a wholly
-    # untracked directory into a single ``?? .rlsbl/releases/`` entry, which
-    # cannot be classified per-file (and must NOT be exempted wholesale --
-    # unreleased.toml lives there and is deliberately committed).
     try:
-        dirty_paths = working_tree_paths(untracked="all")
+        blocking = blocking_dirty_paths()
     except Exception:
-        # Fail closed: an unreadable status is never "clean enough".
+        # An unreadable status is never "clean enough": refuse.
         raise ReleaseValidationError(
             "working tree is not clean. Commit your changes first."
         )
 
-    blocking = sorted(
-        path for path in dirty_paths
-        if not is_tool_owned_state_path(path)
-    )
     if blocking:
         listed = "\n".join(f"  {path}" for path in blocking)
         raise ReleaseValidationError(

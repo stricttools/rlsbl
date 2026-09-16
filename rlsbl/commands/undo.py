@@ -54,7 +54,7 @@ from ..member_context import resolve_member_context
 from ..release_file import unfinalize_release_file
 from ..release_publication import delete_args
 from ..targets import TARGETS
-from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, is_clean_tree, working_tree_paths
+from ..utils import run, run_gh, check_gh_installed, check_gh_auth, get_push_timeout, get_current_branch, push_if_needed, working_tree_paths
 from ..workspace import find_workspace_root, resolve_project
 
 # Status constants for step results
@@ -1118,8 +1118,24 @@ def run_cmd(registry, args, flags, *, ctx):
         print("Error: gh CLI is not authenticated.", file=sys.stderr)
         sys.exit(1)
 
-    if not is_clean_tree():
+    # The clean-tree refusal exempts rlsbl's own untracked release state, the
+    # same way the release path does and through the same predicate. Without
+    # the exemption, `undo` refused over `.rlsbl/releases/in-progress.json` --
+    # a file rlsbl itself writes, and one that is present in the very
+    # situation an operator reaches for undo -- and the remedy it printed
+    # ("commit your changes first") could not be followed in the repository
+    # that needed it.
+    from .release.validate import blocking_dirty_paths
+
+    try:
+        blocking = blocking_dirty_paths()
+    except Exception:
+        # An unreadable status is never "clean enough": refuse.
+        blocking = ["(git status could not be read)"]
+    if blocking:
         print("Error: working tree is not clean. Commit your changes first.", file=sys.stderr)
+        for path in blocking:
+            print(f"  {path}", file=sys.stderr)
         sys.exit(1)
 
     uc = _resolve_context(ctx)
