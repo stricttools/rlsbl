@@ -495,7 +495,10 @@ app = strictcli.App(
         ),
     },
     checks_path=Path(__file__).parent / "data" / "checks.toml",
-    test_coverage=True,
+    # Coverage state lives in this source tree's own .strictcli/ directory:
+    # present in a checkout, absent from an installed wheel, so an installed
+    # rlsbl registers no coverage check and touches no consumer's directory.
+    test_coverage_dir=Path(__file__).parent.parent / ".strictcli",
 )
 
 

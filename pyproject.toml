@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "ruamel-yaml>=0.19.1",
-    "strictcli>=0.41.0",
+    "strictcli>=0.42.0",
     "strictspec>=0.2.3",
     "tomlkit>=0.12",
     "tree-sitter>=0.24",
