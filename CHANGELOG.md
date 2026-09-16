@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.121.6
+
+An installed rlsbl no longer registers the test-coverage check outside its own source tree; strictcli floor raised to 0.42.0.
+
+### Fixes
+
+- **An installed rlsbl no longer registers the cli-test-coverage check or touches .strictcli/ in the directory it runs from.** Coverage is anchored to rlsbl's own source tree (strictcli 0.42.0's declared coverage directory), which an installed wheel does not have.
+
 ## 0.121.5
 
 Documentation moved onto selfdoc's .stricttools/ layout; no user-facing change.
