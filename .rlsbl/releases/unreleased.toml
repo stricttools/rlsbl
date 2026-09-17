@@ -2,11 +2,32 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Scaffold creates the experiments/ and screenshots/ scratch directories, and every repository walk prunes them."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+A project needs a declared place to put a throwaway file -- a prototype, a
+produced repository, a capture, a mid-work screenshot -- so that nothing has to
+reach for a system temporary directory. Scaffold now creates two such
+directories at the project root, experiments/ and screenshots/, each carrying a
+committed .gitignore holding '*' and '!.gitignore'. That spelling is what makes
+the directory exist in a fresh clone, so tooling may rely on it being there,
+while nothing inside it can be committed by accident; a line in the root
+.gitignore would leave the directory absent after a clone instead.
+
+Both files are ordinary shared (target-independent) scaffold mappings, so
+re-running scaffold over a project whose scratch directories already hold work
+merges to a no-op and touches nothing inside them.
+
+rlsbl's repository walks read the filesystem rather than git's index, so the
+ignore file alone would not keep them out: a throwaway git repository under
+experiments/ could turn dead-module detection or the unregistered-project scan
+red. Every walk now prunes both names at the root of the project it is walking,
+from one authority (rlsbl.scratch_dirs). The pruning is root-scoped, matching
+where scaffold creates them, so a directory of the same name nested deeper
+inside a project is still an ordinary source directory.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
