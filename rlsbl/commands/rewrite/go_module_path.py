@@ -26,9 +26,12 @@ What is deliberately NOT rewritten
 * **Any file that is not a ``go.mod`` or a ``.go``.**  READMEs, CI workflows
   and generated code are outside this command's scope, on purpose: it renames
   a module, it does not sweep a repository for a string.
-* **``vendor/`` and ``.git/``, and nothing else.**  A vendored tree is a
-  third-party copy, not this module, and ``.git`` is the repository's own
-  storage.  Every other directory is visited, INCLUDING ``build``, ``dist``,
+* **``vendor/``, ``.git/``, and the project's scratch directories.**  A
+  vendored tree is a third-party copy, not this module; ``.git`` is the
+  repository's own storage; and ``experiments/`` and ``screenshots/`` hold
+  disposable artifacts (see :mod:`rlsbl.scratch_dirs`), which the shared walker
+  prunes from every walk.  Every other directory is visited, INCLUDING
+  ``build``, ``dist``,
   ``static``, ``public``, ``assets`` and ``node_modules``: those are a
   linter's build-output exclusions, and each of them is also a perfectly
   ordinary Go package directory (``internal/assets``, ``cmd/build``,
@@ -53,10 +56,11 @@ from .abort import already_written
 #: third-party copy, not this module.
 _EXCLUDED_COMPONENTS = frozenset({"vendor"})
 
-#: Directory names the sweep never descends into -- the WHOLE list.  Passed
-#: explicitly to :func:`~rlsbl.lint.utils.walk_source_files` so this command
-#: does not inherit the linters' build-output exclusions, which are ordinary
-#: Go package names (see the module docstring).
+#: Directory names the sweep never descends into, on top of the scratch
+#: directories :func:`~rlsbl.lint.utils.walk_source_files` always prunes.
+#: Passed explicitly so this command does not inherit the linters'
+#: build-output exclusions, which are ordinary Go package names (see the
+#: module docstring).
 _WALK_EXCLUDED_DIRS = frozenset({*_EXCLUDED_COMPONENTS, ".git"})
 
 #: Characters that continue a module-path token.  A match must not be preceded

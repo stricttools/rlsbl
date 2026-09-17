@@ -15,6 +15,7 @@ from .lint.npm_ast import NpmAstLinter
 from .lint.python_ast import PythonAstLinter
 from .lint.utils import walk_source_files
 from .module_paths import dotted_under_module, go_import_under_module
+from .scratch_dirs import prune_scratch_dirs
 from .targets.utils import detect_python_package_root, normalize_pypi
 from .utils import read_go_module_path
 
@@ -356,6 +357,9 @@ class DartImportScanner:
                 d for d in dirs
                 if not d.startswith(".") and d not in ("build", "node_modules")
             ]
+            # A generated file inside a throwaway probe is not this project's
+            # generated code, and must not answer for it.
+            prune_scratch_dirs(project_path, dirpath, dirs)
             for filename in filenames:
                 if filename.endswith(".g.dart"):
                     return

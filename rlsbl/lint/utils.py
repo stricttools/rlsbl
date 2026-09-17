@@ -4,6 +4,8 @@ import fnmatch
 import os
 from pathlib import Path
 
+from ..scratch_dirs import scratch_dir_paths
+
 #: Directory names a LINTER never descends into: virtualenvs, caches, and the
 #: build/asset output directories a generated file would otherwise be linted
 #: from.  Entries containing ``*`` or ``?`` are fnmatch patterns; the rest are
@@ -13,8 +15,10 @@ from pathlib import Path
 #: trees.  ``build``, ``dist``, ``static``, ``public`` and ``assets`` are all
 #: legal Go package directories and ordinary Python package names, so a caller
 #: whose job is to REWRITE a tree rather than lint it must pass its own set --
-#: see ``rlsbl.commands.rewrite.go_module_path``, which sweeps everything
-#: except ``vendor/`` and ``.git/``.
+#: see ``rlsbl.commands.rewrite.go_module_path``, which declares its own narrow
+#: set of names.  The scratch directories are not in here and cannot be opted
+#: out of: :func:`walk_source_files` prunes them from every walk, at the root of
+#: whatever it was pointed at.
 LINTER_EXCLUDED_DIRS = frozenset({
     ".venv", "venv", "__pycache__", ".git", "node_modules",
     "build", "dist", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache",
@@ -61,12 +65,20 @@ def walk_source_files(
             and asset directories passes its own narrower set explicitly.
 
     By default (empty exclude_patterns), all files including tests are included.
+
+    *project_path*'s own scratch directories (:data:`~rlsbl.scratch_dirs.
+    SCRATCH_DIR_NAMES`) are always pruned, whatever the caller passes: they hold
+    throwaway probes and produced repositories, which are never this project's
+    sources.  Only the ones at *project_path* itself are pruned -- a directory
+    of the same name nested deeper is an ordinary source directory.
     """
     exact_excluded, glob_excluded = _split_name_filters(excluded_dir_names)
-    # Normalize exclude_dirs to absolute paths for reliable matching.
-    normalized_exclude_dirs: frozenset[str] = frozenset()
+    # Normalize exclude_dirs to absolute paths for reliable matching, and add
+    # the project's own scratch directories: they hold throwaway probes and
+    # produced repositories, which no walk over the project's sources may see.
+    normalized_exclude_dirs: frozenset[str] = scratch_dir_paths(project_path)
     if exclude_dirs:
-        normalized_exclude_dirs = frozenset(
+        normalized_exclude_dirs |= frozenset(
             os.path.realpath(os.path.join(project_path, d))
             for d in exclude_dirs
         )

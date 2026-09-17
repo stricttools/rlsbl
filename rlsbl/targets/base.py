@@ -233,11 +233,16 @@ class BaseTarget:
 
     def shared_template_mappings(self, ctx):
         """Return template-to-file mappings shared across all targets."""
+        from ..scratch_dirs import scratch_template_mappings
+
         mappings = [
             {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
             {"template": "gitignore.tpl", "target": ".gitignore"},
             {"template": "changes/unreleased.jsonl.tpl", "target": ".rlsbl/changes/unreleased.jsonl"},
         ]
+        # The scratch directories (experiments/, screenshots/) are the same for
+        # every ecosystem, so they are shared mappings like the three above.
+        mappings.extend(scratch_template_mappings())
         mappings.extend(self._lint_config_mappings(ctx))
         # Sandboxed test runner: emitted only for projects that declared the
         # test_sandbox config family (the stricttest floor's outer layer).
