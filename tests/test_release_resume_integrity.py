@@ -245,6 +245,22 @@ def _resume_expect_abort(repo, state, flags, capsys):
     return captured.out + captured.err
 
 
+def _cover_commit(repo, sha):
+    """Record *sha* in the unreleased changelog, as the operator would.
+
+    The entry is written and committed directly rather than through
+    ``rlsbl changelog add`` so the fixture stays a fixture; the coverage rules
+    it satisfies are the changelog check's own, and the changelog commit that
+    carries it is exempt because it touches nothing else.
+    """
+    changes = repo / ".rlsbl" / "changes"
+    unreleased = changes / "unreleased.jsonl"
+    entry = {"commits": [sha], "user_facing": False}
+    unreleased.write_text(unreleased.read_text() + json.dumps(entry) + "\n")
+    _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
+    _git(repo, "commit", "-q", "-m", "changelog: cover the fix")
+
+
 def _in_flight_past_the_gate(repo, *, extra_release_commit=True):
     """Leave *repo* exactly as a run that failed after its CI gate went green.
 
@@ -634,8 +650,9 @@ class TestResumeRideIns:
         """The legitimate case the seal must not break.
 
         A red CI gate leaves the candidate unverified.  The documented remedy
-        is to commit the fix on the release branch and resume: the new tip
-        becomes the candidate, is pushed, and is gated again.
+        is to commit the fix on the release branch, record it in the
+        changelog, and resume: the new tip becomes the candidate, is pushed,
+        and is gated again.
         """
         state_path, candidate_sha = _in_flight_past_the_gate(
             mock_git_repo, extra_release_commit=False,
@@ -651,6 +668,10 @@ class TestResumeRideIns:
         (mock_git_repo / "fix.txt").write_text("the fix\n")
         _git(mock_git_repo, "add", "fix.txt")
         _git(mock_git_repo, "commit", "-q", "-m", "fix: make CI green")
+        fix_sha = _git_head(mock_git_repo)
+        # A resume adopts what the branch gained, and only describes commits
+        # the changelog already accounts for.
+        _cover_commit(mock_git_repo, fix_sha)
         fix_sha = _git_head(mock_git_repo)
 
         gated = []
