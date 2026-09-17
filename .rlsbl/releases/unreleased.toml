@@ -2,11 +2,32 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "A stopped release can be resumed again once work has been committed after it."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+A release that stopped -- a red CI verdict, an interrupted run -- leaves its
+state file behind and its branch open, and work continues on that branch. Once
+the stopped release had recorded a green CI verdict, `rlsbl release resume`
+kept the pin the original run took and read every commit made since as a
+ride-in to refuse, including the fix-forward commit the operator had just made
+because the flow told them to. The two resolutions it named could not be
+followed: recording the commits and starting a fresh release is refused for as
+long as the state file exists, and moving them onto a branch of their own is
+not something a release-branch-only workflow does. A repository in that state
+had no way forward.
+
+Resume now does what it was always documented to do -- re-pin at the current
+tip and adopt what the branch gained -- with the condition that makes it
+honest: every adopted commit the release did not create must already be
+described by a changelog entry, or be exempt under the same rules the
+changelog-coverage check applies. An uncovered commit is still refused, but by
+name and subject and with a remedy that runs as written. Adopting past the CI
+gate drops the recorded verdict and candidate, so the tip is pushed and judged
+again and the tag still lands on a commit CI verified; the version, its bump
+and its commit are untouched.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
