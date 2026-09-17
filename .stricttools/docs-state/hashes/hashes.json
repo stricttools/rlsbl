@@ -992,7 +992,8 @@
   "en/rlsbl-scratch_dirs.md": {
     "content": "7e050d506f0d86fdc7b77222ff0d1449db6a402bdfaa100e0c056b88e2ed9c56",
     "description": "b82c30db54f8cf4031169626916ba6a8393b5a700c3039c3316fcab841b1a03d",
-    "seed_hash": "b82c30db54f8cf4031169626916ba6a8393b5a700c3039c3316fcab841b1a03d"
+    "seed_hash": "b82c30db54f8cf4031169626916ba6a8393b5a700c3039c3316fcab841b1a03d",
+    "source_docstring": "e3222a44dd15fbab5c5a7dbdfda54c33e4865f7eecdbd216a115b210851f51d7"
   },
   "en/rlsbl-secret_scan.md": {
     "content": "2ac911ea04c0ec87dfcf4efbdb5b6ac2a5aa10b2d31398b2c8bafd77b4629b41",
@@ -1235,8 +1236,8 @@
     "source_docstring": "c32891a50c37cfb4160b4bc357f00125669b3c2b7099cf49aff79f1b0693e0c9"
   },
   "en/scaffold.md": {
-    "content": "3f48e84924ae2ad2c32c4e7355fa62bf5054f40c11a76d951e419d331f696c97",
-    "description": "598d83250a3323ab6a05742ec023189563bed4b49139f3240533da2bf63afe11"
+    "content": "e17bb55104bacb3cfda37386949b0406435e8a38ca8c5a0b5ada9167f5a8593a",
+    "description": "2683ee7a4d170ba045d714edf405f95b94f0a7940e08574eb83f8bbe452ae90c"
   },
   "en/targets.md": {
     "content": "a8e519ddb61abb48d548e44f76f333f3db379be7c915d7dfab809fcc2f35044d",
