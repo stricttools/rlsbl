@@ -75,6 +75,7 @@ class TestGuardInIsolation:
         save_release_state(state, {"release_created_commits": []})
         _guard_foreign_commits(
             head_sha(cwd=str(repo)), state, cwd=str(repo), phase="entry",
+            resuming=False,
         )
 
     def test_the_releases_own_commits_never_trip_it(self, tmp_path):
@@ -87,7 +88,9 @@ class TestGuardInIsolation:
         ]
         state = str(tmp_path / "state.json")
         save_release_state(state, {"release_created_commits": own})
-        _guard_foreign_commits(pin, state, cwd=str(repo), phase="entry")
+        _guard_foreign_commits(
+            pin, state, cwd=str(repo), phase="entry", resuming=False,
+        )
 
     def test_a_foreign_commit_aborts_and_is_named(self, tmp_path):
         repo = _repo(tmp_path)
@@ -98,7 +101,10 @@ class TestGuardInIsolation:
         save_release_state(state, {"release_created_commits": [mine]})
 
         with pytest.raises(ForeignCommitError) as exc:
-            _guard_foreign_commits(pin, state, cwd=str(repo), phase="candidate push")
+            _guard_foreign_commits(
+                pin, state, cwd=str(repo), phase="candidate push",
+                resuming=False,
+            )
 
         msg = str(exc.value)
         assert theirs[:12] in msg, "the foreign SHA must be named"
@@ -108,6 +114,32 @@ class TestGuardInIsolation:
         assert mine[:12] not in msg, "the release's own commit is not foreign"
         assert "candidate push" in msg, "the checkpoint must be named"
         assert "rlsbl changelog add" in msg, "including them must be an option"
+        assert "start a fresh release" in msg, (
+            "a fresh run has no release in flight, so a fresh release is the "
+            "runnable way to include the work"
+        )
+
+    def test_a_resume_is_told_to_resume_not_to_start_a_fresh_release(
+        self, tmp_path,
+    ):
+        """`release run` refuses while a state file exists, so a refusal
+        raised from inside a release that IS in flight must not send its
+        operator there: the pair of refusals left a stopped release
+        unreleasable."""
+        repo = _repo(tmp_path)
+        pin = head_sha(cwd=str(repo))
+        _commit(repo, "todo.md", "todo: file a note from another session")
+        state = str(tmp_path / "state.json")
+        save_release_state(state, {"release_created_commits": []})
+
+        with pytest.raises(ForeignCommitError) as exc:
+            _guard_foreign_commits(
+                pin, state, cwd=str(repo), phase="CI gate", resuming=True,
+            )
+
+        msg = str(exc.value)
+        assert "rlsbl release resume" in msg
+        assert "fresh release" not in msg
 
     def test_an_unresolvable_pin_is_not_treated_as_drift(self, tmp_path):
         """A pin that git cannot resolve proves nothing either way; the
@@ -115,8 +147,12 @@ class TestGuardInIsolation:
         repo = _repo(tmp_path)
         state = str(tmp_path / "state.json")
         save_release_state(state, {"release_created_commits": []})
-        _guard_foreign_commits("f" * 40, state, cwd=str(repo), phase="entry")
-        _guard_foreign_commits(None, state, cwd=str(repo), phase="entry")
+        _guard_foreign_commits(
+            "f" * 40, state, cwd=str(repo), phase="entry", resuming=False,
+        )
+        _guard_foreign_commits(
+            None, state, cwd=str(repo), phase="entry", resuming=False,
+        )
 
 
 # --------------------------------------------------------------------------- #
