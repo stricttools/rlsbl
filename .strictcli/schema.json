@@ -1160,7 +1160,7 @@
         },
         "resume": {
           "name": "resume",
-          "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps.",
+          "help": "Resume a previously failed release from where it left off. Reads the in-progress state file (.rlsbl/releases/in-progress.json, or .rlsbl-monorepo/releasables/<name>/releases/in-progress.json for releasable releases), validates that the current branch matches the saved state, and re-enters the release flow, skipping already-completed steps. Re-pins at the current branch tip, so the fix-forward commit and everything else committed while the release was stopped are adopted into it: the tip is pushed as the candidate and re-judged by CI, and the tag lands on what CI verified. An adopted commit the release did not create and the changelog does not describe is refused before any mutation, named with its subject, alongside the changelog add that records it.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
