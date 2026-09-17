@@ -174,10 +174,13 @@ def tree_at(sha: str, path: str, *, cwd: str | None = None,
     return (result.stdout or "").strip() or None
 
 
-def get_commit_files(sha):
+def get_commit_files(sha, *, cwd=None):
     """Get the list of files changed by a single commit.
 
     Returns a list of file paths relative to the repo root, or None on error.
+    ``cwd`` names the repository to ask; without it git is asked wherever the
+    process stands, which is the right answer only for a caller that resolved
+    its project from the working directory in the first place.
 
     ``--root`` is required: a parentless commit (a repo's first commit) has
     nothing to diff against, and without it ``git diff-tree`` prints nothing
@@ -191,6 +194,7 @@ def get_commit_files(sha):
             capture_output=True,
             text=True,
             timeout=10,
+            cwd=cwd,
         )
         if result.returncode != 0:
             return None

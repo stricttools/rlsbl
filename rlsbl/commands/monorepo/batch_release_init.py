@@ -115,7 +115,7 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
         operation="batch release init commit count",
     )
     relevant = [c for c in all_commits if c in in_scope]
-    relevant, _stats = filter_exempt_commits(relevant)
+    relevant, _stats = filter_exempt_commits(relevant, cwd=workspace_root)
 
     return (len(relevant), last_release)
 

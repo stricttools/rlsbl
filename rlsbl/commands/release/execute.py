@@ -1452,7 +1452,7 @@ def uncovered_commits(commits, *, changes_dir, cwd=None):
         }
 
     remaining = [sha for sha in commits if sha not in covered]
-    return create_default_registry().filter_commits(remaining)[0]
+    return create_default_registry().filter_commits(remaining, cwd=cwd)[0]
 
 
 def require_adopted_commits_covered(adopted, *, changes_dir, version,
