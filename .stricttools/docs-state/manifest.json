@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.121.7",
+  "version": "0.121.8",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -14947,6 +14947,43 @@
       ]
     },
     {
+      "path": "rlsbl-scratch_dirs.md",
+      "title": "rlsbl.scratch_dirs",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.scratch_dirs",
+          "anchor": "rlsblscratch_dirs"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.scratch_dirs`",
+          "anchor": "rlsblscratch_dirs"
+        },
+        {
+          "level": 3,
+          "text": "`scratch_template_mappings`",
+          "anchor": "scratch_template_mappings"
+        },
+        {
+          "level": 3,
+          "text": "`scratch_dir_paths`",
+          "anchor": "scratch_dir_paths"
+        },
+        {
+          "level": 3,
+          "text": "`prune_scratch_dirs`",
+          "anchor": "prune_scratch_dirs"
+        },
+        {
+          "level": 3,
+          "text": "`is_scratch_dir_name`",
+          "anchor": "is_scratch_dir_name"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-secret_scan.md",
       "title": "rlsbl.secret_scan",
       "type": "doc",
@@ -19721,6 +19758,16 @@
         },
         {
           "level": 2,
+          "text": "Scratch directories",
+          "anchor": "scratch-directories"
+        },
+        {
+          "level": 3,
+          "text": "Checks never look inside them",
+          "anchor": "checks-never-look-inside-them"
+        },
+        {
+          "level": 2,
           "text": "Three-way merge",
           "anchor": "three-way-merge"
         },
@@ -20898,6 +20945,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-17T17:08:10.101283+00:00",
+  "last_gen": "2026-09-17T21:59:34.258795+00:00",
   "theme": "minimal"
 }

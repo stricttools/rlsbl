@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 190 modules"
+description = "API reference index for rlsbl covering 191 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -157,6 +157,7 @@ nav_order = 90
 - [rlsbl.resolved_target](../rlsbl-resolved_target/)
 - [rlsbl.router_filters](../rlsbl-router_filters/)
 - [rlsbl.saferm](../rlsbl-saferm/)
+- [rlsbl.scratch_dirs](../rlsbl-scratch_dirs/)
 - [rlsbl.secret_scan](../rlsbl-secret_scan/)
 - [rlsbl.snapshot](../rlsbl-snapshot/)
 - [rlsbl.strictcli_detect](../rlsbl-strictcli_detect/)
