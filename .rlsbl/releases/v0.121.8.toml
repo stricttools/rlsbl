@@ -40,3 +40,7 @@ regression test asks about one repository while standing in another.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "82f7a40bdb52bc0b35f793db5a907843cf6b6909"
+
+[tree_hashes]
+"." = "cb1194caf3c3cd75fe81521c00d5c2cc2a28336a"
