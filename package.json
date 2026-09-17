@@ -12,10 +12,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/smm-h/rlsbl.git"
+    "url": "git+https://github.com/stricttools/rlsbl.git"
   },
   "bugs": {
-    "url": "https://github.com/smm-h/rlsbl/issues"
+    "url": "https://github.com/stricttools/rlsbl/issues"
   },
   "engines": {
     "node": ">=18"
