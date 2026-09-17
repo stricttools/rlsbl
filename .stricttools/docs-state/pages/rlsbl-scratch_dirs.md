@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.scratch_dirs"
-description = "The scratch directories every scaffolded project carries at its root."
+description = "The scratch directories scaffold creates at every project root: the ignore file that keeps them present in a fresh clone, and the walks that prune them."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 148
 +++
