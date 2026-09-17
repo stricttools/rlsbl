@@ -104,9 +104,9 @@
     "schema_hash": "8ec11c80f2ba2db1ea6f1ccdb6d2f8aebce1c0386f499a42919083e4215beb23"
   },
   "en/cli-release.md": {
-    "content": "f8fdb0f5023790003394123942bdf2522ccf4eed04b40fa303b370fa3d700f5a",
+    "content": "6bdfd747283b152147d57ffbd1ea116985befc68395124dc024e0f8d4a4a885a",
     "description": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e",
-    "schema_hash": "c6461ea1153faac1c5a1d6f3d6116d8c7d8023b8168a59f5187be883ae92d218",
+    "schema_hash": "75aca0d2d21580255819fa714e264afd17ed03398f74265c72abe4a83d1f116a",
     "seed_hash": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e"
   },
   "en/cli-rewrite.md": {
@@ -523,7 +523,8 @@
   "en/rlsbl-commands-release-steps.md": {
     "content": "b2b5fd1aeb7809e1875d9f1ec99252ddce1d8b869344159edaaba5fe7f07b7d7",
     "description": "c496e9e296c8a82e3f29a2ab3944b14a0cf4ec76e5956f43ba06ddf18e213b5f",
-    "seed_hash": "c496e9e296c8a82e3f29a2ab3944b14a0cf4ec76e5956f43ba06ddf18e213b5f"
+    "seed_hash": "c496e9e296c8a82e3f29a2ab3944b14a0cf4ec76e5956f43ba06ddf18e213b5f",
+    "source_docstring": "78b8c72803a84362d34b30bdcfefba007117f06e71a45833bd7aec8dbb31b294"
   },
   "en/rlsbl-commands-release-validate.md": {
     "content": "966cf425ebc59bb82a9d2facf0499b09c0f80856704f103c7787971b44f41c3d",
