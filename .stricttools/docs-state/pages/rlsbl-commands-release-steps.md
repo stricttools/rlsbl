@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.commands.release.steps"
-description = "The release step table: one declaration per step a release records."
+description = "Every release step in one record: what performs it, the inverse that undoes it, the repository-only probe for its artifact, and the paths it creates."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 62
 +++
