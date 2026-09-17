@@ -2,6 +2,40 @@
 
 # Changelog
 
+## 0.122.0
+
+Scaffold creates the experiments/ and screenshots/ scratch directories, and every repository walk prunes them.
+
+<details>
+<summary>Context</summary>
+
+A project needs a declared place to put a throwaway file -- a prototype, a
+produced repository, a capture, a mid-work screenshot -- so that nothing has to
+reach for a system temporary directory. Scaffold now creates two such
+directories at the project root, experiments/ and screenshots/, each carrying a
+committed .gitignore holding '*' and '!.gitignore'. That spelling is what makes
+the directory exist in a fresh clone, so tooling may rely on it being there,
+while nothing inside it can be committed by accident; a line in the root
+.gitignore would leave the directory absent after a clone instead.
+
+Both files are ordinary shared (target-independent) scaffold mappings, so
+re-running scaffold over a project whose scratch directories already hold work
+merges to a no-op and touches nothing inside them.
+
+rlsbl's repository walks read the filesystem rather than git's index, so the
+ignore file alone would not keep them out: a throwaway git repository under
+experiments/ could turn dead-module detection or the unregistered-project scan
+red. Every walk now prunes both names at the root of the project it is walking,
+from one authority (rlsbl.scratch_dirs). The pruning is root-scoped, matching
+where scaffold creates them, so a directory of the same name nested deeper
+inside a project is still an ordinary source directory.
+
+</details>
+
+### Features
+
+- **Scratch directories.** `rlsbl scaffold` now creates `experiments/` and `screenshots/` at the project root, each carrying a committed `.gitignore` that keeps the directory present in a fresh clone while ignoring everything inside it. Every rlsbl check that walks the project tree prunes both at the project root, so a throwaway probe, a produced repository, or a screenshot left in one of them cannot turn a check red.
+
 ## 0.121.8
 
 Point the packaging manifests at the repository's current GitHub owner, and answer the changelog-exemption question in the repository a caller names rather than wherever the process stands.
