@@ -38,3 +38,7 @@ inside a project is still an ordinary source directory.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "6580902ebc96b4be41e005a5ecb6a69f33635f65"
+
+[tree_hashes]
+"." = "e3149d87ed8d19262322991bef57b1925eda416d"
