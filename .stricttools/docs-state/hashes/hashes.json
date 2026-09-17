@@ -206,8 +206,8 @@
     "description": "727c3d26e4914bb2c004338b669b08be349a97c6c8038645e6f9b598a50f3094"
   },
   "en/release-workflow.md": {
-    "content": "02be6244bd78eb9fd4904e7e1435fdde24a86e9a76ae7f401c10f471be862c02",
-    "description": "2c8f088586831fc396798452bb5c281a4d4b429746e74265bfa0ad8ecc68936b",
+    "content": "c47e6a8c5a0adcf7428060d45fe4d11d0889792d4d8a4369065e8a94929c0933",
+    "description": "bcbacee30d721619b50b0b9533b547ece0e3c454ec6538c1b1abf9e5d435cc6f",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
   "en/rlsbl-__main__.md": {
@@ -508,7 +508,7 @@
   "en/rlsbl-commands-release-release_state.md": {
     "content": "0546beb769edfa9af2c3bef51534eef6dd22d251983f8c210e346a7384c69b5a",
     "description": "02ffd7fc5f583d9fa884edd8846f67567b91738f4a38701363776391274ca439",
-    "source_docstring": "a54dfac81c7b09f3e6e7b0f72a251949b24c915deca132c0e3fedd98d0494848"
+    "source_docstring": "79ab814bd7bc0e7c473273b7ff82e91b5ab70c852853a8b8ec70a1efc2c753aa"
   },
   "en/rlsbl-commands-release-rollback.md": {
     "content": "00cd10fe8fccfe9f0567b280eeff33c111947d89a932cddff703fa1f90858003",
