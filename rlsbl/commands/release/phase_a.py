@@ -1339,6 +1339,7 @@ class _Executor:
         _guard_foreign_commits(
             self._inp.pin_sha, self._inp.state_path, cwd=self._inp.git_root,
             phase=step.payload["phase"],
+            resuming=self._inp.state.resuming,
         )
         return None
 

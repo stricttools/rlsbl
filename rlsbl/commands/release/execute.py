@@ -1324,7 +1324,47 @@ class UnverifiedCandidateError(RlsblError):
     """
 
 
-def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
+def foreign_commits(pin_sha, trail, cwd=None):
+    """The commits in ``pin_sha..HEAD`` that *trail* does not account for.
+
+    Returned newest-first, the order ``git rev-list`` gives them. An unusable
+    range yields an empty list -- no pin, a pin this repository cannot resolve,
+    or a preview whose observes answer with the framework's stale carrier. No
+    evidence is not evidence of drift, and every reader of this function takes
+    that stance.
+
+    Uses ``effects.run`` directly rather than the release flow's ``run``: this
+    is bookkeeping, and it must never consume a mock side effect (or shift a
+    call sequence) in tests that stub the release's git calls.
+    """
+    if not pin_sha:
+        return []
+    trail = set(trail or ())
+    try:
+        result = effects.run(
+            ["git", "rev-list", f"{pin_sha.strip()}..HEAD"],
+            capture_output=True, text=True, check=True, cwd=cwd,
+        )
+    except Exception:
+        return []
+    if effects.unsettled(result):
+        return []
+    commits = [c.strip() for c in result.stdout.splitlines() if c.strip()]
+    return [c for c in commits if c not in trail]
+
+
+def commit_subject(sha, cwd=None):
+    """The one-line subject of *sha*, or a stand-in when git cannot answer."""
+    try:
+        return effects.run(
+            ["git", "log", "-1", "--format=%s", sha],
+            capture_output=True, text=True, check=True, cwd=cwd,
+        ).stdout.strip()
+    except Exception:
+        return "(subject unavailable)"
+
+
+def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase, rerun):
     """Refuse to continue if commits in ``pin_sha..HEAD`` are not in *trail*.
 
     A release pins HEAD when it starts and records every commit it creates in
@@ -1339,37 +1379,17 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
     in the changelog and re-run) or move it aside. Nothing is rolled back.
 
     ``phase`` names the checkpoint in the error text (entry / candidate push /
-    CI gate / final push). Uses ``effects.run`` directly, not the mock-patched
-    ``run``, so the guard is never starved of a mock side effect in tests.
+    CI gate / final push). ``rerun`` names what the operator runs after
+    recording the work -- a fresh release when nothing is in flight, and the
+    resume of the release that IS in flight otherwise. It is required because
+    naming the wrong one sends the operator into a second refusal: a fresh
+    release is refused for as long as a release state file exists.
 
     The batch orchestrator uses this directly with a workspace-level pin and
     the union of its members' trails; :func:`_guard_foreign_commits` is the
     single-release wrapper that reads the trail out of a state file.
     """
-    if not pin_sha:
-        return
-
-    trail = set(trail or ())
-
-    try:
-        result = effects.run(
-            ["git", "rev-list", f"{pin_sha.strip()}..HEAD"],
-            capture_output=True, text=True, check=True, cwd=cwd,
-        )
-    except Exception:
-        # An unresolvable pin cannot prove drift either way; the rollback
-        # guard takes the same stance on an unusable range.
-        return
-    if effects.unsettled(result):
-        # A preview, past its first recorded mutation: the framework answers
-        # observes with a stale carrier rather than a fact. Same stance as an
-        # unresolvable range -- no evidence is not evidence of drift -- and
-        # there is nothing to protect anyway, since a preview creates no commit
-        # a ride-in could be confused with.
-        return
-
-    commits = [c.strip() for c in result.stdout.splitlines() if c.strip()]
-    foreign = [c for c in commits if c not in trail]
+    foreign = foreign_commits(pin_sha, trail, cwd=cwd)
     if not foreign:
         return
 
@@ -1380,14 +1400,7 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
         "Foreign commits (not part of this release):",
     ]
     for sha in foreign:
-        try:
-            subject = effects.run(
-                ["git", "log", "-1", "--format=%s", sha],
-                capture_output=True, text=True, check=True, cwd=cwd,
-            ).stdout.strip()
-        except Exception:
-            subject = "(subject unavailable)"
-        lines.append(f"  {sha[:12]}  {subject}")
+        lines.append(f"  {sha[:12]}  {commit_subject(sha, cwd=cwd)}")
     lines.extend([
         "",
         f"The release range is computed from the branch at run time, so these "
@@ -1395,10 +1408,100 @@ def guard_foreign_commits(pin_sha, trail, cwd=None, *, phase):
         f"of it. Pinned at {pin_sha.strip()[:12]}.",
         "",
         "Resolve one way or the other, then re-run:",
-        "  - to include them: record them with `rlsbl changelog add` and start "
-        "a fresh release",
+        f"  - to include them: record them with `rlsbl changelog add` and "
+        f"{rerun}",
         "  - to exclude them: move them off this branch (commit them on a "
         "branch of their own) first",
+    ])
+    raise ForeignCommitError("\n".join(lines))
+
+
+#: What a foreign-commit refusal tells the operator to run once the work is
+#: recorded. A fresh release is refused while a release state file exists, so a
+#: refusal raised from inside a release that IS in flight names its resume.
+RERUN_FRESH_RELEASE = "start a fresh release"
+RERUN_RESUME = "run `rlsbl release resume`"
+
+
+def uncovered_commits(commits, *, changes_dir, cwd=None):
+    """Which of *commits* the unreleased changelog does not account for.
+
+    Coverage is the ``changelog-coverage`` check's own question, asked over an
+    explicit commit list rather than over the unreleased range: a commit is
+    accounted for when some entry in ``unreleased.jsonl`` names it, or when it
+    is exempt (the ``Autogenerated: true`` trailer, or a commit that touches
+    only changelog and release infrastructure). The exemption rules come from
+    the same registry the check uses, so the two can never drift apart.
+
+    A project with no changes directory has no changelog to cover anything,
+    so every commit comes back uncovered.
+    """
+    from ...changelog.exemptions import create_default_registry
+    from ...changelog.files import read_unreleased
+    from ...changelog.resolve import resolve_hashes
+
+    if not commits:
+        return []
+
+    covered = set()
+    if changes_dir and os.path.isdir(changes_dir):
+        hashes = [h for entry in read_unreleased(changes_dir)
+                  for h in entry.commits]
+        covered = {
+            full for full in resolve_hashes(hashes, cwd=cwd).values() if full
+        }
+
+    remaining = [sha for sha in commits if sha not in covered]
+    return create_default_registry().filter_commits(remaining)[0]
+
+
+def require_adopted_commits_covered(adopted, *, changes_dir, version,
+                                    cwd=None):
+    """Refuse a resume whose adopted commits the changelog does not describe.
+
+    A resume re-pins at the current tip, so every commit made since the release
+    stopped becomes part of what this version tags and what its changelog
+    range covers. That is the point -- the fix-forward commit has to be adopted
+    for the release to complete at all -- but it only holds together while the
+    version's changelog actually describes the adopted work.
+
+    So the condition is checked here, before anything mutates, and the refusal
+    names one remedy that can be run as written: record the commits, then
+    resume again. It never offers a fresh release, which ``release run``
+    refuses for as long as this release's state file exists -- the pair of
+    refusals that left a stopped release unreleasable.
+    """
+    uncovered = uncovered_commits(adopted, changes_dir=changes_dir, cwd=cwd)
+    if not uncovered:
+        return
+
+    lines = [
+        f"Resume aborted: {version} would adopt commits made after the "
+        f"release stopped, and the changelog does not describe them.",
+        "",
+        "Uncovered commits:",
+    ]
+    for sha in uncovered:
+        lines.append(f"  {sha[:12]}  {commit_subject(sha, cwd=cwd)}")
+    lines.extend([
+        "",
+        f"Resuming re-pins at the current tip, so these ship under {version} "
+        f"and fall inside its changelog range. Record each of them, then "
+        f"resume:",
+        "",
+    ])
+    for sha in uncovered:
+        lines.append(
+            f"  rlsbl changelog add --commits {sha[:12]} "
+            f"--type fix --description \"...\""
+        )
+        lines.append(
+            f"  # ...or, when it changes nothing a user would notice: "
+            f"rlsbl changelog add --commits {sha[:12]} --no-user-facing"
+        )
+    lines.extend([
+        "",
+        "  rlsbl release resume",
     ])
     raise ForeignCommitError("\n".join(lines))
 
@@ -1498,14 +1601,21 @@ def require_recorded_candidate(state_path, cwd=None, *, version):
     return resolved
 
 
-def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase):
-    """Single-release wrapper: the trail comes from the state file."""
+def _guard_foreign_commits(pin_sha, state_path, cwd=None, *, phase, resuming):
+    """Single-release wrapper: the trail comes from the state file.
+
+    ``resuming`` decides which re-run the refusal names. A fresh run has no
+    release in flight until it writes its own state file, so "start a fresh
+    release" is runnable for it; a resume does, and the same sentence would
+    send its operator into ``release run``'s in-progress refusal.
+    """
     state = load_release_state(state_path)
     guard_foreign_commits(
         pin_sha,
         (state or {}).get("release_created_commits", []),
         cwd=cwd,
         phase=phase,
+        rerun=RERUN_RESUME if resuming else RERUN_FRESH_RELEASE,
     )
 
 
@@ -2209,6 +2319,10 @@ class ReleaseState:
     prior_release_created_commits: list[str] = dataclasses.field(default_factory=list)
     companion_tags: list[str] = dataclasses.field(default_factory=list)
     completed_steps: list[str] = dataclasses.field(default_factory=list)
+    # True when this pass entered through `rlsbl release resume`. It decides
+    # which re-run a foreign-commit refusal names: a fresh release is refused
+    # for as long as this release's state file exists.
+    resuming: bool = False
 
     # Release config fields (persisted in state file for resume)
     include: list[str] = dataclasses.field(default_factory=list)
@@ -2545,6 +2659,7 @@ def _run_release_mutating(state: ReleaseState):
     _pin_sha = _state_dict["pin_sha"]
     _guard_foreign_commits(
         _pin_sha, _state_path, cwd=_git_root, phase="mutating entry",
+        resuming=state.resuming,
     )
     # Load completed_steps to check which steps are already done (empty on
     # fresh start; populated when resuming from a prior failed attempt).
@@ -2941,6 +3056,7 @@ def _run_release_mutating(state: ReleaseState):
         # before any finalization or tag -- not after.
         _guard_foreign_commits(
             _pin_sha, _state_path, cwd=_git_root, phase="CI gate",
+            resuming=state.resuming,
         )
 
         # The commit the tag, the CI-SHA marker and the publish gate all
@@ -3292,6 +3408,7 @@ def _run_release_mutating(state: ReleaseState):
 
             _guard_foreign_commits(
                 _pin_sha, _state_path, cwd=_git_root, phase="final push",
+                resuming=state.resuming,
             )
             if _branch_needs_push:
                 push_if_needed(

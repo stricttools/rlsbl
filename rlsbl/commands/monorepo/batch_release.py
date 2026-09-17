@@ -283,8 +283,8 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
     # per-member push site, so one mock.patch covers every push in a batch.
     from ..release import push_if_needed
     from ..release.execute import (
-        _guard_empty_candidate_window, clear_run_all_dispatch,
-        guard_foreign_commits, run_all_dispatch_owed,
+        _guard_empty_candidate_window, RERUN_FRESH_RELEASE,
+        clear_run_all_dispatch, guard_foreign_commits, run_all_dispatch_owed,
     )
     from ..watch import dispatch_run_all
     from ..release.release_state import (
@@ -293,6 +293,7 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
 
     guard_foreign_commits(
         pin_sha, trail, cwd=workspace_root, phase="batch candidate push",
+        rerun=RERUN_FRESH_RELEASE,
     )
 
     sha = run("git", ["rev-parse", "HEAD"], cwd=workspace_root).strip()
@@ -1248,7 +1249,7 @@ def _push_finalized_batch_file(workspace_root, flags, log, *, pin_sha):
     """
     from ...utils import get_current_branch
     from ..release import push_if_needed
-    from ..release.execute import guard_foreign_commits
+    from ..release.execute import RERUN_FRESH_RELEASE, guard_foreign_commits
 
     created = _commits_between(pin_sha, head_sha(cwd=workspace_root),
                                workspace_root)
@@ -1258,7 +1259,7 @@ def _push_finalized_batch_file(workspace_root, flags, log, *, pin_sha):
     # finalize step created; anything above it rode in.
     guard_foreign_commits(
         pin_sha, [created[-1]], cwd=workspace_root,
-        phase="batch finalize push",
+        phase="batch finalize push", rerun=RERUN_FRESH_RELEASE,
     )
     finalize_sha = created[0]
     branch = get_current_branch(cwd=workspace_root)
