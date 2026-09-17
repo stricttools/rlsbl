@@ -20,7 +20,6 @@ operator means.
 
 import json
 import os
-import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -368,7 +367,6 @@ class TestTheMessagesThatRoutedHere:
 
     def _guard_message(self, repo, capsys):
         """The `release run` in-progress refusal, as its own message."""
-        from rlsbl.commands.release.validate import ReleaseValidationError
         from rlsbl.commands.release import run_cmd as release_run_cmd
         from rlsbl.context import ProjectContext
         from rlsbl.release_file import ReleaseConfig
