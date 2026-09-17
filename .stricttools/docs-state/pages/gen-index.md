@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 189 modules"
+description = "API reference index for rlsbl covering 190 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -71,6 +71,7 @@ nav_order = 90
 - [rlsbl.commands.release.release_state](../rlsbl-commands-release-release_state/)
 - [rlsbl.commands.release.rollback](../rlsbl-commands-release-rollback/)
 - [rlsbl.commands.release.shared](../rlsbl-commands-release-shared/)
+- [rlsbl.commands.release.steps](../rlsbl-commands-release-steps/)
 - [rlsbl.commands.release.validate](../rlsbl-commands-release-validate/)
 - [rlsbl.commands.release_backfill](../rlsbl-commands-release_backfill/)
 - [rlsbl.commands.release_init](../rlsbl-commands-release_init/)

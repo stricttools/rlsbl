@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.121.5",
+  "version": "0.121.6",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -3411,6 +3411,11 @@
           "level": 3,
           "text": "Release state and resume",
           "anchor": "release-state-and-resume"
+        },
+        {
+          "level": 3,
+          "text": "Resuming adopts the branch",
+          "anchor": "resuming-adopts-the-branch"
         },
         {
           "level": 2,
@@ -7510,8 +7515,8 @@
         },
         {
           "level": 3,
-          "text": "`_is_clean_tree`",
-          "anchor": "_is_clean_tree"
+          "text": "`_blocking_dirty_paths`",
+          "anchor": "_blocking_dirty_paths"
         },
         {
           "level": 3,
@@ -7938,8 +7943,28 @@
         },
         {
           "level": 3,
+          "text": "`foreign_commits`",
+          "anchor": "foreign_commits"
+        },
+        {
+          "level": 3,
+          "text": "`commit_subject`",
+          "anchor": "commit_subject"
+        },
+        {
+          "level": 3,
           "text": "`guard_foreign_commits`",
           "anchor": "guard_foreign_commits"
+        },
+        {
+          "level": 3,
+          "text": "`uncovered_commits`",
+          "anchor": "uncovered_commits"
+        },
+        {
+          "level": 3,
+          "text": "`require_adopted_commits_covered`",
+          "anchor": "require_adopted_commits_covered"
         },
         {
           "level": 3,
@@ -8294,6 +8319,11 @@
           "level": 4,
           "text": "`_do_push_candidate`",
           "anchor": "_do_push_candidate"
+        },
+        {
+          "level": 3,
+          "text": "`_build_dispatch`",
+          "anchor": "_build_dispatch"
         }
       ]
     },
@@ -8453,6 +8483,11 @@
         },
         {
           "level": 3,
+          "text": "`_rollback_context`",
+          "anchor": "_rollback_context"
+        },
+        {
+          "level": 3,
           "text": "`_is_tracked`",
           "anchor": "_is_tracked"
         },
@@ -8492,6 +8527,188 @@
           "level": 3,
           "text": "`apply_timeout_overrides`",
           "anchor": "apply_timeout_overrides"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-commands-release-steps.md",
+      "title": "rlsbl.commands.release.steps",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.release.steps",
+          "anchor": "rlsblcommandsreleasesteps"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.release.steps`",
+          "anchor": "rlsblcommandsreleasesteps"
+        },
+        {
+          "level": 3,
+          "text": "`StepContext`",
+          "anchor": "stepcontext"
+        },
+        {
+          "level": 3,
+          "text": "`ArtifactState`",
+          "anchor": "artifactstate"
+        },
+        {
+          "level": 3,
+          "text": "`PlanIssued`",
+          "anchor": "planissued"
+        },
+        {
+          "level": 3,
+          "text": "`DirectlyIssued`",
+          "anchor": "directlyissued"
+        },
+        {
+          "level": 3,
+          "text": "`LocalInverse`",
+          "anchor": "localinverse"
+        },
+        {
+          "level": 3,
+          "text": "`ExternalInverse`",
+          "anchor": "externalinverse"
+        },
+        {
+          "level": 3,
+          "text": "`NoInverse`",
+          "anchor": "noinverse"
+        },
+        {
+          "level": 3,
+          "text": "`LocalProbe`",
+          "anchor": "localprobe"
+        },
+        {
+          "level": 3,
+          "text": "`NoLocalProbe`",
+          "anchor": "nolocalprobe"
+        },
+        {
+          "level": 3,
+          "text": "`no_artifacts`",
+          "anchor": "no_artifacts"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseStep`",
+          "anchor": "releasestep"
+        },
+        {
+          "level": 4,
+          "text": "`plan_kinds`",
+          "anchor": "plan_kinds"
+        },
+        {
+          "level": 3,
+          "text": "`StepInverseError`",
+          "anchor": "stepinverseerror"
+        },
+        {
+          "level": 3,
+          "text": "`_git`",
+          "anchor": "_git"
+        },
+        {
+          "level": 3,
+          "text": "`_resolved_targets`",
+          "anchor": "_resolved_targets"
+        },
+        {
+          "level": 3,
+          "text": "`undo_version_bump`",
+          "anchor": "undo_version_bump"
+        },
+        {
+          "level": 3,
+          "text": "`reset_branch_to_pin`",
+          "anchor": "reset_branch_to_pin"
+        },
+        {
+          "level": 3,
+          "text": "`undo_changelog_finalization`",
+          "anchor": "undo_changelog_finalization"
+        },
+        {
+          "level": 3,
+          "text": "`undo_release_file_finalization`",
+          "anchor": "undo_release_file_finalization"
+        },
+        {
+          "level": 3,
+          "text": "`delete_local_tags`",
+          "anchor": "delete_local_tags"
+        },
+        {
+          "level": 3,
+          "text": "`_version_files`",
+          "anchor": "_version_files"
+        },
+        {
+          "level": 3,
+          "text": "`probe_version_bumped`",
+          "anchor": "probe_version_bumped"
+        },
+        {
+          "level": 3,
+          "text": "`probe_committed`",
+          "anchor": "probe_committed"
+        },
+        {
+          "level": 3,
+          "text": "`probe_snapshot_regenerated`",
+          "anchor": "probe_snapshot_regenerated"
+        },
+        {
+          "level": 3,
+          "text": "`probe_changelog_finalized`",
+          "anchor": "probe_changelog_finalized"
+        },
+        {
+          "level": 3,
+          "text": "`probe_release_file_finalized`",
+          "anchor": "probe_release_file_finalized"
+        },
+        {
+          "level": 3,
+          "text": "`probe_tagged`",
+          "anchor": "probe_tagged"
+        },
+        {
+          "level": 3,
+          "text": "`changelog_finalization_artifacts`",
+          "anchor": "changelog_finalization_artifacts"
+        },
+        {
+          "level": 3,
+          "text": "`release_file_finalization_artifacts`",
+          "anchor": "release_file_finalization_artifacts"
+        },
+        {
+          "level": 3,
+          "text": "`_validate_table`",
+          "anchor": "_validate_table"
+        },
+        {
+          "level": 3,
+          "text": "`step_names`",
+          "anchor": "step_names"
+        },
+        {
+          "level": 3,
+          "text": "`all_plan_kinds`",
+          "anchor": "all_plan_kinds"
+        },
+        {
+          "level": 3,
+          "text": "`rollback_artifacts`",
+          "anchor": "rollback_artifacts"
         }
       ]
     },
@@ -8559,6 +8776,11 @@
           "level": 3,
           "text": "`is_tool_owned_state_path`",
           "anchor": "is_tool_owned_state_path"
+        },
+        {
+          "level": 3,
+          "text": "`blocking_dirty_paths`",
+          "anchor": "blocking_dirty_paths"
         },
         {
           "level": 3,
@@ -9487,6 +9709,21 @@
           "level": 3,
           "text": "`_find_latest_release`",
           "anchor": "_find_latest_release"
+        },
+        {
+          "level": 3,
+          "text": "`_in_progress_state_path`",
+          "anchor": "_in_progress_state_path"
+        },
+        {
+          "level": 3,
+          "text": "`_latest_recorded_version`",
+          "anchor": "_latest_recorded_version"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_unrecorded_in_progress`",
+          "anchor": "_refuse_unrecorded_in_progress"
         },
         {
           "level": 3,
@@ -20661,6 +20898,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-16T00:03:25.768496+00:00",
+  "last_gen": "2026-09-17T15:39:58.262792+00:00",
   "theme": "minimal"
 }
