@@ -1,3 +1,0 @@
-{"format_version":1,"id":"18d62aaf819dfee7181e3654f9ef48c795f021abed9a9c4a","commits":["260cbddd60b534750a8216e32772ed5c184aa604"],"user_facing":true,"description":"**Fixed.** The npm package's repository and issue links named an owner that no longer holds the repository, which also made the npm publish fail its build-attestation check and reject the release.","type":"fix"}
-{"format_version":1,"id":"18d62ab0260d5677b5a463fcea764c178f820f4825b9233b","commits":["f3383fac004248119e13bf60366d7f15fb8a8421"],"user_facing":false}
-{"format_version":1,"id":"18d62ab03a653b6f39f8925efbb84d23a7fcef523b941abb","commits":["1621c00e005fd1a082a341a3d5f841ba0d110db8"],"user_facing":false}
