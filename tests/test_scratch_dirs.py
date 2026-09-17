@@ -128,7 +128,7 @@ class TestScaffoldWritesScratchDirs:
         # A produced artifact inside the directory is ignored, not committable.
         (origin / "experiments" / "produced.bin").write_text("artifact\n")
         status = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "status", "--porcelain", "--", "experiments"],
             cwd=str(origin), capture_output=True, text=True, check=True,
         )
         assert status.stdout.strip() == ""
