@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 
+from ..scratch_dirs import is_scratch_dir_name
 from ..utils import get_check_timeout, tag_exists_locally
 from ..workspace import WorkspaceProject, members_of, project_is_dev_only
 from ._common import (
@@ -559,6 +560,11 @@ def register_workspace_checks(app):
             if entry.startswith("."):
                 continue
             if entry in gitignored:
+                continue
+            # A scratch directory is not gitignored as a whole (it carries a
+            # committed .gitignore), so the listing above does not cover it --
+            # but a produced repository inside one is not a workspace member.
+            if is_scratch_dir_name(entry):
                 continue
             dir_path = os.path.join(root, entry)
             if not os.path.isdir(dir_path):

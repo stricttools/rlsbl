@@ -57,6 +57,7 @@ import re
 from dataclasses import dataclass, field
 
 from .go_identity import read_module_line
+from .scratch_dirs import prune_scratch_dirs
 
 #: Directories never scanned for build configuration: scaffold base copies
 #: (which are not live configuration) and goreleaser's own output.
@@ -323,8 +324,9 @@ class _GoSource:
     def go_files(self):
         """Every non-test ``.go`` file in the module, module-relative.
 
-        ``vendor/`` and ``testdata/`` are other people's code and fixtures; a
-        symbol declared there is not this module's.
+        ``vendor/`` and ``testdata/`` are other people's code and fixtures, and
+        the module's scratch directories hold throwaway probes; a symbol
+        declared in any of them is not this module's.
         """
         if self._go_files is not None:
             return self._go_files
@@ -334,6 +336,7 @@ class _GoSource:
                 d for d in dirnames
                 if d not in (".git", "vendor", "testdata", "node_modules")
             ]
+            prune_scratch_dirs(self.module_dir, dirpath, dirnames)
             for name in filenames:
                 if not name.endswith(".go") or name.endswith("_test.go"):
                     continue
