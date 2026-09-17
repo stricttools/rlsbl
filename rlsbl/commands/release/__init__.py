@@ -98,7 +98,9 @@ from .hooks import (
 from .execute import (
     _rel_to_git_root,
     ForeignCommitError,
+    foreign_commits,
     head_sha,
+    require_adopted_commits_covered,
     ReleaseAbortError,
     ReleaseCIError,
     RollbackClobberError,
@@ -123,6 +125,7 @@ from .release_state import (
     is_state_complete,
     load_release_state,
     resolve_releasable_dir,
+    save_release_state,
 )
 
 
@@ -251,36 +254,35 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     # Whether the release is SEALED to a commit CI has already judged.
     _ci_sealed = "CI_VERIFIED" in _resume_completed
 
-    # Range pin. A resume is its own entry into the mutating phase, and where
-    # it pins decides which commits it is willing to adopt. The split is the CI
-    # gate, because that is exactly where the executor stops re-deriving the
-    # candidate from the branch tip:
+    # Range pin. A resume is its own entry into the mutating phase, and it pins
+    # at the CURRENT tip: that is the whole point of resuming. A release stops
+    # with its branch open, work continues there -- the fix the operator
+    # commits after a red verdict, and whatever else another session lands
+    # beside it -- and the release completes by taking that branch as it now
+    # stands. What arrived since the original pin is ADOPTED, not refused.
     #
-    #   - Pre-gate (CI_VERIFIED absent) -- the fix-forward window. A red or
-    #     unreachable CI verdict leaves the candidate unverified, and the
-    #     documented remedy is to commit the fix on the release branch and
-    #     resume. Re-pinning at the CURRENT tip makes that fix the baseline;
-    #     the executor re-pushes the tip as a new candidate and CI judges it
-    #     again, so nothing reaches a tag without a verdict.
-    #   - Post-gate (CI_VERIFIED present) -- SEALED. The release is committed
-    #     to the commit CI passed; the only commits allowed to appear after it
-    #     are the release's own finalization commits, all of which are in the
-    #     state file's trail. The pin therefore STAYS where the original run
-    #     put it, and anything else in the range is a ride-in the drift guard
-    #     hard-errors on by name.
+    # The commits being adopted are computed against the ORIGINAL pin, before
+    # the new one replaces it, because the original pin plus the release's own
+    # trail is the only record of which commits this release did not make.
+    # They carry one condition, enforced below before anything mutates: the
+    # changelog must already describe each of them.
     #
-    # Re-pinning unconditionally is how a concurrent session's commit was once
-    # adopted by a resume and pushed to the release branch under this version:
-    # it had landed BEFORE the resume started, so the fresh pin put it inside
-    # the baseline instead of inside the range the guard checks.
-    if _ci_sealed:
-        _pin_sha = (
-            saved_state.get("pin_sha")
-            or saved_state.get("candidate_sha")
-            or head_sha(cwd=project_dir)
-        )
-    else:
-        _pin_sha = head_sha(cwd=project_dir)
+    # Refusing them outright was the previous behaviour once ``CI_VERIFIED``
+    # was recorded, and it made a stopped release unreleasable: the refusal
+    # offered a fresh release, which ``release run`` refuses for as long as the
+    # state file exists, and moving the commits off the branch, which the
+    # release-branch-only workflow does not do.
+    _original_pin = (
+        saved_state.get("pin_sha")
+        or saved_state.get("pre_release_sha")
+        or ""
+    ).strip()
+    _adopted = foreign_commits(
+        _original_pin,
+        saved_state.get("release_created_commits", []),
+        cwd=project_dir,
+    )
+    _pin_sha = head_sha(cwd=project_dir)
 
     # Per-invocation timeout overrides and the shared env file, same as the
     # fresh-release path. A resume re-enters at the deploy / post-release-hook
@@ -392,6 +394,48 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     if changes_dir is None and changes_dir_exists(project_dir):
         changes_dir = get_changes_dir(project_dir)
 
+    # The one condition on adoption, checked here: before the changelog is
+    # regenerated, before the lock is taken, before anything at all is
+    # written. Every commit this resume takes on must already be described by
+    # a changelog entry, or be exempt under the rules `changelog-coverage`
+    # applies. Otherwise the tag would carry work that the version's changelog
+    # -- regenerated from those very entries a few lines below -- says nothing
+    # about. The refusal names one remedy, and it runs as written.
+    if _adopted:
+        require_adopted_commits_covered(
+            _adopted, changes_dir=changes_dir, version=new_version,
+            cwd=project_dir,
+        )
+
+    # Adopting past the CI gate breaks the seal. The recorded verdict belongs
+    # to the commit CI judged, and that commit no longer contains everything
+    # this release is about to ship -- nor everything its changelog will
+    # describe. So the CI marker is dropped and the recorded candidate with
+    # it: Phase A pushes the new tip as the candidate, the gate judges THAT,
+    # and the tag lands on what CI verified. The earlier steps keep their
+    # markers, so the version bump and its commit are not redone and the
+    # version being released stays the one the state file recorded.
+    _seal_broken = bool(_adopted) and _ci_sealed
+    if _seal_broken:
+        _resume_completed.discard("CI_VERIFIED")
+        _ci_sealed = False
+    if _seal_broken and not flags.get("dry-run", False):
+        _state_path_resume = get_state_path(
+            project_dir, releasable_dir=_rel_cfg_dir,
+        )
+        _reopened = load_release_state(_state_path_resume) or {}
+        _reopened["completed_steps"] = [
+            s for s in _reopened.get("completed_steps", [])
+            if s != "CI_VERIFIED"
+        ]
+        _reopened.pop("candidate_sha", None)
+        save_release_state(_state_path_resume, _reopened)
+        log(
+            f"Adopting {len(_adopted)} commit(s) made since the release "
+            f"stopped; the recorded CI verdict no longer covers the tip, so "
+            f"the tip is re-pushed as the candidate and re-gated"
+        )
+
     # Fix-forward support. A resume after a red CI gate re-enters with new
     # commits on the release branch (the fix) and, normally, a new changelog
     # entry covering them. CHANGELOG.md was rendered during the ORIGINAL run,
@@ -464,6 +508,7 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
             pre_existing_dirty=set(),
             hook_generated=set(),
             pin_sha=_pin_sha,
+            resuming=True,
             include=saved_state.get("include", []),
             exclude=saved_state.get("exclude", []),
             preid=saved_state.get("preid", ""),
