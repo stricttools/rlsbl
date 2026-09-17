@@ -23,6 +23,32 @@ description = "How rlsbl scaffold generates CI workflows, git hooks, and config 
 | `.rlsbl/version` | Records which rlsbl version generated the scaffolding |
 | `.gitignore` | Additions for build artifacts and rlsbl internals |
 | `CHANGELOG.md` | Generated changelog (created once, never overwritten) |
+| `experiments/.gitignore` | Makes `experiments/` a committed, permanently empty scratch directory |
+| `screenshots/.gitignore` | Makes `screenshots/` a committed, permanently empty scratch directory |
+
+## Scratch directories
+
+Scaffold creates two scratch directories at the project root, `experiments/` and `screenshots/`, so that a tool or an agent that needs somewhere to put a throwaway file has a declared place for it inside the project instead of reaching for a system temporary directory.
+
+- `experiments/` holds throwaway probes: prototypes, produced repositories, captures, one-off outputs -- anything written to find something out rather than to ship.
+- `screenshots/` holds mid-work screenshots taken while verifying a piece of work. It is not a home for published images; those belong in a committed directory of their own.
+
+Each directory carries a committed `.gitignore` whose whole content is:
+
+```gitignore
+*
+!.gitignore
+```
+
+That spelling is what makes the directory exist in a fresh clone, so tooling may rely on it being there, while nothing inside it can be committed by accident. A line in the repository's root `.gitignore` would leave the directory absent after a clone, which is the opposite of the point.
+
+Re-running scaffold over a project whose scratch directories already hold work changes nothing: the `.gitignore` files are scaffold-managed like any other, and their content does not vary by ecosystem or by project, so the merge is a no-op and the directory's contents are never touched.
+
+### Checks never look inside them
+
+rlsbl's repository walks -- dead-module detection, circular-dependency detection, the library linters, the dependency import scans, the ldflags Go source reader, and the unregistered-project scan -- read the filesystem rather than git's index, so a `.gitignore` alone would not keep them out. Every one of those walks prunes both directory names at the root of the project it is walking, which is what lets a throwaway git repository or a stray source file inside `experiments/` leave every check green.
+
+The pruning is scoped to the project root, matching where scaffold creates them. A directory named `experiments` or `screenshots` nested deeper inside a project is an ordinary source directory and is walked normally. In a workspace, every member is walked with its own directory as the root, so each member's own scratch directories are pruned.
 
 ## Three-way merge
 
