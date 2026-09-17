@@ -2,6 +2,42 @@
 
 # Changelog
 
+## 0.121.7
+
+A stopped release can be resumed again once work has been committed after it.
+
+<details>
+<summary>Context</summary>
+
+A release that stopped -- a red CI verdict, an interrupted run -- leaves its
+state file behind and its branch open, and work continues on that branch. Once
+the stopped release had recorded a green CI verdict, `rlsbl release resume`
+kept the pin the original run took and read every commit made since as a
+ride-in to refuse, including the fix-forward commit the operator had just made
+because the flow told them to. The two resolutions it named could not be
+followed: recording the commits and starting a fresh release is refused for as
+long as the state file exists, and moving them onto a branch of their own is
+not something a release-branch-only workflow does. A repository in that state
+had no way forward.
+
+Resume now does what it was always documented to do -- re-pin at the current
+tip and adopt what the branch gained -- with the condition that makes it
+honest: every adopted commit the release did not create must already be
+described by a changelog entry, or be exempt under the same rules the
+changelog-coverage check applies. An uncovered commit is still refused, but by
+name and subject and with a remedy that runs as written. Adopting past the CI
+gate drops the recorded verdict and candidate, so the tip is pushed and judged
+again and the tag still lands on a commit CI verified; the version, its bump
+and its commit are untouched.
+
+</details>
+
+### Fixes
+
+- **Fix.** `rlsbl release undo` no longer refuses over rlsbl's own untracked release-state file. A repository whose `.gitignore` has no entry for `.rlsbl/releases/in-progress.json` reported it as an uncommitted change, so undo refused to start in the very situation it exists for, telling the operator to commit a file rlsbl writes and deletes itself. The same exemption now covers `monorepo rename-releasable`, `monorepo extract` and `monorepo absorb`, and each of these refusals now names the paths that blocked it.
+- **Fix.** `rlsbl release undo` no longer reverts the wrong release when one is still in flight. It chose its target from the committed release archives alone, so a release that stopped before the step that records it was invisible and undo silently selected the PREVIOUS, published release -- deleting that version's tag and GitHub Release while the operator believed they were discarding the half-finished one. Undo now refuses that state, naming the version in flight, the release it would have reverted instead, and how to finish or abandon the attempt. Two messages that routed operators into this -- the `release run` in-progress refusal and the unverified-candidate remedy -- now offer `release undo` only for a version the archives contain.
+- **Fix.** A stopped release could not be resumed once anyone committed after it. `rlsbl release resume` refused every commit made since the release stopped -- the operator's own fix-forward commit included -- and named two resolutions the repository could not follow: recording them and starting a fresh release, which `rlsbl release run` refuses for as long as the stopped release's state file exists, and moving them onto a branch of their own. Resume now re-pins at the current branch tip and adopts those commits. It refuses only the ones the changelog does not yet describe, by name and subject, printing the `rlsbl changelog add` that records each and the `rlsbl release resume` that follows. When adoption invalidates a recorded CI verdict, the tip is pushed as a new candidate and judged again, so the tag still lands on a commit CI verified.
+
 ## 0.121.6
 
 An installed rlsbl no longer registers the test-coverage check outside its own source tree; strictcli floor raised to 0.42.0.
