@@ -38,3 +38,7 @@ and its commit are untouched.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "5db47ee6a39eb196734e5deda1e355c44d0090ba"
+
+[tree_hashes]
+"." = "be813392cdeff0b72817828df5008d4e7bb01702"
