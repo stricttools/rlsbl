@@ -17048,6 +17048,11 @@
         },
         {
           "level": 4,
+          "text": "`scratch_test_exclusion`",
+          "anchor": "scratch_test_exclusion"
+        },
+        {
+          "level": 4,
           "text": "`supports_read_name`",
           "anchor": "supports_read_name"
         },
@@ -19975,6 +19980,11 @@
         },
         {
           "level": 4,
+          "text": "`scratch_test_exclusion`",
+          "anchor": "scratch_test_exclusion"
+        },
+        {
+          "level": 4,
           "text": "`supports_read_name`",
           "anchor": "supports_read_name"
         },
@@ -20980,6 +20990,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-18T01:09:53.423022+00:00",
+  "last_gen": "2026-09-18T01:18:02.287499+00:00",
   "theme": "minimal"
 }
