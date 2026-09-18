@@ -45,3 +45,7 @@ outranks pyproject.toml, or a deno.jsonc, whose comments a rewrite would lose
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "84ec70ebbaf3e55116d5a27d6a2e5be87c59cf53"
+
+[tree_hashes]
+"." = "1dc36f7546d5f64719db640c5bcd25c2906217a3"
