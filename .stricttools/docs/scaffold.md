@@ -23,8 +23,9 @@ description = "How rlsbl scaffold generates CI workflows, git hooks, config file
 | `.rlsbl/version` | Records which rlsbl version generated the scaffolding |
 | `.gitignore` | Additions for build artifacts and rlsbl internals |
 | `CHANGELOG.md` | Generated changelog (created once, never overwritten) |
-| `experiments/.gitignore` | Makes `experiments/` a committed, permanently empty scratch directory |
-| `screenshots/.gitignore` | Makes `screenshots/` a committed, permanently empty scratch directory |
+| `experiments/.gitignore` | Makes `experiments/` a scratch directory git carries but never fills |
+| `screenshots/.gitignore` | Makes `screenshots/` a scratch directory git carries but never fills |
+| `experiments/go.mod`, `screenshots/go.mod` | Go projects only: keeps the go command out of the scratch directories |
 
 ## Scratch directories
 
@@ -42,7 +43,36 @@ Each directory carries a committed `.gitignore` whose whole content is:
 
 That spelling is what makes the directory exist in a fresh clone, so tooling may rely on it being there, while nothing inside it can be committed by accident. A line in the repository's root `.gitignore` would leave the directory absent after a clone, which is the opposite of the point.
 
-Re-running scaffold over a project whose scratch directories already hold work changes nothing: the `.gitignore` files are scaffold-managed like any other, and their content does not vary by ecosystem or by project, so the merge is a no-op and the directory's contents are never touched.
+The ignore file un-ignores exactly the files scaffold itself commits into the directory. In a Go project that is one file more, so the same file reads:
+
+```gitignore
+*
+!.gitignore
+!go.mod
+```
+
+Re-running scaffold over a project whose scratch directories already hold work changes nothing: the files scaffold writes into them are scaffold-managed like any other, so the merge is a no-op and the directory's contents are never touched.
+
+### The project's own test runner skips them too
+
+Pruning the directories from rlsbl's walks (below) keeps rlsbl's checks green and says nothing to the project's test runner. A `test_*.py` left in `experiments/` is still collected by a bare `pytest`, and a `.go` file there without its own module file is still built by `go test ./...` -- so a half-finished probe breaks a suite it has nothing to do with, which is the opposite of what a disposable scratch directory is for.
+
+There is no cross-ecosystem setting for this, so scaffold writes the one each ecosystem's runner honours. Which mechanism a target uses is declared on the target itself and appears in the [support matrix](targets.md) as `scratch_test_exclusion`:
+
+| Ecosystem | What scaffold writes | Where |
+| --- | --- | --- |
+| Python | Both directory names added to `norecursedirs`, alongside pytest's own default patterns | `[tool.pytest.ini_options]` in `pyproject.toml` |
+| Go | A `go.mod` in each scratch directory, and the ignore exception that carries it into a clone | `experiments/go.mod`, `screenshots/go.mod` |
+| Deno | Both directory names added to the top-level `exclude` array | `deno.json` |
+| npm | Nothing | -- |
+
+Three points about that table:
+
+- **pytest's `norecursedirs` replaces its default rather than adding to it**, so scaffold writes pytest's default patterns back alongside the two scratch names. Without that, a scaffolded project would start collecting from `build/`, `dist/` and `node_modules/`. A project that already has the option keeps its own entries, with only the missing scratch names appended.
+- **The Go route is a nested module, not a renamed directory.** `go test ./...` skips a directory that declares its own module, and also one whose name begins with `_` or `.`; the scratch directories keep their plain names, which the convention, every walk and every document here spell out, so the module file is what is left. It costs one more committed file per scratch directory, plus the `!go.mod` line in that directory's ignore file that lets it reach a fresh clone, and it makes a probe placed there a separate module: it cannot import the parent module without a `replace` directive of its own. Without the committed marker, a fresh clone plus one dropped `.go` file is a broken `go test ./...`, which is the case the whole mechanism exists for.
+- **npm is left out on purpose.** `npm test` runs the project's own test script, which names whichever runner the project chose -- jest, vitest, mocha, `node --test` -- each with its own configuration file, several of them executable JavaScript. rlsbl writes none of those files, and it will not start owning one to place a single setting, so it writes nothing and says so here. The same holds for any ecosystem whose entry reads `no-test-runner-recursion`: its runner collects only from a declared test source set, so a scratch directory is never reached in the first place.
+
+`pyproject.toml` and `deno.json` belong to the project, not to scaffold. Scaffold merges the one setting into them and byte-preserves everything else, including comments and key order; a second run is a no-op. They never enter the managed-files registry, so the orphan sweep can never delete them. Where the setting cannot be placed safely -- a `pytest.ini`, which outranks `pyproject.toml` as pytest's configuration file, or a `deno.jsonc`, whose comments a rewrite would lose -- scaffold writes nothing and prints the exact line to add by hand.
 
 ### Checks never look inside them
 
