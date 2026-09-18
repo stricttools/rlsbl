@@ -1,5 +1,5 @@
 +++
-description = "How rlsbl scaffold generates CI workflows, git hooks, config files, and the project's scratch directories, with three-way merge preserving your customizations."
+description = "How rlsbl scaffold generates CI workflows, git hooks, and the scratch directories, plus the per-ecosystem setting that keeps a project's own test runner out of them."
 +++
 
 # Scaffold system
