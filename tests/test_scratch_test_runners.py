@@ -141,27 +141,26 @@ class TestPytestNorecursedirs:
             assert pattern in value
 
     def test_declared_default_matches_the_installed_pytest(self):
-        """The re-stated default is pytest's real one, not a stale copy of it."""
+        """The re-stated default is pytest's real one, not a stale copy of it.
+
+        pytest exposes no public reader for an ini option's default, so this
+        asks the installed pytest to register its own options against a parser
+        and reads the answer back out. A pytest release that changes the
+        default turns this red instead of silently narrowing every scaffolded
+        project's collection.
+        """
+        import warnings as _warnings
+
         import _pytest.main
 
-        recorded = {}
+        with _warnings.catch_warnings():
+            _warnings.simplefilter("ignore")
+            from _pytest.config.argparsing import Parser
 
-        class _Group:
-            def addoption(self, *args, **kwargs):
-                pass
-
-        class _Parser:
-            def getgroup(self, *args, **kwargs):
-                return _Group()
-
-            def addoption(self, *args, **kwargs):
-                pass
-
-            def addini(self, name, help, type=None, default=None):
-                recorded[name] = default
-
-        _pytest.main.pytest_addoption(_Parser())
-        assert list(PYTEST_DEFAULT_NORECURSEDIRS) == list(recorded["norecursedirs"])
+            parser = Parser()
+        _pytest.main.pytest_addoption(parser)
+        _help, _type, default = parser._inidict["norecursedirs"]
+        assert list(PYTEST_DEFAULT_NORECURSEDIRS) == list(default)
 
     def test_a_real_pytest_run_collects_neither_probe(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)

@@ -9,6 +9,7 @@ import tomlkit
 
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
+from ..scratch_dirs import PYTEST_NORECURSEDIRS
 from ..utils import run
 from .. import effects
 
@@ -96,6 +97,10 @@ class PypiTarget(BaseTarget):
     detection_files = ("pyproject.toml",)
     lint_language = "python"
     ecosystem = "Python / PyPI"
+
+    # pytest recurses from its rootdir and collects every test file it finds,
+    # so the scratch directories are named in the norecursedirs ini option.
+    scratch_test_exclusion = PYTEST_NORECURSEDIRS
 
     # Trusted Publishing authorizes a specific repository and workflow to
     # publish this project, so the authorization does not follow the code to a

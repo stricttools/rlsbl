@@ -3,6 +3,8 @@
 import os
 from typing import ClassVar
 
+from ..scratch_dirs import NO_TEST_RUNNER_RECURSION
+
 # The scaffold template that makes a target's directory a source of CI
 # workflows. Its presence is what ``provides_ci_templates`` answers from.
 CI_TEMPLATE_FILENAME = "ci.yml.tpl"
@@ -136,6 +138,26 @@ class BaseTarget:
     Empty for a target whose manifest names no repository.
     """
 
+    scratch_test_exclusion: ClassVar[str] = NO_TEST_RUNNER_RECURSION
+    """How this ecosystem's own test runner is kept out of the scratch dirs.
+
+    ``rlsbl scaffold`` creates ``experiments/`` and ``screenshots/`` at every
+    project's root, and rlsbl's own walks prune them. That says nothing to the
+    PROJECT's test runner, so a half-finished probe planted in one of them can
+    break a suite it has nothing to do with unless the runner is told to skip
+    it too.
+
+    There is no cross-ecosystem mechanism, so each target names the one its
+    runner honours, from the closed vocabulary in
+    :mod:`rlsbl.scratch_dirs`. The default is
+    :data:`~rlsbl.scratch_dirs.NO_TEST_RUNNER_RECURSION`, which is the honest
+    answer for every ecosystem whose runner collects only from a declared test
+    source set and therefore never reaches a scratch directory at all.
+
+    Declared rather than introspected: it is a fact about how the ecosystem's
+    runner discovers tests, not something the target's methods reveal.
+    """
+
     release_materialization_policy: ClassVar[str] = MATERIALIZE_ALWAYS
     """Whether a released version's MISSING refs may simply be recreated.
 
@@ -233,16 +255,20 @@ class BaseTarget:
 
     def shared_template_mappings(self, ctx):
         """Return template-to-file mappings shared across all targets."""
-        from ..scratch_dirs import scratch_template_mappings
+        from ..scratch_dirs import scratch_mechanisms, scratch_template_mappings
 
         mappings = [
             {"template": "CHANGELOG.md.tpl", "target": "CHANGELOG.md"},
             {"template": "gitignore.tpl", "target": ".gitignore"},
             {"template": "changes/unreleased.jsonl.tpl", "target": ".rlsbl/changes/unreleased.jsonl"},
         ]
-        # The scratch directories (experiments/, screenshots/) are the same for
+        # The scratch directories (experiments/, screenshots/) are created for
         # every ecosystem, so they are shared mappings like the three above.
-        mappings.extend(scratch_template_mappings())
+        # What a project's targets declare decides only whether a directory
+        # also carries the module file that keeps the go command out of it.
+        mappings.extend(scratch_template_mappings(
+            scratch_mechanisms({self.name} | self._extract_target_names(ctx))
+        ))
         mappings.extend(self._lint_config_mappings(ctx))
         # Sandboxed test runner: emitted only for projects that declared the
         # test_sandbox config family (the stricttest floor's outer layer).

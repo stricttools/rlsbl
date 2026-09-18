@@ -6,6 +6,7 @@ import re
 
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
+from ..scratch_dirs import RUNNER_CHOSEN_BY_PROJECT
 from .. import effects
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
@@ -17,6 +18,14 @@ class NpmTarget(BaseTarget):
     detection_files = ("package.json",)
     lint_language = "npm"
     ecosystem = "Node.js / npm"
+
+    # `npm test` runs the project's own test script, which names whichever
+    # runner the project chose (jest, vitest, mocha, `node --test`, ...). Each
+    # has its own configuration file, several of them executable JavaScript,
+    # and rlsbl writes none of them -- so telling the runner to skip the
+    # scratch directories would mean taking ownership of a file rlsbl does not
+    # own and cannot merge into safely. It writes nothing instead.
+    scratch_test_exclusion = RUNNER_CHOSEN_BY_PROJECT
 
     @property
     def name(self):

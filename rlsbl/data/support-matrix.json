@@ -139,6 +139,10 @@
     {
       "doc": "Workspace members of this target resolve into ONE shared environment.",
       "name": "shares_workspace_environment"
+    },
+    {
+      "doc": "How this ecosystem's own test runner is told to skip the scaffolded scratch directories, so a probe left in one cannot break the suite.",
+      "name": "scratch_test_exclusion"
     }
   ],
   "checks": {
@@ -1404,6 +1408,10 @@
         [
           "shares_workspace_environment",
           "Workspace members of this target resolve into ONE shared environment."
+        ],
+        [
+          "scratch_test_exclusion",
+          "How this ecosystem's own test runner is told to skip the scaffolded scratch directories, so a probe left in one cannot break the suite."
         ]
       ]
     },
@@ -2109,6 +2117,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "dart",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": true,
@@ -2170,6 +2179,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "deno",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "deno-config-exclude",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2212,6 +2222,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "docker",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2252,6 +2263,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "flutter",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": true,
@@ -2306,6 +2318,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "pkg.go.dev",
       "release_materialization_policy": "refuse-identity-transition",
+      "scratch_test_exclusion": "go-nested-module",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": true,
       "supports_circular_dep_analysis": false,
@@ -2362,6 +2375,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "hex",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2406,6 +2420,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "maven",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": true,
@@ -2446,6 +2461,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "native-android",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2486,6 +2502,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "native-ios",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2546,6 +2563,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "npm",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "runner-chosen-by-project",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": true,
@@ -2588,6 +2606,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "pgdesign",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2628,6 +2647,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "plain",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2695,6 +2715,7 @@
       "publisher_setup_url": "https://pypi.org/manage/account/publishing/",
       "registry_display_name": "PyPI",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "pytest-norecursedirs",
       "shares_workspace_environment": true,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": true,
@@ -2737,6 +2758,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "spec",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2786,6 +2808,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "swift",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2826,6 +2849,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "swift-apple",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
@@ -2877,6 +2901,7 @@
       "publisher_setup_url": "",
       "registry_display_name": "zig",
       "release_materialization_policy": "materialize",
+      "scratch_test_exclusion": "no-test-runner-recursion",
       "shares_workspace_environment": false,
       "supports_cached_registry_probe": false,
       "supports_circular_dep_analysis": false,
