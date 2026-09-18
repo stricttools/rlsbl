@@ -45,6 +45,20 @@ class ReleaseTarget(Protocol):
         ...
 
     @property
+    def scratch_test_exclusion(self) -> str:
+        """How this ecosystem's test runner is kept out of the scratch dirs.
+
+        One member of the closed vocabulary in :mod:`rlsbl.scratch_dirs`:
+        ``"no-test-runner-recursion"`` -- the runner collects only from a
+        declared test source set, so it never reaches one;
+        ``"pytest-norecursedirs"``, ``"go-nested-module"`` and
+        ``"deno-config-exclude"`` -- the setting or file scaffold writes; or
+        ``"runner-chosen-by-project"`` -- the project's manifest names the
+        runner, whose configuration file rlsbl does not own and does not write.
+        """
+        ...
+
+    @property
     def supports_read_name(self) -> bool:
         """Whether ``read_name`` reads a real name for this target."""
         ...
