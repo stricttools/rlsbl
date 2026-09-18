@@ -2,11 +2,39 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Scaffold teaches a project's own test runner to skip the experiments/ and screenshots/ scratch directories."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Scaffold has created experiments/ and screenshots/ at every project's root
+since 0.122.0, and every repository walk rlsbl performs prunes them. That kept
+rlsbl's own checks green and said nothing at all to the project's test runner:
+a test_*.py left in a scratch directory was still collected by a bare pytest
+run, and a .go file there without its own module file was still built by
+go test ./... -- so a half-finished probe could break a suite it had nothing to
+do with, which is the opposite of what a disposable scratch directory is for.
+
+There is no cross-ecosystem setting for this, so each release target now
+declares, as a support axis, the mechanism its own runner honours, from a
+closed vocabulary. Python merges both names into pytest's norecursedirs;
+because that option replaces pytest's default rather than adding to it, the
+default patterns are written back alongside them. Go gets a go.mod in each
+scratch directory -- the go command never descends into a directory that
+declares its own module -- and the directory's ignore file un-ignores that one
+filename, so the marker reaches a fresh clone where a dropped probe would
+otherwise break the build. Deno merges both names into deno.json's exclude
+array. npm is left out on purpose and says so: its test script names whichever
+runner the project chose, and rlsbl writes none of those runners'
+configuration files.
+
+pyproject.toml and deno.json belong to the project rather than to scaffold, so
+the merges run outside the template pipeline, never enter the managed-files
+registry that drives orphan deletion, and preserve everything around the one
+setting. Where the setting cannot be placed safely -- a pytest.ini, which
+outranks pyproject.toml, or a deno.jsonc, whose comments a rewrite would lose
+-- scaffold writes nothing and prints the exact line to add by hand.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
