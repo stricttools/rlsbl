@@ -97,6 +97,7 @@ stricttest_tmp_prefix = "rlsbl-test-env-"
 stricttest_git_user_name = "rlsbl-test"
 stricttest_git_user_email = "rlsbl-test@example.invalid"
 stricttest_preserve = ["go_path", "go_mod_cache", "go_cache", "python_user_base"]
+norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "experiments", "screenshots"]
 
 [tool.coverage.run]
 source = ["rlsbl"]
