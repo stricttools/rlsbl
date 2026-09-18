@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.121.8",
+  "version": "0.122.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -14963,8 +14963,38 @@
         },
         {
           "level": 3,
+          "text": "`scratch_mechanisms`",
+          "anchor": "scratch_mechanisms"
+        },
+        {
+          "level": 3,
           "text": "`scratch_template_mappings`",
           "anchor": "scratch_template_mappings"
+        },
+        {
+          "level": 3,
+          "text": "`scratch_template_vars`",
+          "anchor": "scratch_template_vars"
+        },
+        {
+          "level": 3,
+          "text": "`apply_scratch_test_exclusions`",
+          "anchor": "apply_scratch_test_exclusions"
+        },
+        {
+          "level": 3,
+          "text": "`_rel`",
+          "anchor": "_rel"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_pytest_norecursedirs`",
+          "anchor": "_apply_pytest_norecursedirs"
+        },
+        {
+          "level": 3,
+          "text": "`_apply_deno_exclude`",
+          "anchor": "_apply_deno_exclude"
         },
         {
           "level": 3,
@@ -19763,6 +19793,11 @@
         },
         {
           "level": 3,
+          "text": "The project's own test runner skips them too",
+          "anchor": "the-projects-own-test-runner-skips-them-too"
+        },
+        {
+          "level": 3,
           "text": "Checks never look inside them",
           "anchor": "checks-never-look-inside-them"
         },
@@ -20945,6 +20980,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-17T21:59:34.258795+00:00",
+  "last_gen": "2026-09-18T01:09:53.423022+00:00",
   "theme": "minimal"
 }
