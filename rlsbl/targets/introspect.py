@@ -278,6 +278,12 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         "Workspace members of this target resolve into ONE shared environment.",
         _prop("shares_workspace_environment"),
     ),
+    TargetAxis(
+        "scratch_test_exclusion",
+        "How this ecosystem's own test runner is told to skip the scaffolded "
+        "scratch directories, so a probe left in one cannot break the suite.",
+        _prop("scratch_test_exclusion"),
+    ),
 )
 
 AXIS_NAMES: tuple[str, ...] = tuple(axis.name for axis in TARGET_AXES)

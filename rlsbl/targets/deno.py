@@ -7,6 +7,7 @@ import re
 from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
+from ..scratch_dirs import DENO_CONFIG_EXCLUDE
 from .. import effects
 
 
@@ -15,6 +16,10 @@ class DenoTarget(BaseTarget):
 
     detection_files = ("deno.json", "deno.jsonc")
     ecosystem = "Deno / JSR"
+
+    # `deno test` walks the whole project, and the top-level "exclude" array in
+    # the Deno configuration file is what keeps it out of a directory.
+    scratch_test_exclusion = DENO_CONFIG_EXCLUDE
 
     @property
     def name(self):

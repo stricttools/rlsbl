@@ -24,6 +24,7 @@ from ..npm_wrapper import (
     npm_wrapper_template_mappings,
 )
 from ..ownership import is_root_path
+from ..scratch_dirs import GO_NESTED_MODULE
 from ..utils import read_go_module_path
 from .. import effects
 
@@ -57,6 +58,17 @@ class GoTarget(BaseTarget):
     detection_files = ("go.mod",)
     lint_language = "go"
     ecosystem = "Go modules"
+
+    # `go test ./...` builds every package under the module, and there is no
+    # runner setting that excludes one. A directory that declares its own
+    # module is skipped, and so is one whose name begins with "_" or "." --
+    # but the scratch directories keep their plain names, which every walk,
+    # every doc and the fleet convention itself spell out, so the module file
+    # is the route. Its cost is one more committed file per scratch directory
+    # (and the ignore exception that carries it into a clone), plus the fact
+    # that a probe placed there is a separate module: it cannot import the
+    # parent module without a replace directive of its own.
+    scratch_test_exclusion = GO_NESTED_MODULE
 
     # A Go tag IS the published artifact: the module proxy resolves it and
     # caches the answer permanently. Recreating a tag for a version released

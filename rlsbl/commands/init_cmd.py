@@ -1075,18 +1075,25 @@ def _print_file_status_table(created, skipped):
         print(f"  {target}{dots}{status}")
 
 
-def _print_dry_run_report(plans_groups, registry=None, registries=None):
+def _print_dry_run_report(plans_groups, registry=None, registries=None, *,
+                          extra_created=(), extra_skipped=(), extra_warnings=()):
     """Print the file status table from plans without applying them.
 
     plans_groups is a list of plan lists (registry plans, shared plans, etc.).
+
+    The three ``extra_*`` arguments carry rows produced outside the plan
+    pipeline -- the settings merged into a project-owned configuration file --
+    so the preview shows them alongside the templated files. They are
+    deliberately kept out of the orphan comparison below: a file scaffold
+    merges into is not a file scaffold manages.
     """
     print("=" * 60)
     print("DRY RUN -- no changes made")
     print("=" * 60)
 
-    created = []
-    skipped = []
-    warnings = []
+    created = list(extra_created)
+    skipped = list(extra_skipped)
+    warnings = list(extra_warnings)
     heal_notices = []
     for plans in plans_groups:
         for plan in plans:
@@ -1735,6 +1742,13 @@ def run_cmd(registry, args, flags, ctx):
         # Sandboxed test-runner vars (empty dict when test_sandbox is absent).
         from ..test_sandbox import template_vars as _test_sandbox_vars
         vars_dict.update(_test_sandbox_vars(ctx.config))
+        # Whether a scratch directory also carries a Go module file, which is
+        # what keeps the go command from building a probe planted there.
+        from ..scratch_dirs import scratch_mechanisms, scratch_template_vars
+        _scratch_targets = {registry} | reg._extract_target_names(ctx)
+        vars_dict.update(
+            scratch_template_vars(scratch_mechanisms(_scratch_targets))
+        )
 
         # Publish gate: publish workflows wait for this repo's CI check
         # runs on the release commit. The filter covers every scaffolded
@@ -1822,10 +1836,21 @@ def run_cmd(registry, args, flags, ctx):
                 reg.shared_template_dir(), shared_mappings, vars_dict,
             )
 
+        # Teach this target's own test runner to skip the scratch directories.
+        # These merge one setting into a file the PROJECT owns, so they run
+        # outside the plan pipeline and never enter the managed-files registry
+        # (which drives orphan deletion -- a manifest must never be in it).
+        from ..scratch_dirs import apply_scratch_test_exclusions
+        excl_created, excl_skipped, excl_warnings = apply_scratch_test_exclusions(
+            {registry: target_path}, dry_run=dry_run,
+        )
+
         if dry_run:
             _print_dry_run_report(
                 [reg_plans, pipeline_plans, shim_plans, shared_plans],
-                registry=registry, registries=[registry])
+                registry=registry, registries=[registry],
+                extra_created=excl_created, extra_skipped=excl_skipped,
+                extra_warnings=excl_warnings)
             return
 
         reg_created, reg_skipped, reg_warnings, reg_hashes = apply_plans(reg_plans)
@@ -1833,9 +1858,18 @@ def run_cmd(registry, args, flags, ctx):
         shim_created, shim_skipped, shim_warnings, shim_hashes = apply_plans(shim_plans)
         shared_created, shared_skipped, shared_warnings, shared_hashes = apply_plans(shared_plans)
 
-        created = reg_created + pipe_created + shim_created + shared_created
-        skipped = reg_skipped + pipe_skipped + shim_skipped + shared_skipped
-        warnings = reg_warnings + pipe_warnings + shim_warnings + shared_warnings
+        created = (
+            reg_created + pipe_created + shim_created + shared_created
+            + excl_created
+        )
+        skipped = (
+            reg_skipped + pipe_skipped + shim_skipped + shared_skipped
+            + excl_skipped
+        )
+        warnings = (
+            reg_warnings + pipe_warnings + shim_warnings + shared_warnings
+            + excl_warnings
+        )
 
         # Note when a Go project's main packages live under cmd/ only:
         # `go install module@latest` targets the module root, so users
@@ -2844,6 +2878,13 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         # Sandboxed test-runner vars (empty dict when test_sandbox is absent).
         from ..test_sandbox import template_vars as _test_sandbox_vars
         vars_dict.update(_test_sandbox_vars(ctx.config))
+        # Whether a scratch directory also carries a Go module file, which is
+        # what keeps the go command from building a probe planted there.
+        from ..scratch_dirs import scratch_mechanisms, scratch_template_vars
+        _scratch_targets = set(registries_list) | reg._extract_target_names(ctx)
+        vars_dict.update(
+            scratch_template_vars(scratch_mechanisms(_scratch_targets))
+        )
 
         # Process per-target CI templates: each target gets its own ci-{name}.yml.
         # Workspace roots skip CI templates -- the ci-router handles
@@ -2948,10 +2989,21 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             reg.shared_template_dir(), shared_mappings, vars_dict,
         )
 
+        # Teach each target's own test runner to skip the scratch directories.
+        # These merge one setting into a file the PROJECT owns, so they run
+        # outside the plan pipeline and never enter the managed-files registry
+        # (which drives orphan deletion -- a manifest must never be in it).
+        from ..scratch_dirs import apply_scratch_test_exclusions
+        excl_created, excl_skipped, excl_warnings = apply_scratch_test_exclusions(
+            target_paths, dry_run=dry_run,
+        )
+
         if dry_run:
             _print_dry_run_report(
                 [ci_plans, extra_plans, merged_plans, shared_plans],
                 registries=registries_list,
+                extra_created=excl_created, extra_skipped=excl_skipped,
+                extra_warnings=excl_warnings,
             )
             return
 
@@ -2960,9 +3012,18 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         merged_created, merged_skipped, merged_warnings, merged_hashes = apply_plans(merged_plans)
         shared_created, shared_skipped, shared_warnings, shared_hashes = apply_plans(shared_plans)
 
-        created = ci_created + extra_created + merged_created + shared_created
-        skipped = ci_skipped + extra_skipped + merged_skipped + shared_skipped
-        warnings = ci_warnings + extra_warnings + merged_warnings + shared_warnings
+        created = (
+            ci_created + extra_created + merged_created + shared_created
+            + excl_created
+        )
+        skipped = (
+            ci_skipped + extra_skipped + merged_skipped + shared_skipped
+            + excl_skipped
+        )
+        warnings = (
+            ci_warnings + extra_warnings + merged_warnings + shared_warnings
+            + excl_warnings
+        )
 
         # Remove per-package config.json that duplicates releasable config
         _skip_redundant_releasable_configs(project_root, warnings)
