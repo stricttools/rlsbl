@@ -26,7 +26,7 @@ Project-level configuration file created by `rlsbl scaffold`. This JSON file con
 | hook_timeout | int | Timeout in seconds for release hooks. Default: absent, meaning no timeout — hooks run to completion. |
 | ci_timeout | int | Timeout in seconds for the release CI gate — the in-process wait for CI to conclude on the pushed release candidate. Default: 3600. Run discovery is spent inside this budget and capped at half of it, so the completion wait always keeps at least half. Overridable per-invocation with `--ci-timeout`. |
 | build_timeout | int or object | Timeout in seconds for target build steps. An int applies to every target; an object is keyed by target name with an optional `default` entry. Falls back to each target's shipped default (120s for most, 300s for maven, 60s for pgdesign). |
-| test | object | Per-target test-selection filters. See [test](#test) below. |
+| test | object | Per-target test options: which tests a target selects (`pypi.markers`) and which command runs them (`go.command`). See [test](#test) below. |
 | external_checks | array | Config-declared freeform subprocess checks that run during `rlsbl check` and the release preflight. See [external_checks](#external_checks) below. |
 | checks | map | Per-check settings for the path-capable built-in tool checks (`lint`, `format`, `type-check`). See [checks](#checks) below. |
 | strictspec_gate | object | Opt-in [strictspec certificate deploy gate](#strictspec_gate). Consumes a `strictspec diff` certificate as a `format_version` gate. See below. |
@@ -156,23 +156,33 @@ Example:
 
 ### test
 
-The optional `test` block selects *which* tests run during the built-in test step of a release, on a per-target basis. It maps a release target name to a block of per-target options, letting you scope a target's test run down to a chosen subset (for example, excluding slow integration tests from the PyPI run). It maps a target name to a block of per-target options:
+The optional `test` block declares *how* the built-in test step of a release runs, on a per-target basis — which tests are selected, or which command runs them. It maps a release target name to a block of per-target options, letting you scope a target's test run down to a chosen subset (for example, excluding slow integration tests from the PyPI run) or point a target at the project's own suite script:
 
 ```json
 {
   "test": {
     "pypi": {
       "markers": "not integration"
+    },
+    "go": {
+      "command": "scripts/full-suite.sh"
     }
   }
 }
 ```
 
-- `pypi.markers` is passed to pytest as `-m <markers>`, restricting the run to matching tests. Only `pypi.markers` is recognized today; the shape is built so future per-target options (Go build tags, npm script selection) slot in without reshaping.
-- An absent `test` section — or an absent target key — means "run everything", byte-identical to the prior behavior.
-- Everything must be declared: unknown target names and unknown inner keys are hard errors (no silent tolerance of typos like `marker`), and an empty `markers` string is rejected.
+Each target's option set is its own — the recognized options are:
 
-This is a **selection filter, not a gate bypass**. It narrows the set of tests that run; it does not let a failing test pass or suppress test failures.
+| Target | Option | Effect |
+| --- | --- | --- |
+| `pypi` | `markers` | Passed to pytest as `-m <markers>`, restricting the run to matching tests. |
+| `go` | `command` | Runs from the project root in place of the built-in `go test ./... -race -short -count=1`. |
+
+- `go.command` is the whole suite command as one string, run through a shell from the project root, so it can carry its own arguments (`"scripts/full-suite.sh --fast"`) and name a front-end tool whose generated entry point the tests dispatch through (`"mytool test . -- -race -count=1"`). Both the `test-suite` check and the release's built-in test step run it, with the same `check_timeout` budget and the same failure reporting as the default command.
+- An absent `test` section — or an absent target key, or an absent option within a target's block — means "run everything the built-in way", byte-identical to the prior behavior.
+- Everything must be declared: unknown target names and unknown inner keys are hard errors (no silent tolerance of typos like `marker` or `commnad`), an option belonging to another target is rejected on the target that does not take it, and an empty `markers` or `command` string is rejected.
+
+This is a **selection and substitution surface, not a gate bypass**. It narrows the set of tests that run, or names the command that runs them; it does not let a failing test pass or suppress test failures — a non-zero exit from `go.command` fails the check and the release exactly as `go test` would.
 
 ### external_checks
 

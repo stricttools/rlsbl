@@ -207,7 +207,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `prepush-changelog-coverage` | error | Verifies every pushed commit has a JSONL changelog entry |
 | `prepush-gitignore-guard` | error | Blocks push if rlsbl-managed files are gitignored |
 | `prepush-manual-warning` | warn | Warns on manual push to release branch (non-blocking) |
-| `test-suite` | error | Runs project tests (`pytest` / `go test` / `npm test`) |
+| `test-suite` | error | Runs project tests (`pytest` / `go test` / `npm test`), or the command the [`test`](configuration.md#test) config block names for the target |
 | `test-suite-workspace` | error | Runs tests for affected workspace projects (monorepo only) |
 
 `scaffold-conflicts` (see project checks) is also tagged `prepush`. Dependencies: `test-suite` and `test-suite-workspace` both depend on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`.
