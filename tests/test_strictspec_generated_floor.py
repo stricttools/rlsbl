@@ -12,12 +12,14 @@ lock rather than the generated code.
 """
 
 import json
+from pathlib import Path
 
 import pytest
 
 from rlsbl import app
 from rlsbl.strictspec_floor import (
     declared_floor,
+    declared_targets,
     evaluate_strictspec_floor,
     parse_version,
     read_generated_by,
@@ -198,3 +200,43 @@ class TestApplicability:
         verdict = evaluate_strictspec_floor(tmp_path)
         assert not verdict.ok
         assert "no readable pyproject.toml" in verdict.problems[0]
+
+
+class TestThisRepositorysCommittedValidators:
+    """The pairing this repository ships, read off disk.
+
+    Every test above builds a fixture project. This one reads rlsbl's own
+    committed validators against the strictspec the environment resolves,
+    which is the pairing an installer performs: a strictspec release newer
+    than the stamps makes `rlsbl status`, `rlsbl unreleased` and
+    `rlsbl changelog add` raise on import. Red here, once the lock is
+    refreshed onto the new strictspec, is the suite catching what otherwise
+    reaches every installer.
+    """
+
+    def test_every_committed_validator_is_stamped_with_the_runtime(self):
+        import strictspec
+
+        root = Path(__file__).resolve().parent.parent
+        targets = declared_targets(root)
+        assert targets, "strictspec.toml declares no generation targets"
+
+        stamps = {}
+        for output, lang in targets:
+            if lang != "python":
+                continue
+            path = root / output
+            assert path.is_file(), f"{output} is declared but not generated"
+            stamps[output] = read_generated_by(path)
+
+        assert stamps, "the manifest declares no python validator"
+        mismatched = {
+            output: stamp
+            for output, stamp in stamps.items()
+            if stamp != strictspec.__version__
+        }
+        assert not mismatched, (
+            f"strictspec runtime is {strictspec.__version__} but these "
+            f"validators are stamped otherwise: {mismatched}. Regenerate "
+            f"with `strictspec gen --manifest strictspec.toml`."
+        )
