@@ -530,3 +530,101 @@ class TestCommandEntryPoint:
             )
         assert exc.value.code == 1
         assert "same path" in capsys.readouterr().err
+
+
+class TestTheStrictcliSchemaDump:
+    """The committed strictcli schema dump moves with the module.
+
+    A strictcli-based Go app commits its schema dump at
+    ``.strictcli/schema.json``, and that document's ``project_id`` IS the Go
+    module path.  Left behind by a rename, the next dump refuses ("existing
+    schema belongs to project A, not B") and the release that runs the dump
+    stops with no remedy on offer.  rlsbl already writes this file during a
+    release (it patches the ``version`` line in place), so the rename owns its
+    identity line too.
+    """
+
+    SCHEMA_REL = os.path.join(".strictcli", "schema.json")
+
+    def _dump(self, root, project_id, *, name="foo"):
+        return _write(root, self.SCHEMA_REL, (
+            "{\n"
+            '  "schema_version": 2,\n'
+            f'  "project_id": "{project_id}",\n'
+            f'  "name": "{name}",\n'
+            '  "version": "0.1.0",\n'
+            '  "help": "a tool",\n'
+            '  "commands": {}\n'
+            "}\n"
+        ))
+
+    def test_the_plan_names_the_dump(self, repo):
+        self._dump(repo, OLD)
+        preview = observe(repo, OLD, NEW)
+        assert self.SCHEMA_REL in preview.keys
+        item = next(i for i in preview.items if i.key == self.SCHEMA_REL)
+        assert item.data.occurrences == 1
+        assert item.data.kind == "strictcli schema dump"
+        assert any(f"{OLD} -> {NEW}" in fact for fact in item.facts)
+
+    def test_apply_rewrites_the_project_id_and_nothing_else(self, repo):
+        path = self._dump(repo, OLD)
+        before = path.read_text()
+        preview = observe(repo, OLD, NEW)
+        for item in preview.items:
+            apply_item(item, OLD, NEW)
+        after = path.read_text()
+        assert f'  "project_id": "{NEW}",\n' in after
+        assert OLD not in after
+        assert after == before.replace(
+            f'"project_id": "{OLD}"', f'"project_id": "{NEW}"',
+        )
+
+    def test_a_dump_belonging_to_a_neighbour_is_left_alone(self, repo):
+        """Boundary awareness holds here too: ``foobar`` is not ``foo``."""
+        path = self._dump(repo, "github.com/o/foobar")
+        before = path.read_text()
+        preview = observe(repo, OLD, NEW)
+        assert self.SCHEMA_REL not in preview.keys
+        for item in preview.items:
+            apply_item(item, OLD, NEW)
+        assert path.read_text() == before
+
+    def test_a_dump_whose_project_id_is_not_a_module_path_is_left_alone(self, repo):
+        """A Python or TypeScript app's ``project_id`` is a bare name."""
+        path = self._dump(repo, "foo", name="foo")
+        before = path.read_text()
+        preview = observe(repo, OLD, NEW)
+        assert self.SCHEMA_REL not in preview.keys
+        assert path.read_text() == before
+
+    def test_a_nested_module_s_dump_is_swept_too(self, repo):
+        """The sweep is the whole tree, not just the root dump."""
+        self._dump(repo, OLD)
+        _write(repo, os.path.join("tools", "gen", ".strictcli", "schema.json"), (
+            "{\n"
+            '  "schema_version": 2,\n'
+            f'  "project_id": "{OLD}/tools/gen",\n'
+            '  "name": "gen",\n'
+            '  "version": "0.1.0"\n'
+            "}\n"
+        ))
+        preview = observe(repo, OLD, NEW)
+        nested = os.path.join("tools", "gen", ".strictcli", "schema.json")
+        assert nested in preview.keys
+        for item in preview.items:
+            apply_item(item, OLD, NEW)
+        assert f'"project_id": "{NEW}/tools/gen"' in (
+            repo / "tools" / "gen" / ".strictcli" / "schema.json"
+        ).read_text()
+
+    def test_the_dry_run_shows_the_dump_and_writes_nothing(self, repo, capsys):
+        path = self._dump(repo, OLD)
+        before = path.read_text()
+        cmd_go_module_path(
+            {"from-module": OLD, "to-module": NEW, "dry-run": True},
+            project_root=repo,
+        )
+        out = capsys.readouterr().out
+        assert f"{self.SCHEMA_REL}: rewrite" in out
+        assert path.read_text() == before

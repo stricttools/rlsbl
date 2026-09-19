@@ -23,9 +23,14 @@ What is deliberately NOT rewritten
   spec in a ``.go`` file are prose; rewriting them would make the occurrence
   counts describe something other than the code being moved.  Grep for the old
   path after the rename to catch documentation.
-* **Any file that is not a ``go.mod`` or a ``.go``.**  READMEs, CI workflows
-  and generated code are outside this command's scope, on purpose: it renames
-  a module, it does not sweep a repository for a string.
+* **Any file that is not a ``go.mod``, a ``.go``, or a committed strictcli
+  schema dump.**  READMEs, CI workflows and generated code are outside this
+  command's scope, on purpose: it renames a module, it does not sweep a
+  repository for a string.  The one exception is
+  ``.strictcli/schema.json``, whose ``project_id`` IS the module path for a
+  strictcli-based Go app: that single line is rewritten, because rlsbl already
+  writes this file during a release and a dump left on the old identity makes
+  the next one refuse.
 * **``vendor/``, ``.git/``, and the project's scratch directories.**  A
   vendored tree is a third-party copy, not this module; ``.git`` is the
   repository's own storage; and ``experiments/`` and ``screenshots/`` hold
@@ -40,6 +45,7 @@ What is deliberately NOT rewritten
   to the shared walker rather than inheriting the linters' one.
 """
 
+import json
 import os
 import re
 import sys
@@ -71,6 +77,25 @@ _WALK_EXCLUDED_DIRS = frozenset({*_EXCLUDED_COMPONENTS, ".git"})
 _TOKEN_BEFORE = r"(?<![A-Za-z0-9._/\-])"
 _TOKEN_AFTER = r"(?![A-Za-z0-9._\-])"
 
+#: The committed strictcli schema dump, relative to the module that owns it.
+#: A strictcli-based app dumps its whole CLI surface here, and for a Go app the
+#: document's ``project_id`` is the module path -- so a rename that skips this
+#: file leaves a dump claiming the old identity, and the next
+#: ``--dump-schema`` refuses to overwrite a schema "belonging to" another
+#: project.  rlsbl runs that dump itself at the release's schema-dump step.
+_SCHEMA_DUMP_DIR = ".strictcli"
+_SCHEMA_DUMP_NAME = "schema.json"
+
+#: The top-level ``project_id`` member of a canonically-encoded strictcli
+#: schema dump: two spaces of indent (depth 1), the key, and a JSON string
+#: literal.  Pinned at exactly two spaces and at the start of a line, like the
+#: release's own ``version`` patch, so a ``project_id`` nested deeper -- a flag
+#: NAMED project_id, a nested object carrying one -- can never match, and the
+#: match can never land inside another string's contents.
+_SCHEMA_PROJECT_ID_LINE = re.compile(
+    r'^  "project_id": "((?:[^"\\]|\\.)*)"(,?)$', re.MULTILINE,
+)
+
 
 class GoModuleRewriteError(Exception):
     """A hard error in the module-path rewrite (bad input, count mismatch)."""
@@ -82,7 +107,7 @@ class FileRewrite:
 
     path: str          # absolute path
     rel: str           # path relative to the project root
-    kind: str          # "go.mod" or "go source"
+    kind: str          # "go.mod", "go source" or "strictcli schema dump"
     occurrences: int
     sites: tuple[str, ...]   # human-readable per-occurrence lines
 
@@ -195,6 +220,67 @@ def declared_modules(go_mod_paths):
 
 
 # ---------------------------------------------------------------------------
+# The committed strictcli schema dump
+# ---------------------------------------------------------------------------
+
+
+#: What the plan calls this file, and what ``recompute`` dispatches on.
+SCHEMA_DUMP_KIND = "strictcli schema dump"
+
+
+def find_schema_dumps(root):
+    """Every committed strictcli schema dump in the tree, absolute, sorted."""
+    found = walk_source_files(
+        str(root), (_SCHEMA_DUMP_NAME,), [],
+        excluded_dir_names=_WALK_EXCLUDED_DIRS,
+    )
+    return sorted(
+        p for p in found
+        if os.path.basename(p) == _SCHEMA_DUMP_NAME
+        and os.path.basename(os.path.dirname(p)) == _SCHEMA_DUMP_DIR
+        and not _excluded(p, root)
+    )
+
+
+def rewrite_schema_project_id(text, old, new):
+    """Rewrite a strictcli schema dump's ``project_id``, line-scoped.
+
+    Returns ``(new_text, occurrences, sites)`` -- one occurrence at most, since
+    a document declares one identity.  The patch is TEXTUAL for the same reason
+    the release's ``version`` patch is: strictcli writes this file in its own
+    canonical encoding, and a decode/re-encode round trip through
+    ``json.dumps`` silently produces a different document (``ensure_ascii``
+    alone rewrites every non-ASCII character in every help string).
+
+    A dump whose ``project_id`` is not under *old* is not this module's, and is
+    reported as nothing to do: a Python or TypeScript app's ``project_id`` is a
+    bare distribution name, and a neighbouring Go module's merely starts with
+    the same letters.
+    """
+    match = _SCHEMA_PROJECT_ID_LINE.search(text)
+    if match is None:
+        return text, 0, ()
+    try:
+        current = json.loads(f'"{match.group(1)}"')
+    except ValueError:
+        return text, 0, ()
+    if not go_import_under_module(current, old):
+        return text, 0, ()
+
+    renamed = rewrite_module_prefix(current, old, new, sep=GO_SEP)
+    lineno = text.count("\n", 0, match.start()) + 1
+    replacement = (
+        f'  "project_id": {json.dumps(renamed, ensure_ascii=False)}'
+        f"{match.group(2)}"
+    )
+    return (
+        text[:match.start()] + replacement + text[match.end():],
+        1,
+        (f"line {lineno}: project_id {current} -> {renamed}",),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Go source files
 # ---------------------------------------------------------------------------
 
@@ -279,6 +365,14 @@ def _read(path):
         return f.read()
 
 
+def _is_schema_dump(path):
+    """True when *path* is a committed strictcli schema dump."""
+    return (
+        os.path.basename(path) == _SCHEMA_DUMP_NAME
+        and os.path.basename(os.path.dirname(path)) == _SCHEMA_DUMP_DIR
+    )
+
+
 def observe_file(path, root, old, new):
     """Observe one file, returning a :class:`FileRewrite` or None."""
     rel = os.path.relpath(path, str(root))
@@ -290,6 +384,9 @@ def observe_file(path, root, old, new):
     if os.path.basename(path) == "go.mod":
         _new_text, count, sites = rewrite_go_mod_text(text, old, new)
         kind = "go.mod"
+    elif _is_schema_dump(path):
+        _new_text, count, sites = rewrite_schema_project_id(text, old, new)
+        kind = SCHEMA_DUMP_KIND
     else:
         found = scan_go_source(path, old)
         if not found:
@@ -309,6 +406,8 @@ def recompute(rewrite, old, new):
     text = _read(rewrite.path)
     if rewrite.kind == "go.mod":
         new_text, count, _ = rewrite_go_mod_text(text, old, new)
+    elif rewrite.kind == SCHEMA_DUMP_KIND:
+        new_text, count, _ = rewrite_schema_project_id(text, old, new)
     else:
         new_text, count, _ = rewrite_go_source_text(
             text, scan_go_source(rewrite.path, old), old, new
@@ -340,8 +439,10 @@ def observe(root, old, new):
         if not _excluded(p, root)
     )
 
+    schema_dumps = find_schema_dumps(root)
+
     items = []
-    for path in [*go_mods, *sources]:
+    for path in [*go_mods, *sources, *schema_dumps]:
         found = observe_file(path, root, old, new)
         if found is None:
             continue
