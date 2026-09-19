@@ -137,6 +137,10 @@
       "name": "has_builtin_test_runner"
     },
     {
+      "doc": "Accepts a test.<name> options block in .rlsbl/config.json (overrides validate_test_options).",
+      "name": "accepts_test_options"
+    },
+    {
       "doc": "Workspace members of this target resolve into ONE shared environment.",
       "name": "shares_workspace_environment"
     },
@@ -1406,6 +1410,10 @@
           "Ships a built-in test runner (overrides run_tests)."
         ],
         [
+          "accepts_test_options",
+          "Accepts a test.<name> options block in .rlsbl/config.json (overrides validate_test_options)."
+        ],
+        [
           "shares_workspace_environment",
           "Workspace members of this target resolve into ONE shared environment."
         ],
@@ -2091,6 +2099,7 @@
   ],
   "targets": {
     "dart": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2134,6 +2143,7 @@
       "version_file": "pubspec.yaml"
     },
     "deno": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2196,6 +2206,7 @@
       "version_file": "deno.json"
     },
     "docker": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2239,6 +2250,7 @@
       "version_file": "VERSION"
     },
     "flutter": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2280,6 +2292,7 @@
       "version_file": "pubspec.yaml"
     },
     "go": {
+      "accepts_test_options": true,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2335,6 +2348,7 @@
       "version_file": "VERSION"
     },
     "hex": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2392,6 +2406,7 @@
       "version_file": "mix.exs"
     },
     "maven": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 300,
       "claim_token_env_vars": [],
@@ -2437,6 +2452,7 @@
       "version_file": null
     },
     "native-android": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2478,6 +2494,7 @@
       "version_file": "build.gradle"
     },
     "native-ios": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2519,6 +2536,7 @@
       "version_file": null
     },
     "npm": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [
@@ -2580,6 +2598,7 @@
       "version_file": "package.json"
     },
     "pgdesign": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 60,
       "claim_token_env_vars": [],
@@ -2623,6 +2642,7 @@
       "version_file": "pgdesign.toml"
     },
     "plain": {
+      "accepts_test_options": false,
       "auto_detectable": "conditional",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2664,6 +2684,7 @@
       "version_file": "VERSION"
     },
     "pypi": {
+      "accepts_test_options": true,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [
@@ -2732,6 +2753,7 @@
       "version_file": "pyproject.toml"
     },
     "spec": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2775,6 +2797,7 @@
       "version_file": "version.json"
     },
     "swift": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2825,6 +2848,7 @@
       "version_file": "VERSION"
     },
     "swift-apple": {
+      "accepts_test_options": false,
       "auto_detectable": "no",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],
@@ -2866,6 +2890,7 @@
       "version_file": "VERSION"
     },
     "zig": {
+      "accepts_test_options": false,
       "auto_detectable": "yes",
       "build_timeout_default": 120,
       "claim_token_env_vars": [],

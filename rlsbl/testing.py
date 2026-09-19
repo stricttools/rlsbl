@@ -217,16 +217,33 @@ def _pytest_marker_args(config: dict) -> list[str]:
     configured, else ``[]``.
 
     Reads the per-target test block via ``config.get("test", {}).get("pypi", {})``
-    so future per-target options (go tags, npm script selection) slot into the
-    same shape. An absent section/key -- or an empty/falsy markers value --
-    yields no arguments, keeping the pytest invocation byte-identical to the
-    no-config case. Structural validation (unknown keys, non-string/empty
-    markers) is enforced upstream by ``config.validate_test_config``.
+    so future per-target options (npm script selection) slot into the same
+    shape -- ``_go_test_command`` reads ``test.go`` the same way. An absent
+    section/key -- or an empty/falsy markers value -- yields no arguments,
+    keeping the pytest invocation byte-identical to the no-config case.
+    Structural validation (unknown keys, non-string/empty markers) is enforced
+    upstream by ``config.validate_test_config``.
     """
     markers = (config or {}).get("test", {}).get("pypi", {}).get("markers")
     if markers:
         return ["-m", markers]
     return []
+
+
+def _go_test_command(config: dict | None) -> str | None:
+    """Return the configured ``test.go.command`` string, or None.
+
+    Read through ``config.get("test", {}).get("go", {})`` -- the same per-target
+    shape ``_pytest_marker_args`` reads for pypi. An absent section, an absent
+    ``go`` key, or an absent/empty ``command`` all yield None, which keeps the
+    built-in ``go test`` invocation byte-identical to the no-config case.
+    Structural validation (unknown keys, non-string/empty command) is enforced
+    upstream by ``config.validate_test_config``.
+    """
+    command = (config or {}).get("test", {}).get("go", {}).get("command")
+    if command:
+        return command
+    return None
 
 
 def resolve_test_timeout(config: dict | None, check_timeout: int | None) -> int:
@@ -406,11 +423,32 @@ def _run_pypi_tests(
     return result.returncode == 0
 
 
-def _run_go_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
-    """Run Go tests."""
-    cmd = ["go", "test", "./...", "-race", "-short", "-count=1"]
+def _run_go_tests(
+    *,
+    project_dir: str | None,
+    check_timeout: int = 120,
+    config: dict | None = None,
+) -> bool:
+    """Run Go tests -- the configured suite command, or the built-in default.
+
+    When ``test.go.command`` names a command, that command runs through a shell
+    from the project root instead of the built-in invocation, so a module whose
+    tests only run through a front-end tool or a suite script can say so. The
+    shell is what lets one string carry a script path with its own arguments,
+    matching the freeform external-check surface. With no command configured
+    the built-in ``go test`` invocation runs unchanged.
+
+    Timeout handling and failure reporting are the same on both paths, and the
+    same as the pypi runner's: the budget comes from the caller, and a
+    ``TimeoutExpired`` prints the budget, the command, and ``CHECK_TIMEOUT_HINT``
+    to stderr before returning False.
+    """
+    cmd = _go_test_command(config)
+    shell = cmd is not None
+    if cmd is None:
+        cmd = ["go", "test", "./...", "-race", "-short", "-count=1"]
     try:
-        result = effects.run(cmd, cwd=project_dir, timeout=check_timeout)
+        result = effects.run(cmd, cwd=project_dir, timeout=check_timeout, shell=shell)
     except subprocess.TimeoutExpired:
         print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
         return False

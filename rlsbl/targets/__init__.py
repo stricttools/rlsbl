@@ -129,6 +129,19 @@ def targets_with_builtin_tests():
     )
 
 
+def targets_with_test_options():
+    """Targets that accept a ``test.<name>`` block in ``.rlsbl/config.json``.
+
+    Derived from the targets that override ``validate_test_options``, so the
+    set of recognized test targets, the per-target option sets and the
+    validation can never disagree. ``config.validate_test_config`` asks for it
+    rather than keeping its own list.
+    """
+    return frozenset(
+        name for name, target in TARGETS.items() if target.accepts_test_options
+    )
+
+
 def targets_with_library_lint():
     """Targets that participate in library boundary lint.
 

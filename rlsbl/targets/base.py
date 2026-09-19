@@ -782,6 +782,45 @@ class BaseTarget:
         """
         return type(self).run_tests is not BaseTarget.run_tests
 
+    @property
+    def accepts_test_options(self):
+        """Whether ``.rlsbl/config.json`` may carry a ``test.<name>`` block here.
+
+        Derived from the override rather than declared, so the answer cannot
+        drift from the validator. Callers that need the SET of such targets ask
+        ``rlsbl.targets.targets_with_test_options()``.
+        """
+        return (
+            type(self).validate_test_options is not BaseTarget.validate_test_options
+        )
+
+    def validate_test_options(self, block):
+        """Validate this target's ``test.<name>`` options block.
+
+        The base target accepts no per-target test options, so it is not a
+        recognized test target and ``config.validate_test_config`` never
+        reaches this body. An overriding target names its own option set and
+        each option's value rule, raising ``ConfigError`` on anything else;
+        ``accepts_test_options`` is derived from that override.
+        """
+        return None
+
+    @staticmethod
+    def _reject_unknown_test_options(target_name, block, known_keys):
+        """Refuse an unrecognized key in a ``test.<name>`` block.
+
+        Shared so every target's block refuses a typo in the same sentence,
+        with only the target name and its own option set substituted in.
+        """
+        from ..errors import ConfigError
+
+        for key in block:
+            if key not in known_keys:
+                raise ConfigError(
+                    f"test.{target_name}.'{key}' is not a recognized option. "
+                    f"Valid options: {', '.join(sorted(known_keys))}"
+                )
+
     def run_tests(
         self,
         *,

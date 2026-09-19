@@ -660,22 +660,25 @@ def validate_test_config(config):
     The ``test`` section maps a release target name to a block of per-target
     test options::
 
-        {"test": {"pypi": {"markers": "not integration"}}}
+        {"test": {"pypi": {"markers": "not integration"},
+                  "go": {"command": "scripts/full-suite.sh"}}}
 
-    Absent section or absent target key means "run everything" (today's
-    behavior). Everything must be declared -- unknown targets and unknown
-    inner keys are hard errors (no silent tolerance of typos like ``marker``).
+    Absent section or absent target key means "run everything the built-in
+    way". Everything must be declared -- unknown targets and unknown inner keys
+    are hard errors (no silent tolerance of typos like ``marker``).
 
-    Only ``pypi.markers`` is recognized today; the shape is built so future
-    per-target options (go tags, npm script selection) slot in without
-    reshaping.
+    Which targets accept a block, and which options each one takes, are the
+    registry's answers: the recognized targets are
+    ``targets_with_test_options()`` and each block is handed to that target's
+    own ``validate_test_options``. Adding an option to a target is therefore a
+    change in one place, and this function never names a target.
 
     Raises ``ConfigError`` if:
     - ``test`` is present but not a dict
     - a target key is not a recognized test target
     - a target block is not a dict
     - an inner key is not a recognized option for that target
-    - ``pypi.markers`` is present but not a string, or is an empty string
+    - an option's value breaks that target's own rule for it
     """
     test_section = config.get("test")
     if test_section is None:
@@ -686,7 +689,9 @@ def validate_test_config(config):
             f"test must be a dict, got {type(test_section).__name__}"
         )
 
-    known_targets = {"pypi"}
+    from .targets import TARGETS, targets_with_test_options
+
+    known_targets = targets_with_test_options()
     for target_name, block in test_section.items():
         if target_name not in known_targets:
             raise ConfigError(
@@ -697,31 +702,7 @@ def validate_test_config(config):
             raise ConfigError(
                 f"test.'{target_name}' must be a dict, got {type(block).__name__}"
             )
-        if target_name == "pypi":
-            _validate_pypi_test_block(block)
-
-
-def _validate_pypi_test_block(block):
-    """Validate the ``test.pypi`` options block. See ``validate_test_config``."""
-    known_keys = {"markers"}
-    for key in block:
-        if key not in known_keys:
-            raise ConfigError(
-                f"test.pypi.'{key}' is not a recognized option. "
-                f"Valid options: {', '.join(sorted(known_keys))}"
-            )
-
-    if "markers" in block:
-        markers = block["markers"]
-        if not isinstance(markers, str):
-            raise ConfigError(
-                f"test.pypi.markers must be a string, got {type(markers).__name__}"
-            )
-        if markers == "":
-            raise ConfigError(
-                'test.pypi.markers is an empty string. Provide a pytest marker '
-                'expression (e.g. "not integration") or omit the key entirely.'
-            )
+        TARGETS[target_name].validate_test_options(block)
 
 
 # ---------------------------------------------------------------------------

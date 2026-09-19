@@ -274,6 +274,12 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         _prop("has_builtin_test_runner"),
     ),
     TargetAxis(
+        "accepts_test_options",
+        "Accepts a test.<name> options block in .rlsbl/config.json "
+        "(overrides validate_test_options).",
+        _prop("accepts_test_options"),
+    ),
+    TargetAxis(
         "shares_workspace_environment",
         "Workspace members of this target resolve into ONE shared environment.",
         _prop("shares_workspace_environment"),
@@ -337,6 +343,9 @@ NON_AXIS_ATTRIBUTES: dict[str, str] = {
                                "(the fact is mirror_identity_files).",
     "run_tests": "operation: runs one project's tests "
                  "(the fact is has_builtin_test_runner).",
+    "validate_test_options": "operation: validates one project's "
+                             "test.<name> config block "
+                             "(the fact is accepts_test_options).",
     "shared_template_dir": "operation: resolves the shared scaffold templates "
                            "(the fact is provides_ci_templates).",
     "shared_template_mappings": "operation: builds one project's shared "

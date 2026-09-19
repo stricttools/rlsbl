@@ -94,6 +94,11 @@ class ReleaseTarget(Protocol):
         ...
 
     @property
+    def accepts_test_options(self) -> bool:
+        """Whether ``.rlsbl/config.json`` may carry a ``test.<name>`` block here."""
+        ...
+
+    @property
     def supports_version_query(self) -> bool:
         """Whether this target's registry answers a latest-version query."""
         ...
@@ -416,6 +421,16 @@ class ReleaseTarget(Protocol):
         Returns a ``SuiteRunOutcome``. The default answers SKIPPED naming the
         target, so a project whose target ships no runner records a visible
         skip rather than a passing step for a suite that never ran.
+        """
+        ...
+
+    def validate_test_options(self, block: dict) -> None:
+        """Validate this target's ``test.<name>`` options block.
+
+        The default accepts no options, so the target is not a recognized test
+        target and ``config.validate_test_config`` never reaches it. An
+        overriding target names its own option set and each option's value
+        rule, raising ``ConfigError`` on anything else.
         """
         ...
 
