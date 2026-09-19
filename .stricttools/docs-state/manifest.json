@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.123.0",
+  "version": "0.123.1",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -1417,11 +1417,6 @@
           "level": 3,
           "text": "`validate_test_config`",
           "anchor": "validate_test_config"
-        },
-        {
-          "level": 3,
-          "text": "`_validate_pypi_test_block`",
-          "anchor": "_validate_pypi_test_block"
         },
         {
           "level": 3,
@@ -10197,11 +10192,6 @@
         },
         {
           "level": 3,
-          "text": "`_validate_pypi_test_block`",
-          "anchor": "_validate_pypi_test_block"
-        },
-        {
-          "level": 3,
           "text": "`_declared_target_names`",
           "anchor": "_declared_target_names"
         },
@@ -15716,6 +15706,21 @@
         },
         {
           "level": 4,
+          "text": "`accepts_test_options`",
+          "anchor": "accepts_test_options"
+        },
+        {
+          "level": 4,
+          "text": "`validate_test_options`",
+          "anchor": "validate_test_options"
+        },
+        {
+          "level": 4,
+          "text": "`_reject_unknown_test_options`",
+          "anchor": "_reject_unknown_test_options"
+        },
+        {
+          "level": 4,
           "text": "`run_tests`",
           "anchor": "run_tests"
         },
@@ -16168,6 +16173,11 @@
           "level": 4,
           "text": "`run_tests`",
           "anchor": "run_tests"
+        },
+        {
+          "level": 4,
+          "text": "`validate_test_options`",
+          "anchor": "validate_test_options"
         },
         {
           "level": 4,
@@ -17108,6 +17118,11 @@
         },
         {
           "level": 4,
+          "text": "`accepts_test_options`",
+          "anchor": "accepts_test_options"
+        },
+        {
+          "level": 4,
           "text": "`supports_version_query`",
           "anchor": "supports_version_query"
         },
@@ -17273,6 +17288,11 @@
         },
         {
           "level": 4,
+          "text": "`validate_test_options`",
+          "anchor": "validate_test_options"
+        },
+        {
+          "level": 4,
           "text": "`rewrite_mirror_identity`",
           "anchor": "rewrite_mirror_identity"
         },
@@ -17422,6 +17442,11 @@
           "level": 4,
           "text": "`run_tests`",
           "anchor": "run_tests"
+        },
+        {
+          "level": 4,
+          "text": "`validate_test_options`",
+          "anchor": "validate_test_options"
         },
         {
           "level": 4,
@@ -17951,6 +17976,11 @@
         },
         {
           "level": 3,
+          "text": "`targets_with_test_options`",
+          "anchor": "targets_with_test_options"
+        },
+        {
+          "level": 3,
           "text": "`targets_with_library_lint`",
           "anchor": "targets_with_library_lint"
         },
@@ -18050,6 +18080,11 @@
           "level": 3,
           "text": "`_pytest_marker_args`",
           "anchor": "_pytest_marker_args"
+        },
+        {
+          "level": 3,
+          "text": "`_go_test_command`",
+          "anchor": "_go_test_command"
         },
         {
           "level": 3,
@@ -20040,6 +20075,11 @@
         },
         {
           "level": 4,
+          "text": "`accepts_test_options`",
+          "anchor": "accepts_test_options"
+        },
+        {
+          "level": 4,
           "text": "`supports_version_query`",
           "anchor": "supports_version_query"
         },
@@ -20202,6 +20242,11 @@
           "level": 4,
           "text": "`run_tests`",
           "anchor": "run_tests"
+        },
+        {
+          "level": 4,
+          "text": "`validate_test_options`",
+          "anchor": "validate_test_options"
         },
         {
           "level": 4,
@@ -20467,6 +20512,21 @@
           "level": 4,
           "text": "`has_builtin_test_runner`",
           "anchor": "has_builtin_test_runner-1"
+        },
+        {
+          "level": 4,
+          "text": "`accepts_test_options`",
+          "anchor": "accepts_test_options-1"
+        },
+        {
+          "level": 4,
+          "text": "`validate_test_options`",
+          "anchor": "validate_test_options-1"
+        },
+        {
+          "level": 4,
+          "text": "`_reject_unknown_test_options`",
+          "anchor": "_reject_unknown_test_options"
         },
         {
           "level": 4,
@@ -20840,6 +20900,21 @@
         },
         {
           "level": 4,
+          "text": "`accepts_test_options`",
+          "anchor": "accepts_test_options-2"
+        },
+        {
+          "level": 4,
+          "text": "`validate_test_options`",
+          "anchor": "validate_test_options-2"
+        },
+        {
+          "level": 4,
+          "text": "`_reject_unknown_test_options`",
+          "anchor": "_reject_unknown_test_options-1"
+        },
+        {
+          "level": 4,
           "text": "`run_tests`",
           "anchor": "run_tests-2"
         },
@@ -21010,6 +21085,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-19T14:44:17.534999+00:00",
+  "last_gen": "2026-09-19T20:41:34.990334+00:00",
   "theme": "minimal"
 }
