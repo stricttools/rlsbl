@@ -1067,7 +1067,7 @@
         "spec"
       ]
     },
-    "strictspec-generated-floor": {
+    "strictspec-generated-format": {
       "kind": "targets",
       "targets": [
         "pypi"
@@ -1726,7 +1726,7 @@
           "no"
         ],
         [
-          "strictspec-generated-floor",
+          "strictspec-generated-format",
           "yes",
           "no",
           "no",
