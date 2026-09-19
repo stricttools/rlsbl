@@ -2,11 +2,28 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "Three release-blocking defects fixed: a Go module rename now moves the committed strictcli schema dump, a stale dev-sync overlay entry explains itself, and a red CI verdict prints the failing job's log again."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+All three surfaced in one release of a Go project that had just been renamed onto
+its organization's module path.
+
+The rename swept go.mod tokens and import sites but left .strictcli/schema.json
+claiming the old project_id, so the release's schema-dump step refused and there
+was nothing to do but delete the dump by hand; the sweep now plans and rewrites
+that line too.
+
+The release's version-skew guard read a dev-sources.toml.local-only overlay whose
+checkout was long gone -- a leftover from a dependency era that had ended -- and
+refused with a bare \"path does not exist\". Blocking stays, by design; the message
+now names the file, what it is for, and both ways out.
+
+And the failure summary could not fetch any job log that carried terminal colour,
+because gh refuses to emit escape sequences unless told to, so a red candidate
+printed a run URL and no error lines.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
