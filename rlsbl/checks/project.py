@@ -5,7 +5,7 @@ description-consistency, private-hook-stale, config-schema, license-file,
 publish-mode-workflow, npm-private-mismatch, target-version-readable,
 dunder-version-missing, selfdoc-version-drift, scaffold-conflicts, stash-free,
 cross-repo-path-sources, stricttest-floor, dep-floors, dep-locks,
-go-module-identity, strictspec-generated-floor.
+go-module-identity, strictspec-generated-format.
 """
 
 import json
@@ -801,35 +801,39 @@ def register_project_checks(app):
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} lagging dep floor(s)")
 
-    @app.error_check("strictspec-generated-floor")
-    def check_strictspec_generated_floor(ctx, reporter):
-        """The declared strictspec floor must reach every generated validator.
+    @app.error_check("strictspec-generated-format")
+    def check_strictspec_generated_format(ctx, reporter):
+        """Every committed validator must declare a format the runtime reads.
 
-        A generated validator pairs with the exact strictspec release that
-        produced it (``require_runtime_version(GENERATED_BY)``, at import), so
-        a floor below any committed ``GENERATED_BY`` ships an artifact whose
-        validators cannot import on a floor-resolved install. Compared at full
-        patch precision, which is what ``dep-floors`` (major.minor, and reading
-        the lock rather than the generated code) cannot see.
+        A generated validator declares the shape it was written to as
+        ``GENERATED_CODE_FORMAT`` and calls
+        ``require_generated_code_format(GENERATED_CODE_FORMAT, GENERATED_BY)``
+        at import. Pairing succeeds whenever that format is inside the
+        inclusive range the linked runtime declares, whatever release produced
+        the file -- so an ordinary strictspec release stales nothing, and a
+        validator outside the range (or predating the declaration entirely)
+        raises on import for whoever installed the artifact. The remedy every
+        finding names is regeneration. No dependency floor is derived from
+        ``GENERATED_BY``: it is informational.
         """
         skip_reason = _virtual_root_skip_reason(ctx)
         if skip_reason is not None:
             return reporter.skipped(skip_reason)
 
-        from ..strictspec_floor import evaluate_strictspec_floor
+        from ..strictspec_floor import evaluate_strictspec_generated_format
 
-        verdict = evaluate_strictspec_floor(str(ctx.project_root))
+        verdict = evaluate_strictspec_generated_format(str(ctx.project_root))
         if verdict.skip_reason is not None:
             return reporter.skipped(verdict.skip_reason)
         if verdict.ok:
             return reporter.passed(
-                "; ".join(verdict.notes[:3]) or "strictspec floor covers the "
-                "generated validators"
+                "; ".join(verdict.notes[:3]) or "every generated validator "
+                "declares a format the strictspec runtime reads"
             )
         for problem in verdict.problems:
             reporter.error(problem)
         return reporter.found(
-            f"{len(verdict.problems)} strictspec floor problem(s)"
+            f"{len(verdict.problems)} unreadable generated validator(s)"
         )
 
     @app.error_check("go-module-identity")
