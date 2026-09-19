@@ -236,7 +236,7 @@ dev = [
 requires-dist = [
     { name = "ruamel-yaml", specifier = ">=0.19.1" },
     { name = "strictcli", specifier = ">=0.42.0" },
-    { name = "strictspec", specifier = ">=0.2.3" },
+    { name = "strictspec", specifier = ">=0.2.5" },
     { name = "tomlkit", specifier = ">=0.12" },
     { name = "tree-sitter", specifier = ">=0.24" },
     { name = "tree-sitter-go", specifier = ">=0.23" },
@@ -302,14 +302,14 @@ wheels = [
 
 [[package]]
 name = "strictspec"
-version = "0.2.3"
+version = "0.2.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7f/80/2d3716a8eaef6710b541c0de716f7252dbd1ee494768ab69e504db29d20b/strictspec-0.2.3.tar.gz", hash = "sha256:ead923a013c32ea1a3475f91e709353304ec143db5d33cbd3dcf91c870705305", size = 75494, upload-time = "2026-08-24T10:09:54.344Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1b/5c/f8ef8135015ff04196663f7835841f6d1268d76b24bfefc689f7dc07d0b6/strictspec-0.2.5.tar.gz", hash = "sha256:d44d1fc06a9806d7f247fbd8a2cc28c26d851e9c500e4e791101a250bcb4e721", size = 75492, upload-time = "2026-09-13T01:16:18.598Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/9a/2cbbc27b795b8aa55940eb796fc2b7f203b560c2da20b8b500bac9e690bc/strictspec-0.2.3-py3-none-any.whl", hash = "sha256:1f0ede57270b09b4dbfa66e038f21836cf700792b2c9b8df9c1e5c79c099de78", size = 52647, upload-time = "2026-08-24T10:09:53.024Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/6e/97dcba69f605f2fec38fcba14c92e78c6296c8b74ad9a36dc4aaa72b36fa/strictspec-0.2.5-py3-none-any.whl", hash = "sha256:67419dfb401024218d213ab7b3e75ad9e98d0892471602b7841890f0afbdd05d", size = 52647, upload-time = "2026-09-13T01:16:17.395Z" },
 ]
 
 [[package]]
