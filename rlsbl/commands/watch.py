@@ -291,6 +291,17 @@ def _fetch_failure_log(run_id, config=None):
     view`` walks and that 404 on some repositories, taking the whole failure
     classification with them.
 
+    ``--allow-escape-sequences`` is not optional on that second call. A job log
+    is the runner's terminal output, so it carries ANSI colour whenever any
+    step emitted it, and ``gh api`` refuses to write a response containing
+    terminal escape sequences unless it is told to -- it exits non-zero with
+    "the response contains terminal escape sequences; pass
+    --allow-escape-sequences to output it anyway". Without the flag every
+    coloured failure log raised, and a red release printed "could not fetch
+    failure logs" and a run URL instead of the lines that explain it. The flag
+    precedes the endpoint, so the path stays the last element of the argv, and
+    the argv still matches the GET-pinned ``gh api`` observe prefix.
+
     Every failing job is named in the returned text, so the operator reading a
     fifty-job router run sees WHICH jobs failed rather than only the workflow.
     At most _LOG_FETCH_MAX_JOBS of them are fetched -- enough to classify,
@@ -307,7 +318,7 @@ def _fetch_failure_log(run_id, config=None):
     sections = []
     for job in failed[:_LOG_FETCH_MAX_JOBS]:
         raw = run_gh(
-            ["api", "--method", "GET",
+            ["api", "--method", "GET", "--allow-escape-sequences",
              f"repos/{{owner}}/{{repo}}/actions/jobs/{job['id']}/logs"],
             config=config, timeout=_LOG_FETCH_TIMEOUT,
         )
