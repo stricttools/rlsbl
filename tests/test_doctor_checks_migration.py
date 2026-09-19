@@ -116,7 +116,7 @@ EXPECTED_CHECKS = [
     # every -X linker flag names a symbol the Go source actually declares
     "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator
-    "strictspec-generated-floor",
+    "strictspec-generated-format",
     # committed target support matrix freshness (regenerate-and-compare)
     "target-matrix-fresh",
     # Path-capable tool checks and their competing-scope guards

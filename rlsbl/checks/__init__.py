@@ -78,9 +78,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # ldflags-symbol compares a `-X importpath.Symbol=` linker flag against the
     # Go source it names; the flag and the silent no-op are Go's.
     "ldflags-symbol": frozenset({"go"}),
-    # strictspec-generated-floor compares a python dependency floor against the
-    # python validators strictspec generated.
-    "strictspec-generated-floor": frozenset({"pypi"}),
+    # strictspec-generated-format reads the generated-code format declared by
+    # the python validators strictspec generated.
+    "strictspec-generated-format": frozenset({"pypi"}),
     "license-file": None,
     # --- release tag (universal) ---
     "unpublished-refs": None,
