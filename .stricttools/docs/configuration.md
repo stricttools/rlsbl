@@ -1,5 +1,5 @@
 +++
-description = "Configuration reference: config.json pipelines, batch limits, the sandboxed test runner, dependency floors, external checks, workspace.toml, and which configuration surfaces refuse an unknown key at load."
+description = "Configuration reference: config.json pipelines, per-target test options, batch limits, dependency floors, external checks, and surfaces refusing unknown keys."
 +++
 
 # Configuration reference
