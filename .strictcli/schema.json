@@ -3549,7 +3549,7 @@
         "config-schema"
       ]
     },
-    "strictspec-generated-floor": {
+    "strictspec-generated-format": {
       "tags": [
         "project",
         "preflight"
