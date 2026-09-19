@@ -110,9 +110,9 @@
     "seed_hash": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e"
   },
   "en/cli-rewrite.md": {
-    "content": "0366ec4fa9b3aaa13024f1f1005cfff5a4efa9e3ae3cabedea62b04cdf1771f1",
+    "content": "c564b506f912df435a7ae30230778de5b0cb098f63132b352d9ff87e534935a9",
     "description": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189",
-    "schema_hash": "11804cf075e66d5619ca4d0f5aedf3e20876e694b45eb2b2f8aa53bbb5e08e52",
+    "schema_hash": "77552e047d8733e3759cef0684694ffb4a32ec677dc0127eeb410e39a85b740f",
     "seed_hash": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189"
   },
   "en/cli-scaffold.md": {
@@ -567,8 +567,8 @@
   },
   "en/rlsbl-commands-rewrite-go_module_path.md": {
     "content": "930d66dd4ad1ad8e1348427ec6429f2e9f7c6c25c944ea268144d175edc82550",
-    "description": "bf9d68dbabfc93d3a085107148c73bca4d9f731f5229ab1f5c7f5f3277e7cdf6",
-    "source_docstring": "d6b33094061fb2f00d39508c30e7b500dd9dd1171a72b01fbae87cdb0ed6a5bf"
+    "description": "c4b998482a8c6ebcb64223df0e0d42052de62e8d687d6dd9f4f031b842bff0b3",
+    "source_docstring": "1f4ad5b4a4a596a4e060dc75e676fa4a755d485f605bc876047b19ed8328e812"
   },
   "en/rlsbl-commands-rewrite-uv_path_sources.md": {
     "content": "0043ad5f49363706a655b10e1074720f49998dd8eba05759957056b265f7e9cc",
