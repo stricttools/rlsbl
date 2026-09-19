@@ -10,8 +10,8 @@
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
-    "content": "dd244cde53467320e8da1e23030b654b99336d4ca92ec704f738e9b00cf51038",
-    "description": "87e925430ccf8a23bd491893919408691fcbabff6ccbf2d2938f8a96150af2b5"
+    "content": "5052a305068f3eaabadcd4c51f067814f12bfdbfba2ced3ade2e5eff292732ea",
+    "description": "a47dc41a0f7c453a1c2bf9dcfe84fc216fb068211ace5d604bcc31b34d2be99a"
   },
   "en/ci-customization.md": {
     "content": "6ca3fe39c2f1a77fdfc2220fb8b8ff2d983c5a0fcc023414b10b669c063f9857",
@@ -152,8 +152,8 @@
     "seed_hash": "ea0778df960662a82b229c3e883fc15389b6045a7c7b675fa25a2e15444f71d6"
   },
   "en/configuration.md": {
-    "content": "3c6523658576c15b0b5685226d896b6f07ae4dc26e57c72ce4079324c104ad0d",
-    "description": "e3884f77c183ce4953a0a8c67c69afd516029acc4071065850cfde7f65c51605",
+    "content": "fd157fb322fbd1e000459bf21a0c57f26978874a95c83dd02d3735ceb98ca0df",
+    "description": "489fd647382199bda3fe1f7e30e4ae3afe96848cd238bfd7b1b7cd8baffd775d",
     "source_docstring": "f63ecdc06d0960176c03f8e153c8f9ac925ae3dc16a8edba4ae41c09c5c57e8c"
   },
   "en/conversions.md": {
