@@ -2,11 +2,26 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "A Go project can name its own test-suite command in .rlsbl/config.json, and the target registry now owns which test options each target accepts."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+The built-in test step ran a hard-coded `go test ./... -race -short -count=1`
+for every Go target, with no way to say otherwise. A module whose tests only
+run through a front-end tool's generated entry point, or through the project's
+own suite script carrying its timeout and parallelism caps, could not pass that
+command and had no door to name a different one -- so the `test-suite` check
+and the release preflight blocked on a suite that was never meant to run that
+way. `test.go.command` is that door, read through the same per-target block the
+pypi runner already reads, so both targets are configured in one shape.
+
+Which targets accept a `test.<name>` block, and which options each one takes,
+moved onto the target protocol rather than being listed in the config
+validator. The registry is the single authority for per-target facts, and the
+validator asking it is what keeps the recognized-target set, the per-target
+option sets, and the validation itself from ever disagreeing.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
