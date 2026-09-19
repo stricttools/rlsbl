@@ -2,11 +2,29 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "The committed strictspec validators are regenerated for the generated-code-format pairing, so a fresh install imports them."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+rlsbl's committed strictspec validators used to pair with the exact strictspec
+release that generated them, so a fresh install resolving a newer strictspec
+runtime raised at import before rlsbl could run at all. strictspec 0.3.0 moved
+the pairing onto a generated-code FORMAT -- an integer describing the shape of
+the emitted code, held against the inclusive range every runtime declares -- and
+these validators are regenerated onto it. An install that resolves a later
+strictspec now imports them unchanged.
+
+The check that policed the old pairing went with it. `strictspec-generated-floor`
+derived a `strictspec>=` floor from each validator's GENERATED_BY and refused
+anything lower, which under the format regime would demand a regeneration and a
+re-release of every consumer on every strictspec release -- the outage the
+format declaration exists to end. `strictspec-generated-format` replaces it: it
+reads each committed validator's GENERATED_CODE_FORMAT against the range the
+installed runtime reads, names the file when one is outside it, and names
+regeneration as the remedy. No dependency floor is derived from GENERATED_BY
+anywhere.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
