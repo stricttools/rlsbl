@@ -842,3 +842,49 @@ def test_dev_status_refuses_an_overlay_path_inside_the_repository(
 
     assert rc == 1
     assert "inside this repository" in capsys.readouterr().err
+
+
+def test_a_stale_overlay_path_names_the_file_its_purpose_and_the_remedy(
+    tmp_project, fake_run, uv_present, no_sync_env, capsys
+):
+    """An overlay whose checkout is gone is a leftover, and says so.
+
+    The entry outlives what it pointed at: the checkout moved, or the project
+    stopped depending on that package altogether (a language change leaves the
+    whole block behind). "path does not exist" alone names neither the file it
+    is in, nor what that file is for, nor what to do -- and the same refusal
+    blocks a release through the version-skew guard, where the reader has even
+    less context.
+    """
+    _write_overlay_file(
+        tmp_project, '[[overlay]]\npackage = "depa"\npath = "no-such-dir"\n'
+    )
+    rc = run_sync(str(tmp_project))
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert OVERRIDES_FILENAME in err
+    assert "rlsbl dev sync" in err
+    assert "stale" in err.lower()
+    assert "no-such-dir" in err
+    # The remedy: repoint it, or delete the block (and the file with it, when
+    # it was the only block).
+    assert "delete" in err.lower()
+    assert "[[overlay]]" in err
+
+
+def test_repointing_a_stale_overlay_clears_the_refusal(
+    tmp_project, fake_run, uv_present, no_sync_env, capsys
+):
+    """The remedy the message names is performed here, and the error clears."""
+    _write_overlay_file(
+        tmp_project, '[[overlay]]\npackage = "depa"\npath = "no-such-dir"\n'
+    )
+    assert run_sync(str(tmp_project)) == 1
+    capsys.readouterr()
+
+    _make_overlay_project(tmp_project, "depa-checkout", "depa")
+    _write_overlay_file(
+        tmp_project,
+        '[[overlay]]\npackage = "depa"\npath = "depa-checkout"\n',
+    )
+    assert run_sync(str(tmp_project)) == 0, capsys.readouterr().err

@@ -136,3 +136,64 @@ class TestVersionSkew:
             with pytest.raises(ReleaseValidationError) as exc:
                 _abort_on_version_skew(str(project))
         assert "aheaddep" in str(exc.value)
+
+
+class TestAStaleOverlayEntry:
+    """An overlay whose checkout is gone blocks the release -- readably.
+
+    The guard reading an unreadable overlay file is a hard error by design (a
+    silent skip would let a release ship against unreleased dependency code).
+    What the operator got, though, was "path does not exist" with no word about
+    which file that entry lives in, what the file is for, or how to clear it --
+    and the commonest cause is a leftover: the project stopped depending on the
+    package entirely and the block was never removed.
+    """
+
+    def _stale(self, tmp_path):
+        project = tmp_path / "project"
+        project.mkdir(exist_ok=True)
+        (project / "dev-sources.toml.local-only").write_text(
+            '[[overlay]]\npackage = "somedep"\npath = "../gone"\n'
+        )
+        return project
+
+    def test_the_refusal_names_the_file_its_purpose_and_the_remedy(
+        self, tmp_path, capsys,
+    ):
+        project = self._stale(tmp_path)
+
+        with patch(QUERY_FN) as mock_query:
+            with pytest.raises(ReleaseValidationError) as exc:
+                _abort_on_version_skew(str(project))
+        mock_query.assert_not_called()
+
+        text = capsys.readouterr().err + str(exc.value)
+        assert "dev-sources.toml.local-only" in text
+        assert "rlsbl dev sync" in text
+        assert "stale" in text.lower()
+        assert "delete" in text.lower()
+        assert "[[overlay]]" in text
+
+    def test_deleting_the_overlay_file_clears_the_refusal(self, tmp_path):
+        """The remedy the message names, performed."""
+        project = self._stale(tmp_path)
+        with pytest.raises(ReleaseValidationError):
+            _abort_on_version_skew(str(project))
+
+        (project / "dev-sources.toml.local-only").unlink()
+        with patch(QUERY_FN) as mock_query:
+            _abort_on_version_skew(str(project))  # must not raise
+        mock_query.assert_not_called()
+
+    def test_repointing_the_entry_clears_the_refusal(self, tmp_path):
+        """The other remedy: point 'path' at where the checkout really is."""
+        project = self._stale(tmp_path)
+        with pytest.raises(ReleaseValidationError):
+            _abort_on_version_skew(str(project))
+
+        checkout = _make_checkout(tmp_path, "somedep", "0.3.0")
+        (project / "dev-sources.toml.local-only").write_text(
+            f'[[overlay]]\npackage = "somedep"\npath = "{checkout}"\n'
+        )
+        with patch(QUERY_FN, return_value={"status": "found", "version": "0.4.0"}):
+            _abort_on_version_skew(str(project))  # must not raise

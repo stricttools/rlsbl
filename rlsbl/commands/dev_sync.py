@@ -168,6 +168,37 @@ def _scope_refusal(project_root, package, path):
     return None
 
 
+def _stale_overlay_refusal(package, declared_path, abs_path):
+    """The refusal for an [[overlay]] entry whose checkout is not there.
+
+    An entry outlives what it points at: the checkout moved, or the project
+    stopped depending on the package altogether -- a dependency era ends and
+    the block is left behind. The same refusal also blocks a release, through
+    the version-skew guard that reads this very file, where the reader has no
+    context at all for a bare "path does not exist". So the message names the
+    file, says what the file is for, calls the entry what it is, and names both
+    ways out.
+    """
+    return (
+        f"Error: [[overlay]] entry '{package}' in {OVERRIDES_FILENAME}: the "
+        f"checkout path does not exist: {declared_path} (resolved to "
+        f"{abs_path}).\n\n"
+        f"{OVERRIDES_FILENAME} is the `rlsbl dev sync` overlay file: each "
+        f"[[overlay]] block names a sibling checkout to install editable over "
+        f"this project's locked environment. An entry pointing at nothing is "
+        f"STALE -- the checkout moved, or this project no longer depends on "
+        f"'{package}' at all. `rlsbl release run` reads the same file for its "
+        f"version-skew guard, so a stale entry blocks a release until it is "
+        f"resolved.\n\n"
+        f"Resolve it either way:\n"
+        f"  - point 'path' at the checkout's current location; or\n"
+        f"  - delete the [[overlay]] block for '{package}'. If it was the only "
+        f"block, delete {OVERRIDES_FILENAME} itself -- this project then runs "
+        f"on the locked registry wheels, and neither `rlsbl dev sync` nor the "
+        f"release reads the file at all."
+    )
+
+
 def _load_overlays(project_root):
     """Parse and validate the overlay file. Returns a list of
     {"package": str, "path": str (absolute), "version": str | None} dicts,
@@ -234,10 +265,7 @@ def _load_overlays(project_root):
             os.path.join(project_root, path)
         )
         if not os.path.isdir(abs_path):
-            return _fail(
-                f"Error: [[overlay]] entry '{package}': path does not exist: "
-                f"{path} (resolved to {abs_path})."
-            )
+            return _fail(_stale_overlay_refusal(package, path, abs_path))
         pyproject_path = os.path.join(abs_path, "pyproject.toml")
         if not os.path.isfile(pyproject_path):
             return _fail(
