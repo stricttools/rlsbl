@@ -32,3 +32,7 @@ option sets, and the validation itself from ever disagreeing.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "b0a3582834c8195b8e582a6be722d764111b3658"
+
+[tree_hashes]
+"." = "160c651770d91f52ad6ec9a6da3840716396a54b"
