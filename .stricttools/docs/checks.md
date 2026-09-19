@@ -1,5 +1,5 @@
 +++
-description = "Every check rlsbl runs, grouped by tag, with its severity, the targets it applies to, how a workspace run is scoped, and the checks strictcli registers."
+description = "Every check rlsbl runs, grouped by tag, with its severity, the targets it applies to, the command a test-suite run invokes, and how a workspace run is scoped."
 +++
 
 # Check system
