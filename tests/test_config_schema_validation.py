@@ -107,6 +107,35 @@ class TestValidateTestConfig:
         with pytest.raises(ConfigError, match="empty string"):
             validate_test_config({"test": {"pypi": {"markers": ""}}})
 
+    def test_valid_go_command_passes(self):
+        validate_test_config({"test": {"go": {"command": "scripts/full-suite.sh"}}})
+
+    def test_empty_go_block_passes(self):
+        # A target block with no options is valid -- run the default command.
+        validate_test_config({"test": {"go": {}}})
+
+    def test_go_block_not_dict_raises(self):
+        with pytest.raises(ConfigError, match="must be a dict"):
+            validate_test_config({"test": {"go": "scripts/full-suite.sh"}})
+
+    def test_unknown_go_inner_key_raises(self):
+        # A typo like "commnad" must be rejected, not silently ignored.
+        with pytest.raises(ConfigError, match="not a recognized option"):
+            validate_test_config({"test": {"go": {"commnad": "scripts/x.sh"}}})
+
+    def test_go_markers_key_raises(self):
+        # The pypi option is not a go option -- key sets are per target.
+        with pytest.raises(ConfigError, match="not a recognized option"):
+            validate_test_config({"test": {"go": {"markers": "not integration"}}})
+
+    def test_non_string_go_command_raises(self):
+        with pytest.raises(ConfigError, match="command must be a string"):
+            validate_test_config({"test": {"go": {"command": ["go", "test"]}}})
+
+    def test_empty_string_go_command_raises(self):
+        with pytest.raises(ConfigError, match="empty string"):
+            validate_test_config({"test": {"go": {"command": ""}}})
+
 
 class TestConfigSchemaCheckSurfacesTestConfig:
     """The config-schema check surfaces validate_test_config failures."""
@@ -129,6 +158,33 @@ class TestConfigSchemaCheckSurfacesTestConfig:
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "pass"
+
+    def test_valid_go_test_block_passes_check(self, tmp_project):
+        ctx = ProjectContext(
+            project_root=tmp_project,
+            workspace_root=None,
+            config={
+                "publish_mode": "ci",
+                "test": {"go": {"command": "scripts/full-suite.sh"}},
+            },
+        )
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "pass"
+
+    def test_misspelled_go_key_fails_check(self, tmp_project):
+        ctx = ProjectContext(
+            project_root=tmp_project,
+            workspace_root=None,
+            config={
+                "publish_mode": "ci",
+                "test": {"go": {"commnad": "scripts/full-suite.sh"}},
+            },
+        )
+        result = app._check_defs["config-schema"].impl(ctx)
+        assert result.status == "fail"
+        assert any(
+            "not a recognized option" in d for d in (p.text for p in result.problems)
+        )
 
 
 class TestConfigSchemaCheckSurfacesPipelineTargetLinks:

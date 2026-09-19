@@ -610,16 +610,44 @@ class GoTarget(BaseTarget):
 
     def run_tests(self, *, project_dir=None, workspace_root=None,
                   skip_sync=False, config=None, check_timeout=None):
-        """Run `go test ./...`."""
+        """Run the project's `test.go.command`, or `go test ./...` by default."""
         from ..testing import _run_go_tests, resolve_test_timeout
         from .outcomes import SuiteRunOutcome, SuiteRunStatus
 
         timeout = resolve_test_timeout(config, check_timeout)
-        passed = _run_go_tests(project_dir=project_dir, check_timeout=timeout)
+        passed = _run_go_tests(
+            project_dir=project_dir, check_timeout=timeout, config=config,
+        )
         return SuiteRunOutcome(
             status=SuiteRunStatus.PASSED if passed else SuiteRunStatus.FAILED,
             message=f"{self.name} tests {'passed' if passed else 'failed'}",
         )
+
+    def validate_test_options(self, block):
+        """Validate the ``test.go`` block: one option, ``command``.
+
+        ``command`` is the whole suite command as one string, run from the
+        project root in place of the built-in ``go test`` invocation. An empty
+        string is refused rather than read as "use the default", which the
+        key's absence already says.
+        """
+        from ..errors import ConfigError
+
+        self._reject_unknown_test_options(self.name, block, {"command"})
+
+        if "command" in block:
+            command = block["command"]
+            if not isinstance(command, str):
+                raise ConfigError(
+                    f"test.go.command must be a string, got "
+                    f"{type(command).__name__}"
+                )
+            if command == "":
+                raise ConfigError(
+                    'test.go.command is an empty string. Provide the suite '
+                    'command to run (e.g. "scripts/full-suite.sh") or omit the '
+                    "key entirely to keep the built-in go test invocation."
+                )
 
     supports_dep_floors = True
 

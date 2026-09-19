@@ -535,6 +535,31 @@ class PypiTarget(BaseTarget):
             message=f"{self.name} tests {'passed' if passed else 'failed'}",
         )
 
+    def validate_test_options(self, block):
+        """Validate the ``test.pypi`` block: one option, ``markers``.
+
+        ``markers`` is the pytest marker expression the suite runs with; the
+        runner passes it as ``-m <markers>``. An empty string is refused rather
+        than read as "no markers", which the key's absence already says.
+        """
+        from ..errors import ConfigError
+
+        self._reject_unknown_test_options(self.name, block, {"markers"})
+
+        if "markers" in block:
+            markers = block["markers"]
+            if not isinstance(markers, str):
+                raise ConfigError(
+                    f"test.pypi.markers must be a string, got "
+                    f"{type(markers).__name__}"
+                )
+            if markers == "":
+                raise ConfigError(
+                    'test.pypi.markers is an empty string. Provide a pytest '
+                    'marker expression (e.g. "not integration") or omit the '
+                    "key entirely."
+                )
+
     shares_workspace_environment = True
     supports_dep_floors = True
 

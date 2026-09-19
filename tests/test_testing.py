@@ -553,6 +553,114 @@ class TestGoTarget:
 
 
 # ---------------------------------------------------------------------------
+# go test.go.command config
+# ---------------------------------------------------------------------------
+
+class TestGoTestCommand:
+    """``test.go.command`` replaces the hard-coded ``go test`` invocation.
+
+    The block mirrors the ``test.pypi`` block: absent section, absent target
+    key, or absent option all keep today's command byte-identical.
+    """
+
+    COMMAND_CONFIG = {"test": {"go": {"command": "scripts/full-suite.sh"}}}
+    DEFAULT_CMD = ["go", "test", "./...", "-race", "-short", "-count=1"]
+
+    def test_absent_test_section_runs_the_default_command(self, tmp_project):
+        """No ``test`` section at all: the hard-coded command runs, unshelled."""
+        with patch("rlsbl.effects.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests("go", project_dir=str(tmp_project), config={})
+
+            assert result.passed
+            assert mock_run.call_count == 1
+            assert mock_run.call_args[0][0] == self.DEFAULT_CMD
+            assert mock_run.call_args.kwargs.get("shell", False) is False
+            assert mock_run.call_args.kwargs.get("cwd") == str(tmp_project)
+
+    def test_absent_go_key_runs_the_default_command(self, tmp_project):
+        """A ``test`` section naming only another target leaves Go untouched."""
+        config = {"test": {"pypi": {"markers": "not integration"}}}
+        with patch("rlsbl.effects.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests("go", project_dir=str(tmp_project), config=config)
+
+            assert result.passed
+            assert mock_run.call_args[0][0] == self.DEFAULT_CMD
+
+    def test_empty_go_block_runs_the_default_command(self, tmp_project):
+        """A declared but optionless ``test.go`` block still runs everything."""
+        with patch("rlsbl.effects.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests(
+                "go", project_dir=str(tmp_project), config={"test": {"go": {}}}
+            )
+
+            assert result.passed
+            assert mock_run.call_args[0][0] == self.DEFAULT_CMD
+
+    def test_configured_command_replaces_the_default(self, tmp_project):
+        """The named command runs instead, from the project root."""
+        with patch("rlsbl.effects.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            result = run_project_tests(
+                "go", project_dir=str(tmp_project), config=self.COMMAND_CONFIG
+            )
+
+            assert result.passed
+            assert mock_run.call_count == 1
+            assert mock_run.call_args[0][0] == "scripts/full-suite.sh"
+            assert mock_run.call_args.kwargs.get("shell") is True
+            assert mock_run.call_args.kwargs.get("cwd") == str(tmp_project)
+
+    def test_configured_command_failure_fails_the_run(self, tmp_project):
+        """A non-zero exit from the named command fails the suite step."""
+        with patch("rlsbl.effects.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=1)
+
+            result = run_project_tests(
+                "go", project_dir=str(tmp_project), config=self.COMMAND_CONFIG
+            )
+
+            assert not result.passed
+
+    def test_configured_command_carries_the_check_timeout(self, tmp_project):
+        """The configured budget reaches the named command's subprocess."""
+        config = {"check_timeout": 7, **self.COMMAND_CONFIG}
+        with patch("rlsbl.effects.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+
+            run_project_tests("go", project_dir=str(tmp_project), config=config)
+
+            assert mock_run.call_args.kwargs.get("timeout") == 7
+
+    def test_configured_command_timeout_reports_like_the_python_path(
+        self, tmp_project, capsys
+    ):
+        """A timeout names the budget, the command, and the remediation hint."""
+        config = {"check_timeout": 7, **self.COMMAND_CONFIG}
+        with patch(
+            "rlsbl.effects.run",
+            side_effect=subprocess.TimeoutExpired(
+                cmd="scripts/full-suite.sh", timeout=7
+            ),
+        ):
+            result = run_project_tests(
+                "go", project_dir=str(tmp_project), config=config
+            )
+
+        assert not result.passed
+        err = capsys.readouterr().err
+        assert "timed out after 7s" in err
+        assert "scripts/full-suite.sh" in err
+        assert CHECK_TIMEOUT_HINT in err
+
+
+# ---------------------------------------------------------------------------
 # npm target
 # ---------------------------------------------------------------------------
 
