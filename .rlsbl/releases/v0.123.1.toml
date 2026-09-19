@@ -34,3 +34,7 @@ printed a run URL and no error lines.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "926dbbe1b1f07d6e9f196e60f05faa0cc255875f"
+
+[tree_hashes]
+"." = "fb0adedfc86c220007b73f292277cf8938f09396"
