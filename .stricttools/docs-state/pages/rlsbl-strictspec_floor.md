@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.strictspec_floor"
-description = "The declared strictspec floor must reach every generated validator -- a floor below a committed GENERATED_BY ships validators that cannot import at all."
+description = "Every committed strictspec validator must declare a generated-code format the linked runtime reads, or its import raises before any document is validated."
 generated = true
 nav_group = "API Reference"
 nav_order = 152
