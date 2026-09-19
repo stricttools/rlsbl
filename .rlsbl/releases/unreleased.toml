@@ -2,11 +2,22 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "Restore the strictspec pairing so status, unreleased, and changelog add run on a fresh install."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+strictspec 0.2.5 was published while rlsbl's committed validators were still
+stamped 0.2.3. A generated validator calls require_runtime_version(GENERATED_BY)
+at import and that pairing is exact, so every published rlsbl version resolved
+the newer strictspec through its unpinned floor and then refused to import:
+`rlsbl status`, `rlsbl unreleased`, and `rlsbl changelog add` all aborted with a
+strictspec version pairing mismatch for anyone installing fresh. The repository
+lock still held 0.2.3, so its own suite never saw the skew. This release
+regenerates the validators against 0.2.5, raises the declared floor to match,
+refreshes the lock onto the same runtime, and adds a test that reds whenever the
+committed stamps and the resolved strictspec disagree.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
