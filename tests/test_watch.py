@@ -1273,6 +1273,48 @@ class TestFetchFailureLog:
             _fetch_failure_log("1")
 
 
+    def test_the_job_log_read_allows_terminal_escape_sequences(self):
+        """A coloured CI log must still reach the operator.
+
+        GitHub Actions job logs carry ANSI colour, and ``gh api`` refuses to
+        emit a response containing terminal escape sequences unless it is told
+        to ("the response contains terminal escape sequences; pass
+        --allow-escape-sequences to output it anyway"), exiting non-zero. Every
+        coloured failure log therefore came back as "could not fetch failure
+        logs", leaving a red release with a run URL and no failure lines at
+        all.
+        """
+        coloured = (
+            "2026-01-01T00:00:00Z ##[group]Run pytest\n"
+            "2026-01-01T00:00:01Z \x1b[31mFAILED tests/test_x.py::test_y\x1b[0m\n"
+            "2026-01-01T00:00:02Z ##[error]Process completed with exit code 1.\n"
+        )
+        seen = {}
+
+        def gh(args, **kwargs):
+            if args[-1].endswith("/logs"):
+                seen["args"] = list(args)
+                if "--allow-escape-sequences" not in args:
+                    # What gh really does: refuse, and exit non-zero.
+                    raise subprocess.CalledProcessError(
+                        1, "gh",
+                        stderr="the response contains terminal escape "
+                               "sequences; pass --allow-escape-sequences to "
+                               "output it anyway",
+                    )
+            return self._gh(coloured)(args, **kwargs)
+
+        with patch("rlsbl.utils.run_gh", side_effect=gh), \
+             patch("rlsbl.commands.watch.run_gh", side_effect=gh):
+            text = _fetch_failure_log("123")
+
+        assert "--allow-escape-sequences" in seen["args"]
+        # The flag precedes the endpoint, so every caller that reads the path
+        # off the end of the argv still finds it there.
+        assert seen["args"][-1].endswith("/actions/jobs/7/logs")
+        assert "FAILED tests/test_x.py::test_y" in text
+
+
 class TestRetryClassification:
     """Tests that _watch_single_run gates retries on failure classification
     and always prints the fetched log tail on failure."""
