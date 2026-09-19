@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.124.0",
+  "version": "0.124.1",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -15201,8 +15201,8 @@
         },
         {
           "level": 3,
-          "text": "`StrictspecFloorVerdict`",
-          "anchor": "strictspecfloorverdict"
+          "text": "`StrictspecGeneratedFormatVerdict`",
+          "anchor": "strictspecgeneratedformatverdict"
         },
         {
           "level": 4,
@@ -15211,18 +15211,18 @@
         },
         {
           "level": 3,
-          "text": "`parse_version`",
-          "anchor": "parse_version"
+          "text": "`accepted_format_range`",
+          "anchor": "accepted_format_range"
         },
         {
           "level": 3,
-          "text": "`declared_floor`",
-          "anchor": "declared_floor"
+          "text": "`reads_format`",
+          "anchor": "reads_format"
         },
         {
           "level": 3,
-          "text": "`read_generated_by`",
-          "anchor": "read_generated_by"
+          "text": "`read_generated_code_format`",
+          "anchor": "read_generated_code_format"
         },
         {
           "level": 3,
@@ -15231,8 +15231,8 @@
         },
         {
           "level": 3,
-          "text": "`evaluate_strictspec_floor`",
-          "anchor": "evaluate_strictspec_floor"
+          "text": "`evaluate_strictspec_generated_format`",
+          "anchor": "evaluate_strictspec_generated_format"
         }
       ]
     },
@@ -21085,6 +21085,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-19T21:17:05.801093+00:00",
+  "last_gen": "2026-09-19T23:15:18.640337+00:00",
   "theme": "minimal"
 }
