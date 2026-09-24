@@ -1,5 +1,5 @@
 +++
-description = "The rlsbl release flow: the untagged candidate and the CI check whose red verdict comes only from a run that really concluded in failure, how a resume re-pins at the branch tip and adopts what was committed while the release was stopped, the release commit and the flow-owned fields only the flow may write, the three fates an archived version can record plus the historical spelling it shipped under, how `rlsbl release backfill` reconstructs them for an existing repository, which releasable a reconcile or an undo is scoped to, and the bump types."
+description = "The rlsbl release flow: the untagged candidate and the CI check whose red verdict comes only from a run that really concluded in failure, how a resume re-pins at the branch tip and adopts what was committed while the release was stopped, the release commit and the flow-owned fields no editable release file may carry, the deprecate and yank notices an archive records and every Release body keeps on top, the three fates an archived version can record plus the historical spelling it shipped under, how `rlsbl release backfill` reconstructs them for an existing repository, which releasable a reconcile or an undo is scoped to, and the bump types."
 +++
 
 # Release workflow
@@ -219,7 +219,7 @@ Step 18 does more than preserve the release prose. Before the archive is locked 
 - a **workspace releasable** ships its member directories, so there is one entry per member path. No single git object covers a *set* of subtrees, so one tree hash per member is the honest record — a synthesized hash over the members would be an rlsbl invention that no git command could reproduce or check;
 - a **single-member releasable** ships one directory and gets the single entry for that path.
 
-The release commit is written by the flow and by nothing else, and it is not alone in that: it belongs to the **flow-owned set**, whose single authority is `FLOW_OWNED_FIELDS` in `rlsbl/release_file.py` — the release-commit fields, the version-fate fields described below, and `release_notices`, which [`release deprecate` and `release yank` write](#release-notices). One rule covers the whole set, and both sides of it read that tuple rather than restating its membership:
+The release commit is written by the flow and by nothing else, and it belongs to the **flow-owned set**: the fields an editable release file may never carry, whose single authority is `FLOW_OWNED_FIELDS` in `rlsbl/release_file.py` — the release-commit fields, the version-fate fields described below, and `release_notices`, which [`release deprecate` and `release yank` write](#release-notices). One rule covers the whole set, and both sides of it read that tuple rather than restating its membership:
 
 - the editable `unreleased.toml` carrying *any* member is refused before any mutation — at `rlsbl release run`'s validation, and again at `rlsbl release resume`'s own entry, since a resume re-enters the mutating phase with the release file still editable on disk;
 - `rlsbl release undo` strips every member when it restores an archive as the editable release file, so the freed version can be released again.
