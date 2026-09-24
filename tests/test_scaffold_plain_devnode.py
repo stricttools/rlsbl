@@ -190,7 +190,7 @@ class TestDevNodeGetsNoPublishWorkflow:
                               subdir="conformance"):
         proj_dir = mock_git_repo / subdir
         proj_dir.mkdir()
-        (proj_dir / "package.json").write_text(json.dumps({
+        (proj_dir / "package.json").write_text(json.dumps({"engines": {"node": ">=20"}, 
             "name": "conformance", "version": "0.1.0",
             "scripts": {"test": "node t.js"},
         }, indent=2) + "\n")

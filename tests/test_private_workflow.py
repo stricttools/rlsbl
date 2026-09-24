@@ -97,7 +97,7 @@ class TestPrivateFlagScaffold:
     def test_private_flag_skips_publish_template(self, mock_git_repo):
         """Scaffold with private=True should not create publish.yml."""
         # Create a package.json so npm target is detected
-        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -113,7 +113,7 @@ class TestPrivateFlagScaffold:
 
     def test_private_repo_requires_explicit_publish_mode(self, mock_git_repo):
         """A private repo with no --publish-mode flag is a hard error (must choose)."""
-        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -123,7 +123,7 @@ class TestPrivateFlagScaffold:
 
     def test_private_does_not_scaffold_hook_files(self, mock_git_repo):
         """Private scaffold should not create hook files (hooks are config-driven)."""
-        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -140,7 +140,7 @@ class TestPrivateFlagScaffold:
 
     def test_private_saved_to_config(self, mock_git_repo):
         """Private flag should be saved to .rlsbl/config.json."""
-        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -152,7 +152,7 @@ class TestPrivateFlagScaffold:
 
     def test_public_repo_creates_publish(self, mock_git_repo):
         """Public repos should still get publish.yml."""
-        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -164,7 +164,7 @@ class TestPrivateFlagScaffold:
 
     def test_private_config_remembered(self, mock_git_repo):
         """Once private is saved in config, subsequent scaffolds remember it."""
-        pkg = {"name": "test-pkg", "version": "1.0.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         # First scaffold with --publish-mode none

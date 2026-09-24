@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-{{#if npm.minRequiredNode}}        # engines.node: >= {{npm.minRequiredNode}}
-{{/if}}        node-version: [20, 22, 24]
+        # Every supported Node line package.json's engines.node admits.
+        node-version: {{npm.nodeMatrix}}
     steps:
       - uses: {{action "actions/checkout"}}
       - uses: {{action "pnpm/action-setup"}}

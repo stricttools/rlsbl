@@ -56,7 +56,7 @@ def _make_monorepo(root, subtree_remote=None, project_path="mylib", name="mylib"
     proj_dir = root / project_path
     proj_dir.mkdir(parents=True, exist_ok=True)
     (proj_dir / "package.json").write_text(
-        json.dumps({"name": name, "version": "0.1.0"}) + "\n"
+        json.dumps({"engines": {"node": ">=20"}, "name": name, "version": "0.1.0"}) + "\n"
     )
     (proj_dir / "index.js").write_text("module.exports = 1;\n")
     # Give the sub-project a minimal .rlsbl/config.json so scaffold has a target.

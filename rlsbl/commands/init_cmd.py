@@ -1789,6 +1789,7 @@ def run_cmd(registry, args, flags, ctx):
 
         # Gather template variables
         vars_dict = reg.template_vars(target_path, ctx)
+        vars_dict.update(reg.ci_template_vars(target_path))
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
@@ -2723,6 +2724,7 @@ def _merge_template_vars(registries_list, primary, target_paths, ctx):
     primary_target = TARGETS[primary]
     primary_vars = primary_target.template_vars(target_paths.get(primary, "."), ctx)
     merged.update(primary_vars)
+    merged.update(primary_target.ci_template_vars(target_paths.get(primary, ".")))
     # Non-primary targets: add only namespaced keys (preserve primary's bare keys)
     for target_name in registries_list:
         if target_name == primary:
@@ -2732,6 +2734,7 @@ def _merge_template_vars(registries_list, primary, target_paths, ctx):
         for key, value in target_vars.items():
             if "." in key:
                 merged[key] = value
+        merged.update(target.ci_template_vars(target_paths.get(target_name, ".")))
     return merged
 
 

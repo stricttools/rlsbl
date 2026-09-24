@@ -30,7 +30,7 @@ def _write_fixture(root: Path, download="postinstall"):
     # User-authored launcher manifest -- the name authority. scaffold never
     # invents this.
     (root / "package.json").write_text(
-        json.dumps({"name": "mytool", "version": "0.1.0"}, indent=2) + "\n"
+        json.dumps({"engines": {"node": ">=20"}, "name": "mytool", "version": "0.1.0"}, indent=2) + "\n"
     )
     rlsbl_dir = root / ".rlsbl"
     rlsbl_dir.mkdir(exist_ok=True)

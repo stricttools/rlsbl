@@ -24,7 +24,7 @@ def _ctx(root="."):
 
 def _make_npm_project(repo):
     """Create a minimal npm project."""
-    pkg = {"name": "testpkg", "version": "0.1.0"}
+    pkg = {"engines": {"node": ">=20"}, "name": "testpkg", "version": "0.1.0"}
     (repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
 
 

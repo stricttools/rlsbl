@@ -48,7 +48,7 @@ class TestProcessTemplate:
     def test_replaces_known_variables(self):
         content, unreplaced = process_template(
             "Hello {{name}}, version {{version}}!",
-            {"name": "my-pkg", "version": "1.0.0"},
+            {"engines": {"node": ">=20"}, "name": "my-pkg", "version": "1.0.0"},
         )
         assert content == "Hello my-pkg, version 1.0.0!"
         assert unreplaced == []
@@ -209,7 +209,7 @@ class TestScaffold:
         os.system("git init -q .")
         # Create minimal package.json so npm registry is detected
         with open("package.json", "w") as f:
-            json.dump({"name": "test-pkg", "version": "0.1.0"}, f)
+            json.dump({"engines": {"node": ">=20"}, "name": "test-pkg", "version": "0.1.0"}, f)
 
     def _run_scaffold(self):
         """Run scaffold for npm with stdout suppressed."""
@@ -664,7 +664,7 @@ class TestRelease:
         self.tmp_dir = str(tmp_path)
         # Create package.json so npm registry is detected
         with open("package.json", "w") as f:
-            json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
+            json.dump({"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}, f, indent=2)
             f.write("\n")
         # Create CHANGELOG.md with entry for the bumped version
         with open("CHANGELOG.md", "w") as f:
@@ -865,7 +865,7 @@ class TestReleaseCommitTrailers:
         monkeypatch.chdir(tmp_path)
         self.tmp_dir = str(tmp_path)
         with open("package.json", "w") as f:
-            json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
+            json.dump({"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}, f, indent=2)
             f.write("\n")
         with open("CHANGELOG.md", "w") as f:
             f.write("# Changelog\n\n## 1.0.1\n\nPatch release.\n")
@@ -1202,7 +1202,7 @@ class TestStatusPayload:
         os.system("git config user.name Test")
         # Create minimal npm project
         with open("package.json", "w") as f:
-            json.dump({"name": "test-pkg", "version": "0.1.0"}, f, indent=2)
+            json.dump({"engines": {"node": ">=20"}, "name": "test-pkg", "version": "0.1.0"}, f, indent=2)
             f.write("\n")
         with open("CHANGELOG.md", "w") as f:
             f.write("# Changelog\n\n## 0.1.0\n\nInitial release.\n")
@@ -1245,7 +1245,7 @@ class TestStatusChangelogExemption:
         subprocess.run(["git", "config", "user.name", "Test"], check=True)
         # Create minimal npm project
         with open("package.json", "w") as f:
-            json.dump({"name": "test-pkg", "version": "0.1.0"}, f, indent=2)
+            json.dump({"engines": {"node": ">=20"}, "name": "test-pkg", "version": "0.1.0"}, f, indent=2)
             f.write("\n")
         with open("CHANGELOG.md", "w") as f:
             f.write("# Changelog\n\n## 0.1.0\n\nInitial release.\n")
@@ -1340,7 +1340,7 @@ class TestScaffoldAutoDetection:
     def test_single_npm_scaffold_writes_target_to_config(self, mock_git_repo):
         """After scaffolding a single npm project without existing config,
         .rlsbl/config.json should contain targets: ["npm"]."""
-        pkg = {"name": "test-pkg", "version": "0.1.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "test-pkg", "version": "0.1.0"}
         (mock_git_repo / "package.json").write_text(json.dumps(pkg))
 
         with patch("sys.stdout", new_callable=StringIO):
@@ -1366,7 +1366,7 @@ class TestScaffoldUntrack:
         subprocess.run(["git", "config", "user.name", "Test"], check=True)
         # Create minimal package.json so npm registry is detected
         with open("package.json", "w") as f:
-            json.dump({"name": "test-pkg", "version": "0.1.0"}, f)
+            json.dump({"engines": {"node": ">=20"}, "name": "test-pkg", "version": "0.1.0"}, f)
         subprocess.run(["git", "add", "package.json"], check=True)
         subprocess.run(["git", "commit", "-q", "-m", "initial"], check=True)
 
@@ -1433,7 +1433,7 @@ class TestReleaseRollbackOnPushFailure:
 
         # Create package.json (npm target, version 1.0.0)
         with open("package.json", "w") as f:
-            json.dump({"name": "test-pkg", "version": "1.0.0"}, f, indent=2)
+            json.dump({"engines": {"node": ">=20"}, "name": "test-pkg", "version": "1.0.0"}, f, indent=2)
             f.write("\n")
 
         # Create CHANGELOG.md

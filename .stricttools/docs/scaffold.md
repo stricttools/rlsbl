@@ -159,6 +159,7 @@ Common variables:
 | `{{registryUrl}}` | Target registry URL | `https://pypi.org/project/rlsbl` |
 | `{{pypi.minRequiredPython}}` | Python target | `3.11` |
 | `{{npm.minRequiredNode}}` | npm target | `18` |
+| `{{npm.nodeMatrix}}` | npm target: every supported Node line (20, 22, 24) whose newest release `engines.node` admits; the CI workflow's `node-version` matrix. A `package.json` with no `engines.node` is refused at scaffold, naming the declaration to add | `[22, 24]` |
 | `{{go.minRequiredGo}}` | Go target | `1.21` |
 
 ### Required variables

@@ -29,7 +29,7 @@ def dual_registry_project(mock_git_repo):
     root = mock_git_repo
 
     # package.json with name, version, and bin field
-    pkg = {
+    pkg = {"engines": {"node": ">=20"}, 
         "name": "my-dual-pkg",
         "version": "0.2.0",
         "bin": {"my-dual-pkg": "./bin/cli.js"},
@@ -200,7 +200,7 @@ class TestPypiPrimaryNpmSecondary:
         )
         (root / "pyproject.toml").write_text(pyproject)
 
-        pkg = {
+        pkg = {"engines": {"node": ">=20"}, 
             "name": "my-dual-pkg",
             "version": "0.2.0",
             "bin": {"my-dual-pkg": "./bin/cli.js"},
@@ -256,7 +256,7 @@ class TestPypiPrimaryNpmSecondary:
 class TestMergedPublishCombinations:
     """Unit tests for _generate_merged_publish with diverse target combinations."""
 
-    TEMPLATE_VARS = {"repoName": "user/repo", "name": "test", "version": "1.0.0"}
+    TEMPLATE_VARS = {"engines": {"node": ">=20"}, "repoName": "user/repo", "name": "test", "version": "1.0.0"}
 
     def test_npm_deno_merged(self):
         """Merged publish contains both an npm job and a deno job."""
@@ -353,7 +353,7 @@ class TestMergedPublishCombinations:
         """
         # Simulate a pypi-primary, npm-secondary merged vars dict:
         # pypi vars are un-namespaced, npm vars are only namespaced.
-        vars_dict = {
+        vars_dict = {"engines": {"node": ">=20"}, 
             "name": "test-pkg",
             "version": "1.0.0",
             "repoName": "user/repo",
@@ -450,7 +450,7 @@ class TestMergedPublishCombinations:
 class TestMergedPublishWorkingDirectory:
     """Unit tests for working-directory injection in _generate_merged_publish."""
 
-    TEMPLATE_VARS = {
+    TEMPLATE_VARS = {"engines": {"node": ">=20"}, 
         "repoName": "user/repo",
         "name": "test",
         "version": "1.0.0",
@@ -610,7 +610,7 @@ class TestSubdirectoryNpmTarget:
         # npm in subdirectory
         npm_dir = root / "npm"
         npm_dir.mkdir()
-        pkg = {
+        pkg = {"engines": {"node": ">=20"}, 
             "name": "sub-npm-pkg",
             "version": "0.1.0",
             "bin": {"sub-npm-pkg": "./bin/cli.js"},

@@ -62,7 +62,7 @@ class TestPerTargetCI:
             'version = "0.1.0"\n'
             'requires-python = ">=3.11"\n'
         )
-        pkg = {"name": "wrapper-test", "version": "0.1.0"}
+        pkg = {"engines": {"node": ">=20"}, "name": "wrapper-test", "version": "0.1.0"}
         (root / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -85,7 +85,7 @@ class TestPerTargetCI:
             'version = "0.1.0"\n'
             'requires-python = ">=3.11"\n'
         )
-        pkg = {
+        pkg = {"engines": {"node": ">=20"}, 
             "name": "testable-pkg",
             "version": "0.1.0",
             "scripts": {"test": "jest"},
