@@ -1795,6 +1795,8 @@ def run_cmd(registry, args, flags, ctx):
     # already-scaffolded project (base-tracking-migration incident). Done before
     # acquiring the lock so the guard is a cheap up-front speed bump.
     _require_healable_bases_dir()
+    from ..scratch_dirs import refuse_tracked_scratch_files
+    refuse_tracked_scratch_files()
 
     acquire_lock(project_root=project_root)
 
@@ -2929,6 +2931,8 @@ def run_cmd_multi(registries_list, args, flags, ctx):
     # Refuse to proceed when the whole merge-base directory is missing on an
     # already-scaffolded project (base-tracking-migration incident).
     _require_healable_bases_dir()
+    from ..scratch_dirs import refuse_tracked_scratch_files
+    refuse_tracked_scratch_files()
 
     # Acquire advisory lock to prevent concurrent rlsbl operations
     acquire_lock(project_root=project_root)

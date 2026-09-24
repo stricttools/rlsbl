@@ -161,6 +161,67 @@ def scratch_template_mappings(mechanisms=()):
     return mappings
 
 
+#: The files scaffold itself commits into a scratch directory.
+_SCAFFOLD_OWNED_SCRATCH_FILES = frozenset({".gitignore", SCRATCH_GO_MODULE_FILENAME})
+
+
+def tracked_scratch_files(project_dir="."):
+    """The files git tracks inside *project_dir*'s scratch directories,
+    other than the ones scaffold itself commits there, sorted.
+
+    Outside a git work tree nothing is tracked, and the answer is empty.
+    """
+    result = effects.run(
+        ["git", "ls-files", "-z", "--", *SCRATCH_DIR_NAMES],
+        cwd=project_dir, capture_output=True, text=True, check=False,
+        timeout=60,
+    )
+    if result.returncode != 0:
+        return []
+    found = []
+    for rel in result.stdout.split("\0"):
+        if not rel:
+            continue
+        parts = rel.split("/")
+        if len(parts) == 2 and parts[1] in _SCAFFOLD_OWNED_SCRATCH_FILES:
+            continue
+        found.append(rel)
+    return sorted(found)
+
+
+def refuse_tracked_scratch_files(project_dir="."):
+    """Refuse to scaffold while a scratch directory holds tracked files.
+
+    Scaffold writes an ignore-everything ``.gitignore`` into each scratch
+    directory; committed files under it would stay tracked while every new
+    file beside them is silently ignored, and a directory meant for throwaway
+    output would keep shipping them.
+
+    Raises:
+        ConfigError: listing every such file and the remedies.
+    """
+    from .errors import ConfigError
+
+    files = tracked_scratch_files(project_dir)
+    if not files:
+        return
+    listing = "\n".join(f"  {rel}" for rel in files)
+    dirs = sorted({rel.split("/", 1)[0] for rel in files})
+    example_dest = "assets/" + files[0].split("/", 1)[1]
+    raise ConfigError(
+        f"{' and '.join(d + '/' for d in dirs)} "
+        f"{'is a scratch directory' if len(dirs) == 1 else 'are scratch directories'} "
+        f"(scaffold makes git ignore everything inside), but git tracks these "
+        f"files there:\n{listing}\n"
+        f"Move them out before scaffolding -- images a reader sees belong in "
+        f"the committed assets/ directory, e.g. `mkdir -p "
+        f"{os.path.dirname(example_dest)} && git mv {files[0]} {example_dest}` "
+        f"-- or, if the directory is not "
+        f"scratch space at all, rename the directory (`git mv {dirs[0]} "
+        f"<another name>`). Commit the move and re-run rlsbl scaffold."
+    )
+
+
 def scratch_template_vars(mechanisms=()):
     """Return the template variables the scratch ``.gitignore`` renders from.
 

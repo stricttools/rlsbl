@@ -53,6 +53,8 @@ The ignore file un-ignores exactly the files scaffold itself commits into the di
 
 Re-running scaffold over a project whose scratch directories already hold work changes nothing: the files scaffold writes into them are scaffold-managed like any other, so the merge is a no-op and the directory's contents are never touched.
 
+A scratch directory that already holds files git TRACKS (other than the ones scaffold commits there) is refused before scaffold writes anything: under an ignore-everything rule those files would stay tracked while every new file beside them is silently ignored. The refusal lists the files and the ways out: move them to a committed home (images a reader sees belong in `assets/`, e.g. `mkdir -p assets && git mv screenshots/hero.png assets/hero.png`), or, when the directory is not scratch space at all, rename it; commit the move and re-run scaffold.
+
 ### The project's own test runner skips them too
 
 Pruning the directories from rlsbl's walks (below) keeps rlsbl's checks green and says nothing to the project's test runner. A `test_*.py` left in `experiments/` is still collected by a bare `pytest`, and a `.go` file there without its own module file is still built by `go test ./...` -- so a half-finished probe breaks a suite it has nothing to do with, which is the opposite of what a disposable scratch directory is for.
