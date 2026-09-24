@@ -96,7 +96,7 @@ def make_source(tmp_path, *, name="widget", version="0.1.0", targets=("npm",)):
     run_git(repo, "config", "user.name", "Test")
 
     manifest = (
-        {"package.json": json.dumps({"name": name, "version": version}) + "\n"}
+        {"package.json": json.dumps({"engines": {"node": ">=20"}, "name": name, "version": version}) + "\n"}
         if "npm" in targets else
         {"pyproject.toml": f'[project]\nname = "{name}"\nversion = "{version}"\n'}
     )
@@ -1096,7 +1096,7 @@ class TestHealReDerivesNothing:
         fork = tmp_path / "widget_fork"
         shutil.copytree(str(source), str(fork))
         (fork / "package.json").write_text(
-            json.dumps({"name": "widget", "version": "9.9.9"}) + "\n"
+            json.dumps({"engines": {"node": ">=20"}, "name": "widget", "version": "9.9.9"}) + "\n"
         )
         run_git(fork, "add", "package.json")
         run_git(fork, "commit", "-q", "-m", "chore: bump to 9.9.9")
