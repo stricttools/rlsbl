@@ -16,7 +16,6 @@ business -- that check was what the format declaration replaced.
 import json
 from pathlib import Path
 
-import pytest
 import strictspec
 
 from rlsbl import app
