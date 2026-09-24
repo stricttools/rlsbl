@@ -19,3 +19,7 @@ A generated protobuf file in a gitignored third-party clone crashed `rlsbl rewri
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "0cda5d8e4b3d16ac89dfc607f7f495471fea84d7"
+
+[tree_hashes]
+"." = "4619c22c6ecf0e75db5f2b222fc4c8647bfb18de"
