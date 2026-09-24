@@ -1181,8 +1181,8 @@ _GO_CHOICE_HELP = (
     "is the name of a Go standard-library package (the last element of its "
     "import path, from a committed `go list std` table), since every file "
     "importing both needs an alias; discouraged when it has uppercase letters "
-    "or underscores (Effective Go) or is a predeclared identifier such as len; "
-    "available otherwise"
+    "or underscores (Effective Go) or is one of Go's built-in identifiers such "
+    "as `len` or `string` (reason `predeclared`); available otherwise"
 )
 
 # The payload is one result object for a single name+target, and an array of
