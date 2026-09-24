@@ -10,7 +10,6 @@ itself, so the answer is in the support matrix rather than in a hand-kept list.
 """
 
 import json
-import os
 import shutil
 import subprocess
 import sys
