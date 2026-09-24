@@ -30,7 +30,7 @@ import pytest
 from _pytest.outcomes import Failed
 
 from testisolation import config as st_config
-from testisolation import envfloor, sandbox, socketguard
+from testisolation import env_overrides, sandbox, socketguard
 from testisolation.plugin import settings as resolved_settings
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -98,7 +98,7 @@ class TestEnvPoisoningFloor:
     """Probe: the real developer environment is unreachable from a test."""
 
     def test_home_is_the_throwaway_one(self):
-        session_dir = envfloor.session_env_dir()
+        session_dir = env_overrides.session_env_dir()
         assert session_dir is not None, "the env floor was never installed"
         assert session_dir.name.startswith("rlsbl-test-env-")
         home = Path(os.environ["HOME"]).resolve()
@@ -107,7 +107,7 @@ class TestEnvPoisoningFloor:
         assert not (home / ".gitconfig").exists()
 
     def test_git_config_is_the_throwaway_one(self):
-        session_dir = envfloor.session_env_dir()
+        session_dir = env_overrides.session_env_dir()
         gitconfig = Path(os.environ["GIT_CONFIG_GLOBAL"])
         assert gitconfig == session_dir / "gitconfig"
         assert os.environ["GIT_CONFIG_SYSTEM"] == str(gitconfig)
@@ -115,7 +115,7 @@ class TestEnvPoisoningFloor:
         assert "rlsbl-test@example.invalid" in body
         assert "allow = never" in body
 
-    @pytest.mark.parametrize("var", envfloor.CREDENTIAL_VARS)
+    @pytest.mark.parametrize("var", env_overrides.CREDENTIAL_VARS)
     def test_credential_vector_is_stripped(self, var):
         assert var not in os.environ
 
