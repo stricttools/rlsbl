@@ -1,4 +1,4 @@
-"""Tests for CI service-container scaffold rendering (Phase 7.2).
+"""Tests for CI service-container scaffold rendering.
 
 Covers :func:`rlsbl.ci_yaml.make_ci_workflow_transform`:
 - golden render: a postgres service + test_env expressed as config renders a

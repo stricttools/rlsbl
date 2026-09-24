@@ -1,4 +1,4 @@
-"""Tests for Phase 9.2: asset naming for multi-artifact releasables.
+"""Tests for asset naming for multi-artifact releasables.
 
 Covers:
 - Asset filenames are prefixed with member name in releasable mode

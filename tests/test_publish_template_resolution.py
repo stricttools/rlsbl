@@ -1,6 +1,6 @@
 """Tests for pipeline-driven publish template resolution.
 
-Phase 6.7: _generate_merged_publish uses pipeline template_mappings
+_generate_merged_publish uses pipeline template_mappings
 when pipelines are provided, killing the target-name-based template bypass.
 """
 

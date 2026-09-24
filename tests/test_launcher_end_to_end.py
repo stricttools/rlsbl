@@ -1,4 +1,4 @@
-"""End-to-end launcher scaffold test (Phase 6.5).
+"""End-to-end launcher scaffold test.
 
 Scaffolds a launcher-configured fixture project (Go binary producer + npm
 launcher wrapper) end to end and proves the resulting package carries

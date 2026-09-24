@@ -1,7 +1,6 @@
 """Tests for the {{action "..."}} placeholder in process_template.
 
-Covers the two-pass renderer added in Phase 3 of the template-action
-substitution work:
+Covers the two-pass renderer for template-action substitution:
 
   1. Pass 1 resolves ``{{action "owner/name"}}`` against the central
      version table in ``rlsbl/data/action_versions.toml``.

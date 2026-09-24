@@ -1,4 +1,4 @@
-"""Tests for Phase 4: changelog per releasable.
+"""Tests for changelog per releasable.
 
 Covers:
 - get_releasable_changes_dir path resolution

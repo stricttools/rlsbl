@@ -67,7 +67,7 @@ class MemberContext:
     def pipelines(self) -> dict:
         """Loaded publish pipelines (name -> pipeline), from the merged config.
 
-        Each pipeline carries an explicit ``target`` link (Phase 6.1): a target
+        Each pipeline carries an explicit ``target`` link: a target
         name, or ``None`` for a target-less publisher (deploy). Empty dict when
         the config declares no ``pipelines``.
         """

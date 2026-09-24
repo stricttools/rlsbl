@@ -1,4 +1,4 @@
-"""Tests for scaffold skipping redundant per-package config in releasables (Phase 3c-d).
+"""Tests for scaffold skipping redundant per-package config in releasables.
 
 Covers:
 1. New package in a releasable: no per-package config.json when identical to releasable
@@ -120,7 +120,7 @@ class TestGetReleasableConfigDir:
 
 
 # ---------------------------------------------------------------------------
-# Phase 3c: config.json skip for releasable members
+# config.json skip for releasable members
 # ---------------------------------------------------------------------------
 
 
@@ -283,7 +283,7 @@ class TestNonReleasableConfigPreserved:
 
 
 # ---------------------------------------------------------------------------
-# Phase 1e: saferm invocation for file removal
+# saferm invocation for file removal
 # ---------------------------------------------------------------------------
 
 
@@ -413,12 +413,12 @@ class TestSafermInvocation:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2: scaffold cleanup (orphan base sweep, stale hash pruning, empty dirs)
+# scaffold cleanup (orphan base sweep, stale hash pruning, empty dirs)
 # ---------------------------------------------------------------------------
 
 
 class TestOrphanBaseSweep:
-    """Phase 2.1: sweep orphaned merge bases not caught by the managed-file orphan loop."""
+    """Sweep orphaned merge bases not caught by the managed-file orphan loop."""
 
     def test_orphan_base_without_managed_file_is_removed(self, mock_git_repo, monkeypatch):
         """A base file with no corresponding managed file in the current run is deleted."""
@@ -592,7 +592,7 @@ class TestOrphanBaseSweep:
 
 
 class TestEmptyDirectoryCleanup:
-    """Phase 2.3: empty parent directories are pruned after base file deletion."""
+    """Empty parent directories are pruned after base file deletion."""
 
     def test_empty_parent_dirs_pruned_after_orphan_base_deletion(self, mock_git_repo, monkeypatch):
         """After deleting an orphan base, empty parent directories are removed."""

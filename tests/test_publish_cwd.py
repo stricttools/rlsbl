@@ -1,6 +1,6 @@
 """Tests that pipeline _publish_command methods pass cwd=dir_path to subprocess.
 
-Phase 6.4: subdirectory targets must publish from the correct directory.
+Subdirectory targets must publish from the correct directory.
 """
 
 from unittest.mock import patch

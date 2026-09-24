@@ -71,7 +71,7 @@ EXPECTED_CHECKS = [
     "mirror-required",
     "workspace-unbuildable",
     "circular-deps",
-    # Phase 12 project checks
+    # Project checks
     "publish-mode-workflow",
     "npm-private-mismatch",
     "target-version-readable",

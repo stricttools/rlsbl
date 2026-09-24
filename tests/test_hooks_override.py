@@ -412,7 +412,7 @@ class TestBuiltinTestsSkippedWhenHookCustomized:
 
 
 # ---------------------------------------------------------------------------
-# External checks x hook-customization x dry-run interactions (Phase 1.8)
+# External checks x hook-customization x dry-run interactions
 # ---------------------------------------------------------------------------
 
 _FULL_FLOW_PATCHES = (
@@ -449,7 +449,7 @@ _FULL_FLOW_PATCHES = (
 
 
 class TestExternalChecksVsHookCustomization:
-    """The core Phase 1.8 fix: config-declared external checks run in the
+    """The core fix: config-declared external checks run in the
     preflight step regardless of pre-release hook customization, and are not
     double-run when the hook is not customized."""
 

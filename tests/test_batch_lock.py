@@ -1,4 +1,4 @@
-"""Tests for batch monorepo-wide lock (Phase 1).
+"""Tests for batch monorepo-wide lock.
 
 Verifies:
 - _run_cmd_inner with skip-lock=True skips acquire_lock/release_lock

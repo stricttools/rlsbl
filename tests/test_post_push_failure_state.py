@@ -1,4 +1,4 @@
-"""Phase 1.7 post-push failure-state tests.
+"""Post-push failure-state tests.
 
 Covers the gaps closed in the release push-failure flow:
 

@@ -1,4 +1,4 @@
-"""Regression test for Phase 5.2: changelog-orphans must thread the per-context
+"""Regression test: changelog-orphans must thread the per-context
 tag_glob.
 
 check_changelog_orphans previously called check_no_orphans(entries) discarding

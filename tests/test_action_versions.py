@@ -2,8 +2,7 @@
 
 Covers the loader (rlsbl.action_versions) and a structural check that
 every ``{{action "..."}}`` placeholder in shipped templates resolves
-against ``rlsbl/data/action_versions.toml``. After Phase 3 of the
-template-action substitution work, templates no longer embed literal
+against ``rlsbl/data/action_versions.toml``. Templates no longer embed literal
 ``name@version`` strings -- the placeholder is the only form -- so drift
 between templates and the table is impossible by construction.
 """
@@ -87,7 +86,7 @@ class TestLoader:
 
 class TestTemplatePlaceholders:
     """Every ``{{action "..."}}`` placeholder in shipped templates must
-    resolve via :func:`format_action`. After Phase 3 templates contain no
+    resolve via :func:`format_action`. Templates contain no
     literal ``name@version`` strings, so resolution at scaffold time is
     the only way a version reaches a rendered workflow.
     """

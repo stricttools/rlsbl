@@ -1,4 +1,4 @@
-"""Tests for the launcher ``download`` mode key (Phase 8 prep).
+"""Tests for the launcher ``download`` mode key.
 
 The launcher artifact gains a REQUIRED ``download`` config key selecting how
 the wrapped binary is fetched:

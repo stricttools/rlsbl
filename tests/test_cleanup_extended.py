@@ -1,4 +1,4 @@
-"""Tests for extended cleanup scope in releasable migration (Phase 5c).
+"""Tests for extended cleanup scope in releasable migration.
 
 Covers:
 - hooks/ directory removal during cleanup

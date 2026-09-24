@@ -1,4 +1,4 @@
-"""Tests for Phase 12 checks: publish-mode-workflow, npm-private-mismatch,
+"""Tests for project checks: publish-mode-workflow, npm-private-mismatch,
 target-version-readable, selfdoc-version-drift.
 
 The scaffold-conflict-markers tests that used to live here moved to

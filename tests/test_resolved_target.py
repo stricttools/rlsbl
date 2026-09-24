@@ -2,7 +2,7 @@
 pipeline/target resolver.
 
 The resolver takes a member's detected targets, its loaded pipelines (each
-carrying an explicit ``target`` link from Phase 6.1), and the effective
+carrying an explicit ``target`` link), and the effective
 ``publish_mode`` string, and produces:
 
 - ``resolved_targets``: one :class:`ResolvedTarget` per (target, linked

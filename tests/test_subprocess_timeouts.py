@@ -12,7 +12,7 @@ from rlsbl.testing import run_project_tests
 
 
 # ---------------------------------------------------------------------------
-# Phase 2a: MavenLinter timeout tests
+# MavenLinter timeout tests
 # ---------------------------------------------------------------------------
 
 
@@ -91,7 +91,7 @@ class TestMavenLinterTimeout:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2b: testing.py timeout tests
+# testing.py timeout tests
 # ---------------------------------------------------------------------------
 
 

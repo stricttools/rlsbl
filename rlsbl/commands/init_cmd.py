@@ -2954,7 +2954,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
 
         # Plan the merged publish workflow (skip for publish_mode "none" and workspace roots)
         # Load pipelines so _generate_merged_publish can use pipeline-driven
-        # template resolution (Phase 6.7) instead of hardcoded target-name paths.
+        # template resolution instead of hardcoded target-name paths.
         merged_plans = []
         if not _skip_publish_scaffold(private, is_ws_root, project_root):
             _loaded_pipelines = load_pipelines(ctx.config)

@@ -1,4 +1,4 @@
-"""Dual-registry layout pins (Phase 6.1).
+"""Dual-registry layout pins.
 
 These tests pin the exact scan-depth and layout contract for members that
 publish to more than one registry:

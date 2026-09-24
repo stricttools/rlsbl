@@ -1,4 +1,4 @@
-"""Tests for Phase 4: preventing coexistence of root .rlsbl/ and .rlsbl-monorepo/."""
+"""Tests for preventing coexistence of root .rlsbl/ and .rlsbl-monorepo/."""
 
 
 

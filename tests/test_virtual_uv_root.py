@@ -1,4 +1,4 @@
-"""Tests for virtual uv workspace root handling (Phase 5.1).
+"""Tests for virtual uv workspace root handling.
 
 A virtual root is a pyproject.toml declaring [tool.uv.workspace] with no
 [project] table. It is not a package: pypi.detect() must refuse it and the

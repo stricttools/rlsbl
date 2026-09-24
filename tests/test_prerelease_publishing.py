@@ -11,7 +11,7 @@ from rlsbl.targets.pypi import PypiTarget, _PEP440_PRE_RE
 
 
 # ===========================================================================
-# Phase 4e: Per-target version translation
+# Per-target version translation
 # ===========================================================================
 
 
@@ -215,7 +215,7 @@ class TestVersionConsistencyWithMixedFormats:
 
 
 # ===========================================================================
-# Phase 4f: Publishing integration
+# Publishing integration
 # ===========================================================================
 
 

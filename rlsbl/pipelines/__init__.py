@@ -70,7 +70,7 @@ def load_pipelines(config: dict) -> dict[str, "Pipeline"]:
             local=entry["local"],
             config=entry,
         )
-        # Explicit target link for later phases' ResolvedTarget resolution.
+        # Explicit target link for ResolvedTarget resolution.
         instance.target = entry.get("target")
         result[name] = instance
     return result

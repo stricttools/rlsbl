@@ -1,4 +1,4 @@
-"""Tests for the launcher artifact kind (Phase 12 Part 2).
+"""Tests for the launcher artifact kind.
 
 The launcher artifact is a wrapper-package publish pipeline that downloads
 a binary from a GitHub Release at install/run time. Two ecosystem variants:

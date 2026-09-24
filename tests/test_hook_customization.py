@@ -1,4 +1,4 @@
-"""Tests for config-based hook customization detection (Phase 4c-d).
+"""Tests for config-based hook customization detection.
 
 Verifies:
 - Config-driven pre_release detection takes precedence over script hashing
@@ -71,7 +71,7 @@ def _make_releasable_hook(tmp_path, releasable_name, hook_name, body):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4c: is_hook_customized tests
+# is_hook_customized tests
 # ---------------------------------------------------------------------------
 
 
@@ -155,7 +155,7 @@ class TestIsHookCustomized:
 
 
 # ---------------------------------------------------------------------------
-# Phase 4c: is_releasable_hook_customized tests
+# is_releasable_hook_customized tests
 # ---------------------------------------------------------------------------
 
 
@@ -207,7 +207,7 @@ class TestIsReleasableHookCustomizedWithConfig:
 
 
 # ---------------------------------------------------------------------------
-# Phase 4d: hook_generated dirty snapshot with config-driven hooks
+# hook_generated dirty snapshot with config-driven hooks
 # ---------------------------------------------------------------------------
 
 

@@ -1,4 +1,4 @@
-"""Tests for the npm launcher postinstall/bin shim templates (Phase 6.2).
+"""Tests for the npm launcher postinstall/bin shim templates.
 
 Covers:
 - Template content assertions (platform mapping, checksum verification,
