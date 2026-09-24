@@ -265,9 +265,10 @@ class _ReleasableLayout:
     """
 
     def __init__(self, releasable_config_dir):
-        from ..ownership import member_path
-        from ..workspace import load_workspace, members_of
-        from ..workspace_types import get_releasable_dir
+        import tomllib
+
+        from ..ownership import member_path, normalize_path
+        from ..workspace_types import WORKSPACE_DIR, WORKSPACE_FILE, get_releasable_dir
 
         state_dir = os.path.abspath(str(releasable_config_dir))
         self.name = os.path.basename(state_dir)
@@ -278,7 +279,23 @@ class _ReleasableLayout:
                 f"(.rlsbl-monorepo/releasables/<name>/), so the target paths "
                 f"its config.json declares have no releasable root to resolve from"
             )
-        self.members = members_of(self.name, load_workspace(self.workspace_root))
+        # rlsbl.targets sits below rlsbl.workspace in the import graph, so the
+        # two member keys needed here are read directly rather than through
+        # the validating loader.
+        workspace_file = os.path.join(self.workspace_root, WORKSPACE_DIR, WORKSPACE_FILE)
+        try:
+            with open(workspace_file, "rb") as f:
+                declared = tomllib.load(f).get("projects", [])
+        except (OSError, tomllib.TOMLDecodeError) as e:
+            raise ConfigError(
+                f"cannot read {workspace_file} to find the members of releasable "
+                f"'{self.name}', whose config.json declares a target path: {e}"
+            ) from e
+        self.members = [
+            {"path": normalize_path(entry.get("path", ""))}
+            for entry in declared
+            if isinstance(entry, dict) and entry.get("releasable") == self.name
+        ]
         paths = [member_path(m) for m in self.members]
         root_rel = "" if not paths or "" in paths else os.path.commonpath(paths)
         self.root_rel = root_rel

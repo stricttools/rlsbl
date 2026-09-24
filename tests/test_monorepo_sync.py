@@ -1329,6 +1329,46 @@ class TestReleasableTargetPathResolvesFromReleasableRoot:
             entries = detect_targets(lib_dir, releasable_config_dir=rel_dir)
             assert [(e.name, e.path) for e in entries] == [("pypi", lib_dir)]
 
+    def test_a_path_no_member_contains_is_refused(self, mock_git_repo):
+        """Without a root member the releasable's root is its members' deepest
+        common directory; a path there that no member holds has no owner."""
+        from rlsbl.errors import ConfigError
+        from rlsbl.targets import detect_targets
+
+        root = str(mock_git_repo)
+        for member in ("pkgs/a", "pkgs/b"):
+            os.makedirs(os.path.join(root, member, "npm"), exist_ok=True)
+        make_workspace(
+            mock_git_repo,
+            [{"path": "pkgs/a", "name": "a", "releasable": "pair"},
+             {"path": "pkgs/b", "name": "b", "releasable": "pair"}],
+            releasables=["pair"],
+        )
+        rel_dir = os.path.join(root, ".rlsbl-monorepo", "releasables", "pair")
+        os.makedirs(rel_dir, exist_ok=True)
+        config_path = os.path.join(rel_dir, "config.json")
+
+        def declare(path):
+            with open(config_path, "w") as f:
+                json.dump({"publish_mode": "ci",
+                           "targets": ["pypi", {"name": "npm", "path": path}]}, f)
+
+        declare("npm")
+        with pytest.raises(ConfigError) as info:
+            detect_targets(os.path.join(root, "pkgs", "a"), releasable_config_dir=rel_dir)
+        message = str(info.value)
+        assert "pkgs/npm" in message
+        assert "releasable's root (pkgs)" in message
+
+        # The remedy it names: a path inside one of the members.
+        declare("a/npm")
+        a_entries = detect_targets(os.path.join(root, "pkgs", "a"), releasable_config_dir=rel_dir)
+        b_entries = detect_targets(os.path.join(root, "pkgs", "b"), releasable_config_dir=rel_dir)
+        assert [(e.name, os.path.relpath(e.path, root)) for e in a_entries] == [
+            ("pypi", os.path.join("pkgs", "a")), ("npm", os.path.join("pkgs", "a", "npm")),
+        ]
+        assert [e.name for e in b_entries] == ["pypi"]
+
     def test_sync_succeeds_and_generates_the_npm_publish_job(
         self, mock_git_repo, capsys,
     ):
