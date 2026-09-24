@@ -1,6 +1,10 @@
 """Tests for rlsbl.lint -- library boundary linting."""
 
 from rlsbl.lint import lint_library
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 # Helper to create a minimal Python project marker
 _PYPROJECT = '[project]\nname = "example"\n'

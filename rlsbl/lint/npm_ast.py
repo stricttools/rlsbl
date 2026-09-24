@@ -9,6 +9,7 @@ from tree_sitter import Language, Parser
 
 from .config import LanguageLintConfig
 from .result import LintResult
+from .tree_walk import iter_preorder, naming_source
 from .utils import walk_source_files
 
 JS_LANG = Language(tree_sitter_javascript.language())
@@ -30,6 +31,12 @@ def _lang_for_ext(ext):
     if ext in _TSX_EXTENSIONS:
         return TSX_LANG
     return JS_LANG
+
+
+def _parse(filepath, source):
+    """Parse *source* with the grammar *filepath*'s extension selects."""
+    lang = _lang_for_ext(os.path.splitext(filepath)[1])
+    return Parser(lang).parse(source.encode("utf-8"))
 
 
 def _node_line(node):
@@ -55,24 +62,13 @@ def _collect_all_imports(tree, filepath):
     """
     imports = set()
 
-    def _walk(node):
-        if node.type == "import_statement":
+    for node in iter_preorder(tree.root_node):
+        if node.type in ("import_statement", "export_statement"):
             for child in node.children:
                 if child.type == "string":
                     pkg = _extract_string(child)
                     imports.add((pkg, filepath, _node_line(node), False))
-            for child in node.children:
-                _walk(child)
-            return
-
-        if node.type == "export_statement":
-            for child in node.children:
-                if child.type == "string":
-                    pkg = _extract_string(child)
-                    imports.add((pkg, filepath, _node_line(node), False))
-            for child in node.children:
-                _walk(child)
-            return
+            continue
 
         if node.type == "call_expression":
             func = node.children[0] if node.children else None
@@ -98,10 +94,6 @@ def _collect_all_imports(tree, filepath):
                             imports.add((pkg, filepath, _node_line(node), False))
                             break
 
-        for child in node.children:
-            _walk(child)
-
-    _walk(tree.root_node)
     return imports
 
 
@@ -132,7 +124,7 @@ def _check_stdout(tree, filepath, config):
     if "console" in ignore:
         return results
 
-    def _walk(node):
+    for node in iter_preorder(tree.root_node):
         if node.type == "call_expression":
             func = node.children[0] if node.children else None
             if func and func.type == "member_expression":
@@ -156,10 +148,6 @@ def _check_stdout(tree, filepath, config):
                         message=f"Library calls console.{method}()",
                     ))
 
-        for child in node.children:
-            _walk(child)
-
-    _walk(tree.root_node)
     return results
 
 
@@ -227,15 +215,11 @@ class NpmAstLinter:
             except (OSError, UnicodeDecodeError):
                 continue
 
-            ext = os.path.splitext(filepath)[1]
-            lang = _lang_for_ext(ext)
-            parser = Parser(lang)
-            source_bytes = source.encode("utf-8")
-            tree = parser.parse(source_bytes)
-
-            results.extend(_check_forbidden_imports(tree, filepath, config))
-            if config.stdout_enabled:
-                results.extend(_check_stdout(tree, filepath, config))
+            with naming_source(filepath):
+                tree = _parse(filepath, source)
+                results.extend(_check_forbidden_imports(tree, filepath, config))
+                if config.stdout_enabled:
+                    results.extend(_check_stdout(tree, filepath, config))
 
         return results
 
@@ -257,11 +241,8 @@ class NpmAstLinter:
             except (OSError, UnicodeDecodeError):
                 continue
 
-            ext = os.path.splitext(filepath)[1]
-            lang = _lang_for_ext(ext)
-            parser = Parser(lang)
-            source_bytes = source.encode("utf-8")
-            tree = parser.parse(source_bytes)
-            all_imports.update(_collect_all_imports(tree, filepath))
+            with naming_source(filepath):
+                tree = _parse(filepath, source)
+                all_imports.update(_collect_all_imports(tree, filepath))
 
         return all_imports

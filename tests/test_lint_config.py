@@ -9,6 +9,9 @@ from rlsbl.lint import lint_library
 from rlsbl.lint.config import load_language_config, load_parser_setting
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 class TestLoadParserSetting:
     """load_parser_setting: missing file defaults; invalid present values hard-error."""
 

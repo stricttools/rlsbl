@@ -14,6 +14,7 @@ what make it safe to run, and each is pinned below:
 """
 
 import os
+import subprocess
 
 import pytest
 
@@ -31,6 +32,10 @@ OLD = "github.com/o/foo"
 NEW = "github.com/n/qux"
 
 
+def _git(root, *args):
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+
+
 def _write(root, rel, text):
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,9 +45,14 @@ def _write(root, rel, text):
 
 @pytest.fixture
 def repo(tmp_path):
-    """A small Go module that imports itself, a neighbour, and a third party."""
+    """A small Go module that imports itself, a neighbour, and a third party.
+
+    A git work tree whose files are all untracked: the sweep reads what git
+    lists, and an untracked file that is not ignored is listed.
+    """
     root = tmp_path / "repo"
     root.mkdir()
+    _git(root, "init", "-q")
     _write(root, "go.mod", (
         f"module {OLD}\n"
         "\n"
@@ -263,6 +273,7 @@ class TestObserveAndApply:
         """The module need not be declared here -- an upstream move is a sweep too."""
         root = tmp_path / "consumer"
         root.mkdir()
+        _git(root, "init", "-q")
         _write(root, "go.mod", (
             "module example.com/app\n\nrequire " + OLD + " v1.0.0\n"
         ))
@@ -391,6 +402,7 @@ class TestASingleOccurrenceRepo:
     def test_a_module_directive_alone_is_a_one_file_plan(self, tmp_path):
         root = tmp_path / "bare"
         root.mkdir()
+        _git(root, "init", "-q")
         _write(root, "go.mod", f"module {OLD}\n")
         preview = observe(root, OLD, NEW)
         assert preview.keys == ("go.mod", "(total)")
@@ -473,6 +485,7 @@ class TestTheWalkerParameter:
     def test_the_default_is_the_linter_set(self, tmp_path):
         from rlsbl.lint.utils import LINTER_EXCLUDED_DIRS, walk_source_files
 
+        _git(tmp_path, "init", "-q")
         for rel in ("build/a.go", "assets/b.go", "pkg.egg-info/c.go", "src/d.go"):
             _write(tmp_path, rel, "package p\n")
         found = walk_source_files(str(tmp_path), (".go",), [])
@@ -485,6 +498,7 @@ class TestTheWalkerParameter:
     def test_an_explicit_set_replaces_it_entirely(self, tmp_path):
         from rlsbl.lint.utils import walk_source_files
 
+        _git(tmp_path, "init", "-q")
         for rel in ("build/a.go", "vendor/b.go", "src/d.go"):
             _write(tmp_path, rel, "package p\n")
         found = walk_source_files(
@@ -628,3 +642,76 @@ class TestTheStrictcliSchemaDump:
         out = capsys.readouterr().out
         assert f"{self.SCHEMA_REL}: rewrite" in out
         assert path.read_text() == before
+
+
+class TestTheWalkScope:
+    """The sweep considers exactly what ``git ls-files --cached --others
+    --exclude-standard`` lists: tracked files plus untracked files that are
+    not ignored, never an ignored one."""
+
+    @pytest.fixture
+    def git_repo(self, repo):
+        _git(repo, "add", "go.mod", "main.go")
+        _git(repo, "commit", "-q", "-m", "init")
+        return repo
+
+    def test_an_ignored_third_party_clone_is_not_rewritten(self, git_repo):
+        _write(git_repo, ".gitignore", "third_party/\n")
+        clone = _write(git_repo, "third_party/dep/dep.go", (
+            f'package dep\n\nimport "{OLD}/internal/svc"\n\nvar _ = svc.X\n'
+        ))
+        keys = {item.key for item in observe(git_repo, OLD, NEW).items}
+        assert os.path.join("third_party", "dep", "dep.go") not in keys
+        assert "main.go" in keys
+        cmd_go_module_path(
+            {"from-module": OLD, "to-module": NEW, "dry-run": False},
+            project_root=git_repo,
+        )
+        assert f'"{OLD}/internal/svc"' in clone.read_text()
+
+    def test_an_untracked_file_that_is_not_ignored_is_rewritten(self, git_repo):
+        # internal/svc/svc.go was never added: untracked, and not ignored.
+        keys = {item.key for item in observe(git_repo, OLD, NEW).items}
+        assert os.path.join("internal", "svc", "svc.go") in keys
+
+    def test_a_deep_generated_file_is_rewritten_not_a_crash(self, git_repo):
+        """A generated file whose one string concatenation is thousands of
+        terms deep parses into a tree deeper than Python's recursion limit."""
+        concat = " +\n\t".join(['"x"'] * 3150)
+        _write(git_repo, "gen/descriptor.pb.go", (
+            f'package gen\n\nimport "{OLD}/internal/deep"\n\n'
+            f"var _ = deep.Y\n\nconst raw = {concat}\n"
+        ))
+        keys = {item.key for item in observe(git_repo, OLD, NEW).items}
+        assert os.path.join("gen", "descriptor.pb.go") in keys
+
+    def test_a_directory_outside_any_git_work_tree_is_refused(self, tmp_path, capsys):
+        plain = tmp_path / "plain"
+        _write(plain, "go.mod", f"module {OLD}\n")
+        with pytest.raises(SystemExit) as exc:
+            cmd_go_module_path(
+                {"from-module": OLD, "to-module": NEW, "dry-run": True},
+                project_root=plain,
+            )
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "not inside a git work tree" in err
+        assert str(plain) in err
+
+    def test_a_file_that_fails_to_parse_is_named(self, git_repo, monkeypatch, capsys):
+        from rlsbl.lint import go_ast
+
+        class _Exhausted:
+            def parse(self, _source):
+                raise RecursionError("maximum recursion depth exceeded")
+
+        monkeypatch.setattr(go_ast, "_make_parser", _Exhausted)
+        with pytest.raises(SystemExit) as exc:
+            cmd_go_module_path(
+                {"from-module": OLD, "to-module": NEW, "dry-run": True},
+                project_root=git_repo,
+            )
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert f"Error: {git_repo}{os.sep}" in err
+        assert ".go: could not be parsed: RecursionError: maximum recursion" in err

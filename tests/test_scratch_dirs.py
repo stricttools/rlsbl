@@ -15,6 +15,10 @@ from pathlib import Path
 from rlsbl.context import ProjectContext
 
 from conftest import capture_all_checks, run_git
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

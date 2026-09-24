@@ -25,6 +25,9 @@ from rlsbl.lint.languages import LANGUAGES, LANGUAGES_BY_NAME, get_language
 from rlsbl.targets import TARGETS, targets_with_library_lint
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 class TestLanguageTableIsTheAuthority:
     """Everything the linter knows about a language comes from one table."""
 

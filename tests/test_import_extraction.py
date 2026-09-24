@@ -6,6 +6,10 @@ import json
 from rlsbl.lint.npm_ast import NpmAstLinter
 from rlsbl.lint.protocol import ImportScanner
 from rlsbl.lint.python_ast import PythonAstLinter
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 
 _PYPROJECT = '[project]\nname = "example"\n'

@@ -28,6 +28,9 @@ from rlsbl.targets import TARGETS
 from rlsbl.workspace_types import get_releasable_dir
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 def _git(cwd, *args):
     return subprocess.run(
         ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=True,

@@ -26,6 +26,9 @@ from rlsbl.module_paths import (
 )
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 class TestTheRule:
     def test_the_prefix_itself_is_inside(self):
         assert go_import_under_module("github.com/o/foo", "github.com/o/foo")

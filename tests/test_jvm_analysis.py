@@ -8,6 +8,10 @@ from rlsbl.dep_validation import (
     find_circular_jvm_deps,
     find_dead_jvm_modules,
 )
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 
 # ---------------------------------------------------------------------------

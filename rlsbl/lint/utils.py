@@ -1,9 +1,11 @@
-"""Shared file-walking utilities for linters providing recursive directory traversal with gitignore-aware filtering and extension matching."""
+"""Shared file-walking utilities for linters and source sweeps: the files git lists for a project (tracked, plus untracked files that are not ignored), filtered by extension, directory name, and pattern."""
 
 import fnmatch
 import os
+import subprocess
 from pathlib import Path
 
+from .. import effects
 from ..scratch_dirs import scratch_dir_paths
 
 #: Directory names a LINTER never descends into: virtualenvs, caches, and the
@@ -42,6 +44,86 @@ def _split_name_filters(names):
     return frozenset(exact), tuple(globs)
 
 
+class SourceWalkError(Exception):
+    """The files of a project could not be listed."""
+
+
+#: The listing every source walk starts from: tracked files, plus untracked
+#: files that are not ignored.  An ignored file -- a third-party clone, a build
+#: output, a local-only probe -- is never a project source.
+GIT_LIST_ARGS = ("ls-files", "-z", "--cached", "--others", "--exclude-standard")
+
+
+def git_listed_files(project_path: str) -> list[str]:
+    """What ``git ls-files --cached --others --exclude-standard`` lists under
+    *project_path*, as paths relative to it, sorted.
+
+    Only regular files are returned: a tracked path deleted from the working
+    tree, a submodule's gitlink, and a nested repository (listed as a
+    directory) are not files to read.
+
+    A *project_path* that does not exist holds no files, and yields none.
+
+    Raises:
+        SourceWalkError: *project_path* is not inside a git work tree, or git
+            could not be run.
+    """
+    if not os.path.isdir(project_path):
+        return []
+    try:
+        result = effects.run(
+            ["git", *GIT_LIST_ARGS],
+            cwd=project_path, capture_output=True, text=True, check=True,
+            timeout=120,
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or "").strip()
+        raise SourceWalkError(
+            f"{project_path} is not inside a git work tree: rlsbl reads exactly "
+            f"the files `git {' '.join(GIT_LIST_ARGS[:1] + GIT_LIST_ARGS[2:])}` "
+            f"lists (tracked, plus untracked files that are not ignored), so "
+            f"the directory must belong to a git repository"
+            + (f" (git said: {detail})" if detail else "")
+        ) from exc
+    except OSError as exc:
+        raise SourceWalkError(
+            f"could not run git to list the files of {project_path}: {exc}"
+        ) from exc
+    listed = set()
+    for rel in result.stdout.split("\0"):
+        if not rel or rel.endswith("/"):
+            continue
+        if os.path.isfile(os.path.join(project_path, rel)):
+            listed.add(rel)
+    return sorted(listed)
+
+
+def _dir_pattern_excludes(name, rel_subdir, exclude_patterns):
+    """Does an exclude pattern take the directory *rel_subdir* out?"""
+    for pat in exclude_patterns:
+        if pat.endswith("/"):
+            if fnmatch.fnmatch(name, pat.rstrip("/")) or fnmatch.fnmatch(
+                rel_subdir + "/", pat
+            ):
+                return True
+        elif fnmatch.fnmatch(rel_subdir, pat):
+            return True
+    return False
+
+
+def _file_pattern_excludes(rel, exclude_patterns):
+    """Does an exclude pattern take the file *rel* out?"""
+    for pat in exclude_patterns:
+        if pat.endswith("/"):
+            if pat.rstrip("/") in Path(rel).parts:
+                return True
+        elif fnmatch.fnmatch(os.path.basename(rel), pat):
+            return True
+        elif fnmatch.fnmatch(rel, pat):
+            return True
+    return False
+
+
 def walk_source_files(
     project_path: str,
     extensions: tuple[str, ...],
@@ -50,7 +132,13 @@ def walk_source_files(
     *,
     excluded_dir_names: frozenset[str] = LINTER_EXCLUDED_DIRS,
 ) -> list[str]:
-    """Walk project directory, return source files matching extensions.
+    """Return the project's source files matching *extensions*, absolute, sorted.
+
+    The candidates are exactly what :func:`git_listed_files` lists: tracked
+    files plus untracked files that are not ignored.  An ignored file is never
+    returned, whatever the filters below say, and a directory outside any git
+    work tree is refused (:class:`SourceWalkError`).  The filters then narrow
+    that listing:
 
     Args:
         project_path: root of the walk.
@@ -83,69 +171,37 @@ def walk_source_files(
             for d in exclude_dirs
         )
 
+    # Each directory's verdict, computed once however many files it holds.
+    dir_excluded: dict[str, bool] = {}
+
+    def _excluded_dir(rel_subdir):
+        verdict = dir_excluded.get(rel_subdir)
+        if verdict is None:
+            name = os.path.basename(rel_subdir)
+            verdict = (
+                name in exact_excluded
+                or any(fnmatch.fnmatchcase(name, pat) for pat in glob_excluded)
+                or os.path.realpath(os.path.join(project_path, rel_subdir))
+                in normalized_exclude_dirs
+                or (bool(exclude_patterns)
+                    and _dir_pattern_excludes(name, rel_subdir, exclude_patterns))
+            )
+            dir_excluded[rel_subdir] = verdict
+        return verdict
+
     results = []
-    for dirpath, dirs, filenames in os.walk(project_path):
-        dirs[:] = [
-            d for d in dirs
-            if d not in exact_excluded
-            and not any(fnmatch.fnmatchcase(d, pat) for pat in glob_excluded)
-        ]
-
-        # Prune directories that match exclude_dirs (sibling project paths)
-        if normalized_exclude_dirs:
-            dirs[:] = [
-                d for d in dirs
-                if os.path.realpath(os.path.join(dirpath, d))
-                not in normalized_exclude_dirs
-            ]
-
-        # Prune directories that match exclude patterns
-        if exclude_patterns:
-            rel_dir = os.path.relpath(dirpath, project_path)
-            pruned = []
-            for d in dirs:
-                rel_subdir = os.path.join(rel_dir, d) if rel_dir != "." else d
-                # Check if directory itself matches a pattern (e.g. "tests/")
-                skip = False
-                for pat in exclude_patterns:
-                    if pat.endswith("/"):
-                        if fnmatch.fnmatch(d, pat.rstrip("/")) or fnmatch.fnmatch(
-                            rel_subdir + "/", pat
-                        ):
-                            skip = True
-                            break
-                    elif fnmatch.fnmatch(rel_subdir, pat):
-                        skip = True
-                        break
-                if not skip:
-                    pruned.append(d)
-            dirs[:] = pruned
-
-        for filename in filenames:
-            if not any(filename.endswith(ext) for ext in extensions):
-                continue
-            full = os.path.join(dirpath, filename)
-            rel = os.path.relpath(full, project_path)
-
-            # Check file-level exclude patterns
-            if exclude_patterns:
-                skip = False
-                for pat in exclude_patterns:
-                    if pat.endswith("/"):
-                        # Directory pattern, already handled above
-                        parts = Path(rel).parts
-                        dir_name = pat.rstrip("/")
-                        if dir_name in parts:
-                            skip = True
-                            break
-                    elif fnmatch.fnmatch(os.path.basename(rel), pat):
-                        skip = True
-                        break
-                    elif fnmatch.fnmatch(rel, pat):
-                        skip = True
-                        break
-                if skip:
-                    continue
-
-            results.append(full)
+    for rel_posix in git_listed_files(project_path):
+        filename = rel_posix.rsplit("/", 1)[-1]
+        if not any(filename.endswith(ext) for ext in extensions):
+            continue
+        parts = rel_posix.split("/")
+        if any(
+            _excluded_dir("/".join(parts[:i + 1]))
+            for i in range(len(parts) - 1)
+        ):
+            continue
+        rel = os.path.join(*parts)
+        if exclude_patterns and _file_pattern_excludes(rel, exclude_patterns):
+            continue
+        results.append(os.path.join(project_path, rel))
     return results

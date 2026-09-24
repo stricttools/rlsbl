@@ -1639,37 +1639,36 @@ def _build_jvm_class_index(project_dir: str) -> dict[str, str]:
         if not os.path.isdir(src_dir):
             continue
 
-        for dirpath, _dirs, filenames in os.walk(src_dir):
-            for filename in filenames:
-                if not filename.endswith(_JVM_SOURCE_EXTENSIONS):
-                    continue
+        # What git lists under the source root, every directory visited.
+        for filepath in walk_source_files(
+            src_dir, _JVM_SOURCE_EXTENSIONS, [], excluded_dir_names=frozenset(),
+        ):
+            filename = os.path.basename(filepath)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except (OSError, UnicodeDecodeError):
+                continue
 
-                filepath = os.path.join(dirpath, filename)
-                try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        content = f.read()
-                except (OSError, UnicodeDecodeError):
-                    continue
+            # Extract package declaration
+            pkg_match = _JVM_PACKAGE_RE.search(content)
+            package = pkg_match.group(1) if pkg_match else ""
 
-                # Extract package declaration
-                pkg_match = _JVM_PACKAGE_RE.search(content)
-                package = pkg_match.group(1) if pkg_match else ""
+            # Choose type regex based on file extension
+            if filename.endswith(".java"):
+                type_re = _JAVA_TYPE_RE
+            else:
+                type_re = _KOTLIN_TYPE_RE
 
-                # Choose type regex based on file extension
-                if filename.endswith(".java"):
-                    type_re = _JAVA_TYPE_RE
+            # Extract all type declarations
+            rel_path = os.path.relpath(filepath, project_dir)
+            for m in type_re.finditer(content):
+                type_name = m.group(1)
+                if package:
+                    fqn = f"{package}.{type_name}"
                 else:
-                    type_re = _KOTLIN_TYPE_RE
-
-                # Extract all type declarations
-                rel_path = os.path.relpath(filepath, project_dir)
-                for m in type_re.finditer(content):
-                    type_name = m.group(1)
-                    if package:
-                        fqn = f"{package}.{type_name}"
-                    else:
-                        fqn = type_name
-                    index[fqn] = rel_path
+                    fqn = type_name
+                index[fqn] = rel_path
 
     return index
 

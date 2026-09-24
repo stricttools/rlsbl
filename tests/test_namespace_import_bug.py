@@ -10,6 +10,10 @@ imported.
 """
 
 from rlsbl.import_scanners import PythonImportScanner
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 
 class TestNamespacePackageImports:

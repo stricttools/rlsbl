@@ -19,6 +19,12 @@ left alone.
 What is deliberately NOT rewritten
 ----------------------------------
 
+* **Anything git ignores.**  The sweep reads exactly what ``git ls-files
+  --cached --others --exclude-standard`` lists (see
+  :func:`rlsbl.lint.utils.walk_source_files`): tracked files plus untracked
+  files that are not ignored.  A gitignored third-party clone is somebody
+  else's module, and a directory outside any git work tree is refused.
+
 * **Comments.**  ``//`` text in a ``go.mod`` and anything outside an import
   spec in a ``.go`` file are prose; rewriting them would make the occurrence
   counts describe something other than the code being moved.  Grep for the old
@@ -53,7 +59,8 @@ from dataclasses import dataclass
 
 from ... import effects
 from ...lint.go_ast import scan_imports
-from ...lint.utils import walk_source_files
+from ...lint.tree_walk import SourceParseError
+from ...lint.utils import SourceWalkError, walk_source_files
 from ...module_paths import GO_SEP, go_import_under_module, rewrite_module_prefix
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
 from .abort import already_written
@@ -568,7 +575,7 @@ def cmd_go_module_path(flags, project_root):
     )
     try:
         preview = reconcile(reconciler, dry_run=dry_run)
-    except GoModuleRewriteError as e:
+    except (GoModuleRewriteError, SourceParseError, SourceWalkError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

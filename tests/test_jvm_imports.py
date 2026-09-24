@@ -8,6 +8,10 @@ from rlsbl.import_scanners import (
     build_jvm_package_map,
 )
 from rlsbl.targets.maven import MavenTarget
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 
 # ---------------------------------------------------------------------------

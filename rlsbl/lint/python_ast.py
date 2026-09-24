@@ -9,6 +9,7 @@ from tree_sitter import Language, Parser
 
 from .config import LanguageLintConfig
 from .result import LintResult
+from .tree_walk import iter_preorder, naming_source
 from .utils import walk_source_files
 
 @dataclasses.dataclass(frozen=True)
@@ -146,15 +147,10 @@ def _collect_all_imports(tree, filepath):
     """
     imports = set()
 
-    def _walk(node):
+    for node in iter_preorder(tree.root_node):
         if node.type == "import_statement":
             guarded = _is_in_try_except_import_error(node)
             tc = _is_in_type_checking_block(node)
-            if guarded:
-                # Still walk children for nested structures, but also
-                # collect the import as guarded below.
-                for child in node.children:
-                    _walk(child)
             for child in node.children:
                 if child.type == "dotted_name":
                     module = child.text.decode("utf-8")
@@ -174,14 +170,9 @@ def _collect_all_imports(tree, filepath):
                             filepath=filepath, line=_node_line(node),
                             guarded=guarded, type_checking=tc,
                         ))
-            if guarded:
-                return
         elif node.type == "import_from_statement":
             guarded = _is_in_try_except_import_error(node)
             tc = _is_in_type_checking_block(node)
-            if guarded:
-                for child in node.children:
-                    _walk(child)
             module_node = child_by_field(node, "module_name")
             if module_node:
                 module = module_node.text.decode("utf-8")
@@ -191,12 +182,6 @@ def _collect_all_imports(tree, filepath):
                     filepath=filepath, line=_node_line(node),
                     guarded=guarded, type_checking=tc,
                 ))
-            if guarded:
-                return
-        for child in node.children:
-            _walk(child)
-
-    _walk(tree.root_node)
     return imports
 
 
@@ -238,13 +223,11 @@ def _check_stdout(tree, filepath, config):
     results = []
     ignore = set(config.stdout_ignore)
 
-    def _walk(node):
+    for node in iter_preorder(tree.root_node):
         if node.type == "call":
             func = node.child_by_field_name("function")
             if func is None:
-                for child in node.children:
-                    _walk(child)
-                return
+                continue
 
             # print() calls
             if func.type == "identifier" and func.text == b"print" and "print" not in ignore:
@@ -289,10 +272,6 @@ def _check_stdout(tree, filepath, config):
                         message="Library uses logging directly",
                     ))
 
-        for child in node.children:
-            _walk(child)
-
-    _walk(tree.root_node)
     return results
 
 
@@ -339,37 +318,44 @@ def _always_terminates(node):
     - It is an if_statement with an else_clause where the if body, all elif
       bodies, and the else body all always terminate.
     """
-    if node.type in _TERMINATOR_TYPES:
-        return True
+    # Every node on the stack must terminate for *node* to; the answer is
+    # False as soon as one does not.  A stack rather than recursion, because
+    # if/else nesting can run deeper than Python's recursion limit.
+    pending = [node]
+    while pending:
+        current = pending.pop()
+        if current.type in _TERMINATOR_TYPES:
+            continue
 
-    if node.type == "block":
-        children = [c for c in node.children if c.is_named and c.type != "comment"]
-        return bool(children) and _always_terminates(children[-1])
+        if current.type == "block":
+            children = [c for c in current.children if c.is_named and c.type != "comment"]
+            if not children:
+                return False
+            pending.append(children[-1])
+            continue
 
-    if node.type == "if_statement":
-        has_else = False
-        # Collect the if body and all elif/else clause bodies
-        bodies = []
-        for child in node.children:
-            if child.type == "block":
-                # The if branch body
-                bodies.append(child)
-            elif child.type == "elif_clause":
-                for ec_child in child.children:
-                    if ec_child.type == "block":
-                        bodies.append(ec_child)
-            elif child.type == "else_clause":
-                has_else = True
-                for ec_child in child.children:
-                    if ec_child.type == "block":
-                        bodies.append(ec_child)
+        if current.type == "if_statement":
+            has_else = False
+            # Collect the if body and all elif/else clause bodies
+            for child in current.children:
+                if child.type == "block":
+                    # The if branch body
+                    pending.append(child)
+                elif child.type == "elif_clause":
+                    for ec_child in child.children:
+                        if ec_child.type == "block":
+                            pending.append(ec_child)
+                elif child.type == "else_clause":
+                    has_else = True
+                    for ec_child in child.children:
+                        if ec_child.type == "block":
+                            pending.append(ec_child)
+            if not has_else:
+                return False
+            continue
 
-        if not has_else:
-            return False
-
-        return all(_always_terminates(body) for body in bodies)
-
-    return False
+        return False
+    return True
 
 
 def _terminator_label(node):
@@ -395,12 +381,13 @@ def _check_unreachable_code(tree, filepath):
     if/else with all branches terminating), any subsequent sibling statements
     are flagged as unreachable.
 
-    Skips nested function and class definitions -- a return inside a nested
-    function does not make the outer code unreachable.
+    Each block is judged on its own direct statements only, so a return
+    inside a nested function or class body never makes the enclosing block's
+    code unreachable; the nested body is checked as a block of its own.
     """
     results = []
 
-    def _walk_blocks(node):
+    for node in iter_preorder(tree.root_node):
         if node.type == "block":
             named_children = [c for c in node.children if c.is_named and c.type != "comment"]
             found_terminator = None
@@ -416,19 +403,6 @@ def _check_unreachable_code(tree, filepath):
                 elif _always_terminates(child):
                     found_terminator = child
 
-        # Recurse into children, but skip nested function/class definitions
-        # to avoid false positives (a return in an inner function does not
-        # terminate the outer block)
-        for child in node.children:
-            if child.type in ("function_definition", "class_definition"):
-                # Still walk inside the function/class to find unreachable
-                # code within those scopes
-                for grandchild in child.children:
-                    _walk_blocks(grandchild)
-            else:
-                _walk_blocks(child)
-
-    _walk_blocks(tree.root_node)
     return results
 
 
@@ -455,13 +429,12 @@ class PythonAstLinter:
             except (OSError, UnicodeDecodeError):
                 continue
 
-            source_bytes = source.encode("utf-8")
-            tree = parser.parse(source_bytes)
-
-            results.extend(_check_forbidden_imports(tree, filepath, config))
-            if config.stdout_enabled:
-                results.extend(_check_stdout(tree, filepath, config))
-            results.extend(_check_unreachable_code(tree, filepath))
+            with naming_source(filepath):
+                tree = parser.parse(source.encode("utf-8"))
+                results.extend(_check_forbidden_imports(tree, filepath, config))
+                if config.stdout_enabled:
+                    results.extend(_check_stdout(tree, filepath, config))
+                results.extend(_check_unreachable_code(tree, filepath))
 
         return results
 
@@ -486,8 +459,8 @@ class PythonAstLinter:
             except (OSError, UnicodeDecodeError):
                 continue
 
-            source_bytes = source.encode("utf-8")
-            tree = parser.parse(source_bytes)
-            all_imports.update(_collect_all_imports(tree, filepath))
+            with naming_source(filepath):
+                tree = parser.parse(source.encode("utf-8"))
+                all_imports.update(_collect_all_imports(tree, filepath))
 
         return all_imports

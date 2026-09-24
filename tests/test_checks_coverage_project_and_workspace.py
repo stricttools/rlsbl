@@ -24,6 +24,10 @@ from rlsbl.check_context import WorkspaceCheckContext
 from rlsbl.checks.scope import scope_adapter
 from rlsbl.context import ProjectContext
 from rlsbl.targets.outcomes import SuiteRunOutcome, SuiteRunStatus
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 # run_project_tests answers with a SuiteRunOutcome, not a bool: a target with no
 # built-in runner must be distinguishable from a suite that ran and passed.
 _TESTS_PASSED = SuiteRunOutcome(SuiteRunStatus.PASSED, "pypi tests passed")

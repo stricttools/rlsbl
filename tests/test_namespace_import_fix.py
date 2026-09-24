@@ -22,6 +22,9 @@ from rlsbl.lint.python_ast import ImportRecord
 from rlsbl.targets.utils import detect_python_package_root
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 class TestDetectPythonPackageRoot:
     """detect_python_package_root returns the package root from hatch config or filesystem."""
 
