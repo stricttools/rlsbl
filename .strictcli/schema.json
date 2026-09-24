@@ -641,7 +641,7 @@
     },
     "check-name": {
       "name": "check-name",
-      "help": "Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.",
+      "help": "Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks.",
       "effect": "read_only",
       "payload_schema": {
         "type": [
@@ -656,12 +656,33 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "available",
+              "taken",
+              "invalid",
+              "discouraged",
+              "error"
+            ]
           },
           "reason": {
             "type": [
               "string",
               "null"
+            ],
+            "enum": [
+              null,
+              "registered",
+              "stdlib",
+              "moniker",
+              "normalized",
+              "ultranorm",
+              "not-identifier",
+              "keyword",
+              "blank",
+              "uppercase",
+              "underscore",
+              "predeclared"
             ]
           },
           "structured_conflicts": {
@@ -697,9 +718,6 @@
           },
           "error": {
             "type": "string"
-          },
-          "github_count": {
-            "type": "integer"
           }
         },
         "required": [
@@ -722,12 +740,33 @@
               "type": "string"
             },
             "status": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "available",
+                "taken",
+                "invalid",
+                "discouraged",
+                "error"
+              ]
             },
             "reason": {
               "type": [
                 "string",
                 "null"
+              ],
+              "enum": [
+                null,
+                "registered",
+                "stdlib",
+                "moniker",
+                "normalized",
+                "ultranorm",
+                "not-identifier",
+                "keyword",
+                "blank",
+                "uppercase",
+                "underscore",
+                "predeclared"
               ]
             },
             "structured_conflicts": {
@@ -763,9 +802,6 @@
             },
             "error": {
               "type": "string"
-            },
-            "github_count": {
-              "type": "integer"
             }
           },
           "required": [
@@ -783,7 +819,7 @@
       "flags": [
         {
           "name": "target",
-          "help": "Registry to query for name availability; repeatable",
+          "help": "Registry or rule set to check each name against; repeatable",
           "value_schema": {
             "type": "array",
             "items": {
@@ -791,8 +827,7 @@
               "enum": [
                 "npm",
                 "pypi",
-                "go",
-                "github"
+                "go"
               ]
             }
           },
@@ -808,18 +843,14 @@
             },
             {
               "value": "go",
-              "help": "the Go module proxy"
-            },
-            {
-              "value": "github",
-              "help": "GitHub repository names"
+              "help": "the Go package name the candidate implies, judged offline (no network): invalid when it is not a Go identifier, is a keyword, or is the blank identifier (the Go spec refuses these as a package clause); taken when it is the name of a Go standard-library package (the last element of its import path, from a committed `go list std` table), since every file importing both needs an alias; discouraged when it has uppercase letters or underscores (Effective Go) or is a predeclared identifier such as len; available otherwise"
             }
           ],
           "unique": true
         },
         {
           "name": "delay",
-          "help": "Milliseconds to wait between consecutive registry API queries",
+          "help": "Milliseconds to wait between consecutive registry API queries (the offline go check never waits)",
           "value_schema": {
             "type": "string"
           },
@@ -2105,19 +2136,18 @@
         },
         "check-names": {
           "name": "check-names",
-          "help": "Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.",
+          "help": "Check every publishable project name in the monorepo workspace against one target, with the same verdicts as check-name. npm and PyPI query the registry for each name and report whether it is available or already taken; go judges the Go package name each project implies offline, as available, taken by a standard-library package, invalid, or discouraged. Supports optional prefix and suffix arguments to test naming conventions, with a configurable delay between registry queries to avoid rate limiting.",
           "effect": "read_only",
           "flags": [
             {
               "name": "target",
-              "help": "Registry to query for name availability across all workspace projects",
+              "help": "Registry or rule set to check every workspace project name against",
               "value_schema": {
                 "type": "string",
                 "enum": [
                   "npm",
                   "pypi",
-                  "go",
-                  "github"
+                  "go"
                 ]
               },
               "presence": "required",
@@ -2132,11 +2162,7 @@
                 },
                 {
                   "value": "go",
-                  "help": "the Go module proxy"
-                },
-                {
-                  "value": "github",
-                  "help": "GitHub repository names"
+                  "help": "the Go package name the candidate implies, judged offline (no network): invalid when it is not a Go identifier, is a keyword, or is the blank identifier (the Go spec refuses these as a package clause); taken when it is the name of a Go standard-library package (the last element of its import path, from a committed `go list std` table), since every file importing both needs an alias; discouraged when it has uppercase letters or underscores (Effective Go) or is a predeclared identifier such as len; available otherwise"
                 }
               ]
             },
@@ -2158,7 +2184,7 @@
             },
             {
               "name": "delay",
-              "help": "Milliseconds to wait between consecutive registry API queries",
+              "help": "Milliseconds to wait between consecutive registry API queries (the offline go check never waits)",
               "value_schema": {
                 "type": "string"
               },
