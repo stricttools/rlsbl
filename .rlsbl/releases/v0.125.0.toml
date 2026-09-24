@@ -25,3 +25,7 @@ pre-1.0, so the removal ships without a compatibility shim.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "7ddb377baa0b0273a7b094a383aafaa1917329c4"
+
+[tree_hashes]
+"." = "8649cc489782bd15d19b29edfbdbdf02fd3083c4"
