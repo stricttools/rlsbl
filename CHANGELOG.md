@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 0.125.0
+
+check-name --target go becomes an offline Go package-name check against the language and a committed standard-library table, and the github target is removed.
+
+<details>
+<summary>Context</summary>
+
+Neither networked check could inform a naming decision. A Go module path lives
+under its owner, so pkg.go.dev for a bare name almost always said not found;
+a GitHub repository name is owner-scoped, so a GitHub-wide count never meant
+taken. What a Go name can really collide with is the language and the
+standard library, both knowable offline: the go target now reports invalid,
+taken (by a standard-library package), discouraged, or available. rlsbl is
+pre-1.0, so the removal ships without a compatibility shim.
+
+</details>
+
+### Breaking
+
+- **`check-name --target go` now judges the Go package name offline, and the `github` target is removed.** Requesting pkg.go.dev for a bare name almost always answered "not found" and said nothing, and the GitHub target only counted repositories anywhere containing the name, which is scoped to each owner and never meant it was taken. The go target now contacts no network and checks the identifier callers would type: `invalid` when it is not a Go identifier, is a keyword, or is `_` (the note says the package clause must then differ from the path element, and suggests no name); `taken` with reason `stdlib` when it is the name of a Go standard-library package, with the colliding import paths (such as `encoding/json`) under `structured_conflicts` with the `go-stdlib` rule; `discouraged` for uppercase letters, underscores, or a predeclared identifier such as `len`; `available` otherwise. The standard-library list is a committed table generated from `go list std`, never read from a local toolchain. The `exists` and `not_found` statuses and the `github_count` field are gone, `--target github` is refused at parse time by `check-name` and `monorepo check-names`, and neither command waits `--delay` between offline go checks.
+
 ## 0.124.2
 
 The committed strictspec validators are regenerated for the generated-code-format pairing, so a fresh install imports them.
