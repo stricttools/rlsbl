@@ -75,9 +75,9 @@
     "schema_hash": "6bf61b345615538d2a83180e7b498ab5eea7397122e629c8925c2d84f3d867ce"
   },
   "en/cli-monorepo.md": {
-    "content": "d9e91fa5e59a18b7a06ab4d6b8a57dbdea6fcda62f4cf81e4020945711b87233",
+    "content": "688605ec7cf939e96f62ad850a0333cb53605ab538bcbe2713ca31ea7e59ddee",
     "description": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff",
-    "schema_hash": "2a217725f00996fbd2387f591f834cbf172f8404ab8d2efecbc7d92f3c9bb807",
+    "schema_hash": "1e4cbacde27459505c0e6c2d8e05c37d2109a791bfc745e7e4eb083e2b0097b6",
     "seed_hash": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff"
   },
   "en/cli-pre-push-check.md": {
