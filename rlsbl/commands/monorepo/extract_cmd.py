@@ -1843,6 +1843,13 @@ def _apply_state(dep, item, run):
     for name in _state_entries(dep):
         src = os.path.join(dep.source_state_dir, name)
         dst = os.path.join(dep.dest_state_dir, name)
+        if name == "bases" and not dep.is_multi:
+            # A member's merge bases sit under its path in the releasable's
+            # bases/; the hoisted member is the standalone project itself.
+            member_bases = os.path.join(src, dep.members[0].path)
+            if os.path.isdir(member_bases):
+                effects.copytree(member_bases, dst, dirs_exist_ok=True)
+            continue
         if os.path.isdir(src):
             effects.copytree(src, dst, dirs_exist_ok=True)
         elif name == "config.json" and not dep.is_multi:

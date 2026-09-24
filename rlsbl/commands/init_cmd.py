@@ -561,9 +561,56 @@ def check_unreplaced_vars(source_path, unreplaced):
         )
 
 
+def _releasable_member_root(project_root):
+    """``(workspace_root, releasable_dir)`` when *project_root* is a releasable
+    member other than the workspace root, else None.
+
+    Such a member keeps no release state of its own (see
+    :func:`rlsbl.releasable_cleanup.verify_minimal_rlsbl`, which the
+    ``releasable-residue`` check enforces): its releasable's state directory
+    keeps it instead.  The root member is exempt -- its ``.rlsbl/`` is the
+    workspace's own.
+    """
+    rel_dir = _get_releasable_config_dir(project_root)
+    if rel_dir is None:
+        return None
+    from ..workspace import find_workspace_root
+
+    ws_root = find_workspace_root(str(project_root))
+    if os.path.realpath(str(project_root)) == os.path.realpath(str(ws_root)):
+        return None
+    return ws_root, rel_dir
+
+
+def scaffold_bases_dir(project_root):
+    """The directory holding *project_root*'s scaffold merge bases, absolute.
+
+    A standalone project, the workspace root, and a member that releases
+    nothing keep them in their own ``.rlsbl/bases/``.  A releasable member
+    keeps them in its releasable's state directory, under the member's path
+    (``.rlsbl-monorepo/releasables/<name>/bases/<member path>/``), because
+    that is where the workspace keeps a releasable member's state.
+    """
+    member = _releasable_member_root(project_root)
+    if member is None:
+        return os.path.join(str(project_root), BASES_DIR)
+    ws_root, rel_dir = member
+    member_path = os.path.relpath(
+        os.path.realpath(str(project_root)), os.path.realpath(str(ws_root)),
+    )
+    return os.path.join(rel_dir, "bases", member_path)
+
+
+def _bases_dir():
+    """The merge-base directory of the project being scaffolded, relative to
+    it (the cwd): ``.rlsbl/bases`` for a standalone project."""
+    cwd = os.getcwd()
+    return os.path.relpath(scaffold_bases_dir(cwd), cwd)
+
+
 def _save_base(target, content):
     """Save rendered template content as the merge base for future three-way merges."""
-    base_path = os.path.join(BASES_DIR, target)
+    base_path = os.path.join(_bases_dir(), target)
     effects.makedirs(os.path.dirname(base_path), exist_ok=True)
     with effects.open_write(base_path, "w", encoding="utf-8") as f:
         f.write(content)
@@ -571,7 +618,7 @@ def _save_base(target, content):
 
 def _load_base(target):
     """Load the stored merge base for a target file. Returns None if not stored."""
-    base_path = os.path.join(BASES_DIR, target)
+    base_path = os.path.join(_bases_dir(), target)
     if not os.path.exists(base_path):
         return None
     with open(base_path, "r", encoding="utf-8") as f:
@@ -634,13 +681,14 @@ def _require_healable_bases_dir():
     Fresh projects (no ``managed-files.json``) are exempt: their first scaffold
     legitimately has no bases yet and creates the directory as it runs.
     """
-    if os.path.exists(MANAGED_FILES) and not os.path.isdir(BASES_DIR):
+    bases_dir = _bases_dir()
+    if os.path.exists(MANAGED_FILES) and not os.path.isdir(bases_dir):
         raise ConfigError(
-            f"{BASES_DIR} is missing but {MANAGED_FILES} exists: this project "
+            f"{bases_dir} is missing but {MANAGED_FILES} exists: this project "
             "was scaffolded before merge-base tracking and cannot merge "
             "template updates safely.\n"
             "  To heal, create the base directory and re-run scaffold:\n"
-            f"    mkdir -p {BASES_DIR} && rlsbl scaffold\n"
+            f"    mkdir -p {bases_dir} && rlsbl scaffold\n"
             "  The re-run reconstructs each managed file's merge base from its "
             "most recent 'rlsbl scaffold' commit, then performs a normal "
             "three-way merge (conflicts surface as markers, never silent "
@@ -1283,14 +1331,19 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     # remapping after amend/rebase). Same content-hash strategy as pre-push.
     _install_or_update_post_rewrite_hook()
 
-    # Write scaffolding version marker so the pre-push hook can detect drift
-    from rlsbl import __version__
-    marker_dir = os.path.join(".", ".rlsbl")
-    effects.makedirs(marker_dir, exist_ok=True)
-    marker_path = os.path.join(marker_dir, "version")
-    with effects.open_write(marker_path, "w") as f:
-        f.write(__version__ + "\n")
-    print("Wrote scaffolding version marker (.rlsbl/version)")
+    # Write scaffolding version marker so the pre-push hook can detect drift.
+    # A releasable member keeps no marker of its own: the pre-push hook reads
+    # the repository root's, and the release flow writes none for a member.
+    if _releasable_member_root(os.getcwd()) is None:
+        from rlsbl import __version__
+        marker_dir = os.path.join(".", ".rlsbl")
+        effects.makedirs(marker_dir, exist_ok=True)
+        marker_path = os.path.join(marker_dir, "version")
+        with effects.open_write(marker_path, "w") as f:
+            f.write(__version__ + "\n")
+        print("Wrote scaffolding version marker (.rlsbl/version)")
+
+    bases_dir = _bases_dir()
 
     # Persist file hashes for future customization detection
     all_new_hashes = {}
@@ -1317,13 +1370,13 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
             )
             orphan_removed.add(orphan_path)
             # Also clean up the merge base if it exists
-            base_path = os.path.join(BASES_DIR, orphan_path)
+            base_path = os.path.join(bases_dir, orphan_path)
             if os.path.exists(base_path):
                 saferm_delete(
                     base_path,
                     description=f"Removing orphaned scaffold merge base: {base_path}",
                 )
-                # Prune empty parent directories up to BASES_DIR
+                # Prune empty parent directories up to the bases directory
                 try:
                     effects.removedirs(os.path.dirname(base_path))
                 except OSError:
@@ -1341,11 +1394,11 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     # template removed).  The first pass above handles bases for orphaned managed
     # files; this second pass catches bases that linger after the managed file
     # was removed outside the orphan loop (e.g., manually deleted or renamed).
-    if os.path.isdir(BASES_DIR):
-        for dirpath, _dirnames, filenames in os.walk(BASES_DIR):
+    if os.path.isdir(bases_dir):
+        for dirpath, _dirnames, filenames in os.walk(bases_dir):
             for fname in filenames:
                 base_abs = os.path.join(dirpath, fname)
-                managed_rel = os.path.relpath(base_abs, BASES_DIR)
+                managed_rel = os.path.relpath(base_abs, bases_dir)
                 if managed_rel not in all_new_hashes:
                     if dry_run:
                         print(f"Would remove orphaned base: {base_abs}")
@@ -1355,7 +1408,7 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                             description=f"Removing orphaned scaffold merge base: {base_abs}",
                         )
                         print(f"Removing orphaned scaffold merge base: {base_abs}")
-                        # Prune empty parent directories up to BASES_DIR
+                        # Prune empty parent directories up to the bases directory
                         try:
                             effects.removedirs(os.path.dirname(base_abs))
                         except OSError:
@@ -1442,9 +1495,10 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
         if os.path.exists(rlsbl_file) and rlsbl_file not in files_to_commit:
             files_to_commit.append(rlsbl_file)
     # Include any base files that were saved for the created targets
-    if os.path.isdir(BASES_DIR):
+    bases_dir = _bases_dir()
+    if os.path.isdir(bases_dir):
         for target, _ in created:
-            base_path = os.path.join(BASES_DIR, target)
+            base_path = os.path.join(bases_dir, target)
             if os.path.exists(base_path) and base_path not in files_to_commit:
                 files_to_commit.append(base_path)
 

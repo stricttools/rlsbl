@@ -18,9 +18,9 @@ description = "How rlsbl scaffold generates CI workflows, git hooks, and the scr
 | `.rlsbl/hooks/pre-checks.sh` | User-owned pre-checks hook (runs before tests) |
 | `.rlsbl/hooks/pre-release.sh` | Scaffold-managed pre-release hook |
 | `.rlsbl/hooks/post-release.sh` | Scaffold-managed post-release hook |
-| `.rlsbl/bases/` | Merge bases for three-way merge (internal) |
+| `.rlsbl/bases/` | Merge bases for three-way merge (internal); a releasable member's live in its releasable's state directory instead (see below) |
 | `.rlsbl/hashes.json` | File hashes for change detection (internal) |
-| `.rlsbl/version` | Records which rlsbl version generated the scaffolding |
+| `.rlsbl/version` | Records which rlsbl version generated the scaffolding; not written for a releasable member |
 | `.gitignore` | Additions for build artifacts and rlsbl internals |
 | `CHANGELOG.md` | Generated changelog (created once, never overwritten) |
 | `experiments/.gitignore` | Makes `experiments/` a scratch directory git carries but never fills |
@@ -86,7 +86,7 @@ When scaffold runs on a project that already has scaffolded files, it performs a
 
 ### How it works
 
-After each scaffold run, the rendered template content is saved as a **base** in `.rlsbl/bases/<target-path>`. This base acts as the common ancestor for the next merge. On the next scaffold run, three versions exist for each file, allowing scaffold to compute a precise diff between what changed on each side:
+After each scaffold run, the rendered template content is saved as a **base** in `.rlsbl/bases/<target-path>`. In a monorepo, a member that belongs to a releasable keeps no release state of its own (the `releasable-residue` check refuses it), so its bases are saved where the workspace keeps that member's state: `.rlsbl-monorepo/releasables/<releasable>/bases/<member path>/<target-path>`; and no `.rlsbl/version` marker is written for it. This base acts as the common ancestor for the next merge. On the next scaffold run, three versions exist for each file, allowing scaffold to compute a precise diff between what changed on each side:
 
 - **Ours**: the file currently on disk (may include your edits)
 - **Base**: the last scaffolded version (what was written last time)

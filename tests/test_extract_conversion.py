@@ -1065,6 +1065,23 @@ class TestApplySingleMember:
             ns.initial_version
         )
 
+    def test_the_member_s_merge_bases_become_the_standalone_bases(self, tmp_path):
+        """A releasable keeps each member's scaffold merge bases under the
+        member's path; the hoisted member IS the standalone project, so its
+        bases land directly in the destination's ``.rlsbl/bases/``."""
+        ns = make_source(tmp_path)
+        _commit(ns.root, {
+            ".rlsbl-monorepo/releasables/extras/bases/pkgC/.github/workflows/ci.yml":
+                "name: CI\n",
+        }, "rlsbl scaffold")
+        target = tmp_path / "extras_out"
+
+        cmd_extract(str(ns.root), "extras", str(target))
+
+        bases = target / ".rlsbl" / "bases"
+        assert (bases / ".github" / "workflows" / "ci.yml").read_text() == "name: CI\n"
+        assert not (bases / "pkgC").exists()
+
     def test_tags_translate_with_one_boundary_alias(self, tmp_path):
         ns = make_source(tmp_path)
         target = tmp_path / "extras_out"
