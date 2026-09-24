@@ -17,3 +17,7 @@ context = "The pytest plugin, Go module, and npm package formerly named strictte
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "b8597c7b9b86d5eeab4727236cc327f00f530709"
+
+[tree_hashes]
+"." = "35cc4ce555e80bee8aa1e4d1ed3302a3f35ddb93"
