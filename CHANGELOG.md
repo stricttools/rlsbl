@@ -2,6 +2,26 @@
 
 # Changelog
 
+## 0.126.0
+
+The test isolation floor follows the plugin's rename to testisolation: the testisolation-floor check and the TESTISOLATION_SANDBOX runner variable. Deprecate and yank notices, and the CI marker, now stay on GitHub Releases through a notes re-sync.
+
+<details>
+<summary>Context</summary>
+
+The pytest plugin, Go module, and npm package formerly named stricttest now ship as testisolation. rlsbl distributes the sandboxed runner that the plugin detects through an environment variable, so consumers that set testisolation_sandbox_required need this release before their sandboxed runs are recognized.
+
+</details>
+
+### Breaking
+
+- **The `stricttest-floor` check is now `testisolation-floor`, following the test isolation plugin's rename from stricttest to testisolation.** The check now recognizes the `testisolation` dependency and its `testisolation_sandbox_required` ini key, and the sandboxed test runner exports `TESTISOLATION_SANDBOX=1` instead of `STRICTTEST_SANDBOX=1`. Update any `rlsbl check --name stricttest-floor` invocation, move the project to the `testisolation` package, and re-run `rlsbl scaffold` so `scripts/test.sh` exports the new variable.
+
+### Fixes
+
+- **`rlsbl release edit` keeps the CI marker when it re-syncs Release notes.** Re-syncing a GitHub Release from CHANGELOG.md used to replace the whole body and delete the hidden `rlsbl-ci-sha` marker the publish workflow reads to learn which commit CI verified; `changelog amend`, `changelog edit`, and `changelog remove` re-sync released versions the same way. The notes are now composed by the same publication module the release flow and `release reconcile` use, so an existing marker is kept and a Release without one gains none.
+- **`release deprecate` and `release yank` notices now stay on the GitHub Release through every later re-sync.** Both commands record the exact notice they prepend in the version's release archive (`release_notices`) and commit it before editing the Release, and every Release body rlsbl composes (`release edit` and the changelog commands that call it, `release reconcile`, and `release scrub`) is built from the recorded notices, the notes, and the `rlsbl-ci-sha` marker. Before, a re-sync rebuilt the body from the notes and marker alone and silently erased the notice. A version with no release archive is now refused by both commands before anything is written, and `release_notices` in `unreleased.toml` is refused like the other flow-owned fields.
+
 ## 0.125.0
 
 check-name --target go becomes an offline Go package-name check against the language and a committed standard-library table, and the github target is removed.
