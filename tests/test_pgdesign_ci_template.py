@@ -21,6 +21,8 @@ import os
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
 from ruamel.yaml import YAML
 
 from rlsbl.commands.init_cmd import process_template, run_cmd
@@ -165,3 +167,52 @@ class TestScaffoldedWorkingDirectory:
         assert "defaults" not in doc["jobs"]["test"], (
             "a root-path target must not carry a needless working-directory"
         )
+
+
+class TestGoVersionFile:
+    """The pgdesign CI installs the Go declared in ``.go-version`` next to
+    pgdesign.toml, so scaffold creates that file when it is missing -- holding
+    the Go on this machine, the Go the project is developed with -- and never
+    touches one that exists."""
+
+    @pytest.fixture(autouse=True)
+    def _machine_go(self, monkeypatch):
+        from rlsbl.targets import pgdesign
+
+        monkeypatch.setattr(pgdesign, "machine_go_version", lambda: "1.26.6")
+
+    @pytest.mark.parametrize("target_path", [".", "schema"])
+    def test_a_missing_go_version_file_is_created_beside_pgdesign_toml(
+        self, mock_git_repo, target_path,
+    ):
+        _scaffold(mock_git_repo, target_path=target_path)
+        schema_dir = mock_git_repo if target_path == "." else mock_git_repo / target_path
+        assert (schema_dir / ".go-version").read_text() == "1.26.6\n"
+
+    def test_an_existing_go_version_file_is_left_alone(self, mock_git_repo):
+        (mock_git_repo / ".go-version").write_text("1.25.1\n")
+        _scaffold(mock_git_repo, target_path=".")
+        assert (mock_git_repo / ".go-version").read_text() == "1.25.1\n"
+
+
+def test_the_machine_go_version_drops_the_go_prefix(monkeypatch):
+    from rlsbl.targets import pgdesign
+
+    class _Done:
+        returncode = 0
+        stdout = "go1.26.6\n"
+
+    monkeypatch.setattr(pgdesign.effects, "run", lambda *a, **k: _Done())
+    assert pgdesign.machine_go_version() == "1.26.6"
+
+
+def test_no_go_on_the_machine_is_refused_naming_the_file_to_write(monkeypatch):
+    from rlsbl.errors import ConfigError
+    from rlsbl.targets import pgdesign
+
+    def _missing(*_a, **_k):
+        raise FileNotFoundError("go")
+
+    monkeypatch.setattr(pgdesign.effects, "run", _missing)
+    with pytest.raises(ConfigError, match=r"\.go-version.*1\.26\.6"):
+        pgdesign.machine_go_version()

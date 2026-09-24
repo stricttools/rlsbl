@@ -6,8 +6,44 @@ import sys
 import tomlkit
 
 from .base import BaseTarget, TemplateVars
-from ..errors import VersionError
+from ..errors import ConfigError, VersionError
 from .. import effects
+
+#: The file the scaffolded CI installs Go from, next to pgdesign.toml.
+GO_VERSION_FILE = ".go-version"
+
+
+def machine_go_version():
+    """The version of the Go installed on this machine, without the ``go``
+    prefix (``1.26.6``).
+
+    Raises:
+        ConfigError: no usable go command, naming the file to write by hand.
+    """
+    remedy = (
+        f"Create {GO_VERSION_FILE} next to pgdesign.toml yourself, holding one "
+        f"line with the Go version CI should install (e.g. 1.26.6), and re-run "
+        f"rlsbl scaffold."
+    )
+    try:
+        result = effects.run(
+            ["go", "env", "GOVERSION"], capture_output=True, text=True,
+            check=False, timeout=30,
+        )
+    except (FileNotFoundError, OSError) as exc:
+        raise ConfigError(
+            f"the pgdesign CI installs the Go named in {GO_VERSION_FILE}, which "
+            f"does not exist, and there is no go command here to read a version "
+            f"from ({exc}). {remedy}"
+        ) from exc
+    raw = (result.stdout or "").strip()
+    if result.returncode != 0 or not raw.startswith("go") or not raw[2:3].isdigit():
+        raise ConfigError(
+            f"the pgdesign CI installs the Go named in {GO_VERSION_FILE}, which "
+            f"does not exist, and `go env GOVERSION` gave no release version "
+            f"({raw or 'no output'!r}). {remedy}"
+        )
+    return raw[2:]
 
 
 class PgdesignTarget(BaseTarget):
@@ -140,6 +176,22 @@ class PgdesignTarget(BaseTarget):
         return os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates", "pgdesign"
         )
+
+    def ensure_ci_inputs(self, dir_path, *, dry_run=False):
+        """Create ``.go-version`` beside pgdesign.toml when it is missing.
+
+        The scaffolded CI installs the Go it names, which is meant to be the
+        Go the project is developed with, so it is seeded from the Go on this
+        machine. An existing file is the project's and is never rewritten;
+        changing the version is an edit to that file.
+        """
+        path = os.path.normpath(os.path.join(dir_path, GO_VERSION_FILE))
+        if os.path.exists(path):
+            return []
+        version = machine_go_version()
+        if not dry_run:
+            effects.atomic_write_text(path, version + "\n")
+        return [(path, f"created (Go {version}, the go on this machine)")]
 
     def template_mappings(self, ctx):
         return [

@@ -307,6 +307,16 @@ class ReleaseTarget(Protocol):
         """
         return {}
 
+    def ensure_ci_inputs(self, dir_path, *, dry_run=False) -> list:
+        """Create the files this target's CI templates read, when missing.
+
+        Called by scaffold alone. Returns ``[(path, status)]`` for each file
+        created (*dir_path*-joined), in scaffold's own file-report vocabulary;
+        under *dry_run* nothing is written and the same list is returned. A
+        file that already exists belongs to the project and is never touched.
+        """
+        return []
+
     def template_mappings(self, ctx) -> list[dict[str, str]]:
         """Target-specific template-to-output-path mappings."""
         return []

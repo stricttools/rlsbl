@@ -294,6 +294,11 @@ OBSERVE_ALLOWLIST = (
         "package enumeration in go_introspect.py; -e keeps it off the network "
         "and the format string only shapes stdout",
     ),
+    ObserveEntry(
+        ("go", "env", "GOVERSION"), "self-report",
+        "prints the installed Go's version (the pgdesign scaffold seeds "
+        ".go-version from it)",
+    ),
     ObserveEntry(("uv", "--version"), "self-report", "prints uv's version"),
     ObserveEntry(("ruff", "--version"), "self-report", "prints ruff's version"),
     ObserveEntry(("safegit", "--version"), "self-report", "prints safegit's version"),
