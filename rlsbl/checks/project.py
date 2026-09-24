@@ -866,6 +866,31 @@ def register_project_checks(app):
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} module path mismatch(es)")
 
+    @app.error_check("go-toolchain-declared")
+    def check_go_toolchain_declared(ctx, reporter):
+        """Every Go module's go.mod must carry a ``toolchain`` line.
+
+        ``actions/setup-go`` installs the Go that line names, and without it
+        the ``go`` directive's version -- the oldest Go consumers may build
+        with -- so CI tests on a Go nobody develops with. Presence only: the
+        line is never compared with the Go on this machine. The remedy every
+        finding names is ``go mod edit -toolchain=<version>``.
+        """
+        from ..go_toolchain import evaluate_go_toolchain
+
+        module_dirs = _go_module_dirs(ctx, "go-toolchain-declared")
+        if not module_dirs:
+            return reporter.skipped("no Go target detected")
+
+        verdict = evaluate_go_toolchain(_repo_root(ctx), module_dirs)
+        if verdict.ok:
+            return reporter.passed("every go.mod declares a toolchain line")
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(
+            f"{len(verdict.problems)} go.mod file(s) without a toolchain line"
+        )
+
     @app.error_check("ldflags-symbol")
     def check_ldflags_symbol(ctx, reporter):
         """Every ``-X importpath.Symbol=`` must name a symbol that exists.

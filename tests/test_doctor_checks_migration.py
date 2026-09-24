@@ -113,6 +113,8 @@ EXPECTED_CHECKS = [
     "dep-locks",
     # a go.mod module path names where the repository actually lives
     "go-module-identity",
+    # every go.mod declares the Go it is developed with (a toolchain line)
+    "go-toolchain-declared",
     # every -X linker flag names a symbol the Go source actually declares
     "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator
