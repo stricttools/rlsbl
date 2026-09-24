@@ -1125,15 +1125,25 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
 # check
 # ---------------------------------------------------------------------------
 
-# One availability result, as `_result_to_json` builds it. `note`, `error` and
-# `github_count` appear only when the underlying check set them.
+# One name verdict, as `_result_to_json` builds it. `note` and `error` appear
+# only when the underlying check set them.
 _CHECK_NAME_RESULT_SCHEMA = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
         "target": {"type": "string"},
-        "status": {"type": "string"},
-        "reason": {"type": ["string", "null"]},
+        "status": {
+            "type": "string",
+            "enum": ["available", "taken", "invalid", "discouraged", "error"],
+        },
+        "reason": {
+            "type": ["string", "null"],
+            "enum": [
+                None, "registered", "stdlib", "moniker", "normalized", "ultranorm",
+                "not-identifier", "keyword", "blank", "uppercase", "underscore",
+                "predeclared",
+            ],
+        },
         "structured_conflicts": {
             "type": "array",
             "items": {
@@ -1153,7 +1163,6 @@ _CHECK_NAME_RESULT_SCHEMA = {
         "exit_code": {"type": "integer"},
         "note": {"type": "string"},
         "error": {"type": "string"},
-        "github_count": {"type": "integer"},
     },
     "required": [
         "name", "target", "status", "reason",
@@ -1161,6 +1170,20 @@ _CHECK_NAME_RESULT_SCHEMA = {
     ],
     "additionalProperties": False,
 }
+
+# The go choice's help, shared by check-name and monorepo check-names: states
+# which problems make a name invalid (the Go spec) and which only discouraged
+# (Effective Go, predeclared-identifier shadowing).
+_GO_CHOICE_HELP = (
+    "the Go package name the candidate implies, judged offline (no network): "
+    "invalid when it is not a Go identifier, is a keyword, or is the blank "
+    "identifier (the Go spec refuses these as a package clause); taken when it "
+    "is the name of a Go standard-library package (the last element of its "
+    "import path, from a committed `go list std` table), since every file "
+    "importing both needs an alias; discouraged when it has uppercase letters "
+    "or underscores (Effective Go) or is a predeclared identifier such as len; "
+    "available otherwise"
+)
 
 # The payload is one result object for a single name+target, and an array of
 # them for any other combination -- so the declaration carries both forms: the
@@ -1174,14 +1197,13 @@ _CHECK_NAME_PAYLOAD_SCHEMA = {
 }
 
 
-@app.command(name="check-name", help="Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.", effect="read_only", payload_schema=_CHECK_NAME_PAYLOAD_SCHEMA)
+@app.command(name="check-name", help="Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks.", effect="read_only", payload_schema=_CHECK_NAME_PAYLOAD_SCHEMA)
 @strictcli.flag(name="target", type=str, presence="required", repeatable=True, unique=True, choices=[
     strictcli.Choice("npm", help="the npm registry"),
     strictcli.Choice("pypi", help="the Python Package Index"),
-    strictcli.Choice("go", help="the Go module proxy"),
-    strictcli.Choice("github", help="GitHub repository names"),
-], help="Registry to query for name availability; repeatable")
-@strictcli.flag(name="delay", type=str, default="200", help="Milliseconds to wait between consecutive registry API queries")
+    strictcli.Choice("go", help=_GO_CHOICE_HELP),
+], help="Registry or rule set to check each name against; repeatable")
+@strictcli.flag(name="delay", type=str, default="200", help="Milliseconds to wait between consecutive registry API queries (the offline go check never waits)")
 @effects.handler
 def cmd_check_name(ctx, target, delay):
     """Query package registries to check name availability."""
@@ -2258,16 +2280,15 @@ def cmd_mono_status(ctx):
     _cmd_status({}, project_root=root)
 
 
-@mono.command(name="check-names", help="Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.", effect="read_only")
+@mono.command(name="check-names", help="Check every publishable project name in the monorepo workspace against one target, with the same verdicts as check-name. npm and PyPI query the registry for each name and report whether it is available or already taken; go judges the Go package name each project implies offline, as available, taken by a standard-library package, invalid, or discouraged. Supports optional prefix and suffix arguments to test naming conventions, with a configurable delay between registry queries to avoid rate limiting.", effect="read_only")
 @strictcli.flag(name="target", type=str, presence="required", choices=[
     strictcli.Choice("npm", help="the npm registry"),
     strictcli.Choice("pypi", help="the Python Package Index"),
-    strictcli.Choice("go", help="the Go module proxy"),
-    strictcli.Choice("github", help="GitHub repository names"),
-], help="Registry to query for name availability across all workspace projects")
+    strictcli.Choice("go", help=_GO_CHOICE_HELP),
+], help="Registry or rule set to check every workspace project name against")
 @strictcli.flag(name="prefix", type=str, presence="optional", help="String to prepend to each project name before checking availability")
 @strictcli.flag(name="suffix", type=str, presence="optional", help="String to append to each project name before checking availability")
-@strictcli.flag(name="delay", type=str, default="200", help="Milliseconds to wait between consecutive registry API queries")
+@strictcli.flag(name="delay", type=str, default="200", help="Milliseconds to wait between consecutive registry API queries (the offline go check never waits)")
 @effects.handler
 def cmd_mono_check_names(ctx, target, prefix, suffix, delay):
     """Check package name availability across registries for all workspace projects."""

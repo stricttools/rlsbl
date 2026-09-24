@@ -941,7 +941,7 @@ def _cmd_release_order(flags, project_root):
 def _cmd_check_names(args, flags, project_root):
     target = flags.get("target")
     if not target:
-        print("Error: --target is required. Usage: rlsbl monorepo check-names --target <npm|pypi|go|github>", file=sys.stderr)
+        print("Error: --target is required. Usage: rlsbl monorepo check-names --target <npm|pypi|go>", file=sys.stderr)
         sys.exit(1)
 
     prefix = flags.get("prefix", "")
@@ -959,7 +959,7 @@ def _cmd_check_names(args, flags, project_root):
         print("No projects in workspace.")
         return
 
-    from ..check import _check_single_name, _format_table_row
+    from ..check import _check_single_name, _format_table_row, summary_line
 
     from ...workspace import project_is_dev_only
 
@@ -972,6 +972,7 @@ def _cmd_check_names(args, flags, project_root):
         return
 
     rows = []
+    offline = False
     for i, proj in enumerate(projects):
         # A project's registry_name IS its registry identity: use it verbatim,
         # bypassing prefix/suffix. Only fall back to prefix+name+suffix when no
@@ -988,7 +989,9 @@ def _cmd_check_names(args, flags, project_root):
             "checked_name": checked_name,
             "status": table_row["status"],
         })
-        if i < len(projects) - 1:
+        # An offline check (go) asks no registry, so there is no rate limit to respect.
+        offline = bool(result.get("offline"))
+        if i < len(projects) - 1 and not offline:
             time.sleep(delay_ms / 1000)
 
     # Compute column widths
@@ -1002,18 +1005,11 @@ def _cmd_check_names(args, flags, project_root):
         line = f"{row['project']:<{proj_width}}  {row['checked_name']:<{name_width}}  {row['status']:<{status_width}}"
         print(line)
 
-    # Summary line
-    available_count = sum(1 for r in rows if r["status"] in ("available", "not found"))
-    taken_count = sum(1 for r in rows if r["status"] in ("taken", "exists", "CONFLICT"))
-    error_count = sum(1 for r in rows if r["status"] == "error")
-    total = len(rows)
-    if error_count:
-        print(f"\nSummary: {available_count} available, {taken_count} taken, {error_count} error(s) ({total} total)")
-    else:
-        print(f"\nSummary: {available_count} available, {taken_count} taken ({total} total)")
+    print(f"\n{summary_line(rows)}")
 
-    # Batch context note
-    msg = f"Checked with {delay_ms}ms delay between names."
-    if delay_ms == 200:
-        msg += " Increase --delay if rate limited."
-    print(msg)
+    # Batch context note: the delay only applies to networked checks.
+    if not offline:
+        msg = f"Checked with {delay_ms}ms delay between names."
+        if delay_ms == 200:
+            msg += " Increase --delay if rate limited."
+        print(msg)

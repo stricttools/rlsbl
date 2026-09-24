@@ -51,7 +51,7 @@ class TestCheckNameMultiTarget(unittest.TestCase):
         result = app.test(["check-name", "mypackage", "--target", "invalid"])
         self.assertEqual(result.exit_code, 1)
         self.assertIn("invalid", result.stderr)
-        self.assertIn("npm, pypi, go, github", result.stderr)
+        self.assertIn("npm, pypi, go", result.stderr)
 
     def test_invalid_target_reported_on_the_first_bad_value(self):
         """The parser refuses the first value that is not a declared choice."""
