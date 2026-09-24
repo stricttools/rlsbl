@@ -10,7 +10,7 @@
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
-    "content": "afadb611cfb11e974df945415e0de463228c547197e2a141fcdf19e181feaa30",
+    "content": "7760e57a90f48ab74c3e5e066eaff2b0d7dfcc272fe704448d2004574ff0a562",
     "description": "a47dc41a0f7c453a1c2bf9dcfe84fc216fb068211ace5d604bcc31b34d2be99a"
   },
   "en/ci-customization.md": {
@@ -24,9 +24,9 @@
     "seed_hash": "e4afae5e858dc47720b3f170cf0ccf654c9bf83f4b77130b63dde72547b5ea58"
   },
   "en/cli-check-name.md": {
-    "content": "75cb0038ae1cdbaa2ff5ed4ab86ea3bf0f0960bc8dccdb75968f55ce9028dc43",
+    "content": "699ceb2b74661bfd04a364aa00a4d8f8ea359ce750892f4e6eea325a92847a6f",
     "description": "079528211a62127530c0be9f21e5ca06c00c6e5cb02f33ef23f85a7abfc21331",
-    "schema_hash": "fa6e87ae8c5b89c55a9b009748376c03d11f48589b5da8d8f4a02356af4a9838"
+    "schema_hash": "a715b74523370fd1e7e4f6b86feca3b07f5d883178641fef6c5cdb0f38b24483"
   },
   "en/cli-check.md": {
     "content": "b34d1b21bbc9bdde816253a3b46ed3f21a6289d9deea8e8a221899c2ed8f003a",
@@ -65,7 +65,7 @@
     "seed_hash": "fcf763657174f6f67caf821bc63e5bebaad176eb032db4b39f29e06e9618a8ee"
   },
   "en/cli-index.md": {
-    "content": "ce9c4c4450d8cbabad132c8dfd273df55b8f867c8f8d478079c9eddb5162adaf",
+    "content": "0713feb8e7a8132de9e99fd53fee8dc56d441b790a35546c7d97ebcf9fea9f77",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -567,7 +567,7 @@
   "en/rlsbl-commands-rewrite-go_module_path.md": {
     "content": "930d66dd4ad1ad8e1348427ec6429f2e9f7c6c25c944ea268144d175edc82550",
     "description": "c4b998482a8c6ebcb64223df0e0d42052de62e8d687d6dd9f4f031b842bff0b3",
-    "source_docstring": "1f4ad5b4a4a596a4e060dc75e676fa4a755d485f605bc876047b19ed8328e812"
+    "source_docstring": "9a13b90da14a0cdb150f0d2c64605cf6e360ba737189b703ec09fc924581dbd4"
   },
   "en/rlsbl-commands-rewrite-uv_path_sources.md": {
     "content": "0043ad5f49363706a655b10e1074720f49998dd8eba05759957056b265f7e9cc",
@@ -1257,7 +1257,7 @@
     "source_docstring": "c32891a50c37cfb4160b4bc357f00125669b3c2b7099cf49aff79f1b0693e0c9"
   },
   "en/scaffold.md": {
-    "content": "4883e97a5b7a5225655891a96eaebebf4fec68e98499ede158483f7de5462f98",
+    "content": "6622f0d66541af41be0dba2aea1a9fca7a54d9847f4798b25243289c532c02bf",
     "description": "edc89e691cca10e2e7b94c178c74182ebad7c2c6885f1c2cebe04cee94071e17"
   },
   "en/targets.md": {
