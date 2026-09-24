@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.125.0",
+  "version": "0.126.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -940,6 +940,11 @@
           "level": 2,
           "text": "monorepo cleanup",
           "anchor": "monorepo-cleanup"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-8"
         },
         {
           "level": 2,
@@ -2524,6 +2529,26 @@
           "level": 3,
           "text": "`_split_name_filters`",
           "anchor": "_split_name_filters"
+        },
+        {
+          "level": 3,
+          "text": "`SourceWalkError`",
+          "anchor": "sourcewalkerror"
+        },
+        {
+          "level": 3,
+          "text": "`git_listed_files`",
+          "anchor": "git_listed_files"
+        },
+        {
+          "level": 3,
+          "text": "`_dir_pattern_excludes`",
+          "anchor": "_dir_pattern_excludes"
+        },
+        {
+          "level": 3,
+          "text": "`_file_pattern_excludes`",
+          "anchor": "_file_pattern_excludes"
         },
         {
           "level": 3,
@@ -5701,6 +5726,11 @@
         },
         {
           "level": 3,
+          "text": "`_publish_skip_reason`",
+          "anchor": "_publish_skip_reason"
+        },
+        {
+          "level": 3,
           "text": "`_is_releasable_member_project`",
           "anchor": "_is_releasable_member_project"
         },
@@ -5771,6 +5801,21 @@
         },
         {
           "level": 3,
+          "text": "`_releasable_member_root`",
+          "anchor": "_releasable_member_root"
+        },
+        {
+          "level": 3,
+          "text": "`scaffold_bases_dir`",
+          "anchor": "scaffold_bases_dir"
+        },
+        {
+          "level": 3,
+          "text": "`_bases_dir`",
+          "anchor": "_bases_dir"
+        },
+        {
+          "level": 3,
           "text": "`_save_base`",
           "anchor": "_save_base"
         },
@@ -5838,6 +5883,16 @@
           "level": 3,
           "text": "`_install_or_update_post_rewrite_hook`",
           "anchor": "_install_or_update_post_rewrite_hook"
+        },
+        {
+          "level": 3,
+          "text": "`_ensure_ci_inputs`",
+          "anchor": "_ensure_ci_inputs"
+        },
+        {
+          "level": 3,
+          "text": "`_publish_orphan_reasons`",
+          "anchor": "_publish_orphan_reasons"
         },
         {
           "level": 3,
@@ -11618,6 +11673,43 @@
       ]
     },
     {
+      "path": "rlsbl-go_toolchain.md",
+      "title": "rlsbl.go_toolchain",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.go_toolchain",
+          "anchor": "rlsblgo_toolchain"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.go_toolchain`",
+          "anchor": "rlsblgo_toolchain"
+        },
+        {
+          "level": 3,
+          "text": "`ToolchainVerdict`",
+          "anchor": "toolchainverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`declares_toolchain`",
+          "anchor": "declares_toolchain"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_go_toolchain`",
+          "anchor": "evaluate_go_toolchain"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-hook_hashes.md",
       "title": "rlsbl.hook_hashes",
       "type": "doc",
@@ -12009,6 +12101,11 @@
         },
         {
           "level": 3,
+          "text": "`_import_specs`",
+          "anchor": "_import_specs"
+        },
+        {
+          "level": 3,
           "text": "`_check_forbidden_imports`",
           "anchor": "_check_forbidden_imports"
         },
@@ -12169,6 +12266,11 @@
           "level": 3,
           "text": "`_lang_for_ext`",
           "anchor": "_lang_for_ext"
+        },
+        {
+          "level": 3,
+          "text": "`_parse`",
+          "anchor": "_parse"
         },
         {
           "level": 3,
@@ -12458,6 +12560,38 @@
       ]
     },
     {
+      "path": "rlsbl-lint-tree_walk.md",
+      "title": "rlsbl.lint.tree_walk",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.lint.tree_walk",
+          "anchor": "rlsbllinttree_walk"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.lint.tree_walk`",
+          "anchor": "rlsbllinttree_walk"
+        },
+        {
+          "level": 3,
+          "text": "`iter_preorder`",
+          "anchor": "iter_preorder"
+        },
+        {
+          "level": 3,
+          "text": "`SourceParseError`",
+          "anchor": "sourceparseerror"
+        },
+        {
+          "level": 3,
+          "text": "`naming_source`",
+          "anchor": "naming_source"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-lint-utils.md",
       "title": "rlsbl.lint.utils",
       "type": "doc",
@@ -12476,6 +12610,26 @@
           "level": 3,
           "text": "`_split_name_filters`",
           "anchor": "_split_name_filters"
+        },
+        {
+          "level": 3,
+          "text": "`SourceWalkError`",
+          "anchor": "sourcewalkerror"
+        },
+        {
+          "level": 3,
+          "text": "`git_listed_files`",
+          "anchor": "git_listed_files"
+        },
+        {
+          "level": 3,
+          "text": "`_dir_pattern_excludes`",
+          "anchor": "_dir_pattern_excludes"
+        },
+        {
+          "level": 3,
+          "text": "`_file_pattern_excludes`",
+          "anchor": "_file_pattern_excludes"
         },
         {
           "level": 3,
@@ -12773,6 +12927,63 @@
           "level": 3,
           "text": "`rewrite_module_prefix`",
           "anchor": "rewrite_module_prefix"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-node_matrix.md",
+      "title": "rlsbl.node_matrix",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.node_matrix",
+          "anchor": "rlsblnode_matrix"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.node_matrix`",
+          "anchor": "rlsblnode_matrix"
+        },
+        {
+          "level": 3,
+          "text": "`NodeMatrixError`",
+          "anchor": "nodematrixerror"
+        },
+        {
+          "level": 3,
+          "text": "`_upper_exclusive`",
+          "anchor": "_upper_exclusive"
+        },
+        {
+          "level": 3,
+          "text": "`_comparator_bounds`",
+          "anchor": "_comparator_bounds"
+        },
+        {
+          "level": 3,
+          "text": "`_parse_set`",
+          "anchor": "_parse_set"
+        },
+        {
+          "level": 3,
+          "text": "`node_lines_satisfying`",
+          "anchor": "node_lines_satisfying"
+        },
+        {
+          "level": 3,
+          "text": "`missing_engines_message`",
+          "anchor": "missing_engines_message"
+        },
+        {
+          "level": 3,
+          "text": "`project_node_matrix`",
+          "anchor": "project_node_matrix"
+        },
+        {
+          "level": 3,
+          "text": "`render_matrix`",
+          "anchor": "render_matrix"
         }
       ]
     },
@@ -15065,6 +15276,16 @@
         },
         {
           "level": 3,
+          "text": "`tracked_scratch_files`",
+          "anchor": "tracked_scratch_files"
+        },
+        {
+          "level": 3,
+          "text": "`refuse_tracked_scratch_files`",
+          "anchor": "refuse_tracked_scratch_files"
+        },
+        {
+          "level": 3,
           "text": "`scratch_template_vars`",
           "anchor": "scratch_template_vars"
         },
@@ -15608,6 +15829,16 @@
         },
         {
           "level": 4,
+          "text": "`ci_template_vars`",
+          "anchor": "ci_template_vars"
+        },
+        {
+          "level": 4,
+          "text": "`ensure_ci_inputs`",
+          "anchor": "ensure_ci_inputs"
+        },
+        {
+          "level": 4,
           "text": "`template_mappings`",
           "anchor": "template_mappings"
         },
@@ -15685,6 +15916,11 @@
           "level": 4,
           "text": "`claim_placeholder`",
           "anchor": "claim_placeholder"
+        },
+        {
+          "level": 4,
+          "text": "`claim_credentials`",
+          "anchor": "claim_credentials"
         },
         {
           "level": 4,
@@ -16802,6 +17038,16 @@
         },
         {
           "level": 3,
+          "text": "`_npmrc_has_login`",
+          "anchor": "_npmrc_has_login"
+        },
+        {
+          "level": 3,
+          "text": "`_missing_package_json_message`",
+          "anchor": "_missing_package_json_message"
+        },
+        {
+          "level": 3,
           "text": "`NpmTarget`",
           "anchor": "npmtarget"
         },
@@ -16862,6 +17108,11 @@
         },
         {
           "level": 4,
+          "text": "`ci_template_vars`",
+          "anchor": "ci_template_vars"
+        },
+        {
+          "level": 4,
           "text": "`template_mappings`",
           "anchor": "template_mappings"
         },
@@ -16904,6 +17155,11 @@
           "level": 4,
           "text": "`query_latest_version`",
           "anchor": "query_latest_version"
+        },
+        {
+          "level": 4,
+          "text": "`claim_credentials`",
+          "anchor": "claim_credentials"
         },
         {
           "level": 4,
@@ -16981,6 +17237,11 @@
         },
         {
           "level": 3,
+          "text": "`machine_go_version`",
+          "anchor": "machine_go_version"
+        },
+        {
+          "level": 3,
           "text": "`PgdesignTarget`",
           "anchor": "pgdesigntarget"
         },
@@ -17038,6 +17299,11 @@
           "level": 4,
           "text": "`template_dir`",
           "anchor": "template_dir"
+        },
+        {
+          "level": 4,
+          "text": "`ensure_ci_inputs`",
+          "anchor": "ensure_ci_inputs"
         },
         {
           "level": 4,
@@ -17220,6 +17486,11 @@
         },
         {
           "level": 4,
+          "text": "`claim_credentials`",
+          "anchor": "claim_credentials"
+        },
+        {
+          "level": 4,
           "text": "`detect`",
           "anchor": "detect"
         },
@@ -17315,6 +17586,16 @@
         },
         {
           "level": 4,
+          "text": "`ci_template_vars`",
+          "anchor": "ci_template_vars"
+        },
+        {
+          "level": 4,
+          "text": "`ensure_ci_inputs`",
+          "anchor": "ensure_ci_inputs"
+        },
+        {
+          "level": 4,
           "text": "`template_mappings`",
           "anchor": "template_mappings"
         },
@@ -17399,6 +17680,11 @@
           "level": 2,
           "text": "`rlsbl.targets.pypi`",
           "anchor": "rlsbltargetspypi"
+        },
+        {
+          "level": 3,
+          "text": "`_pypirc_token`",
+          "anchor": "_pypirc_token"
         },
         {
           "level": 3,
@@ -17549,6 +17835,16 @@
           "level": 4,
           "text": "`query_latest_version`",
           "anchor": "query_latest_version"
+        },
+        {
+          "level": 4,
+          "text": "`_claim_token`",
+          "anchor": "_claim_token"
+        },
+        {
+          "level": 4,
+          "text": "`claim_credentials`",
+          "anchor": "claim_credentials"
         },
         {
           "level": 4,
@@ -20177,6 +20473,11 @@
         },
         {
           "level": 4,
+          "text": "`claim_credentials`",
+          "anchor": "claim_credentials"
+        },
+        {
+          "level": 4,
           "text": "`detect`",
           "anchor": "detect"
         },
@@ -20269,6 +20570,16 @@
           "level": 4,
           "text": "`template_vars`",
           "anchor": "template_vars"
+        },
+        {
+          "level": 4,
+          "text": "`ci_template_vars`",
+          "anchor": "ci_template_vars"
+        },
+        {
+          "level": 4,
+          "text": "`ensure_ci_inputs`",
+          "anchor": "ensure_ci_inputs"
         },
         {
           "level": 4,
@@ -20417,6 +20728,16 @@
         },
         {
           "level": 4,
+          "text": "`ci_template_vars`",
+          "anchor": "ci_template_vars-1"
+        },
+        {
+          "level": 4,
+          "text": "`ensure_ci_inputs`",
+          "anchor": "ensure_ci_inputs-1"
+        },
+        {
+          "level": 4,
           "text": "`template_mappings`",
           "anchor": "template_mappings-1"
         },
@@ -20494,6 +20815,11 @@
           "level": 4,
           "text": "`claim_placeholder`",
           "anchor": "claim_placeholder-1"
+        },
+        {
+          "level": 4,
+          "text": "`claim_credentials`",
+          "anchor": "claim_credentials-1"
         },
         {
           "level": 4,
@@ -20802,6 +21128,16 @@
         },
         {
           "level": 4,
+          "text": "`ci_template_vars`",
+          "anchor": "ci_template_vars-2"
+        },
+        {
+          "level": 4,
+          "text": "`ensure_ci_inputs`",
+          "anchor": "ensure_ci_inputs-2"
+        },
+        {
+          "level": 4,
           "text": "`template_mappings`",
           "anchor": "template_mappings-2"
         },
@@ -20879,6 +21215,11 @@
           "level": 4,
           "text": "`claim_placeholder`",
           "anchor": "claim_placeholder-2"
+        },
+        {
+          "level": 4,
+          "text": "`claim_credentials`",
+          "anchor": "claim_credentials-2"
         },
         {
           "level": 4,
@@ -21167,6 +21508,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-24T16:04:56.877894+00:00",
+  "last_gen": "2026-09-24T20:22:41.811062+00:00",
   "theme": "minimal"
 }

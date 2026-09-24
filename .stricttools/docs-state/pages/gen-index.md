@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 192 modules"
+description = "API reference index for rlsbl covering 195 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -105,6 +105,7 @@ nav_order = 90
 - [rlsbl.go_identity](../rlsbl-go_identity/)
 - [rlsbl.go_introspect](../rlsbl-go_introspect/)
 - [rlsbl.go_package_name](../rlsbl-go_package_name/)
+- [rlsbl.go_toolchain](../rlsbl-go_toolchain/)
 - [rlsbl.hook_hashes](../rlsbl-hook_hashes/)
 - [rlsbl.import_scanners](../rlsbl-import_scanners/)
 - [rlsbl.layers](../rlsbl-layers/)
@@ -121,12 +122,14 @@ nav_order = 90
 - [rlsbl.lint.python_ast](../rlsbl-lint-python_ast/)
 - [rlsbl.lint.python_regex](../rlsbl-lint-python_regex/)
 - [rlsbl.lint.result](../rlsbl-lint-result/)
+- [rlsbl.lint.tree_walk](../rlsbl-lint-tree_walk/)
 - [rlsbl.lint.utils](../rlsbl-lint-utils/)
 - [rlsbl.lock](../rlsbl-lock/)
 - [rlsbl.maven_central](../rlsbl-maven_central/)
 - [rlsbl.member_context](../rlsbl-member_context/)
 - [rlsbl.mirror_publication](../rlsbl-mirror_publication/)
 - [rlsbl.module_paths](../rlsbl-module_paths/)
+- [rlsbl.node_matrix](../rlsbl-node_matrix/)
 - [rlsbl.npm_wrapper](../rlsbl-npm_wrapper/)
 - [rlsbl.observe_allowlist](../rlsbl-observe_allowlist/)
 - [rlsbl.overlay_state](../rlsbl-overlay_state/)

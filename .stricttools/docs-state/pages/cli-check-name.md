@@ -9,7 +9,7 @@ nav_order = 3
 
 # rlsbl check-name
 
-Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks.
+Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks. Exits 0 when every name is available, 2 when any check ended in an error, and 1 otherwise: taken, invalid, and discouraged all exit 1, so a discouraged Go name exits 1 even though Go accepts it.
 
 **Effect:** read_only
 

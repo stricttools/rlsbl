@@ -10,7 +10,7 @@ nav_order = 4
 
 # rlsbl claim-name
 
-Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.
+Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 

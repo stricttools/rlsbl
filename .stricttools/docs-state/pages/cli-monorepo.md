@@ -212,9 +212,15 @@ Absorb an external repository into this workspace as a releasable. The source's 
 
 ## monorepo cleanup
 
-Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Detect residue first with `rlsbl check --name releasable-residue`.
+Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically unless --no-auto-commit is passed. Detect residue first with `rlsbl check --name releasable-residue`.
 
 **Effect:** mutating
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the deletions after removing them (the handler commits when neither --auto-commit nor --no-auto-commit is passed) |
 
 ## monorepo rename-releasable
 
