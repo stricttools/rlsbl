@@ -241,5 +241,9 @@ class TestDevNodeGetsNoPublishWorkflow:
         make_workspace(mock_git_repo, [
             {"path": "conformance", "name": "conformance", "dev_only": True, "releasable": False},
         ])
+        # As a releasable member its merge bases lived at the releasable; a
+        # member that releases nothing keeps its own, so the scaffold asks for
+        # the directory before it heals the bases (the refusal's own remedy).
+        (proj_dir / ".rlsbl" / "bases").mkdir()
         self._scaffold(proj_dir)
         assert not publish.exists()

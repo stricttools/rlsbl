@@ -1755,14 +1755,17 @@ def _scaffold_member(arr):
     half-scaffolded is a repository nobody can release, and finding that out
     later costs more than stopping here.
     """
-    # The releasable model keeps merge bases at the releasable, so a member's
-    # own `.rlsbl/bases/` is residue (see _sweep_member_rlsbl) -- and a scaffold
-    # run against a member that has `managed-files.json` but no `bases/` refuses
-    # with a one-line heal: create the directory and re-run, and it reconstructs
-    # each base from the last scaffold commit. Doing that heal here is what
-    # makes a re-run of this conversion reach the scaffold at all, since the
-    # previous run's sweep is exactly what removed the directory.
-    bases = os.path.join(arr.member_rlsbl_dir, "bases")
+    # The releasable model keeps a member's merge bases in the releasable's
+    # state directory (see scaffold_bases_dir), so the member's own
+    # `.rlsbl/bases/` from its standalone life is residue (see
+    # _sweep_member_rlsbl) -- and a scaffold run against a member that has
+    # `managed-files.json` but no bases directory refuses with a one-line heal:
+    # create the directory and re-run, and it reconstructs each base from the
+    # last scaffold commit. Doing that heal here is what lets the conversion
+    # reach the scaffold at all.
+    from ..init_cmd import scaffold_bases_dir
+
+    bases = scaffold_bases_dir(arr.dest_full)
     managed = os.path.join(arr.member_rlsbl_dir, "managed-files.json")
     if os.path.isfile(managed) and not os.path.isdir(bases):
         effects.makedirs(bases, exist_ok=True)
@@ -1784,11 +1787,12 @@ def _scaffold_member(arr):
 def _sweep_member_rlsbl(arr):
     """Remove what the scaffold wrote that a releasable member may not keep.
 
-    ``rlsbl scaffold`` writes a standalone project's ``.rlsbl/``: a scaffolding
-    ``version`` marker and a ``bases/`` directory of merge bases. Under a
-    releasable those belong to the releasable, and the ``releasable-residue``
-    check errors on a member that keeps them -- so an absorb that ran the
-    scaffold and stopped would hand back a workspace failing its own checks.
+    The arriving repository was a standalone project, so its ``.rlsbl/``
+    carries a scaffolding ``version`` marker and a ``bases/`` directory of
+    merge bases. Under a releasable those belong to the releasable (the scaffold
+    of a member writes neither), and the ``releasable-residue`` check errors on
+    a member that keeps them -- so an absorb that stopped here would hand back a
+    workspace failing its own checks.
 
     The rule is not restated here: :func:`verify_minimal_rlsbl` is the one
     place that says what a member's ``.rlsbl/`` may hold, and this removes
