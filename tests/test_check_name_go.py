@@ -244,4 +244,4 @@ class TestDiscouragedExitCodeIsDocumented:
         help_text = rlsbl.app._commands["check-name"].help
         assert "Exits 0 when every name is available" in help_text
         assert "a discouraged Go name exits 1 even though Go accepts it" in help_text
-        assert "2 when any check errored" in help_text
+        assert "2 when any check ended in an error" in help_text
