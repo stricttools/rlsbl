@@ -18,8 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: {{action "actions/checkout"}}
-{{#if go.minRequiredGo}}      # go.mod: go {{go.minRequiredGo}}
-{{/if}}      - uses: {{action "actions/setup-go"}}
+      # setup-go reads go.mod's `toolchain` line first, then its `go` directive.
+      # Declare the development Go in `toolchain` (go mod edit -toolchain=goX.Y.Z)
+      # so CI tests with it; `go` stays the consumers' floor.
+      - uses: {{action "actions/setup-go"}}
         with:
           go-version-file: go.mod
       - run: go vet ./...
