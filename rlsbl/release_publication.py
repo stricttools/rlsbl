@@ -10,8 +10,14 @@ recreated Releases with notes only -- no ``rlsbl-ci-sha`` marker at all -- and
 never marked a pre-release version as a GitHub pre-release. A Release recreated
 that way is a Release the publish workflow cannot judge.
 
-Three decisions live here, and nowhere else:
+Four decisions live here, and nowhere else:
 
+* **The layout** of a body is :func:`compose_body`: the version's recorded
+  notices (``release_notices`` in its release archive, written by ``rlsbl
+  release deprecate`` and ``rlsbl release yank``), each followed by a blank
+  line, then the notes and the marker. Because the notices are read from the
+  repository, a re-sync reproduces a deprecated Release's top unchanged
+  instead of erasing it.
 * **The notes** are the version's own CHANGELOG.md section, verbatim.
 * **The released-commit marker** is ``<!-- rlsbl-ci-sha: <40 hex> -->``, and
   the sha it carries is THE RELEASE RECORD'S RELEASE COMMIT for that version -- the
@@ -38,6 +44,7 @@ import time
 from dataclasses import dataclass
 
 from . import effects
+from .utils import commit_files
 
 
 # The publish workflow's only precise statement of which commit CI must be
@@ -66,27 +73,49 @@ def ci_sha_from_body(body: str) -> str | None:
     return match.group(1) if match else None
 
 
-def markerless_body(version: str, notes: str) -> str:
+# What separates one block of a Release body from the next: a notice from the
+# notice below it, and the last notice from the notes.
+BLOCK_SEPARATOR = "\n\n"
+
+
+def compose_body(notices, rest: str) -> str:
+    """The layout of every Release body: *notices* top to bottom, then *rest*.
+
+    *rest* is the notes-and-marker document (or, for a notice being added to a
+    Release, the body the forge already holds). An empty *rest* leaves the
+    notices standing alone.
+    """
+    blocks = [*notices, rest] if rest else list(notices)
+    return BLOCK_SEPARATOR.join(blocks)
+
+
+def markerless_body(version: str, notes: str, *, notices) -> str:
     """The Release body for a version whose release commit nothing names.
 
-    The same notes :attr:`ReleasePublication.body` carries, without a marker:
-    a marker is never invented for a Release that has no commit to name.
+    The same notices and notes :attr:`ReleasePublication.body` carries,
+    without a marker: a marker is never invented for a Release that has no
+    commit to name.
     """
-    return (notes or f"Release {version}").rstrip("\n") + "\n"
+    return compose_body(
+        notices, (notes or f"Release {version}").rstrip("\n") + "\n",
+    )
 
 
-def resynced_body(existing: str, *, tag: str, version: str, notes: str) -> str:
+def resynced_body(existing: str, *, tag: str, version: str, notes: str,
+                  notices) -> str:
     """An existing Release's body with its notes replaced by *notes*.
 
     The marker *existing* carries is kept, by composing the full
     :class:`ReleasePublication` document around the sha it names; a body
-    carrying no marker gets the notes alone and gains none.
+    carrying no marker gets the notes alone and gains none. The notices are
+    the version's recorded ones (:func:`release_notices_from_record`), never
+    whatever the forge's body happens to start with.
     """
     sha = ci_sha_from_body(existing)
     if sha is None:
-        return markerless_body(version, notes)
+        return markerless_body(version, notes, notices=notices)
     return publication(tag=tag, version=version, candidate_sha=sha,
-                       notes=notes).body
+                       notes=notes, notices=notices).body
 
 
 def is_prerelease(version: str) -> bool:
@@ -112,6 +141,8 @@ class ReleasePublication:
         version: the version being published, which decides
             :attr:`prerelease`.
         candidate_sha: the release record's release commit for *version*.
+        notices: the version's recorded deprecate/yank notices, top to
+            bottom (``release_notices`` in its release archive).
     """
 
     tag: str
@@ -119,6 +150,7 @@ class ReleasePublication:
     candidate_sha: str
     notes: str = ""
     title: str | None = None
+    notices: tuple[str, ...] = ()
 
     @property
     def release_title(self) -> str:
@@ -134,11 +166,11 @@ class ReleasePublication:
 
     @property
     def body(self) -> str:
-        """The Release body: the notes, a blank line, then the marker."""
+        """The Release body: the notices, the notes, a blank line, the marker."""
         notes = (self.notes or "").rstrip("\n")
         if not notes:
             notes = f"Release {self.version}"
-        return f"{notes}\n\n{self.marker}\n"
+        return compose_body(self.notices, f"{notes}\n\n{self.marker}\n")
 
     def reconciled_body(self, existing: str) -> str | None:
         """*existing* with this publication's marker on it, or None when correct.
@@ -153,8 +185,13 @@ class ReleasePublication:
         return f"{stripped}\n\n{self.marker}\n"
 
 
-def publication(*, tag, version, candidate_sha, notes="", title=None):
+def publication(*, tag, version, candidate_sha, notices, notes="", title=None):
     """Build the :class:`ReleasePublication` for one version.
+
+    *notices* is required, so no writer can compose a body for a deprecated
+    or yanked version and silently drop its notice: a caller writing a
+    version's Release passes :func:`release_notices_from_record`, and one
+    whose version cannot carry notices passes ``()`` and says why.
 
     Raises ``ValueError`` when the release commit is missing: a Release written without
     the marker is one the publish workflow cannot judge, and silently omitting
@@ -169,7 +206,7 @@ def publication(*, tag, version, candidate_sha, notes="", title=None):
         )
     return ReleasePublication(
         tag=tag, version=version, candidate_sha=sha, notes=notes or "",
-        title=title,
+        title=title, notices=tuple(notices),
     )
 
 
@@ -198,6 +235,20 @@ def release_commit_from_record(releases_dir: str, version: str) -> str | None:
     if archive.unrecoverable or archive.never_released:
         return None
     return archive.candidate_sha
+
+
+def release_notices_from_record(releases_dir: str, version: str) -> tuple[str, ...]:
+    """The deprecate/yank notices *version*'s archive records, top to bottom.
+
+    Empty for a version with no archive or with no notices: nothing recorded
+    means nothing to put on top of the body.
+    """
+    from .release_file import archived_release_path, read_release_file
+
+    path = archived_release_path(releases_dir, version)
+    if not os.path.isfile(path):
+        return ()
+    return tuple(read_release_file(path).release_notices or ())
 
 
 def version_never_released(releases_dir: str, version: str) -> bool:
@@ -327,6 +378,60 @@ def update_release(pub: ReleasePublication, *, gh, config=None, repo=None,
 def read_release_body(tag, *, gh, config=None, repo=None) -> str:
     """The existing Release's body, as ``gh`` reports it."""
     return gh(view_body_args(tag, repo=repo), config=config) or ""
+
+
+def notice_archive_path(releases_dir: str, version: str) -> str:
+    """The archive a deprecate/yank notice for *version* is recorded in.
+
+    Raises ``ValueError`` when the version has no archive: a notice that is
+    only on the forge is erased by the next re-sync, which is what recording
+    it exists to prevent, so the command refuses before it changes anything.
+    """
+    from .release_file import archived_release_path
+
+    path = archived_release_path(releases_dir, version)
+    if not os.path.isfile(path):
+        raise ValueError(
+            f"{version} has no release archive at {path}. A deprecate or yank "
+            f"notice is recorded in the version's archive so every later "
+            f"re-sync of its GitHub Release keeps it; without the archive the "
+            f"notice would exist only on GitHub and the next "
+            f"`rlsbl release edit` would erase it."
+        )
+    return path
+
+
+def publish_release_notice(*, tag, notice, archive_path, commit_message, gh,
+                           dry_run, cwd=None):
+    """Record *notice* in *archive_path*, commit it, and put it on the Release.
+
+    The Release is also marked pre-release. The notice goes on top of the body
+    the forge holds, through :func:`compose_body`, so earlier notices and the
+    notes stay as they were. Under *dry_run* the archive write and the commit
+    are made through :mod:`rlsbl.effects` (recorded, not performed, in a
+    preview) and the forge is left untouched.
+
+    The archive is committed BEFORE the forge is edited: a failed edit then
+    leaves the notice recorded, and a later ``rlsbl release edit`` puts it on
+    the Release.
+    """
+    from .release_file import writable_release_file, write_release_notice
+
+    # An unreadable body (no Release body, a network failure) is not fatal:
+    # the notice is the point, and it stands on its own.
+    try:
+        current_body = read_release_body(tag, gh=gh)
+    except Exception:
+        current_body = ""
+
+    with writable_release_file(archive_path):
+        write_release_notice(archive_path, notice)
+    commit_files(commit_message, [archive_path], allow_failure=True, cwd=cwd)
+
+    if dry_run:
+        return
+    with notes_file(compose_body([notice], current_body)) as path:
+        gh(edit_all_args(tag, path, prerelease=True))
 
 
 def ensure_marker(pub: ReleasePublication, *, gh, config=None, repo=None,

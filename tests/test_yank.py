@@ -215,6 +215,23 @@ class TestCapabilityConsistency:
 class TestYankCommand:
     """Test the yank command's registry-aware removal flow."""
 
+    @pytest.fixture(autouse=True)
+    def _archive(self, tmp_path):
+        """Yank records its notice in the version's archive and commits it.
+
+        The archive is a real tmp file wherever the project root points; the
+        commit is stubbed out.
+        """
+        path = tmp_path / "v1.0.0.toml"
+        path.write_text(
+            'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+            'include = []\nexclude = []\n',
+            encoding="utf-8",
+        )
+        with patch(f"{MOD}.notice_archive_path", return_value=str(path)), \
+             patch("rlsbl.release_publication.commit_files"):
+            yield
+
     @patch(f"{MOD}.check_gh_auth", return_value=True)
     @patch(f"{MOD}.check_gh_installed", return_value=True)
     @patch(f"{MOD}.run_gh")
@@ -305,10 +322,6 @@ class TestYankCommand:
         ]
 
         with patch(f"rlsbl.commands.yank.TARGETS", {"npm": target}), \
-             patch("os.path.exists", return_value=True), \
-             patch("os.unlink"), \
-             patch("os.rename"), \
-             patch("builtins.open", unittest.mock.mock_open()), \
              patch("sys.stdout", new_callable=StringIO) as out:
             run_cmd(["1.0.0"], {}, project_root=".")
 

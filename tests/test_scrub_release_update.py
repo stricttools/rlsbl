@@ -197,6 +197,7 @@ class TestTheUpdatedDocument:
 
         expected = publication(
             tag="v1.0.0", version="1.0.0", candidate_sha=RELEASE_COMMIT, notes=notes,
+            notices=(),
         ).body
         assert gh.bodies["v1.0.0"] == expected, (
             "the scrub must write the same document the release flow writes, "

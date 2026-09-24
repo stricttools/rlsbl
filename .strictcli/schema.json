@@ -1303,7 +1303,7 @@
         },
         "deprecate": {
           "name": "deprecate",
-          "help": "Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.",
+          "help": "Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. The notice is first recorded in the version's release archive (release_notices) and committed, so every later re-sync of the Release keeps it; a version with no archive is refused. Use --reason to explain why and --use to suggest a replacement version.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -1337,7 +1337,7 @@
         },
         "yank": {
           "name": "yank",
-          "help": "Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.",
+          "help": "Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice, recorded first in the version's release archive (release_notices) and committed, so every later re-sync of the Release keeps it; a version with no archive is refused before any registry is touched.",
           "effect": "mutating",
           "consequential": true,
           "flags": [

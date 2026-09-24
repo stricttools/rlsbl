@@ -1,22 +1,22 @@
 """Deprecate command that marks a past release as deprecated by setting the GitHub pre-release flag and prepending a deprecation notice to the release notes."""
 
-import os
 import sys
-import time
 
 from ..member_context import resolve_member_context
-from ..release_publication import read_release_body
+from ..release_file import get_releases_dir
+from ..release_publication import notice_archive_path, publish_release_notice
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
-from .. import effects
 
 
 def run_cmd(args, flags, project_root):
     """Deprecate a past GitHub Release.
 
     Marks the release as pre-release and prepends a deprecation notice
-    to the release body.
+    to the release body. The notice is recorded in the version's release
+    archive (``release_notices``) and committed, so every later re-sync of
+    the Release keeps it.
 
     In monorepo mode, uses the project's monorepo tag format (e.g.
     ``mylib@v1.2.3``) instead of the plain ``v1.2.3`` tag.
@@ -114,41 +114,33 @@ def run_cmd(args, flags, project_root):
     # --approve-consequential skips it, with one prompt wording and one
     # non-interactive error across every rlsbl command.
 
-    _soft_deprecate(tag, reason, use, dry_run)
+    try:
+        archive_path = notice_archive_path(
+            get_releases_dir(project_dir, releasable_dir=releasable_config_dir),
+            version,
+        )
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    _soft_deprecate(tag, reason, use, dry_run, archive_path=archive_path,
+                    project_dir=project_dir)
 
 
-def _soft_deprecate(tag, reason, use, dry_run):
-    """Mark as pre-release and prepend a deprecation notice to the release body."""
-    # Build deprecation notice
+def _soft_deprecate(tag, reason, use, dry_run, *, archive_path, project_dir):
+    """Record the deprecation notice, then mark the Release with it."""
     notice = _build_notice(reason, use)
 
-    # The existing body, read through the one reader that knows how a Release
-    # document is fetched. Unreadable (no gh, no Release, a network failure) is
-    # not fatal: the notice is the point, and it stands on its own.
-    try:
-        current_body = read_release_body(tag, gh=run_gh)
-    except Exception:
-        current_body = ""
-
-    new_body = notice + "\n\n" + current_body if current_body else notice
+    publish_release_notice(
+        tag=tag, notice=notice, archive_path=archive_path,
+        commit_message=f"release: deprecate {tag}", gh=run_gh,
+        dry_run=dry_run, cwd=project_dir,
+    )
 
     if dry_run:
         print(f"Would mark {tag} as pre-release with deprecation notice:")
         print(notice)
         return
-
-    # Write new body to a temp file to avoid shell escaping issues
-    notes_file = f".rlsbl-deprecate-{int(time.time() * 1000)}.tmp"
-    writing_file = notes_file + ".writing"
-    try:
-        with effects.open_write(writing_file, "w", encoding="utf-8") as f:
-            f.write(new_body)
-        effects.rename(writing_file, notes_file)
-        run_gh(["release", "edit", tag, "--prerelease", "--notes-file", notes_file])
-    finally:
-        for tmp in (notes_file, writing_file):
-            if os.path.exists(tmp):
-                effects.remove(tmp)
 
     print(f"Deprecated {tag} (marked as pre-release)")
 

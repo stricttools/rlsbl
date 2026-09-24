@@ -5,76 +5,87 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 
 from rlsbl.commands.deprecate import run_cmd, _build_notice
 from conftest import cli_ctx
 
 
+@pytest.fixture(autouse=True)
+def _archive_in_cwd(tmp_path, monkeypatch):
+    """Every test runs in its own tmp cwd holding v0.9.1's release archive.
+
+    Deprecate records its notice in the version's archive and commits it, so
+    a version without one is refused; the commit is stubbed out.
+    """
+    monkeypatch.chdir(tmp_path)
+    releases = tmp_path / ".rlsbl" / "releases"
+    releases.mkdir(parents=True)
+    (releases / "v0.9.1.toml").write_text(
+        'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+        'include = []\nexclude = []\n',
+        encoding="utf-8",
+    )
+    with patch("rlsbl.release_publication.commit_files"):
+        yield
+
+
+def _forge(written):
+    """A gh stand-in answering one past Release and capturing the edited body."""
+    def gh(args, **kwargs):
+        args = list(args)
+        if args[:2] == ["release", "list"]:
+            return "v0.9.2"
+        if args[:2] == ["release", "view"]:
+            return "Old notes" if "body" in args else ""
+        if args[:2] == ["release", "edit"]:
+            path = args[args.index("--notes-file") + 1]
+            with open(path, encoding="utf-8") as f:
+                written.append((args, f.read()))
+            return ""
+        raise AssertionError(f"unexpected gh call: {args}")
+    return gh
+
+
 class TestSoftDeprecate(unittest.TestCase):
     """Verify the deprecate flow marks a release as pre-release with a deprecation notice."""
 
-    @patch("os.path.exists", return_value=True)
-    @patch("os.unlink")
-    @patch("os.rename")
     @patch("rlsbl.commands.deprecate.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.deprecate.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.deprecate.run_gh")
     @patch("rlsbl.commands.deprecate.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.deprecate.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_deprecate_basic(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, _rename, _unlink, _exists):
+    def test_deprecate_basic(self, _detect, _ws_root, _gh_inst, _gh_auth):
         """Deprecate marks release as pre-release and prepends deprecation notice."""
-        mock_run_gh.side_effect = [
-            "",          # gh release view v0.9.1 (exists check)
-            "v0.9.2",   # gh release list (latest is v0.9.2, not our target)
-            "Old notes", # gh release view v0.9.1 --json body
-            "",          # gh release edit v0.9.1 --prerelease --notes-file ...
-        ]
-
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout, \
-             patch("builtins.open", unittest.mock.mock_open()):
+        written = []
+        with patch("rlsbl.commands.deprecate.run_gh", side_effect=_forge(written)), \
+             patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd(["0.9.1"], {}, project_root=".")
 
         output = mock_stdout.getvalue()
         self.assertIn("Deprecated v0.9.1", output)
         self.assertIn("pre-release", output)
 
-        # Verify gh release edit was called with --prerelease
-        edit_calls = [c for c in mock_run_gh.call_args_list
-                      if c[0][0] and "edit" in c[0][0]]
-        self.assertEqual(len(edit_calls), 1)
-        self.assertIn("--prerelease", edit_calls[0][0][0])
+        # Verify gh release edit was called once, with --prerelease
+        self.assertEqual(len(written), 1)
+        self.assertIn("--prerelease", written[0][0])
 
-    @patch("os.path.exists", return_value=True)
-    @patch("os.unlink")
-    @patch("os.rename")
     @patch("rlsbl.commands.deprecate.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.deprecate.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.deprecate.run_gh")
     @patch("rlsbl.commands.deprecate.find_workspace_root", return_value=None)
     @patch("rlsbl.commands.deprecate.resolve_member_context", return_value=MagicMock(targets=[]))
-    def test_deprecate_with_reason_and_use(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth, _rename, _unlink, _exists):
+    def test_deprecate_with_reason_and_use(self, _detect, _ws_root, _gh_inst, _gh_auth):
         """Deprecate with --reason and --use includes both in the deprecation notice."""
-        mock_run_gh.side_effect = [
-            "",             # gh release view v0.9.1
-            "v0.9.2",      # gh release list (latest)
-            "Old notes",   # gh release view body
-            "",             # gh release edit
-        ]
-
-        mock_open = unittest.mock.mock_open()
-        with patch("sys.stdout", new_callable=StringIO), \
-             patch("builtins.open", mock_open):
+        written = []
+        with patch("rlsbl.commands.deprecate.run_gh", side_effect=_forge(written)), \
+             patch("sys.stdout", new_callable=StringIO):
             run_cmd(["0.9.1"], {"reason": "broken on macOS", "use": "0.9.2"}, project_root=".")
 
-        # Check what was written to the notes file
-        written = "".join(
-            call_args[0][0]
-            for call_args in mock_open().write.call_args_list
+        body = written[0][1]
+        self.assertEqual(
+            body,
+            "> **Deprecated:** broken on macOS. Use v0.9.2 instead.\n\nOld notes",
         )
-        self.assertIn("broken on macOS", written)
-        self.assertIn("v0.9.2", written)
-        self.assertIn("Deprecated", written)
-        self.assertIn("Old notes", written)
 
 
 class TestDeprecateNoHardFlag(unittest.TestCase):

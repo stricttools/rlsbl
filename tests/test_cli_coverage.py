@@ -1408,6 +1408,19 @@ class TestYankCoverageConfirmation:
     a user learns to answer without reading.
     """
 
+    @pytest.fixture(autouse=True)
+    def _archive(self, tmp_path):
+        """The notice is recorded in a real tmp archive; the commit is stubbed."""
+        path = tmp_path / "v1.0.0.toml"
+        path.write_text(
+            'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+            'include = []\nexclude = []\n',
+            encoding="utf-8",
+        )
+        with patch(f"{MOD_YANK}.notice_archive_path", return_value=str(path)), \
+             patch("rlsbl.release_publication.commit_files"):
+            yield
+
     @patch(f"{MOD_YANK}.find_workspace_root", return_value=None)
     @patch(f"{MOD_YANK}.resolve_member_context", return_value=MagicMock(targets=[]))
     @patch(f"{MOD_YANK}.check_gh_installed", return_value=True)
@@ -1418,8 +1431,7 @@ class TestYankCoverageConfirmation:
         from rlsbl.commands.yank import run_cmd
         # No targets means no probes; a prompt here would raise on EOF.
         with patch("builtins.input", side_effect=EOFError) as mock_input:
-            with patch("rlsbl.commands.yank.effects"):
-                run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
+            run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
         mock_input.assert_not_called()
 
 
@@ -1504,6 +1516,19 @@ class TestDeprecateCoverageMonorepoContext:
 
 class TestDeprecateCoverageSoftDeprecate:
     """Cover _soft_deprecate."""
+
+    @pytest.fixture(autouse=True)
+    def _archive(self, tmp_path):
+        """The notice is recorded in a real tmp archive; the commit is stubbed."""
+        path = tmp_path / "v1.0.0.toml"
+        path.write_text(
+            'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+            'include = []\nexclude = []\n',
+            encoding="utf-8",
+        )
+        with patch(f"{MOD_DEPRECATE}.notice_archive_path", return_value=str(path)), \
+             patch("rlsbl.release_publication.commit_files"):
+            yield
 
     @patch(f"{MOD_DEPRECATE}.find_workspace_root", return_value=None)
     @patch(f"{MOD_DEPRECATE}.resolve_member_context", return_value=MagicMock(targets=[]))

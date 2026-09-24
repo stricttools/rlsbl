@@ -325,8 +325,11 @@ def publish_version(
     )
     say(f"Mirror tag {tag}: {tag_outcome}")
 
+    # No notices: `release deprecate` and `release yank` mark the source
+    # repository's Release, never a mirror's.
     pub = publication(
         tag=tag, version=version, candidate_sha=split_sha, notes=notes,
+        notices=(),
     )
     release_outcome = publish_release(
         pub, gh=gh, repo=remote, directory=directory,

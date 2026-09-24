@@ -219,12 +219,12 @@ Step 18 does more than preserve the release prose. Before the archive is locked 
 - a **workspace releasable** ships its member directories, so there is one entry per member path. No single git object covers a *set* of subtrees, so one tree hash per member is the honest record — a synthesized hash over the members would be an rlsbl invention that no git command could reproduce or check;
 - a **single-member releasable** ships one directory and gets the single entry for that path.
 
-The release commit is written by the flow and by nothing else, and it is not alone in that: it belongs to the **flow-owned set**, whose single authority is `FLOW_OWNED_FIELDS` in `rlsbl/release_file.py` — the release-commit fields together with the version-fate fields described below. One rule covers the whole set, and both sides of it read that tuple rather than restating its membership:
+The release commit is written by the flow and by nothing else, and it is not alone in that: it belongs to the **flow-owned set**, whose single authority is `FLOW_OWNED_FIELDS` in `rlsbl/release_file.py` — the release-commit fields, the version-fate fields described below, and `release_notices`, which [`release deprecate` and `release yank` write](#release-notices). One rule covers the whole set, and both sides of it read that tuple rather than restating its membership:
 
 - the editable `unreleased.toml` carrying *any* member is refused before any mutation — at `rlsbl release run`'s validation, and again at `rlsbl release resume`'s own entry, since a resume re-enters the mutating phase with the release file still editable on disk;
 - `rlsbl release undo` strips every member when it restores an archive as the editable release file, so the freed version can be released again.
 
-The ground is the same for each: no release-commit value exists before the release runs, and each fate field states something about a version whose fate is already settled. A member found in `unreleased.toml` is therefore either a hand-authored claim about something that has not happened, or an archive copied back without being un-finalized.
+The ground is the same for each: no release-commit value exists before the release runs, each fate field states something about a version whose fate is already settled, and a notice describes a version that is already on GitHub. A member found in `unreleased.toml` is therefore either a hand-authored claim about something that has not happened, or an archive copied back without being un-finalized.
 
 Archives written before release commits were recorded carry neither field; readers treat absence as absence and never substitute a value.
 
@@ -297,6 +297,12 @@ An archive recording none of the three is a hard error at every read-for-use sit
 
 When both sources cover one version and name *different* spellings, the ref set cannot be derived: the error names both sources with both spellings and stops there. Neither outranks the other — they are contradictory statements about which ref a published version owns — so correcting whichever one is wrong is the operator's call, not a precedence rule's.
 
+### Release notices
+
+`rlsbl release deprecate` and `rlsbl release yank` put a notice at the top of a past version's GitHub Release, for example `> **Deprecated:** never published to PyPI; CI failed on missing gitleaks. Use v0.101.1 instead.` Each first records the notice in the version's release archive, as the first element of `release_notices` (the list is in top-to-bottom order, and a later notice goes on top), commits the archive, and only then edits the Release. A version with no archive is refused before anything is written.
+
+Every Release body rlsbl composes -- `rlsbl release edit` and the changelog commands that call it, `rlsbl release reconcile`, and `rlsbl release scrub` -- is built by `rlsbl/release_publication.py` from the repository: the recorded notices, each followed by a blank line, then the notes and the `rlsbl-ci-sha` marker. Re-syncing an already-deprecated Release therefore reproduces its top unchanged instead of erasing the notice.
+
 ### The CI gate
 
 The gate blocks the irreversible half of the release until the repository's own CI has spoken about the candidate commit, and it distinguishes four outcomes rather than collapsing them into pass/fail. The distinction matters because the right operator response differs sharply between a definite failure, an unfinished wait, and a repository that simply has no CI to wait for:
@@ -362,9 +368,9 @@ Each of these writes one of the namespaces above deliberately, and the list is c
 | `rlsbl release undo` | Deletes the GitHub Release, deletes the tag (remote and local), reverts the version-bump commit and pushes the branch. With `--version`, a non-latest release only when it is provably unpublished, and then the Release and tag only. | branch heads, tags, Releases |
 | `rlsbl release reconcile` | Re-pushes the tags an out-of-band rewrite moved and writes their GitHub Release documents in place, creating only the ones origin does not have. Fail-closed: a divergence no record explains is a hard error, never a force-push. | tags, Releases |
 | `rlsbl release scrub` | The rewrite itself -- see the table above. | history, tags, Releases |
-| `rlsbl release edit` | Re-syncs one version's GitHub Release notes from CHANGELOG.md. | Releases |
-| `rlsbl release deprecate` | Prepends a deprecation notice to a Release's body and sets its pre-release flag. | Releases |
-| `rlsbl release yank` | Prepends a yank notice and sets the pre-release flag, plus the registry's own removal (npm deprecate, Go retract, a PyPI checklist). | Releases (and registries) |
+| `rlsbl release edit` | Re-syncs one version's GitHub Release notes from CHANGELOG.md, keeping the [recorded notices](#release-notices) on top. | Releases |
+| `rlsbl release deprecate` | Records a deprecation notice in the version's release archive and commits it, then prepends the notice to the Release's body and sets its pre-release flag. | Releases |
+| `rlsbl release yank` | Records a yank notice the same way and prepends it, sets the pre-release flag, plus the registry's own removal (npm deprecate, Go retract, a PyPI checklist). | Releases (and registries) |
 | `rlsbl changelog amend` / `rlsbl changelog edit` / `rlsbl changelog remove` | Rewrites a released version's JSONL -- appending an entry, changing one, or deleting one -- regenerates CHANGELOG.md, and re-syncs that version's GitHub Release notes. | Releases |
 | `rlsbl monorepo rename-releasable` | Creates and pushes one boundary alias tag at the renamed releasable's current version, when the tag format carries `{name}`. Historical releases stay under the old prefix. | tags |
 

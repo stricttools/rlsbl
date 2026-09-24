@@ -3613,9 +3613,11 @@ def _run_release_mutating(state: ReleaseState):
     # construction.
     from ...release_publication import publication as _publication
 
+    # No notices: `release deprecate` and `release yank` refuse the latest
+    # release, so the version being released here has none recorded yet.
     _pub = _publication(
         tag=tag, version=new_version, candidate_sha=pushed_sha,
-        notes=changelog_entry or "",
+        notes=changelog_entry or "", notices=(),
     )
     notes_body = _pub.body
     with effects.open_write(writing_file, "w", encoding="utf-8") as f:

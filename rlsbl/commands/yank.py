@@ -6,20 +6,19 @@ status, then executes the registry-specific yank action:
 - Go: retract directive + tag deletion
 - PyPI: human-in-the-loop checklist (no yank API)
 
-Also sets the GitHub pre-release flag and adds a yank notice to the release.
+Also sets the GitHub pre-release flag and adds a yank notice to the release,
+recording the notice in the version's release archive (``release_notices``).
 """
 
-import os
 import sys
-import time
 
 from ..member_context import resolve_member_context
 from ..publication_probe import PublicationStatus
-from ..release_publication import read_release_body
+from ..release_file import get_releases_dir
+from ..release_publication import notice_archive_path, publish_release_notice
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
-from .. import effects
 
 
 def run_cmd(args, flags, project_root):
@@ -119,6 +118,17 @@ def run_cmd(args, flags, project_root):
         print("Cannot verify whether this is the latest release. Aborting for safety.", file=sys.stderr)
         sys.exit(1)
 
+    # The yank notice is recorded in the version's archive; a version without
+    # one is refused here, before any registry is touched.
+    try:
+        archive_path = notice_archive_path(
+            get_releases_dir(project_dir, releasable_dir=releasable_config_dir),
+            version,
+        )
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
     # Probe registries for publication status. Each entry is probed in ITS OWN
     # directory: a target declared with a ``path`` has its manifest there, and
     # the project root either holds a different package or none at all.
@@ -179,7 +189,8 @@ def run_cmd(args, flags, project_root):
         _yank_target(t, target_path, version, tag, reason, dry_run)
 
     # Mark GitHub release as pre-release with yank notice
-    _mark_github_release(tag, reason, use, dry_run)
+    _mark_github_release(tag, reason, use, dry_run, archive_path=archive_path,
+                         project_dir=project_dir)
 
     if dry_run:
         print(f"\nDry run complete for {tag}.")
@@ -213,35 +224,20 @@ def _yank_target(target, target_dir, version, tag, reason, dry_run):
     return outcome
 
 
-def _mark_github_release(tag, reason, use, dry_run):
-    """Mark GitHub release as pre-release with a yank notice."""
+def _mark_github_release(tag, reason, use, dry_run, *, archive_path, project_dir):
+    """Record the yank notice, then mark the GitHub Release with it."""
     notice = _build_yank_notice(reason, use)
 
-    # Read through the one Release-document reader; an unreadable body leaves
-    # the notice standing alone rather than aborting the yank.
-    try:
-        current_body = read_release_body(tag, gh=run_gh)
-    except Exception:
-        current_body = ""
-
-    new_body = notice + "\n\n" + current_body if current_body else notice
+    publish_release_notice(
+        tag=tag, notice=notice, archive_path=archive_path,
+        commit_message=f"release: yank {tag}", gh=run_gh,
+        dry_run=dry_run, cwd=project_dir,
+    )
 
     if dry_run:
         print(f"  github: would mark {tag} as pre-release with yank notice")
         return
-
-    notes_file = f".rlsbl-yank-{int(time.time() * 1000)}.tmp"
-    writing_file = notes_file + ".writing"
-    try:
-        with effects.open_write(writing_file, "w", encoding="utf-8") as f:
-            f.write(new_body)
-        effects.rename(writing_file, notes_file)
-        run_gh(["release", "edit", tag, "--prerelease", "--notes-file", notes_file])
-        print(f"  github: marked {tag} as pre-release")
-    finally:
-        for tmp in (notes_file, writing_file):
-            if os.path.exists(tmp):
-                effects.remove(tmp)
+    print(f"  github: marked {tag} as pre-release")
 
 
 def _build_yank_notice(reason, use):
