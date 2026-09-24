@@ -161,13 +161,14 @@ def cleanup_per_package_release_state(workspace_root, projects=None,
     return removed
 
 
-def run_cleanup_command(workspace_root, *, dry_run=False):
+def run_cleanup_command(workspace_root, *, dry_run=False, auto_commit=True):
     """CLI entry for `rlsbl monorepo cleanup`.
 
     Removes per-package release-state residue from releasable member
     packages (via :func:`cleanup_per_package_release_state`, which uses
     saferm for an audit trail), then commits the deletions so the working
-    tree stays clean.
+    tree stays clean -- unless *auto_commit* is False
+    (``--no-auto-commit``), which leaves them uncommitted and says so.
 
     Returns the list of removed (or would-be-removed) paths.
     """
@@ -199,7 +200,15 @@ def run_cleanup_command(workspace_root, *, dry_run=False):
     tracked_changes = working_tree_paths(
         cwd=str(workspace_root), paths=removed,
     )
-    if tracked_changes:
+    if tracked_changes and not auto_commit:
+        quoted = " ".join(
+            os.path.relpath(p, str(workspace_root)) for p in tracked_changes
+        )
+        print(
+            f"Skipped commit (--no-auto-commit). Run `safegit commit -- "
+            f"{quoted}` manually."
+        )
+    elif tracked_changes:
         from .utils import commit_files
         commit_files(
             "chore: remove per-package release-state residue",

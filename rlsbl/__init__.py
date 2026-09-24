@@ -2584,10 +2584,12 @@ def cmd_mono_absorb(ctx, source_repo, dest_path, name, registry_name, releasable
     )
 
 
-@mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Detect residue first with `rlsbl check --name releasable-residue`.", effect="mutating")
+@mono.command(name="cleanup", help="Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically unless --no-auto-commit is passed. Detect residue first with `rlsbl check --name releasable-residue`.", effect="mutating")
+@strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Commit the deletions after removing them (the handler commits when neither --auto-commit nor --no-auto-commit is passed)")
 @effects.handler
-def cmd_mono_cleanup(ctx):
+def cmd_mono_cleanup(ctx, auto_commit):
     """Remove per-package release-state residue from releasable members."""
+    auto_commit = _opt_default(auto_commit, True)
     dry_run = ctx.dry_run
     root = _require_project_root()
     from .workspace import find_workspace_root
@@ -2596,7 +2598,7 @@ def cmd_mono_cleanup(ctx):
         print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
         sys.exit(1)
     from .releasable_cleanup import run_cleanup_command
-    run_cleanup_command(ws_root, dry_run=dry_run)
+    run_cleanup_command(ws_root, dry_run=dry_run, auto_commit=auto_commit)
 
 
 # Consequential: the rename declares a fact about this repository's history --
