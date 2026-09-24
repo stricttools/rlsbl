@@ -335,6 +335,11 @@
       "-f"
     ],
     [
+      "go",
+      "env",
+      "GOVERSION"
+    ],
+    [
       "uv",
       "--version"
     ],
@@ -641,7 +646,7 @@
     },
     "check-name": {
       "name": "check-name",
-      "help": "Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks.",
+      "help": "Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks. Exits 0 when every name is available, 2 when any check ended in an error, and 1 otherwise: taken, invalid, and discouraged all exit 1, so a discouraged Go name exits 1 even though Go accepts it.",
       "effect": "read_only",
       "payload_schema": {
         "type": [
@@ -861,7 +866,7 @@
     },
     "claim-name": {
       "name": "claim-name",
-      "help": "Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.",
+      "help": "Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed.",
       "effect": "mutating",
       "consequential": true,
       "flags": [
@@ -2548,8 +2553,19 @@
         },
         "cleanup": {
           "name": "cleanup",
-          "help": "Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically. Detect residue first with `rlsbl check --name releasable-residue`.",
-          "effect": "mutating"
+          "help": "Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically unless --no-auto-commit is passed. Detect residue first with `rlsbl check --name releasable-residue`.",
+          "effect": "mutating",
+          "flags": [
+            {
+              "name": "auto-commit",
+              "help": "Commit the deletions after removing them (the handler commits when neither --auto-commit nor --no-auto-commit is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
+            }
+          ]
         },
         "rename-releasable": {
           "name": "rename-releasable",
@@ -2750,7 +2766,7 @@
       "commands": {
         "go-module-path": {
           "name": "go-module-path",
-          "help": "Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-scoped. The committed strictcli schema dump moves with it: the project_id line in every .strictcli/schema.json under the old module path is rewritten too, so the next --dump-schema does not refuse a dump belonging to the old project. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. Comments, vendored trees, and every other file are never touched. Use --dry-run to print the per-file plan with occurrence counts.",
+          "help": "Rename a Go module path across the repository. Rewrites the module-path tokens in every go.mod (the module directive plus any require, replace, exclude or retract reference from a nested module) and every Go import site under the old path, located by the tree-sitter import scanner and rewritten line-scoped. The committed strictcli schema dump moves with it: the project_id line in every .strictcli/schema.json under the old module path is rewritten too, so the next --dump-schema does not refuse a dump belonging to the old project. Containment is boundary-aware, so a neighbouring module whose path merely begins with the same letters is left alone. The files considered are what `git ls-files --cached --others --exclude-standard` lists: tracked files plus untracked files that are not ignored, so a gitignored third-party clone is never touched, and neither are comments, vendored trees, or any other kind of file. Use --dry-run to print the per-file plan with occurrence counts.",
           "effect": "mutating",
           "flags": [
             {
@@ -3234,6 +3250,17 @@
       "depends_on": []
     },
     "go-module-identity": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "go-toolchain-declared": {
       "tags": [
         "project",
         "preflight"
