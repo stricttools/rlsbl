@@ -1237,7 +1237,7 @@ def cmd_check_name(ctx, target, delay):
 
 @app.command(
     name="claim-name",
-    help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available.",
+    help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed.",
     effect="mutating",
     # Claiming a name on a public registry is the operator's call: it decides
     # what this project is called to everyone outside it. (It is also the
