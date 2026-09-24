@@ -27,7 +27,7 @@ A project can have a target for versioning without a corresponding pipeline (e.g
 
 When `rlsbl release run`, `rlsbl scaffold`, or `rlsbl targets` needs to know which targets apply, it calls `detect_targets(dir_path)` which scans the project directory for manifest files and applies content-based disambiguation when multiple targets could match. The detection logic follows two paths:
 
-1. **Explicit configuration** — If `.rlsbl/config.json` contains a `targets` array, that list is authoritative. Each entry is either a string (`"npm"`) or a dict with `name` and optional `path` (for subdirectory targets). Unknown target names are warned and skipped.
+1. **Explicit configuration** — If `.rlsbl/config.json` contains a `targets` array, that list is authoritative. Each entry is either a string (`"npm"`) or a dict with `name` and optional `path` (for subdirectory targets). Unknown target names are warned and skipped. In a monorepo, a releasable's `.rlsbl-monorepo/releasables/<name>/config.json` declares the targets of every member it holds: a string entry applies to each member in its own directory, while a `path` entry names one package, resolved from the releasable's root (the deepest directory holding all its members, which is the repository root when the root member belongs to it), and only the member whose territory holds that directory carries it. A `path` no member of the releasable contains is refused.
 
 2. **Auto-detection fallback** — If no `targets` array exists in config, every registered target's `detect()` method is called against the directory. Targets that return `True` are included.
 

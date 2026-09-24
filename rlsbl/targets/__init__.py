@@ -252,6 +252,60 @@ def _auto_detect(dir_path):
     return found
 
 
+class _ReleasableLayout:
+    """Where a releasable's members sit, for the target paths it declares.
+
+    A target the releasable declares with a ``path`` names one package. The
+    path resolves from the releasable's root -- the deepest directory holding
+    every member: the repository root when the root member belongs to the
+    releasable, the member's own directory when it has a single member -- and
+    the package belongs to the one member whose territory holds it, by the
+    most-specific-path rule file ownership uses. The other members do not
+    carry that target at all.
+    """
+
+    def __init__(self, releasable_config_dir):
+        from ..ownership import member_path
+        from ..workspace import load_workspace, members_of
+        from ..workspace_types import get_releasable_dir
+
+        state_dir = os.path.abspath(str(releasable_config_dir))
+        self.name = os.path.basename(state_dir)
+        self.workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(state_dir)))
+        if os.path.abspath(get_releasable_dir(self.workspace_root, self.name)) != state_dir:
+            raise ConfigError(
+                f"{state_dir} is not a releasable state directory "
+                f"(.rlsbl-monorepo/releasables/<name>/), so the target paths "
+                f"its config.json declares have no releasable root to resolve from"
+            )
+        self.members = members_of(self.name, load_workspace(self.workspace_root))
+        paths = [member_path(m) for m in self.members]
+        root_rel = "" if not paths or "" in paths else os.path.commonpath(paths)
+        self.root_rel = root_rel
+        self.root_dir = (
+            os.path.join(self.workspace_root, root_rel) if root_rel else self.workspace_root
+        )
+
+    def is_owner(self, entry, dir_path, config_path):
+        """Is the member at *dir_path* the one owning *entry*'s package?"""
+        from ..ownership import member_for_directory, member_path, normalize_path
+
+        rel = os.path.relpath(os.path.abspath(entry.path), self.workspace_root)
+        owner = None
+        if rel != ".." and not rel.startswith("../"):
+            owner = member_for_directory(rel, self.members, include_root=True)
+        if owner is None:
+            shown_root = self.root_rel or "the repository root"
+            raise ConfigError(
+                f"{config_path} declares target '{entry.name}' at {rel}, which no "
+                f"member of releasable '{self.name}' contains. A target path on a "
+                f"releasable resolves from the releasable's root ({shown_root}) and "
+                f"must name a directory inside one of its members."
+            )
+        here = normalize_path(os.path.relpath(os.path.abspath(dir_path), self.workspace_root))
+        return member_path(owner) == here
+
+
 def detect_targets(dir_path=".", releasable_config_dir=None):
     """Detect which targets are applicable in the given directory.
 
@@ -260,6 +314,9 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
     has a ``"targets"`` list, uses that (opt-in config).  Each entry
     can be a plain string (defaults to dir_path) or a dict with
     ``"name"`` and optional ``"path"`` (subdirectory relative to dir_path).
+    A releasable's own ``targets`` list is the exception for ``"path"``: the
+    path resolves from the releasable's root and the target belongs only to
+    the member owning that directory (see :class:`_ReleasableLayout`).
 
     Two-tier rule when ``targets`` key is absent from the merged config:
 
@@ -287,7 +344,29 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
         if rel_targets is not None and isinstance(rel_targets, list):
             # Releasable defines targets -- use them directly, skip merge
             result = []
+            layout = None
             for entry in rel_targets:
+                if isinstance(entry, dict) and "path" in entry:
+                    # A path names one package under the releasable's root,
+                    # owned by one member; the other members do not have it.
+                    if layout is None:
+                        layout = _ReleasableLayout(releasable_config_dir)
+                    try:
+                        te = _parse_target_entry(entry, layout.root_dir)
+                    except (ConfigError, TypeError) as e:
+                        print(f"Warning: {e}, skipping", file=sys.stderr)
+                        continue
+                    if not layout.is_owner(te, dir_path, rel_config_path):
+                        continue
+                    if te.name in TARGETS:
+                        if not os.path.isdir(te.path):
+                            print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
+                                  file=sys.stderr)
+                        result.append(te)
+                    else:
+                        print(f"Warning: unknown target '{te.name}' in config, skipping",
+                              file=sys.stderr)
+                    continue
                 try:
                     te = _parse_target_entry(entry, dir_path)
                 except (ConfigError, TypeError) as e:
