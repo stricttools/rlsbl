@@ -1,4 +1,4 @@
-"""Tests for the batch_limits validation checks (Phase 4).
+"""Tests for the batch_limits validation checks.
 
 Covers:
 - _get_batch_limits_config: defaults + override + type validation

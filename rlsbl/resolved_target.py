@@ -1,6 +1,6 @@
 """Resolution of a member's release surface into ResolvedTarget records, linking separately-configured targets and pipelines for the release flow.
 
-Targets and pipelines are configured separately-but-linked (Phase 6.1): each
+Targets and pipelines are configured separately-but-linked: each
 pipeline entry declares an explicit ``target`` link (a target name, or ``null``
 for a target-less publisher such as a docs/site deploy). This module turns that
 linked configuration into the flat, per-pipeline view the release flow wants.
@@ -45,7 +45,7 @@ class ResolvedTarget:
             verbatim from config (``"ci"`` / ``"none"``) -- never collapsed to a
             private boolean.
         artifact_kind: the pipeline config's ``artifact`` value where present
-            (e.g. Go's ``library`` / ``binary``, wired in a later phase), or
+            (e.g. Go's ``library`` / ``binary``), or
             ``None``. Carried as the raw config value.
         primary: whether this record is the release's primary/registry target.
             At most one record in a resolved list is primary; the release flow
@@ -68,7 +68,7 @@ class ResolvedTarget:
 
 
 def _pipeline_target_link(pipeline) -> Optional[str]:
-    """The pipeline's explicit target link (Phase 6.1's ``.target`` attribute).
+    """The pipeline's explicit target link (its ``.target`` attribute).
 
     ``load_pipelines`` sets ``instance.target`` from the entry's ``target`` key
     (a target name string, or ``None`` for a target-less publisher). This is the

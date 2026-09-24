@@ -1,4 +1,4 @@
-"""Tests for Phase 6: release flow on releasable model.
+"""Tests for release flow on releasable model.
 
 Covers:
 - ReleaseState construction with releasable fields

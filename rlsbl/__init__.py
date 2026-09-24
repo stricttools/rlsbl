@@ -1219,8 +1219,8 @@ def cmd_check_name(ctx, target, delay):
     effect="mutating",
     # Claiming a name on a public registry is the operator's call: it decides
     # what this project is called to everyone outside it. (It is also the
-    # command whose "dry run that published for real" incident started the
-    # effects campaign.)
+    # command whose "dry run that published for real" incident motivated the
+    # effect classification.)
     consequential=True,
     # The publish is irreversible on both registries rlsbl supports, so the
     # preview says why it is there rather than listing it like any other step.
@@ -2784,9 +2784,7 @@ transition = app.group("transition", help="Record the transition-record facts an
     # history IS. Every fact here silences a reader that would otherwise keep
     # reporting a divergence -- a tag nothing accounts for, a release history
     # that looks abandoned, a tag prefix nothing explains -- and an agent that
-    # could write them could silence its own findings. (The campaign's later
-    # classification re-derivation reviews this entry along with the rest of
-    # the consequential set.)
+    # could write them could silence its own findings.
     consequential=True,
     help="Append one operator-declared fact to this repository's transition record: a tag that stands outside the version model (--non-version-tag), a member's or releasable's deliberately closed release history (--release-history-closed), or a releasable that was renamed (--releasable-rename <old> --to <new>). Exactly one must be elected, and --reason states why in the operator's own words. The event is appended to the repository-scoped record (.rlsbl-monorepo/transitions.jsonl in a workspace, .rlsbl/transitions.jsonl standalone) and committed. A second declaration of the same kind about the same subject is refused, naming the one already recorded.",
 )

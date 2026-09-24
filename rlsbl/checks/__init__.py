@@ -153,7 +153,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "format-scope-guard": frozenset({"pypi"}),
     "type-check": frozenset({"pypi"}),
     "type-check-scope-guard": frozenset({"pypi"}),
-    # --- phase 12 project checks ---
+    # --- project checks ---
     "publish-mode-workflow": None,
     "npm-private-mismatch": frozenset({"npm"}),
     "target-version-readable": None,

@@ -1,4 +1,4 @@
-"""Tests for backward compatibility bridge: hook migration warning (Phase 4e).
+"""Tests for backward compatibility bridge: hook migration warning.
 
 Verifies:
 1. Warning emitted when customized script exists without config

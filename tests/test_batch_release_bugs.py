@@ -133,7 +133,7 @@ class TestBatchModeSkipsValidation:
 
 
 # ---------------------------------------------------------------------------
-# Phase 1c: release init warns in explicit-mode monorepo
+# release init warns in explicit-mode monorepo
 # ---------------------------------------------------------------------------
 
 
@@ -211,7 +211,7 @@ class TestReleaseInitMonorepoWarning:
 
 
 # ---------------------------------------------------------------------------
-# Phase 1.2: resolved-plan file + per-item idempotency + archive-as-repair
+# resolved-plan file + per-item idempotency + archive-as-repair
 #
 # These tests simulate batch releases against a real git repo. run_cmd is
 # mocked to reproduce the *observable* effects of a real release: it bumps the
@@ -647,7 +647,7 @@ class TestBatchPlanIdempotency:
 
 
 # ---------------------------------------------------------------------------
-# Phase 3.1(c): a batch release never reports success it cannot evidence.
+# A batch release never reports success it cannot evidence.
 #
 # Two silent-zero holes lived here. A member whose release call exited 0
 # skipped the batch's own bookkeeping entirely -- neither `released` nor

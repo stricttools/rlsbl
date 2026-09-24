@@ -1,4 +1,4 @@
-"""Tests for the pypi launcher first-run shim template (Phase 6.3).
+"""Tests for the pypi launcher first-run shim template.
 
 Covers:
 - Template content assertions (platform mapping, checksum verification,

@@ -1,4 +1,4 @@
-"""Tests for config-driven hook execution (Phase 4a-b).
+"""Tests for config-driven hook execution.
 
 Covers:
 1. normalize_hook_entry handles strings and dicts correctly
@@ -817,7 +817,7 @@ class TestRunReleaseHookPostRelease:
 class TestConfigHooksWithoutScriptFile:
     """Verify config-driven hooks run even when no script file exists on disk.
 
-    This covers the Phase 4 audit fix: before the fix, call sites gated on
+    This covers an audit fix: before the fix, call sites gated on
     ``os.path.exists(script_path)`` which prevented config-driven hooks from
     running when no script file was present.
     """

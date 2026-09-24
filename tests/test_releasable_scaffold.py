@@ -1,4 +1,4 @@
-"""Tests for releasable directory scaffolding (Phase 9).
+"""Tests for releasable directory scaffolding.
 
 Covers:
 - scaffold_releasable_dirs creates correct directory structure

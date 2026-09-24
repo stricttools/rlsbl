@@ -1,4 +1,4 @@
-"""Tests for the ``requires-services`` check (Phase 7.3).
+"""Tests for the ``requires-services`` check.
 
 The check hard-errors when config declares CI services / test_env that the
 rendered workflow files on disk do not provision, and skips visibly when

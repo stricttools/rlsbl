@@ -107,8 +107,7 @@ def test_no_handler_swallows_kwargs():
     A ``**_kwargs`` catch-all disables strictcli's registration-time signature
     validation and silently absorbs flags/args/globals the handler forgot to
     declare. Only the handlers in ``KWARGS_EXEMPT_HANDLERS`` are permitted to
-    keep it (their registration blocks are removed in later phases); that set
-    must shrink to empty as those phases land.
+    keep it; that set must stay empty.
     """
     offenders = []
     for path, handler in _iter_project_handlers():

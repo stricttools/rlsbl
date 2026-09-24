@@ -1,4 +1,4 @@
-"""Tests for Phase 8: Gradle version catalog, build, lint, and lockfile support."""
+"""Tests for Gradle version catalog, build, lint, and lockfile support."""
 
 import json
 import os
@@ -13,7 +13,7 @@ from rlsbl.errors import VersionError
 
 
 # ---------------------------------------------------------------------------
-# Phase 8a: Gradle version catalog support
+# Gradle version catalog support
 # ---------------------------------------------------------------------------
 
 
@@ -196,12 +196,12 @@ class TestVersionCatalogKeyMissing:
 
 
 class TestPhase6eHardErrorRemoved:
-    """Phase 6e hard error removed -- catalog now supported."""
+    """The old catalog hard error is removed -- catalog now supported."""
 
     def test_catalog_no_longer_raises_unsupported_error(self, tmp_project):
         """Without version_catalog_key, catalog is silently skipped.
 
-        The old Phase 6e error ("not yet supported") and the Phase 8a
+        The old "not yet supported" error and the old
         config-required error are both gone. The catalog is simply
         ignored and the next priority source is used.
         """
@@ -235,7 +235,7 @@ class TestPhase6eHardErrorRemoved:
 
 
 # ---------------------------------------------------------------------------
-# Phase 8b: Build step during release
+# Build step during release
 # ---------------------------------------------------------------------------
 
 
@@ -320,7 +320,7 @@ class TestBuildMaven:
 
 
 # ---------------------------------------------------------------------------
-# Phase 8c: Lint execution
+# Lint execution
 # ---------------------------------------------------------------------------
 
 
@@ -399,7 +399,7 @@ class TestLintFallback:
 
 
 # ---------------------------------------------------------------------------
-# Phase 8d: Lockfile sync
+# Lockfile sync
 # ---------------------------------------------------------------------------
 
 

@@ -1,4 +1,4 @@
-"""Mixed monorepo tag-scheme guard (Phase 6.2).
+"""Mixed monorepo tag-scheme guard.
 
 Go publishes monorepo tags path-based (``{path}/v*``); every other target
 uses ``{name}@v*``. A single monorepo member dir declaring both a Go target

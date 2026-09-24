@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Route direct stdlib effect calls in rlsbl/ through rlsbl.effects.
 
-One-shot codemod for the effect-chokepoint convergence (Phase 6.1).  It walks
+One-shot codemod for the effect-chokepoint convergence.  It walks
 the production package with ``ast``, rewrites each banned call's *callee*
 in place (arguments are untouched, so behavior is preserved exactly), and
 inserts the ``effects`` import where a file gained its first call.

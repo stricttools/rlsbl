@@ -1,6 +1,6 @@
 """Tests for workspace-targets check filtering and releasable union verification.
 
-Phase 6: verifies that the workspace-targets check correctly:
+Verifies that the workspace-targets check correctly:
 - Skips dev_only projects (don't cause failure even with no targets)
 - Skips releasable=false projects (explicitly non-releasable)
 - Passes releasable members that inherit targets

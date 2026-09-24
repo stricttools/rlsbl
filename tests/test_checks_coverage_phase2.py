@@ -1,4 +1,4 @@
-"""Phase 2 coverage tests for check modules.
+"""Coverage tests for check modules.
 
 Targets:
 - rlsbl/checks/prepush.py  (lines 34, 58, 65-87, 95, 98, 128-142)
@@ -3249,8 +3249,8 @@ class TestWorkspaceCiSyncedEdge:
 
 
 class TestReclassifiedLabels:
-    """Pin the derived status label for each sub-condition that was
-    reclassified in Phase 4.2 (warn/pass -> skip, warn -> error, etc.)."""
+    """Pin the derived status label for each sub-condition that
+    was reclassified (warn/pass -> skip, warn -> error, etc.)."""
 
     # -- version-consistency: not-applicable conditions -> skip -----------
 

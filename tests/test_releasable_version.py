@@ -1,4 +1,4 @@
-"""Tests for releasable directory structure and version management (Phase 3).
+"""Tests for releasable directory structure and version management.
 
 Covers:
 - Path resolution utilities (get_releasable_dir, get_releasable_version_path)

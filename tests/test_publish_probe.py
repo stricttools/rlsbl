@@ -1,4 +1,4 @@
-"""Tests for Phase 7.1: idempotent publish with probe-first pattern.
+"""Tests for idempotent publish with probe-first pattern.
 
 Tests that each pipeline's publish() calls probe_before_publish() and
 handles already-published errors as success. Also tests per-pipeline
@@ -413,7 +413,7 @@ class TestGoProbeRework(unittest.TestCase):
 
 
 class TestRecoveryDispatch(unittest.TestCase):
-    """Tests for Phase 7.5: recovery dispatch with tag input."""
+    """Tests for recovery dispatch with tag input."""
 
     def test_all_publish_templates_have_tag_input(self):
         """All publish templates have workflow_dispatch.inputs.tag."""

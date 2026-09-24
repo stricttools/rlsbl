@@ -1,4 +1,4 @@
-"""Tests for Phase 9.3: checks for multi-artifact releasables.
+"""Tests for checks for multi-artifact releasables.
 
 Covers:
 - version-consistency enforces published members' manifests == releasable version

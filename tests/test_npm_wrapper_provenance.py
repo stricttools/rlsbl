@@ -1,6 +1,6 @@
 """Tests for npm wrapper provenance support in build_npm_publish_jobs.
 
-Phase 6.6: provenance config threads --provenance flag + id-token: write
+The provenance config threads the --provenance flag + id-token: write
 permission into the generated wrapper publish job.
 """
 

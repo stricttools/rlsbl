@@ -1,4 +1,4 @@
-"""Tests for Phase 9: per-member publish loop in releasable mode.
+"""Tests for per-member publish loop in releasable mode.
 
 Covers:
 - Each non-private member with pipelines publishes at the shared version

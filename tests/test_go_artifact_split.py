@@ -1,6 +1,6 @@
 """Tests for Go artifact split: library vs binary pipeline template selection.
 
-Phase 6.5: Go pipelines carry required artifact: library|binary.
+Go pipelines carry required artifact: library|binary.
 Library uses module-verification publish template (no goreleaser).
 Binary uses goreleaser publish template.
 """

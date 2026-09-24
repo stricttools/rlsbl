@@ -258,7 +258,7 @@ def new_event_id() -> str:
     without an external dependency: ``<16 hex ns><32 hex uuid4>``.
 
     This deliberately mirrors ``rlsbl.changelog.schema.generate_entry_id``
-    rather than importing it. A later phase has the changelog reading transition record
+    rather than importing it. The changelog may read transition-record
     release commit remaps, and importing the changelog package from here would close
     that loop into an import cycle. Two independent record systems each owning
     their own id generator is the cost of keeping them independent.

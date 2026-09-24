@@ -1,4 +1,4 @@
-"""Tests for Maven Central validation (Phase 6c), maven test execution (Phase 6d), and Gradle version catalog detection (Phase 6e)."""
+"""Tests for Maven Central validation, maven test execution, and Gradle version catalog detection."""
 
 import os
 import subprocess
@@ -105,7 +105,7 @@ GRADLE_BUILD_VANNIKTECH = textwrap.dedent("""\
 
 
 # ---------------------------------------------------------------------------
-# Phase 6c: POM metadata validation
+# POM metadata validation
 # ---------------------------------------------------------------------------
 
 class TestPomMetadataComplete:
@@ -362,7 +362,7 @@ class TestValidateMavenCentralMetadata:
 
 
 # ---------------------------------------------------------------------------
-# Phase 6d: Maven test execution
+# Maven test execution
 # ---------------------------------------------------------------------------
 
 class TestMavenTestExecutionGradle:
@@ -445,7 +445,7 @@ class TestMavenTestExecutionMaven:
 
 
 # ---------------------------------------------------------------------------
-# Phase 6e: Version catalog detection (updated for Phase 8a support)
+# Version catalog detection (Gradle catalogs are supported)
 # ---------------------------------------------------------------------------
 
 class TestVersionCatalogDetection:

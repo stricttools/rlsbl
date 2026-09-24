@@ -1,4 +1,4 @@
-"""Tests for Phase 5.5: shared tag-glob resolver + per-releasable status rows.
+"""Tests for shared tag-glob resolver + per-releasable status rows.
 
 `rlsbl monorepo status` previously rendered one row per project and derived
 tag globs per-member even for releasable members, so releasable members showed

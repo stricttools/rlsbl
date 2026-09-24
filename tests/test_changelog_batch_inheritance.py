@@ -1,4 +1,4 @@
-"""Tests for batch_limits config inheritance and exclusion writes in releasable mode (Phase 1f).
+"""Tests for batch_limits config inheritance and exclusion writes in releasable mode.
 
 Covers:
 1. cmd_add in releasable mode inherits releasable-level batch_limits

@@ -1,4 +1,4 @@
-"""Tests for Phase 5.4: two-level lint config resolution.
+"""Tests for two-level lint config resolution.
 
 Lint config resolves from the member-level .rlsbl/lint/<language>.toml when it
 exists, otherwise from the releasable-level lint/ directory (member wins

@@ -557,7 +557,7 @@ needs_network = false
 depends_on = []
 
 # ---------------------------------------------------------------------------
-# Phase 12 project checks
+# Project checks
 # ---------------------------------------------------------------------------
 
 [checks.publish-mode-workflow]

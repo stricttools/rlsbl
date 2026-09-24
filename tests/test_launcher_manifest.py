@@ -1,4 +1,4 @@
-"""Tests for launcher manifest-as-name-authority handling (Phase 6.4).
+"""Tests for launcher manifest-as-name-authority handling.
 
 Covers:
 - Absent manifest -> hard error (naming the path).
