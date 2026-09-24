@@ -216,6 +216,39 @@ class TestPytestNorecursedirs:
         for name in SCRATCH_DIR_NAMES:
             assert name in value
 
+    @pytest.mark.parametrize("before, after", [
+        # A table after the injected one: separated by one blank line.
+        (
+            '[project]\nname = "x"\n\n[tool.ruff]\nline-length = 100\n\n'
+            '[build-system]\nrequires = ["hatchling"]\n',
+            '[tool.ruff]\nline-length = 100\n\n[tool.pytest.ini_options]\n'
+            'norecursedirs = {value}\n\n[build-system]\n',
+        ),
+        (
+            '[project]\nname = "x"\n\n[tool.pytest]\n\n[tool.uv]\ndev = true\n',
+            '[tool.pytest.ini_options]\nnorecursedirs = {value}\n\n[tool.uv]\n',
+        ),
+        # The injected table ends the file: one newline, no trailing blank line.
+        (
+            '[project]\nname = "x"\n\n[build-system]\nrequires = ["hatchling"]\n',
+            '[build-system]\nrequires = ["hatchling"]\n\n'
+            '[tool.pytest.ini_options]\nnorecursedirs = {value}\n',
+        ),
+    ])
+    def test_the_injected_table_is_set_off_by_a_blank_line(
+        self, tmp_path, monkeypatch, before, after,
+    ):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "pyproject.toml").write_text(before)
+
+        apply_scratch_test_exclusions({"pypi": "."})
+
+        text = (tmp_path / "pyproject.toml").read_text()
+        value = tomlkit.dumps({"v": _read_norecursedirs(tmp_path / "pyproject.toml")})
+        value = value.split(" = ", 1)[1].rstrip("\n")
+        assert after.format(value=value) in text
+        assert not text.endswith("\n\n")
+
     def test_a_pytest_ini_is_reported_rather_than_bypassed(self, tmp_path, monkeypatch):
         """pytest.ini outranks pyproject.toml, so writing there would be inert."""
         monkeypatch.chdir(tmp_path)

@@ -244,7 +244,8 @@ def _apply_pytest_norecursedirs(target_dir, created, skipped, warnings, dry_run)
             table[key] = child
         table = child
     ini_options = table.get("ini_options")
-    if ini_options is None:
+    created_table = ini_options is None
+    if created_table:
         ini_options = tomlkit.table()
         table["ini_options"] = ini_options
 
@@ -258,8 +259,16 @@ def _apply_pytest_norecursedirs(target_dir, created, skipped, warnings, dry_run)
     missing = [name for name in SCRATCH_DIR_NAMES if name not in patterns]
     if missing or existing is None:
         ini_options["norecursedirs"] = patterns + missing
+    if created_table:
+        # A table tomlkit inserts carries no trailing blank line, so the next
+        # table header would follow on the very next line.
+        ini_options.add(tomlkit.nl())
 
     updated = tomlkit.dumps(doc)
+    if created_table and updated.endswith("\n\n") and not original.endswith("\n\n"):
+        # ...unless the new table ends the file, where the blank line would
+        # be a trailing one.
+        updated = updated[:-1]
     if updated == original:
         skipped.append((pyproject_rel, "unchanged (pytest norecursedirs)"))
         return
