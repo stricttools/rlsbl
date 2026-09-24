@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.release_publication"
-description = "The one place a GitHub Release's notes, its rlsbl-ci-sha marker and its pre-release flag are decided, so the flow and the reconciler write one document."
+description = "The one place a GitHub Release's body is composed (the deprecate and yank notices its archive records, then the notes and the rlsbl-ci-sha marker) and its pre-release flag decided, so every writer produces one document."
 generated = true
 nav_group = "API Reference"
 nav_order = 144
