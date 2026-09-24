@@ -1,6 +1,6 @@
 # strictspec generated validator. DO NOT EDIT.
 #
-# strictspec generator: 0.3.0
+# strictspec generator: 0.4.0
 # schema:              rlsbl-transition-record-event (format_version 1)
 # regenerate:          strictspec gen --manifest strictspec.toml
 #
@@ -18,11 +18,11 @@ from strictspec import Diagnostic, Value
 # INFORMATIONAL: pairing is on GENERATED_CODE_FORMAT below, so a later release
 # of the runtime reads this file unchanged, and no tool may derive a dependency
 # floor from this string.
-GENERATED_BY = "0.3.0"
+GENERATED_BY = "0.4.0"
 # GENERATED_CODE_FORMAT is the shape of generated code this file was written to.
 # The runtime pairing guard hard-errors unless this format is one the linked
 # runtime reads; the remedy is regeneration.
-GENERATED_CODE_FORMAT = 1
+GENERATED_CODE_FORMAT = 2
 SCHEMA_FORMAT_VERSION = 1
 
 # _EMBEDDED_SCHEMA carries the compiled schema (and its imported type-definition
@@ -48,8 +48,8 @@ def validate_bytes(input: bytes, syntax: str) -> tuple[Value | None, tuple[Diagn
 
 
 def validate_bytes_with_evidence(input: bytes, syntax: str, evidence: dict | None) -> tuple[Value | None, tuple[Diagnostic, ...]]:
-    """validate_bytes plus cross-document resolver evidence for the phase-2
-    constraint vocabulary.
+    """validate_bytes plus cross-document resolver evidence for the constraint
+    vocabulary.
     """
     result = _program.validate_with_evidence(input, syntax, evidence)
     if not result.valid:
