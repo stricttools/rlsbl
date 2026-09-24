@@ -93,7 +93,7 @@ Revert a release. Without --version, reverts the latest release (deletes GitHub 
 
 ## release deprecate
 
-Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.
+Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. The notice is first recorded in the version's release archive (release_notices) and committed, so every later re-sync of the Release keeps it; a version with no archive is refused. Use --reason to explain why and --use to suggest a replacement version.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -112,7 +112,7 @@ Mark a past release as deprecated. Sets the GitHub Release pre-release flag and 
 
 ## release yank
 
-Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.
+Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice, recorded first in the version's release archive (release_notices) and committed, so every later re-sync of the Release keeps it; a version with no archive is refused before any registry is touched.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 

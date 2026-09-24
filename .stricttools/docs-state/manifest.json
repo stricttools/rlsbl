@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.124.2",
+  "version": "0.125.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -3396,6 +3396,11 @@
           "level": 3,
           "text": "The three version fates",
           "anchor": "the-three-version-fates"
+        },
+        {
+          "level": 3,
+          "text": "Release notices",
+          "anchor": "release-notices"
         },
         {
           "level": 3,
@@ -14548,6 +14553,11 @@
         },
         {
           "level": 3,
+          "text": "`write_release_notice`",
+          "anchor": "write_release_notice"
+        },
+        {
+          "level": 3,
           "text": "`strip_release_commit`",
           "anchor": "strip_release_commit"
         },
@@ -14625,6 +14635,26 @@
         },
         {
           "level": 3,
+          "text": "`ci_sha_from_body`",
+          "anchor": "ci_sha_from_body"
+        },
+        {
+          "level": 3,
+          "text": "`compose_body`",
+          "anchor": "compose_body"
+        },
+        {
+          "level": 3,
+          "text": "`markerless_body`",
+          "anchor": "markerless_body"
+        },
+        {
+          "level": 3,
+          "text": "`resynced_body`",
+          "anchor": "resynced_body"
+        },
+        {
+          "level": 3,
           "text": "`is_prerelease`",
           "anchor": "is_prerelease"
         },
@@ -14667,6 +14697,11 @@
           "level": 3,
           "text": "`release_commit_from_record`",
           "anchor": "release_commit_from_record"
+        },
+        {
+          "level": 3,
+          "text": "`release_notices_from_record`",
+          "anchor": "release_notices_from_record"
         },
         {
           "level": 3,
@@ -14717,6 +14752,16 @@
           "level": 3,
           "text": "`read_release_body`",
           "anchor": "read_release_body"
+        },
+        {
+          "level": 3,
+          "text": "`notice_archive_path`",
+          "anchor": "notice_archive_path"
+        },
+        {
+          "level": 3,
+          "text": "`publish_release_notice`",
+          "anchor": "publish_release_notice"
         },
         {
           "level": 3,
@@ -21122,6 +21167,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-24T14:48:17.588903+00:00",
+  "last_gen": "2026-09-24T16:04:56.877894+00:00",
   "theme": "minimal"
 }
