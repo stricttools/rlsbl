@@ -7,7 +7,7 @@
 # rather than editing this file. Hand edits do survive re-scaffolding (three-way
 # merge), but they drift from every other repo's runner.
 #
-# This is the outer layer of the stricttest floor: the plugin's always-on env
+# This is the outer layer of the testisolation floor: the plugin's always-on env
 # poisoning, credential strip, and socket guard protect every run; this script
 # adds the physical isolation a full suite needs. It runs the project's test
 # command inside a bubblewrap (bwrap) sandbox where:
@@ -26,9 +26,9 @@
 # --clearenv/--setenv/--chdir). It deliberately avoids --overlay-src/--tmp-overlay
 # (overlayfs), which the stock apt bubblewrap on CI runners is built without.
 #
-# The sandbox exports STRICTTEST_SANDBOX=1, which lifts the stricttest floor's
+# The sandbox exports TESTISOLATION_SANDBOX=1, which lifts the testisolation floor's
 # bare-run refusal (a bare full-suite run outside the sandbox is a hard error
-# when the project sets stricttest_sandbox_required = true).
+# when the project sets testisolation_sandbox_required = true).
 #
 # Usage:
 #   scripts/test.sh                 # full suite, configured default args
@@ -75,7 +75,7 @@ ENV_ARGS=(
   --setenv HOME /sandbox-home
   --setenv TMPDIR /sandbox-tmp
   --setenv LANG C.UTF-8
-  --setenv STRICTTEST_SANDBOX 1
+  --setenv TESTISOLATION_SANDBOX 1
 
 )
 
