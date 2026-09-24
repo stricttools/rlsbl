@@ -107,7 +107,7 @@ def test_atexit_registered_on_acquire(tmp_path, monkeypatch):
 # ``fcntl.flock`` is per-open-file-description, so any separate process proves
 # the point -- but multiprocessing's default start method on Linux became
 # ``forkserver`` in Python 3.14, and a forkserver child is spawned over a unix
-# socket in a randomly named temp directory. The stricttest socket guard
+# socket in a randomly named temp directory. The testisolation socket guard
 # refuses it, and the path is randomized, so it cannot be named in an exact
 # unix allowlist either. A subprocess needs no channel at all: the verdict
 # comes back on stdout.

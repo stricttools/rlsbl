@@ -48,7 +48,7 @@ _DENO_JSON = '{\n  "name": "@scope/mylib",\n  "version": "0.1.0"\n}\n'
 def _child_pytest(cwd):
     """Run a real pytest against *cwd*, with this repo's own plugins off.
 
-    The rlsbl suite runs under the stricttest plugin, which aborts any pytest
+    The rlsbl suite runs under the testisolation plugin, which aborts any pytest
     process whose configuration does not declare its stances.  The fixture
     project is a plain project that declares none, so the child run disables
     the plugins the parent environment happens to carry.
@@ -56,7 +56,7 @@ def _child_pytest(cwd):
     return subprocess.run(
         [
             sys.executable, "-m", "pytest", "-q",
-            "-p", "no:stricttest",
+            "-p", "no:testisolation",
             "-p", "no:cacheprovider",
             "-p", "no:xdist",
             "-p", "no:randomly",

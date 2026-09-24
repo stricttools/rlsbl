@@ -1,7 +1,7 @@
 """The ``test_sandbox`` config family: sandboxed test-runner distribution.
 
-rlsbl is the *distributor* of the stricttest floor's outer layer. The floor
-itself (the pytest plugin, the Go env-hygiene module) lives in the stricttest
+rlsbl is the *distributor* of the testisolation floor's outer layer. The floor
+itself (the pytest plugin, the Go env-hygiene module) lives in the testisolation
 repo; what ships from here is the bubblewrap runner script that the floor's
 bare-run refusal points at, plus the adoption check that keeps an adopted repo
 honest.
@@ -20,7 +20,7 @@ A project opts in by declaring a ``test_sandbox`` section in
     }
 
 ``rlsbl scaffold`` then renders ``templates/shared/test-sandbox.sh.tpl`` to
-``runner_path`` (executable), and the ``stricttest-floor`` check enforces that
+``runner_path`` (executable), and the ``testisolation-floor`` check enforces that
 the runner exists and that every declared CI workflow actually invokes it.
 
 Design notes:
@@ -47,11 +47,11 @@ from .errors import ConfigError
 
 CONFIG_KEY = "test_sandbox"
 
-#: The environment variable the runner exports; the stricttest floor reads it
+#: The environment variable the runner exports; the testisolation floor reads it
 #: to lift its bare-run refusal. Not configurable -- the floor and the runner
 #: must agree, and a repo that needs a second (legacy) name declares it under
 #: ``extra_env``.
-SANDBOX_ENV_VAR = "STRICTTEST_SANDBOX"
+SANDBOX_ENV_VAR = "TESTISOLATION_SANDBOX"
 
 #: Toolchain caches the runner template knows how to bind. Closed on purpose:
 #: an ecosystem is listed here only once the template implements its binds and
@@ -219,7 +219,7 @@ def validate_test_sandbox_config(config):
                 raise ConfigError(
                     f"{CONFIG_KEY}.extra_env must not redeclare "
                     f"{SANDBOX_ENV_VAR}: the runner always exports it (that is "
-                    "the variable the stricttest floor reads)."
+                    "the variable the testisolation floor reads)."
                 )
 
 
@@ -294,10 +294,10 @@ def template_vars(config):
 
 
 # ---------------------------------------------------------------------------
-# Adoption detection + floor verdict (consumed by the stricttest-floor check)
+# Adoption detection + floor verdict (consumed by the testisolation-floor check)
 # ---------------------------------------------------------------------------
 
-PLUGIN_DIST_NAME = "stricttest"
+PLUGIN_DIST_NAME = "testisolation"
 _PYTEST_INI_SECTION = ("tool", "pytest", "ini_options")
 
 
@@ -323,7 +323,7 @@ def _requirement_names(entries):
 
 
 def plugin_declared(project_root):
-    """True when the stricttest pytest plugin is a declared dependency.
+    """True when the testisolation pytest plugin is a declared dependency.
 
     Looks at runtime dependencies, PEP 735 dependency groups, and optional
     dependency extras -- wherever a repo happens to put its test tooling.
@@ -357,19 +357,19 @@ def _pytest_ini_options(project_root):
 
 
 def sandbox_required_declared(project_root):
-    """True when the suite declares ``stricttest_sandbox_required`` truthy.
+    """True when the suite declares ``testisolation_sandbox_required`` truthy.
 
     A repo that says its full suite must go through a sandbox runner, but has
     no runner distributed to it, is broken -- that is the state this reports.
     """
-    value = _pytest_ini_options(project_root).get("stricttest_sandbox_required")
+    value = _pytest_ini_options(project_root).get("testisolation_sandbox_required")
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
 class FloorVerdict:
-    """Result of evaluating the stricttest floor for one project."""
+    """Result of evaluating the testisolation floor for one project."""
 
     def __init__(self, *, adopted, skip_reason=None, problems=None, notes=None):
         self.adopted = adopted
@@ -383,10 +383,10 @@ class FloorVerdict:
 
 
 def evaluate_floor(config, project_root):
-    """Evaluate the stricttest floor's adoption state for a project.
+    """Evaluate the testisolation floor's adoption state for a project.
 
     Returns a :class:`FloorVerdict`. Unadopted repos (no ``test_sandbox``
-    section and no stricttest plugin dependency) come back with
+    section and no testisolation plugin dependency) come back with
     ``adopted=False`` and a skip reason. Adopted repos come back with the
     concrete broken states, if any.
     """
@@ -402,8 +402,8 @@ def evaluate_floor(config, project_root):
         return FloorVerdict(
             adopted=False,
             skip_reason=(
-                "stricttest floor not adopted (no test_sandbox config section, "
-                "no stricttest dependency)"
+                "testisolation floor not adopted (no test_sandbox config section, "
+                "no testisolation dependency)"
             ),
         )
 
@@ -415,15 +415,15 @@ def evaluate_floor(config, project_root):
         # declares that it requires one.
         if sandbox_required_declared(root):
             problems.append(
-                "pyproject.toml sets stricttest_sandbox_required = true, but "
+                "pyproject.toml sets testisolation_sandbox_required = true, but "
                 f"'{CONFIG_KEY}' is absent from .rlsbl/config.json, so no "
                 "sandbox runner is distributed to this repo. Declare the "
                 f"'{CONFIG_KEY}' section and run `rlsbl scaffold`."
             )
         else:
             notes.append(
-                "stricttest plugin adopted; no sandbox runner declared "
-                "(stricttest_sandbox_required is false)"
+                "testisolation plugin adopted; no sandbox runner declared "
+                "(testisolation_sandbox_required is false)"
             )
         return FloorVerdict(adopted=True, problems=problems, notes=notes)
 

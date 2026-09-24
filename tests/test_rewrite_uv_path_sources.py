@@ -424,11 +424,11 @@ class TestApply:
 
             [tool.uv.sources]
             core = { path = "../core" }
-        """, LOCK, config=json.dumps({"internal_dep_floors": ["stricttest"]}))
+        """, LOCK, config=json.dumps({"internal_dep_floors": ["testisolation"]}))
         for item in observe(root, probe=_published).items:
             apply_item(item, root)
         config = json.loads((root / ".rlsbl" / "config.json").read_text())
-        assert config["internal_dep_floors"] == ["core", "stricttest"]
+        assert config["internal_dep_floors"] == ["core", "testisolation"]
 
     def test_a_mixed_source_list_survives_the_conversion(self, tmp_path):
         """End to end: the floor is written and the index sibling stays."""

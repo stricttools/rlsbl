@@ -1073,28 +1073,6 @@
         "pypi"
       ]
     },
-    "stricttest-floor": {
-      "kind": "universal",
-      "targets": [
-        "pypi",
-        "go",
-        "npm",
-        "dart",
-        "deno",
-        "hex",
-        "zig",
-        "swift",
-        "swift-apple",
-        "maven",
-        "native-android",
-        "native-ios",
-        "docker",
-        "flutter",
-        "pgdesign",
-        "plain",
-        "spec"
-      ]
-    },
     "subtree-remote-reachable": {
       "kind": "workspace",
       "targets": []
@@ -1155,6 +1133,28 @@
     "test-suite-workspace": {
       "kind": "workspace",
       "targets": []
+    },
+    "testisolation-floor": {
+      "kind": "universal",
+      "targets": [
+        "pypi",
+        "go",
+        "npm",
+        "dart",
+        "deno",
+        "hex",
+        "zig",
+        "swift",
+        "swift-apple",
+        "maven",
+        "native-android",
+        "native-ios",
+        "docker",
+        "flutter",
+        "pgdesign",
+        "plain",
+        "spec"
+      ]
     },
     "type-check": {
       "kind": "targets",

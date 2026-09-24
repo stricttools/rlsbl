@@ -56,15 +56,15 @@ dev = [
     "pytest-cov>=5.0",
     "pytest-xdist>=3.5",
     "ruff>=0.15.20",
-    # rlsbl distributes the stricttest floor's outer layer (the bwrap runner and
-    # the stricttest-floor check), so it runs the published plugin rather than a
+    # rlsbl distributes the testisolation floor's outer layer (the bwrap runner and
+    # the testisolation-floor check), so it runs the published plugin rather than a
     # private copy of it. Floor at the version that first shipped every ini key
     # used below (the five safety keys plus threshold / tmp_prefix / git
     # identity / preserve).
-    "stricttest>=0.1.1",
+    "testisolation>=0.3.0",
 ]
 
-# The stricttest floor's configuration. Installing the plugin IS adoption: the
+# The testisolation floor's configuration. Installing the plugin IS adoption: the
 # five safety keys are required and a missing one aborts the session.
 #
 # Stances, and why:
@@ -87,16 +87,16 @@ dev = [
 #                         pinned binary) and PYTHONUSERBASE (the extract/absorb
 #                         tests shell out to a system-python git-filter-repo).
 [tool.pytest.ini_options]
-stricttest_sockets = "deny"
-stricttest_socket_allowlist = []
-stricttest_unix_socket_allowlist = []
-stricttest_loopback = "deny"
-stricttest_sandbox_required = "true"
-stricttest_threshold = "50"
-stricttest_tmp_prefix = "rlsbl-test-env-"
-stricttest_git_user_name = "rlsbl-test"
-stricttest_git_user_email = "rlsbl-test@example.invalid"
-stricttest_preserve = ["go_path", "go_mod_cache", "go_cache", "python_user_base"]
+testisolation_sockets = "deny"
+testisolation_socket_allowlist = []
+testisolation_unix_socket_allowlist = []
+testisolation_loopback = "deny"
+testisolation_sandbox_required = "true"
+testisolation_threshold = "50"
+testisolation_tmp_prefix = "rlsbl-test-env-"
+testisolation_git_user_name = "rlsbl-test"
+testisolation_git_user_email = "rlsbl-test@example.invalid"
+testisolation_preserve = ["go_path", "go_mod_cache", "go_cache", "python_user_base"]
 norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "experiments", "screenshots"]
 
 [tool.coverage.run]
