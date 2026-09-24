@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.124.1",
+  "version": "0.124.2",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -5318,16 +5318,6 @@
         },
         {
           "level": 3,
-          "text": "`check_go_availability`",
-          "anchor": "check_go_availability"
-        },
-        {
-          "level": 3,
-          "text": "`check_github_availability`",
-          "anchor": "check_github_availability"
-        },
-        {
-          "level": 3,
           "text": "`_check_variants`",
           "anchor": "_check_variants"
         },
@@ -5370,6 +5360,11 @@
           "level": 3,
           "text": "`_format_table_row`",
           "anchor": "_format_table_row"
+        },
+        {
+          "level": 3,
+          "text": "`summary_line`",
+          "anchor": "summary_line"
         },
         {
           "level": 3,
@@ -11572,6 +11567,48 @@
           "level": 3,
           "text": "`resolve_main_package_dir`",
           "anchor": "resolve_main_package_dir"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-go_package_name.md",
+      "title": "rlsbl.go_package_name",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.go_package_name",
+          "anchor": "rlsblgo_package_name"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.go_package_name`",
+          "anchor": "rlsblgo_package_name"
+        },
+        {
+          "level": 3,
+          "text": "`stdlib_import_paths`",
+          "anchor": "stdlib_import_paths"
+        },
+        {
+          "level": 3,
+          "text": "`package_name_of`",
+          "anchor": "package_name_of"
+        },
+        {
+          "level": 3,
+          "text": "`stdlib_packages_named`",
+          "anchor": "stdlib_packages_named"
+        },
+        {
+          "level": 3,
+          "text": "`is_go_identifier`",
+          "anchor": "is_go_identifier"
+        },
+        {
+          "level": 3,
+          "text": "`check_go_package_name`",
+          "anchor": "check_go_package_name"
         }
       ]
     },
@@ -21085,6 +21122,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-19T23:15:18.640337+00:00",
+  "last_gen": "2026-09-24T14:48:17.588903+00:00",
   "theme": "minimal"
 }

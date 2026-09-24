@@ -96,7 +96,7 @@ Show the current version, last release tag, and changelog coverage for every pro
 
 ## monorepo check-names
 
-Check package name availability on a target registry for all projects in the monorepo workspace. Queries the registry API for each project name and reports whether it is available or already taken. Supports optional prefix and suffix arguments to test naming conventions like scoped packages, with a configurable delay between registry queries to avoid rate limiting.
+Check every publishable project name in the monorepo workspace against one target, with the same verdicts as check-name. npm and PyPI query the registry for each name and report whether it is available or already taken; go judges the Go package name each project implies offline, as available, taken by a standard-library package, invalid, or discouraged. Supports optional prefix and suffix arguments to test naming conventions, with a configurable delay between registry queries to avoid rate limiting.
 
 **Effect:** read_only
 
@@ -104,10 +104,10 @@ Check package name availability on a target registry for all projects in the mon
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str | required |  | Registry to query for name availability across all workspace projects Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go module proxy), `github` (GitHub repository names). |
+| `--target` |  | str | required |  | Registry or rule set to check every workspace project name against Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go package name the candidate implies, judged offline (no network): invalid when it is not a Go identifier, is a keyword, or is the blank identifier (the Go spec refuses these as a package clause); taken when it is the name of a Go standard-library package (the last element of its import path, from a committed `go list std` table), since every file importing both needs an alias; discouraged when it has uppercase letters or underscores (Effective Go) or is a predeclared identifier such as len; available otherwise). |
 | `--prefix` |  | str | optional |  | String to prepend to each project name before checking availability |
 | `--suffix` |  | str | optional |  | String to append to each project name before checking availability |
-| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries |
+| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries (the offline go check never waits) |
 
 ## monorepo outdated
 

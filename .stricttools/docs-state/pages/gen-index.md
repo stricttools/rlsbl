@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 191 modules"
+description = "API reference index for rlsbl covering 192 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -104,6 +104,7 @@ nav_order = 90
 - [rlsbl.git_util](../rlsbl-git_util/)
 - [rlsbl.go_identity](../rlsbl-go_identity/)
 - [rlsbl.go_introspect](../rlsbl-go_introspect/)
+- [rlsbl.go_package_name](../rlsbl-go_package_name/)
 - [rlsbl.hook_hashes](../rlsbl-hook_hashes/)
 - [rlsbl.import_scanners](../rlsbl-import_scanners/)
 - [rlsbl.layers](../rlsbl-layers/)
