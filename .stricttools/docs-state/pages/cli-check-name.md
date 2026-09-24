@@ -1,6 +1,6 @@
 +++
 title = "rlsbl check-name"
-description = "Query npm, PyPI, or other registries to check whether one or more package names are available."
+description = "Check whether package names are usable: npm and PyPI availability over the network, and an offline check of the Go package name a candidate implies."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 3
