@@ -195,7 +195,7 @@ class TestVersionCatalogKeyMissing:
         assert target.read_version(str(tmp_project)) == "5.0.0"
 
 
-class TestPhase6eHardErrorRemoved:
+class TestCatalogHardErrorRemoved:
     """The old catalog hard error is removed -- catalog now supported."""
 
     def test_catalog_no_longer_raises_unsupported_error(self, tmp_project):

@@ -1062,7 +1062,7 @@ class TestLatePollRetryDedup:
 
 
 class TestRerunFailureLogTail:
-    """Tests for the retry-failure log tail (feature 1.5b): when the in-place
+    """Tests for the retry-failure log tail: when the in-place
     rerun ALSO fails, the failing-step log tail is printed alongside the run
     URL, and a broken fetch never breaks the return path."""
 
