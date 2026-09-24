@@ -628,7 +628,7 @@ def _setup_released_source_repo(tmp_path):
     c1 = _make_multi_commit(
         repo,
         {
-            "package.json": json.dumps({"name": "widget", "version": "0.1.0"}) + "\n",
+            "package.json": json.dumps({"engines": {"node": ">=20"}, "name": "widget", "version": "0.1.0"}) + "\n",
             "src/index.js": "export const v = 1;\n",
             ".rlsbl/config.json": json.dumps({"publish_mode": "ci", "targets": ["npm"]}) + "\n",
         },
@@ -647,7 +647,7 @@ def _setup_released_source_repo(tmp_path):
     c3 = _make_multi_commit(
         repo,
         {
-            "package.json": json.dumps({"name": "widget", "version": "0.2.0"}) + "\n",
+            "package.json": json.dumps({"engines": {"node": ">=20"}, "name": "widget", "version": "0.2.0"}) + "\n",
             "src/feature.js": "export const f = 2;\n",
         },
         "feat: v0.2.0 feature",
