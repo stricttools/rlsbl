@@ -28,6 +28,9 @@ floor and a bare-run refusal guard.
 include = ["npm", "pypi"]
 exclude = []
 candidate_sha = "379a16126fdcc029931876534bd62ebc671ec468"
+release_notices = [
+    "> **Deprecated:** tagged but never published to any registry; the publish failed and was fixed forward. Use v0.111.0 instead.",
+]
 
 [tree_hashes]
 "." = "740bffe4a07f23d751b9dbf751f2cca036c55f6e"
