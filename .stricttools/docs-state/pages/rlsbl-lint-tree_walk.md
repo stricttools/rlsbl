@@ -2,7 +2,6 @@
 title = "rlsbl.lint.tree_walk"
 description = "Iterative pre-order traversal of tree-sitter syntax trees of any depth, and the error that names a source file whose parsing or analysis failed."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 113
 +++
