@@ -1,4 +1,4 @@
-# stricttest: remaining consumer floors
+# testisolation: remaining consumer floors
 
 Split out of `todo/stricttest-dogfooding-and-consumer-floors.md` (2026-08-06)
 when its item 1 landed (see `todo/.done/stricttest-dogfooding.md`). Original
