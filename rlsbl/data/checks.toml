@@ -879,6 +879,20 @@ pure = true
 needs_network = false
 depends_on = []
 
+# go-toolchain-declared: setup-go installs the Go named by go.mod's `toolchain`
+# line and falls back to the `go` directive -- the consumers' floor -- without
+# one, so CI would test on an older Go than the project is developed with.
+# Presence only, never compared with the machine's Go (a machine input). Pure
+# (reads go.mod). In "preflight" so a release cannot ship a module whose CI
+# verdict came from the wrong Go.
+[checks.go-toolchain-declared]
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 # ldflags-symbol: `go build -ldflags "-X importpath.Symbol=value"` sets a
 # package-level string var at link time, and a -X naming a symbol that does not
 # exist links SILENTLY -- nothing is set and the binary reports its fallback

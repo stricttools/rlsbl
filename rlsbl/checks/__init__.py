@@ -75,6 +75,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # go-module-identity compares a go.mod module path against the repository's
     # own origin identity, which only Go has.
     "go-module-identity": frozenset({"go"}),
+    # go-toolchain-declared asks whether go.mod carries a `toolchain` line,
+    # which is Go's.
+    "go-toolchain-declared": frozenset({"go"}),
     # ldflags-symbol compares a `-X importpath.Symbol=` linker flag against the
     # Go source it names; the flag and the silent no-op are Go's.
     "ldflags-symbol": frozenset({"go"}),

@@ -635,6 +635,12 @@
         "go"
       ]
     },
+    "go-toolchain-declared": {
+      "kind": "targets",
+      "targets": [
+        "go"
+      ]
+    },
     "layers-violations": {
       "kind": "workspace",
       "targets": []
@@ -1619,6 +1625,18 @@
         ],
         [
           "go-module-identity",
+          "no",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "go-toolchain-declared",
           "no",
           "yes",
           "no",
