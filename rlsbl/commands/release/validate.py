@@ -116,6 +116,9 @@ def validate_no_authored_release_commit(release_config):
     * ``never_released`` says a version NUMBER exists that no release ever used.
       The file it appears on is the one preparing that very release.
     * ``shipped_as`` names the tag spelling a version already shipped under.
+    * ``release_notices`` records the deprecate/yank notices on a version's
+      GitHub Release, which ``release deprecate`` and ``release yank`` write
+      into the archive of a version that already shipped.
 
     So any of them in ``unreleased.toml`` is either a hand-authored claim about
     something that has not happened, or an archive that was copied back without
@@ -130,6 +133,7 @@ def validate_no_authored_release_commit(release_config):
     from ...release_file import (
         FLOW_OWNED_FIELDS,
         NEVER_RELEASED_FIELD,
+        RELEASE_NOTICES_FIELD,
         UNRECOVERABLE_FIELD,
     )
 
@@ -145,7 +149,9 @@ def validate_no_authored_release_commit(release_config):
         f"release commit records the commit CI verified and the tree each released "
         f"path shipped -- neither exists before the release runs -- while "
         f"{UNRECOVERABLE_FIELD} and {NEVER_RELEASED_FIELD} record the fate of a "
-        f"version that is already settled. All of them belong in the archived "
+        f"version that is already settled, and {RELEASE_NOTICES_FIELD} records "
+        f"the notices `release deprecate` and `release yank` put on a released "
+        f"version's GitHub Release. All of them belong in the archived "
         f"v{{version}}.toml, never in unreleased.toml. Remove "
         f"{'them' if len(present) > 1 else 'it'} from "
         f"the release file and re-run."

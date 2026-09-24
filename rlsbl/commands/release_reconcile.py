@@ -323,6 +323,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
     """
     from ..release_publication import (
         release_commit_from_record,
+        release_notices_from_record,
         create_release,
         edit_all_args,
         is_prerelease,
@@ -382,19 +383,22 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
             tag_prefix_index=tag_prefix_index,
         )
         release_commit = None
+        notices = ()
         if release_record_dir and os.path.isdir(release_record_dir):
             try:
                 release_commit = release_commit_from_record(release_record_dir, version)
+                notices = release_notices_from_record(release_record_dir, version)
             except Exception as exc:
                 print(
                     f"Warning: the release archive for {version} could not be "
                     f"read ({exc}); its Release is written without an "
-                    f"rlsbl-ci-sha marker.",
+                    f"rlsbl-ci-sha marker and without the deprecate or yank "
+                    f"notices the archive records.",
                     file=sys.stderr,
                 )
         pub = (
             publication(tag=tag_name, version=version, candidate_sha=release_commit,
-                        notes=notes)
+                        notes=notes, notices=notices)
             if release_commit else None
         )
         if pub is None:
@@ -418,7 +422,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
             else:
                 # Markerless: the same document minus the release commit it does not
                 # have, through the same two argv builders.
-                body = markerless_body(version, notes)
+                body = markerless_body(version, notes, notices=notices)
                 with notes_file(body, directory=str(project_root)) as path:
                     if exists:
                         args = edit_all_args(
@@ -1584,7 +1588,11 @@ def check_plan_matches(plan, observation, path):
 
 def _release_publication_for(action, *, changelog_path, releases_dir):
     """The Release document for one version, from the changelog and the release record."""
-    from ..release_publication import release_commit_from_record, publication
+    from ..release_publication import (
+        publication,
+        release_commit_from_record,
+        release_notices_from_record,
+    )
 
     notes = ""
     if changelog_path and os.path.exists(changelog_path):
@@ -1595,6 +1603,7 @@ def _release_publication_for(action, *, changelog_path, releases_dir):
     return publication(
         tag=action.tag, version=action.version, candidate_sha=release_commit,
         notes=notes,
+        notices=release_notices_from_record(releases_dir, action.version),
     )
 
 

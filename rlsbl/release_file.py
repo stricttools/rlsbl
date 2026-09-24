@@ -60,8 +60,14 @@ NEVER_RELEASED_FIELD = "never_released"
 # never-released one, which shipped under nothing.
 SHIPPED_AS_FIELD = "shipped_as"
 
-# Every field only the release flow (or the backfill pass acting for it) may
-# author. The editable unreleased.toml carrying any of them is refused at
+# The notices `release deprecate` and `release yank` put at the top of a past
+# version's GitHub Release, recorded in its archive so every Release body
+# rlsbl composes for the version carries them (rlsbl.release_publication).
+# Top-to-bottom order, as they appear in the body.
+RELEASE_NOTICES_FIELD = "release_notices"
+
+# Every field only rlsbl's own commands may author: the release flow, the
+# backfill pass acting for it, and deprecate/yank for the notices. The editable unreleased.toml carrying any of them is refused at
 # release validation, and `release undo` strips them all when it restores an
 # archive as the editable file. Stated once here; the refusal and the strip
 # both read it.
@@ -70,6 +76,7 @@ FLOW_OWNED_FIELDS = (
     UNRECOVERABLE_FIELD,
     NEVER_RELEASED_FIELD,
     SHIPPED_AS_FIELD,
+    RELEASE_NOTICES_FIELD,
 )
 
 # A git object name (commit or tree). The same shape the schema's
@@ -214,6 +221,9 @@ class ReleaseConfig:
     # The historical tag spelling this version shipped under, when it differs
     # from the scheme in effect today. None means the current scheme applies.
     shipped_as: str | None = None
+    # The deprecate/yank notices on this version's GitHub Release, top to
+    # bottom. None means the field is ABSENT.
+    release_notices: list[str] | None = None
 
 
 def get_releases_dir(project_dir: str = ".", *, releasable_dir: str | None = None) -> str:
@@ -556,6 +566,10 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
         data[NEVER_RELEASED_FIELD] if NEVER_RELEASED_FIELD in data else None
     )
     shipped_as = data[SHIPPED_AS_FIELD] if SHIPPED_AS_FIELD in data else None
+    release_notices = (
+        [str(n) for n in data[RELEASE_NOTICES_FIELD]]
+        if RELEASE_NOTICES_FIELD in data else None
+    )
 
     return ReleaseConfig(
         bump=bump,
@@ -571,6 +585,7 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
         unrecoverable=unrecoverable,
         never_released=never_released,
         shipped_as=shipped_as,
+        release_notices=release_notices,
     )
 
 
@@ -908,6 +923,31 @@ def write_unrecoverable_marker(path: str) -> None:
     effects.atomic_write_text(path, tomlkit.dumps(doc))
 
 
+def write_release_notice(path: str, notice: str) -> None:
+    """Record a deprecate or yank *notice* on an already-written archive.
+
+    The notice goes FIRST in ``release_notices``: the command that wrote it
+    prepends it to the Release body, so a later notice sits above an earlier
+    one, and the list is in top-to-bottom order. The caller unlocks the file
+    (:func:`writable_release_file`); the document is otherwise preserved as
+    written.
+    """
+    if not notice:
+        raise ReleaseFileError(f"refusing to record an empty notice in {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        doc = tomlkit.loads(f.read())
+    existing = [str(n) for n in doc.get(RELEASE_NOTICES_FIELD, [])]
+    notices = tomlkit.array()
+    notices.multiline(True)
+    for item in [notice, *existing]:
+        notices.append(item)
+    if RELEASE_NOTICES_FIELD in doc:
+        doc[RELEASE_NOTICES_FIELD] = notices
+    else:
+        doc.add(RELEASE_NOTICES_FIELD, notices)
+    effects.atomic_write_text(path, tomlkit.dumps(doc))
+
+
 def strip_release_commit(path: str) -> bool:
     """Remove the release commit fields from a release file. True if anything changed.
 
@@ -916,9 +956,9 @@ def strip_release_commit(path: str) -> bool:
     release file, and an editable file carrying a release commit is refused at the
     next release validation (the release commit is the flow's to author, never the
     operator's). Every other flow-owned field goes with them: the
-    ``unrecoverable`` and ``never_released`` markers and ``shipped_as`` are each
-    a statement about a version whose fate is already settled, meaningless on a
-    file describing the next one.
+    ``unrecoverable`` and ``never_released`` markers, ``shipped_as`` and
+    ``release_notices`` are each a statement about a version whose fate is
+    already settled, meaningless on a file describing the next one.
     """
     with open(path, "r", encoding="utf-8") as f:
         doc = tomlkit.loads(f.read())

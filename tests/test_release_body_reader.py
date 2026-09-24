@@ -42,32 +42,62 @@ def test_only_the_publication_module_reads_a_release_body():
     )
 
 
-class TestCommandsRouteThroughTheModule:
-    """The two folded call sites, each pinned by the function it now calls."""
+def _archive(tmp_path):
+    """A minimal release archive the notice is recorded in."""
+    path = tmp_path / "v1.2.3.toml"
+    path.write_text(
+        'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+        'include = []\nexclude = []\n',
+        encoding="utf-8",
+    )
+    return str(path)
 
-    def test_deprecate_reads_the_body_through_the_module(self):
+
+class TestCommandsRouteThroughTheModule:
+    """The two folded call sites, each pinned by the function it now calls.
+
+    Both commands hand the notice to
+    :func:`~rlsbl.release_publication.publish_release_notice`, which reads the
+    existing body through the module's own reader.
+    """
+
+    def test_deprecate_reads_the_body_through_the_module(self, tmp_path):
         from rlsbl.commands import deprecate
 
-        with patch.object(deprecate, "read_release_body", return_value="old") as m, \
+        with patch.object(release_publication, "read_release_body",
+                          return_value="old") as m, \
+                patch.object(release_publication, "commit_files"), \
                 patch.object(deprecate, "run_gh") as gh:
-            deprecate._soft_deprecate("v1.2.3", "broken", None, True)
+            deprecate._soft_deprecate(
+                "v1.2.3", "broken", None, True,
+                archive_path=_archive(tmp_path), project_dir=str(tmp_path),
+            )
         assert m.call_args[0][0] == "v1.2.3"
         assert gh.call_count == 0, "a dry run must not edit the Release"
 
-    def test_yank_reads_the_body_through_the_module(self):
+    def test_yank_reads_the_body_through_the_module(self, tmp_path):
         from rlsbl.commands import yank
 
-        with patch.object(yank, "read_release_body", return_value="old") as m, \
+        with patch.object(release_publication, "read_release_body",
+                          return_value="old") as m, \
+                patch.object(release_publication, "commit_files"), \
                 patch.object(yank, "run_gh") as gh:
-            yank._mark_github_release("v1.2.3", "broken", None, True)
+            yank._mark_github_release(
+                "v1.2.3", "broken", None, True,
+                archive_path=_archive(tmp_path), project_dir=str(tmp_path),
+            )
         assert m.call_args[0][0] == "v1.2.3"
         assert gh.call_count == 0
 
-    def test_an_unreadable_body_is_not_fatal(self):
+    def test_an_unreadable_body_is_not_fatal(self, tmp_path):
         """The notice still goes on; a Release with no readable body gets it alone."""
         from rlsbl.commands import deprecate
 
         with patch.object(
-            deprecate, "read_release_body", side_effect=RuntimeError("no gh"),
-        ):
-            deprecate._soft_deprecate("v1.2.3", "broken", None, True)
+            release_publication, "read_release_body",
+            side_effect=RuntimeError("no gh"),
+        ), patch.object(release_publication, "commit_files"):
+            deprecate._soft_deprecate(
+                "v1.2.3", "broken", None, True,
+                archive_path=_archive(tmp_path), project_dir=str(tmp_path),
+            )

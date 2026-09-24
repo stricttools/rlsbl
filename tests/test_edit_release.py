@@ -387,6 +387,7 @@ class TestEditReleaseKeepsCiShaMarker:
         expected = publication(
             tag="v0.23.0", version="0.23.0", candidate_sha=_MARKER_SHA,
             notes="- Added new feature X\n- Fixed bug Y",
+            notices=(),
         ).body
         assert forge.written[0] == expected
         assert _MARKER_LINE in forge.written[0]

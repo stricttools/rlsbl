@@ -29,6 +29,7 @@ OTHER = "b" * 40
 def _pub(version="1.2.3", notes="### Features\n- a thing\n", sha=SHA):
     return publication(
         tag=f"v{version}", version=version, candidate_sha=sha, notes=notes,
+        notices=(),
     )
 
 
@@ -46,7 +47,8 @@ class TestTheBody:
 
     def test_a_missing_release_commit_is_refused(self):
         with pytest.raises(ValueError) as exc:
-            publication(tag="v1.0.0", version="1.0.0", candidate_sha="")
+            publication(tag="v1.0.0", version="1.0.0", candidate_sha="",
+                        notices=())
         assert "rlsbl-ci-sha" in str(exc.value)
 
 

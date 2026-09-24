@@ -11,8 +11,10 @@ from ..release_publication import (
     edit_notes_args,
     notes_file,
     read_release_body,
+    release_notices_from_record,
     resynced_body,
 )
+from ..release_file import get_releases_dir
 
 
 def run_cmd(args, flags, project_root):
@@ -138,9 +140,14 @@ def run_cmd(args, flags, project_root):
 
     # The body is composed by rlsbl.release_publication, the one authority for
     # what a Release document carries, so the notes match what the release
-    # flow wrote and the marker the publish check reads is kept.
+    # flow wrote, the marker the publish check reads is kept, and the
+    # deprecate/yank notices the version's archive records stay on top.
+    notices = release_notices_from_record(
+        get_releases_dir(project_dir, releasable_dir=releasable_config_dir),
+        version,
+    )
     body = resynced_body(current_body, tag=tag, version=version,
-                         notes=changelog_entry)
+                         notes=changelog_entry, notices=notices)
     with notes_file(body) as path:
         run_gh(edit_notes_args(tag, path))
 

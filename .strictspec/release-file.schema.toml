@@ -132,6 +132,14 @@ required = false
 non_empty = true
 description = "The historical tag spelling this version ACTUALLY shipped under, when it differs from the tag scheme in effect today (e.g. \"strictcli@v0.12.0\" on a version now tagged \"v0.12.0\", or \"auth-gateway/v0.1.0\" on one absorbed under a workspace scheme). One string per archive: a version shipped once, under one name. Orthogonal to the three fate states -- legal on a recorded and on an unrecoverable archive, refused on a never-released one, which shipped under nothing."
 
+[types.ReleaseConfig.fields.release_notices]
+type = "array"
+required = false
+description = "The notices `rlsbl release deprecate` and `rlsbl release yank` put at the top of this version's GitHub Release, each the exact markdown block as it appears in the body, in top-to-bottom order (a later notice is inserted first, because it goes on top). Written only by those two commands, into the archive. rlsbl.release_publication puts them back on top of every Release body it composes for this version, so a notes re-sync (`rlsbl release edit`, and the changelog commands that call it) keeps them instead of erasing them. Flow-owned: the editable unreleased.toml carrying it is refused at release validation."
+[types.ReleaseConfig.fields.release_notices.item]
+type = "string"
+non_empty = true
+
 # NOTE: the preid couplings (preid == "stable" requires bump == "prerelease";
 # bump == "infra" forbids preid) are consumer-native, not schema constraints:
 # rlsbl treats preid = "" / whitespace as UNSET, so a present-but-empty preid

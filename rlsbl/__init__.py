@@ -1328,7 +1328,7 @@ def cmd_release_undo(ctx, target, version):
 # release deprecate (was: release yank)
 # ---------------------------------------------------------------------------
 
-@release_group.command(name="deprecate", help="Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. Use --reason to explain why and --use to suggest a replacement version.", effect="mutating", consequential=True)  # a public, consumer-visible statement about a shipped version
+@release_group.command(name="deprecate", help="Mark a past release as deprecated. Sets the GitHub Release pre-release flag and prepends a deprecation notice to the release notes. The notice is first recorded in the version's release archive (release_notices) and committed, so every later re-sync of the Release keeps it; a version with no archive is refused. Use --reason to explain why and --use to suggest a replacement version.", effect="mutating", consequential=True)  # a public, consumer-visible statement about a shipped version
 @strictcli.flag(name="reason", type=str, presence="optional", help="Human-readable explanation of why this version is being deprecated")
 @strictcli.flag(name="use", type=str, presence="optional", help="Suggest this version as a replacement in the deprecation notice")
 @strictcli.arg(name="version", help="Semver string of the release to deprecate, with or without v prefix (e.g. 0.9.1)", presence="required")
@@ -1353,7 +1353,7 @@ def cmd_release_deprecate(ctx, reason, use, version):
 # release yank (registry-aware removal)
 # ---------------------------------------------------------------------------
 
-@release_group.command(name="yank", help="Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice.", effect="mutating", consequential=True)  # removes a published version from public registries
+@release_group.command(name="yank", help="Remove a published version from package registries. Probes each configured target's registry to determine publication status, then executes registry-specific removal: npm deprecate, Go retract, or PyPI manual checklist. Also marks the GitHub Release as pre-release with a yank notice, recorded first in the version's release archive (release_notices) and committed, so every later re-sync of the Release keeps it; a version with no archive is refused before any registry is touched.", effect="mutating", consequential=True)  # removes a published version from public registries
 @strictcli.flag(name="reason", type=str, presence="optional", help="Human-readable explanation of why this version is being yanked")
 @strictcli.flag(name="use", type=str, presence="optional", help="Suggest this version as a replacement in the yank notice")
 @strictcli.arg(name="version", help="Semver string of the release to yank, with or without v prefix (e.g. 0.9.1)", presence="required")
