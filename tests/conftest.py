@@ -15,7 +15,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Three-layer test sandbox
 #
-# Layer 1 (the ``stricttest`` pytest plugin, always-on): the env-poisoning
+# Layer 1 (the ``testisolation`` pytest plugin, always-on): the env-poisoning
 # floor, the socket guard, the autouse tmp-cwd chdir, the push guard, the
 # TMPDIR-inside-repo refusal and the bare-run threshold. The plugin binds them
 # in ``pytest_load_initial_conftests`` -- before this module is even imported --
@@ -26,8 +26,8 @@ import pytest
 #
 # Layer 2 (scripts/test.sh): a bwrap sandbox that runs the FULL suite with the
 # real repo bound read-only, a writable ephemeral copy as cwd, private tmpfs
-# TMPDIR, and no network. It exports ``STRICTTEST_SANDBOX=1``, which lifts the
-# plugin's bare-run refusal (``stricttest_sandbox_required = true``) for
+# TMPDIR, and no network. It exports ``TESTISOLATION_SANDBOX=1``, which lifts the
+# plugin's bare-run refusal (``testisolation_sandbox_required = true``) for
 # full-ish runs while keeping small targeted runs bare-runnable.
 #
 # Layer 3 (CI): the CI workflow runs the suite job inside the same bwrap

@@ -1,7 +1,7 @@
 """Tests for the ``test_sandbox`` config family: validation, scaffold emission,
-and the ``stricttest-floor`` adoption check.
+and the ``testisolation-floor`` adoption check.
 
-rlsbl distributes the outer layer of the stricttest floor -- the bubblewrap
+rlsbl distributes the outer layer of the testisolation floor -- the bubblewrap
 runner script -- and enforces that an adopted repo actually has a working one.
 """
 
@@ -240,7 +240,7 @@ class TestScaffoldEmission:
 
         content = runner.read_text()
         assert "{{" not in content
-        # The sandbox env var the stricttest floor reads.
+        # The sandbox env var the testisolation floor reads.
         assert f"--setenv {SANDBOX_ENV_VAR} 1" in content
         # Config-driven pieces.
         assert 'SANDBOX_CACHES="uv go"' in content
@@ -521,7 +521,7 @@ class TestOrphanedScratchSweep:
 
 
 # ---------------------------------------------------------------------------
-# The stricttest-floor check
+# The testisolation-floor check
 # ---------------------------------------------------------------------------
 
 
@@ -554,7 +554,7 @@ def _texts(result):
 
 def _run_floor_check(tmp_path, config):
     checks = capture_all_checks()
-    return checks["stricttest-floor"](make_ctx(tmp_path, config))
+    return checks["testisolation-floor"](make_ctx(tmp_path, config))
 
 
 class TestFloorCheck:
@@ -622,9 +622,9 @@ class TestFloorCheck:
             tmp_path,
             pyproject=(
                 "[project]\nname = 'x'\nversion = '0'\n"
-                "[dependency-groups]\ndev = ['stricttest>=0.1']\n"
+                "[dependency-groups]\ndev = ['testisolation>=0.1']\n"
                 "[tool.pytest.ini_options]\n"
-                'stricttest_sandbox_required = "true"\n'
+                'testisolation_sandbox_required = "true"\n'
             ),
         )
         result = _run_floor_check(tmp_path, config)
@@ -636,9 +636,9 @@ class TestFloorCheck:
             tmp_path,
             pyproject=(
                 "[project]\nname = 'x'\nversion = '0'\n"
-                "dependencies = ['stricttest']\n"
+                "dependencies = ['testisolation']\n"
                 "[tool.pytest.ini_options]\n"
-                'stricttest_sandbox_required = "false"\n'
+                'testisolation_sandbox_required = "false"\n'
             ),
         )
         result = _run_floor_check(tmp_path, config)

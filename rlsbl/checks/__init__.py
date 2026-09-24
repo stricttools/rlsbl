@@ -63,7 +63,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "private-hook-stale": None,
     "config-schema": None,
     "strictspec-certificate-gate": None,
-    "stricttest-floor": None,
+    "testisolation-floor": None,
     # dep-floors reads pyproject/uv.lock, package.json/package-lock.json, and
     # go.mod. Which ecosystems those are is the targets' own answer
     # (supports_dep_floors), not a list restated here.

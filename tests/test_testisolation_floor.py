@@ -1,7 +1,7 @@
-"""In-consumer proof that the stricttest floor is armed in THIS suite.
+"""In-consumer proof that the testisolation floor is armed in THIS suite.
 
 rlsbl distributes the floor's outer layer (the bwrap runner template and the
-``stricttest-floor`` adoption check), so it runs the published plugin instead of
+``testisolation-floor`` adoption check), so it runs the published plugin instead of
 a private copy of it -- `tests/conftest.py` used to carry all of this verbatim.
 The plugin ships its own meta-tests, but those prove the guards work in the
 *plugin's* repo. What they cannot prove is that rlsbl's declared stance is the
@@ -29,9 +29,9 @@ from pathlib import Path
 import pytest
 from _pytest.outcomes import Failed
 
-from stricttest import config as st_config
-from stricttest import envfloor, sandbox, socketguard
-from stricttest.plugin import settings as resolved_settings
+from testisolation import config as st_config
+from testisolation import envfloor, sandbox, socketguard
+from testisolation.plugin import settings as resolved_settings
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -40,8 +40,8 @@ class TestPluginIsTheSource:
     """The floor comes from the installed plugin, not from a private copy."""
 
     def test_plugin_is_registered(self, request):
-        assert request.config.pluginmanager.hasplugin("stricttest"), (
-            "the stricttest pytest11 plugin is not loaded -- the floor this "
+        assert request.config.pluginmanager.hasplugin("testisolation"), (
+            "the testisolation pytest11 plugin is not loaded -- the floor this "
             "suite relies on would be absent"
         )
 
@@ -56,7 +56,7 @@ class TestPluginIsTheSource:
         ):
             assert banned not in text, (
                 f"tests/conftest.py re-implements {banned!r}, which the "
-                "stricttest plugin already provides. Configure the plugin via "
+                "testisolation plugin already provides. Configure the plugin via "
                 "[tool.pytest.ini_options] instead of forking the floor."
             )
 
@@ -82,7 +82,7 @@ class TestDeclaredStance:
     def test_sandbox_handshake_var_is_the_plugin_default(self):
         """scripts/test.sh and the floor must agree on ONE variable name."""
         s = resolved_settings()
-        assert s.sandbox_env == "STRICTTEST_SANDBOX"
+        assert s.sandbox_env == "TESTISOLATION_SANDBOX"
         runner = (_REPO_ROOT / "scripts" / "test.sh").read_text()
         assert f"--setenv {s.sandbox_env} 1" in runner, (
             "the sandbox runner does not export the variable the floor reads; "

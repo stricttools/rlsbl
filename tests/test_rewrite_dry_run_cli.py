@@ -16,7 +16,7 @@ allowlist the real app was built with are all the real ones:
 
 The only stand-in below the dispatch is the PyPI publication probe in the
 uv-path-sources tests -- the suite has no network by construction (see the
-stricttest stances in pyproject.toml), and the probe is a seam the unit tests
+testisolation stances in pyproject.toml), and the probe is a seam the unit tests
 cover on its own terms.
 """
 

@@ -271,7 +271,7 @@ class BaseTarget:
         ))
         mappings.extend(self._lint_config_mappings(ctx))
         # Sandboxed test runner: emitted only for projects that declared the
-        # test_sandbox config family (the stricttest floor's outer layer).
+        # test_sandbox config family (the testisolation floor's outer layer).
         from ..test_sandbox import runner_mapping
 
         runner = runner_mapping(getattr(ctx, "config", None))

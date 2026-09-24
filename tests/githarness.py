@@ -27,7 +27,7 @@ from pathlib import Path
 
 from rlsbl import effects as _effects
 
-# The stricttest floor exports a throwaway commit identity in the ENVIRONMENT as
+# The testisolation floor exports a throwaway commit identity in the ENVIRONMENT as
 # well as in the throwaway global git config, so a git invocation that ignores
 # the config file still cannot commit as the real developer. Environment
 # identity outranks every config level, including a repo's own

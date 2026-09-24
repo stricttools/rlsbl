@@ -105,8 +105,8 @@ EXPECTED_CHECKS = [
     "wrapper-producer",
     # strictspec certificate deploy gate
     "strictspec-certificate-gate",
-    # stricttest floor adoption (sandboxed test runner)
-    "stricttest-floor",
+    # testisolation floor adoption (sandboxed test runner)
+    "testisolation-floor",
     # ecosystem-internal dependency floors (declared >= vs locked version)
     "dep-floors",
     # every lockfile still resolves the manifest beside it
@@ -441,7 +441,7 @@ class TestCheckDryRun:
     Since strictcli unified the two preview behaviours, ``check --dry-run``
     EXECUTES the checks declared pure and renders only the impure remainder as
     the would-run plan -- so its exit code now reports real results. These tests
-    run in a bare temp directory (stricttest chdirs every test into its own),
+    run in a bare temp directory (testisolation chdirs every test into its own),
     which is not an rlsbl project, so pure checks legitimately fail there and
     the exit code is not the thing under test. What is under test is that every
     registered check appears in the preview, as an executed row or a plan entry.

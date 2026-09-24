@@ -3586,19 +3586,6 @@
       "needs_network": false,
       "depends_on": []
     },
-    "stricttest-floor": {
-      "tags": [
-        "project",
-        "preflight"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [
-        "config-schema"
-      ]
-    },
     "subtree-remote-reachable": {
       "tags": [
         "workspace"
@@ -3658,6 +3645,19 @@
         "prepush-changelog-coverage"
       ],
       "scope": "workspace:non_dev_only"
+    },
+    "testisolation-floor": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "config-schema"
+      ]
     },
     "type-check": {
       "tags": [

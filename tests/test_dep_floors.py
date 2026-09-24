@@ -244,18 +244,18 @@ class TestPypi:
         DROPPED -- no verdict at all, however far behind its floor was.
         A test-infrastructure dependency is exactly where that shape lives.
         """
-        _pyproject(tmp_path, [], groups={"dev": ["stricttest"]})
-        _uv_lock(tmp_path, {"stricttest": "0.4.0"})
-        result = _run(tmp_path, _config(names=("stricttest",)))
+        _pyproject(tmp_path, [], groups={"dev": ["testisolation"]})
+        _uv_lock(tmp_path, {"testisolation": "0.4.0"})
+        result = _run(tmp_path, _config(names=("testisolation",)))
         assert result.status == "fail"
         text = _text(result)
         assert "[dependency-groups].dev" in text
-        assert "stricttest>=0.4.0" in text
+        assert "testisolation>=0.4.0" in text
 
     def test_dependency_group_floor_at_locked_version_passes(self, tmp_path):
-        _pyproject(tmp_path, [], groups={"dev": ["stricttest>=0.4.0"]})
-        _uv_lock(tmp_path, {"stricttest": "0.4.0"})
-        result = _run(tmp_path, _config(names=("stricttest",)))
+        _pyproject(tmp_path, [], groups={"dev": ["testisolation>=0.4.0"]})
+        _uv_lock(tmp_path, {"testisolation": "0.4.0"})
+        result = _run(tmp_path, _config(names=("testisolation",)))
         assert result.status == "pass"
 
     def test_runtime_declaration_wins_over_a_dependency_group(self, tmp_path):

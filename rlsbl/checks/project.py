@@ -4,7 +4,7 @@ Checks: lock, version-consistency, name-consistency, license-consistency,
 description-consistency, private-hook-stale, config-schema, license-file,
 publish-mode-workflow, npm-private-mismatch, target-version-readable,
 dunder-version-missing, selfdoc-version-drift, scaffold-conflicts, stash-free,
-cross-repo-path-sources, stricttest-floor, dep-floors, dep-locks,
+cross-repo-path-sources, testisolation-floor, dep-floors, dep-locks,
 go-module-identity, strictspec-generated-format.
 """
 
@@ -735,12 +735,12 @@ def register_project_checks(app):
             return reporter.found(f"{len(errors)} config error(s)")
         return reporter.passed("config schema valid")
 
-    @app.error_check("stricttest-floor")
-    def check_stricttest_floor(ctx, reporter):
-        """An adopted stricttest floor must have a working sandbox runner.
+    @app.error_check("testisolation-floor")
+    def check_testisolation_floor(ctx, reporter):
+        """An adopted testisolation floor must have a working sandbox runner.
 
         Skips visibly on repos that have adopted neither the ``test_sandbox``
-        config family nor the stricttest plugin. Once adopted, a missing or
+        config family nor the testisolation plugin. Once adopted, a missing or
         non-executable runner, an incomplete config family, or a CI workflow
         that does not invoke the declared runner is a hard error.
         """
@@ -757,12 +757,12 @@ def register_project_checks(app):
         if verdict.ok:
             if verdict.notes:
                 return reporter.passed("; ".join(verdict.notes[:3]))
-            return reporter.passed("stricttest floor adopted")
+            return reporter.passed("testisolation floor adopted")
 
         for problem in verdict.problems:
             reporter.error(problem)
         return reporter.found(
-            f"{len(verdict.problems)} stricttest floor problem(s)"
+            f"{len(verdict.problems)} testisolation floor problem(s)"
         )
 
     @app.error_check("dep-floors")
