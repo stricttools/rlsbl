@@ -2,7 +2,6 @@
 title = "rlsbl check-name"
 description = "Query npm, PyPI, or other registries to check whether one or more package names are available."
 generated = true
-seeded = true
 nav_group = "CLI Reference"
 nav_order = 3
 +++
@@ -10,7 +9,7 @@ nav_order = 3
 
 # rlsbl check-name
 
-Query npm, PyPI, or other registries to check whether one or more package names are available. Accepts multiple names as positional arguments and respects a configurable delay between checks.
+Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks.
 
 **Effect:** read_only
 
@@ -18,5 +17,5 @@ Query npm, PyPI, or other registries to check whether one or more package names 
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | list[str] (unique) | required |  | Registry to query for name availability; repeatable Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go module proxy), `github` (GitHub repository names). |
-| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries |
+| `--target` |  | list[str] (unique) | required |  | Registry or rule set to check each name against; repeatable Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go package name the candidate implies, judged offline (no network): invalid when it is not a Go identifier, is a keyword, or is the blank identifier (the Go spec refuses these as a package clause); taken when it is the name of a Go standard-library package (the last element of its import path, from a committed `go list std` table), since every file importing both needs an alias; discouraged when it has uppercase letters or underscores (Effective Go) or is a predeclared identifier such as len; available otherwise). |
+| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries (the offline go check never waits) |

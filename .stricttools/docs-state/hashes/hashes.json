@@ -26,8 +26,7 @@
   "en/cli-check-name.md": {
     "content": "5c47d6959ce9e93dcb93f5dcb5d5324df5a0ddc8fa8afcc9421e3c2b537c6a76",
     "description": "464a19e9df222d4047c9e03317033ccaf4fa1e93a805b53c4cab2706d5c00548",
-    "schema_hash": "a0fac73c2cae46df68e2beffa6f6462e481c076003f84c9d8201b7574fcf8f01",
-    "seed_hash": "464a19e9df222d4047c9e03317033ccaf4fa1e93a805b53c4cab2706d5c00548"
+    "schema_hash": "a0fac73c2cae46df68e2beffa6f6462e481c076003f84c9d8201b7574fcf8f01"
   },
   "en/cli-check.md": {
     "content": "b34d1b21bbc9bdde816253a3b46ed3f21a6289d9deea8e8a221899c2ed8f003a",
@@ -175,9 +174,9 @@
     "description": "b752744a8a9ef0f190d20a5fefbd532e5ed046ed8c483544de1248a6f28bdbc6"
   },
   "en/gen-index.md": {
-    "content": "dd61b645f2e3bece9e6d88e2db1e369a08bcd1dd08c0007612b0cbcef43453d6",
-    "description": "6bf03dee25a31eb125d4c4d2ad1422a94cff186c861d12ad81971e4274887566",
-    "seed_hash": "6bf03dee25a31eb125d4c4d2ad1422a94cff186c861d12ad81971e4274887566"
+    "content": "5305de171194165d93dc5ac5699c4701d104378dc04b3f08b081cd868925c9c1",
+    "description": "c2aba373117e78f6a18b0472fc11889ecfd73d51966154dda8beb6a9bb1b3b02",
+    "seed_hash": "c2aba373117e78f6a18b0472fc11889ecfd73d51966154dda8beb6a9bb1b3b02"
   },
   "en/import-scanning.md": {
     "content": "596c1de86ce286ddd69de48b497bc18777fe697987e9ec8e3162831939fa2b47",
@@ -698,6 +697,11 @@
     "content": "b202af5dabcbc7643c2c3181f534c46eb2eb72b85f5d298d80413f31377f60a8",
     "description": "4efc7638d87a7f7a4ce8fcae4ae80a8477c89c26b5e18bf927ff92840662a8b7",
     "source_docstring": "b96cc0d184af07e7bfab4a4dba4541fbe7cd2ab4f08791ed31c847ba723c7bb8"
+  },
+  "en/rlsbl-go_package_name.md": {
+    "content": "f9dfcdc2e151ef97f24ea8f9d5e15c5d5ee98ccf3c3f6284b153b0ce6194e728",
+    "description": "03b8b9e1e1ad2336b1a72886eb69542e199f6ab68fd5a71b9121189f79054679",
+    "seed_hash": "03b8b9e1e1ad2336b1a72886eb69542e199f6ab68fd5a71b9121189f79054679"
   },
   "en/rlsbl-hook_hashes.md": {
     "content": "07525bab64c05aed865f35da51f722a0d2c0ede81d1a42db99af20ce8ccb8706",
