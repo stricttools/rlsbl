@@ -1037,7 +1037,9 @@ def commit_files(
                 cwd=cwd,
             )
         else:
-            run("git", ["add", *files], cwd=cwd)
+            addable = _git_addable(files, cwd=cwd)
+            if addable:
+                run("git", ["add", "--", *addable], cwd=cwd)
             result = run("git", ["commit", *trailer_args, "-m", message], cwd=cwd)
         return result if return_result else True
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
@@ -1045,6 +1047,31 @@ def commit_files(
             print(f"Warning: commit failed: {e}", file=sys.stderr)
             return False
         raise
+
+
+def _git_addable(files, *, cwd=None):
+    """The named paths ``git add`` can take: everything except a deletion
+    already staged in the index.
+
+    saferm stages the removal of a tracked file by default, and such a path
+    is gone from both the working tree and the index, where ``git add`` fails
+    with "pathspec did not match". The index already carries its removal, so
+    the commit records it without an add.
+    """
+    base = cwd or "."
+    missing = [f for f in files if not os.path.lexists(os.path.join(base, f))]
+    if not missing:
+        return list(files)
+    listed = run("git", ["ls-files", "-z", "--", *missing], cwd=cwd)
+    in_index = {os.path.normpath(p) for p in listed.split("\0") if p}
+
+    def _indexed(f):
+        # ls-files answers relative to cwd, whatever form the path was named
+        # in, and names the files under a removed directory, not the directory.
+        rel = os.path.normpath(os.path.relpath(os.path.join(base, f), base))
+        return rel in in_index or any(p.startswith(rel + os.sep) for p in in_index)
+
+    return [f for f in files if f not in missing or _indexed(f)]
 
 
 def is_git_repo(path: str | None = None) -> bool:
