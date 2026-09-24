@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.commands.check"
-description = "Check command to query package name availability across npm, PyPI, the Go module proxy (pkg.go.dev), and GitHub repository namespaces."
+description = "Check command to judge package names: npm and PyPI availability over the network, and an offline Go package-name check."
 generated = true
 nav_group = "API Reference"
 nav_order = 29
