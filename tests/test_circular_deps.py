@@ -10,6 +10,10 @@ from rlsbl.dep_validation import (
     find_circular_npm_deps,
     find_circular_python_deps,
 )
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 
 # ---------------------------------------------------------------------------

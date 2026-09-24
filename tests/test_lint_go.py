@@ -8,6 +8,9 @@ from rlsbl.lint.go_ast import GoAstLinter
 from rlsbl.lint.go_regex import GoRegexLinter
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 def _make_go_project(tmp_path, go_source, go_filename="lib.go"):
     """Create a minimal Go project with a go.mod and source file."""
     (tmp_path / "go.mod").write_text("module example.com/mylib\n\ngo 1.21\n")

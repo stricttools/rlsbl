@@ -28,6 +28,9 @@ import pytest
 
 import rlsbl
 
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
 OLD = "github.com/o/foo"
 NEW = "github.com/n/qux"
 

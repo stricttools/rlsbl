@@ -996,6 +996,23 @@ def tmp_project(tmp_path, monkeypatch):
 
 
 @pytest.fixture
+def source_work_tree(tmp_path):
+    """Make *tmp_path* a git work tree with nothing committed.
+
+    rlsbl's source walks read exactly what ``git ls-files --cached --others
+    --exclude-standard`` lists, so a project built under ``tmp_path`` must sit
+    in a work tree to have any sources at all; its files are then untracked
+    and not ignored, which is listed.  A test module whose projects are plain
+    directories opts in with ``pytestmark = pytest.mark.usefixtures(
+    "source_work_tree")``.
+    """
+    subprocess.run(
+        ["git", "init", "-q", "-b", "main"], cwd=str(tmp_path), check=True,
+    )
+    return tmp_path
+
+
+@pytest.fixture
 def mock_git_repo(tmp_project):
     """Create a minimal git repo with an initial commit in a temp directory.
 

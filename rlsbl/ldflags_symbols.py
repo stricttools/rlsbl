@@ -57,7 +57,6 @@ import re
 from dataclasses import dataclass, field
 
 from .go_identity import read_module_line
-from .scratch_dirs import prune_scratch_dirs
 
 #: Directories never scanned for build configuration: scaffold base copies
 #: (which are not live configuration) and goreleaser's own output.
@@ -326,25 +325,24 @@ class _GoSource:
 
         ``vendor/`` and ``testdata/`` are other people's code and fixtures, and
         the module's scratch directories hold throwaway probes; a symbol
-        declared in any of them is not this module's.
+        declared in any of them is not this module's.  Like every source walk,
+        this reads only what git lists (tracked, plus untracked files that are
+        not ignored): an ignored file is not this module's either.
         """
         if self._go_files is not None:
             return self._go_files
-        collected = []
-        for dirpath, dirnames, filenames in os.walk(self.module_dir):
-            dirnames[:] = [
-                d for d in dirnames
-                if d not in (".git", "vendor", "testdata", "node_modules")
-            ]
-            prune_scratch_dirs(self.module_dir, dirpath, dirnames)
-            for name in filenames:
-                if not name.endswith(".go") or name.endswith("_test.go"):
-                    continue
-                rel = os.path.relpath(
-                    os.path.join(dirpath, name), self.module_dir,
-                )
-                collected.append(rel.replace(os.sep, "/"))
-        self._go_files = sorted(collected)
+        from .lint.utils import walk_source_files
+
+        found = walk_source_files(
+            self.module_dir, (".go",), [],
+            excluded_dir_names=frozenset(
+                {".git", "vendor", "testdata", "node_modules"}),
+        )
+        self._go_files = sorted(
+            os.path.relpath(path, self.module_dir).replace(os.sep, "/")
+            for path in found
+            if not path.endswith("_test.go")
+        )
         return self._go_files
 
     def files_in(self, rel_dir):

@@ -10,6 +10,9 @@ from rlsbl.lint.npm_ast import NpmAstLinter
 from rlsbl.lint.npm_regex import NpmRegexLinter
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 def _make_npm_project(tmp_path, js_source=None, js_filename="lib.js",
                       package_json=None):
     """Create a minimal npm project with package.json and optional source file."""

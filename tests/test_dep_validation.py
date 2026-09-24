@@ -26,6 +26,9 @@ from rlsbl.workspace import WORKSPACE_DIR
 from conftest import workspace_toml
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 def _capture_all_checks():
     """Register all rlsbl checks on a mock app and return a dict of {name: fn(ctx)}.
 

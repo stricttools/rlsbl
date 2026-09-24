@@ -46,7 +46,7 @@ This is the interface that low-level AST linters implement. The workspace-level 
 
 ### walk_source_files() (lint/utils.py)
 
-File discovery utility shared by both the workspace-level scanners and the file-level graph builders. It walks the project directory tree, filters by file extension, and excludes non-source directories to produce the set of files that should be scanned for imports. Key features:
+File discovery utility shared by both the workspace-level scanners and the file-level graph builders. Its candidates are exactly what `git ls-files --cached --others --exclude-standard` lists for the project: tracked files plus untracked files that are not ignored. A gitignored file (a third-party clone, a build output) is never scanned, and a directory outside any git work tree is refused. It then filters by file extension and excludes non-source directories to produce the set of files that should be scanned for imports. Key features:
 
 - Extension matching (e.g., `(".py",)`, `(".go",)`, `(".js", ".ts", ".mjs", ".cjs", ".tsx")`)
 - Default exclusion of common non-source directories, named by `LINTER_EXCLUDED_DIRS`: `.venv`, `node_modules`, `__pycache__`, `.git`, `build`, `dist`, `.selfdoc`, `_build`, `static`, `public`, `assets`, and any `*.egg-info` directory (entries containing glob characters are fnmatch patterns)

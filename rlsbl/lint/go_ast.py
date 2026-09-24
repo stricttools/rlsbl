@@ -5,6 +5,7 @@ from tree_sitter import Language, Parser
 
 from .config import LanguageLintConfig
 from .result import LintResult
+from .tree_walk import iter_preorder, naming_source
 from .utils import walk_source_files
 
 GO_LANG = Language(tree_sitter_go.language())
@@ -21,41 +22,41 @@ def _node_line(node):
     return node.start_point[0] + 1
 
 
+def _import_specs(root):
+    """Every ``import_spec`` under *root*, in document order, with the
+    import path each one names.
+
+    Yields ``(spec_node, import_path)``.  Both single and grouped
+    (``import_spec_list``) declarations are covered, and nothing inside an
+    import declaration is mistaken for another one.
+    """
+    for node in iter_preorder(root, descend=lambda n: n.type != "import_declaration"):
+        if node.type != "import_declaration":
+            continue
+        for spec in iter_preorder(
+            node, descend=lambda n: n.type in ("import_declaration", "import_spec_list"),
+        ):
+            if spec.type != "import_spec":
+                continue
+            # The import path is a string literal child, in either quote form.
+            for child in spec.children:
+                if child.type in STRING_LITERAL_TYPES:
+                    yield spec, _extract_string_content(child)
+
+
 def _check_forbidden_imports(tree, filepath, config):
     """Walk AST for import_declaration nodes (single and grouped)."""
     results = []
     forbidden = frozenset(config.forbidden_imports)
-
-    def _walk(node):
-        if node.type == "import_declaration":
-            # Both single and grouped imports contain import_spec children
-            for child in node.children:
-                _check_import_spec(child)
-            return
-        for child in node.children:
-            _walk(child)
-
-    def _check_import_spec(node):
-        if node.type == "import_spec":
-            # The import path is a string literal child, in either quote form.
-            for child in node.children:
-                if child.type in STRING_LITERAL_TYPES:
-                    # Extract content from the string literal
-                    content = _extract_string_content(child)
-                    if content in forbidden:
-                        results.append(LintResult(
-                            file=filepath,
-                            line=_node_line(node),
-                            rule="forbidden-import",
-                            severity="error",
-                            message=f"Library imports forbidden package '{content}'",
-                        ))
-        elif node.type == "import_spec_list":
-            # Grouped import: recurse into children
-            for child in node.children:
-                _check_import_spec(child)
-
-    _walk(tree.root_node)
+    for spec, content in _import_specs(tree.root_node):
+        if content in forbidden:
+            results.append(LintResult(
+                file=filepath,
+                line=_node_line(spec),
+                rule="forbidden-import",
+                severity="error",
+                message=f"Library imports forbidden package '{content}'",
+            ))
     return results
 
 
@@ -91,7 +92,7 @@ def _check_stdout(tree, filepath, config):
     results = []
     ignore = set(config.stdout_ignore)
 
-    def _walk(node):
+    for node in iter_preorder(tree.root_node):
         if node.type == "call_expression":
             func = node.children[0] if node.children else None
             if func and func.type == "selector_expression":
@@ -137,10 +138,6 @@ def _check_stdout(tree, filepath, config):
                                 message="Library writes to os.Stdout",
                             ))
 
-        for child in node.children:
-            _walk(child)
-
-    _walk(tree.root_node)
     return results
 
 
@@ -153,8 +150,7 @@ def _check_entry_points(tree, filepath, config):
     has_func_main = False
     func_main_line = 0
 
-    def _walk(node):
-        nonlocal has_package_main, has_func_main, func_main_line
+    for node in iter_preorder(tree.root_node):
         if node.type == "package_clause":
             for child in node.children:
                 if child.type == "package_identifier" and child.text == b"main":
@@ -164,10 +160,6 @@ def _check_entry_points(tree, filepath, config):
                 if child.type == "identifier" and child.text == b"main":
                     has_func_main = True
                     func_main_line = _node_line(node)
-        for child in node.children:
-            _walk(child)
-
-    _walk(tree.root_node)
 
     if has_package_main and has_func_main and "main" not in ignore:
         results.append(LintResult(
@@ -200,30 +192,12 @@ def scan_imports(filepath: str) -> list[tuple[str, str, int]]:
     except (OSError, UnicodeDecodeError):
         return []
 
-    parser = _make_parser()
-    tree = parser.parse(source.encode("utf-8"))
-    results: list[tuple[str, str, int]] = []
-
-    def _walk(node):
-        if node.type == "import_declaration":
-            for child in node.children:
-                _collect_import_spec(child)
-            return
-        for child in node.children:
-            _walk(child)
-
-    def _collect_import_spec(node):
-        if node.type == "import_spec":
-            for child in node.children:
-                if child.type in STRING_LITERAL_TYPES:
-                    content = _extract_string_content(child)
-                    results.append((content, filepath, _node_line(node)))
-        elif node.type == "import_spec_list":
-            for child in node.children:
-                _collect_import_spec(child)
-
-    _walk(tree.root_node)
-    return results
+    with naming_source(filepath):
+        tree = _make_parser().parse(source.encode("utf-8"))
+        return [
+            (content, filepath, _node_line(spec))
+            for spec, content in _import_specs(tree.root_node)
+        ]
 
 
 class GoAstLinter:
@@ -244,13 +218,12 @@ class GoAstLinter:
             except (OSError, UnicodeDecodeError):
                 continue
 
-            source_bytes = source.encode("utf-8")
-            tree = parser.parse(source_bytes)
-
-            results.extend(_check_forbidden_imports(tree, filepath, config))
-            if config.stdout_enabled:
-                results.extend(_check_stdout(tree, filepath, config))
-            if config.entry_point_enabled:
-                results.extend(_check_entry_points(tree, filepath, config))
+            with naming_source(filepath):
+                tree = parser.parse(source.encode("utf-8"))
+                results.extend(_check_forbidden_imports(tree, filepath, config))
+                if config.stdout_enabled:
+                    results.extend(_check_stdout(tree, filepath, config))
+                if config.entry_point_enabled:
+                    results.extend(_check_entry_points(tree, filepath, config))
 
         return results

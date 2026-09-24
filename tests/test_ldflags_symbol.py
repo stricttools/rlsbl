@@ -26,6 +26,9 @@ from conftest import make_ctx
 from githarness import git, init_repo
 
 
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 

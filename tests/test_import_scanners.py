@@ -13,6 +13,9 @@ from rlsbl.import_scanners import (
     _is_test_context,
 )
 
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
+
 # Minimal pyproject.toml so language detection finds Python
 _PYPROJECT = '[project]\nname = "example"\n'
 

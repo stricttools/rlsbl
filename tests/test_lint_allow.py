@@ -6,6 +6,10 @@ cases where the allowed import is not in the forbidden list.
 """
 
 from rlsbl.lint import lint_library
+import pytest
+
+
+pytestmark = pytest.mark.usefixtures("source_work_tree")
 
 
 def _make_go_project(tmp_path, go_source, go_filename="lib.go"):
