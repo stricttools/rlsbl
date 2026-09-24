@@ -1180,3 +1180,53 @@ releasable = "core"
         assert run.exit_code == 0, run.stderr
 
         assert self._impl()(self._ctx(tmp_project)).status == "pass"
+
+
+class TestCleanupAutoCommit:
+    """``monorepo cleanup`` takes ``--auto-commit/--no-auto-commit`` like
+    rlsbl's other committing commands: it commits by default, and
+    ``--no-auto-commit`` leaves the deletions uncommitted and says so."""
+
+    def _run(self, monkeypatch, tmp_path, **kwargs):
+        import rlsbl.releasable_cleanup as mod
+        import rlsbl.utils as utils
+
+        residue = str(tmp_path / "pkg" / ".rlsbl" / "version")
+        monkeypatch.setattr(
+            mod, "cleanup_per_package_release_state",
+            lambda root, dry_run=False: [residue],
+        )
+        monkeypatch.setattr(utils, "working_tree_paths", lambda cwd, paths: list(paths))
+        commits = []
+        monkeypatch.setattr(utils, "commit_files", lambda msg, files, cwd: commits.append(files))
+        mod.run_cleanup_command(str(tmp_path), **kwargs)
+        return commits, residue
+
+    def test_it_commits_by_default(self, monkeypatch, tmp_path):
+        commits, residue = self._run(monkeypatch, tmp_path)
+        assert commits == [[residue]]
+
+    def test_no_auto_commit_leaves_the_deletions_uncommitted(
+        self, monkeypatch, tmp_path, capsys,
+    ):
+        commits, _ = self._run(monkeypatch, tmp_path, auto_commit=False)
+        assert commits == []
+        assert "Skipped commit (--no-auto-commit)" in capsys.readouterr().out
+
+    def test_the_cli_passes_the_flag_through(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        import rlsbl
+        import rlsbl.releasable_cleanup as mod
+        import rlsbl.workspace as ws
+
+        seen = MagicMock()
+        monkeypatch.setattr(mod, "run_cleanup_command", seen)
+        monkeypatch.setattr(ws, "find_workspace_root", lambda _p: "/ws")
+        monkeypatch.setattr(rlsbl, "_require_project_root", lambda: "/ws")
+        result = rlsbl.app.test(["monorepo", "cleanup", "--no-auto-commit"])
+        assert result.exit_code == 0, result.stderr
+        assert seen.call_args.kwargs["auto_commit"] is False
+        result = rlsbl.app.test(["monorepo", "cleanup"])
+        assert result.exit_code == 0, result.stderr
+        assert seen.call_args.kwargs["auto_commit"] is True
