@@ -26,6 +26,9 @@ Large feature release spanning multiple areas:
 include = ["npm", "pypi"]
 exclude = []
 candidate_sha = "e67c5ac49168b9508e556f7e239ea5162bf4bdd4"
+release_notices = [
+    "> **Deprecated:** never published to PyPI; CI failed on missing gitleaks. Use v0.101.1 instead.",
+]
 
 [tree_hashes]
 "." = "e846041518618adba14d681562db4d5f47ca1339"
