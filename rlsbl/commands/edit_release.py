@@ -2,13 +2,17 @@
 
 import os
 import sys
-import time
 
 from ..member_context import resolve_member_context
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import check_gh_auth, check_gh_installed, extract_changelog_entry, run_gh
 from ..workspace import find_workspace_root, resolve_project
-from .. import effects
+from ..release_publication import (
+    edit_notes_args,
+    notes_file,
+    read_release_body,
+    resynced_body,
+)
 
 
 def run_cmd(args, flags, project_root):
@@ -119,9 +123,10 @@ def run_cmd(args, flags, project_root):
         )
         sys.exit(1)
 
-    # Check that the GitHub Release exists
+    # Read the existing Release's body: its absence means there is no Release
+    # to edit, and its rlsbl-ci-sha marker must be kept on the re-synced notes.
     try:
-        run_gh(["release", "view", tag])
+        current_body = read_release_body(tag, gh=run_gh)
     except Exception:
         print(f"Error: GitHub Release for {tag} not found.", file=sys.stderr)
         sys.exit(1)
@@ -131,17 +136,12 @@ def run_cmd(args, flags, project_root):
         print(f"Changelog entry:\n{changelog_entry}")
         return
 
-    # Write notes to a temp file to avoid shell escaping issues
-    notes_file = f".rlsbl-notes-{int(time.time() * 1000)}.tmp"
-    writing_file = notes_file + ".writing"
-    try:
-        with effects.open_write(writing_file, "w", encoding="utf-8") as f:
-            f.write(changelog_entry)
-        effects.rename(writing_file, notes_file)
-        run_gh(["release", "edit", tag, "--notes-file", notes_file])
-    finally:
-        for tmp in (notes_file, writing_file):
-            if os.path.exists(tmp):
-                effects.remove(tmp)
+    # The body is composed by rlsbl.release_publication, the one authority for
+    # what a Release document carries, so the notes match what the release
+    # flow wrote and the marker the publish check reads is kept.
+    body = resynced_body(current_body, tag=tag, version=version,
+                         notes=changelog_entry)
+    with notes_file(body) as path:
+        run_gh(edit_notes_args(tag, path))
 
     print(f"Updated GitHub Release notes for {tag}")

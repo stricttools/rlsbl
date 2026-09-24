@@ -1208,6 +1208,7 @@ class TestEditReleaseMonorepoTagFormat:
         entry.path = "."
         mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run_gh.return_value = ""
 
         mock_project = MagicMock()
         mock_project.__getitem__ = lambda self, key: {"name": "my-pkg", "path": "packages/my-pkg"}[key]
@@ -1226,4 +1227,5 @@ class TestEditReleaseMonorepoTagFormat:
         target.monorepo_tag_format.assert_called_once_with(
             "my-pkg", "1.0.0", path="packages/my-pkg"
         )
-        assert any(c[0] == (["release", "view", "my-pkg@v1.0.0"],) for c in mock_run_gh.call_args_list)
+        from rlsbl.release_publication import view_body_args
+        assert any(c[0] == (view_body_args("my-pkg@v1.0.0"),) for c in mock_run_gh.call_args_list)

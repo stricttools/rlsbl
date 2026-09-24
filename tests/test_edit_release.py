@@ -5,6 +5,7 @@ from io import StringIO
 from unittest.mock import patch, MagicMock
 
 from rlsbl.commands.edit_release import run_cmd
+from rlsbl.release_publication import view_body_args
 
 
 # Shared changelog content for tests
@@ -54,6 +55,7 @@ class TestEditRelease(unittest.TestCase):
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run.return_value = ""
 
         with patch("builtins.open", unittest.mock.mock_open()), \
              patch("os.rename"), \
@@ -62,7 +64,7 @@ class TestEditRelease(unittest.TestCase):
                 run_cmd(["0.23.0"], {}, project_root=".")
 
         # Verify gh release view was called to check existence
-        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
+        assert any(c[0] == (view_body_args("v0.23.0"),) for c in mock_run.call_args_list)
         # Verify gh release edit was called with --notes-file
         edit_call = [c for c in mock_run.call_args_list
                      if c[0][0][:3] == ["release", "edit", "v0.23.0"]]
@@ -87,6 +89,7 @@ class TestEditRelease(unittest.TestCase):
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run.return_value = ""
 
         with patch("builtins.open", unittest.mock.mock_open()), \
              patch("os.rename"), \
@@ -112,6 +115,7 @@ class TestEditRelease(unittest.TestCase):
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run.return_value = ""
 
         with patch("builtins.open", unittest.mock.mock_open()), \
              patch("os.rename"), \
@@ -121,7 +125,7 @@ class TestEditRelease(unittest.TestCase):
 
         # read_version should NOT be called when version is explicit
         target.read_version.assert_not_called()
-        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
+        assert any(c[0] == (view_body_args("v0.23.0"),) for c in mock_run.call_args_list)
 
     @patch("rlsbl.commands.edit_release.run_gh")
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value="- Fixed bug")
@@ -137,6 +141,7 @@ class TestEditRelease(unittest.TestCase):
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run.return_value = ""
 
         with patch("builtins.open", unittest.mock.mock_open()), \
              patch("os.rename"), \
@@ -148,7 +153,7 @@ class TestEditRelease(unittest.TestCase):
         mock_extract.assert_called_once()
         self.assertEqual(mock_extract.call_args[0][1], "0.23.0")
         # Tag should be "v0.23.0"
-        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
+        assert any(c[0] == (view_body_args("v0.23.0"),) for c in mock_run.call_args_list)
 
     @patch("rlsbl.commands.edit_release.extract_changelog_entry", return_value=None)
     @patch("os.path.exists", return_value=True)
@@ -210,6 +215,7 @@ class TestEditRelease(unittest.TestCase):
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
+        mock_run.return_value = ""
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             run_cmd(["0.23.0"], {"dry-run": True}, project_root=".")
@@ -219,7 +225,7 @@ class TestEditRelease(unittest.TestCase):
         self.assertIn("v0.23.0", output)
 
         # gh release view should still be called (to check existence)
-        assert any(c[0] == (["release", "view", "v0.23.0"],) for c in mock_run.call_args_list)
+        assert any(c[0] == (view_body_args("v0.23.0"),) for c in mock_run.call_args_list)
         # gh release edit should NOT be called
         edit_calls = [c for c in mock_run.call_args_list
                       if c[0][0] and "edit" in c[0][0]]
@@ -269,7 +275,7 @@ class TestEditReleaseReleasableInheritance:
 
         # Version auto-detected from the pypi target (releasable-level),
         # tag built with the releasable tag format.
-        assert ["release", "view", "alpha@v0.1.0"] in gh_calls
+        assert view_body_args("alpha@v0.1.0") in gh_calls
         out = capsys.readouterr().out
         assert "Would update GitHub Release notes for alpha@v0.1.0" in out
 
@@ -311,10 +317,114 @@ class TestEditReleaseReleasableInheritance:
              patch("rlsbl.commands.edit_release.run_gh", side_effect=fake_run_gh):
             run_cmd([], {"dry-run": True}, project_root=str(member))
 
-        assert ["release", "view", "alpha@v0.1.0"] in gh_calls
+        assert view_body_args("alpha@v0.1.0") in gh_calls
         out = capsys.readouterr().out
         assert "Would update GitHub Release notes for alpha@v0.1.0" in out
         assert "Initial release" in out
+
+
+_MARKER_SHA = "a" * 40
+_MARKER_LINE = f"<!-- rlsbl-ci-sha: {_MARKER_SHA} -->"
+
+
+class _FakeForge:
+    """A gh stand-in holding one Release body, recording what edit writes.
+
+    Answers both the bare existence probe (``release view <tag>``) and the
+    body read (``release view <tag> --json body -q .body``), so a test fails
+    on the body it asserts rather than on an unexpected argv.
+    """
+
+    def __init__(self, tag, body):
+        self.tag = tag
+        self.body = body
+        self.written = []
+
+    def __call__(self, args, **kwargs):
+        args = list(args)
+        if args[:3] == ["release", "view", self.tag]:
+            return self.body
+        if args[:3] == ["release", "edit", self.tag]:
+            path = args[args.index("--notes-file") + 1]
+            with open(path, encoding="utf-8") as f:
+                self.written.append(f.read())
+            self.body = self.written[-1]
+            return ""
+        raise AssertionError(f"unexpected gh call: {args}")
+
+
+class TestEditReleaseKeepsCiShaMarker:
+    """release edit re-syncs the notes without dropping the rlsbl-ci-sha marker.
+
+    The publish check reads the marker to learn which commit CI verified; a
+    notes re-sync that replaces the whole body with the changelog section
+    erases it. The re-synced body must be the same document the release flow
+    composes through rlsbl.release_publication.
+    """
+
+    def _run(self, tmp_path, forge, version="0.23.0"):
+        (tmp_path / "CHANGELOG.md").write_text(CHANGELOG, encoding="utf-8")
+        target = MagicMock()
+        target.tag_format.side_effect = lambda v: f"v{v}"
+        entry = MagicMock()
+        entry.name = "npm"
+        entry.path = str(tmp_path)
+        with patch("rlsbl.commands.edit_release.check_gh_installed", return_value=True), \
+             patch("rlsbl.commands.edit_release.check_gh_auth", return_value=True), \
+             patch("rlsbl.commands.edit_release.resolve_member_context",
+                   return_value=MagicMock(targets=[entry])), \
+             patch("rlsbl.commands.edit_release.TARGETS", {"npm": target}), \
+             patch("rlsbl.commands.edit_release.run_gh", side_effect=forge):
+            run_cmd([version], {}, project_root=str(tmp_path))
+
+    def test_existing_marker_is_preserved(self, tmp_path, capsys):
+        from rlsbl.release_publication import publication
+
+        forge = _FakeForge("v0.23.0", f"- stale notes\n\n{_MARKER_LINE}\n")
+        self._run(tmp_path, forge)
+
+        assert len(forge.written) == 1
+        expected = publication(
+            tag="v0.23.0", version="0.23.0", candidate_sha=_MARKER_SHA,
+            notes="- Added new feature X\n- Fixed bug Y",
+        ).body
+        assert forge.written[0] == expected
+        assert _MARKER_LINE in forge.written[0]
+        assert "stale notes" not in forge.written[0]
+
+    def test_markerless_release_gains_no_marker(self, tmp_path, capsys):
+        forge = _FakeForge("v0.23.0", "- stale notes\n")
+        self._run(tmp_path, forge)
+
+        assert len(forge.written) == 1
+        assert "rlsbl-ci-sha" not in forge.written[0]
+        assert forge.written[0].rstrip("\n") == "- Added new feature X\n- Fixed bug Y"
+
+    def test_changelog_sync_path_preserves_marker(self, tmp_path, capsys):
+        """changelog amend, edit and remove re-sync through `rlsbl release edit`.
+
+        ``_sync_github_release`` shells out to ``rlsbl release edit <version>``;
+        the subprocess is routed in-process here so the whole re-sync path runs
+        against the fake forge.
+        """
+        from rlsbl.commands import changelog_cmd
+
+        forge = _FakeForge("v0.23.0", f"- stale notes\n\n{_MARKER_LINE}\n")
+        invoked = []
+
+        def fake_run(argv, **kwargs):
+            invoked.append(list(argv))
+            assert list(argv[:3]) == ["rlsbl", "release", "edit"]
+            self._run(tmp_path, forge, version=argv[3])
+            return MagicMock(returncode=0, stderr="")
+
+        with patch.object(changelog_cmd.effects, "run", side_effect=fake_run):
+            changelog_cmd._sync_github_release("0.23.0")
+
+        assert invoked == [["rlsbl", "release", "edit", "0.23.0"]]
+        assert len(forge.written) == 1
+        assert _MARKER_LINE in forge.written[0]
+        assert "- Added new feature X" in forge.written[0]
 
 
 if __name__ == "__main__":

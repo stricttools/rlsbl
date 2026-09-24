@@ -1,8 +1,10 @@
 """The one place a GitHub Release's body, marker and pre-release flag are decided.
 
 A GitHub Release is written by more than one part of rlsbl: the release flow
-creates it at step 21, and ``rlsbl release reconcile`` materializes or repairs
-it after a rewrite or a partial release. Before this module each site decided
+creates it at step 21, ``rlsbl release reconcile`` materializes or repairs
+it after a rewrite or a partial release, and ``rlsbl release edit`` (which the
+changelog commands call after changing a released version) re-syncs its notes
+through :func:`resynced_body`. Before this module each site decided
 independently what a Release body looks like, which meant the reconcile path
 recreated Releases with notes only -- no ``rlsbl-ci-sha`` marker at all -- and
 never marked a pre-release version as a GitHub pre-release. A Release recreated
@@ -41,7 +43,7 @@ from . import effects
 # The publish workflow's only precise statement of which commit CI must be
 # green on. Pinned to its own line so a reconcile REPLACES it rather than
 # appending a second one to a body that already carries a stale marker.
-CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: [0-9a-f]{40} -->\n?", re.M)
+CI_SHA_MARKER_RE = re.compile(r"^<!-- rlsbl-ci-sha: ([0-9a-f]{40}) -->\n?", re.M)
 
 
 def ci_sha_marker(candidate_sha: str) -> str:
@@ -56,6 +58,35 @@ def ci_sha_marker(candidate_sha: str) -> str:
 def strip_ci_sha_marker(body: str) -> str:
     """*body* with any released-commit marker line removed."""
     return CI_SHA_MARKER_RE.sub("", body or "")
+
+
+def ci_sha_from_body(body: str) -> str | None:
+    """The sha the first released-commit marker in *body* names, or None."""
+    match = CI_SHA_MARKER_RE.search(body or "")
+    return match.group(1) if match else None
+
+
+def markerless_body(version: str, notes: str) -> str:
+    """The Release body for a version whose release commit nothing names.
+
+    The same notes :attr:`ReleasePublication.body` carries, without a marker:
+    a marker is never invented for a Release that has no commit to name.
+    """
+    return (notes or f"Release {version}").rstrip("\n") + "\n"
+
+
+def resynced_body(existing: str, *, tag: str, version: str, notes: str) -> str:
+    """An existing Release's body with its notes replaced by *notes*.
+
+    The marker *existing* carries is kept, by composing the full
+    :class:`ReleasePublication` document around the sha it names; a body
+    carrying no marker gets the notes alone and gains none.
+    """
+    sha = ci_sha_from_body(existing)
+    if sha is None:
+        return markerless_body(version, notes)
+    return publication(tag=tag, version=version, candidate_sha=sha,
+                       notes=notes).body
 
 
 def is_prerelease(version: str) -> bool:
