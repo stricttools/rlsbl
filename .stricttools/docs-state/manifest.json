@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.126.0",
+  "version": "0.127.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -18394,6 +18394,16 @@
         },
         {
           "level": 3,
+          "text": "`_ReleasableLayout`",
+          "anchor": "_releasablelayout"
+        },
+        {
+          "level": 4,
+          "text": "`is_owner`",
+          "anchor": "is_owner"
+        },
+        {
+          "level": 3,
           "text": "`detect_targets`",
           "anchor": "detect_targets"
         },
@@ -19071,6 +19081,11 @@
           "level": 3,
           "text": "`commit_files`",
           "anchor": "commit_files"
+        },
+        {
+          "level": 3,
+          "text": "`_git_addable`",
+          "anchor": "_git_addable"
         },
         {
           "level": 3,
@@ -21508,6 +21523,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-24T20:22:41.811062+00:00",
+  "last_gen": "2026-09-24T22:58:10.668320+00:00",
   "theme": "minimal"
 }
