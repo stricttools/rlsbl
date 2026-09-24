@@ -12,6 +12,28 @@ from .. import effects
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
 
 
+def _missing_package_json_message(pkg_path, ctx):
+    """The refusal for an npm target directory holding no ``package.json``."""
+    project_root = getattr(ctx, "project_root", None)
+    workspace_root = getattr(ctx, "workspace_root", None)
+    shown = pkg_path
+    owner = "this project"
+    if workspace_root is not None and project_root is not None:
+        from ..workspace import resolve_project
+
+        member = resolve_project(str(workspace_root), str(project_root))
+        shown = os.path.relpath(os.path.abspath(pkg_path), os.path.abspath(str(workspace_root)))
+        if member is not None:
+            owner = f"workspace member '{member.name}' ({member.path}/)"
+    return (
+        f"{owner} has an npm target, but {shown} does not exist, so there is "
+        f"no package to scaffold or publish. Either create the package there "
+        f"(npm init), or remove the npm entry from the targets list in the "
+        f".rlsbl/config.json that declares it (a releasable member inherits its "
+        f"releasable's targets from .rlsbl-monorepo/releasables/<name>/config.json)."
+    )
+
+
 class NpmTarget(BaseTarget):
     """Release target for npm/Node.js projects (package.json)."""
 
@@ -182,8 +204,14 @@ class NpmTarget(BaseTarget):
         )
 
     def template_vars(self, dir_path, ctx):
-        """Extract template variables from the target project's package.json."""
+        """Extract template variables from the target project's package.json.
+
+        A target directory with no ``package.json`` is refused, naming the
+        workspace member (when there is one) and the missing file.
+        """
         pkg_path = os.path.join(dir_path, "package.json")
+        if not os.path.isfile(pkg_path):
+            raise ConfigError(_missing_package_json_message(pkg_path, ctx))
         with open(pkg_path, "r", encoding="utf-8") as f:
             pkg = json.load(f)
 

@@ -412,6 +412,10 @@ def _build_project_template_vars(project_dir, root):
         target = TARGETS[entry.name]
         try:
             tvars = target.template_vars(entry.path, ctx)
+        except ConfigError:
+            # A refusal names what is wrong with the project's own
+            # declarations: building a router without it is not a fallback.
+            raise
         except Exception as e:
             from ...utils import warn_exception
             warn_exception(f"template_vars failed for target {entry.name}", e)

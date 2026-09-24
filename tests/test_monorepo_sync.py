@@ -1139,6 +1139,38 @@ class TestBuildProjectTemplateVars:
         assert tvars.get("go.minRequiredGo") == "1.23"
         assert tvars.get("minRequiredGo") == "1.23"
 
+    def test_an_npm_target_without_package_json_is_refused_naming_the_member(
+        self, mock_git_repo,
+    ):
+        """A member whose npm target directory has no package.json is refused
+        with the member and the missing file named -- never a traceback
+        followed by a router built from half the members' variables."""
+        from rlsbl.errors import ConfigError
+
+        make_workspace(mock_git_repo, [{"path": "lib", "name": "lib"}])
+        proj_dir = os.path.join(str(mock_git_repo), "lib")
+        os.makedirs(os.path.join(proj_dir, ".rlsbl"), exist_ok=True)
+        os.makedirs(os.path.join(proj_dir, "npm"), exist_ok=True)
+        with open(os.path.join(proj_dir, ".rlsbl", "config.json"), "w") as f:
+            json.dump({"targets": [{"name": "npm", "path": "npm"}],
+                       "publish_mode": "ci"}, f)
+
+        with pytest.raises(ConfigError) as info:
+            _build_project_template_vars(proj_dir, str(mock_git_repo))
+        message = str(info.value)
+        assert "member 'lib'" in message
+        assert os.path.join("lib", "npm", "package.json") in message
+
+        # Either remedy the refusal names clears it: creating the package...
+        with open(os.path.join(proj_dir, "npm", "package.json"), "w") as f:
+            json.dump({"name": "lib", "version": "0.1.0"}, f)
+        assert _build_project_template_vars(proj_dir, str(mock_git_repo))["npm.name"] == "lib"
+        # ...or removing the npm entry from the targets list.
+        os.remove(os.path.join(proj_dir, "npm", "package.json"))
+        with open(os.path.join(proj_dir, ".rlsbl", "config.json"), "w") as f:
+            json.dump({"targets": [], "publish_mode": "ci"}, f)
+        assert _build_project_template_vars(proj_dir, str(mock_git_repo)) == {}
+
     def test_no_targets_returns_empty(self, mock_git_repo):
         """Directory with no detectable targets returns empty dict."""
         proj_dir = os.path.join(str(mock_git_repo), "empty")
