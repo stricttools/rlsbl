@@ -90,3 +90,36 @@ def test_a_standalone_project_keeps_its_own_bases_and_marker(mock_git_repo, monk
     assert (mock_git_repo / ".rlsbl" / "version").is_file()
     assert scaffold_bases_dir(str(mock_git_repo)) == os.path.join(
         str(mock_git_repo), ".rlsbl", "bases")
+
+
+def test_a_member_missing_its_releasable_level_bases_is_told_why_and_the_remedy_heals_it(
+    mock_git_repo, monkeypatch,
+):
+    """A member scaffolded while its bases still lived in its own
+    ``.rlsbl/bases/`` has a ``managed-files.json`` but no releasable-level bases
+    directory. The refusal says that is where a member's bases live now -- not
+    that the member predates merge-base tracking -- and the remedy it names
+    clears it."""
+    import shutil
+
+    import pytest
+
+    from rlsbl.errors import ConfigError
+
+    proj_dir = _member(mock_git_repo, monkeypatch)
+    _scaffold(proj_dir)
+    bases = scaffold_bases_dir(str(proj_dir))
+    shutil.rmtree(bases)
+
+    with pytest.raises(ConfigError) as info:
+        _scaffold(proj_dir)
+    message = str(info.value)
+    assert "before merge-base tracking" not in message
+    assert "releasable" in message
+    rel = os.path.relpath(bases, str(proj_dir))
+    assert f"mkdir -p {rel} && rlsbl scaffold" in message
+
+    os.makedirs(rel)
+    _scaffold(proj_dir)
+    assert os.path.isdir(bases)
+    assert verify_minimal_rlsbl(str(proj_dir)) == []

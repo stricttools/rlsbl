@@ -703,10 +703,22 @@ def _require_healable_bases_dir():
     """
     bases_dir = _bases_dir()
     if os.path.exists(MANAGED_FILES) and not os.path.isdir(bases_dir):
+        if _releasable_member_root(os.getcwd()) is not None:
+            # A member scaffolded while its bases lived in its own
+            # .rlsbl/bases/ (which the releasable-residue cleanup removes).
+            cause = (
+                "a releasable member's merge bases live in its releasable's "
+                "state directory, and this member has none there yet (it was "
+                "last scaffolded when they were kept in its own .rlsbl/bases/), "
+                "so it cannot merge template updates safely."
+            )
+        else:
+            cause = (
+                "this project was scaffolded before merge-base tracking and "
+                "cannot merge template updates safely."
+            )
         raise ConfigError(
-            f"{bases_dir} is missing but {MANAGED_FILES} exists: this project "
-            "was scaffolded before merge-base tracking and cannot merge "
-            "template updates safely.\n"
+            f"{bases_dir} is missing but {MANAGED_FILES} exists: {cause}\n"
             "  To heal, create the base directory and re-run scaffold:\n"
             f"    mkdir -p {bases_dir} && rlsbl scaffold\n"
             "  The re-run reconstructs each managed file's merge base from its "
