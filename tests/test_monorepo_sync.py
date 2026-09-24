@@ -1246,6 +1246,116 @@ class TestRootPublisherSync:
         assert "publish_gate_check_regex" in str(exc.value)
 
 
+class TestReleasableTargetPathResolvesFromReleasableRoot:
+    """A target a releasable declares with a path names one package, at that
+    path under the releasable's root -- never one copy of it under each member.
+
+    Regression: a releasable with a root member, library members, and a
+    top-level ``npm/`` package declared ``{"name": "npm", "path": "npm"}``.
+    Every member resolved it against its own directory, so sync looked for
+    ``protocols/npm/package.json`` and refused the workspace.
+    """
+
+    LIBRARIES = ("protocols", "secrets")
+
+    def _setup(self, repo, *, with_npm_package=True):
+        root = str(repo)
+        with open(os.path.join(root, "pyproject.toml"), "w") as f:
+            f.write('[project]\nname = "orxtra"\nversion = "1.2.3"\n')
+        for lib in self.LIBRARIES:
+            os.makedirs(os.path.join(root, lib), exist_ok=True)
+            with open(os.path.join(root, lib, "pyproject.toml"), "w") as f:
+                f.write(f'[project]\nname = "orxtra-{lib}"\nversion = "1.2.3"\n')
+            # Each library runs its own CI, so sync renders its variables.
+            lib_wf_dir = os.path.join(root, lib, ".github", "workflows")
+            os.makedirs(lib_wf_dir, exist_ok=True)
+            with open(os.path.join(lib_wf_dir, "ci.yml"), "w") as f:
+                f.write(CI_WORKFLOW)
+        os.makedirs(os.path.join(root, "npm"), exist_ok=True)
+        if with_npm_package:
+            with open(os.path.join(root, "npm", "package.json"), "w") as f:
+                json.dump({"name": "orxtra", "version": "1.2.3"}, f)
+        else:
+            with open(os.path.join(root, "npm", "README.md"), "w") as f:
+                f.write("no package here\n")
+
+        wf_dir = os.path.join(root, ".github", "workflows")
+        os.makedirs(wf_dir, exist_ok=True)
+        with open(os.path.join(wf_dir, "publish.yml"), "w") as f:
+            f.write(PUBLISH_WORKFLOW)
+
+        mono = os.path.join(root, ".rlsbl-monorepo")
+        rel_dir = os.path.join(mono, "releasables", "orxtra")
+        os.makedirs(rel_dir, exist_ok=True)
+        with open(os.path.join(rel_dir, "config.json"), "w") as f:
+            json.dump({
+                "publish_mode": "ci",
+                "targets": ["pypi", {"name": "npm", "path": "npm"}],
+                "publish_gate_check_regex": "^(root-ci) / ",
+            }, f)
+
+        members = "".join(
+            f'[[projects]]\npath = "{lib}"\nlibrary = true\n'
+            f'releasable = "orxtra"\n\n'
+            for lib in self.LIBRARIES
+        )
+        with open(os.path.join(mono, "workspace.toml"), "w") as f:
+            f.write(
+                '[[releasables]]\nname = "orxtra"\n'
+                'tag_format = "{name}@v{version}"\n\n'
+                '[[projects]]\npath = "."\nname = "root"\nreleasable = "orxtra"\n\n'
+                + members
+                + '[[projects]]\npath = "npm"\ndev_only = true\nreleasable = false\n'
+            )
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "setup releasable"],
+            cwd=root, check=True,
+        )
+        return rel_dir
+
+    def test_the_path_resolves_once_from_the_releasable_root(self, mock_git_repo):
+        from rlsbl.targets import detect_targets
+
+        rel_dir = self._setup(mock_git_repo)
+        root = str(mock_git_repo)
+
+        root_entries = detect_targets(root, releasable_config_dir=rel_dir)
+        assert sorted((e.name, os.path.relpath(e.path, root)) for e in root_entries) == [
+            ("npm", "npm"), ("pypi", "."),
+        ]
+        for lib in self.LIBRARIES:
+            lib_dir = os.path.join(root, lib)
+            entries = detect_targets(lib_dir, releasable_config_dir=rel_dir)
+            assert [(e.name, e.path) for e in entries] == [("pypi", lib_dir)]
+
+    def test_sync_succeeds_and_generates_the_npm_publish_job(
+        self, mock_git_repo, capsys,
+    ):
+        self._setup(mock_git_repo)
+        _cmd_sync({}, project_root=".")
+
+        publish = mock_git_repo / ".github" / "workflows" / "publish.yml"
+        jobs = parse_ci_workflow(publish.read_text())["jobs"]
+        assert "root-npm" in jobs
+        assert jobs["root-npm"]["defaults"]["run"]["working-directory"] == "npm"
+        assert not any(k.startswith(self.LIBRARIES) and "npm" in k for k in jobs)
+        assert "protocols/npm" not in capsys.readouterr().err
+
+    def test_the_refusal_fires_for_the_one_path_that_lacks_package_json(
+        self, mock_git_repo, capsys,
+    ):
+        from rlsbl.errors import ConfigError
+
+        self._setup(mock_git_repo, with_npm_package=False)
+        with pytest.raises(ConfigError) as info:
+            _cmd_sync({}, project_root=".")
+        message = str(info.value)
+        assert "member 'root'" in message
+        assert os.path.join("npm", "package.json") in message
+        assert "protocols" not in message
+
+
 class TestPublishModeNoneMembers:
     """A member declaring ``publish_mode: "none"`` must never reach the router.
 

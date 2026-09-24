@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from conftest import make_workspace
 from rlsbl import app
 from rlsbl.context import ProjectContext
 from rlsbl.check_context import WorkspaceCheckContext
@@ -913,6 +914,13 @@ class TestWorkspaceUnregisteredCheck:
         """A directory declared as a releasable's target path is NOT flagged."""
         self._npm_wrapper(mock_git_repo)
         (mock_git_repo / "pyproject.toml").write_text('[project]\nname = "core"\n')
+        # The releasable's target path resolves from the releasable's root,
+        # which the workspace's member list defines.
+        make_workspace(
+            mock_git_repo,
+            [{"path": ".", "name": "root", "releasable": "core"}],
+            releasables=[{"name": "core", "tag_format": "v{version}"}],
+        )
         rel_dir = mock_git_repo / ".rlsbl-monorepo" / "releasables" / "core"
         rel_dir.mkdir(parents=True)
         (rel_dir / "config.json").write_text(json.dumps({
@@ -923,7 +931,7 @@ class TestWorkspaceUnregisteredCheck:
             project_root=mock_git_repo,
             workspace_root=mock_git_repo,
             config={},
-            projects=[{"path": ".", "name": "core", "releasable": "core"}],
+            projects=[{"path": ".", "name": "root", "releasable": "core"}],
             graph=None,
         )
         result = app._check_defs["workspace-unregistered"].impl(ctx)
