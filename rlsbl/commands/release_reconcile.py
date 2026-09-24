@@ -326,6 +326,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
         create_release,
         edit_all_args,
         is_prerelease,
+        markerless_body,
         notes_file,
         publication,
         update_release,
@@ -417,7 +418,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
             else:
                 # Markerless: the same document minus the release commit it does not
                 # have, through the same two argv builders.
-                body = (notes or f"Release {version}").rstrip("\n") + "\n"
+                body = markerless_body(version, notes)
                 with notes_file(body, directory=str(project_root)) as path:
                     if exists:
                         args = edit_all_args(
