@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.go_package_name"
-description = "Offline judgement of a Go package name: the identifier callers type, as in ``testsandbox.Run``."
+description = "Offline judgement of the Go package name a check-name candidate implies: invalid, taken by a standard-library package, discouraged, or available."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 95
 +++
