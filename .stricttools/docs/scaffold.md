@@ -26,6 +26,7 @@ description = "How rlsbl scaffold generates CI workflows, git hooks, and the scr
 | `experiments/.gitignore` | Makes `experiments/` a scratch directory git carries but never fills |
 | `screenshots/.gitignore` | Makes `screenshots/` a scratch directory git carries but never fills |
 | `experiments/go.mod`, `screenshots/go.mod` | Go projects only: keeps the go command out of the scratch directories |
+| `.go-version` | pgdesign target only, beside `pgdesign.toml`: the Go its CI installs. Created from the Go on this machine when missing and never rewritten; change the version by editing the file |
 
 ## Scratch directories
 

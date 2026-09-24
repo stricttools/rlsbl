@@ -1316,6 +1316,17 @@ def _install_or_update_post_rewrite_hook():
     )
 
 
+def _ensure_ci_inputs(target_paths, *, dry_run):
+    """Create the files each target's CI templates read, when missing."""
+    created = []
+    for name in sorted(target_paths):
+        target = TARGETS.get(name)
+        if target is not None:
+            created.extend(target.ensure_ci_inputs(
+                target_paths[name] or ".", dry_run=dry_run))
+    return created
+
+
 def _publish_orphan_reasons(private, is_ws_root, project_root):
     """``{publish.yml: reason}`` when this project gets no publish workflow."""
     reason = _publish_skip_reason(private, is_ws_root, project_root)
@@ -1928,6 +1939,7 @@ def run_cmd(registry, args, flags, ctx):
         excl_created, excl_skipped, excl_warnings = apply_scratch_test_exclusions(
             {registry: target_path}, dry_run=dry_run,
         )
+        excl_created.extend(_ensure_ci_inputs({registry: target_path}, dry_run=dry_run))
 
         if dry_run:
             _print_dry_run_report(
@@ -3086,6 +3098,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         excl_created, excl_skipped, excl_warnings = apply_scratch_test_exclusions(
             target_paths, dry_run=dry_run,
         )
+        excl_created.extend(_ensure_ci_inputs(target_paths, dry_run=dry_run))
 
         if dry_run:
             _print_dry_run_report(
