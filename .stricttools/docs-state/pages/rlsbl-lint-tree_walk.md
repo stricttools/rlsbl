@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.lint.tree_walk"
-description = "Iterative traversal of tree-sitter syntax trees, and the error that names a source file which could not be analyzed."
+description = "Iterative pre-order traversal of tree-sitter syntax trees of any depth, and the error that names a source file whose parsing or analysis failed."
 generated = true
 seeded = true
 nav_group = "API Reference"

@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.go_toolchain"
-description = "Whether each Go module declares the Go it is developed with: go.mod's ``toolchain`` line."
+description = "Checks that each Go module's go.mod carries a toolchain line, so CI's setup-go installs the Go the project is developed with rather than the consumers' floor."
 generated = true
 seeded = true
 nav_group = "API Reference"

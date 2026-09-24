@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.node_matrix"
-description = "The Node versions an npm project's CI tests on, derived from ``engines.node``."
+description = "Derives an npm project's CI Node matrix: every supported Node line whose newest release satisfies package.json's engines.node range, or a refusal."
 generated = true
 seeded = true
 nav_group = "API Reference"

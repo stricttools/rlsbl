@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.lint.utils"
-description = "Shared file-walking utilities for linters providing recursive directory traversal with gitignore-aware filtering and extension matching."
+description = "Shared source-file walk for linters and sweeps: the files git lists (tracked, plus untracked and not ignored), filtered by extension, directory, and pattern."
 generated = true
 nav_group = "API Reference"
 nav_order = 114
