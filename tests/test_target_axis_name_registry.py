@@ -168,7 +168,7 @@ class TestNameConsistencyNamesTheSilentTargets:
 
 
 class TestRegistryDisplayNames:
-    """The display table is asked of the targets, plus one declared non-target."""
+    """The display table is asked of the targets."""
 
     def test_targets_supply_their_own_display_names(self):
         from rlsbl.commands.check import _registry_display
@@ -176,15 +176,6 @@ class TestRegistryDisplayNames:
         assert _registry_display("npm") == "npm"
         assert _registry_display("pypi") == "PyPI"
         assert _registry_display("go") == "pkg.go.dev"
-
-    def test_github_is_declared_as_the_one_non_target_registry(self):
-        from rlsbl.commands.check import (
-            _NON_TARGET_REGISTRY_DISPLAY,
-            _registry_display,
-        )
-
-        assert _registry_display("github") == "GitHub"
-        assert set(_NON_TARGET_REGISTRY_DISPLAY) & set(TARGETS) == set()
 
     def test_an_unknown_registry_renders_as_itself(self):
         from rlsbl.commands.check import _registry_display

@@ -83,7 +83,7 @@ class TestCliSurface:
         result = app.test(["check-name", "serde", "--target", "crates"])
         assert result.exit_code == 1
         assert "crates" in result.stderr
-        assert "npm, pypi, go, github" in result.stderr
+        assert "npm, pypi, go" in result.stderr
 
     def test_claim_name_rejects_crates(self):
         """`claim-name --target crates` is likewise a parse-time refusal."""

@@ -1,4 +1,4 @@
-"""Check command to query package name availability across npm, PyPI, the Go module proxy (pkg.go.dev), and GitHub repository namespaces."""
+"""Check command to judge package names: npm and PyPI availability over the network, and an offline Go package-name check."""
 
 import json
 import re
@@ -19,6 +19,7 @@ from itertools import product  # noqa: E402
 
 from rlsbl.targets.utils import normalize_npm, normalize_pypi  # noqa: E402
 from .. import effects
+from ..go_package_name import check_go_package_name
 
 
 def _request_with_backoff(url, timeout=5, max_retries=3, headers=None):
@@ -35,9 +36,6 @@ def _request_with_backoff(url, timeout=5, max_retries=3, headers=None):
     exhausting retries.
     """
     req = urllib.request.Request(url, method="GET")
-    # GitHub API requires a User-Agent header
-    if "api.github.com" in url:
-        req.add_header("User-Agent", "rlsbl-cli")
     if headers:
         for key, value in headers.items():
             req.add_header(key, value)
@@ -264,54 +262,6 @@ def get_pypi_variants(name):
     return list(variants)
 
 
-def check_go_availability(name):
-    """Check if a Go module path exists on pkg.go.dev.
-
-    Returns {"status": "not_found"|"exists"|"error", "message"?: str, "note"?: str}.
-
-    Go modules use repository paths (e.g. github.com/user/repo), not a flat
-    claimable namespace, so we report "not found" / "exists" rather than the
-    "available" / "taken" language used for npm and PyPI.
-    """
-    url = f"https://pkg.go.dev/{name}"
-    try:
-        with _request_with_backoff(url, timeout=5) as resp:
-            if resp.status == 200:
-                return {"status": "exists"}
-            return {"status": "error", "message": f"Unexpected status {resp.status}"}
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return {
-                "status": "not_found",
-                "note": "Go modules use repository paths, not a central registry.",
-            }
-        return {"status": "error", "message": f"Unexpected status {e.code}"}
-    except Exception as e:
-        return {"status": "error", "message": str(e) or "Network error"}
-
-
-def check_github_availability(name):
-    """Check if a repository name exists on GitHub.
-
-    Searches the GitHub API for repositories with the given name.
-    Returns {"status": "available"|"exists"|"error", "count": int, ...}.
-    """
-    url = f"https://api.github.com/search/repositories?q={name}+in:name"
-    try:
-        with _request_with_backoff(url, timeout=5) as resp:
-            data = json.loads(resp.read())
-            count = data.get("total_count", 0)
-            if count == 0:
-                return {"status": "available", "count": 0}
-            return {
-                "status": "exists",
-                "count": count,
-                "note": f"{count} repos with this name on GitHub",
-            }
-    except Exception as e:
-        return {"status": "error", "message": str(e) or "Network error"}
-
-
 def _check_variants(name, check_fn, get_variants_fn, delay_ms=0):
     """Check name variants for similarity using the given availability checker.
 
@@ -379,6 +329,7 @@ _RULE_TOKEN_NPM_MONIKER = "npm-moniker"
 _RULE_TOKEN_PYPI_SEPARATOR = "pypi-separator"
 _RULE_TOKEN_PYPI_ULTRANORM = "pypi-ultranorm"
 _RULE_TOKEN_STDLIB = "stdlib"
+_RULE_TOKEN_GO_STDLIB = "go-stdlib"
 
 # Token -> human sentence.  Used to surface the rule sentences alongside the
 # machine tokens in JSON output.  ultranorm/stdlib get generic sentences here
@@ -388,6 +339,7 @@ _RULE_TOKEN_SENTENCES = {
     _RULE_TOKEN_PYPI_SEPARATOR: _PYPI_NORMALIZED_RULE,
     _RULE_TOKEN_PYPI_ULTRANORM: "PyPI blocks names that are visually similar (l/1/i and o/0 substitutions)",
     _RULE_TOKEN_STDLIB: "PyPI blocks names that match Python standard library modules",
+    _RULE_TOKEN_GO_STDLIB: "a Go package named like a standard library package forces an import alias on every file that imports both",
 }
 
 
@@ -395,7 +347,7 @@ def _add_structured_conflicts(result, names, rule):
     """Append ``{"name": ..., "rule": ...}`` objects to the unified conflict field.
 
     This is the canonical machine-readable surface: every collision mechanism
-    (npm moniker, pypi separator, pypi ultranorm, stdlib)
+    (npm moniker, pypi separator, pypi ultranorm, stdlib, go-stdlib)
     folds its conflicts into ``result["structured_conflicts"]`` via this helper.
     The list is re-sorted by (name, rule) after each addition, so the final
     ordering is deterministic regardless of attach-site order — and a name that
@@ -465,14 +417,17 @@ def _check_single_name(name, registry, delay_ms=0):
     Returns a dict with keys:
         - name: the package name checked
         - registry: which registry was checked
-        - status: "available", "taken", "exists", "not_found", or "error"
+        - status: "available", "taken", "error", and for go only "invalid"
+          or "discouraged" (see rlsbl.go_package_name)
         - variants: list of similar names that are taken (npm/pypi only)
-        - reason: why the name is taken/unavailable, or None if available/error.
+        - reason: why the name is not available, or None if available/error.
           Values: "registered", "stdlib", "moniker", "normalized", "ultranorm"
-          (set by _apply_ultranorm_check), or None.
+          (set by _apply_ultranorm_check), the go tokens "not-identifier",
+          "keyword", "blank", "uppercase", "underscore", "predeclared", or None.
         - error: error message if status is "error" (absent otherwise)
-        - note: informational note (go/github only, absent otherwise)
-        - github_count: number of GitHub repos (only when registry is "github")
+        - note: the sentence explaining a collision or a go verdict
+        - offline: True when the check contacted no network (go), so batch
+          callers skip the rate-limit delay between names
         - conflicts: full list of colliding package names (npm moniker collisions
           only; the machine-readable form of the enumerated ``note``)
         - conflict_rule: the normalization rule that makes the conflicts collide
@@ -557,32 +512,18 @@ def _check_single_name(name, registry, delay_ms=0):
                 result["variants"] = soft  # only soft similar names shown as informational
 
     elif registry == "go":
-        check_result = check_go_availability(name)
-        result["status"] = check_result["status"]
-        if check_result["status"] == "error":
-            result["error"] = check_result["message"]
-        elif check_result["status"] == "exists":
-            result["reason"] = "registered"
-        if check_result.get("note"):
-            result["note"] = check_result["note"]
-
-    elif registry == "github":
-        gh_result = check_github_availability(name)
-        result["status"] = gh_result["status"]
-        if gh_result["status"] == "error":
-            result["error"] = gh_result.get("message", "GitHub API error")
-        else:
-            result["github_count"] = gh_result.get("count", 0)
-            if gh_result.get("note"):
-                result["note"] = gh_result["note"]
+        # Offline: the Go package name against the language and the committed
+        # standard-library table. No registry is asked.
+        verdict = check_go_package_name(name)
+        result["status"] = verdict["status"]
+        result["reason"] = verdict["reason"]
+        result["offline"] = True
+        if verdict["note"]:
+            result["note"] = verdict["note"]
+        if verdict["conflicts"]:
+            _add_structured_conflicts(result, verdict["conflicts"], _RULE_TOKEN_GO_STDLIB)
 
     return result
-
-
-# Registries `check-name` can query that are NOT release targets. GitHub hosts
-# repositories, not packages, so no target owns it; every other entry in the
-# display table comes from the target registry.
-_NON_TARGET_REGISTRY_DISPLAY = {"github": "GitHub"}
 
 
 def _registry_display(registry):
@@ -592,16 +533,26 @@ def _registry_display(registry):
     target = TARGETS.get(registry)
     if target is not None:
         return target.registry_display_name
-    return _NON_TARGET_REGISTRY_DISPLAY.get(registry, registry)
+    return registry
+
+
+# The go verdicts' headline, keyed by status, and the explanation printed under
+# it, keyed by reason.
+_GO_STATUS_HEADLINES = {
+    "available": "is available as a Go package name.",
+    "taken": "is taken as a Go package name.",
+    "invalid": "is not a valid Go package name.",
+    "discouraged": "is a legal but discouraged Go package name.",
+}
 
 
 def _format_single_result(result):
     """Print the verbose output for a single name check result.
 
-    Returns an exit code: 0 = available, 1 = taken/collision, 2 = error.
+    Returns an exit code: 0 = available, 1 = taken/invalid/discouraged, 2 = error.
 
     When status is "error", prints the error message and returns 2 immediately,
-    skipping variant/GitHub output (same behavior as the old sys.exit(1) calls).
+    skipping variant output.
     """
     name = result["name"]
     registry = result["registry"]
@@ -646,33 +597,15 @@ def _format_single_result(result):
             print(f"  Note: {result['note']}")
 
     elif registry == "go":
-        print(f'Checking pkg.go.dev for "{name}"...')
-        if status == "error":
-            print(f"Error checking pkg.go.dev: {result['error']}", file=sys.stderr)
-            return 2
-        if status == "not_found":
-            print(f'"{name}" not found on pkg.go.dev.')
-        else:
-            print(f'"{name}" exists on pkg.go.dev.')
-        if reason in _REASON_EXPLANATIONS:
-            print(_REASON_EXPLANATIONS[reason])
+        print(f'Checking Go package name "{name}" (offline)...')
+        print(f'"{name}" {_GO_STATUS_HEADLINES[status]}')
         if result.get("note"):
             print(f"  Note: {result['note']}")
-
-    elif registry == "github":
-        print(f'Checking GitHub for "{name}"...')
-        if status == "error":
-            print(f"Error checking GitHub: {result['error']}", file=sys.stderr)
-            return 2
-        github_count = result.get("github_count", 0)
-        if github_count == 0:
-            print(f'No GitHub repos named "{name}".')
-        else:
-            print(f'{github_count} GitHub repo(s) named "{name}".')
-            print("  Note: GitHub names are org-scoped, not globally unique.")
+        print("\nChecked: Go package-name rules, Go standard library (offline)")
+        return _result_exit_code(result)
 
     # Variant warnings (npm/pypi only)
-    available = status in ("available", "not_found")
+    available = status == "available"
     variants = result.get("variants", [])
     if variants:
         print("\nSimilar names already taken:")
@@ -697,8 +630,7 @@ def _format_single_result(result):
         )
 
     # Steps-run summary. Registry display names come from the targets, not
-    # from a dict keyed by target name; GitHub is not a release target and is
-    # declared here as the one non-target registry check-name can query.
+    # from a dict keyed by target name.
     steps = [_registry_display(registry)]
     if registry == "pypi":
         # stdlib check always runs for PyPI (it's local)
@@ -707,16 +639,11 @@ def _format_single_result(result):
         steps.append("variants")
     if result.get("moniker_checked"):
         steps.append("moniker similarity")
-    if result.get("github_count") is not None and registry != "github":
-        steps.append("GitHub repos")
     if result.get("ultranorm_checked"):
         steps.append("ultranormalization")
     print(f"\nChecked: {', '.join(steps)}")
 
-    # Return exit code based on status
-    if status in ("taken", "exists"):
-        return 1
-    return 0
+    return _result_exit_code(result)
 
 
 def _format_table_row(result):
@@ -726,21 +653,33 @@ def _format_table_row(result):
     """
     name = result["name"]
     status = result["status"]
-    registry = result["registry"]
 
-    if status == "error":
-        display_status = "error"
-    elif registry == "go":
-        display_status = "not found" if status == "not_found" else "exists"
-    elif registry == "github":
-        count = result.get("github_count", 0)
-        display_status = f"{count} repos" if status == "exists" else "no repos"
-    elif result.get("ultranorm_conflicts"):
+    if status != "error" and result.get("ultranorm_conflicts"):
         display_status = "CONFLICT"
     else:
-        display_status = status  # "available" or "taken"
+        # available, taken, error, and for go invalid or discouraged
+        display_status = status
 
     return {"name": name, "status": display_status}
+
+
+def summary_line(rows):
+    """The batch summary under a table of ``_format_table_row`` rows.
+
+    Counts available, taken (CONFLICT included) and, only when present, the go
+    target's invalid and discouraged verdicts, then errors.
+    """
+    available = sum(1 for r in rows if r["status"] == "available")
+    taken = sum(1 for r in rows if r["status"] in ("taken", "CONFLICT"))
+    parts = [f"{available} available", f"{taken} taken"]
+    for label in ("invalid", "discouraged"):
+        count = sum(1 for r in rows if r["status"] == label)
+        if count:
+            parts.append(f"{count} {label}")
+    errors = sum(1 for r in rows if r["status"] == "error")
+    if errors:
+        parts.append(f"{errors} error(s)")
+    return f"Summary: {', '.join(parts)} ({len(rows)} total)"
 
 
 def _apply_ultranorm_check(result, registry, delay_ms):
@@ -789,14 +728,14 @@ def _apply_ultranorm_check(result, registry, delay_ms):
 def _result_exit_code(result):
     """Compute the exit code for a single check result without printing.
 
-    Mirrors the codes the human formatters return: 2 = error, 1 = taken/exists,
-    0 = available/not_found.
+    Mirrors the codes the human formatters return: 2 = error, 0 = available,
+    1 = anything else (taken, and for go invalid or discouraged).
     """
     if result["status"] == "error":
         return 2
-    if result["status"] in ("taken", "exists"):
-        return 1
-    return 0
+    if result["status"] == "available":
+        return 0
+    return 1
 
 
 def _result_to_json(result, exit_code):
@@ -805,7 +744,7 @@ def _result_to_json(result, exit_code):
     Carries the identity (name, target), status, reason, the unified
     ``structured_conflicts`` field (from the collision mechanisms), the
     human rule sentences for the tokens present, and the exit-relevant code.
-    Optional keys (note, error, github_count) appear only when set.
+    Optional keys (note, error) appear only when set.
     """
     structured = result.get("structured_conflicts", [])
     tokens = sorted({c["rule"] for c in structured})
@@ -822,8 +761,6 @@ def _result_to_json(result, exit_code):
         obj["note"] = result["note"]
     if result.get("error"):
         obj["error"] = result["error"]
-    if "github_count" in result:
-        obj["github_count"] = result["github_count"]
     return obj
 
 
@@ -846,7 +783,7 @@ def run_cmd(registry, args, flags):
             # `rlsbl check` is the project-check command and takes no package
             # names at all, so the usage line that named it sent every reader
             # of this refusal to a command that would refuse them again.
-            "Error: missing package name(s). Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go|github>",
+            "Error: missing package name(s). Usage: rlsbl check-name <name> [<name2> ...] --target <npm|pypi|go>",
             file=sys.stderr,
         )
         return 1, []
@@ -865,6 +802,7 @@ def run_cmd(registry, args, flags):
     rows = []
     payload = []
     max_exit = 0
+    offline = False
     for i, name in enumerate(names):
         result = _check_single_name(name, registry, delay_ms=delay_ms)
         _apply_ultranorm_check(result, registry, delay_ms)
@@ -872,7 +810,8 @@ def run_cmd(registry, args, flags):
         payload.append(_result_to_json(result, ec))
         rows.append(_format_table_row(result))
         max_exit = max(max_exit, ec)
-        if i < len(names) - 1:
+        offline = bool(result.get("offline"))
+        if i < len(names) - 1 and not offline:
             time.sleep(delay_ms / 1000)
 
     if not json_mode:
@@ -884,20 +823,13 @@ def run_cmd(registry, args, flags):
         for row in rows:
             print(f"{row['name']:<{name_width}}  {row['status']}")
 
-        # Summary line
-        available_count = sum(1 for r in rows if r["status"] in ("available", "not found"))
-        taken_count = sum(1 for r in rows if r["status"] in ("taken", "exists", "CONFLICT"))
-        error_count = sum(1 for r in rows if r["status"] == "error")
-        total = len(rows)
-        if error_count:
-            print(f"\nSummary: {available_count} available, {taken_count} taken, {error_count} error(s) ({total} total)")
-        else:
-            print(f"\nSummary: {available_count} available, {taken_count} taken ({total} total)")
+        print(f"\n{summary_line(rows)}")
 
-        # Batch context note
-        msg = f"Checked with {delay_ms}ms delay between names."
-        if delay_ms == 200:
-            msg += " Increase --delay if rate limited."
-        print(msg)
+        # Batch context note: the delay only applies to networked checks.
+        if not offline:
+            msg = f"Checked with {delay_ms}ms delay between names."
+            if delay_ms == 200:
+                msg += " Increase --delay if rate limited."
+            print(msg)
 
     return max_exit, payload
