@@ -229,3 +229,19 @@ class TestGithubTargetRemoved:
         assert not hasattr(check, "check_github_availability")
         assert not hasattr(check, "check_go_availability")
         assert not hasattr(check, "_NON_TARGET_REGISTRY_DISPLAY")
+
+
+class TestDiscouragedExitCodeIsDocumented:
+    """A discouraged Go name exits 1, like a taken one, and the help says so:
+    an agent reads --help before invoking and must not read exit 1 on a legal
+    name as a failure of the command itself."""
+
+    def test_a_discouraged_name_exits_one(self):
+        result = rlsbl.app.test(["check-name", "--target", "go", "My_Pkg"])
+        assert result.exit_code == 1, result.stdout
+
+    def test_the_help_states_the_exit_codes(self):
+        help_text = rlsbl.app._commands["check-name"].help
+        assert "Exits 0 when every name is available" in help_text
+        assert "a discouraged Go name exits 1 even though Go accepts it" in help_text
+        assert "2 when any check errored" in help_text
